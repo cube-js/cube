@@ -125,6 +125,11 @@ type CacheEntry = {
   result: any;
   renewalKey: string;
   requestId?: string;
+  // Identifies the query that produced this entry. The cache key omits things
+  // that change the resolved pre-aggregation tables (indexesSql, the matched
+  // time-dimension range), so `requestId` alone cannot tell "my own
+  // continue-wait retry" from "a different query in the same request flow".
+  queryHash?: string;
 };
 
 export interface QueryCacheOptions {
@@ -918,6 +923,7 @@ export class QueryCache {
           result: res,
           renewalKey,
           requestId: options.requestId,
+          queryHash: getCacheHash([query, values]) as string,
         };
         return this
           .cacheDriver
@@ -1020,8 +1026,24 @@ export class QueryCache {
 
       const isExpired = !renewalThreshold || !parsedResult.time || renewedAgo > renewalThreshold * 1000;
       const isKeyMismatch = renewalKey && parsedResult.renewalKey !== renewalKey;
+      // A continue-wait retry re-runs the *same* query, so the entry's query
+      // must match too. Entries written before `queryHash` existed carry none;
+      // accept those rather than force a revalidation storm on deploy.
+      //
+      // `query` here is post-`replacePreAggregationTableNames`, which is what
+      // makes this work — the resolved table names are the only thing telling
+      // the colliding queries apart. It also means a rebuilt pre-aggregation
+      // counts as a different query, on purpose: the new table version yields
+      // different SQL, so the retry falls through to the renewal branch below
+      // and blocks on fresh data rather than serving the pre-rebuild result.
+      const isSameQuery = () => !parsedResult.queryHash ||
+        parsedResult.queryHash === getCacheHash([query, values]);
+      // Hashing is deferred past the two `requestId` checks: without a
+      // requestId on either side the short-circuit cannot apply, and md5 over
+      // the full SQL and params would be paid on every cache hit for nothing.
       const isSameRequest = options.requestId && parsedResult.requestId &&
-        QueryCache.extractRequestUUID(parsedResult.requestId) === QueryCache.extractRequestUUID(options.requestId);
+        QueryCache.extractRequestUUID(parsedResult.requestId) === QueryCache.extractRequestUUID(options.requestId) &&
+        isSameQuery();
 
       // Continue-wait cycle: result was produced by our request,
       // refreshKey changed during execution — return cached, refresh in background.
