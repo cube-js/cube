@@ -33,9 +33,10 @@ export function getCacheHash(queryKey: QueryKey | CacheKey, processUid?: string)
 }
 
 /**
- * Extracts the UUID prefix from a request ID by stripping the `-span-N` suffix.
+ * Extracts the UUID prefix from a request ID by stripping the `-span-` suffix.
+ *
+ * Re-exported from `base-driver`, which emits the same id into the `trace_id`
+ * SQL comment: the two have to strip identically or that comment stops joining
+ * to the Query History export.
  */
-export function extractRequestUUID(requestId: string): string {
-  const idx = requestId.lastIndexOf('-span-');
-  return idx !== -1 ? requestId.substring(0, idx) : requestId;
-}
+export { toTraceId as extractRequestUUID } from '@cubejs-backend/base-driver';
