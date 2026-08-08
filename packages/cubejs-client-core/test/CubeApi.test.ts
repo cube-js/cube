@@ -532,6 +532,90 @@ describe('CubeApi cubeSql', () => {
     expect(res.data[0]).toEqual(['0']);
     expect(res.data[rowCount - 1]).toEqual([String(rowCount - 1)]);
   });
+
+  // Regression: `cubeSql` used to build its request params from a fixed whitelist,
+  // so a `timezone` option compiled (after a cast) but never reached the request body
+  // and the query silently ran in the deployment's default time zone.
+  test('should forward the timezone option to the request params', async () => {
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify({ error: cubeSqlResponseBodyNoRefreshTime })),
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    await cubeApi.cubeSql('SELECT status FROM users', { timezone: 'America/Los_Angeles' });
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[0]).toBe('cubesql');
+    expect(requestSpy.mock.calls[0]?.[1]?.timezone).toBe('America/Los_Angeles');
+  });
+
+  test('should omit timezone from the request params when not set', async () => {
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify({ error: cubeSqlResponseBodyNoRefreshTime })),
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    await cubeApi.cubeSql('SELECT status FROM users');
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]).not.toHaveProperty('timezone');
+  });
+
+  test('should forward the timezone option to the stream request params', async () => {
+    const requestStreamSpy = vi.spyOn(HttpTransport.prototype, 'requestStream').mockImplementation(() => ({
+      stream: async () => (async function* generate() {
+        yield new TextEncoder().encode(`${cubeSqlResponseBodyNoRefreshTime}\n`);
+      }()),
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const chunks: unknown[] = [];
+    for await (const chunk of cubeApi.cubeSqlStream('SELECT status FROM users', { timezone: 'America/Los_Angeles' })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(requestStreamSpy).toHaveBeenCalled();
+    expect(requestStreamSpy.mock.calls[0]?.[0]).toBe('cubesql');
+    expect(requestStreamSpy.mock.calls[0]?.[1]?.params?.timezone).toBe('America/Los_Angeles');
+  });
+
+  test('should omit timezone from the stream request params when not set', async () => {
+    const requestStreamSpy = vi.spyOn(HttpTransport.prototype, 'requestStream').mockImplementation(() => ({
+      stream: async () => (async function* generate() {
+        yield new TextEncoder().encode(`${cubeSqlResponseBodyNoRefreshTime}\n`);
+      }()),
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    for await (const chunk of cubeApi.cubeSqlStream('SELECT status FROM users')) {
+      // drain the stream
+    }
+
+    expect(requestStreamSpy).toHaveBeenCalled();
+    // `undefined` is dropped both by JSON.stringify (POST body) and by
+    // requestStream's query-string builder, so it never reaches the wire.
+    expect(requestStreamSpy.mock.calls[0]?.[1]?.params?.timezone).toBeUndefined();
+  });
 });
 
 describe('CubeApi with baseRequestId', () => {

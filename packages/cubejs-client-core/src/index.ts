@@ -126,6 +126,12 @@ export type CubeSqlOptions = LoadMethodOptions & {
    * Query timeout in milliseconds
    */
   timeout?: number;
+  /**
+   * IANA time zone name (e.g. `America/Los_Angeles`) to run the query in,
+   * same as `query.timezone` in the REST API's `/v1/load`. Passed through
+   * verbatim. When omitted, the deployment's default time zone is used.
+   */
+  timezone?: string;
 };
 
 export type CubeSqlSchemaColumn = {
@@ -787,6 +793,10 @@ class CubeApi {
           cubesqlParams.cache = options.cache;
         }
 
+        if (options?.timezone) {
+          cubesqlParams.timezone = options.timezone;
+        }
+
         const request = this.request('cubesql', cubesqlParams);
 
         return request;
@@ -878,7 +888,8 @@ class CubeApi {
       baseRequestId: uuidv4(),
       params: {
         query: sqlQuery,
-        cache: options?.cache
+        cache: options?.cache,
+        timezone: options?.timezone,
       }
     });
 
