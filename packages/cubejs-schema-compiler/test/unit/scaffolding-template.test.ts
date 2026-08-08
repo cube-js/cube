@@ -1,3 +1,4 @@
+import YAML from 'js-yaml';
 import {
   ScaffoldingTemplate,
   SchemaFormat,
@@ -557,6 +558,174 @@ describe('ScaffoldingTemplate', () => {
       expect(render(['a]'])).toContain('tags: ["a]"]');
       // Nothing structural: still unquoted.
       expect(render(['plain', 'ok'])).toContain('tags: [plain, ok]');
+    });
+
+    describe('quoting values that are structural in YAML', () => {
+      // Titles come from the warehouse — `title` is the titleized column name — so a
+      // column name decides whether the generated file parses. Assertions read the
+      // PARSED document rather than the rendered text: the defect is that the output
+      // parses as something other than the string that went in, which a text
+      // assertion cannot see.
+      const renderColumn = (columnName: string) => new ScaffoldingTemplate(
+        {
+          public: {
+            orders: [
+              { name: 'id', type: 'integer', attributes: ['primaryKey'] },
+              { name: columnName, type: 'character varying', attributes: [] },
+            ],
+          },
+        },
+        driver,
+        { format: SchemaFormat.Yaml, snakeCase: true }
+      ).generateFilesByTableNames(['public.orders'])[0].content;
+
+      // The non-`id` dimension, read back from the parsed document.
+      const dimensionOf = (columnName: string) => {
+        const parsed: any = YAML.load(renderColumn(columnName));
+
+        return parsed.cubes[0].dimensions.find((d: any) => d.name !== 'id');
+      };
+
+      it.each([
+        // A colon-space makes the scalar a mapping; in a block context it fails to parse.
+        ['revenue: usd', 'Revenue: Usd'],
+        // A space-hash starts a comment and truncates the rest of the line.
+        ['price # net', 'Price # Net'],
+        // An indicator character only bites in first position.
+        ['*starred', '*starred'],
+        ['- leading dash', '- Leading Dash'],
+        // Everything structural at once.
+        ['weird: name # with [everything]', 'Weird: Name # with [everything]'],
+      ])(
+        'keeps the title a string for a column named %p',
+        (columnName, title) => {
+          expect(dimensionOf(columnName).title).toBe(title);
+        }
+      );
+
+      it.each([
+        // A type-shaped member name resolves to null or a number rather than to a
+        // string, leaving the cube with a dimension that has no usable name.
+        ['null'],
+        ['0x1f'],
+        ['123'],
+        ['0b101'],
+      ])('keeps the member name a string for a column named %p', (columnName) => {
+        expect(dimensionOf(columnName).name).toBe(columnName);
+      });
+
+      it('keeps a date-shaped title a string rather than a Date', () => {
+        // The member name loses the dashes to snake_case, but the title keeps them and
+        // would otherwise resolve to a Date.
+        expect(dimensionOf('2026-08-06').title).toBe('2026-08-06');
+      });
+
+      it.each([
+        // Only a `#` after whitespace starts a comment, and a colon binds as a mapping
+        // only before whitespace or end-of-scalar, so these need no quotes. Quoting
+        // them would be noise.
+        ['order#status', 'Order#status'],
+        ['a:b', 'A:b'],
+      ])('leaves %p unquoted, needing no escape', (columnName, title) => {
+        expect(renderColumn(columnName)).toContain(`title: ${title}`);
+      });
+
+      it('leaves a name YAML 1.2 reads as a string unquoted', () => {
+        // `yes`/`on`/`off` are booleans only under YAML 1.1. Assert the parse too: the
+        // rendered text reads the same under a 1.1 loader that returns `true`.
+        expect(renderColumn('yes')).toContain('name: yes');
+        expect(dimensionOf('yes').name).toBe('yes');
+      });
+
+      it.each([
+        // `memberName()` strips the structural characters but not the type-shaped ones,
+        // so a drill reference renders through the same predicate as the name it points
+        // at — otherwise `name: "2024"` is a string and `drill_members: [2024]` a number,
+        // and the drill dead-ends at click time.
+        ['2024'],
+        ['null'],
+        ['true'],
+        ['0x1f'],
+        ['1e5'],
+        // The underscores a snake_cased date leaves behind are digit separators in YAML.
+        ['2026-08-06'],
+      ])('keeps every drill member denoting a dimension for a column named %p', (columnName) => {
+        const parsed: any = YAML.load(renderColumn(columnName));
+        const [cube] = parsed.cubes;
+        const names = cube.dimensions.map((d: any) => d.name);
+
+        // Order differs — dimensions sort the primary key first — so compare as sets.
+        // Tag each with its type: a bare `2024` and a quoted `"2024"` are the same
+        // string once sorted, and telling them apart is the whole point here.
+        const typed = (list: any[]) => list
+          .map((v) => `${typeof v}:${String(v)}`)
+          .sort();
+
+        expect(typed(cube.measures[0].drill_members)).toEqual(typed(names));
+      });
+
+      it.each([
+        // A double-quoted scalar may span lines, but YAML folds the break to a space and
+        // an unindented continuation fails the document — so the break has to be escaped,
+        // not merely quoted. A lone CR is a line break to YAML too, and the remaining C0
+        // controls make the loader reject the file outright.
+        ['line1\nline2', 'Line1\nline2'],
+        ['a\rb', 'A\rb'],
+        ['tab\there', 'Tab\there'],
+        ['bell\x07here', 'Bell\x07here'],
+        ['esc\x1bhere', 'Esc\x1bhere'],
+      ])('round-trips a control character in a column named %p', (columnName, title) => {
+        expect(dimensionOf(columnName).title).toBe(title);
+      });
+
+      it.each([
+        // A C1 control or an unpaired surrogate is non-printable to the loader, which
+        // rejects the whole stream rather than the one value.
+        ['\x80'],
+        ['\x9f'],
+        ['\ud800'],
+        ['\udc00'],
+        ['\ufffe'],
+        ['\uffff'],
+      ])('emits a file that parses around the non-printable %j', (char) => {
+        expect(() => YAML.load(renderColumn(`pri${char}ce`))).not.toThrow();
+      });
+
+      it.each([
+        // A cube name comes from the table name the way a member name comes from a
+        // column, and it is interpolated rather than rendered — so it needs the same
+        // predicate, or a join naming `"2024"` misses the cube calling itself `2024`.
+        ['2024'],
+        ['null'],
+        ['true'],
+      ])('keeps the cube name a string for a table named %p', (tableName) => {
+        const [{ content }] = new ScaffoldingTemplate(
+          {
+            public: {
+              [tableName]: [
+                { name: 'id', type: 'integer', attributes: ['primaryKey'] },
+              ],
+            },
+          },
+          driver,
+          { format: SchemaFormat.Yaml, snakeCase: true }
+        ).generateFilesByTableNames([`public.${tableName}`]);
+
+        expect((YAML.load(content) as any).cubes[0].name).toBe(tableName);
+      });
+
+      it('emits a file that parses whatever the column name is', () => {
+        for (const columnName of [
+          'revenue: usd',
+          'price # net',
+          'null',
+          '*starred',
+          'c:\\path',
+          'weird: name # with [everything]',
+        ]) {
+          expect(() => YAML.load(renderColumn(columnName))).not.toThrow();
+        }
+      });
     });
 
     it('uses the camelCase key and member names when snakeCase is off', () => {
