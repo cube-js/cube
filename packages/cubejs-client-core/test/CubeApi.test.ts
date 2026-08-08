@@ -612,7 +612,9 @@ describe('CubeApi cubeSql', () => {
     }
 
     expect(requestStreamSpy).toHaveBeenCalled();
-    expect(requestStreamSpy.mock.calls[0]?.[1]?.params).not.toHaveProperty('timezone');
+    // `undefined` is dropped both by JSON.stringify (POST body) and by
+    // requestStream's query-string builder, so it never reaches the wire.
+    expect(requestStreamSpy.mock.calls[0]?.[1]?.params?.timezone).toBeUndefined();
   });
 });
 

@@ -138,6 +138,32 @@ sqlQuery | string | The SQL query to run |
 options? | [CubeSqlOptions](#cubesqloptions) | - |
 callback? | [LoadMethodCallback](#loadmethodcallback)‹[CubeSqlResult](#cubesqlresult)› | - |
 
+### `cubeSqlStream`
+
+>  **cubeSqlStream**(**sqlQuery**: string, **options?**: [CubeSqlOptions](#cubesqloptions)): *AsyncGenerator‹CubeSqlStreamChunk›*
+
+Same as [`cubeSql`](#cubesql), but yields the results as they stream in. Each
+chunk is either `{ type: 'schema', schema, lastRefreshTime? }`,
+`{ type: 'data', data }` (one row), or `{ type: 'error', error }`.
+
+```js
+for await (const chunk of cubeApi.cubeSqlStream(
+  'SELECT status, MEASURE(count) FROM orders GROUP BY 1',
+  { timezone: 'America/Los_Angeles' }
+)) {
+  if (chunk.type === 'data') {
+    console.log(chunk.data);
+  }
+}
+```
+
+**Parameters:**
+
+Name | Type | Description |
+------ | ------ | ------ |
+sqlQuery | string | The SQL query to run |
+options? | [CubeSqlOptions](#cubesqloptions) | - |
+
 ### `dryRun`
 
 > **dryRun**(**query**: [Query](#query-2) | [Query](#query-2)[], **options?**: [LoadMethodOptions](#loadmethodoptions)): *Promise‹[TDryRunResponse](#tdryrunresponse)›*
@@ -884,7 +910,7 @@ signal? | AbortSignal | AbortSignal to cancel requests |
 ### `CubeSqlOptions`
 
 Extends [`LoadMethodOptions`](#loadmethodoptions) with the options accepted by
-[`cubeSql`](#cubesql).
+[`cubeSql`](#cubesql) and [`cubeSqlStream`](#cubesqlstream).
 
 Name | Type | Optional? | Description |
 ------ | ------ | ------ | --- |
@@ -895,7 +921,7 @@ Name | Type | Optional? | Description |
 
 Name | Type |
 ------ | ------ |
-schema | `{ name: string, column_type: string }[]` |
+schema | `{ name: string, column_type: string, format?: string }[]` |
 data | `(string \| number \| boolean \| null)[][]` |
 lastRefreshTime? | string |
 

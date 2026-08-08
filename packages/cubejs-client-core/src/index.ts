@@ -889,7 +889,7 @@ class CubeApi {
       params: {
         query: sqlQuery,
         cache: options?.cache,
-        ...(options?.timezone ? { timezone: options.timezone } : {}),
+        timezone: options?.timezone,
       }
     });
 
