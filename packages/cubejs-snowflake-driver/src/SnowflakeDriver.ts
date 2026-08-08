@@ -19,6 +19,8 @@ import {
   DriverCapabilities,
   DriverInterface,
   GenericDataBaseType,
+  resolveSqlPreamble,
+  splitSqlPreamble,
   StreamOptions,
   StreamTableDataWithTypes,
   TableStructure,
@@ -175,6 +177,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
        * Whether this driver is used for pre-aggregations.
        */
       preAggregations?: boolean,
+      preAggregationsSqlPreamble?: boolean,
 
       /**
        * Max pool size value for the [cube]<-->[db] pool.
@@ -186,16 +189,27 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
        * request before determining it as not valid. Default - 10000 ms.
        */
       testConnectionTimeout?: number,
+
+      /**
+       * SQL executed once on the session before any query.
+       */
+      sqlPreamble?: string,
     } = {}
   ) {
-    super({
-      testConnectionTimeout: config.testConnectionTimeout,
-    });
-
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
     const preAggregations = config.preAggregations || false;
+    // Pre-aggregation builds resolve the preamble from the pre-aggregation
+    // namespace even when their credentials do not, since the preamble is not a
+    // connection target. Falls back to `preAggregations` for a driver
+    // constructed directly rather than through the server's driver factory.
+    const preAggregationsSqlPreamble = config.preAggregationsSqlPreamble ?? preAggregations;
+
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+      sqlPreamble: resolveSqlPreamble(config, getEnv('dbSqlPreamble', { dataSource, preAggregations: preAggregationsSqlPreamble })),
+    });
 
     let privateKey = getEnv('snowflakePrivateKey', { dataSource, preAggregations });
 
@@ -251,6 +265,15 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       application: 'CubeDev_Cube',
       ...config
     };
+  }
+
+  /**
+   * This driver applies `sql_preamble`.
+   *
+   * Applied once on the long-lived session.
+   */
+  public override supportsSqlPreamble(): boolean {
+    return true;
   }
 
   /**
@@ -492,6 +515,19 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         [],
         false,
       );
+
+      // Snowflake keeps one long-lived connection per driver instance, so the
+      // preamble runs once here and every later query inherits its session
+      // state. It runs after the ALTER SESSION so a user preamble can override
+      // those defaults deliberately.
+      const preamble = this.sqlPreamble();
+
+      if (preamble) {
+        for (const statement of splitSqlPreamble(preamble)) {
+          await this.execute(connection, statement, [], false);
+        }
+      }
+
       return connection;
     } catch (e) {
       this.connection = null;

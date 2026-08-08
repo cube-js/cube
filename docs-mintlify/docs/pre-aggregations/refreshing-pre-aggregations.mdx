@@ -82,6 +82,21 @@ the dedicated connection always uses the same driver as the data source it belon
 
 <Info>
 
+[`CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE`](/reference/configuration/environment-variables#cubejs_db_sql_preamble)
+is the one variable that does inherit: when it is unset, builds run the regular
+[`CUBEJS_DB_SQL_PREAMBLE`](/reference/configuration/environment-variables#cubejs_db_sql_preamble).
+A preamble usually defines a function the data model's SQL calls, and a build that
+silently ran without it would fail on the missing function rather than fall back to
+anything sensible. Set it to an empty value to run builds with no preamble.
+
+It also configures session setup rather than a connection target, so — like the
+variables below — setting it alone does not switch pre-aggregations onto a dedicated
+connection.
+
+</Info>
+
+<Info>
+
 [`CUBEJS_PRE_AGGREGATIONS_SCHEMA`](/reference/configuration/environment-variables#cubejs_pre_aggregations_schema),
 [`CUBEJS_PRE_AGGREGATIONS_BUILDER`](/reference/configuration/environment-variables#cubejs_pre_aggregations_builder),
 [`CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME`](/reference/configuration/environment-variables#cubejs_pre_aggregations_backoff_max_time),
