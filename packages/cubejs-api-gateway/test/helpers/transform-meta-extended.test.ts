@@ -193,6 +193,24 @@ describe('transformMetaExtended helpers', () => {
     expect(extendedCube.extends).toBe('\'ExtendedCube\'');
   });
 
+  test('transformCube - includes sql_table when defined', () => {
+    const mockCubeWithSqlTable = {
+      ...MOCK_USERS_CUBE,
+      sql_table: 'public.users',
+      name: 'MockUsersCube',
+    };
+    const handledCube = transformCube(mockCubeWithSqlTable, { MockUsersCube: mockCubeWithSqlTable });
+    expect(handledCube).toBeDefined();
+    expect(handledCube).toHaveProperty('sql_table');
+    expect(handledCube.sql_table).toBe('public.users');
+  });
+
+  test('transformCube - sql_table is undefined when not defined', () => {
+    const handledCube = transformCube(MOCK_USERS_CUBE, { MockUsersCube: MOCK_USERS_CUBE });
+    expect(handledCube).toBeDefined();
+    expect(handledCube.sql_table).toBeUndefined();
+  });
+  
   test('transformDimension', () => {
     const handledDimension = transformDimension(MOCK_USERS_CUBE.dimensions.id, MOCK_USERS_CUBE);
     expect(handledDimension).toBeDefined();
