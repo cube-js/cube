@@ -138,7 +138,7 @@ Four states show up in the mapping sidebar:
 |---|---|
 | **Mapped automatically** | The control's own dimension is on the chart's semantic view, so it's wired up without configuration. |
 | **Manually mapped** | You (or an AI agent) picked a specific dimension for this chart. **Reset** restores the automatic mapping. |
-| **Suggested match** | The control's dimension isn't on the chart's semantic view, but a different dimension there has the same name and type. The suggestion is offered, not applied — select it (or use **Accept all**) and save to map the control. |
+| **Suggested match** | The control's dimension isn't on the chart's semantic view, but a different dimension there has the same name and type. Names match ignoring case, and only when exactly one dimension matches — two that differ only in case are ambiguous, so neither is suggested. The suggestion is offered, not applied — select it (or use **Accept all**) and save to map the control. |
 | **Can't map automatically** | The control targets a dimension that doesn't exist on the chart's semantic view, and no same-name, same-type match was found. The chart is unaffected by the control until you map it manually. |
 
 Two semantic views can share a dimension name and mean different things by it, so a suggested match reaches a chart only once the mapping is saved.
