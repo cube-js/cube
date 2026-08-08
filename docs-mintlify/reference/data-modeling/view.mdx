@@ -369,7 +369,8 @@ Operators use the same labels data consumers see in the workbook filter bar —
 what you see in the filter bar is what you type: `is`, `is not`, `after date`,
 `after or on date`, `before date`, `before or on date`, `between`, `contains`,
 `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`,
-`is null`, `is not null`.
+`is null`, `is not null`, `is empty`, `is not empty`. The last two are for
+string members only, and test for an empty string rather than a missing value.
 
 Operators are case-insensitive and whitespace-tolerant. Internal type names and
 REST API aliases (e.g. `equals`, `gte`, `inDateRange`) are also accepted.
