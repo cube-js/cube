@@ -91,6 +91,12 @@ button next to the branch switcher. It copies the current URL with
 `?branch=<branch-name>` appended; opening that link switches the recipient to
 the same branch.
 
+On the **Changes** tab, the diff is always shown against an explicit base branch,
+defaulting to the branch's fork point (with the deploy branch offered as an
+alternative when it isn't already the fork point). The selected base is carried
+in the link via `?base=<branch-name>`, so a review link is shareable and shows
+the same comparison to whoever opens it.
+
 ## Generating data model files
 
 You can generate data model files when [creating a new

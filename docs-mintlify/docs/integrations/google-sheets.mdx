@@ -127,6 +127,16 @@ their header, both when the report is inserted and after **Refresh**.
 You can also manage saved reports in the **[Saved Reports][ref-saved-reports]** page
 in Cube Cloud.
 
+## Number formatting
+
+A measure's [`format`][ref-measure-format] from the data model — including `abbr`
+(compact notation, e.g. `1.2M`) — is applied as a native spreadsheet number format,
+so the cell keeps its numeric value and stays usable in `SUM`, pivots, and charts.
+
+To pin every measure column in a report to a fixed magnitude regardless of the data
+model's format, open the sidebar's **Display** tab and set **Scale** to **Model
+default**, **Absolute**, **Thousands (K)**, **Millions (M)**, or **Billions (B)**.
+The setting is session-local to the current report.
 
 [link-google-sheets]: https://workspace.google.com/products/sheets/
 [link-marketplace-listing]: https://workspace.google.com/u/0/marketplace/app/cube_cloud_for_sheets/641460343379
@@ -135,3 +145,4 @@ in Cube Cloud.
 [ref-pre-aggs]: /docs/pre-aggregations/using-pre-aggregations
 [ref-sql-api-enabled]: /reference/core-data-apis/sql-api#cube-cloud
 [ref-saved-reports]: /docs/workspace/saved-reports
+[ref-measure-format]: /reference/data-modeling/measures#format
