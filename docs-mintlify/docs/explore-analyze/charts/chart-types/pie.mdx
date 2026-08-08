@@ -15,15 +15,34 @@ Standard filled circle. Each slice's arc length is proportional to its value.
 
 ### Donut
 
-A pie with a hollow center. Increase the **Inner radius** value in the Style tab to any non-zero value to switch to a donut. The hollow center can be used to surface a summary value via a [KPI](/docs/explore-analyze/charts/chart-types/kpi) tile on a dashboard, or simply to reduce visual density.
+A pie with a hollow center. Set **Shape** to **Donut** in the Style tab; the inner radius is fixed, with no separate size control. The hollow center can be used to surface a summary value via a [KPI](/docs/explore-analyze/charts/chart-types/kpi) tile on a dashboard, or simply to reduce visual density.
 
-{/* Screenshot: donut chart — same data as the pie variant, with inner radius applied. Place directly below this heading, half-width centered or side-by-side with pie. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+{/* Screenshot: donut chart — same data as the pie variant, with Shape set to Donut. Place directly below this heading, half-width centered or side-by-side with pie. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
-## Inner radius
+## Rings
 
-Drag the **Inner radius** slider in the Style tab or enter a pixel value. Setting it to `0` returns to a full pie.
+Query more than one dimension and the chart splits into concentric rings, one per dimension, each nested by category within the ring above it. Reorder rings by dragging a row in the **Rings** section of the Fields tab; the top row is the innermost ring.
 
-{/* Screenshot: Style tab with the Inner radius control highlighted. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Note>
+
+A measure that isn't additive across categories — an average or a distinct count, for example — doesn't sum correctly once split across rings, so only the outer ring's value is exact. The chart shows an inline warning when this applies.
+
+</Note>
+
+## Data labels
+
+Configure labels from the **Data labels** section of the Style tab:
+
+- **Content** — independently toggle **Category**, **Value**, and **Percent**; any combination is allowed. **Value** and **Percent** each carry their own number format, set from the format button next to their toggle.
+- **Position** — **Inside** the slice or **Outside** it.
+- **Ring scope** — on a chart with [rings](#rings), show labels on the **outer ring** only or on **all rings**. Inner rings only ever show **Category**, since **Value** and **Percent** would need per-ring aggregation.
+- **Font size** — in pixels.
+
+{/* Screenshot: Style tab's Data labels section with Category/Value/Percent toggles and format buttons. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Tooltip fields
+
+By default, the hover tooltip lists every queried field. Narrow it to specific fields, or turn it off, from the **Tooltips** control in the Fields tab.
 
 ## Color and slice ordering
 
