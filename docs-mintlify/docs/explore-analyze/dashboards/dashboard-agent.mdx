@@ -104,6 +104,20 @@ How it works and what to expect:
 This works the same way on both published dashboards and
 [embedded][ref-embedding] dashboards.
 
+## Copying a dashboard to make an edit
+
+If you ask the agent for a change that would require editing the dashboard
+itself — adding or removing a widget, changing the layout — it never applies
+that change to the dashboard you're viewing. If you can create workbooks
+yourself (the [Explorer role][ref-roles] or above) but don't have edit access
+to *this* dashboard, the agent instead duplicates it into a new workbook you
+own, applies your requested change to that copy, and shows a **Copy created**
+card with an **Open copy in builder** button to take you there. The original
+dashboard is never touched, and only you see the copy.
+
+If you don't have permission to create workbooks (the Viewer role), the agent
+tells you it can't make the change instead of creating a copy.
+
 ## Attachments
 
 You can attach uploaded files to the conversation, and the agent can read their
@@ -137,8 +151,10 @@ it never changes the **saved** dashboard.
 
 - Save its filter or time-granularity changes to the dashboard — they apply to
   your session only and never change what other viewers see
-- Edit the dashboard, or add/remove widgets
-- Create reports or workbooks
+- Edit the dashboard, or add/remove widgets — if you can create workbooks
+  yourself, it offers an editable copy instead; see
+  [Copying a dashboard to make an edit](#copying-a-dashboard-to-make-an-edit)
+- Create reports or workbooks from scratch
 - Change the data model
 
 If you need any of those, use the [Workbook Agent][ref-workbook-agent] instead.
@@ -152,8 +168,11 @@ If you need any of those, use the [Workbook Agent][ref-workbook-agent] instead.
   it to change something with no control on the dashboard, it explains the
   current state instead of applying a change.
 - **No authoring on published dashboards.** The published Dashboard Agent
-  cannot create reports or build dashboards, edit the saved dashboard, or change
-  the data model. Those live in the [Workbook Agent][ref-workbook-agent].
+  never edits the saved dashboard, or changes the data model. Those live in the
+  [Workbook Agent][ref-workbook-agent]. If your edit request needs dashboard
+  authoring and you can create workbooks, the agent offers an editable copy
+  instead — see
+  [Copying a dashboard to make an edit](#copying-a-dashboard-to-make-an-edit).
 - **Report search covers published reports only.** When the agent searches for
   existing reports, it sees published reports.
 
@@ -163,3 +182,4 @@ If you need any of those, use the [Workbook Agent][ref-workbook-agent] instead.
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
 [ref-control-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
 [ref-embedding]: /embedding/iframe/dashboards
+[ref-roles]: /admin/users-and-permissions/roles-and-permissions
