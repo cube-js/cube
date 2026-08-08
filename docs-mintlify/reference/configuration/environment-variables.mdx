@@ -1046,8 +1046,8 @@ MySQL, DuckDB and JDBC-based (including Databricks) drivers.
 
 Any other driver ignores this variable, so setting it there changes nothing about
 how queries run — while still moving the pre-aggregation cache key and rebuilding
-every pre-aggregation on that data source. Cube logs a warning at startup when it
-detects this.
+every pre-aggregation on that data source. Cube logs a warning the first time it
+connects to the data source when it detects this.
 
 </Warning>
 

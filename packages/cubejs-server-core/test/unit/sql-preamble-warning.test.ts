@@ -18,7 +18,11 @@ class ServerCoreOpen extends CubejsServerCore {
   public readonly warnings: { message: string, props: any }[] = [];
 
   public constructor() {
-    super({ dbType: 'postgres', apiSecret: 'secret' } as any);
+    // No `dbType` — it was removed in v1.7.0 and now throws. The warning reads the
+    // driver and the environment, so the data source needs no configuring here.
+    // The refresh timer is off: a live scheduler outlives the suite and crashes the
+    // worker on the way out.
+    super({ apiSecret: 'secret', scheduledRefreshTimer: false } as any);
     this.logger = ((message: string, props: any) => {
       this.warnings.push({ message, props });
     }) as any;
@@ -45,9 +49,10 @@ describe('the unapplied SQL preamble warning', () => {
     delete process.env.CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     delete process.env.CUBEJS_DB_SQL_PREAMBLE;
     delete process.env.CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE;
+    await core.shutdown();
   });
 
   test('warns when a preamble is set on a driver that does not apply it', () => {
