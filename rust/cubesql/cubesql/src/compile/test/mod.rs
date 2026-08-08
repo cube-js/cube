@@ -2,7 +2,7 @@ use super::{convert_sql_to_cube_query, CompilationResult, QueryPlan};
 use crate::{
     compile::{
         engine::df::{scan::MemberField, wrapper::SqlQuery},
-        DatabaseProtocol, StatusFlags,
+        DatabaseProtocol, DatabaseVariable, StatusFlags,
     },
     config::{ConfigObj, ConfigObjImpl},
     sql::{
@@ -20,7 +20,10 @@ use crate::{
 };
 use async_trait::async_trait;
 use cubeclient::models::V1CubeMetaType;
-use datafusion::{arrow::datatypes::SchemaRef, dataframe::DataFrame as DFDataFrame};
+use datafusion::{
+    arrow::datatypes::SchemaRef, dataframe::DataFrame as DFDataFrame, scalar::ScalarValue,
+    variable::VarType,
+};
 use std::future::Future;
 use std::{collections::HashMap, env, ops::Deref, sync::Arc};
 use uuid::Uuid;
@@ -42,6 +45,8 @@ pub mod test_df_execution;
 pub mod test_filters;
 #[cfg(test)]
 pub mod test_introspection;
+#[cfg(test)]
+pub mod test_post_processing;
 #[cfg(test)]
 pub mod test_udfs;
 #[cfg(test)]
@@ -1166,6 +1171,17 @@ impl TestContext {
     pub async fn convert_sql_to_cube_query(&self, query: &str) -> CompilationResult<QueryPlan> {
         // TODO push to_string() deeper
         convert_sql_to_cube_query(&query.to_string(), self.meta.clone(), self.session.clone()).await
+    }
+
+    /// Sets a boolean session variable, the way the native bridge does it for a single request.
+    pub fn set_session_flag(&self, name: &str, value: bool) {
+        self.session.state.set_variables(vec![DatabaseVariable {
+            name: name.to_string(),
+            value: ScalarValue::Boolean(Some(value)),
+            var_type: VarType::UserDefined,
+            readonly: false,
+            additional_params: None,
+        }]);
     }
 
     pub async fn execute_query_with_flags(
