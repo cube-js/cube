@@ -20,7 +20,7 @@ export class FileRepository implements SchemaFileRepository {
   }
 
   public localPath(): string {
-    return path.join(process.cwd(), this.repositoryPath);
+    return path.resolve(process.cwd(), this.repositoryPath);
   }
 
   protected async getFiles(dir: string, fileList: string[] = []): Promise<string[]> {
