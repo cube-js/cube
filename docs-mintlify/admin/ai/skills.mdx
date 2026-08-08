@@ -97,6 +97,9 @@ its complete instructions on demand.
   instruction body stays server-side and is never sent to the browser.
 - Skills are surfaced through a viewer-accessible deployment endpoint, so they work for
   any configured agent as well as the default `auto` agent.
+- Skills are also available when the agent is used through the [MCP server](/docs/integrations/mcp-server),
+  not just the in-app chat surface. Skills remain unavailable to viewers chatting on a
+  published or embedded dashboard, where the agent is limited to read-only Q&A.
 - Because the agent matches against `description`, a well-written description makes
   automatic matching more reliable.
 

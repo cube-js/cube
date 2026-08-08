@@ -255,7 +255,7 @@ programmatically. Creating and editing workbooks requires the Explorer role or h
 | --- | --- | --- |
 | `readWorkbook` | Reads a workbook — its name and its current dashboard draft and published configs. | Read-only |
 | `createWorkbook` | Creates a new empty workbook, the container that holds reports and a dashboard. | Write |
-| `createReport` | Saves a query plus its visualization as a report inside a workbook, and returns the `reportId` a chart widget references. | Write |
+| `createReport` | Saves a query plus its visualization as a report, and returns the `reportId` a chart widget references. `workbookId` is optional: pass it to add the report as a tab of that workbook (referenceable by a CHART widget there); omit it (optionally passing `folderId`) to save a standalone exploration reachable from the workspace browser and the [Google Sheets][ref-google-sheets] / [Excel][ref-excel] add-in's saved reports list instead. | Write |
 | `updateDashboard` | Saves the dashboard layout to the workbook **draft**. Replaces the full widget set and does not go live. | Destructive — prompts |
 | `publishDashboard` | Publishes the current draft to make it live. Idempotent — republishing an unchanged draft is a no-op. | Destructive — prompts |
 
@@ -362,3 +362,5 @@ publish it.
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-dashboards]: /docs/explore-analyze/dashboards
 [ref-dev-mode]: /docs/data-modeling/dev-mode
+[ref-google-sheets]: /docs/integrations/google-sheets
+[ref-excel]: /docs/integrations/microsoft-excel

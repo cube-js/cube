@@ -135,6 +135,16 @@ their header, both when the report is inserted and after **Refresh**.
 You can also manage saved reports in the **[Saved Reports][ref-saved-reports]** page
 in Cube Cloud.
 
+## Number formatting
+
+A measure's [`format`][ref-measure-format] from the data model — including `abbr`
+(compact notation, e.g. `1.2M`) — is applied as a native spreadsheet number format,
+so the cell keeps its numeric value and stays usable in `SUM`, pivots, and charts.
+
+To pin every measure column in a report to a fixed magnitude regardless of the data
+model's format, open the sidebar's **Display** tab and set **Scale** to **Model
+default**, **Absolute**, **Thousands (K)**, **Millions (M)**, or **Billions (B)**.
+The setting is session-local to the current report.
 
 [ref-excel]: /admin/connect-to-data/visualization-tools/excel
 [link-pivottable]: https://support.microsoft.com/en-us/office/create-a-pivottable-to-analyze-worksheet-data-a9a84538-bfe9-40a9-a8e9-f99134456576
@@ -145,3 +155,4 @@ in Cube Cloud.
 [link-excel-addins]: https://support.microsoft.com/en-us/office/add-or-remove-add-ins-in-excel-0af570c4-5cf3-4fa9-9b88-403625a0b460
 [link-ms-appsource]: https://appsource.microsoft.com/en-us/product/office/WA200008486
 [ref-saved-reports]: /docs/workspace/saved-reports
+[ref-measure-format]: /reference/data-modeling/measures#format
