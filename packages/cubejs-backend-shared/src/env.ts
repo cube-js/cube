@@ -338,6 +338,14 @@ const variables: Record<string, (...args: any) => any> = {
   nestedFoldersDelimiter: () => get('CUBEJS_NESTED_FOLDERS_DELIMITER')
     .default('')
     .asString(),
+  // Measures that declare no drill members get a default set computed at
+  // compilation time. Declared drill members always take precedence.
+  autoDrillMembers: () => get('CUBEJS_AUTO_DRILL_MEMBERS')
+    .default('false')
+    .asBoolStrict(),
+  autoDrillMembersLimit: () => get('CUBEJS_AUTO_DRILL_MEMBERS_LIMIT')
+    .default('10')
+    .asInt(),
   defaultTimezone: () => get('CUBEJS_DEFAULT_TIMEZONE')
     .default('UTC')
     .asString(),
