@@ -2109,7 +2109,7 @@ describe('SQL Generation', () => {
       const queryString = queryAndParams[0];
       expect(queryString).toContain('1 = 1 "order__proxied"');
       expect(queryString).toContain('(select * from order where 1 = 1)  AS "order"');
-      expect(queryString).toContain('WHERE (1 = 1 = ?)');
+      expect(queryString).toContain('WHERE ((1 = 1) = ?)');
     });
 
     it('correctly substitute filter params in cube\'s query measure used in filter', async () => {

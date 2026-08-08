@@ -10,7 +10,7 @@ impl FilterOperationSql for ToDateRollingWindowOp {
             .granularity
             .apply_to_input_sql(ctx.plan_templates, from)?;
 
-        let date_field = ctx.convert_tz(ctx.member_sql)?;
+        let date_field = ctx.convert_tz(ctx.member_sql())?;
         ctx.plan_templates.time_range_filter(date_field, from, to)
     }
 }
