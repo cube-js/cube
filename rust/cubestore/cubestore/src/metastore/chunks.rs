@@ -53,6 +53,13 @@ impl Chunk {
         self.partition_id
     }
 
+    pub fn unset_min_max(&self) -> Self {
+        let mut to_update = self.clone();
+        to_update.min = None;
+        to_update.max = None;
+        to_update
+    }
+
     pub fn set_partition_id(&self, partition_id: u64) -> Self {
         let mut to_update = self.clone();
         to_update.partition_id = partition_id;
