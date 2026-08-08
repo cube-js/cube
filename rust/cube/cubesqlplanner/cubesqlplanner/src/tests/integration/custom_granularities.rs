@@ -168,6 +168,100 @@ async fn test_type_time_alias_wraps_compound_exprs_before_tz_cast() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_fiscal_year_by_origin_does_not_truncate_to_calendar_year() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: fiscal_year_by_1st_april
+            dateRange:
+              - \"2024-04-01\"
+              - \"2026-03-31\"
+        order:
+          - id: orders.created_at
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+
+    // `1 year` is a trivial interval, so the grain used to fall onto the DATE_TRUNC branch,
+    // which has no way to express an April 1 origin.
+    assert!(
+        !sql.to_lowercase().contains("date_trunc('year'"),
+        "off-boundary origin was truncated to the calendar year\nFull SQL:\n{sql}"
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_calendar_year_by_origin_still_truncates() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: calendar_year_by_origin
+            dateRange:
+              - \"2024-01-01\"
+              - \"2025-12-31\"
+        order:
+          - id: orders.created_at
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+
+    // An origin that already sits on the year boundary keeps the cheaper DATE_TRUNC rendering.
+    assert!(
+        sql.to_lowercase().contains("date_trunc('year'"),
+        "on-boundary origin should still truncate\nFull SQL:\n{sql}"
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_fiscal_year_by_origin_with_time_shift_measure() {
+    let ctx = create_context();
+
+    // The shape from the original report: a time-shift measure alongside the plain one, both
+    // grouped by a fiscal-year grain. The shifted leaf must bin on the same origin as the
+    // unshifted one, or the two sides join on incompatible buckets.
+    let query = indoc! {"
+        measures:
+          - orders.total_amount
+          - orders.total_amount_prior_year
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: fiscal_year_by_1st_april
+            dateRange:
+              - \"2024-04-01\"
+              - \"2026-03-31\"
+        order:
+          - id: orders.created_at
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+
+    assert!(
+        !sql.to_lowercase().contains("date_trunc('year'"),
+        "time-shifted leaf truncated to the calendar year\nFull SQL:\n{sql}"
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_custom_granularity_with_daterange_filter() {
     let ctx = create_context();
 

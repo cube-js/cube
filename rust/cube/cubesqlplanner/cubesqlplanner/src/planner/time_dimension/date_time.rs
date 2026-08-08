@@ -54,6 +54,42 @@ impl QueryDateTime {
         )
     }
 
+    /// Whether this instant sits exactly on the start of the given predefined granularity —
+    /// i.e. whether `DATE_TRUNC(granularity, self)` would leave it unchanged.
+    ///
+    /// Judged on the local wall clock, so a midnight that a DST gap pushed forward to 01:00 still
+    /// counts as the start of its day.
+    pub fn is_start_of(&self, granularity: &str) -> Result<bool, CubeError> {
+        let dt = self.naive_local();
+        // Midnight can be absent from the local calendar when a DST gap swallows it; the day then
+        // starts at whatever instant the gap resolves to, and that is still its start.
+        let midnight = dt.date().and_hms_opt(0, 0, 0).ok_or_else(|| {
+            CubeError::internal(format!("Failed to build midnight for {}", dt.date()))
+        })?;
+        let start_of_day =
+            Self::from_local_date_time(self.date_time.timezone(), midnight)?.naive_local();
+        let starts_the_day = dt.time() == start_of_day.time() && dt.date() == start_of_day.date();
+        let zero_time = starts_the_day && dt.nanosecond() == 0;
+
+        let res = match granularity {
+            "year" => zero_time && dt.month() == 1 && dt.day() == 1,
+            "quarter" => zero_time && dt.day() == 1 && (dt.month() - 1).is_multiple_of(3),
+            "month" => zero_time && dt.day() == 1,
+            "week" => zero_time && dt.weekday() == Weekday::Mon,
+            "day" => zero_time,
+            "hour" => dt.minute() == 0 && dt.second() == 0 && dt.nanosecond() == 0,
+            "minute" => dt.second() == 0 && dt.nanosecond() == 0,
+            "second" => dt.nanosecond() == 0,
+            other => {
+                return Err(CubeError::internal(format!(
+                    "Unexpected granularity '{other}' in date alignment check"
+                )))
+            }
+        };
+
+        Ok(res)
+    }
+
     pub fn date_time(&self) -> DateTime<Tz> {
         self.date_time
     }
@@ -204,6 +240,29 @@ impl QueryDateTime {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn is_start_of_accepts_a_midnight_swallowed_by_a_dst_gap() {
+        // Paraguay springs forward at midnight, so 2023-10-01T00:00 does not exist locally and
+        // resolves to 01:00. It is still the first instant of that day, month and quarter.
+        let tz = "America/Asuncion".parse::<Tz>().unwrap();
+        let d = QueryDateTime::from_date_str(tz, "2023-10-01").unwrap();
+
+        assert_eq!(d.default_format(), "2023-10-01T01:00:00.000");
+        assert!(d.is_start_of("day").unwrap());
+        assert!(d.is_start_of("month").unwrap());
+        assert!(d.is_start_of("quarter").unwrap());
+        assert!(!d.is_start_of("year").unwrap());
+    }
+
+    #[test]
+    fn is_start_of_still_rejects_a_real_time_component() {
+        let tz = "America/Asuncion".parse::<Tz>().unwrap();
+        // 2023-10-02 has an ordinary midnight, so 01:00 on it is genuinely mid-day.
+        let d = QueryDateTime::from_date_str(tz, "2023-10-02T01:00:00").unwrap();
+        assert!(!d.is_start_of("day").unwrap());
+        assert!(d.is_start_of("hour").unwrap());
+    }
 
     #[test]
     fn test_parse_date_time() {
