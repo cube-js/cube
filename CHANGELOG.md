@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.18](https://github.com/cube-js/cube/compare/v1.7.17...v1.7.18) (2026-08-09)
+
+### Features
+
+- **client-core:** support timezone option in cubeSql() and cubeSqlStream() ([#11507](https://github.com/cube-js/cube/issues/11507)) ([843f56d](https://github.com/cube-js/cube/commit/843f56d8c242c5e2f893b4d6b95b66e83e7d569c))
+
 ## [1.7.17](https://github.com/cube-js/cube/compare/v1.7.16...v1.7.17) (2026-08-07)
 
 ### Bug Fixes
