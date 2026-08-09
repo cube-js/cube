@@ -131,6 +131,30 @@ cubes:
             type: string
             sql: "NULLIF(category, 'books')"
 
+          # Reads a member and a raw cube column in one expression: the member
+          # half can resolve against a CTE column, the raw half never can.
+          - name: status_and_category
+            type: string
+            sql: "UPPER({CUBE.status}) || {CUBE}.category"
+
+          # Clean sql, with the raw cube column confined to the mask. Reading the
+          # cube refs unfiltered would treat it as a raw read of the dimension.
+          - name: status_upper_masked_by_column
+            type: string
+            sql: "UPPER({CUBE.status})"
+            mask:
+                sql: "{CUBE}.category"
+
+          # Multi-stage time dimension carrying a mask: the mask is not rendered
+          # unless the member is masked, so the dimension it names must not be
+          # required of the CTE.
+          - name: created_at_masked_multi_stage
+            type: time
+            sql: "{CUBE.created_at}"
+            multi_stage: true
+            mask:
+                sql: "{CUBE.category}"
+
           - name: customer_name
             type: string
             sql: "{customers.name}"
@@ -370,6 +394,87 @@ cubes:
                 - interval: "1 month"
                   type: prior
                   timeDimension: orders.created_at
+
+          # Reads a plain dimension of its own cube alongside an aggregated
+          # dependency, without declaring it. At month grain the raw
+          # `created_at` value is no column of the CTE this measure is computed
+          # from, and the only rendering left would be the cube alias, which
+          # that CTE's FROM does not contain — the planner rejects it.
+          - name: amount_first_half_of_month
+            type: sum
+            sql: "CASE WHEN EXTRACT(DAY FROM {CUBE.created_at}) <= 15 THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+
+          # The same read, with the grain the sql needs declared.
+          - name: amount_first_half_of_month_with_grain
+            type: sum
+            sql: "CASE WHEN EXTRACT(DAY FROM {CUBE.created_at}) <= 15 THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+            grain:
+                include:
+                    - orders.created_at
+
+          # Undeclared read one stage further out: the dimension is read by a
+          # measure whose aggregated dependency is itself multi-stage.
+          - name: amount_prev_month_first_half
+            type: sum
+            sql: "CASE WHEN EXTRACT(DAY FROM {CUBE.created_at}) <= 15 THEN {CUBE.amount_prev_month} ELSE 0 END"
+            multi_stage: true
+
+          # Undeclared read of a non-time dimension.
+          - name: completed_amount_multi_stage
+            type: sum
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+
+          # Reads the very dimension its own `reduce_by` drops from the stage
+          # grain. The dimension still reaches the CTE from the keys side the
+          # JOIN-model builds on the parent grain, so this one plans.
+          - name: amount_reduce_status_reading_status
+            type: sum
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+            reduce_by:
+                - orders.status
+
+          # Reads a dimension built out of another one. It is no column of the
+          # CTE itself, but renders from the column its own sql reads.
+          - name: amount_by_category_label
+            type: sum
+            sql: "CASE WHEN {CUBE.category_label} = 'Literature' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+
+          # `drill_filters` are held on the symbol and never rendered, so the
+          # dimension this one names puts no column requirement on the CTE.
+          - name: amount_with_drill_filters
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            drill_filters:
+                - sql: "{CUBE.category} = 'books'"
+
+          # A mask is rendered only for members the security context masks, so
+          # the dimension it reads puts no column requirement on the CTE either.
+          - name: amount_with_masked_dimension_read
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            mask:
+                sql: "CASE WHEN {CUBE.category} = 'books' THEN 0 ELSE 1 END"
+
+          # The read resolves through a member, but the same expression also
+          # reaches a raw cube column that no CTE column can stand in for.
+          - name: amount_by_status_and_category
+            type: sum
+            sql: "CASE WHEN {CUBE.status_and_category} = 'X' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+
+          # The dimension read here is clean; only its unrendered mask names a
+          # raw cube column.
+          - name: amount_by_status_upper_masked
+            type: sum
+            sql: "CASE WHEN {CUBE.status_upper_masked_by_column} = 'X' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
 
           - name: amount_mom_diff
             type: number
