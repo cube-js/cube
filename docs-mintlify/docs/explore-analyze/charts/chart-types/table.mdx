@@ -84,16 +84,16 @@ Under a column pivot, a width set on a measure applies to every column generated
 
 </Note>
 
-## Showing columns as links, bars, or sparklines
+## Showing columns as links, bars, sparklines, or images
 
-By default, a column displays its value. It can also be drawn as an inline link, an inline bar, or a sparkline — from the column's card in the **Columns** section of the **Style** tab.
+By default, a column displays its value. It can also be drawn as an inline link, an inline bar, a sparkline, or an image — from the column's card in the **Columns** section of the **Style** tab.
 
-Each card has a **Value** toggle and, next to it, a group of icon buttons for **inline bars**, **sparkline**, and **link**:
+Each card has a **Value** toggle and, next to it, a group of icon buttons for **inline bars**, **sparkline**, **link**, and **image**:
 
 - **Value** shows the formatted value in the cell. It **composes** with a bar or a sparkline rather than excluding it — a cell can show a bar and its value together.
-- The three icon buttons are mutually exclusive: picking one replaces whichever was active. Clicking the active one again clears it, returning the column to a plain value.
+- The icon buttons are mutually exclusive: picking one replaces whichever was active. Clicking the active one again clears it, returning the column to a plain value.
 - With none of them active, **Value** is forced on and its toggle disabled — so a plain column always shows its value.
-- Each button is offered only where it applies: bars and sparklines on **numeric** columns, and **link** only on a column whose dimension declares links or uses `format: link` (see [Inline links](#inline-links)). In link mode the value *is* the link text, so **Value** stays forced on there too.
+- Each button is offered only where it applies: bars and sparklines on **numeric** columns, **link** only on a column whose dimension declares links or uses `format: link` (see [Inline links](#inline-links)), and **image** on any **string** column (see [Images](#images)). In link mode the value *is* the link text, so **Value** stays forced on there too; image mode draws the thumbnail instead of the value, so **Value** is off.
 
 {/* TODO: screenshot — a column card showing the Value toggle beside the inline bars / sparkline / link buttons */}
 
@@ -171,6 +171,41 @@ Internally, sparklines are powered by additional queries grouped by time dimensi
 </Note>
 
 {/* TODO screenshot: table with a sparkline column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Images
+
+A column whose values are image URLs can render them as inline thumbnails.
+
+A dimension declared with
+[`format: imageUrl`](/reference/data-modeling/dimensions#format) renders as thumbnails
+straight away, with no chart configuration — the data model is enough. For any other
+string column, select the **image** button on the column's card to switch it on.
+
+| Option | Description |
+|---|---|
+| **Image height** | Thumbnail height in pixels, up to 96. Sits beside the column's width control. The row grows to fit it and doesn't shift as images load. |
+| **Image shape** | **Square**, **Rounded**, or **Circle**. |
+| **Image fit** | **Fit whole image** shows the whole image inside the box; **Fill and crop** fills the box, cropping the overflow. |
+
+Cells that can't render an image degrade rather than break: an empty value, a total or
+subtotal row, and a URL whose scheme isn't `https` or `data:image/*` all render as plain
+text, with no request issued. A permitted URL that fails to load leaves a neutral
+placeholder of the same size, so the row never reflows.
+
+Copying a cell copies the URL, not the image — the same value that lands in an export.
+
+A thumbnail is clickable only where the dimension also declares
+[`links`](/docs/data-modeling/dimensions#links); the `imageUrl` format makes a value an
+image source, not a destination.
+
+<Info>
+
+Images are fetched directly by the viewer's browser, so they must be publicly reachable
+over `https` — Cube does not proxy or cache them.
+
+</Info>
+
+{/* TODO screenshot: table with an image column and the Style tab's image controls */}
 
 ## Cell menu
 
