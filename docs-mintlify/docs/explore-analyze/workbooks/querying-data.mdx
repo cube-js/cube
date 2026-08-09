@@ -221,6 +221,13 @@ period always aligns exactly with the current buckets. A measure can have
 several comparisons active at once, such as month over month and year over
 year side by side.
 
+The menu is also available when the query has no time dimension in its
+results, as long as exactly one time dimension is used as a filter with a
+start and end date. Cube reads the comparison period from that filter's own
+date range instead of from a grouped column — a query filtered to `Q1 2026`
+offers **Previous period** as `Q4 2025`, for example — so a report with no
+time column can still compare against the preceding window.
+
 Each comparison adds derived columns next to the measure. Choose which ones
 to show under **Comparison columns** in the same menu:
 
@@ -268,7 +275,7 @@ Two indicators next to each result describe the data behind it.
 
 ## Editing Semantic SQL by hand
 
-You can edit the Semantic SQL directly in the editor to refine a query — for example, to add a `WHERE` clause, change `GROUP BY` order, or apply a different sort. After making changes, click **Save and Run** to apply them to the query and refresh the results, or **Discard** to revert.
+You can edit the Semantic SQL directly in the editor to refine a query — for example, to add a `WHERE` clause, change `GROUP BY` order, or apply a different sort. After making changes, click **Save and Run** to apply them to the query and refresh the results, or **Discard** to revert. **Save and Run** also reformats the SQL for readability.
 
 <Frame>
   <img src="https://static.cube.dev/docs/explore-analyze/workbooks/edit-semantic-sql-v2.png" />

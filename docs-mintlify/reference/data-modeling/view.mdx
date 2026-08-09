@@ -380,6 +380,14 @@ value's grain, not a range — `is yesterday` matches yesterday only (e.g.
 `is this month` matches the current month. For a rolling window, use `between`
 with two bounds.
 
+A date or time member also accepts `in the month`, `in the quarter`, `in the
+year`, and their negations `not in the month`, `not in the quarter`, `not in
+the year`. These take a single fixed date (e.g. `"2026-03-01"`) and match
+every row whose value falls in that date's calendar month, quarter, or year —
+`DATE_TRUNC('quarter', created_at) = DATE_TRUNC('quarter', DATE '2026-03-01')`.
+Unlike `is this month`, the reference date is fixed rather than resolved
+against the current date on every run.
+
 ##### Relative date values
 
 A `between` filter always takes an explicit two-element `[start, end]` pair.
