@@ -15,6 +15,8 @@ fn create_context() -> TestContext {
     TestContext::new(schema).unwrap()
 }
 
+const SEED: &str = "integration_multi_stage_tables.sql";
+
 fn month_query(measure: &str) -> String {
     format!(
         indoc! {r#"
@@ -89,9 +91,8 @@ async fn test_undeclared_string_dimension_read_is_reported() {
 async fn test_declared_grain_plans_and_reads_the_cte_column() {
     let ctx = create_context();
 
-    let sql = ctx
-        .build_sql(&month_query("amount_first_half_of_month_with_grain"))
-        .unwrap();
+    let query = month_query("amount_first_half_of_month_with_grain");
+    let sql = ctx.build_sql(&query).unwrap();
 
     // The trailing quote is what keeps this from matching `orders__created_at_month`.
     assert!(
@@ -104,6 +105,10 @@ async fn test_declared_grain_plans_and_reads_the_cte_column() {
         "The measure must not read the dimension off the cube alias:\n{}",
         sql
     );
+
+    if let Some(result) = ctx.try_execute_pg(&query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 /// The declared grain widens the leaf only — the query still reports months.
@@ -132,6 +137,11 @@ async fn test_declared_grain_keeps_the_query_grain() {
 
 /// A dimension the stage's own `reduce_by` drops is still reachable from the
 /// keys side, so reading it must not be reported.
+///
+/// The values are the whole month against the `completed` row rather than the
+/// `completed` total: `reduce_by` collapses the measure to a grain without
+/// `status`, and the CASE then reads the status of the broadcast row. That is
+/// what this shape means, not a defect in the reachability check.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_dimension_reachable_from_the_keys_side_is_not_reported() {
     let ctx = create_context();
@@ -158,6 +168,10 @@ async fn test_dimension_reachable_from_the_keys_side_is_not_reported() {
         "Expected the measure to read the dimension off the keys side:\n{}",
         sql
     );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 /// A `grain.include` on the measure below widens *that* measure's leaf, not the
@@ -204,6 +218,10 @@ async fn test_dimension_in_the_query_grain_is_not_reported() {
         "Expected the measure to read the dimension off the stage grain:\n{}",
         sql
     );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 /// A dimension built out of another one is no column of the CTE itself, but
@@ -237,6 +255,10 @@ async fn test_dimension_derived_from_a_grain_dimension_is_not_reported() {
         "Expected the derived dimension to render from the grain column:\n{}",
         sql
     );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 /// The read resolves through a member, but the same expression also reaches a
@@ -285,6 +307,13 @@ async fn test_dimension_read_only_by_drill_filters_is_not_reported() {
         "The drill filter must not put a cube-qualified column into the CTE:\n{}",
         sql
     );
+
+    if let Some(result) = ctx
+        .try_execute_pg(&month_query("amount_with_drill_filters"), SEED)
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
 }
 
 /// A mask is rendered only for members the security context masks, so a
@@ -338,6 +367,10 @@ async fn test_raw_column_read_only_by_a_mask_is_not_reported() {
         "The inactive mask must not put a cube-qualified column into the CTE:\n{}",
         sql
     );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 /// The exclusion is conditional on the mask not being applied. Once the query
