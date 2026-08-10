@@ -380,6 +380,10 @@ The segment's own `sql` prefixes its columns with the cube, which is not in
 scope inside the `sql` that builds that cube, so the pushed-down predicate is
 restated in `filter()` — the same way a dimension's column is.
 
+A function may be passed instead of a string, as long as it takes no arguments:
+a segment carries no filter values to pass to it. A function that does take
+arguments renders as `1 = 1`.
+
 <Info>
 
 Naming a segment is only supported by the default SQL planner. With

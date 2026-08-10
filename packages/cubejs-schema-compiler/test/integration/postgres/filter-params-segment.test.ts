@@ -53,6 +53,21 @@ describe('FILTER_PARAMS referencing a segment', () => {
         start_load: { sql: \`\${CUBE}.evid = 115 AND \${CUBE}.action_group = 'load'\` },
       },
     });
+
+    cube('callback_events', {
+      sql: \`${events} WHERE \${FILTER_PARAMS.callback_events.start_load.filter(() => "evid = 115")}
+        AND \${FILTER_PARAMS.callback_events.needs_value.filter((v) => 'evid = ' + v)}\`,
+      measures: {
+        count: { type: 'count' },
+      },
+      dimensions: {
+        id: { sql: 'id', type: 'number', primaryKey: true },
+      },
+      segments: {
+        start_load: { sql: \`\${CUBE}.evid = 115\` },
+        needs_value: { sql: \`\${CUBE}.evid = 115\` },
+      },
+    });
   `);
 
   // The cube's `sql` is a subquery aliased as the cube, so everything before
@@ -116,6 +131,33 @@ describe('FILTER_PARAMS referencing a segment', () => {
       });
 
       expect(baseSql(sql, 'grouped_events')).toMatch(/evid = 115 AND action_group = 'load'/);
+    });
+
+    it('renders a callback column that takes no filter values', async () => {
+      const sql = await buildSql({
+        measures: ['callback_events.count'],
+        segments: ['callback_events.start_load'],
+      });
+
+      // Nothing else in this cube's sql states the predicate, so it can only
+      // have come from the callback the binding compiled.
+      expect(baseSql(sql, 'callback_events')).toMatch(/WHERE \(evid = 115\)/);
+    });
+
+    // A segment supplies no values, so a column that takes one cannot render.
+    // Dropping only its restatement is narrower than binding a value the
+    // segment never gave — the segment still filters the query on its own.
+    it('leaves a value-taking callback column always-true', async () => {
+      const sql = await buildSql({
+        measures: ['callback_events.count'],
+        segments: ['callback_events.needs_value'],
+      });
+
+      // The parentheses are what the filter renderer adds around a binding it
+      // reached, so they tell an activated-then-dropped column apart from the
+      // bare `1 = 1` of a binding whose segment was never selected.
+      expect(baseSql(sql, 'callback_events')).toMatch(/AND \(1\s*=\s*1\)/);
+      expect(baseSql(sql, 'callback_events')).not.toMatch(/undefined|\{fpv:/);
     });
 
     // The predicate now applies both inside the cube's sql and in the outer

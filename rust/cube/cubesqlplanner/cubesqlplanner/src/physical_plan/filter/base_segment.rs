@@ -19,16 +19,7 @@ impl ToSql for BaseSegment {
         templates: &PlanSqlTemplates,
         filters_ctx: &FiltersContext,
     ) -> Result<String, CubeError> {
-        // A segment can be named by more than one binding of the same group —
-        // its own path and the path a view re-exports it under both resolve
-        // here. The map is unordered, so the name is what picks between them.
-        if let Some(item) = filters_ctx
-            .filter_params_columns
-            .iter()
-            .filter(|(name, _)| self.matches_member_name(name))
-            .min_by_key(|(name, _)| *name)
-            .map(|(_, item)| item)
-        {
+        if let Some(item) = self.matching_filter_params_column(filters_ctx) {
             return self.filter_params_column_sql(
                 item,
                 visitor,
@@ -50,9 +41,28 @@ impl ToSql for BaseSegment {
 }
 
 impl BaseSegment {
+    // The binding named by the path the query asked for is the one the model
+    // meant. A view re-exporting a segment leaves only the underlying cube's
+    // path to match, which takes a scan; the name breaks the tie when a group
+    // binds both paths, since the map is unordered.
+    fn matching_filter_params_column<'a>(
+        &self,
+        filters_ctx: &'a FiltersContext,
+    ) -> Option<&'a SqlCallFilterParamsItem> {
+        if let Some(item) = filters_ctx.filter_params_columns.get(&self.full_name()) {
+            return Some(item);
+        }
+        filters_ctx
+            .filter_params_columns
+            .iter()
+            .filter(|(name, _)| self.matches_member_name(name))
+            .min_by_key(|(name, _)| *name)
+            .map(|(_, item)| item)
+    }
+
     // A segment restricts the rows without comparing anything to a filter value,
     // so its `FILTER_PARAMS` column is the whole predicate rather than the left
-    // side of one, and no value is passed to a callback column.
+    // side of one.
     fn filter_params_column_sql(
         &self,
         item: &SqlCallFilterParamsItem,
@@ -63,14 +73,7 @@ impl BaseSegment {
     ) -> Result<String, CubeError> {
         match &item.column {
             FilterParamsColumn::String(column_sql) => Ok(column_sql.clone()),
-            FilterParamsColumn::Compiled(compiled) => {
-                if compiled.value_params_count > 0 {
-                    return Err(CubeError::user(format!(
-                        "FILTER_PARAMS column for segment `{}` takes {} filter value(s), but a \
-                         segment carries none — declare the callback without parameters",
-                        item.filter_symbol_name, compiled.value_params_count
-                    )));
-                }
+            FilterParamsColumn::Compiled(compiled) if compiled.value_params_count == 0 => {
                 let Some(call) = &item.compiled_call else {
                     return Err(CubeError::internal(format!(
                         "Compiled filter params column for `{}` has no call",
@@ -79,7 +82,14 @@ impl BaseSegment {
                 };
                 call.eval(visitor, node_processor, query_tools, templates)
             }
-            FilterParamsColumn::Callback(callback) => callback.call(&Vec::new()),
+            // A column that takes filter values cannot render for a segment,
+            // which supplies none — a rest parameter consumes as many as the
+            // query happens to give, and a parameter list that could not be read
+            // is assumed to take some. Only the restatement inside this SQL is
+            // dropped; the segment still reaches the query on its own.
+            FilterParamsColumn::Compiled(_) | FilterParamsColumn::Callback(_) => {
+                templates.always_true()
+            }
         }
     }
 }
