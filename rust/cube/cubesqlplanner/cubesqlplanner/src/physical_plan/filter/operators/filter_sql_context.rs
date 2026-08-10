@@ -53,16 +53,16 @@ impl<'a> FilterSqlContext<'a> {
     // different predicate on the rest. Parentheses pin the whole expression as
     // one operand; an atomic expression needs none and keeps its shape.
     fn as_operand(member_sql: &str) -> String {
+        // An expression ending in a line comment swallows whatever the template
+        // appends on that line, so it needs the wrapping — and a line of its own
+        // for the closing parenthesis — however atomic it otherwise is.
+        if ends_in_line_comment(member_sql) {
+            return format!("({}\n)", member_sql);
+        }
         if !is_top_level_compound(member_sql) {
             return member_sql.to_string();
         }
-        // An expression ending in a line comment would swallow the closing
-        // parenthesis, so that one gets a line of its own.
-        if ends_in_line_comment(member_sql) {
-            format!("({}\n)", member_sql)
-        } else {
-            format!("({})", member_sql)
-        }
+        format!("({})", member_sql)
     }
 
     pub fn allocate_param(&self, value: &str) -> String {

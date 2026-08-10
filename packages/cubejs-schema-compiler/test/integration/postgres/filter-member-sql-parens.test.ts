@@ -23,7 +23,11 @@ import { dbRunner } from './PostgresDBRunner';
 //   1: true  2: false  3: false  4: false  5: NULL  6: false
 // and `big_or_flag` = `amount > 50 OR flag` to
 //   1: true  2: true  3: true  4: false  5: true  6: NULL
-describe('Filter member SQL parenthesization', () => {
+
+// The fix lives in the Tesseract planner; the legacy planner is out of scope.
+const tesseract = getEnv('nativeSqlPlanner');
+
+(tesseract ? describe : describe.skip)('Filter member SQL parenthesization', () => {
   jest.setTimeout(200000);
 
   const compilers = prepareYamlCompiler(`
@@ -79,6 +83,11 @@ cubes:
 
       - name: amount_plus_commented
         sql: "amount + 1 -- one more"
+        type: number
+
+      # Atomic, but still swallows whatever a template appends on that line.
+      - name: amount_commented
+        sql: "amount -- as is"
         type: number
 
       - name: shifted_at
@@ -143,7 +152,6 @@ cubes:
 
   describe('WHERE — dimension whose SQL is a top-level AND/OR', () => {
     it('equals', async () => {
-      if (!getEnv('nativeSqlPlanner')) return;
       await expectRows(
         byId([{ member: 'orders.big_and_flag', operator: 'equals', values: ['false'] }]),
         idRows(2, 3, 4, 6)
@@ -151,7 +159,6 @@ cubes:
     });
 
     it('notEquals', async () => {
-      if (!getEnv('nativeSqlPlanner')) return;
       await expectRows(
         byId([{ member: 'orders.big_and_flag', operator: 'notEquals', values: ['true'] }]),
         idRows(2, 3, 4, 5, 6)
@@ -159,7 +166,6 @@ cubes:
     });
 
     it('equals with several values (IN list)', async () => {
-      if (!getEnv('nativeSqlPlanner')) return;
       await expectRows(
         byId([{ member: 'orders.big_and_flag', operator: 'equals', values: ['true', 'false'] }]),
         idRows(1, 2, 3, 4, 6)
@@ -167,7 +173,6 @@ cubes:
     });
 
     it('notEquals with several values (NOT IN list)', async () => {
-      if (!getEnv('nativeSqlPlanner')) return;
       await expectRows(
         byId([{ member: 'orders.big_or_flag', operator: 'notEquals', values: ['true', 'false'] }]),
         idRows(6)
@@ -175,7 +180,6 @@ cubes:
     });
 
     it('set', async () => {
-      if (!getEnv('nativeSqlPlanner')) return;
       await expectRows(
         byId([{ member: 'orders.big_and_flag', operator: 'set' }]),
         idRows(1, 2, 3, 4, 6)
@@ -183,7 +187,6 @@ cubes:
     });
 
     it('notSet', async () => {
-      if (!getEnv('nativeSqlPlanner')) return;
       await expectRows(
         byId([{ member: 'orders.big_or_flag', operator: 'notSet' }]),
         idRows(6)
@@ -195,7 +198,6 @@ cubes:
     // Unparenthesized this renders `amount > 50 = CAST($1 AS BOOLEAN)`, which
     // Postgres rejects outright ("syntax error at or near =").
     it('equals', async () => {
-      if (!getEnv('nativeSqlPlanner')) return;
       await expectRows(
         byId([{ member: 'orders.big', operator: 'equals', values: ['false'] }]),
         idRows(2, 4, 6)
@@ -203,7 +205,6 @@ cubes:
     });
 
     it('notEquals', async () => {
-      if (!getEnv('nativeSqlPlanner')) return;
       await expectRows(
         byId([{ member: 'orders.big', operator: 'notEquals', values: ['true'] }]),
         idRows(2, 4, 6)
@@ -220,7 +221,6 @@ cubes:
     });
 
     it('equals on a top-level AND measure', async () => {
-      if (!getEnv('nativeSqlPlanner')) return;
       await expectRows(
         byGrp([{ member: 'orders.busy', operator: 'equals', values: ['false'] }]),
         [
@@ -232,7 +232,6 @@ cubes:
     });
 
     it('equals on a top-level comparison measure', async () => {
-      if (!getEnv('nativeSqlPlanner')) return;
       await expectRows(
         byGrp([{ member: 'orders.total_over_150', operator: 'equals', values: ['true'] }]),
         [{ orders__grp: 'g2', orders__total: '210' }]
@@ -243,7 +242,6 @@ cubes:
     // syntax error on Trino/Athena. Postgres happens to parse it the intended
     // way, so only the emitted shape can be asserted here.
     it('equals on a top-level IS NOT NULL measure', async () => {
-      if (!getEnv('nativeSqlPlanner')) return;
       const sql = await expectRows(
         byGrp([{ member: 'orders.total_is_set', operator: 'equals', values: ['true'] }]),
         [
@@ -302,28 +300,36 @@ cubes:
     ];
 
     it.each(cases)('%s', async (_name, filter, expected) => {
-      if (!getEnv('nativeSqlPlanner')) return;
       const [sql] = await buildSql(byId([filter]));
       expect(sql).toContain(expected);
     });
   });
 
-  // A member SQL ending in a line comment would comment out the closing
-  // parenthesis, so it gets a line of its own.
-  it('wraps a member whose SQL ends in a line comment', async () => {
-    if (!getEnv('nativeSqlPlanner')) return;
-    const sql = await expectRows(
-      byId([{ member: 'orders.amount_plus_commented', operator: 'gt', values: ['50'] }]),
-      idRows(1, 3, 5)
-    );
-    expect(sql).toContain('(amount + 1 -- one more\n) > $1');
+  // A member SQL ending in a line comment swallows whatever the template
+  // appends on that line, so the closing parenthesis gets a line of its own —
+  // and an atomic expression needs the wrapping for that reason alone.
+  describe('member SQL ending in a line comment', () => {
+    it('compound expression', async () => {
+      const sql = await expectRows(
+        byId([{ member: 'orders.amount_plus_commented', operator: 'gt', values: ['50'] }]),
+        idRows(1, 3, 5)
+      );
+      expect(sql).toContain('(amount + 1 -- one more\n) > $1');
+    });
+
+    it('atomic expression', async () => {
+      const sql = await expectRows(
+        byId([{ member: 'orders.amount_commented', operator: 'gt', values: ['50'] }]),
+        idRows(1, 3, 5)
+      );
+      expect(sql).toContain('(amount -- as is\n) > $1');
+    });
   });
 
   // The wrapping must stay off atomic members, or every filter in every model
   // would change shape.
   describe('atomic members stay unwrapped', () => {
     it('plain column dimension', async () => {
-      if (!getEnv('nativeSqlPlanner')) return;
       const [sql] = await buildSql(byId([
         { member: 'orders.amount', operator: 'equals', values: ['100'] },
       ]));
@@ -332,7 +338,6 @@ cubes:
     });
 
     it('aggregate measure', async () => {
-      if (!getEnv('nativeSqlPlanner')) return;
       const [sql] = await buildSql({
         measures: ['orders.total'],
         dimensions: ['orders.grp'],
