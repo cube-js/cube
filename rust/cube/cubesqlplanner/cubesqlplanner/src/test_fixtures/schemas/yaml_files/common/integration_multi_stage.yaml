@@ -473,8 +473,21 @@ cubes:
           # raw cube column.
           - name: amount_by_status_upper_masked
             type: sum
-            sql: "CASE WHEN {CUBE.status_upper_masked_by_column} = 'X' THEN {CUBE.total_amount} ELSE 0 END"
+            sql: "CASE WHEN {CUBE.status_upper_masked_by_column} = 'COMPLETED' THEN {CUBE.total_amount} ELSE 0 END"
             multi_stage: true
+
+          # Masked, with the dimension the mask reads declared. Pins that an
+          # applied mask is rendered inside the multi-stage CTE and therefore
+          # reads its dimension as a column of it.
+          - name: amount_masked_by_category_in_grain
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            grain:
+                include:
+                    - orders.category
+            mask:
+                sql: "CASE WHEN {CUBE.category} = 'books' THEN -1 ELSE 0 END"
 
           # Declares a grain its own leaf is computed at.
           - name: amount_with_status_in_leaf_grain

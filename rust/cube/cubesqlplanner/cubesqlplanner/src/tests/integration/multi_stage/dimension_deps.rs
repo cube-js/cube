@@ -159,6 +159,7 @@ async fn test_dimension_reachable_from_the_keys_side_is_not_reported() {
               - "2024-03-31"
         order:
           - id: orders.status
+          - id: orders.created_at
     "#};
 
     let sql = ctx.build_sql(query).unwrap();
@@ -209,6 +210,7 @@ async fn test_dimension_in_the_query_grain_is_not_reported() {
               - "2024-03-31"
         order:
           - id: orders.status
+          - id: orders.created_at
     "#};
 
     let sql = ctx.build_sql(query).unwrap();
@@ -244,6 +246,7 @@ async fn test_dimension_derived_from_a_grain_dimension_is_not_reported() {
               - "2024-03-31"
         order:
           - id: orders.category
+          - id: orders.created_at
     "#};
 
     let sql = ctx.build_sql(query).unwrap();
@@ -280,6 +283,7 @@ async fn test_read_mixing_a_member_and_a_raw_column_is_reported() {
               - "2024-03-31"
         order:
           - id: orders.status
+          - id: orders.created_at
     "#};
 
     match ctx.build_sql(query) {
@@ -298,9 +302,8 @@ async fn test_read_mixing_a_member_and_a_raw_column_is_reported() {
 async fn test_dimension_read_only_by_drill_filters_is_not_reported() {
     let ctx = create_context();
 
-    let sql = ctx
-        .build_sql(&month_query("amount_with_drill_filters"))
-        .unwrap();
+    let query = month_query("amount_with_drill_filters");
+    let sql = ctx.build_sql(&query).unwrap();
 
     assert!(
         !sql.contains("\"orders\".category"),
@@ -308,10 +311,7 @@ async fn test_dimension_read_only_by_drill_filters_is_not_reported() {
         sql
     );
 
-    if let Some(result) = ctx
-        .try_execute_pg(&month_query("amount_with_drill_filters"), SEED)
-        .await
-    {
+    if let Some(result) = ctx.try_execute_pg(&query, SEED).await {
         insta::assert_snapshot!(result);
     }
 }
@@ -322,9 +322,8 @@ async fn test_dimension_read_only_by_drill_filters_is_not_reported() {
 async fn test_dimension_read_only_by_an_inactive_mask_is_not_reported() {
     let ctx = create_context();
 
-    let sql = ctx
-        .build_sql(&month_query("amount_with_masked_dimension_read"))
-        .unwrap();
+    let query = month_query("amount_with_masked_dimension_read");
+    let sql = ctx.build_sql(&query).unwrap();
 
     assert!(
         !sql.contains("\"orders\".category"),
@@ -353,6 +352,7 @@ async fn test_raw_column_read_only_by_a_mask_is_not_reported() {
               - "2024-03-31"
         order:
           - id: orders.status
+          - id: orders.created_at
     "#};
 
     let sql = ctx.build_sql(query).unwrap();
@@ -396,6 +396,57 @@ async fn test_active_mask_reading_an_out_of_grain_dimension_is_reported() {
             "The error must name the dimension the mask reads:\n{}",
             e
         ),
+    }
+}
+
+/// The accept side of the same rule, and the premise the mask branch rests on:
+/// an applied mask is rendered inside the multi-stage CTE, so its dimension read
+/// resolves against a column of that CTE rather than the cube alias.
+///
+/// The dimension is grouped by in the query, not merely declared in
+/// `grain.include`. An unconditional mask replaces the member's aggregate, so its
+/// read sits outside any aggregate and has to be in the stage's own GROUP BY; a
+/// declared leaf grain puts the column in the source but not in that GROUP BY,
+/// and the database rejects the result. The reachability check does not tell the
+/// two apart — it asks only whether a column exists — so that shape still plans
+/// and fails at the database.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_active_mask_reading_a_grouped_dimension_plans() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_masked_by_category_in_grain
+        dimensions:
+          - orders.category
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: orders.category
+          - id: orders.created_at
+        maskedMembers:
+          - member: orders.amount_masked_by_category_in_grain
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+
+    assert!(
+        sql.contains("\"fk_aggregate\".\"orders__category\" = 'books'"),
+        "Expected the mask to render against the CTE column:\n{}",
+        sql
+    );
+    assert!(
+        !sql.contains("\"orders\".category = 'books'"),
+        "The mask must not read the dimension off the cube alias:\n{}",
+        sql
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
     }
 }
 

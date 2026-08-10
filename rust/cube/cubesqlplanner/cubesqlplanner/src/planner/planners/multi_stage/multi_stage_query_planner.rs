@@ -1212,7 +1212,11 @@ fn visit_rendered_slots(
     visit: &mut dyn FnMut(&dyn SymbolDeps),
 ) {
     // A mask reaches the SQL exactly for the members it is applied to, so it
-    // counts as rendered only for those.
+    // counts as rendered only for those. The member's own slots below stay
+    // required even then: an unconditional mask replaces the original render
+    // rather than wrapping it, so strictly they are not emitted for a masked
+    // member — but the same model is broken for every unmasked one, and the
+    // narrower rule would only move where that surfaces.
     if is_masked(member) {
         if let Some(mask) = member.mask_sql() {
             visit(mask);

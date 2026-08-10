@@ -4,12 +4,12 @@ expression: result
 ---
 orders__status | orders__created_at_month | orders__amount_reduce_status_reading_status
 ---------------+--------------------------+--------------------------------------------
-cancelled      | 2024-02-01 00:00:00      | 0                                          
 cancelled      | 2024-01-01 00:00:00      | 0                                          
+cancelled      | 2024-02-01 00:00:00      | 0                                          
 cancelled      | 2024-03-01 00:00:00      | 0                                          
-completed      | 2024-02-01 00:00:00      | 750.00                                     
 completed      | 2024-01-01 00:00:00      | 500.00                                     
+completed      | 2024-02-01 00:00:00      | 750.00                                     
 completed      | 2024-03-01 00:00:00      | 1000.00                                    
 pending        | 2024-01-01 00:00:00      | 0                                          
-pending        | 2024-03-01 00:00:00      | 0                                          
-pending        | 2024-02-01 00:00:00      | 0
+pending        | 2024-02-01 00:00:00      | 0                                          
+pending        | 2024-03-01 00:00:00      | 0
