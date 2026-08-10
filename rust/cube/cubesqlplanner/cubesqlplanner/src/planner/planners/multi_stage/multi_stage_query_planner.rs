@@ -228,6 +228,10 @@ impl MultiStageQueryPlanner {
         resolved_multi_stage_dimensions: &mut HashSet<String>,
         scope: &mut PlanningScope,
     ) -> Result<(), CubeError> {
+        // The CASE-SWITCH path plans every branch dependency as its own CTE,
+        // dimensions included, so each one is a column of the source rather than
+        // something the stage grain has to carry. It deliberately skips the
+        // reachability check `default_make_childs` applies.
         if let Some(Case::CaseSwitch(case_switch)) = member.case() {
             if self.try_make_childs_for_case_switch(
                 case_switch,
@@ -339,7 +343,12 @@ impl MultiStageQueryPlanner {
         resolved_multi_stage_dimensions: &mut HashSet<String>,
         scope: &mut PlanningScope,
     ) -> Result<(), CubeError> {
-        let rendered: HashSet<String> = rendered_dependencies(&member)
+        let is_masked = |m: &Rc<MemberSymbol>| {
+            self.query_tools
+                .query_tools()
+                .is_member_masked(&m.full_name())
+        };
+        let rendered: HashSet<String> = rendered_dependencies(&member, &is_masked)
             .into_iter()
             .map(|d| d.resolve_reference_chain().full_name())
             .collect();
@@ -359,7 +368,7 @@ impl MultiStageQueryPlanner {
                     result.push(description);
                 }
             } else if dep.is_dimension() && rendered.contains(&dep.full_name()) {
-                Self::check_dimension_is_reachable(&member, dep, &new_state, parent_state)?;
+                self.check_dimension_is_reachable(&member, dep, &new_state, parent_state)?;
             }
         }
         if !has_inputs {
@@ -392,12 +401,17 @@ impl MultiStageQueryPlanner {
     /// all — the fallback is its own cube alias, and no cube is part of a CTE
     /// built from subqueries.
     fn check_dimension_is_reachable(
+        &self,
         member: &Rc<MemberSymbol>,
         dimension: &Rc<MemberSymbol>,
         grain_state: &QueryProperties,
         parent_state: &QueryProperties,
     ) -> Result<(), CubeError> {
-        if dimension_is_reachable(dimension, grain_state, parent_state) {
+        if dimension_is_reachable(dimension, grain_state, parent_state, &|m| {
+            self.query_tools
+                .query_tools()
+                .is_member_masked(&m.full_name())
+        }) {
             return Ok(());
         }
         Err(CubeError::user(format!(
@@ -1156,6 +1170,7 @@ fn dimension_is_reachable(
     dimension: &Rc<MemberSymbol>,
     grain_state: &QueryProperties,
     parent_state: &QueryProperties,
+    is_masked: &dyn Fn(&Rc<MemberSymbol>) -> bool,
 ) -> bool {
     let target = dimension.full_name();
     let carries = |state: &QueryProperties| {
@@ -1168,28 +1183,41 @@ fn dimension_is_reachable(
     if carries(grain_state) || carries(parent_state) {
         return true;
     }
-    let deps = rendered_dependencies(dimension);
+    let deps = rendered_dependencies(dimension, is_masked);
     !deps.is_empty()
-        && !reads_raw_cube_column(dimension)
+        && !reads_raw_cube_column(dimension, is_masked)
         && deps.iter().all(|dep| {
             dimension_is_reachable(
                 &dep.clone().resolve_reference_chain(),
                 grain_state,
                 parent_state,
+                is_masked,
             )
         })
 }
 
 // The slots of a member that reach its rendered SQL. `drill_filters` are carried
-// by the symbol but never emitted, and a `mask` is emitted only for members the
-// security context actually masks — neither can put a column requirement on the
-// CTE. Both the member deps and the cube refs have to be read through this, or an
-// excluded slot leaks back in through the side that isn't filtered.
+// by the symbol but never emitted, so they never put a column requirement on the
+// CTE. A `mask` is emitted only for the members it applies to, so it is included
+// for those and excluded otherwise. Both the member deps and the cube refs have to
+// be read through this, or an excluded slot leaks back in through the side that
+// isn't filtered.
 //
 // `iter_sql_calls` is the neighbouring accessor and is deliberately not reused:
 // on the measure side it covers `kind` and `case` only, missing `measure_filters`
 // and `measure_order_by`.
-fn visit_rendered_slots(member: &Rc<MemberSymbol>, visit: &mut dyn FnMut(&dyn SymbolDeps)) {
+fn visit_rendered_slots(
+    member: &Rc<MemberSymbol>,
+    is_masked: &dyn Fn(&Rc<MemberSymbol>) -> bool,
+    visit: &mut dyn FnMut(&dyn SymbolDeps),
+) {
+    // A mask reaches the SQL exactly for the members it is applied to, so it
+    // counts as rendered only for those.
+    if is_masked(member) {
+        if let Some(mask) = member.mask_sql() {
+            visit(mask);
+        }
+    }
     if let Ok(measure) = member.as_measure() {
         visit(measure.kind());
         for filter in measure.measure_filters() {
@@ -1207,21 +1235,29 @@ fn visit_rendered_slots(member: &Rc<MemberSymbol>, visit: &mut dyn FnMut(&dyn Sy
         // A time dimension is a view of its base: the granularity renders around
         // whatever the base renders, so both contribute.
         visit(time_dimension.granularity_obj());
-        visit_rendered_slots(time_dimension.base_symbol(), visit);
+        visit_rendered_slots(time_dimension.base_symbol(), is_masked, visit);
     } else {
         visit(member.as_ref());
     }
 }
 
-fn rendered_dependencies(member: &Rc<MemberSymbol>) -> Vec<Rc<MemberSymbol>> {
+fn rendered_dependencies(
+    member: &Rc<MemberSymbol>,
+    is_masked: &dyn Fn(&Rc<MemberSymbol>) -> bool,
+) -> Vec<Rc<MemberSymbol>> {
     let mut result = vec![];
-    visit_rendered_slots(member, &mut |slot| result.extend(collect_deps(slot)));
+    visit_rendered_slots(member, is_masked, &mut |slot| {
+        result.extend(collect_deps(slot))
+    });
     result
 }
 
-fn reads_raw_cube_column(member: &Rc<MemberSymbol>) -> bool {
+fn reads_raw_cube_column(
+    member: &Rc<MemberSymbol>,
+    is_masked: &dyn Fn(&Rc<MemberSymbol>) -> bool,
+) -> bool {
     let mut found = false;
-    visit_rendered_slots(member, &mut |slot| {
+    visit_rendered_slots(member, is_masked, &mut |slot| {
         found = found || !collect_cube_refs(slot).is_empty()
     });
     found

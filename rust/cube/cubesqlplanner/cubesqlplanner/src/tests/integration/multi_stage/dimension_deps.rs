@@ -160,6 +160,22 @@ async fn test_dimension_reachable_from_the_keys_side_is_not_reported() {
     );
 }
 
+/// A `grain.include` on the measure below widens *that* measure's leaf, not the
+/// columns its own CTE projects, so a member reading the dimension one stage up
+/// still has nowhere to read it from. Pinned because the difference between
+/// widening a leaf and projecting a column is easy to mistake for an oversight.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_grain_declared_by_a_child_does_not_satisfy_the_parent() {
+    let message = expect_error("amount_reading_a_child_leaf_grain");
+
+    assert!(
+        message.contains("orders.amount_reading_a_child_leaf_grain")
+            && message.contains("orders.status"),
+        "The error must name both the member and the dimension it reads:\n{}",
+        message
+    );
+}
+
 /// A dimension the query itself groups by is part of the stage grain, so it
 /// resolves without any declaration.
 #[tokio::test(flavor = "multi_thread")]
@@ -322,6 +338,32 @@ async fn test_raw_column_read_only_by_a_mask_is_not_reported() {
         "The inactive mask must not put a cube-qualified column into the CTE:\n{}",
         sql
     );
+}
+
+/// The exclusion is conditional on the mask not being applied. Once the query
+/// masks the member, the mask does reach the SQL, and the dimension it reads has
+/// to be reachable like any other.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_active_mask_reading_an_out_of_grain_dimension_is_reported() {
+    let ctx = create_context();
+
+    let query = format!(
+        "{}{}",
+        month_query("amount_with_masked_dimension_read"),
+        indoc! {"
+            maskedMembers:
+              - member: orders.amount_with_masked_dimension_read
+        "},
+    );
+
+    match ctx.build_sql(&query) {
+        Ok(sql) => panic!("Expected a planning error, got SQL:\n{sql}"),
+        Err(e) => assert!(
+            e.to_string().contains("orders.category"),
+            "The error must name the dimension the mask reads:\n{}",
+            e
+        ),
+    }
 }
 
 /// The same exclusion has to hold when the masked member is a multi-stage time

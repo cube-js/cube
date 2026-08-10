@@ -476,6 +476,23 @@ cubes:
             sql: "CASE WHEN {CUBE.status_upper_masked_by_column} = 'X' THEN {CUBE.total_amount} ELSE 0 END"
             multi_stage: true
 
+          # Declares a grain its own leaf is computed at.
+          - name: amount_with_status_in_leaf_grain
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            grain:
+                include:
+                    - orders.status
+
+          # Reads the dimension the measure below it declared. A declared grain
+          # widens that measure's own leaf, not the columns its CTE projects, so
+          # this read still has nowhere to come from.
+          - name: amount_reading_a_child_leaf_grain
+            type: sum
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.amount_with_status_in_leaf_grain} ELSE 0 END"
+            multi_stage: true
+
           - name: amount_mom_diff
             type: number
             sql: "{CUBE.total_amount} - {CUBE.amount_prev_month}"
