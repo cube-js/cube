@@ -7,6 +7,7 @@ mod date_filters;
 mod dimension_symbol;
 mod filter;
 mod filter_params_callback_column;
+mod filter_params_segment;
 mod join_hints_collector;
 mod measure_symbol;
 mod member_expressions_on_views;
