@@ -1,4 +1,5 @@
 /* eslint-disable no-restricted-syntax, quotes */
+import { AthenaQuery } from '../../src/adapter/AthenaQuery';
 import { PrestodbQuery } from '../../src/adapter/PrestodbQuery';
 import { TrinoQuery } from '../../src/adapter/TrinoQuery';
 import { prepareJsCompiler } from './PrepareCompiler';
@@ -63,27 +64,25 @@ describe('Trino/Presto time dimensions over DATE columns', () => {
 
   const promoted = (column: string) => `COALESCE("events".${column}, CAST(NULL AS TIMESTAMP))`;
 
+  const trinoConvertTz = (column: string) => `CAST((${promoted(column)} AT TIME ZONE '${timezone}') AS TIMESTAMP)`;
+
+  const prestoConvertTz = (column: string) => {
+    const atTimezone = `${promoted(column)} AT TIME ZONE '${timezone}'`;
+    return `CAST(date_add('minute', timezone_minute(${atTimezone}), ` +
+      `date_add('hour', timezone_hour(${atTimezone}), ${promoted(column)})) AS TIMESTAMP)`;
+  };
+
   const dialects = [
-    {
-      name: 'TrinoQuery',
-      QueryClass: TrinoQuery,
-      convertTz: (column: string) => `CAST((${promoted(column)} AT TIME ZONE '${timezone}') AS TIMESTAMP)`
-    },
-    {
-      name: 'PrestodbQuery',
-      QueryClass: PrestodbQuery,
-      convertTz: (column: string) => {
-        const atTimezone = `${promoted(column)} AT TIME ZONE '${timezone}'`;
-        return `CAST(date_add('minute', timezone_minute(${atTimezone}), ` +
-          `date_add('hour', timezone_hour(${atTimezone}), ${promoted(column)})) AS TIMESTAMP)`;
-      }
-    }
+    { name: 'TrinoQuery', QueryClass: TrinoQuery, convertTz: trinoConvertTz },
+    { name: 'PrestodbQuery', QueryClass: PrestodbQuery, convertTz: prestoConvertTz },
+    // Athena has no convertTz of its own; pin that it keeps inheriting the fix.
+    { name: 'AthenaQuery', QueryClass: AthenaQuery, convertTz: prestoConvertTz }
   ] as const;
 
   for (const { name, QueryClass, convertTz } of dialects) {
     describe(name, () => {
-      // `d` is the column that used to fail outright; `ts`/`tstz` guard the
-      // promotion against changing what already worked.
+      // `d` is the column the engine rejects; `ts`/`tstz` pin that the
+      // promotion leaves the types that already work alone.
       for (const column of ['d', 'ts', 'tstz']) {
         it(`promotes the ${column} column instead of feeding it to AT TIME ZONE`, async () => {
           await compiler.compile();
@@ -94,6 +93,17 @@ describe('Trino/Presto time dimensions over DATE columns', () => {
           expect(sql).toContain(convertTz(column));
         });
       }
+
+      it('leaves the field untouched without a timezone', async () => {
+        await compiler.compile();
+
+        const query = new QueryClass({ joinGraph, cubeEvaluator, compiler }, {
+          measures: ['events.count'],
+          timezone: null
+        });
+
+        expect(query.convertTz('"events".d')).toBe('"events".d');
+      });
     });
   }
 });
