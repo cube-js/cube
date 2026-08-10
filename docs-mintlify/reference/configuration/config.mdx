@@ -51,9 +51,23 @@ or when a more flexible setup is needed.
 
 It's a [multitenancy][ref-multitenancy] option.
 
-`context_to_app_id` is a function to determine an app id which is used as
-caching key for various in-memory structures like data model compilation
-results, etc.
+`context_to_app_id` is a function to determine an app id which is used as the
+caching key for the compiled data model and other data model-related in-memory
+structures. Each distinct app id gets its own data model compilation, which is
+what enables [`COMPILE_CONTEXT`][ref-compile-context] and per-tenant
+[`repository_factory`][self-repofactory].
+
+<Warning>
+
+`context_to_app_id` enables multitenancy for data model compilation only.
+Querying and caching stay shared across app ids: database connections, query
+queues, the query results cache, and pre-aggregations, including their tables in
+the pre-aggregations schema. To isolate those per tenant as well, define
+[`context_to_orchestrator_id`][self-orchestrator-id] and
+[`pre_aggregations_schema`][self-pre-aggregations-schema]. See
+[multitenancy][ref-multitenancy] for details.
+
+</Warning>
 
 Called on each request.
 
@@ -1527,6 +1541,7 @@ module.exports = {
 [ref-rest-scopes]: /reference/core-data-apis/rest-api#api-scopes
 [ref-config-options]: /admin/connect-to-data#configuration-options
 [self-orchestrator-id]: #context_to_orchestrator_id
+[ref-compile-context]: /reference/data-modeling/context-variables#compile_context
 [ref-multiple-data-sources]: /admin/connect-to-data/multiple-data-sources
 [ref-websockets]: /recipes/core-data-api/real-time-data-fetch
 [ref-matching-preaggs]: /docs/pre-aggregations/matching-pre-aggregations

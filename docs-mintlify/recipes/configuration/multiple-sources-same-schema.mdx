@@ -18,7 +18,11 @@ same data model.
 
 To enable multitenancy, use the
 [`contextToAppId`](/reference/configuration/config#context_to_app_id) function to
-provide distinct identifiers for each tenant. Also, implement the
+provide distinct identifiers for each tenant's data model and the
+[`contextToOrchestratorId`](/reference/configuration/config#context_to_orchestrator_id)
+function to give each tenant its own database connections and query queues.
+Without the latter, all tenants would share a single connection to whichever
+data source was resolved first. Also, implement the
 [`driverFactory`](/reference/configuration/config#driver_factory) function where
 you can select a data source based on the tenant name.
 [JSON Web Token](/docs/data-modeling/access-control) includes information about the tenant name in
@@ -27,7 +31,11 @@ the `tenant` property of the `securityContext`.
 ```javascript
 module.exports = {
   // Provides distinct identifiers for each tenant which are used as caching keys
+  // for the compiled data model and the query orchestrator, respectively
   contextToAppId: ({ securityContext }) =>
+    `CUBE_APP_${securityContext.tenant}`,
+
+  contextToOrchestratorId: ({ securityContext }) =>
     `CUBE_APP_${securityContext.tenant}`,
 
   // Selects the database connection configuration based on the tenant name
