@@ -14,6 +14,7 @@ use crate::planner::filter::BaseFilter;
 use crate::planner::filter::FilterItem;
 use crate::planner::filter::FilterOperator;
 use crate::planner::state::State;
+use crate::planner::symbols::deps::{collect_cube_refs, collect_deps, SymbolDeps};
 use crate::planner::symbols::transforms;
 use crate::planner::symbols::AggregationType;
 use crate::planner::Case;
@@ -221,11 +222,16 @@ impl MultiStageQueryPlanner {
         &self,
         member: Rc<MemberSymbol>,
         new_state: Rc<QueryProperties>,
+        parent_state: &Rc<QueryProperties>,
         result: &mut Vec<Rc<MultiStageQueryDescription>>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
         resolved_multi_stage_dimensions: &mut HashSet<String>,
         scope: &mut PlanningScope,
     ) -> Result<(), CubeError> {
+        // The CASE-SWITCH path plans every branch dependency as its own CTE,
+        // dimensions included, so each one is a column of the source rather than
+        // something the stage grain has to carry. It deliberately skips the
+        // reachability check `default_make_childs` applies.
         if let Some(Case::CaseSwitch(case_switch)) = member.case() {
             if self.try_make_childs_for_case_switch(
                 case_switch,
@@ -241,6 +247,7 @@ impl MultiStageQueryPlanner {
         self.default_make_childs(
             member,
             new_state,
+            parent_state,
             result,
             descriptions,
             resolved_multi_stage_dimensions,
@@ -330,11 +337,21 @@ impl MultiStageQueryPlanner {
         &self,
         member: Rc<MemberSymbol>,
         new_state: Rc<QueryProperties>,
+        parent_state: &Rc<QueryProperties>,
         result: &mut Vec<Rc<MultiStageQueryDescription>>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
         resolved_multi_stage_dimensions: &mut HashSet<String>,
         scope: &mut PlanningScope,
     ) -> Result<(), CubeError> {
+        let is_masked = |m: &Rc<MemberSymbol>| {
+            self.query_tools
+                .query_tools()
+                .is_member_masked(&m.full_name())
+        };
+        let rendered: HashSet<String> = rendered_dependencies(&member, &is_masked)
+            .into_iter()
+            .map(|d| d.resolve_reference_chain().full_name())
+            .collect();
         let mut has_inputs = false;
         for dep in member.get_dependencies() {
             let dep = &dep.resolve_reference_chain();
@@ -350,6 +367,8 @@ impl MultiStageQueryPlanner {
                 if !description.is_multi_stage_dimension() || member.as_dimension().is_ok() {
                     result.push(description);
                 }
+            } else if dep.is_dimension() && rendered.contains(&dep.full_name()) {
+                self.check_dimension_is_reachable(&member, dep, &new_state, parent_state)?;
             }
         }
         if !has_inputs {
@@ -372,6 +391,36 @@ impl MultiStageQueryPlanner {
             descriptions.push(description.clone());
         }
         Ok(())
+    }
+
+    /// A dimension read by a multi-stage member's SQL is rendered against the
+    /// CTE that computes the member, so it has to be a column of it. Two grains
+    /// can supply one: the stage's own (`grain_state`) and, when the assembly
+    /// broadcasts a narrowed measure back onto the query grid, the keys side
+    /// built from `parent_state`. Beyond those the dimension has no rendering at
+    /// all — the fallback is its own cube alias, and no cube is part of a CTE
+    /// built from subqueries.
+    fn check_dimension_is_reachable(
+        &self,
+        member: &Rc<MemberSymbol>,
+        dimension: &Rc<MemberSymbol>,
+        grain_state: &QueryProperties,
+        parent_state: &QueryProperties,
+    ) -> Result<(), CubeError> {
+        if dimension_is_reachable(dimension, grain_state, parent_state, &|m| {
+            self.query_tools
+                .query_tools()
+                .is_member_masked(&m.full_name())
+        }) {
+            return Ok(());
+        }
+        Err(CubeError::user(format!(
+            "Multi-stage member {member} reads dimension {dimension}, which is not part of the \
+             grain it is computed at. Add {dimension} to `grain.include` of {member}, or remove \
+             it from the member's sql.",
+            member = member.full_name(),
+            dimension = dimension.full_name(),
+        )))
     }
 
     /// Plans CASE-SWITCH dependencies: collects, per dependency, the
@@ -640,6 +689,7 @@ impl MultiStageQueryPlanner {
             self.make_childs(
                 member.clone(),
                 new_state.clone(),
+                &state,
                 &mut input,
                 descriptions,
                 resolved_multi_stage_dimensions,
@@ -678,6 +728,7 @@ impl MultiStageQueryPlanner {
                     self.make_childs(
                         member.clone(),
                         state.clone(),
+                        &state,
                         &mut keys_input,
                         descriptions,
                         resolved_multi_stage_dimensions,
@@ -1101,6 +1152,119 @@ impl MultiStageQueryPlanner {
 
         Ok((Rc::new(new_state), new_time_dimension))
     }
+}
+
+// Mirrors how references are resolved when the CTE is rendered: a member the
+// source exposes as a column stops the walk, and anything else is reachable only
+// if every member its own SQL reads is. A dimension that also reads a raw cube
+// column is unreachable whatever its member deps resolve to — that column renders
+// against the cube alias, which such a CTE never has in scope.
+//
+// A leaf outside both grains is reported as well. `sql: category` and a constant
+// `sql: "'x'"` are indistinguishable here — neither carries a cube ref — so the
+// constant is reported too, and declaring it in `grain.include` resolves that the
+// same way. The same ambiguity runs the other way: a bare identifier inside a
+// larger expression (`UPPER({CUBE.status}) || category`) carries no cube ref
+// either, so it passes and fails at the database instead.
+fn dimension_is_reachable(
+    dimension: &Rc<MemberSymbol>,
+    grain_state: &QueryProperties,
+    parent_state: &QueryProperties,
+    is_masked: &dyn Fn(&Rc<MemberSymbol>) -> bool,
+) -> bool {
+    let target = dimension.full_name();
+    let carries = |state: &QueryProperties| {
+        state
+            .dimensions()
+            .iter()
+            .chain(state.time_dimensions().iter())
+            .any(|d| d.clone().resolve_reference_chain().full_name() == target)
+    };
+    if carries(grain_state) || carries(parent_state) {
+        return true;
+    }
+    let deps = rendered_dependencies(dimension, is_masked);
+    !deps.is_empty()
+        && !reads_raw_cube_column(dimension, is_masked)
+        && deps.iter().all(|dep| {
+            dimension_is_reachable(
+                &dep.clone().resolve_reference_chain(),
+                grain_state,
+                parent_state,
+                is_masked,
+            )
+        })
+}
+
+// The slots of a member that reach its rendered SQL. `drill_filters` are carried
+// by the symbol but never emitted, so they never put a column requirement on the
+// CTE. A `mask` is emitted only for the members it applies to, so it is included
+// for those and excluded otherwise. Both the member deps and the cube refs have to
+// be read through this, or an excluded slot leaks back in through the side that
+// isn't filtered.
+//
+// `iter_sql_calls` is the neighbouring accessor and is deliberately not reused:
+// on the measure side it covers `kind` and `case` only, missing `measure_filters`
+// and `measure_order_by`.
+fn visit_rendered_slots(
+    member: &Rc<MemberSymbol>,
+    is_masked: &dyn Fn(&Rc<MemberSymbol>) -> bool,
+    visit: &mut dyn FnMut(&dyn SymbolDeps),
+) {
+    // A mask reaches the SQL exactly for the members it is applied to, so it
+    // counts as rendered only for those. The member's own slots below stay
+    // required even then: an unconditional mask replaces the original render
+    // rather than wrapping it, so strictly they are not emitted for a masked
+    // member — but the same model is broken for every unmasked one, and the
+    // narrower rule would only move where that surfaces.
+    if is_masked(member) {
+        if let Some(mask) = member.mask_sql() {
+            visit(mask);
+        }
+    }
+    if let Ok(measure) = member.as_measure() {
+        visit(measure.kind());
+        for filter in measure.measure_filters() {
+            visit(filter);
+        }
+        for order_by in measure.measure_order_by() {
+            visit(order_by);
+        }
+        if let Some(case) = measure.case() {
+            visit(case);
+        }
+    } else if let Ok(dimension) = member.as_dimension() {
+        visit(dimension.kind());
+    } else if let Ok(time_dimension) = member.as_time_dimension() {
+        // A time dimension is a view of its base: the granularity renders around
+        // whatever the base renders, so both contribute.
+        visit(time_dimension.granularity_obj());
+        visit_rendered_slots(time_dimension.base_symbol(), is_masked, visit);
+    } else {
+        visit(member.as_ref());
+    }
+}
+
+fn rendered_dependencies(
+    member: &Rc<MemberSymbol>,
+    is_masked: &dyn Fn(&Rc<MemberSymbol>) -> bool,
+) -> Vec<Rc<MemberSymbol>> {
+    let mut result = vec![];
+    visit_rendered_slots(member, is_masked, &mut |slot| {
+        result.extend(collect_deps(slot))
+    });
+    result
+}
+
+fn reads_raw_cube_column(
+    member: &Rc<MemberSymbol>,
+    is_masked: &dyn Fn(&Rc<MemberSymbol>) -> bool,
+) -> bool {
+    let mut found = false;
+    visit_rendered_slots(member, is_masked, &mut |slot| {
+        found = found || !collect_cube_refs(slot).is_empty()
+    });
+    found
 }
 
 fn multi_stage_filter_directive(member: &Rc<MemberSymbol>) -> Option<MultiStageFilter> {

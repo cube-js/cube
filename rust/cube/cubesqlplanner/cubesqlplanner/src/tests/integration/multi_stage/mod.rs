@@ -2,6 +2,7 @@ mod add_group_by;
 mod bucketing;
 mod calculated;
 mod case_switch;
+mod dimension_deps;
 mod dimensions;
 mod edge_cases;
 mod filter_directive;
