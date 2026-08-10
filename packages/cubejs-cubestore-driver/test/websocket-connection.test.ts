@@ -257,6 +257,33 @@ describe('WebSocketConnection', () => {
       await expect(big).rejects.toThrow('Cube Store response size exceeds the maximum message size of 1 MB');
     }, JEST_TIMEOUT);
 
+    it('gives up when an over-limit response keeps killing the connection', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      // The oversized response always wins the race against the small query's
+      // answer, so re-sending never shrinks the set of messages in flight and
+      // never leaves the offender alone to be attributed.
+      const arrived = new Map<number, Set<string>>();
+
+      server.handler = (message, mockConnection) => {
+        const queries = arrived.get(mockConnection.index) || new Set<string>();
+        queries.add(message.query);
+        arrived.set(mockConnection.index, queries);
+
+        if (queries.has('SELECT big') && queries.has('SELECT small')) {
+          mockConnection.ws.send(Buffer.alloc(MAX_MESSAGE_SIZE * 2));
+        }
+      };
+
+      const big = query('SELECT big');
+      const small = query('SELECT small');
+
+      // Both have to settle rather than being re-sent forever, even at the cost
+      // of blaming the size on a query that never approached the limit.
+      await expect(big).rejects.toThrow(MessageTooLargeError);
+      await expect(small).rejects.toThrow(MessageTooLargeError);
+    }, JEST_TIMEOUT);
+
     it('reports a request that is over the limit without sending it', async () => {
       connection = new WebSocketConnection(server.url);
 

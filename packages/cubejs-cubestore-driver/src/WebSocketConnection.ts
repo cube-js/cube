@@ -46,6 +46,9 @@ interface SentMessage {
   resolve: (value: any) => void;
   reject: (reason?: any) => void;
   buffer: Uint8Array;
+  // How many connections died under this message from a failure that can't be
+  // attributed to a single message. Used to give it exactly one more round.
+  fatalRounds: number;
 }
 
 export type QueryParameter = null | boolean | number | string | Buffer;
@@ -201,26 +204,50 @@ export class WebSocketConnection {
 
             // The connection multiplexes messages and an oversized one can't be
             // attributed -- `ws` drops the frame before its message id is read
-            // -- so only a message that was alone in flight can be failed with
-            // it. Anything else is re-sent as usual: answering the innocent
-            // messages leaves the offender alone, and the next round names it.
-            if (fatalError && pending.length === 1) {
-              webSocket.sentMessages[pending[0]].reject(fatalError);
-              delete webSocket.sentMessages[pending[0]];
+            // -- so a message that was alone in flight is the one at fault.
+            // Anything else gets one more round, which answers the innocent
+            // messages and usually leaves the offender alone to be named next
+            // time. Whatever is still in flight after that round is failed
+            // regardless: an offender whose response keeps arriving before the
+            // other answers would otherwise be re-sent forever.
+            if (fatalError) {
+              // eslint-disable-next-line no-restricted-syntax
+              for (const key of pending) {
+                const sentMessage = webSocket.sentMessages[key];
+                sentMessage.fatalRounds += 1;
 
-              if (webSocket === this.webSocket) {
-                this.webSocket = null;
+                if (pending.length === 1 || sentMessage.fatalRounds > 1) {
+                  delete webSocket.sentMessages[key];
+                  sentMessage.reject(fatalError);
+                }
               }
 
-              return;
+              if (!Object.keys(webSocket.sentMessages).length) {
+                if (webSocket === this.webSocket) {
+                  this.webSocket = null;
+                }
+
+                return;
+              }
             }
 
             setTimeout(async () => {
               try {
                 const nextWebSocket = await this.initWebSocket();
+                const resent = Object.keys(webSocket.sentMessages);
+
+                // Register the whole batch before writing any of it. Writing
+                // yields, and a socket that closes in between must find every
+                // message of the batch: the ones not registered yet would end
+                // up on a socket whose 'close' has already been handled, with
+                // nobody left to write or to re-send them.
                 // eslint-disable-next-line no-restricted-syntax
-                for (const key of Object.keys(webSocket.sentMessages)) {
+                for (const key of resent) {
                   nextWebSocket.sentMessages[key] = webSocket.sentMessages[key];
+                }
+
+                // eslint-disable-next-line no-restricted-syntax
+                for (const key of resent) {
                   await nextWebSocket.sendAsync(webSocket.sentMessages[key].buffer);
                 }
               } catch (e) {
@@ -290,7 +317,7 @@ export class WebSocketConnection {
 
     const socket = await this.initWebSocket();
     return new Promise((resolve, reject) => {
-      socket.sentMessages[messageId] = { resolve, reject, buffer };
+      socket.sentMessages[messageId] = { resolve, reject, buffer, fatalRounds: 0 };
 
       // If socket is closing this message should be resent
       if (socket.readyState === WebSocket.OPEN) {
@@ -303,9 +330,11 @@ export class WebSocketConnection {
         });
       } else if (socket.readyState === WebSocket.CLOSED) {
         // 'close' already fired for this socket, so no re-send is going to pick
-        // this message up and nothing would ever settle it.
+        // this message up and nothing would ever settle it. That handler also
+        // dropped `this.webSocket`, so trying again establishes a fresh
+        // connection rather than failing a query that was never written.
         delete socket.sentMessages[messageId];
-        reject(new ConnectionError('CubeStore connection is closed'));
+        this.sendMessage(messageId, buffer).then(resolve, reject);
       }
     });
   }
