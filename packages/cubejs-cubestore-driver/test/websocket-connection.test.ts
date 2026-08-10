@@ -284,6 +284,60 @@ describe('WebSocketConnection', () => {
       await expect(small).rejects.toThrow(MessageTooLargeError);
     }, JEST_TIMEOUT);
 
+    it('gives a query its extra round back once an ordinary disconnect intervenes', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      const arrived = new Map<number, Set<string>>();
+      const longMessageIds = new Map<number, number>();
+      const sendOversized = (mockConnection: MockConnection) => {
+        mockConnection.ws.send(Buffer.alloc(MAX_MESSAGE_SIZE * 2));
+      };
+
+      server.handler = (message, mockConnection) => {
+        const { index } = mockConnection;
+        const queries = arrived.get(index) || new Set<string>();
+        queries.add(message.query);
+        arrived.set(index, queries);
+
+        if (message.query === 'SELECT long') {
+          longMessageIds.set(index, message.messageId);
+        }
+
+        // Act once both are in flight, so the oversized response is never
+        // attributable to the query that caused it.
+        if (!queries.has('SELECT long') || !queries.has('SELECT big')) {
+          return;
+        }
+
+        if (index === 1) {
+          // An ordinary disconnect, unrelated to message size.
+          mockConnection.ws.terminate();
+          return;
+        }
+
+        const longMessageId = longMessageIds.get(index);
+        if (index >= 3 && longMessageId !== undefined) {
+          // The slow query finally answers, which leaves the offender alone.
+          mockConnection.ws.send(buildErrorMessage(longMessageId, answeredBy(index)));
+        }
+
+        sendOversized(mockConnection);
+      };
+
+      const long = query('SELECT long');
+      const big = query('SELECT big');
+      big.catch(() => {
+        // noop
+      });
+
+      // Two size incidents with an ordinary disconnect in between: the slow
+      // query is innocent in both, so the round it is owed has to survive the
+      // disconnect rather than being spent by the first incident.
+      await expectAnsweredBy(long, 3);
+
+      await expect(big).rejects.toThrow(MessageTooLargeError);
+    }, JEST_TIMEOUT);
+
     it('reports a request that is over the limit without sending it', async () => {
       connection = new WebSocketConnection(server.url);
 

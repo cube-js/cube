@@ -229,6 +229,16 @@ export class WebSocketConnection {
 
                 return;
               }
+            } else {
+              // Only consecutive unattributable failures count towards giving
+              // up on a message: a query that outlived an ordinary disconnect
+              // gets its extra round back, so a later, unrelated oversized
+              // response can't fail it on the spot. The loop the counter
+              // bounds is fatal every round, so nothing resets there.
+              // eslint-disable-next-line no-restricted-syntax
+              for (const key of pending) {
+                webSocket.sentMessages[key].fatalRounds = 0;
+              }
             }
 
             setTimeout(async () => {
@@ -332,7 +342,9 @@ export class WebSocketConnection {
         // 'close' already fired for this socket, so no re-send is going to pick
         // this message up and nothing would ever settle it. That handler also
         // dropped `this.webSocket`, so trying again establishes a fresh
-        // connection rather than failing a query that was never written.
+        // connection rather than failing a query that was never written. The
+        // `messageId` is deliberately kept, like a re-send: Cube Store
+        // de-duplicates on `(connection_id, message_id)`.
         delete socket.sentMessages[messageId];
         this.sendMessage(messageId, buffer).then(resolve, reject);
       }
