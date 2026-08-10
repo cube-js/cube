@@ -16,7 +16,6 @@ export async function* responseChunks(res: Response): AsyncIterable<Uint8Array> 
     return;
   }
 
-  // Node.js Readable (node-fetch v2 via cross-fetch)
   if (body && Symbol.asyncIterator in body) {
     for await (const chunk of body as AsyncIterable<Buffer | Uint8Array | string>) {
       if (typeof chunk === 'string') {
