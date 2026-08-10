@@ -150,6 +150,20 @@ impl MockMemberSql {
                     continue;
                 }
 
+                // `{FILTER_PARAMS_COLUMN:<cube>.<member>:<column>}` records a
+                // FILTER_PARAMS binding whose column is a plain string, the way
+                // `.filter('created_at')` is written in the data model.
+                if let Some(body) = path.strip_prefix("FILTER_PARAMS_COLUMN:") {
+                    let (cube_name, name, column) = Self::parse_filter_params_body(body)?;
+                    let index = args.insert_filter_params(FilterParamsItem {
+                        cube_name,
+                        name,
+                        column: FilterParamsColumn::String(column),
+                    });
+                    result.push_str(&format!("{{fp:{}}}", index));
+                    continue;
+                }
+
                 // `{FILTER_PARAMS:<cube>.<member>:<column>}` records a FILTER_PARAMS
                 // binding with a callback column and yields `{fp:N}`. Inside
                 // `<column>`, `[path]` is a member reference — recorded into this
@@ -157,32 +171,12 @@ impl MockMemberSql {
                 // dependency list — and `%N` stands for the Nth filter value the
                 // planner passes at render time.
                 if let Some(body) = path.strip_prefix("FILTER_PARAMS:") {
-                    let (member, column) = body.split_once(':').ok_or_else(|| {
-                        CubeError::user(format!(
-                            "FILTER_PARAMS needs a `<cube>.<member>:<column>` body: {}",
-                            body
-                        ))
-                    })?;
-                    // The scanner above stops at the first `}`, so a column carrying
-                    // one would have been cut short here.
-                    if column.is_empty() || column.contains('{') {
-                        return Err(CubeError::user(format!(
-                            "FILTER_PARAMS column must be non-empty and reference members as `[path]`: {}",
-                            column
-                        )));
-                    }
-                    let member_parts = member.split('.').collect::<Vec<_>>();
-                    if member_parts.len() != 2 || member_parts.iter().any(|p| p.is_empty()) {
-                        return Err(CubeError::user(format!(
-                            "FILTER_PARAMS member must be `<cube>.<member>`: {}",
-                            member
-                        )));
-                    }
-                    let (cube_name, name) = (member_parts[0], member_parts[1]);
-                    let column = Self::parse_column_references(column, &mut args, &mut args_names)?;
+                    let (cube_name, name, column) = Self::parse_filter_params_body(body)?;
+                    let column =
+                        Self::parse_column_references(&column, &mut args, &mut args_names)?;
                     let index = args.insert_filter_params(FilterParamsItem {
-                        cube_name: cube_name.to_string(),
-                        name: name.to_string(),
+                        cube_name,
+                        name,
                         column: FilterParamsColumn::Callback(Rc::new(
                             MockFilterParamsCallback::new(column),
                         )),
@@ -223,6 +217,36 @@ impl MockMemberSql {
         }
 
         Ok((result, args, args_names))
+    }
+
+    // Splits a `<cube>.<member>:<column>` FILTER_PARAMS body.
+    fn parse_filter_params_body(body: &str) -> Result<(String, String, String), CubeError> {
+        let (member, column) = body.split_once(':').ok_or_else(|| {
+            CubeError::user(format!(
+                "FILTER_PARAMS needs a `<cube>.<member>:<column>` body: {}",
+                body
+            ))
+        })?;
+        // The scanner above stops at the first `}`, so a column carrying one
+        // would have been cut short here.
+        if column.is_empty() || column.contains('{') {
+            return Err(CubeError::user(format!(
+                "FILTER_PARAMS column must be non-empty and reference members as `[path]`: {}",
+                column
+            )));
+        }
+        let member_parts = member.split('.').collect::<Vec<_>>();
+        if member_parts.len() != 2 || member_parts.iter().any(|p| p.is_empty()) {
+            return Err(CubeError::user(format!(
+                "FILTER_PARAMS member must be `<cube>.<member>`: {}",
+                member
+            )));
+        }
+        Ok((
+            member_parts[0].to_string(),
+            member_parts[1].to_string(),
+            column.to_string(),
+        ))
     }
 
     // Replaces every `[path.to.member]` in a callback column with the `{arg:N}`

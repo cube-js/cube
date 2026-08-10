@@ -332,6 +332,62 @@ cube(`multi_filter`, {
 })
 ```
 
+### Example with segment
+
+A `FILTER_PARAMS` argument can also name a [segment][ref-ref-segments]. A segment
+is not compared to a value, so the expression passed to `filter()` is the whole
+predicate rather than a column: it is rendered as-is when the query selects that
+segment, and as `1 = 1` when it does not.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: events
+    sql: |
+      SELECT *
+      FROM events
+      WHERE {FILTER_PARAMS.events.start_load.filter(
+        "evid = 115 AND action_group = 'load'"
+      )}
+
+    segments:
+      - name: start_load
+        sql: "{CUBE}.evid = 115 AND {CUBE}.action_group = 'load'"
+```
+
+```javascript title="JavaScript"
+cube(`events`, {
+  sql: `
+    SELECT *
+    FROM events
+    WHERE ${FILTER_PARAMS.events.start_load.filter(
+      `evid = 115 AND action_group = 'load'`
+    )}
+  `,
+
+  segments: {
+    start_load: {
+      sql: `${CUBE}.evid = 115 AND ${CUBE}.action_group = 'load'`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+The segment's own `sql` prefixes its columns with the cube, which is not in
+scope inside the `sql` that builds that cube, so the pushed-down predicate is
+restated in `filter()` — the same way a dimension's column is.
+
+<Info>
+
+Naming a segment is only supported by the default SQL planner. With
+[`CUBEJS_TESSERACT_SQL_PLANNER`][ref-env-tesseract] set to `false`, such a
+binding always renders as `1 = 1`.
+
+</Info>
+
 ## `FILTER_GROUP`
 
 If you use `FILTER_PARAMS` in your query more than once, you must wrap them
@@ -818,3 +874,5 @@ cube(`orders`, {
 [ref-dynamic-jinja]: /docs/data-modeling/dynamic/jinja
 [ref-filter-boolean]: /reference/core-data-apis/rest-api/query-format#boolean-logical-operators
 [ref-links]: /reference/data-modeling/dimensions#links
+[ref-ref-segments]: /reference/data-modeling/segments
+[ref-env-tesseract]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
