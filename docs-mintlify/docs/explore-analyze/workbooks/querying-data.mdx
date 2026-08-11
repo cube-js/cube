@@ -214,12 +214,16 @@ the comparison to all measures at once.
 </Frame>
 
 The menu is available when the query includes a time dimension with a year,
-quarter, month, week, or day granularity. The presets depend on that
-granularity — a month grain offers **Previous period**, **Same period
-previous quarter**, and **Same period previous year** — so the comparison
-period always aligns exactly with the current buckets. A measure can have
-several comparisons active at once, such as month over month and year over
-year side by side.
+quarter, month, week, or day granularity — either one it groups by, or one it
+only filters. Grouping gives presets read off the granularity — a month grain
+offers **Previous period**, **Same period previous quarter**, and **Same
+period previous year** — so the comparison period always aligns exactly with
+the current buckets. Filtering without grouping gives a comparison anchored to
+the filter's own date window instead (for example, **Previous period** shifts
+back by exactly the filtered window's length), which lets a report with no
+time column still compare against a prior period. A measure can have several
+comparisons active at once, such as month over month and year over year side
+by side.
 
 Each comparison adds derived columns next to the measure. Choose which ones
 to show under **Comparison columns** in the same menu:
@@ -237,7 +241,10 @@ Comparisons are saved with the report and apply everywhere it appears —
 charts, totals, and [dashboards][ref-dashboards]. Cube fetches the
 comparison values with a companion query whose date filters are shifted back
 by the comparison offset; you can [inspect it](#inspecting-queries) to check
-the math.
+the math. On a dashboard, the comparison follows whatever the viewer has the
+widget filtered to — narrowing the dashboard's filters also narrows the
+comparison window, so the two periods being compared always stay the same
+length.
 
 ## Inspecting queries
 
