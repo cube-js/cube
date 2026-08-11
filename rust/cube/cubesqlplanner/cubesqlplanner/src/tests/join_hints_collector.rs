@@ -52,16 +52,18 @@ fn test_collect_join_hints_view_symbols() {
     assert_eq!(hints.len(), 1);
     assert_eq!(hints.items(), &[v(&["cube_a", "cube_b", "cube_c"])]);
 
+    // Members of the root cube of the view are enriched with the view join map
+    // into the prefix of the path they sit on, so they come back as a vector.
     let dim = ctx.create_dimension("a_with_b_and_c.name").unwrap();
     let hints = collect_join_hints(&dim).unwrap();
     assert_eq!(hints.len(), 1);
-    assert_eq!(hints.items(), &[s("cube_a")]);
+    assert_eq!(hints.items(), &[v(&["cube_a"])]);
 
     // View measure from root join_path
     let measure = ctx.create_measure("a_with_b_and_c.total_value").unwrap();
     let hints = collect_join_hints(&measure).unwrap();
     assert_eq!(hints.len(), 1);
-    assert_eq!(hints.items(), &[s("cube_a")]);
+    assert_eq!(hints.items(), &[v(&["cube_a"])]);
 }
 
 #[test]
@@ -95,7 +97,8 @@ fn test_join_hints_many_to_one_view_root_dim() {
     let dim = ctx.create_dimension("many_to_one_view.root_dim").unwrap();
     let hints = collect_join_hints(&dim).unwrap();
     assert_eq!(hints.len(), 1);
-    assert_eq!(hints.items(), &[s("many_to_one_root")]);
+    // Enriched with the view join map into the prefix of the path it sits on.
+    assert_eq!(hints.items(), &[v(&["many_to_one_root"])]);
 }
 
 #[test]
@@ -116,7 +119,8 @@ fn test_join_hints_many_to_one_view_root_measure() {
     let measure = ctx.create_measure("many_to_one_view.root_val_avg").unwrap();
     let hints = collect_join_hints(&measure).unwrap();
     assert_eq!(hints.len(), 1);
-    assert_eq!(hints.items(), &[s("many_to_one_root")]);
+    // Enriched with the view join map into the prefix of the path it sits on.
+    assert_eq!(hints.items(), &[v(&["many_to_one_root"])]);
 }
 
 #[test]
