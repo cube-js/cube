@@ -962,6 +962,13 @@ impl CubeScanWrapperNode {
                 })
                 .map(|mem| mem.member.as_str()),
         )
+        // A scan can have no members to resolve from, like when it selects only
+        // synthetic fields, so fall back to the cubes it scans.
+        .and_then(|data_source| {
+            data_source.or_else_try(|| {
+                meta.data_source_for_cube_names(node.used_cubes.iter().map(|c| c.as_str()))
+            })
+        })
         .map_err(|err| {
             CubeError::internal(format!(
                 "Can't generate SQL for node; error: {err}; node: {node:?}"
@@ -3643,6 +3650,15 @@ impl WrappedSelectNode {
             }
 
             meta.data_source_for_member_names(every_used_member.iter().map(|m| m.as_str()))
+                // A query can reference no members to resolve from, like when it
+                // selects only synthetic fields, so fall back to the cubes it scans.
+                .and_then(|data_source| {
+                    data_source.or_else_try(|| {
+                        meta.data_source_for_cube_names(
+                            ungrouped_scan_node.used_cubes.iter().map(|c| c.as_str()),
+                        )
+                    })
+                })
                 .map_err(|err| {
                     CubeError::internal(format!("Could not determine data source: {err}"))
                 })?
@@ -4490,6 +4506,125 @@ impl<'ctx, 'mem> ExpressionVisitor for CollectMembersVisitor<'ctx, 'mem> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        compile::engine::df::scan::CubeScanOptions,
+        sql::HttpAuthContext,
+        transport::{CubeMeta, CubeMetaDimension, CubeMetaType},
+    };
+    use datafusion::logical_plan::DFField;
+    use std::collections::HashMap;
+
+    /// Each entry is a cube with one dimension, on a data source of its own.
+    fn meta_context_with_cubes(cubes: &[(&str, &str, &str)]) -> MetaContext {
+        MetaContext::new(
+            cubes
+                .iter()
+                .map(|(cube_name, member, _)| CubeMeta {
+                    name: cube_name.to_string(),
+                    description: None,
+                    title: None,
+                    r#type: CubeMetaType::Cube,
+                    dimensions: vec![CubeMetaDimension::new(
+                        member.to_string(),
+                        "string".to_string(),
+                    )],
+                    measures: vec![],
+                    segments: vec![],
+                    joins: None,
+                    folders: None,
+                    nested_folders: None,
+                    hierarchies: None,
+                    meta: None,
+                })
+                .collect(),
+            cubes
+                .iter()
+                .map(|(_, member, data_source)| (member.to_string(), data_source.to_string()))
+                .collect(),
+            HashMap::new(),
+            uuid::Uuid::new_v4(),
+        )
+    }
+
+    fn cube_scan_node(member_fields: Vec<MemberField>, used_cubes: Vec<String>) -> CubeScanNode {
+        let schema = Arc::new(
+            DFSchema::new_with_metadata(
+                member_fields
+                    .iter()
+                    .enumerate()
+                    .map(|(i, _)| DFField::new(None, &format!("c{i}"), DataType::Utf8, true))
+                    .collect::<Vec<_>>(),
+                HashMap::new(),
+            )
+            .unwrap(),
+        );
+
+        CubeScanNode::new(
+            schema,
+            member_fields,
+            V1LoadRequestQuery::new(),
+            Arc::new(HttpAuthContext {
+                access_token: "token".to_string(),
+                base_path: "path".to_string(),
+            }),
+            CubeScanOptions {
+                change_user: None,
+                max_records: None,
+                cache_mode: None,
+                throw_continue_wait: false,
+            },
+            used_cubes,
+            None,
+        )
+    }
+
+    /// A plain wrapped `CubeScan` whose columns are all literals has no member to
+    /// resolve a data source from, so it falls back to the cubes it scans. The
+    /// push-to-cube path has `test_wrapper_only_system_fields` for this; the SQL
+    /// surface never reaches this one, so it is covered here directly.
+    #[test]
+    fn test_data_source_for_cube_scan_without_members() {
+        let meta = meta_context_with_cubes(&[("Orders", "Orders.status", "warehouse")]);
+        let node = cube_scan_node(
+            vec![MemberField::Literal(ScalarValue::Utf8(Some(
+                "anything".to_string(),
+            )))],
+            vec!["Orders".to_string()],
+        );
+
+        let data_source = CubeScanWrapperNode::data_source_for_cube_scan(&meta, &node).unwrap();
+        assert!(matches!(data_source, DataSource::Specific("warehouse")));
+    }
+
+    /// With a member to resolve from, that member decides and the fallback must not
+    /// take over. `used_cubes` holds a second cube on another data source, so
+    /// falling back would merge the two into a conflict instead - that is what
+    /// makes the precedence observable rather than assumed.
+    #[test]
+    fn test_data_source_for_cube_scan_with_members() {
+        let meta = meta_context_with_cubes(&[
+            ("Orders", "Orders.status", "warehouse"),
+            ("Visits", "Visits.url", "analytics"),
+        ]);
+        let node = cube_scan_node(
+            vec![MemberField::regular("Orders.status".to_string())],
+            vec!["Orders".to_string(), "Visits".to_string()],
+        );
+
+        let data_source = CubeScanWrapperNode::data_source_for_cube_scan(&meta, &node).unwrap();
+        assert!(matches!(data_source, DataSource::Specific("warehouse")));
+    }
+
+    /// Literal-only columns and no cubes to fall back to: nothing restricts the
+    /// data source, and the caller raises its own error.
+    #[test]
+    fn test_data_source_for_cube_scan_without_members_or_cubes() {
+        let meta = meta_context_with_cubes(&[("Orders", "Orders.status", "warehouse")]);
+        let node = cube_scan_node(vec![MemberField::Literal(ScalarValue::Utf8(None))], vec![]);
+
+        let data_source = CubeScanWrapperNode::data_source_for_cube_scan(&meta, &node).unwrap();
+        assert!(matches!(data_source, DataSource::Unrestricted));
+    }
 
     #[test]
     fn test_member_expression_sql() {

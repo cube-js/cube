@@ -2809,3 +2809,47 @@ async fn test_case_wrapper_sum_case_date_only_string() {
         displayable(physical_plan.as_ref()).indent()
     );
 }
+
+/// Query can reference no members at all, only synthetic fields.
+/// Data source is resolved from cubes of the scan node in that case.
+#[tokio::test]
+async fn test_wrapper_only_system_fields() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        SELECT COUNT(DISTINCT "F0"."__user") AS "user_count",
+               COUNT(1) AS "row_count",
+               MIN("F0"."__user") AS "user_min",
+               MAX("F0"."__user") AS "user_max",
+               COUNT(DISTINCT "F0"."__cubeJoinField") AS "join_field_count",
+               MIN("F0"."__cubeJoinField") AS "join_field_min",
+               MAX("F0"."__cubeJoinField") AS "join_field_max"
+        FROM (
+            SELECT "T1"."__user" AS "__user", "T1"."__cubeJoinField" AS "__cubeJoinField"
+            FROM KibanaSampleDataEcommerce AS "T1"
+        ) AS "F0"
+        LIMIT 1
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains(r#"\"cubeName\":\"KibanaSampleDataEcommerce\""#),
+        "SQL contains member expressions for the scanned cube: {}",
+        sql
+    );
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+}
