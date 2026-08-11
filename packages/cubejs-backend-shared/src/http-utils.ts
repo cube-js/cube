@@ -1,4 +1,5 @@
-import decompress from 'decompress';
+import * as tar from 'tar';
+import extractZip from 'extract-zip';
 import fetch, { Headers, Request, Response } from 'node-fetch';
 import bytes from 'bytes';
 import { throttle } from 'throttle-debounce';
@@ -63,6 +64,70 @@ export async function streamWithProgress(
   );
 }
 
+/**
+ * Extract a downloaded archive.
+ *
+ * Dispatches on the archive's **magic bytes**, not its filename. That is not a
+ * stylistic choice: `streamWithProgress` saves to
+ * `crypto.randomBytes(16).toString('hex')` with no extension at all, so there is
+ * nothing to dispatch on by name. The `decompress` package this replaces sniffed
+ * content for the same reason.
+ *
+ * `decompress` is unmaintained and carries two unfixed archive-extraction
+ * advisories (GHSA-mp2f-45pm-3cg9, GHSA-h39j-r5qq-r9mm — both "extraction can
+ * create files outside the target directory"). Both replacements refuse to
+ * escape `cwd`: `tar` strips leading `/` and drops any entry containing `..`,
+ * and `extract-zip` resolves each entry against the target and rejects paths
+ * that leave it.
+ *
+ * `.tar.bz2`, which `decompress` also handled, is deliberately not supported —
+ * nothing in this repository produces one, and it would mean another dependency.
+ * It throws a named error rather than failing obscurely.
+ */
+export async function extractArchive(archivePath: string, cwd: string): Promise<void> {
+  // 262 bytes: enough for the `ustar` magic a plain tar carries at offset 257.
+  const header = Buffer.alloc(262);
+  const fd = await fs.promises.open(archivePath, 'r');
+
+  let bytesRead: number;
+
+  try {
+    ({ bytesRead } = await fd.read(header, 0, header.length, 0));
+  } finally {
+    await fd.close();
+  }
+
+  const startsWith = (...magic: number[]) => bytesRead >= magic.length && magic.every((byte, i) => header[i] === byte);
+
+  // gzip (1f 8b) covers .tar.gz/.tgz; `tar.x` gunzips transparently.
+  if (startsWith(0x1f, 0x8b)) {
+    await tar.x({ file: archivePath, cwd });
+    return;
+  }
+
+  // zip: "PK", or "PK" for an empty archive.
+  if (startsWith(0x50, 0x4b)) {
+    await extractZip(archivePath, { dir: path.resolve(cwd) });
+    return;
+  }
+
+  // Uncompressed tar: "ustar" at offset 257.
+  if (bytesRead >= 262 && header.slice(257, 262).toString('latin1') === 'ustar') {
+    await tar.x({ file: archivePath, cwd });
+    return;
+  }
+
+  if (startsWith(0x42, 0x5a, 0x68)) {
+    throw new Error(
+      'Unsupported archive format: bzip2. Supported formats are gzip (.tar.gz/.tgz), tar and zip.'
+    );
+  }
+
+  throw new Error(
+    'Unable to detect archive format from its contents. Supported formats are gzip (.tar.gz/.tgz), tar and zip.'
+  );
+}
+
 type DownloadAndExtractFile = {
   showProgress: boolean;
   cwd: string;
@@ -111,7 +176,7 @@ export async function downloadAndExtractFile(url: string, { cwd, skipExtract, ds
       fs.copyFileSync(savedFilePath, destPath);
     }
   } else {
-    await decompress(savedFilePath, cwd);
+    await extractArchive(savedFilePath, cwd);
   }
 
   try {

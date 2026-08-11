@@ -1,6 +1,5 @@
 import fs from 'fs-extra';
-import decompress from 'decompress';
-import decompressTargz from 'decompress-targz';
+import * as tar from 'tar';
 import path from 'path';
 import { executeCommand } from '@cubejs-backend/shared';
 
@@ -61,9 +60,13 @@ export class PackageFetcher {
   public async downloadPackages() {
     await this.downloadRepo();
 
-    await decompress(this.repoArchivePath, this.tmpFolderPath, {
-      plugins: [decompressTargz()],
-    });
+    // `decompress` + `decompress-targz` are unmaintained and carry two unfixed
+    // archive-extraction advisories (GHSA-mp2f-45pm-3cg9, GHSA-h39j-r5qq-r9mm).
+    // This call site only ever handled gzipped tars — it passed the targz plugin
+    // explicitly — so `tar.x` is a direct equivalent, and it refuses to write
+    // outside `cwd`: leading `/` is stripped and entries containing `..` are
+    // dropped.
+    await tar.x({ file: this.repoArchivePath, cwd: this.tmpFolderPath });
 
     const dir = fs.readdirSync(this.tmpFolderPath).find((name) => !name.endsWith('tar.gz'));
 
