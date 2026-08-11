@@ -104,6 +104,10 @@ Each control has a **Visibility** setting that determines how it appears on the 
 
 Set the visibility from the **Visibility** dropdown when editing the control. **Hidden** controls remain visible in the dashboard builder so editors can reconfigure them, but disappear from the published view.
 
+## Bookmarking and sharing
+
+On a published dashboard, changing a control's value updates the dashboard's URL (`?f_<View>.<member>=…` for filters). This makes your current filter and time-granularity selections bookmarkable and shareable — anyone opening the link sees the same values you had set. This applies to viewer-made changes on published dashboards only; picking a value in the dashboard builder sets the widget's saved default instead.
+
 ## Interaction with charts
 
 When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] whose query already uses the same dimension. Charts that don't reference that dimension are left alone, so a dashboard can mix scoped and unscoped views by default. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different dimension.

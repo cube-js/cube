@@ -27,7 +27,12 @@ Each chart shows the name of the underlying workbook tab as its title. To rename
 
 Use **Hide Title** in the widget's settings menu to suppress the title on the dashboard — useful when the chart's content already makes the subject obvious, or when an adjacent [text widget][ref-text] provides its own heading. Choose **Show Title** in the same menu to bring it back.
 
+## Downloading a chart
+
+Open a chart widget's menu (`⋮`) on a published dashboard and choose **Download as CSV**, **Download as PNG**, or **Download as PDF** to export that chart on its own, without downloading the whole dashboard. This uses the same server-rendered snapshot mechanism as the dashboard-level [Download as PNG or PDF][ref-dashboard-download] action, scoped to a single widget, and requires the same **Manage** permission on the workbook that owns the dashboard.
+
 [ref-workbooks]: /docs/explore-analyze/workbooks
+[ref-dashboard-download]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
 [ref-incompatible-controls]: /docs/explore-analyze/dashboards/widgets/controls#incompatible-controls
 [ref-text]: /docs/explore-analyze/dashboards/widgets/text

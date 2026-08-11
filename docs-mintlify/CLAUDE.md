@@ -124,7 +124,7 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
           - Controls 
             - Filter widget
             - Time grain switcher
-          - AI summary
+          - Analysis
     - **Dashboard**
       - Scheduled refresh
     - **Semantic Model**

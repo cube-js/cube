@@ -211,7 +211,7 @@ neither `listDeployments` nor the `chat` selection can reach an excluded deploym
 
 ## Available actions
 
-The MCP server exposes 16 tools, grouped below.
+The MCP server exposes 20 tools, grouped below.
 
 Every tool runs as the authenticated user. Queries respect the same
 [permissions][ref-roles] as the rest of Cube, including row-level security — MCP is a new
@@ -277,6 +277,19 @@ default. Users without it never see them.
 | `writeDataModelFile` | Creates or overwrites a model source file on the dev branch (whole-file replacement). Recompiles the model and reports `valid` plus any `validationError`. | Destructive — prompts |
 | `deleteDataModelFile` | Deletes a model source file on the dev branch. | Destructive — prompts |
 | `getDataModelChanges` | Shows the diff of the dev branch against its parent — the pending changes, for review before committing. | Read-only |
+| `getBranchDiff` | Diffs any branch against an arbitrary base (the deploy branch by default) — unlike `getDataModelChanges`, which only diffs a dev branch against its immediate parent. | Read-only |
+| `getDeploymentEnv` | Lists the deployment's environment variables, with secret-named values redacted. Useful for checking configuration (e.g., an export bucket) when a pre-aggregation build fails. | Read-only |
+
+### Pre-aggregations
+
+These tools verify that pre-aggregations defined in the data model actually build — including on an un-deployed dev branch, which `runQuery` can't reach since it only hits the deployed SQL API. Gated the same way as [Data model editing](#data-model-editing).
+
+| Tool | Description | Access |
+| --- | --- | --- |
+| `getPreAggregationStatus` | Lists pre-aggregations with their partitions, how many have built, the newest build time, and the exact error for any that failed. | Read-only |
+| `buildPreAggregation` | Triggers an on-demand build of one pre-aggregation. | Write |
+
+Both tools target the deploy branch by default; pass a dev `branchName` from `startDataModelEdit` to target that branch's dev worker instead.
 
 #### How model edits stay safe
 
@@ -293,7 +306,7 @@ into the MCP server:
   from the Cube UI, as described in [Development mode][ref-dev-mode]. The MCP server
   deliberately exposes no commit tool — an AI client can prepare changes, but only a
   person can ship them.
-- **Registration is permission-gated.** The six tools above are only offered to users
+- **Registration is permission-gated.** The tools above are only offered to users
   whose role allows editing the semantic model.
 
 Review pending work with `getDataModelChanges` before you commit.
