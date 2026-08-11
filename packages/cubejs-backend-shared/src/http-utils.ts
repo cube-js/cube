@@ -77,13 +77,19 @@ export async function streamWithProgress(
  * resolve successfully, leaving the caller to fail later on a confusing
  * missing-file error.
  *
- * Only `TAR_ENTRY_ERROR` — the code tar uses for a rejected path — goes through
- * `internalExceptions`, deliberately: that helper calls `process.exit(1)` under
- * `CUBEJS_INTERNAL_EXCEPTIONS=exit`, and tar also warns about benign conditions
- * (unsupported entry types such as fifos and devices, `TAR_ENTRY_INVALID`, failed
- * utime/chown). Routing those through it would let one odd entry in a third-party
- * tarball take the process down mid-download, where previously it extracted and
- * carried on. Everything else is logged and ignored, as tar itself treats it.
+ * Only `TAR_ENTRY_ERROR` goes through `internalExceptions`, deliberately: that
+ * helper calls `process.exit(1)` under `CUBEJS_INTERNAL_EXCEPTIONS=exit`, and tar
+ * also warns about benign conditions (unsupported entry types such as fifos and
+ * devices, `TAR_ENTRY_INVALID`, failed utime/chown). Routing those through it
+ * would let one odd entry in a third-party tarball take the process down
+ * mid-download, where previously it extracted and carried on.
+ *
+ * `TAR_ENTRY_ERROR` is not only the path-rejection code — measured, tar reports
+ * per-entry write failures through it too (a read-only target raises it once per
+ * entry, same as a `..` name does). Both belong on this side of the split: a
+ * half-extracted install is a real failure, and escalating it is what the opt-in
+ * `exit` setting asks for. Everything else is logged and ignored, as tar treats
+ * it.
  */
 const tarOptions = {
   preserveOwner: false,

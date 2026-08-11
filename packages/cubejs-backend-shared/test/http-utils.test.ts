@@ -82,7 +82,11 @@ describe('extractArchive', () => {
 
       const cdh = Buffer.alloc(46);
       cdh.writeUInt32LE(0x02014b50, 0); // central directory signature
-      cdh.writeUInt16LE(20, 4); // version made by
+      // version made by: high byte is the host system. 3 = unix, which is what a
+      // producer capable of recording a symlink emits — with the default 0 (MS-DOS)
+      // the external-attributes field is formally DOS attribute bits and the unix
+      // mode below is not meant to be read at all.
+      cdh.writeUInt16LE((3 << 8) | 20, 4);
       cdh.writeUInt16LE(10, 6); // version needed
       cdh.writeUInt16LE(0, 10); // method: stored
       cdh.writeUInt32LE(sum, 16);
