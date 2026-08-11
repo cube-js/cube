@@ -65,26 +65,47 @@ export async function streamWithProgress(
 }
 
 /**
- * Extract a downloaded archive.
+ * Options shared by every `tar.x` call here.
  *
- * Dispatches on the archive's **magic bytes**, not its filename. That is not a
- * stylistic choice: `streamWithProgress` saves to
- * `crypto.randomBytes(16).toString('hex')` with no extension at all, so there is
- * nothing to dispatch on by name. The `decompress` package this replaces sniffed
- * content for the same reason.
+ * `preserveOwner` defaults to true when running as root, which is the normal case
+ * inside the Cube image; extracted files would then take whatever uid/gid the
+ * tarball recorded. Writing as the current user matches how this path has always
+ * behaved.
  *
- * `decompress` is unmaintained and carries two unfixed archive-extraction
- * advisories (GHSA-mp2f-45pm-3cg9, GHSA-h39j-r5qq-r9mm — both "extraction can
- * create files outside the target directory"). Both replacements refuse to
- * escape `cwd`: `tar` strips leading `/` and drops any entry containing `..`,
- * and `extract-zip` resolves each entry against the target and rejects paths
- * that leave it.
+ * `onwarn` is load-bearing: tar *drops* unsafe entries with a warning rather than
+ * failing, so an archive consisting only of `../evil` would extract to nothing and
+ * resolve successfully, leaving the caller to fail later on a confusing
+ * missing-file error.
+ */
+const tarOptions = {
+  preserveOwner: false,
+  onwarn: (code: string, message: string) => {
+    internalExceptions(new Error(`tar skipped an entry while extracting (${code}): ${message}`));
+  },
+};
+
+/**
+ * Extract a downloaded archive into `cwd`, which is created if missing.
  *
- * `.tar.bz2`, which `decompress` also handled, is deliberately not supported —
- * nothing in this repository produces one, and it would mean another dependency.
- * It throws a named error rather than failing obscurely.
+ * Dispatches on magic bytes, not the filename, because there is no filename to
+ * dispatch on: `streamWithProgress` saves downloads as
+ * `crypto.randomBytes(16).toString('hex')`, with no extension.
+ *
+ * Handles gzip (`.tar.gz` / `.tgz`), uncompressed tar and zip. Two gaps are
+ * deliberate and both throw a named error rather than failing obscurely: bzip2,
+ * and pre-POSIX v7 tars, which carry no `ustar` magic at offset 257 to detect them
+ * by.
+ *
+ * Neither backend writes outside `cwd`: `tar` strips a leading `/` on extraction and
+ * drops entries containing `..`, and `extract-zip` rejects entries that resolve outside
+ * the target.
  */
 export async function extractArchive(archivePath: string, cwd: string): Promise<void> {
+  // `extract-zip` creates its target but `tar.x` throws `CwdError` when it is
+  // missing, so without this the contract would depend on the archive's format —
+  // which callers cannot know in advance, that being the point of magic-byte dispatch.
+  mkdirpSync(cwd);
+
   // 262 bytes: enough for the `ustar` magic a plain tar carries at offset 257.
   const header = Buffer.alloc(262);
   const fd = await fs.promises.open(archivePath, 'r');
@@ -101,19 +122,20 @@ export async function extractArchive(archivePath: string, cwd: string): Promise<
 
   // gzip (1f 8b) covers .tar.gz/.tgz; `tar.x` gunzips transparently.
   if (startsWith(0x1f, 0x8b)) {
-    await tar.x({ file: archivePath, cwd });
+    await tar.x({ file: archivePath, cwd, ...tarOptions });
     return;
   }
 
-  // zip: "PK", or "PK" for an empty archive.
+  // zip: the two-byte "PK" prefix, shared by a local file header and by the
+  // end-of-central-directory record that an empty archive consists of.
   if (startsWith(0x50, 0x4b)) {
     await extractZip(archivePath, { dir: path.resolve(cwd) });
     return;
   }
 
   // Uncompressed tar: "ustar" at offset 257.
-  if (bytesRead >= 262 && header.slice(257, 262).toString('latin1') === 'ustar') {
-    await tar.x({ file: archivePath, cwd });
+  if (bytesRead >= 262 && header.subarray(257, 262).toString('latin1') === 'ustar') {
+    await tar.x({ file: archivePath, cwd, ...tarOptions });
     return;
   }
 

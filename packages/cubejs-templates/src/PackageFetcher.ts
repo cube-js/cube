@@ -60,13 +60,15 @@ export class PackageFetcher {
   public async downloadPackages() {
     await this.downloadRepo();
 
-    // `decompress` + `decompress-targz` are unmaintained and carry two unfixed
-    // archive-extraction advisories (GHSA-mp2f-45pm-3cg9, GHSA-h39j-r5qq-r9mm).
-    // This call site only ever handled gzipped tars — it passed the targz plugin
-    // explicitly — so `tar.x` is a direct equivalent, and it refuses to write
-    // outside `cwd`: leading `/` is stripped and entries containing `..` are
-    // dropped.
-    await tar.x({ file: this.repoArchivePath, cwd: this.tmpFolderPath });
+    // Only ever a gzipped tar (GitHub's /archive/<ref>.tar.gz). `tar.x` refuses to
+    // write outside `cwd`: a leading `/` is stripped on extraction and entries containing `..` are
+    // dropped — but dropped with a warning rather than an error, so surface it.
+    await tar.x({
+      file: this.repoArchivePath,
+      cwd: this.tmpFolderPath,
+      preserveOwner: false,
+      onwarn: (code, message) => console.warn(`tar skipped an entry (${code}): ${message}`),
+    });
 
     const dir = fs.readdirSync(this.tmpFolderPath).find((name) => !name.endsWith('tar.gz'));
 

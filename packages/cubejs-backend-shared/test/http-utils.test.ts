@@ -35,6 +35,23 @@ describe('extractArchive', () => {
   };
 
   /**
+   * Assert the fixture really is hostile before extracting it.
+   *
+   * The zip fixtures are safe by construction — the rejection itself proves the
+   * hostile name survived into the archive. The tar fixtures have no such witness:
+   * absolute-path stripping already happens in tar's `WriteEntry` constructor, and
+   * only ordering keeps the `..` name assigned in `onWriteEntry` intact. If a future
+   * tar normalises it, the fixture silently becomes benign and these tests keep
+   * passing while proving nothing — the exact trap the zip fixture is hand-rolled to
+   * avoid. So read the names back.
+   */
+  const storedNames = async (archive: string) => {
+    const names: string[] = [];
+    await tar.t({ file: archive, onReadEntry: (e) => names.push(e.path) });
+    return names;
+  };
+
+  /**
    * Build a .zip with entry names stored verbatim.
    *
    * Hand-rolled (stored/uncompressed, so no deflate needed) rather than using a
@@ -126,17 +143,30 @@ describe('extractArchive', () => {
   describe('refuses to write outside the target directory', () => {
     it('drops a tar entry that traverses up with ..', async () => {
       const archive = path.join(work, 'evil.tar.gz');
-      await writeTarGz(archive, [{ name: '../PWNED.txt', content: 'pwned' }]);
+      await writeTarGz(archive, [
+        { name: '../PWNED.txt', content: 'pwned' },
+        // A benign sibling, so a pass distinguishes "dropped the bad entry" from
+        // "extracted nothing at all".
+        { name: 'safe.txt', content: 'safe' },
+      ]);
 
-      await extractArchive(archive, targetDir());
+      expect(await storedNames(archive)).toContain('../PWNED.txt');
+
+      const target = targetDir();
+      await extractArchive(archive, target);
 
       expect(fs.existsSync(path.join(work, 'PWNED.txt'))).toBe(false);
+      expect(fs.readFileSync(path.join(target, 'safe.txt'), 'utf8')).toBe('safe');
     });
 
     it('contains a tar entry with an absolute path instead of honouring it', async () => {
       const archive = path.join(work, 'abs.tar.gz');
       const escapeTo = path.join(work, 'ABS_PWNED.txt');
       await writeTarGz(archive, [{ name: escapeTo, content: 'pwned' }]);
+
+      // The absolute name survives verbatim into the archive — tar strips the leading
+      // `/` when *extracting*, not when writing — so the fixture really is hostile.
+      expect(await storedNames(archive)).toContain(escapeTo);
 
       const target = targetDir();
       await extractArchive(archive, target);
@@ -168,6 +198,10 @@ describe('extractArchive', () => {
         { name: 'esc', symlinkTo: outside },
         { name: 'esc/SYM_PWNED.txt', content: 'pwned' },
       ]);
+
+      expect(await storedNames(archive)).toEqual(
+        expect.arrayContaining(['esc', 'esc/SYM_PWNED.txt'])
+      );
 
       // Either it refuses the entry or it writes inside the target; it must not
       // materialise a file in `outside`.
