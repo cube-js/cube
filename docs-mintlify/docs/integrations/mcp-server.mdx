@@ -19,12 +19,29 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 
 ## Overview
 
-Cube hosts an MCP server endpoint for your tenant. MCP clients connect over HTTPS and authenticate via OAuth.
+Cube hosts an MCP server endpoint. MCP clients connect over HTTPS and authenticate via OAuth.
 
-- **Endpoint:** `https://<cube-mcp-server-host>/api/mcp`
-- **OAuth discovery:** `https://<cube-mcp-server-host>/.well-known/oauth`
-- **OAuth flow:** Authorization Code + PKCE, `client_id` = `cube-mcp-client`, scope = `mcp-agent-access`
+- **Endpoint:** `https://cubecloud.dev/mcp`
+- **OAuth flow:** Authorization Code + PKCE, `client_id` = `cube-mcp-client`, scope = `mcp-agent-access`. Clients discover it automatically from the endpoint — there is nothing to configure by hand.
+- **Account selection:** You sign in to Cube as part of the OAuth flow and, if you belong to more than one account, choose which one to connect.
 - **Deployment selection:** On connect, the client lands on the tenant **default deployment** set by your admin (or the first deployment you can access). Clients can also target a specific deployment and agent per request — see [Select a deployment and agent](#select-a-deployment-and-agent).
+
+### One endpoint for everyone
+
+`https://cubecloud.dev/mcp` is the same URL for every account, deployment and region. Cube
+identifies your account from the OAuth token and routes each request to whichever
+deployment serves it, so there is no per-tenant host to look up before you can connect.
+
+<Note>
+
+If Cube runs in your own cloud account or on your own domain, use that console domain
+instead — `https://<your-console-domain>/mcp`.
+
+</Note>
+
+Each deployment also keeps a **region-specific endpoint**, shown under
+**Admin → MCP Server**. Both work. Prefer the single endpoint above unless you need a
+client to reach a deployment's region directly without passing through the control plane.
 
 ## Admin setup
 
@@ -34,11 +51,12 @@ Before enabling MCP, make sure you have:
 
 - **Admin privileges** in your Cube instance
 - An active Cube tenant
-- MCP server URL configured
 
-### 1) Confirm MCP server URL
+### 1) Check the MCP page
 
-MCP uses your Cube MCP server host. If the URL isn’t configured, the MCP page will show “MCP configuration is unavailable.”
+Go to **Admin → MCP Server**. The page shows the endpoint to hand to clients along with
+ready-made setup snippets for each supported client. If it reads “MCP configuration is
+unavailable,” the MCP server host isn’t configured for the account yet.
 
 ### 2) Configure deployment access
 
@@ -70,7 +88,7 @@ authenticated user is allowed to see.
 ### Claude Code
 
 ```bash
-claude mcp add --transport http cube-mcp-server https://<cube-mcp-server-host>/api/mcp
+claude mcp add --transport http cube-mcp-server https://cubecloud.dev/mcp
 ```
 
 #### Authentication and usage flow:
@@ -78,9 +96,9 @@ claude mcp add --transport http cube-mcp-server https://<cube-mcp-server-host>/a
 1. Run the command copied from **Admin → MCP Server → AI Clients → Claude Code**.
 2. Then run Claude and use `/mcp` to list available servers.
 3. Select `cube-mcp-server` and choose `Authenticate`.
-2. A browser window opens for authentication.
-3. Log into Cube and choose your tenant.
-4. Return to Claude Code and start asking questions.
+4. A browser window opens for authentication.
+5. Log into Cube and choose your tenant.
+6. Return to Claude Code and start asking questions.
 
 <Frame>
   <img src="https://lgo0ecceic.ucarecd.net/68c3e7e2-def2-4aec-84a5-8cded3473def/" />
@@ -92,7 +110,7 @@ claude mcp add --transport http cube-mcp-server https://<cube-mcp-server-host>/a
 2. Scroll to **Integrations** and click **Add more**.
 3. Use:
    - **Integration name:** Cube MCP
-   - **Integration URL:** `https://<cube-mcp-server-host>/api/mcp`
+   - **Integration URL:** `https://cubecloud.dev/mcp`
 4. Complete the OAuth flow to grant access.
 5. Enable tools in any new chats.
 
@@ -109,7 +127,7 @@ claude mcp add --transport http cube-mcp-server https://<cube-mcp-server-host>/a
   "mcpServers": {
     "cube-mcp-server": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "--transport", "http", "https://<cube-mcp-server-host>/api/mcp"]
+      "args": ["-y", "mcp-remote", "--transport", "http", "https://cubecloud.dev/mcp"]
     }
   }
 }
@@ -124,7 +142,7 @@ Add the MCP endpoint under Tools & MCP Settings, then complete the OAuth flow.
   "mcpServers": {
     "cube-mcp-server": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "--transport", "http", "https://<cube-mcp-server-host>/api/mcp"]
+      "args": ["-y", "mcp-remote", "--transport", "http", "https://cubecloud.dev/mcp"]
     }
   }
 }
@@ -135,7 +153,7 @@ Add the MCP endpoint under Tools & MCP Settings, then complete the OAuth flow.
 Preferred (CLI):
 
 ```bash
-codex mcp add cube-mcp-server --url https://<cube-mcp-server-host>/api/mcp
+codex mcp add cube-mcp-server --url https://cubecloud.dev/mcp
 ```
 
 If this is your first time using MCP in Codex, enable the feature in `~/.codex/config.toml`:
@@ -152,7 +170,7 @@ Manual setup:
 rmcp_client = true
 
 [mcp_servers."cube-mcp-server"]
-url = "https://<cube-mcp-server-host>/api/mcp"
+url = "https://cubecloud.dev/mcp"
 ```
 
 Then run `codex mcp login cube-mcp-server` to authenticate.
@@ -211,7 +229,7 @@ neither `listDeployments` nor the `chat` selection can reach an excluded deploym
 
 ## Available actions
 
-The MCP server exposes 16 tools, grouped below.
+The MCP server exposes 20 tools, grouped below.
 
 Every tool runs as the authenticated user. Queries respect the same
 [permissions][ref-roles] as the rest of Cube, including row-level security — MCP is a new
@@ -277,6 +295,21 @@ default. Users without it never see them.
 | `writeDataModelFile` | Creates or overwrites a model source file on the dev branch (whole-file replacement). Recompiles the model and reports `valid` plus any `validationError`. | Destructive — prompts |
 | `deleteDataModelFile` | Deletes a model source file on the dev branch. | Destructive — prompts |
 | `getDataModelChanges` | Shows the diff of the dev branch against its parent — the pending changes, for review before committing. | Read-only |
+| `getBranchDiff` | Shows what **any** branch changed against the deploy branch: the changed-file list with per-file line counts, plus the unified diff. | Read-only |
+| `getDeploymentEnv` | Lists the deployment's environment variables, with every secret-looking value redacted to `[ENCRYPTED]`. Useful for confirming configuration is present and shaped as expected. | Read-only |
+
+`getDataModelChanges` answers "what have I changed?" for your own dev branch against its
+immediate parent. `getBranchDiff` answers "what did this branch change?" for any branch,
+including feature branches — reach for it when a change edits existing cubes, where the
+file list looks identical on both branches and `listDataModelFiles` reveals nothing.
+
+<Note>
+
+`getDeploymentEnv` never returns secret values. Anything that looks like a credential is
+replaced with `[ENCRYPTED]` before it leaves Cube, so an AI client can verify that a
+variable is set without ever seeing what it is set to.
+
+</Note>
 
 #### How model edits stay safe
 
@@ -293,10 +326,36 @@ into the MCP server:
   from the Cube UI, as described in [Development mode][ref-dev-mode]. The MCP server
   deliberately exposes no commit tool — an AI client can prepare changes, but only a
   person can ship them.
-- **Registration is permission-gated.** The six tools above are only offered to users
-  whose role allows editing the semantic model.
+- **Registration is permission-gated.** Every tool in the two sections above — the six
+  model-editing tools, `getBranchDiff`, `getDeploymentEnv`, and both pre-aggregation
+  tools — is offered only to users whose role allows editing the semantic model. A Viewer
+  never sees them at all.
 
 Review pending work with `getDataModelChanges` before you commit.
+
+### Pre-aggregations
+
+These tools inspect and trigger [pre-aggregation][ref-pre-aggregations] builds. They are
+registered under the same semantic-model permission as the data model tools above.
+
+| Tool | Description | Access |
+| --- | --- | --- |
+| `getPreAggregationStatus` | Lists the data model's pre-aggregations with their definitions and, for each, how many partitions exist, how many were built, when the newest build landed, and the exact error if a build failed. | Read-only |
+| `buildPreAggregation` | Queues an on-demand build of one pre-aggregation and returns once it is accepted. The build runs asynchronously. | Write |
+
+Together these close the loop on pre-aggregation work: a query alone cannot prove a rollup
+was used, and external pre-aggregations fail in configuration-specific ways — a missing
+export bucket, denied bucket permissions — that only an actual build surfaces. Call
+`buildPreAggregation`, then poll `getPreAggregationStatus` to see whether the partitions
+built or to read the failure.
+
+<Note>
+
+`buildPreAggregation` runs real queries against your data warehouse and, for external
+pre-aggregations, writes through the export bucket. It consumes warehouse resources, so
+expect a cost per build.
+
+</Note>
 
 ## Example workflows
 
@@ -350,6 +409,20 @@ recompiles the model and reports validation errors, so you can iterate until it 
 Review the result with `getDataModelChanges`, then commit the branch from the Cube UI to
 publish it.
 
+To review a branch you didn't author — a colleague's feature branch, say — call
+`getBranchDiff` with its name instead. It compares against the deploy branch and returns
+the full changed-file list even when the patch itself is trimmed.
+
+### Verify a pre-aggregation
+
+After adding or changing a pre-aggregation, call `getPreAggregationStatus` to see whether
+its partitions exist and when they were last built. If nothing has been built yet — or you
+want to confirm an external pre-aggregation's export bucket actually works — call
+`buildPreAggregation`, then poll `getPreAggregationStatus` again. A failed build reports
+the exact error, which is usually a configuration problem rather than a modeling one;
+`getDeploymentEnv` will tell you whether the expected variables (`CUBEJS_DB_EXPORT_BUCKET`
+and friends) are set.
+
 ## Troubleshooting
 
 - **MCP configuration is unavailable**: Configure the MCP server URL.
@@ -358,6 +431,7 @@ publish it.
 - **`Deployment <id> is not available via MCP for this account` (403)**: The requested deployment is excluded by the deployment-access allow-list or by the user's permissions. Call `listDeployments` to see which deployments are reachable, or adjust the allow-list in **Admin → MCP Server → Deployment Access**.
 
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-pre-aggregations]: /docs/pre-aggregations/using-pre-aggregations
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-dashboards]: /docs/explore-analyze/dashboards
