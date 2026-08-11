@@ -179,14 +179,12 @@ describe('extractArchive', () => {
       const target = targetDir();
       await extractArchive(archive, target);
 
-      // tar strips the leading `/` rather than writing to the absolute location,
-      // so the entry lands *inside* the target.
+      // tar strips the leading `/` rather than writing to the absolute location, so
+      // the entry lands *inside* the target, re-rooted at its otherwise-unchanged
+      // path. Assert that positively: "nothing escaped" alone cannot distinguish
+      // contained from dropped.
       expect(fs.existsSync(escapeTo)).toBe(false);
-      const landed = fs.readdirSync(target, { recursive: true }) as string[];
-      expect(landed.length).toBeGreaterThan(0);
-      for (const entry of landed) {
-        expect(path.resolve(target, entry).startsWith(path.resolve(target))).toBe(true);
-      }
+      expect(fs.existsSync(path.join(target, escapeTo))).toBe(true);
     });
 
     it('rejects a zip entry that traverses up with .. (Zip Slip)', async () => {
