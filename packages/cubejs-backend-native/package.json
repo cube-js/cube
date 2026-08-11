@@ -47,7 +47,7 @@
     "jest-bench": "^29",
     "pg": "^8.11.3",
     "typescript": "~5.2.2",
-    "uuid": "^8.3.2"
+    "uuid": "^11.1.1"
   },
   "dependencies": {
     "@cubejs-backend/cubesql": "1.7.18",
