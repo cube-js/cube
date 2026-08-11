@@ -88,12 +88,14 @@ Under a column pivot, a width set on a measure applies to every column generated
 
 By default, a column displays its value. It can also be drawn as an inline link, an inline bar, a sparkline, or an image — from the column's card in the **Columns** section of the **Style** tab.
 
-Each card has a **Value** toggle and, next to it, a group of icon buttons for **inline bars**, **sparkline**, **link**, and **image**:
+Each card has a **Value** toggle, a **Bars** / **Sparkline** pair, and separate **Link**
+and **Image** buttons:
 
 - **Value** shows the formatted value in the cell. It **composes** with a bar or a sparkline rather than excluding it — a cell can show a bar and its value together.
-- The icon buttons are mutually exclusive: picking one replaces whichever was active. Clicking the active one again clears it, returning the column to a plain value.
-- With none of them active, **Value** is forced on and its toggle disabled — so a plain column always shows its value.
-- Each button is offered only where it applies: bars and sparklines on **numeric** columns, **link** only on a column whose dimension declares links or uses `format: link` (see [Inline links](#inline-links)), and **image** on any **string** column (see [Images](#images)). In link mode the value *is* the link text, so **Value** stays forced on there too; image mode draws the thumbnail instead of the value, so **Value** is forced off and its toggle disabled. Only bars and sparklines leave the toggle free, because only they draw something the value can sit beside.
+- **Bars** and **Sparkline** are mutually exclusive: picking one replaces the other, and clicking the active one again clears it.
+- **Link** and **Image** are independent of each other, so a column can be both — an image with a declared link renders as a clickable thumbnail. Switching one off leaves the other alone.
+- With nothing active, **Value** is forced on and its toggle disabled — so a plain column always shows its value.
+- Each button is offered only where it applies: bars and sparklines on **numeric** columns, **Link** only on a column whose dimension declares links or uses `format: link` (see [Inline links](#inline-links)), and **Image** where the dimension declares `format: imageUrl` or the column's values are image URLs (see [Images](#images)). In link mode the value *is* the link text, so **Value** stays forced on there too; image mode draws the thumbnail instead of the value, so **Value** is forced off and its toggle disabled. Only bars and sparklines leave the toggle free, because only they draw something the value can sit beside.
 
 {/* TODO: screenshot — a column card showing the Value toggle beside the inline bars / sparkline / link buttons */}
 
@@ -178,14 +180,15 @@ A column whose values are image URLs can render them as inline thumbnails.
 
 A dimension declared with
 [`format: imageUrl`](/reference/data-modeling/dimensions#format) renders as thumbnails
-straight away, with no chart configuration — the data model is enough. For any other
-string column, select the **image** button on the column's card to switch it on.
+straight away, with no chart configuration — the data model is enough. Any other string
+column offers an **Image** button on the column's card once its values look like image
+URLs, so you can render an unmodelled column of URLs without changing the data model.
 
 | Option | Description |
 |---|---|
-| **Image height** | Thumbnail height in pixels, 24 by default and up to 96. Sits beside the column's width control. The row grows to fit it and doesn't shift as images load. |
-| **Image shape** | **Square**, **Rounded**, or **Circle**. |
+| **Image shape** | **Square** or **Circle**. |
 | **Image fit** | **Fit whole image** shows the whole image inside the box; **Fill and crop** fills the box, cropping the overflow. |
+| **Image height** | Thumbnail height in pixels, 20 by default and up to 100, in steps of ten. The row grows to fit it and doesn't shift as images load. |
 
 Cells that can't render an image degrade rather than break: an empty value, a total or
 subtotal row, and a URL whose scheme isn't `https` or `data:image/*` all render as plain
@@ -196,7 +199,9 @@ Copying a cell copies the URL, not the image — the same value that lands in an
 
 A thumbnail is clickable only where the dimension also declares
 [`links`](/docs/data-modeling/dimensions#links); the `imageUrl` format makes a value an
-image source, not a destination.
+image source, not a destination. **Image** and **Link** are independent buttons, so a
+column that declares both can render a clickable thumbnail — or you can switch either off
+on its own.
 
 <Info>
 
@@ -278,7 +283,7 @@ The **Values** alignment control shows left until you set it, even where numeric
 
 </Note>
 
-Vertical alignment is always available, but it only has a visible effect once a row is taller than one line — set **Overflow** to wrap, or turn on **Word wrap** for an individual column, and the shorter cells beside a wrapped value will sit at the top, middle, or bottom as you choose. Until you set a vertical alignment, values sit at the top. A per-column setting overrides the table-wide one.
+Vertical alignment is always available, but it only has a visible effect once a row is taller than one line — set **Overflow** to wrap, or turn on **Word wrap** for an individual column, and the shorter cells beside a wrapped value will sit at the top, middle, or bottom as you choose. Values are vertically centred unless you choose otherwise. A per-column setting overrides the table-wide one.
 
 The **Values** section also holds these table-wide row toggles, shown as icon buttons:
 
