@@ -20,7 +20,7 @@ Series mapping controls which query columns are assigned to which chart channels
 
 ## Assigning fields
 
-Each channel is a dropdown. Open the channel you want to fill and pick a column from the list — the chart updates as soon as you choose.
+Each channel is a dropdown. Open the channel you want to fill and pick a column from the list — the chart updates as soon as you choose. The **Tooltip** channel is the exception: it holds several fields, one dropdown per row — see [tooltips](/docs/explore-analyze/charts/configuration/tooltips).
 
 The same column can be used in more than one channel. Picking a dimension for the X axis does not remove it from the tooltip, so you can show a field on both.
 
@@ -34,4 +34,4 @@ While the chart is in this multi-series mode, the Color channel stays pinned to 
 
 ## Removing a field
 
-Clear the channel with the **×** on its dropdown. The chart re-renders without that encoding.
+Clear the channel with the **×** on its dropdown. The chart re-renders without that encoding. In the **Tooltip** channel the **×** removes one row, leaving the other tooltip fields in place.

@@ -68,7 +68,7 @@ The Base Role is required. Save is disabled until one is selected.
 
 #### Auto-bump to Developer
 
-If you check any deployment-scoped action stronger than **Access deployment** (`DeploymentRead`) — for example, **Edit deployment** or **Edit data model** — the Base Role is automatically forced to **Developer**, and the Viewer and Explorer options are disabled with a tooltip:
+If you check any deployment-scoped action other than **Access deployment** (`DeploymentRead`), **Access AI agents** (`DeploymentAgentRead`), and **Download data** (`DownloadData`) — for example, **Edit deployment** or **Edit data model** — the Base Role is automatically forced to **Developer**, and the Viewer and Explorer options are disabled with a tooltip:
 
 > Selected permissions require Developer access
 
