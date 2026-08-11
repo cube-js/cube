@@ -5382,10 +5382,16 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         vol = Stable
     );
     register_fun_stub!(udf, "unistr", tsig = [Utf8], rettyp = Utf8);
+    // In Postgres the bucket count is int4, but integer literals are parsed as Int64 here,
+    // and Int64 is never coerced down to Int32. Accept both so that a plain literal count
+    // like "width_bucket(x, 0, 100, 10)" plans.
     register_fun_stub!(
         udf,
         "width_bucket",
-        tsig = [Float64, Float64, Float64, Int32],
+        tsigs = [
+            [Float64, Float64, Float64, Int32],
+            [Float64, Float64, Float64, Int64],
+        ],
         rettyp = Int32
     );
     // TODO: "width_bucket" also has a two-arg variant with anyarray args

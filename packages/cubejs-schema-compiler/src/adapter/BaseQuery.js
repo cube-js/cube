@@ -4565,6 +4565,7 @@ export class BaseQuery {
         DATE: 'DATE({{ args_concat }})',
 
         PERCENTILECONT: 'PERCENTILE_CONT({{ args_concat }})',
+        WIDTH_BUCKET: 'WIDTH_BUCKET({{ args_concat }})',
       },
       statements: {
         select: '{% if ctes %} WITH {% if recursive %}RECURSIVE {% endif %}\n' +

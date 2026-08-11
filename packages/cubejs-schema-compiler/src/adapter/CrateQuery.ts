@@ -13,4 +13,10 @@ export class CrateQuery extends PostgresQuery {
   public countDistinctApprox(sql: string): string {
     return `hyperloglog_distinct(${sql})`;
   }
+
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    delete templates.functions.WIDTH_BUCKET;
+    return templates;
+  }
 }

@@ -363,6 +363,7 @@ export class CubeStoreQuery extends BaseQuery {
     // across partitioned tables is unsafe. Don't push those join types down to CubeStore.
     delete templates.join_types.full;
     delete templates.join_types.right;
+    delete templates.functions.WIDTH_BUCKET;
     return templates;
   }
 }
