@@ -284,8 +284,9 @@ be adjusted per column on the chart's Style tab. Values that aren't `https` or
 
 <Info>
 
-Images are fetched directly by the viewer's browser, so they must be publicly reachable
-over `https` — Cube does not proxy or cache them.
+Images at `https` URLs are fetched directly by the viewer's browser, so they must be
+publicly reachable — Cube does not proxy or cache them. `data:image/*` values are
+rendered inline and need no network access.
 
 </Info>
 

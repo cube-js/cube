@@ -93,7 +93,7 @@ Each card has a **Value** toggle and, next to it, a group of icon buttons for **
 - **Value** shows the formatted value in the cell. It **composes** with a bar or a sparkline rather than excluding it — a cell can show a bar and its value together.
 - The icon buttons are mutually exclusive: picking one replaces whichever was active. Clicking the active one again clears it, returning the column to a plain value.
 - With none of them active, **Value** is forced on and its toggle disabled — so a plain column always shows its value.
-- Each button is offered only where it applies: bars and sparklines on **numeric** columns, **link** only on a column whose dimension declares links or uses `format: link` (see [Inline links](#inline-links)), and **image** on any **string** column (see [Images](#images)). In link mode the value *is* the link text, so **Value** stays forced on there too; image mode draws the thumbnail instead of the value, so **Value** is off.
+- Each button is offered only where it applies: bars and sparklines on **numeric** columns, **link** only on a column whose dimension declares links or uses `format: link` (see [Inline links](#inline-links)), and **image** on any **string** column (see [Images](#images)). In link mode the value *is* the link text, so **Value** stays forced on there too; image mode draws the thumbnail instead of the value, so **Value** is forced off and its toggle disabled. Only bars and sparklines leave the toggle free, because only they draw something the value can sit beside.
 
 {/* TODO: screenshot — a column card showing the Value toggle beside the inline bars / sparkline / link buttons */}
 
@@ -183,7 +183,7 @@ string column, select the **image** button on the column's card to switch it on.
 
 | Option | Description |
 |---|---|
-| **Image height** | Thumbnail height in pixels, up to 96. Sits beside the column's width control. The row grows to fit it and doesn't shift as images load. |
+| **Image height** | Thumbnail height in pixels, 24 by default and up to 96. Sits beside the column's width control. The row grows to fit it and doesn't shift as images load. |
 | **Image shape** | **Square**, **Rounded**, or **Circle**. |
 | **Image fit** | **Fit whole image** shows the whole image inside the box; **Fill and crop** fills the box, cropping the overflow. |
 
@@ -200,8 +200,9 @@ image source, not a destination.
 
 <Info>
 
-Images are fetched directly by the viewer's browser, so they must be publicly reachable
-over `https` — Cube does not proxy or cache them.
+Images at `https` URLs are fetched directly by the viewer's browser, so they must be
+publicly reachable — Cube does not proxy or cache them. `data:image/*` values are
+rendered inline and need no network access.
 
 </Info>
 
