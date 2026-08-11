@@ -289,6 +289,9 @@ export class FilterMember {
 
   asArray(): any[] {
     return this.filters.map((filter) => {
+      if (filter.or) {
+        return { or: asArray(filter.or) };
+      }
       return {
         ...this.query.meta.resolveMember(filter.member || filter.dimension, [
           'dimensions',
