@@ -3,9 +3,10 @@ title: Time zones
 description: Run queries in the time zone your readers actually work in — account-wide, per user, and per dashboard.
 ---
 
-By default, every query Cube runs buckets time in the deployment's Account Time Zone
-(the [`CUBEJS_DEFAULT_TIMEZONE`](/reference/configuration/environment-variables#cubejs_default_timezone)
-environment variable, `UTC` unless you change it). That means "orders today" answers the
+By default, every query Cube runs buckets time in the deployment's
+[default time zone](/docs/data-modeling/configuration#default-time-zone) — the
+[`CUBEJS_DEFAULT_TIMEZONE`](/reference/configuration/environment-variables#cubejs_default_timezone)
+environment variable, `UTC` unless you change it. That means "orders today" answers the
 same question for everyone, regardless of where they sit — which is wrong by up to a day
 for anyone outside that zone.
 
@@ -16,8 +17,8 @@ dashboard instead.
 
 This feature is **off by default**, and turning it on **moves numbers**. While it is
 off, nothing changes for anyone. Once it is on, a reader whose effective zone differs
-from the Account Time Zone sees different daily, weekly, and monthly totals — because
-the days are cut in a different place.
+from that default sees different daily, weekly, and monthly totals — because the days
+are cut in a different place.
 
 </Warning>
 
@@ -45,11 +46,12 @@ made:
 | Control | What it does |
 | --- | --- |
 | **Enable user time zones** | The master switch. Off by default; while off, no surface resolves a zone at all. |
-| **Tenant time zone** | The zone everyone in the account gets unless they override it. Leave it as **Deployment default** to keep using each deployment's Account Time Zone. |
+| **Tenant time zone** | The account-wide zone: everyone gets it unless they override it. Leave it as **Deployment default** to keep using each deployment's own default. |
 | **Allow personal time zones** | Whether users may choose their own zone on their Preferences page. On by default once the feature is enabled. |
 
 The last two appear only while the feature is enabled, and they apply to every user in
-the tenant.
+the account. The UI labels the middle control **Tenant time zone**; this page calls the
+zone it sets the *account-wide zone*, matching how the docs scope things.
 
 {/* TODO: screenshot — Admin → Settings → Time Zones card with the three controls */}
 
@@ -60,7 +62,7 @@ When **Allow personal time zones** is on, each user can pick their own zone unde
 the user has explicitly chosen is ever applied — Cube never silently uses the browser's
 zone, though it will offer the detected zone as a suggestion.
 
-Turning **Allow personal time zones** off makes everyone query in the tenant zone again,
+Turning **Allow personal time zones** off makes everyone query in the account-wide zone again,
 and existing personal choices stop applying.
 
 ## Dashboard time zone
@@ -71,9 +73,9 @@ rather than of whoever opens it. Set it in the dashboard builder under
 
 | Choice | Behavior |
 | --- | --- |
-| **Deployment default** | Inherit — follow the tenant zone, or the deployment's Account Time Zone when no tenant zone is set. |
+| **Deployment default** | Inherit — follow the account-wide zone, or the deployment's own default when no account-wide zone is set. |
 | **Viewer time zone** | Resolve per reader, so each viewer sees their own local day. Use this for an operational board. |
-| A named zone | Pin the dashboard — "this dashboard reports in `America/New_York`", and keeps doing so after an admin changes the tenant zone. |
+| A named zone | Pin the dashboard — "this dashboard reports in `America/New_York`", and keeps doing so after an admin changes the account-wide zone. |
 
 The zone is stored with the **published** version, so editing a draft does not move the
 numbers on the dashboard people are currently reading. Publish to apply it.
@@ -115,18 +117,18 @@ Highest priority first.
 3. The reader's personal zone — only when the artifact is set to **Viewer time zone**,
    and only when the account allows personal zones.
 4. What the artifact inherits: the account-wide embed zone for an embed, otherwise the
-   tenant zone.
-5. The deployment's Account Time Zone.
+   account-wide zone.
+5. The deployment's default time zone.
 
 **Ad-hoc surfaces** — a new exploration, a standalone chat — resolve the reader's own
-personal zone first, then the tenant zone. Here the only reader is the person asking, so
+personal zone first, then the account-wide zone. Here the only reader is the person asking, so
 their own zone is the right answer.
 
 **Embedded surfaces** follow their own chain, documented in
 [embedded time zones](/embedding/iframe/time-zones).
 
 At every level, if nothing resolves, Cube sends no zone and the deployment applies its
-Account Time Zone — exactly as it did before this feature existed.
+default time zone — exactly as it did before this feature existed.
 
 ## Valid time zone values
 

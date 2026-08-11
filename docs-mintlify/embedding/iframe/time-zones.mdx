@@ -9,8 +9,15 @@ zone you control. You can set a default for the whole account, override it per e
 a URL parameter, or switch it at runtime from the host page.
 
 This matters most when your end users are not in your deployment's zone: without it,
-"today" in an embedded dashboard means today in the Account Time Zone, not in your
+"today" in an embedded dashboard means today in the deployment's
+[default time zone](/docs/data-modeling/configuration#default-time-zone), not in your
 customer's.
+
+<Note>
+
+Available on [Premium and above plans](https://cube.dev/pricing).
+
+</Note>
 
 <Info>
   Embedded time zones require **user time zones** to be enabled for the account. See
@@ -28,10 +35,13 @@ priority first:
 2. **URL parameter** — the `?timezone=` query parameter on the embed URL (see
    [Per embed via URL](#per-embed-via-url)).
 3. **Dashboard's own zone** — a dashboard pinned to a named zone, or set to resolve per
-   viewer (see [dashboard time zone](/admin/time-zones#dashboard-time-zone)).
+   viewer (see [dashboard time zone](/admin/time-zones#dashboard-time-zone)). In
+   [signed embedding](/embedding/iframe/auth/signed) the viewer has no Cube account and
+   therefore no personal zone, so a viewer-resolved dashboard falls through to the next
+   step — supply `?timezone=` if you want each end user's own zone.
 4. **Account default** — the zone configured in **Embed → Settings** (see
    [Account-wide default](#account-wide-default)).
-5. **Tenant zone**, then the deployment's Account Time Zone.
+5. **Account-wide zone**, then the deployment's default time zone.
 
 A host override outranks a dashboard's pinned zone by design: the integrator is speaking
 for the whole frame, and you know your user's zone better than the dashboard's author
@@ -39,7 +49,7 @@ does.
 
 <Note>
   If the account policy is disabled, none of this applies — Cube sends no zone and the
-  deployment's Account Time Zone is used, exactly as before.
+  deployment's default time zone is used, exactly as before.
 </Note>
 
 ## Account-wide default
@@ -50,8 +60,8 @@ Set a default time zone for all embedded surfaces:
 2. In the **Time Zone** card, pick a zone from the dropdown.
 
 The selected zone applies to every embedded surface across the account, unless a specific
-embed overrides it. Re-selecting the tenant zone clears the embed-specific value, so
-embeds follow the tenant zone again.
+embed overrides it. Re-selecting the account-wide zone clears the embed-specific value, so
+embeds follow the account-wide zone again.
 
 The picker is inert while user time zones are off for the account — a zone stored there
 would be one nothing applies.

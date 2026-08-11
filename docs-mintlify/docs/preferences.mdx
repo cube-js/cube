@@ -18,25 +18,6 @@ account, apply across all devices, and don't affect other users in the account.
 | New message scrolling | Automatically scroll to new messages in chat | On |
 | Alternating row colors | Highlight alternating rows in data tables | Off |
 
-## Time zone
-
-By default your queries run in the deployment's Account Time Zone. If your admin has
-enabled **user time zones** and left personal time zones allowed, you can pick your own
-under **Time zone** on the **Preferences** page — so time dimensions bucket into your
-local day and `today` means your today.
-
-Only a zone you pick is applied; Cube never silently switches you to your browser's zone.
-If your device is somewhere else, Cube offers the detected zone as a dismissible
-suggestion rather than applying it.
-
-Leaving it as **Deployment default** follows the tenant zone your admin set, or the
-deployment's Account Time Zone when there isn't one. The control is hidden when your admin
-has not enabled the feature, or has turned off personal time zones — in that case
-everyone queries in the tenant zone.
-
-See [Time zones](/admin/time-zones) for what a zone changes and how dashboards carry their
-own.
-
 ## Language
 
 The Cube interface is available in 10 languages across 12 locales (Spanish and
@@ -69,3 +50,23 @@ To set the language of **embedded** Cube surfaces (dashboards, Analytics Chat, a
 Creator Mode) instead, see [embedding localization](/embedding/iframe/localization).
 
 </Info>
+
+## Time zone
+
+By default your queries run in the deployment's
+[default time zone](/docs/data-modeling/configuration#default-time-zone). If your admin has
+enabled **user time zones** and left personal time zones allowed, you can pick your own
+under **Time zone** on the **Preferences** page — so time dimensions bucket into your
+local day and `today` means your today.
+
+Only a zone you pick is applied; Cube never silently switches you to your browser's zone.
+If your device is somewhere else, Cube offers the detected zone as a dismissible
+suggestion rather than applying it.
+
+Leaving it as **Deployment default** follows the account-wide zone your admin set, or the
+deployment's default time zone when there isn't one. The control is hidden when your admin
+has not enabled the feature, or has turned off personal time zones — in that case
+everyone queries in the account-wide zone.
+
+See [Time zones](/admin/time-zones) for what a zone changes and how dashboards carry their
+own.
