@@ -314,6 +314,7 @@ sendAction("cube:action:refresh");
 | [`cube:action:set-color-scheme`](#cube-action-set-color-scheme) | Switch light / dark / auto | `{ scheme }` |
 | [`cube:action:set-theme`](#cube-action-set-theme) | Apply a brand theme (colors, fonts) | `embedTheme` object |
 | [`cube:action:set-locale`](#cube-action-set-locale) | Switch the UI language | `{ locale }` |
+| [`cube:action:set-timezone`](#cube-action-set-timezone) | Switch the query time zone | `{ timezone }` |
 | [`cube:action:set-filter`](#cube-action-set-filter) | Push a filter into a dashboard | `{ filterUrlParameter }` |
 | [`cube:action:navigate`](#cube-action-navigate) | Navigate the embed to a path | `{ path }` |
 | [`cube:action:refresh`](#cube-action-refresh) | Re-run the embed's queries | _none_ |
@@ -357,6 +358,20 @@ for the list of supported languages and the other ways to set the language.
 
 ```js
 sendAction("cube:action:set-locale", { locale: "es" });
+```
+
+#### `cube:action:set-timezone` {#cube-action-set-timezone}
+
+Switch the time zone the embed's queries run in — which day a row falls into, and what
+`today` means. Takes precedence over the `?timezone=` URL parameter and the account
+default. See [Time zones](/embedding/iframe/time-zones) for the other ways to set it.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `timezone` | `string` | An [IANA time zone name](/admin/time-zones#valid-time-zone-values), e.g. `Asia/Tokyo`. Bare UTC offsets are ignored. |
+
+```js
+sendAction("cube:action:set-timezone", { timezone: "Asia/Tokyo" });
 ```
 
 #### `cube:action:set-filter` {#cube-action-set-filter}

@@ -11,11 +11,31 @@ account, apply across all devices, and don't affect other users in the account.
 | --- | --- | --- |
 | Theme | Choose between System, Light, or Dark visual theme | System |
 | Language | Choose the language for the Cube interface | English (US) |
+| Time zone | Run your queries in this time zone, so dates like "today" match your local day | Deployment default |
 | Sidebar drawer | Show only icons and expand the sidebar on hover | Off |
 | Pointer cursors | Use pointer cursors on interactive elements | On |
 | Code editor | Switch to the new CodeMirror-based code editor for data models | Off |
 | New message scrolling | Automatically scroll to new messages in chat | On |
 | Alternating row colors | Highlight alternating rows in data tables | Off |
+
+## Time zone
+
+By default your queries run in the deployment's Account Time Zone. If your admin has
+enabled **user time zones** and left personal time zones allowed, you can pick your own
+under **Time zone** on the **Preferences** page — so time dimensions bucket into your
+local day and `today` means your today.
+
+Only a zone you pick is applied; Cube never silently switches you to your browser's zone.
+If your device is somewhere else, Cube offers the detected zone as a dismissible
+suggestion rather than applying it.
+
+Leaving it as **Deployment default** follows the tenant zone your admin set, or the
+deployment's Account Time Zone when there isn't one. The control is hidden when your admin
+has not enabled the feature, or has turned off personal time zones — in that case
+everyone queries in the tenant zone.
+
+See [Time zones](/admin/time-zones) for what a zone changes and how dashboards carry their
+own.
 
 ## Language
 

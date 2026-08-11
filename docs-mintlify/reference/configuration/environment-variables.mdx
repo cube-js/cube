@@ -1106,6 +1106,10 @@ The default [time zone][ref-time-zone] for queries.
 You can set the time zone name in the [TZ Database Name][link-tzdb] format, e.g.,
 `America/Los_Angeles`.
 
+This is the fallback. When [user time zones](/admin/time-zones) are enabled for the
+account, a resolved account, personal, dashboard, or embed zone is sent with the query and
+takes precedence over this value.
+
 ## `CUBEJS_DEFAULT_API_SCOPES`
 
 [API scopes][ref-rest-scopes] used to allow or disallow access to REST (JSON) API
