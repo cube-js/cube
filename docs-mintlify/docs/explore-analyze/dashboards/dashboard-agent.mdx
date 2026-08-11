@@ -36,9 +36,10 @@ are never saved to the dashboard — see
     [workbook][ref-workbooks]: creating reports, building and editing
     dashboards, and running analysis.
 
-  The published Dashboard Agent can adjust **your own view** — filters and time
-  granularity, for your session only — but intentionally cannot author or change
-  the **saved** dashboard.
+  Any viewer can adjust **their own view** — filters and time granularity, for
+  their session only. Authoring the **saved** dashboard through this panel
+  depends on the viewer's permissions — see
+  [What the Dashboard Agent can and can't do](#what-the-dashboard-agent-can-and-cant-do).
 </Note>
 
 ## Opening the agent
@@ -116,8 +117,20 @@ contents — text, PDF, ZIP, and image files are supported.
 
 ## What the Dashboard Agent can and can't do
 
-The published Dashboard Agent can answer questions and adjust your own view, but
-it never changes the **saved** dashboard.
+The published Dashboard Agent can answer questions and adjust your own view.
+Whether it can also author the **saved** dashboard depends on your permissions
+on the workbook that owns it:
+
+- **If you have edit permission on the dashboard**, asking the agent to change
+  it edits the workbook's **draft** directly — the agent never publishes for
+  you; review the draft and use the dashboard's **Edit** action to publish it.
+- **If you don't have edit permission but can create workbooks**, asking the
+  agent to change the dashboard duplicates it into a new workbook you own,
+  applies the change there, and hands off to the new dashboard. The original
+  dashboard is never touched.
+- **If you have neither**, the agent stays read-only: it can't create reports,
+  workbooks, or a duplicate dashboard, and it explains that instead of applying
+  a change.
 
 **It can:**
 
@@ -132,16 +145,21 @@ it never changes the **saved** dashboard.
 - Explain how a metric or dimension is defined
 - Look up the values available for a dimension
 - Read the contents of [attachments](#attachments) you add to the chat
+- Edit the dashboard's draft in place, or duplicate it into a new dashboard you
+  own, depending on your permissions (see above)
 
 **It can't:**
 
-- Save its filter or time-granularity changes to the dashboard — they apply to
-  your session only and never change what other viewers see
-- Edit the dashboard, or add/remove widgets
-- Create reports or workbooks
+- Publish a draft it edited — you review and publish yourself via the
+  dashboard's **Edit** action
+- Save filter or time-granularity changes applied via
+  [Changing filters and time granularity](#changing-filters-and-time-granularity)
+  to the dashboard — those always apply to your session only, regardless of
+  your permissions
 - Change the data model
 
-If you need any of those, use the [Workbook Agent][ref-workbook-agent] instead.
+For full authoring — building dashboards from scratch, editing any report, or
+changing the data model — use the [Workbook Agent][ref-workbook-agent] instead.
 
 ## Limitations
 
@@ -151,9 +169,10 @@ If you need any of those, use the [Workbook Agent][ref-workbook-agent] instead.
   applies to your session only — it is never saved to the dashboard. If you ask
   it to change something with no control on the dashboard, it explains the
   current state instead of applying a change.
-- **No authoring on published dashboards.** The published Dashboard Agent
-  cannot create reports or build dashboards, edit the saved dashboard, or change
-  the data model. Those live in the [Workbook Agent][ref-workbook-agent].
+- **Draft edits and duplication need permission.** Editing the saved dashboard
+  (as a draft) or duplicating it requires, respectively, edit permission on the
+  workbook or permission to create workbooks. A viewer with neither stays
+  read-only and the agent explains why instead of applying a change.
 - **Report search covers published reports only.** When the agent searches for
   existing reports, it sees published reports.
 
