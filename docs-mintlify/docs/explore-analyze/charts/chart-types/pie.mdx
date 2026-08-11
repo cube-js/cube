@@ -15,15 +15,17 @@ Standard filled circle. Each slice's arc length is proportional to its value.
 
 ### Donut
 
-A pie with a hollow center. Increase the **Inner radius** value in the Style tab to any non-zero value to switch to a donut. The hollow center can be used to surface a summary value via a [KPI](/docs/explore-analyze/charts/chart-types/kpi) tile on a dashboard, or simply to reduce visual density.
+A pie with a hollow center. Select **Donut** under **Shape** in the Style tab to switch; select **Pie** to switch back.
 
-{/* Screenshot: donut chart — same data as the pie variant, with inner radius applied. Place directly below this heading, half-width centered or side-by-side with pie. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+{/* Screenshot: donut chart — same data as the pie variant. Place directly below this heading, half-width centered or side-by-side with pie. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
-## Inner radius
+## Show total
 
-Drag the **Inner radius** slider in the Style tab or enter a pixel value. Setting it to `0` returns to a full pie.
+Turn on **Show total** in the Style tab to render the measure's grand total in the donut's hole. The total uses the measure's own number format, so changing the format of the measure changes the total with it.
 
-{/* Screenshot: Style tab with the Inner radius control highlighted. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+The option appears only for a donut, since a pie has no hollow center to fill. Switching back to a pie hides the total and remembers the setting, so returning to a donut restores it.
+
+{/* Screenshot: donut chart with the center total visible, Style tab showing the Show total switch. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ## Color and slice ordering
 
