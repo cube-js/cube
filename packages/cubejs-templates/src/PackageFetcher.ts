@@ -1,8 +1,6 @@
 import fs from 'fs-extra';
-import decompress from 'decompress';
-import decompressTargz from 'decompress-targz';
 import path from 'path';
-import { executeCommand } from '@cubejs-backend/shared';
+import { executeCommand, extractArchive } from '@cubejs-backend/shared';
 
 import { proxyFetch } from './utils';
 
@@ -61,9 +59,7 @@ export class PackageFetcher {
   public async downloadPackages() {
     await this.downloadRepo();
 
-    await decompress(this.repoArchivePath, this.tmpFolderPath, {
-      plugins: [decompressTargz()],
-    });
+    await extractArchive(this.repoArchivePath, this.tmpFolderPath);
 
     const dir = fs.readdirSync(this.tmpFolderPath).find((name) => !name.endsWith('tar.gz'));
 

@@ -1,4 +1,3 @@
-import decompress from 'decompress';
 import fetch, { Headers, Request, Response } from 'node-fetch';
 import bytes from 'bytes';
 import { throttle } from 'throttle-debounce';
@@ -14,6 +13,20 @@ import { internalExceptions } from './errors';
 import { getHttpAgentForProxySettings } from './proxy';
 
 type ByteProgressCallback = (info: { progress: number; eta: number; speed: string }) => void;
+
+/**
+ * Extracts an archive (tar, tar.bz2, tar.gz or zip) into `cwd`.
+ *
+ * `@xhmikosr/decompress` is ESM-only, so it must be pulled in with a dynamic import. This
+ * package is compiled with `module: Node16` (see tsconfig.json) so that TypeScript keeps the
+ * `import()` intact instead of downleveling it to `require()`, while everything else in the
+ * package is still emitted as CommonJS.
+ */
+export async function extractArchive(archivePath: string, cwd: string): Promise<void> {
+  const { default: decompress } = await import('@xhmikosr/decompress');
+
+  await decompress(archivePath, cwd);
+}
 
 export async function streamWithProgress(
   response: Response,
@@ -111,7 +124,7 @@ export async function downloadAndExtractFile(url: string, { cwd, skipExtract, ds
       fs.copyFileSync(savedFilePath, destPath);
     }
   } else {
-    await decompress(savedFilePath, cwd);
+    await extractArchive(savedFilePath, cwd);
   }
 
   try {

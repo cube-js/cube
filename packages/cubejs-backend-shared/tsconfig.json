@@ -8,5 +8,9 @@
     "outDir": "dist",
     "rootDir": ".",
     "baseUrl": ".",
+    // Node16 keeps the dynamic `import()` of the ESM-only `@xhmikosr/decompress` intact
+    // in the emitted CommonJS, instead of downleveling it to `require()`.
+    "module": "Node16",
+    "moduleResolution": "Node16",
   }
 }

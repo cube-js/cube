@@ -1,0 +1,17 @@
+// The root tsconfig.jest.json does not include this package's sources, so the ambient
+// declaration for the untyped `@xhmikosr/decompress` would not be part of the program.
+// Extending the package tsconfig keeps `include` (and therefore src/*.d.ts) in place.
+//
+// Module resolution is pinned back to CommonJS here because Jest runs the sources through
+// its own CommonJS runtime; the Node16 emit only matters for the published dist build.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "sourceMap": true,
+    "inlineSourceMap": true,
+    "inlineSources": true,
+    "resolveJsonModule": true
+  }
+}
