@@ -70,7 +70,7 @@ The Base Role is required. Save is disabled until one is selected.
 
 If you check any deployment-scoped action stronger than **Access deployment** (`DeploymentRead`) — for example, **Edit deployment** or **Edit data model** — the Base Role is automatically forced to **Developer**, and the Viewer and Explorer options are disabled with a tooltip:
 
-> Selected actions require Developer role
+> Selected permissions require Developer access
 
 Removing the elevated action re-enables the lower tiers. This mirrors the server-side rule that any deployment write or data-model write requires the Developer license tier.
 
@@ -127,7 +127,7 @@ When **Full access** is checked, the granular checkboxes appear checked and disa
 
 <Tip>
 
-**Access deployment** (`DeploymentRead`) and **Download data** (`DownloadData`) are special. They are the only deployment actions that do **not** auto-bump the Base Role to Developer, because Viewers also need them just to open a deployment and download data from it.
+**Access deployment** (`DeploymentRead`), **Access AI agents** (`DeploymentAgentRead`) and **Download data** (`DownloadData`) are special. They are the only deployment actions that do **not** auto-bump the Base Role to Developer, because Viewers also need them to open a deployment, use AI chat, and download data from it.
 
 </Tip>
 
