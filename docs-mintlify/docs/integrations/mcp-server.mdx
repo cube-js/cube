@@ -22,6 +22,11 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 Cube hosts an MCP server endpoint for your tenant. MCP clients connect over HTTPS and authenticate via OAuth.
 
 - **Endpoint:** `https://<cube-mcp-server-host>/api/mcp`
+- **Centralized endpoint:** `https://<console-domain>/mcp` — one fixed URL, on the Cube
+  Cloud console domain rather than your tenant's own host, that proxies to the same
+  server. Use it for MCP connector directories and clients that require one server URL
+  registered up front, since the per-tenant endpoint above can vary by region or BYOC
+  domain.
 - **OAuth discovery:** `https://<cube-mcp-server-host>/.well-known/oauth`
 - **OAuth flow:** Authorization Code + PKCE, `client_id` = `cube-mcp-client`, scope = `mcp-agent-access`
 - **Deployment selection:** On connect, the client lands on the tenant **default deployment** set by your admin (or the first deployment you can access). Clients can also target a specific deployment and agent per request — see [Select a deployment and agent](#select-a-deployment-and-agent).
@@ -211,7 +216,7 @@ neither `listDeployments` nor the `chat` selection can reach an excluded deploym
 
 ## Available actions
 
-The MCP server exposes 16 tools, grouped below.
+The MCP server exposes 20 tools, grouped below.
 
 Every tool runs as the authenticated user. Queries respect the same
 [permissions][ref-roles] as the rest of Cube, including row-level security — MCP is a new
@@ -232,6 +237,7 @@ a dashboard or your data model happens without an explicit approval.
 | `listDeployments` | Lists the deployments and agents you can reach over MCP. |
 | `chat` | Asks a question of a Cube agent, optionally targeting a specific deployment and agent. |
 | `loadQueryResults` | Paginates through the results of a previous query. |
+| `getDeploymentEnv` | Lists a deployment's environment variables, with secret-looking values redacted. Read-only — it cannot change them. |
 
 See [Select a deployment and agent](#select-a-deployment-and-agent) for how these three
 work together.
@@ -245,6 +251,13 @@ work together.
 
 Call `searchDataModel` before `runQuery` to find exact view and member names rather than
 guessing them.
+
+### Pre-aggregations
+
+| Tool | Description | Access |
+| --- | --- | --- |
+| `getPreAggregationStatus` | Lists the data model's pre-aggregations with their definitions and, for each, how many partitions exist, how many have been built, when the newest build landed, and the error if a build failed. | Read-only |
+| `buildPreAggregation` | Queues an on-demand build of one pre-aggregation and returns once it's accepted; poll `getPreAggregationStatus` for the result. Runs real queries against your data source, so it consumes warehouse resources. | Write |
 
 ### Dashboard authoring
 
@@ -277,6 +290,7 @@ default. Users without it never see them.
 | `writeDataModelFile` | Creates or overwrites a model source file on the dev branch (whole-file replacement). Recompiles the model and reports `valid` plus any `validationError`. | Destructive — prompts |
 | `deleteDataModelFile` | Deletes a model source file on the dev branch. | Destructive — prompts |
 | `getDataModelChanges` | Shows the diff of the dev branch against its parent — the pending changes, for review before committing. | Read-only |
+| `getBranchDiff` | Shows what any branch changed against an arbitrary base (the deploy branch by default) — the changed-file list with insertion/deletion counts plus the unified diff. Broader than `getDataModelChanges`, which only compares your own dev branch to its immediate parent. | Read-only |
 
 #### How model edits stay safe
 

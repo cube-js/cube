@@ -28,8 +28,8 @@ Displays a single value from your query result.
 | **Field** | The measure or dimension to display |
 | **Row** | Which row of the result to read from |
 | **Format** | Number formatting (currency, percent, etc.) |
-| **Font size / color** | Text appearance |
-| **Alignment** | Left, center, or right |
+
+See [Styling blocks](#styling-blocks) below for font size, color, background, and alignment.
 
 {/* TODO screenshot: Number block (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -42,7 +42,8 @@ Displays a current value alongside a previous value with a calculated difference
 | **Current field / row** | The primary value |
 | **Previous field / row** | The value to compare against — can be a different column or a different row from the same column |
 | **Difference format** | Absolute, percentage, or both |
-| **Positive color / Negative color** | Colors applied based on whether the change is positive or negative |
+
+See [Styling blocks](#styling-blocks) below for the positive/negative/neutral colors applied based on the direction of change.
 
 To compare to a static goal, add a column to your query that always returns the same number (e.g. a calculated field with a constant), then select it as the **Previous** field.
 
@@ -63,6 +64,8 @@ Shows a value relative to a target as a progress bar or circle. Useful for goal 
 To compare against a static number like a quarterly goal, add a calculated field that always returns that number and use it as the **Target** field.
 </Tip>
 
+See [Styling blocks](#styling-blocks) below for background and alignment.
+
 {/* TODO screenshot: Progress bar block (bar style) and circle style (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ### Sparkline
@@ -78,6 +81,8 @@ Renders a compact trend chart — either a bar or line — within the KPI tile. 
 | **Max points** | Limits the number of data points rendered |
 | **Colors** | Line/fill colors |
 
+See [Styling blocks](#styling-blocks) below for background and alignment.
+
 {/* TODO screenshot: Sparkline block showing a trend line (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ### Text
@@ -92,7 +97,25 @@ Use text blocks for short labels and headings inside the KPI. For complex layout
 
 A free-form HTML block rendered inside the KPI tile. Use this for advanced custom layouts that go beyond what the other block types support.
 
+See [Styling blocks](#styling-blocks) below for background and alignment.
+
 {/* TODO screenshot: HTML block with custom content (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Styling blocks
+
+Every block has a **Style** panel with alignment controls — horizontal (left, center, right) and vertical (top, middle, bottom) — for positioning its content within the block's space.
+
+Most block types also get a **Background** color, painted behind that block only; leave it unset to show the tile's own background through. Some block types add colors of their own:
+
+| Block | Style controls |
+|---|---|
+| **Number** | Value color and background (linked as a pair), font size |
+| **Comparison** | Positive / negative change colors, and a neutral color paired with the background |
+| **Progress bar** | Background |
+| **Sparkline** | Background (the sparkline's own line/fill colors are set in the Fields tab) |
+| **HTML** | Background |
+
+Text blocks don't have a background or color control — style them directly with Markdown/HTML.
 
 ## Layout controls
 

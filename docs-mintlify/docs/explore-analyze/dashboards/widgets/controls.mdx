@@ -20,7 +20,9 @@ The available operators depend on the type of the underlying dimension:
 |---|---|
 | **String** | `is`, `is not`, `contains`, `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`, `is null`, `is not null` |
 | **Number** | `is`, `is not`, `greater than`, `greater than or equal`, `less than`, `less than or equal`, `is null`, `is not null` |
-| **Time** | `is`, `is not`, `before date`, `before or on date`, `after date`, `after or on date`, `between`, `relative date`, `is null`, `is not null` |
+| **Time** | `is`, `is not`, `before date`, `before or on date`, `after date`, `after or on date`, `between`, `relative date`, `in`/`not in the month`, `in`/`not in the quarter`, `in`/`not in the year`, `is null`, `is not null` |
+
+The `in the month` / `in the quarter` / `in the year` operators (and their negations) match a fixed calendar period — pick a month, quarter, or year and every row in that period matches, regardless of when the dashboard is viewed. This differs from `relative date` values like `this month`, which resolve against the current date each time the dashboard loads.
 
 ### Single vs. multiple selection
 
@@ -67,6 +69,10 @@ How the attribute value is matched to the filter:
 Empty, `null`, or unresolvable attribute values are skipped — the filter falls back to whatever static default it has, or no default if none is set.
 
 The user attribute default only seeds the filter's *initial* value. Viewers can still change the filter unless its [visibility](#visibility) is set to **Disabled**, in which case the resolved attribute value is locked in for that viewer. Values passed via URL parameters also take precedence over user attribute defaults, so deep links continue to work.
+
+### Bookmarking and sharing
+
+On a published dashboard, changing a filter's value updates the page URL to match. A viewer can bookmark or share that URL, and opening it re-applies the same filter values — no extra setup required.
 
 ### Faceted filters
 
