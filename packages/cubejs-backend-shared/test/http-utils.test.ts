@@ -60,7 +60,7 @@ describe('extractArchive', () => {
    * would make the Zip Slip test below extract a perfectly benign archive and
    * pass for the wrong reason. Byte control is the point.
    */
-  const writeZip = async (file: string, entries: { name: string; content: string }[]) => {
+  const writeZip = async (file: string, entries: { name: string; content: string; mode?: number }[]) => {
     const local: Buffer[] = [];
     const central: Buffer[] = [];
     let offset = 0;
@@ -89,6 +89,10 @@ describe('extractArchive', () => {
       cdh.writeUInt32LE(data.length, 20);
       cdh.writeUInt32LE(data.length, 24);
       cdh.writeUInt16LE(name.length, 28);
+      // External attributes carry the unix mode in the high 16 bits, which is how a
+      // zip records a symlink (`0o120000`). `>>> 0` because the shift overflows into a
+      // negative signed int32 otherwise.
+      cdh.writeUInt32LE((((entry.mode ?? 0o100644) << 16) >>> 0), 38);
       cdh.writeUInt32LE(offset, 42); // relative offset of local header
       central.push(cdh, name);
 
@@ -208,6 +212,23 @@ describe('extractArchive', () => {
       await extractArchive(archive, targetDir()).catch(() => undefined);
 
       expect(fs.existsSync(path.join(outside, 'SYM_PWNED.txt'))).toBe(false);
+    });
+
+    it('does not write through a zip symlink that points outside the target', async () => {
+      // The zip backend's containment is the half worth proving separately: a symlink
+      // entry has a clean relative *name*, so only a check on the resolved destination
+      // catches the entry written through it afterwards.
+      const archive = path.join(work, 'zipsym.zip');
+      const outside = path.join(work, 'outside');
+      fs.mkdirSync(outside);
+
+      await writeZip(archive, [
+        { name: 'esc', content: outside, mode: 0o120777 },
+        { name: 'esc/PWNED.txt', content: 'pwned-through-symlink' },
+      ]);
+
+      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/out of bound path/i);
+      expect(fs.existsSync(path.join(outside, 'PWNED.txt'))).toBe(false);
     });
   });
 
