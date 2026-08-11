@@ -19,17 +19,13 @@ Map a dimension to the **Color** channel to assign each point a color by categor
 
 {/* Screenshot: scatter chart — same axes, points colored by traffic source (4–5 colors). Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
-### With size encoding
-
-Map a third numeric measure to the **Size** channel to scale each point's radius by value. Use this to encode a third variable without adding a new axis.
-
-{/* Screenshot: scatter chart with sized and colored points — average order value (X), return rate (Y), total revenue as size, colored by category. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
-
 ## Size encoding
 
-Assign a measure to the **Size** channel in the Fields tab. Points scale proportionally to the measure value. Configure the minimum and maximum radius in the Style tab.
+The Fields tab has no **Size** channel: it offers X, Y, Color, tooltips, data labels, and small multiples. To scale each point's radius by a third measure, add a `size` encoding to the chart's Vega specification with the spec editor.
 
-{/* Screenshot: Fields tab with Size channel assigned — showing the size field token. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+Once the specification has a `size` encoding, a **Size** section appears on the Style tab, where its legend can be configured like the color legend.
+
+{/* Screenshot: scatter chart with sized and colored points — average order value (X), return rate (Y), total revenue as size, colored by category. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ## Tooltips
 

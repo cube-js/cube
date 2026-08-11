@@ -118,8 +118,11 @@ Either grant **Full access** (a shortcut that enables every current and future d
 | Data Model  | View data model                     | Read data model files and dev branches.                                                                                                                                   |
 | Data Model  | Edit data model                     | Edit the data model on any branch, including the main/deploy branch. Allows committing and merging to main, force-syncing main, and starting dev mode against main.       |
 | Data Model  | Edit data model on dev branches     | Edit the data model only on non-default branches. Blocks any write that targets the main/deploy branch (including merging to main).                                       |
-| Monitoring  | Access query history                | View deployment query history, performance, and traces.                                                                                                                   |
+| Data Model  | Access SQL Runner                   | Open the SQL Runner and run queries in it.                                                                                                                                |
+| AI          | Access AI agents                    | Use the AI agent in Analytics Chat, workbooks, the IDE, and dashboards.                                                                                                   |
 | Data Export | Download data                       | Download query results as CSV from workbooks, Analytics Chat, and published dashboards. Granted by default to the built-in Viewer, Explorer, and Developer roles. See [Data download controls][ref-data-download-controls]. |
+| Monitoring  | Access query history                | View deployment query history, performance, and traces.                                                                                                                   |
+| Pre-aggregations | Build pre-aggregations         | Trigger pre-aggregation builds, including **Build all** and bulk builds. Removing it prevents accidental large builds.                                                     |
 
 When **Full access** is checked, the granular checkboxes appear checked and disabled — granting Full access today also covers any deployment-scoped permissions added in the future.
 
@@ -127,7 +130,7 @@ When **Full access** is checked, the granular checkboxes appear checked and disa
 
 <Tip>
 
-**Access deployment** (`DeploymentRead`), **Access AI agents** (`DeploymentAgentRead`) and **Download data** (`DownloadData`) are special. They are the only deployment actions that do **not** auto-bump the Base Role to Developer, because Viewers also need them to open a deployment, use AI chat, and download data from it.
+**Access deployment** (`DeploymentRead`), **Access AI agents** (`DeploymentAgentRead`), and **Download data** (`DownloadData`) are special. They are the only deployment actions that do **not** auto-bump the Base Role to Developer, because Viewers also need them to open a deployment, use AI chat, and download data from it.
 
 </Tip>
 
@@ -254,5 +257,8 @@ This section lists every action a custom role can grant. The internal action nam
 | `SchemaRead`              | View data model                                             |
 | `SchemaUpdate`            | Edit data model                                             |
 | `SchemaUpdateDevBranches` | Edit data model on dev branches                             |
-| `APMRead`                 | Access query history                                        |
+| `SqlRunnerRead`           | Access SQL Runner                                           |
+| `DeploymentAgentRead`     | Access AI agents                                            |
 | `DownloadData`            | Download data                                               |
+| `APMRead`                 | Access query history                                        |
+| `PreAggregationBuild`     | Build pre-aggregations                                      |
