@@ -59,13 +59,17 @@ what enables [`COMPILE_CONTEXT`][ref-compile-context] and per-tenant
 
 <Warning>
 
-`context_to_app_id` enables multitenancy for data model compilation only.
-Querying and caching stay shared across app ids: database connections, query
-queues, the query results cache, and pre-aggregations, including their tables in
-the pre-aggregations schema. To isolate those per tenant as well, define
-[`context_to_orchestrator_id`][self-orchestrator-id] and
-[`pre_aggregations_schema`][self-pre-aggregations-schema]. See
-[multitenancy][ref-multitenancy] for details.
+`context_to_app_id` enables multitenancy for data model compilation only. On its
+own, it leaves querying and caching shared across app ids. To isolate those per
+tenant as well:
+
+- [`pre_aggregations_schema`][self-pre-aggregations-schema] gives each tenant its
+  own pre-aggregation tables. It is resolved per app id, so `context_to_app_id`
+  is a prerequisite for it.
+- [`context_to_orchestrator_id`][self-orchestrator-id] gives each tenant its own
+  database connections, query queues, and query results cache.
+
+See [multitenancy][ref-multitenancy] for details.
 
 </Warning>
 
@@ -646,6 +650,16 @@ be used exclusively by Cube and shall not be shared with any application.
 </Warning>
 
 Called once per [`app_id`][self-opts-ctx-to-appid].
+
+<Warning>
+
+Because this option is evaluated once per app id, deriving the schema name from
+the security context requires [`context_to_app_id`][self-opts-ctx-to-appid] to be
+defined as well. Otherwise all tenants share a single app id, and every one of
+them ends up pinned to the schema name resolved for whichever tenant triggered
+the first data model compilation.
+
+</Warning>
 
 <CodeGroup>
 

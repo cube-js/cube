@@ -277,9 +277,10 @@ pre-aggregations, including their tables in the pre-aggregations schema. So
 tenants whose data models generate the same SQL will share queue entries, cached
 results, and pre-aggregation tables.
 
-To isolate those resources per tenant as well, define
-[`context_to_orchestrator_id`][ref-config-ctx-to-orch-id] and
-[`pre_aggregations_schema`][ref-config-preagg-schema], as shown in the sections
+To isolate those resources per tenant as well, add
+[`pre_aggregations_schema`][ref-config-preagg-schema] for per-tenant
+pre-aggregation tables and [`context_to_orchestrator_id`][ref-config-ctx-to-orch-id]
+for per-tenant connections, queues, and results cache, as shown in the sections
 below.
 
 </Warning>

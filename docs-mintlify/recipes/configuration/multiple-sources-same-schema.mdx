@@ -30,11 +30,12 @@ the `tenant` property of the `securityContext`.
 
 ```javascript
 module.exports = {
-  // Provides distinct identifiers for each tenant which are used as caching keys
-  // for the compiled data model and the query orchestrator, respectively
+  // Provides a distinct identifier for each tenant's compiled data model
   contextToAppId: ({ securityContext }) =>
     `CUBE_APP_${securityContext.tenant}`,
 
+  // Provides a distinct identifier for each tenant's query orchestrator, so
+  // that every tenant gets its own database connections and query queues
   contextToOrchestratorId: ({ securityContext }) =>
     `CUBE_APP_${securityContext.tenant}`,
 
