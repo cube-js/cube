@@ -221,6 +221,12 @@ period always aligns exactly with the current buckets. A measure can have
 several comparisons active at once, such as month over month and year over
 year side by side.
 
+A query with no grouped time dimension can still anchor a comparison to a
+time dimension it only **filters** — the comparison window derives from the
+filter's own bounds instead of a granularity preset. Menu rows explain why an
+anchor isn't offered when it can't produce one — for example, an open-ended
+filter or a filter inside an `OR` group.
+
 Each comparison adds derived columns next to the measure. Choose which ones
 to show under **Comparison columns** in the same menu:
 

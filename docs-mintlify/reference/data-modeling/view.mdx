@@ -369,7 +369,9 @@ Operators use the same labels data consumers see in the workbook filter bar —
 what you see in the filter bar is what you type: `is`, `is not`, `after date`,
 `after or on date`, `before date`, `before or on date`, `between`, `contains`,
 `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`,
-`is null`, `is not null`.
+`is null`, `is not null`. Time dimensions also accept `in the month`, `not in
+the month`, `in the quarter`, `not in the quarter`, `in the year`, and `not in
+the year`, which filter to a specific calendar period.
 
 Operators are case-insensitive and whitespace-tolerant. Internal type names and
 REST API aliases (e.g. `equals`, `gte`, `inDateRange`) are also accepted.
