@@ -51,8 +51,8 @@ configuration file:
 
 ```javascripttitle="cube.js"
 module.exports = {
-  // Create a new appId for each team, this prevents teams from seeing each
-  // other's data
+  // Create a new appId for each team so that a separate data model is
+  // compiled for each of them and `COMPILE_CONTEXT` can be used below
   // https://cube.dev/docs/product/configuration/reference/config#context_to_app_id
   contextToAppId: ({ securityContext }) => {
     return securityContext.team
