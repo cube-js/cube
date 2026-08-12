@@ -1,6 +1,6 @@
 ---
 title: Series mapping
-description: Assign query columns to chart channels — X axis, Y axis, color, and tooltips.
+description: Assign query columns to chart channels — X axis, Y axis, color, small multiples, and tooltips.
 ---
 
 Series mapping controls which query columns are assigned to which chart channels. This is done in the **Fields** tab of the chart configuration panel.
@@ -17,7 +17,7 @@ Series mapping controls which query columns are assigned to which chart channels
 | **Small multiples** | Repeats the chart once per unique value, as a grid of panels — see [small multiples](/docs/explore-analyze/charts/configuration/small-multiples). Its dropdown is labelled **Split by** | Bar, line, area, scatter |
 | **Tooltip** | Fields shown on hover | Vega-based types, pie, and map — but not table, KPI, or HTML. Pie and map use a checklist instead of field rows — see [tooltips](/docs/explore-analyze/charts/configuration/tooltips) |
 
-Pie charts do not use the X, Y, or Color channels. Their **Fields** tab is its own panel — **Rings**, **Measure** (which sets slice size), and **Tooltips** — where the innermost ring also sets the slice colors.
+Pie charts do not use the X, Y, or Color channels. Their **Fields** tab is its own panel — **Rings**, **Measure** (which sets slice size), and **Tooltips**. The innermost ring is the dimension slices are colored by; the colors themselves come from the [color palette](/docs/explore-analyze/charts/configuration/color-and-stacking), as described on the [pie & donut](/docs/explore-analyze/charts/chart-types/pie) page.
 
 ## Assigning fields
 
@@ -29,7 +29,7 @@ The same column can be used in more than one channel. Picking a dimension for th
 
 ## Multiple measures on one chart
 
-When a chart plots several measures at once, the **Fields** tab replaces the measure channel with a **Series** section listing one row per measure. Every series then gets independent color and style settings in [series configuration](/docs/explore-analyze/charts/configuration/series-configuration).
+Put more than one measure on the Y axis and the chart plots each as its own series. The **Fields** tab then replaces the Y channel with a **Series** section listing one row per measure, and every series gets independent color and style settings in [series configuration](/docs/explore-analyze/charts/configuration/series-configuration).
 
 While the chart is in this multi-series mode, the **Color** channel stays pinned to **Series** and cannot be pointed at another column — it reports the mode rather than setting it.
 
