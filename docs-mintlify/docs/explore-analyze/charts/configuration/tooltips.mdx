@@ -9,11 +9,11 @@ Tooltips appear when a user hovers over a data point in a chart. By default, Cub
 
 ## Default behavior
 
-When a chart is first created, the fields assigned to its channels (X, Y, Color) are included in the tooltip automatically. The tooltip is enabled by default on all Vega-based chart types (bar, line, area, scatter, heatmap, boxplot) and on map charts.
+When a chart is first created, the fields assigned to its channels (X, Y, Color) are included in the tooltip automatically. The tooltip is enabled by default on all Vega-based chart types (bar, line, area, scatter, heatmap, boxplot), on pie, and on map charts. Table, KPI, and HTML charts have no tooltip control.
 
 ## Configuring tooltip fields
 
-Open the **Fields** tab of the chart configuration panel and expand the **Tooltips** section. Each field in the tooltip is one row: a dropdown naming the field, and an **×** that removes the row.
+On the Vega-based types, open the **Fields** tab of the chart configuration panel and expand the **Tooltips** section. Each field in the tooltip is one row: a dropdown naming the field, and an **×** that removes the row.
 
 | Action | How |
 |---|---|
@@ -23,11 +23,13 @@ Open the **Fields** tab of the chart configuration panel and expand the **Toolti
 
 Fields appear in the tooltip in the order the rows are listed, which is the order they were added.
 
+Pie and map charts use a different control: a **Tooltips** row whose button opens a checklist of the query's columns. Tick the fields to show — there are no per-field rows, and no ordering.
+
 {/* TODO screenshot: the Tooltips section expanded in the Fields tab, showing its field rows and the + Tooltip button (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ## Disabling tooltips
 
-Turn off the switch on the **Tooltips** section header. Turning it back on restores the automatic tooltip rather than the field list you had configured, so a custom list has to be rebuilt.
+Turn off the switch on the **Tooltips** section header. Turning it back on restores the automatic tooltip rather than the field list you had configured, so a custom list has to be rebuilt. Pie and map charts have no such switch — clear every field from the checklist instead.
 
 ## Tooltip behavior on stacked charts
 
