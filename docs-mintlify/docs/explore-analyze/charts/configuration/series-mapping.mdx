@@ -31,7 +31,7 @@ The same column can be used in more than one channel. Picking a dimension for th
 
 Add a second measure to the query and the chart plots each measure as its own series. This is a property of the query rather than a channel you set: the Y dropdown holds one column, so when a second measure arrives the **Fields** tab replaces the Y channel with a **Series** section listing one row per measure.
 
-The other way to plot two measures is to give each its own Y-axis layer with **+ Y Axis**, the button below the Y channel. The two do not compete: a layer has its own Fields controls and takes one measure, so the **Series** section appears only for the measures within a single layer. Layers are what carry per-series mark types — see [series configuration](/docs/explore-analyze/charts/configuration/series-configuration).
+The other way to plot two measures is to give each its own Y-axis layer with **+ Y Axis**, the button below the Y channel. Each layer has its own copy of the Fields controls and the rule above applies inside each one separately: a layer showing one measure keeps a plain Y channel, and a layer showing several gets its own **Series** section. Layers are also what carry per-series mark types — see [series configuration](/docs/explore-analyze/charts/configuration/series-configuration).
 
 While the chart is in this multi-series mode, the **Color** channel stays pinned to **Series** and cannot be pointed at another column — it reports the mode rather than setting it.
 
