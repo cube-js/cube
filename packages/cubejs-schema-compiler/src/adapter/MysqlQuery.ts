@@ -187,6 +187,11 @@ export class MysqlQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.STRING_AGG = 'GROUP_CONCAT({% if distinct %}DISTINCT {% endif %}{{ args[0] }} SEPARATOR {{ args[1] }})';
     templates.functions.UTCTIMESTAMP = 'UTC_TIMESTAMP()';
+    // DATEADD is being rewritten to DATE_ADD, which reports sub-day intervals in
+    // milliseconds. MySQL has no MILLISECOND unit, so those are scaled to microseconds
+    templates.functions.DATE_ADD = 'DATE_ADD({{ args[0] }}, INTERVAL '
+      + '{% if date_part == "MILLISECOND" %}{{ interval }}000 MICROSECOND'
+      + '{% else %}{{ interval }} {{ date_part }}{% endif %})';
     // PERCENTILE_CONT works but requires PARTITION BY
     delete templates.functions.PERCENTILECONT;
     delete templates.functions.WIDTH_BUCKET;

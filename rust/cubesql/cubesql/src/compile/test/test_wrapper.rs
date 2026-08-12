@@ -16,6 +16,7 @@ use crate::{
         test::{
             convert_select_to_query_plan, convert_select_to_query_plan_customized,
             convert_select_to_query_plan_with_config, init_testing_logger, LogicalPlanTestUtils,
+            TestContext,
         },
         DatabaseProtocol,
     },
@@ -2852,4 +2853,234 @@ async fn test_wrapper_only_system_fields() {
         "Physical plan: {}",
         displayable(physical_plan.as_ref()).indent()
     );
+}
+
+/// A per-group aggregate in a CTE, date-filtered and counted on the outside, must be
+/// pushed down whole: `DATEADD` in the outer filter is rewritten to `DATE_ADD`, so the
+/// filter and the aggregate above it only push down when the data source has a
+/// `functions/DATE_ADD` template.
+#[tokio::test]
+async fn test_wrapper_cte_aggregate_then_date_filter() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        WITH first_orders AS (
+            SELECT customer_gender, MIN(order_date) AS first_order_at
+            FROM KibanaSampleDataEcommerce
+            WHERE has_subscription = true
+            GROUP BY 1
+        )
+        SELECT COUNT(DISTINCT customer_gender) AS customers
+        FROM first_orders
+        WHERE first_order_at >= DATEADD('month', -12, CURRENT_DATE())
+          AND first_order_at < CURRENT_DATE()
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("COUNT(DISTINCT"),
+        "outer aggregate is pushed down: {}",
+        sql
+    );
+    assert!(
+        sql.contains("DATE_ADD"),
+        "outer date filter is pushed down: {}",
+        sql
+    );
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+}
+
+/// `DATEADD` is rewritten to `date_add`, and the dialect template renders it from the
+/// `date_part` and `interval` variables rather than from the arguments. The rewrite maps
+/// every unit onto one of three parts - sub-day units become `MILLISECOND`, `day` and
+/// `week` become `DAY`, and `month`, `quarter` and `year` become `MONTH` - so each dialect
+/// has to render all three. These are the real templates from the query classes; the ones
+/// used elsewhere in these tests take `args_concat` and would not catch a wrong unit.
+#[tokio::test]
+async fn test_wrapper_date_add_dialect_templates() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let dialects = [
+        (
+            // PostgresQuery, RedshiftQuery inherits it, DuckDBQuery repeats it
+            "({{ args[0] }} + '{{ interval }} {{ date_part }}'::interval)",
+            [
+                "(CURRENT_DATE() + '7200000 MILLISECOND'::interval)",
+                "(CURRENT_DATE() + '14 DAY'::interval)",
+                "(CURRENT_DATE() + '24 MONTH'::interval)",
+            ],
+        ),
+        (
+            // SnowflakeQuery, MssqlQuery, RedshiftQuery
+            "DATEADD({{ date_part }}, {{ interval }}, {{ args[0] }})",
+            [
+                "DATEADD(MILLISECOND, 7200000, CURRENT_DATE())",
+                "DATEADD(DAY, 14, CURRENT_DATE())",
+                "DATEADD(MONTH, 24, CURRENT_DATE())",
+            ],
+        ),
+        (
+            // MysqlQuery: MySQL has no MILLISECOND unit, so those become microseconds
+            "DATE_ADD({{ args[0] }}, INTERVAL {% if date_part == \"MILLISECOND\" %}\
+             {{ interval }}000 MICROSECOND{% else %}{{ interval }} {{ date_part }}{% endif %})",
+            [
+                "DATE_ADD(CURRENT_DATE(), INTERVAL 7200000000 MICROSECOND)",
+                "DATE_ADD(CURRENT_DATE(), INTERVAL 14 DAY)",
+                "DATE_ADD(CURRENT_DATE(), INTERVAL 24 MONTH)",
+            ],
+        ),
+        (
+            // ClickHouseQuery, DatabricksQuery
+            "({{ args[0] }} + INTERVAL {{ interval }} {{ date_part }})",
+            [
+                "(CURRENT_DATE() + INTERVAL 7200000 MILLISECOND)",
+                "(CURRENT_DATE() + INTERVAL 14 DAY)",
+                "(CURRENT_DATE() + INTERVAL 24 MONTH)",
+            ],
+        ),
+        (
+            // PrestodbQuery, TrinoQuery and AthenaQuery inherit it
+            "DATE_ADD('{{ date_part }}', {{ interval }}, {{ args[0] }})",
+            [
+                "DATE_ADD('MILLISECOND', 7200000, CURRENT_DATE())",
+                "DATE_ADD('DAY', 14, CURRENT_DATE())",
+                "DATE_ADD('MONTH', 24, CURRENT_DATE())",
+            ],
+        ),
+    ];
+
+    for (template, expected) in dialects {
+        for (unit, expected) in ["hour", "week", "year"].iter().zip(expected) {
+            // A filter over a per-group aggregate cannot become a Cube filter, so the
+            // whole expression has to be rendered by the template
+            let sql = convert_select_to_query_plan_customized(
+                format!(
+                    r#"
+                    WITH first_orders AS (
+                        SELECT customer_gender, MIN(order_date) AS first_order_at
+                        FROM KibanaSampleDataEcommerce
+                        GROUP BY 1
+                    )
+                    SELECT COUNT(DISTINCT customer_gender) AS customers
+                    FROM first_orders
+                    WHERE first_order_at > DATEADD('{unit}', 2, CURRENT_DATE())
+                    "#
+                ),
+                DatabaseProtocol::PostgreSQL,
+                vec![("functions/DATE_ADD".to_string(), template.to_string())],
+            )
+            .await
+            .as_logical_plan()
+            .find_cube_scan_wrapped_sql()
+            .wrapped_sql
+            .sql;
+
+            assert!(
+                sql.contains(expected),
+                "`{}` renders as `{}` with template `{}`, got: {}",
+                unit,
+                expected,
+                template,
+                sql
+            );
+        }
+    }
+}
+
+/// Sub-day units are reported as a millisecond count inside an `IntervalDayTime`, which
+/// keeps days and milliseconds in separate halves of an i64 and reads them back
+/// separately. A negative offset used to decode as a mixed interval and fail the query,
+/// and a count past the 31 bit half used to wrap silently to a different amount of time,
+/// so both signs and the range boundary are covered here. Whole days are carried into the
+/// other half, which is what keeps ordinary spans past that boundary expressible. The
+/// encoding is the same for every dialect, so one template stands in for all of them.
+#[tokio::test]
+async fn test_wrapper_date_add_negative_and_out_of_range_intervals() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = TestContext::with_custom_templates(
+        DatabaseProtocol::PostgreSQL,
+        vec![(
+            "functions/DATE_ADD".to_string(),
+            "DATEADD({{ date_part }}, {{ interval }}, {{ args[0] }})".to_string(),
+        )],
+    )
+    .await;
+
+    let cases = [
+        ("hour", "-2", Some("DATEADD(MILLISECOND, -7200000, ")),
+        ("minute", "-30", Some("DATEADD(MILLISECOND, -1800000, ")),
+        ("second", "-90", Some("DATEADD(MILLISECOND, -90000, ")),
+        ("day", "-2", Some("DATEADD(DAY, -2, ")),
+        ("week", "-2", Some("DATEADD(DAY, -14, ")),
+        ("month", "-12", Some("DATEADD(MONTH, -12, ")),
+        ("year", "-1", Some("DATEADD(MONTH, -12, ")),
+        // The last span the millisecond half can hold on its own, and the first one past
+        // it, which is day aligned and so is carried into the other half
+        ("hour", "596", Some("DATEADD(MILLISECOND, 2145600000, ")),
+        ("hour", "720", Some("DATEADD(DAY, 30, ")),
+        ("hour", "-720", Some("DATEADD(DAY, -30, ")),
+        ("minute", "43200", Some("DATEADD(DAY, 30, ")),
+        // Neither day aligned nor small enough to count in milliseconds. The rewrite is
+        // skipped, which leaves the `dateadd` stub to report `NotImplemented` at
+        // execution rather than answering with a different date
+        ("hour", "597", None),
+        ("hour", "1000000", None),
+    ];
+
+    for (unit, amount, expected) in cases {
+        let logical_plan = context
+            .convert_sql_to_cube_query(&format!(
+                r#"
+                WITH first_orders AS (
+                    SELECT customer_gender, MIN(order_date) AS first_order_at
+                    FROM KibanaSampleDataEcommerce
+                    GROUP BY 1
+                )
+                SELECT COUNT(DISTINCT customer_gender) AS customers
+                FROM first_orders
+                WHERE first_order_at > DATEADD('{unit}', {amount}, CURRENT_DATE())
+                "#
+            ))
+            .await
+            .unwrap_or_else(|error| panic!("`{}` by {} should compile: {}", unit, amount, error))
+            .as_logical_plan();
+
+        let Some(expected) = expected else {
+            assert!(
+                logical_plan.find_filter().is_some(),
+                "`{}` by {} is not rewritten: {:?}",
+                unit,
+                amount,
+                logical_plan
+            );
+            continue;
+        };
+
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(
+            sql.contains(expected),
+            "`{}` by {} renders as `{}`, got: {}",
+            unit,
+            amount,
+            expected,
+            sql
+        );
+    }
 }

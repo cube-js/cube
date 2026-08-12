@@ -67,6 +67,8 @@ export class DuckDBQuery extends BaseQuery {
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.functions.STRING_AGG = 'STRING_AGG({% if distinct %}DISTINCT {% endif %}{{ args[0] }}, COALESCE({{ args[1] }}, \'\'))';
+    // DATEADD is being rewritten to DATE_ADD
+    templates.functions.DATE_ADD = '({{ args[0] }} + \'{{ interval }} {{ date_part }}\'::interval)';
     delete templates.functions.WIDTH_BUCKET;
     templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     templates.expressions.ilike = '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
