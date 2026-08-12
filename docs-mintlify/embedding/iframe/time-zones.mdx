@@ -1,0 +1,97 @@
+---
+title: Time zones
+description: Set the time zone for embedded Cube surfaces — account-wide, per embed via URL, or at runtime.
+---
+
+Embedded Cube surfaces — dashboards, [Analytics Chat](/embedding/iframe/analytics-chat),
+and the full app in [Creator Mode](/embedding/iframe/creator-mode) — bucket time in a
+zone you control. You can set a default for the whole account, override it per embed with
+a URL parameter, or switch it at runtime from the host page.
+
+This matters most when your end users are not in your deployment's zone: without it,
+"today" in an embedded dashboard means today in the deployment's
+[default time zone](/docs/data-modeling/configuration#default-time-zone), not in your
+customer's.
+
+<Note>
+
+Available on [Premium and above plans](https://cube.dev/pricing).
+
+</Note>
+
+<Info>
+  Embedded time zones require **user time zones** to be enabled for the account. See
+  [Time zones](/admin/time-zones) for the account-wide policy, what a zone changes, and
+  the console-side behavior.
+</Info>
+
+## How the zone is resolved
+
+The time zone of an embedded surface is resolved from the following sources, highest
+priority first:
+
+1. **Runtime override** — a [`cube:action:set-timezone`](/embedding/iframe/events#cube-action-set-timezone)
+   message sent from the host page (see [At runtime](#at-runtime)).
+2. **URL parameter** — the `?timezone=` query parameter on the embed URL (see
+   [Per embed via URL](#per-embed-via-url)).
+3. **Dashboard's own zone** — a dashboard pinned to a named zone, or set to resolve per
+   viewer (see [dashboard time zone](/admin/time-zones#dashboard-time-zone)). In
+   [signed embedding](/embedding/iframe/auth/signed) the viewer has no Cube account and
+   therefore no personal zone, so a viewer-resolved dashboard falls through to the next
+   step — supply `?timezone=` if you want each end user's own zone.
+4. **Account default** — the zone configured in **Embed → Settings** (see
+   [Account-wide default](#account-wide-default)).
+5. **Account-wide zone**, then the deployment's default time zone.
+
+A host override outranks a dashboard's pinned zone by design: the integrator is speaking
+for the whole frame, and you know your user's zone better than the dashboard's author
+does.
+
+<Note>
+  If the account policy is disabled, none of this applies — Cube sends no zone and the
+  deployment's default time zone is used, exactly as before.
+</Note>
+
+## Account-wide default
+
+Set a default time zone for all embedded surfaces:
+
+1. Go to **Embed → Settings**.
+2. In the **Time Zone** card, pick a zone from the dropdown.
+
+The selected zone applies to every embedded surface across the account, unless a specific
+embed overrides it. Re-selecting the account-wide zone clears the embed-specific value, so
+embeds follow the account-wide zone again.
+
+The picker is inert while user time zones are off for the account — a zone stored there
+would be one nothing applies.
+
+## Per embed via URL
+
+Override the account default for an individual embed by adding the `?timezone=` query
+parameter to the embed URL:
+
+```text
+https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&timezone=America/New_York
+```
+
+The parameter is read once when the embed loads and pinned for the session, so in-app
+navigation won't drop it.
+
+Values must be [IANA time zone names](/admin/time-zones#valid-time-zone-values). An
+unusable value — including a bare UTC offset like `+05:30` — is ignored, and the embed
+falls back to the account default rather than quietly shifting every number.
+
+## At runtime
+
+Switch the zone after the embed has loaded by sending a
+[`cube:action:set-timezone`](/embedding/iframe/events#cube-action-set-timezone) message
+from the host page. This takes precedence over both the URL parameter and the account
+default — use it when your own user changes their zone:
+
+```js
+sendAction("cube:action:set-timezone", { timezone: "Asia/Tokyo" });
+```
+
+See [Events and actions](/embedding/iframe/events) for the full host ↔ embed messaging
+contract.

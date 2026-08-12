@@ -409,6 +409,7 @@
                   "admin/customization/dashboard-themes"
                 ]
               },
+              "admin/time-zones",
               "admin/account-billing/ai-tokens",
               "admin/account-billing/api-keys",
               "admin/account-billing/billing-faq",
@@ -435,6 +436,7 @@
               "embedding/iframe/creator-mode",
               "embedding/iframe/customization",
               "embedding/iframe/localization",
+              "embedding/iframe/time-zones",
               "embedding/iframe/events",
               {
                 "group": "Authentication",
