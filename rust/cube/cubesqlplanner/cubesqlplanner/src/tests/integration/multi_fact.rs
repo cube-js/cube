@@ -599,6 +599,35 @@ async fn test_non_multiplied_multi_join() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_aggregate_grouped_by_own_primary_key() {
+    let ctx = create_context();
+
+    // customers.total_lifetime_value is multiplied by the customers→orders
+    // join, so it is read through the keys subquery and re-joined to customers
+    // by customers' primary key. That key is also a query dimension here, so it
+    // plays both roles at once and the keys subquery has to project it exactly
+    // once - two columns under one alias make every reference to it from the
+    // re-join ambiguous.
+    let query = indoc! {"
+        measures:
+          - customers.total_lifetime_value
+          - orders.count
+        dimensions:
+          - customers.id
+          - orders.status
+        order:
+          - id: customers.id
+          - id: orders.status
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_multi_fact_view_two_facts_with_measure_filter() {
     let schema = MockSchema::from_yaml_file("common/integration_multi_fact_view.yaml");
     let ctx = TestContext::new(schema).unwrap();
