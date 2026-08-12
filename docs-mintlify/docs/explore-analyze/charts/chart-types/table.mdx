@@ -95,9 +95,9 @@ and **Image** buttons:
 - **Bars** and **Sparkline** are mutually exclusive: picking one replaces the other, and clicking the active one again clears it.
 - **Link** and **Image** are independent of each other, so a column can be both — an image with a declared link renders as a clickable thumbnail. Switching one off leaves the other alone.
 - With nothing active, **Value** is forced on and its toggle disabled — so a plain column always shows its value.
-- Each button is offered only where it applies: bars and sparklines on **numeric** columns, **Link** only on a column whose dimension declares links or uses `format: link` (see [Inline links](#inline-links)), and **Image** where the dimension declares `format: imageUrl` or the column's values are image URLs (see [Images](#images)). In link mode the value *is* the link text, so **Value** stays forced on there too; image mode draws the thumbnail instead of the value, so **Value** is forced off and its toggle disabled. Only bars and sparklines leave the toggle free, because only they draw something the value can sit beside.
+- Each button is offered only where it applies: bars and sparklines on **numeric** columns, **Link** only on a column whose dimension declares links or uses `format: link` (see [Inline links](#inline-links)), and **Image** where the dimension declares `format: imageUrl` or the column's values are image URLs (see [Images](#images)). In link mode the value *is* the link text, so **Value** stays forced on there too; image mode draws the thumbnail instead of the value, so **Value** is forced off and its toggle disabled. With **Link** and **Image** both on, image wins: the thumbnail replaces the link text and becomes the click target. Only bars and sparklines leave the toggle free, because only they draw something the value can sit beside.
 
-{/* TODO: screenshot — a column card showing the Value toggle beside the inline bars / sparkline / link buttons */}
+{/* TODO: screenshot — a column card showing the Value toggle beside the Bars / Sparkline / Link / Image buttons */}
 
 ### Inline links
 
@@ -112,16 +112,16 @@ There are two ways to get one:
 - **[`format: link`](/reference/data-modeling/dimensions#format) on the dimension**, when the
   value already *is* a URL. Use the object form to show a label instead of the raw URL.
 
-For a column whose dimension declares links, selecting the link button reveals a picker for
+For a column whose dimension declares links, selecting the **Link** button reveals a picker for
 which of the declared links renders inline (inert when the dimension declares only one).
 Clicking the link text opens it; clicking elsewhere in the cell selects it and opens the
 cell menu as usual.
 
-{/* TODO: screenshot — a table with an inline link column and the Style tab's link button selected */}
+{/* TODO: screenshot — a table with an inline link column and the Style tab's Link button selected */}
 
 ### Inline bars
 
-Display a numeric column as a proportional in-cell bar by selecting the **inline bars** button on the column's card. Each bar's length reflects the value's magnitude within the column's range.
+Display a numeric column as a proportional in-cell bar by selecting the **Bars** button on the column's card. Each bar's length reflects the value's magnitude within the column's range.
 
 | Option | Description |
 |---|---|
@@ -137,7 +137,7 @@ When a column contains both positive and negative values, bars are drawn in both
 
 ### Sparklines
 
-Display a numeric column as a **sparkline** — a mini trend chart in each cell that plots the measure across a time dimension. Select the **sparkline** button on the column's card in the **Columns** section of the **Style** tab.
+Display a numeric column as a **sparkline** — a mini trend chart in each cell that plots the measure across a time dimension. Select the **Sparkline** button on the column's card in the **Columns** section of the **Style** tab.
 
 A sparkline needs a time dimension to use as its horizontal axis. When you switch a column to **Sparkline** and pick its horizontal axis time dimension, that dimension is **removed from the table query** (if it was there): the table shows one row per remaining dimension, correctly aggregated, while the sparkline plots the measure's value across the time dimension. Values are always correct for any measure type, including counts of distinct values, averages, and custom measures.
 
