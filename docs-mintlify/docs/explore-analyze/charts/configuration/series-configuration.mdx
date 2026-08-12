@@ -1,11 +1,11 @@
 ---
 title: Series configuration
-description: Configure individual series — mark type, color, and display options — independently from the global chart settings.
+description: Configure Y-axis layers — mark type, axis assignment, stacking, and data labels — independently from the global chart settings.
 ---
 
-Series configuration lets you override chart settings for one series. It applies to a chart built from stacked Y-axis layers, added with **+ Y Axis** on the Fields tab — each layer carries its own mark type and axis assignment.
+Series configuration applies to a chart built from **Y-axis layers**. Below the Y channel on the **Fields** tab there is a **+ Y Axis** button; each press adds a layer with its own measure, mark type, and axis assignment. It is not a channel dropdown, and it is offered only when the X axis is categorical or time-based and the chart is neither a heatmap, a boxplot, nor [split into small multiples](/docs/explore-analyze/charts/configuration/small-multiples).
 
-This is a different thing from [multi-series mode](/docs/explore-analyze/charts/configuration/series-mapping), which a query with several measures produces automatically. That mode lists its measures in a **Series** section whose rows carry no settings of their own.
+A chart can also carry several series without layers, when the query itself returns more than one measure. That is [multi-series mode](/docs/explore-analyze/charts/configuration/series-mapping), and nothing on this page applies to it — its measures are listed in a **Series** section whose rows carry no settings of their own. **Which one you are in is visible on the Fields tab**: layers each show their own measure and mark-type controls, while multi-series shows one flat **Series** list.
 
 {/* TODO screenshot: series configuration panel expanded for one series (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -29,9 +29,7 @@ To create a bar + line chart:
 
 ## Color
 
-When no **Color** channel is assigned (single-color bar and line charts with no color-by dimension), the **Style** tab offers a color swatch. Click it to set the chart's mark color.
-
-The control is not shown at all once a Color channel is active — including in [multi-series mode](/docs/explore-analyze/charts/configuration/series-mapping), where Color is pinned to **Series**. Colors then come from the palette in [Color & stacking](/docs/explore-analyze/charts/configuration/color-and-stacking), assigned to each series by its position in the list.
+Color is not set per layer. It is a chart-level control on the **Style** tab, and only when no Color channel is assigned — see [mark color](/docs/explore-analyze/charts/configuration/color-and-stacking).
 
 ## Y axis assignment
 
