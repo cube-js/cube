@@ -172,8 +172,11 @@ describe('QueryOrchestrator rollup only mode', () => {
     ).rejects.toThrow(rollupOnlyError);
   });
 
-  // The SQL API's native transport retries any error whose message contains
-  // "continue wait", so a miss worded that way would spin instead of failing.
+  // The SQL API's native transport retries an error whose message IS
+  // "continue wait" (`scan.rs` compares the whole string, case-insensitively),
+  // so a miss worded that way would spin instead of failing. The assertion
+  // below is deliberately stricter than that equality: a message merely
+  // mentioning a continue wait would be misleading even where it can't retry.
   test('the miss error is not mistaken for a continue wait', async () => {
     await expect(
       rollupOnlyOrchestrator.streamQuery(missQuery('rollup only wording'))

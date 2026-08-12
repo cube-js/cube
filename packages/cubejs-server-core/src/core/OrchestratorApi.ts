@@ -65,6 +65,20 @@ export class OrchestratorApi {
     try {
       return await this.orchestrator.streamQuery(query);
     } catch (err) {
+      // A pre-aggregation still building is not a query error. `executeQuery`
+      // logs it as 'Continue wait' rather than a failure, and the gateway keys
+      // its retryable 200 off `err.message === 'Continue wait'` — which only
+      // survives if the error reaches it unwrapped.
+      if (err instanceof ContinueWaitError) {
+        this.logger('Continue wait', {
+          query: query.query?.replace(/\s+/g, ' '),
+          params: query.values,
+          requestId: query.requestId,
+        });
+
+        throw err;
+      }
+
       this.logger('Error querying db', {
         query: query.query?.replace(/\s+/g, ' '),
         params: query.values,
