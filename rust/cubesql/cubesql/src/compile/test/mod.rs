@@ -29,6 +29,8 @@ pub mod rewrite_engine;
 #[cfg(test)]
 pub mod test_bi_workarounds;
 #[cfg(test)]
+pub mod test_copy;
+#[cfg(test)]
 pub mod test_cube_join;
 #[cfg(test)]
 pub mod test_cube_join_grouped;
@@ -1201,7 +1203,9 @@ impl TestContext {
                     output.push(frame.print());
                     output_flags = flags;
                 }
-                QueryPlan::CreateTempTable(_, _, _, _) => {
+                QueryPlan::CreateTempTable(_, _, _, _, _)
+                | QueryPlan::CopyFrom(_)
+                | QueryPlan::CreateEmptyTempTable(_) => {
                     // nothing to do
                 }
                 QueryPlan::MetaOk(flags, _) => {

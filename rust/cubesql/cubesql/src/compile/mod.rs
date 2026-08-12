@@ -1,6 +1,7 @@
 use self::engine::CubeContext;
 
 pub mod builder;
+pub mod copy;
 pub mod engine;
 pub mod error;
 pub mod parser;
@@ -6052,10 +6053,9 @@ ORDER BY
             meta.clone(),
             get_test_session(DatabaseProtocol::PostgreSQL, meta.clone()).await,
         ).await;
-        match create_query {
-            Err(CompilationError::Unsupported(msg, _)) => assert_eq!(msg, "Unsupported query type: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INTEGER) ON COMMIT PRESERVE ROWS"),
-            _ => panic!("CREATE TABLE should throw CompilationError::Unsupported"),
-        };
+        // A temporary table with column definitions is created empty, to be filled
+        // by COPY ... FROM STDIN
+        assert!(create_query.is_ok());
 
         let select_into_query = convert_sql_to_cube_query(
             &"
