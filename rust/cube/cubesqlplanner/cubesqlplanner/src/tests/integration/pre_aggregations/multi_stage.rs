@@ -73,6 +73,132 @@ async fn test_multi_stage_time_shift_pre_agg_with_leaf_measure() {
     }
 }
 
+// cube-js/cube#11536: same fixture/query as
+// test_multi_stage_time_shift_pre_agg_with_leaf_measure, but queried through a
+// passthrough view. extract_date_range() must widen the matched pre-agg's
+// date_range by the shift interval identically whether the time dimension
+// filter is cube-qualified or view-qualified.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_time_shift_pre_agg_via_view() {
+    let schema = MockSchema::from_yaml(indoc! {r#"
+        cubes:
+            - name: customers
+              sql: "SELECT * FROM ms_customers"
+              joins:
+                  - name: returns
+                    relationship: one_to_many
+                    sql: "{customers}.id = {returns.customer_id}"
+              dimensions:
+                  - name: id
+                    type: number
+                    sql: id
+                    primary_key: true
+              measures:
+                  - name: total_lifetime_value
+                    type: sum
+                    sql: lifetime_value
+
+                  - name: total_lifetime_value_prev_month_by_returns
+                    type: number
+                    sql: "{CUBE.total_lifetime_value}"
+                    multi_stage: true
+                    time_shift:
+                        - interval: "1 month"
+                          type: prior
+
+              pre_aggregations:
+                  - name: customers_lifetime_by_returns_month
+                    type: rollup
+                    measures:
+                        - total_lifetime_value
+                    time_dimension: returns.created_at
+                    granularity: month
+
+            - name: returns
+              sql: "SELECT * FROM ms_returns"
+              dimensions:
+                  - name: id
+                    type: number
+                    sql: id
+                    primary_key: true
+                  - name: customer_id
+                    type: number
+                    sql: customer_id
+                  - name: created_at
+                    type: time
+                    sql: created_at
+              measures:
+                  - name: count
+                    type: count
+
+        views:
+            - name: customers_view
+              cubes:
+                  - join_path: customers
+                    includes:
+                        - total_lifetime_value
+                        - total_lifetime_value_prev_month_by_returns
+                  - join_path: customers.returns
+                    includes:
+                        - created_at
+    "#})
+    .unwrap()
+    .only_pre_aggregations(&["customers_lifetime_by_returns_month"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {r#"
+        measures:
+          - customers_view.total_lifetime_value
+          - customers_view.total_lifetime_value_prev_month_by_returns
+        time_dimensions:
+          - dimension: customers_view.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: customers_view.created_at
+    "#};
+
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    let names: Vec<&str> = pre_aggrs.iter().map(|u| u.name().as_str()).collect();
+
+    assert_eq!(
+        pre_aggrs.len(),
+        2,
+        "Expected 2 usages (shifted + unshifted leaf); got {:?}",
+        names
+    );
+    assert!(
+        names
+            .iter()
+            .all(|n| *n == "customers_lifetime_by_returns_month"),
+        "Both usages must be customers_lifetime_by_returns_month; got {:?}",
+        names
+    );
+
+    let shifted_range = Some((
+        "2023-12-01T00:00:00.000".to_string(),
+        "2024-02-29T23:59:59.999".to_string(),
+    ));
+    let original_range = Some((
+        "2024-01-01T00:00:00.000".to_string(),
+        "2024-03-31T23:59:59.999".to_string(),
+    ));
+    let shifted = pre_aggrs
+        .iter()
+        .find(|u| u.date_range == shifted_range)
+        .expect("Expected a usage with shifted date_range");
+    let unshifted = pre_aggrs
+        .iter()
+        .find(|u| u.date_range == original_range)
+        .expect("Expected a usage with original date_range");
+    assert_ne!(
+        shifted.index, unshifted.index,
+        "Shifted and unshifted usages must have different usage indexes"
+    );
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_multi_stage_time_shift_pre_agg_with_multi_stage_measure() {
     let schema = MockSchema::from_yaml_file(YAML)
