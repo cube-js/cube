@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.19](https://github.com/cube-js/cube/compare/v1.7.18...v1.7.19) (2026-08-12)
+
+### Bug Fixes
+
+- **cubesql:** Resolve data source for synthetic-only queries ([#11526](https://github.com/cube-js/cube/issues/11526)) ([b1c87dc](https://github.com/cube-js/cube/commit/b1c87dc40f9c7183d7eb6a5c0e08682092aac077))
+- **schema-compiler:** promote DATE columns in Trino/Presto convertTz ([#11516](https://github.com/cube-js/cube/issues/11516)) ([bb0d57a](https://github.com/cube-js/cube/commit/bb0d57aae1cfd4495e8d814fb6bfe737053ce4eb))
+- **tesseract:** report multi-stage reads of out-of-grain dimensions ([#11514](https://github.com/cube-js/cube/issues/11514)) ([e090594](https://github.com/cube-js/cube/commit/e0905948546b4bccf8f95295d8e7c1898e7f9f56))
+- **tesseract:** Resolve join for hint-less member expressions on views ([#11501](https://github.com/cube-js/cube/issues/11501)) ([9715bf1](https://github.com/cube-js/cube/commit/9715bf189db8b1e725db5bc7c3241e5e793be1fe))
+
+### Features
+
+- **cubesql:** Support `regtype` and `regtype[]` casts ([#11503](https://github.com/cube-js/cube/issues/11503)) ([c12a106](https://github.com/cube-js/cube/commit/c12a1065208e4308f15855b981ce85ae9be6acc2))
+- **cubesql:** Support `WIDTH_BUCKET` SQL pushdown ([#11500](https://github.com/cube-js/cube/issues/11500)) ([b951c00](https://github.com/cube-js/cube/commit/b951c004038acf4e7640867bf3702d3144ad80a9))
+- **tesseract:** push a segment named in FILTER_PARAMS into the cube's sql ([#11517](https://github.com/cube-js/cube/issues/11517)) ([a0723ac](https://github.com/cube-js/cube/commit/a0723ace6ff2d76404b219ffa72df8cfada6cc13))
+
 ## [1.7.18](https://github.com/cube-js/cube/compare/v1.7.17...v1.7.18) (2026-08-09)
 
 ### Features

@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.19](https://github.com/cube-js/cube/compare/v1.7.18...v1.7.19) (2026-08-12)
+
+### Features
+
+- **cubesql:** Support `WIDTH_BUCKET` SQL pushdown ([#11500](https://github.com/cube-js/cube/issues/11500)) ([b951c00](https://github.com/cube-js/cube/commit/b951c004038acf4e7640867bf3702d3144ad80a9))
+
 ## [1.7.18](https://github.com/cube-js/cube/compare/v1.7.17...v1.7.18) (2026-08-09)
 
 **Note:** Version bump only for package @cubejs-backend/questdb-driver

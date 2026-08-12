@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.19](https://github.com/cube-js/cube/compare/v1.7.18...v1.7.19) (2026-08-12)
+
+### Bug Fixes
+
+- **schema-compiler:** promote DATE columns in Trino/Presto convertTz ([#11516](https://github.com/cube-js/cube/issues/11516)) ([bb0d57a](https://github.com/cube-js/cube/commit/bb0d57aae1cfd4495e8d814fb6bfe737053ce4eb))
+
+### Features
+
+- **cubesql:** Support `WIDTH_BUCKET` SQL pushdown ([#11500](https://github.com/cube-js/cube/issues/11500)) ([b951c00](https://github.com/cube-js/cube/commit/b951c004038acf4e7640867bf3702d3144ad80a9))
+- **tesseract:** push a segment named in FILTER_PARAMS into the cube's sql ([#11517](https://github.com/cube-js/cube/issues/11517)) ([a0723ac](https://github.com/cube-js/cube/commit/a0723ace6ff2d76404b219ffa72df8cfada6cc13))
+
 ## [1.7.18](https://github.com/cube-js/cube/compare/v1.7.17...v1.7.18) (2026-08-09)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

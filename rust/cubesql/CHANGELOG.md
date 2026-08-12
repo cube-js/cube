@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.19](https://github.com/cube-js/cube/compare/v1.7.18...v1.7.19) (2026-08-12)
+
+### Bug Fixes
+
+- **cubesql:** Resolve data source for synthetic-only queries ([#11526](https://github.com/cube-js/cube/issues/11526)) ([b1c87dc](https://github.com/cube-js/cube/commit/b1c87dc40f9c7183d7eb6a5c0e08682092aac077))
+
+### Features
+
+- **cubesql:** Support `regtype` and `regtype[]` casts ([#11503](https://github.com/cube-js/cube/issues/11503)) ([c12a106](https://github.com/cube-js/cube/commit/c12a1065208e4308f15855b981ce85ae9be6acc2))
+- **cubesql:** Support `WIDTH_BUCKET` SQL pushdown ([#11500](https://github.com/cube-js/cube/issues/11500)) ([b951c00](https://github.com/cube-js/cube/commit/b951c004038acf4e7640867bf3702d3144ad80a9))
+
 ## [1.7.18](https://github.com/cube-js/cube/compare/v1.7.17...v1.7.18) (2026-08-09)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql
