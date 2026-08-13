@@ -90,6 +90,27 @@ const DRIVER_REBUILD_WARN_THRESHOLD = 50;
 const MAX_DRIVER_REBUILD_ATTEMPTS = 3;
 
 /**
+ * How long a data source keeps a freshly rebuilt driver before another
+ * configuration change may replace it. Inside the window the cached driver is
+ * reused without even asking the factory, exactly as before this file learned
+ * to rebuild at all.
+ *
+ * A rebuild tears down a connection pool, so the rate has to be bounded by
+ * something other than how often contexts happen to differ. Without this, a
+ * deployment whose `driverFactory` returns a configuration that is not stable
+ * across calls — a credential minted per call, say, or one carrying a nonce —
+ * would rebuild on request after request. That deployment works today, because
+ * the driver is resolved once and the difference is never noticed; it must not
+ * be turned into pool churn.
+ *
+ * The cost is that a credential which rotates twice inside one window is picked
+ * up a window late rather than immediately. At half a minute against
+ * credentials that live for an hour, that is not a tradeoff worth agonising
+ * over — and the alternative, before this change, was "not until redeploy".
+ */
+const DRIVER_REBUILD_MIN_INTERVAL_MS = 30 * 1000;
+
+/**
  * What a cached driver was built from. `null` on either field means "cannot
  * tell whether it changed", which is always read as "assume it did not".
  */
@@ -102,6 +123,18 @@ type DriverOrigin = {
 type DriverFactoryResult = {
   value: DriverConfig | BaseDriver;
   securityContextFingerprint: string | null;
+};
+
+/** Rebuild history of the one driver an alias set resolves to. */
+type DriverRebuildState = {
+  count: number;
+  lastRebuildAt: number;
+  /**
+   * Whether the suppression window opened by that rebuild has already been
+   * logged. Reset by each rebuild, so a thrashing deployment reports once per
+   * window rather than once per query.
+   */
+  suppressionReported: boolean;
 };
 
 function wrapToFnIfNeeded<T, R>(possibleFn: T | ((a: R) => T)): (a: R) => T {
@@ -646,13 +679,13 @@ export class CubejsServerCore {
     const driverOrigin: Record<string, DriverOrigin> = {};
 
     /**
-     * How many times each key has been rebuilt. Reported with the rebuild so a
-     * deployment whose `contextToOrchestratorId` does not partition by whatever
-     * `driverFactory` reads — every user sharing one orchestrator, say — is
-     * diagnosable: it rebuilds on request after request rather than once per
-     * credential rotation.
+     * Rebuild history per alias set, which both rate-limits rebuilds and makes
+     * a deployment whose `contextToOrchestratorId` does not partition by
+     * whatever `driverFactory` reads — every user sharing one orchestrator, say
+     * — diagnosable: it keeps resolving a changed configuration rather than
+     * doing so once per credential rotation.
      */
-    const driverRebuilds: Record<string, number> = {};
+    const driverRebuilds: Record<string, DriverRebuildState> = {};
 
     let externalPreAggregationsDriverPromise: Promise<BaseDriver> | null = null;
 
@@ -704,11 +737,51 @@ export class CubejsServerCore {
         delete driverOrigin[key];
       });
 
+      /**
+       * Rebuilds are counted and rate-limited per alias set, not per key: a
+       * rotation seen first through `default@pre_agg` and then through `default`
+       * is one rebuild of one shared driver, and must not read as two counters
+       * at 1 — nor rebuild twice.
+       */
+      const rebuildKey = aliasedKeys[0];
+
       // Already resolved by the staleness check below, so the factory is not
       // asked twice for the same rebuild.
       let resolvedFactoryResult: DriverFactoryResult | undefined;
 
       const cached = driverPromise[factoryKey];
+      const rebuildState = driverRebuilds[rebuildKey];
+
+      if (
+        cached &&
+        rebuildState &&
+        Date.now() - rebuildState.lastRebuildAt < DRIVER_REBUILD_MIN_INTERVAL_MS
+      ) {
+        // Inside the window this is a plain cache hit: the factory is not asked
+        // whether anything changed, because acting on the answer is what has to
+        // be rate-limited and asking a user-supplied function on every query is
+        // not free either. A configuration that really did change is picked up
+        // by the first resolution after the window closes.
+        if (!rebuildState.suppressionReported) {
+          rebuildState.suppressionReported = true;
+
+          // Carries `warning` so it survives the default log level, as the
+          // rebuild it follows does.
+          this.logger('Driver rebuild suppressed', {
+            dataSource,
+            preAggregations,
+            rebuildCount: rebuildState.count,
+            warning: 'Driver was rebuilt less than '
+              + `${DRIVER_REBUILD_MIN_INTERVAL_MS / 1000}s ago; reusing it without `
+              + 'rechecking its configuration. Sustained suppression means the '
+              + 'configuration is not stable across driverFactory calls, or that '
+              + 'contextToOrchestratorId does not distinguish the contexts '
+              + 'driverFactory returns different connections for.',
+          });
+        }
+
+        return cached;
+      }
 
       if (cached) {
         const staleness = await this.resolveDriverStaleness(
@@ -746,12 +819,23 @@ export class CubejsServerCore {
         } else if (!staleness.stale) {
           return cached;
         } else {
-          // Counted per alias set, not per key: a rotation seen first through
-          // `default@pre_agg` and then through `default` is one rebuild of one
-          // shared driver, and must not read as two counters at 1.
-          const rebuildKey = aliasedKeys[0];
-          driverRebuilds[rebuildKey] = (driverRebuilds[rebuildKey] || 0) + 1;
-          const rebuildCount = driverRebuilds[rebuildKey];
+          // Opens a fresh suppression window, so the next configuration change
+          // for this alias set waits it out rather than tearing down the pool
+          // this rebuild is about to stand up.
+          //
+          // Re-read rather than reusing what was captured before the staleness
+          // probe awaited: reaching here means no concurrent rebuild landed, but
+          // the count is the one piece of state that would silently lose an
+          // increment if that ever stopped being true.
+          const state = driverRebuilds[rebuildKey]
+            || { count: 0, lastRebuildAt: 0, suppressionReported: false };
+
+          state.count += 1;
+          state.lastRebuildAt = Date.now();
+          state.suppressionReported = false;
+          driverRebuilds[rebuildKey] = state;
+
+          const rebuildCount = state.count;
 
           // Carries `warning` so it survives the default log level: a
           // plain-params message matches no allowlist in
@@ -1159,6 +1243,11 @@ export class CubejsServerCore {
    * built from the first request's token was reused for the life of the
    * process, so every new connection it opened failed to authenticate.
    *
+   * A `stale: true` verdict is permission to rebuild, not an instruction to: the
+   * caller rate-limits rebuilds per data source, because the rate at which a
+   * configuration appears to change is a property of user code, while the cost
+   * of acting on it is a connection pool.
+   *
    * Note this follows the documented contract of `contextToOrchestratorId` —
    * that it is the cache key for database connections. Two contexts that
    * resolve to different connections but share an orchestrator id are a
@@ -1203,23 +1292,20 @@ export class CubejsServerCore {
       return { stale: false };
     }
 
+    // `null` for a constructed driver, which carries no configuration to
+    // compare — and, like every other `null` here, is read as "assume
+    // unchanged". Nothing is released on that path: the value belongs to the
+    // factory, which may be handing out a singleton it expects to keep working.
+    //
+    // No factory can actually reach it. One that returns drivers consistently
+    // recorded a null config fingerprint on its first build and is rejected by
+    // the guard above before the factory is ever called; one that switches from
+    // configs to drivers is rejected by `OptsHandler.assertDriverFactoryResult`,
+    // and that throw is caught above as a probe failure. It is handled because
+    // the type admits it, not because it happens.
     const configFingerprint = isDriver(value) ? null : fingerprint(value);
 
     if (configFingerprint === null || configFingerprint === origin.configFingerprint) {
-      // A driver the factory constructed for this probe is about to be dropped,
-      // so hand back whatever it opened rather than leaking it. Only reachable
-      // for a factory that returns a config sometimes and a driver other times.
-      if (isDriver(value)) {
-        try {
-          await (<BaseDriver>value).release();
-        } catch (error) {
-          this.logger('Driver release error', {
-            dataSource: context.dataSource,
-            error: (error as Error).stack || (error as Error).toString(),
-          });
-        }
-      }
-
       origin.securityContextFingerprint = securityContextFingerprint;
 
       return { stale: false };

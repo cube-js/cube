@@ -11,6 +11,28 @@ type FakeDriver = BaseDriver & {
 };
 
 /**
+ * Rebuilds are rate-limited per data source, so a test that rebuilds more than
+ * once has to say how much time passed in between. Patching `Date.now` rather
+ * than using fake timers keeps the real microtask scheduling these tests depend
+ * on to interleave concurrent resolutions.
+ */
+function fakeClock() {
+  let now = Date.parse('2026-01-01T00:00:00Z');
+  const spy = jest.spyOn(Date, 'now').mockImplementation(() => now);
+
+  return {
+    /** Longer than any rebuild interval the server enforces. */
+    advancePastRebuildInterval: () => {
+      now += 60 * 1000;
+    },
+    advance: (ms: number) => {
+      now += ms;
+    },
+    restore: () => spy.mockRestore(),
+  };
+}
+
+/**
  * Stands in for real driver construction so these tests exercise the caching
  * decisions without needing a database. Everything else — the driver factory
  * closure, the fingerprinting, the rebuild — is the production code path.
@@ -104,8 +126,20 @@ async function createCore(options: CreateOptions, securityContext: unknown) {
 }
 
 describe('driver cache invalidation', () => {
+  let clock: ReturnType<typeof fakeClock>;
+
   beforeAll(() => {
     process.env.CUBEJS_API_SECRET = 'api-secret';
+  });
+
+  // Frozen by default, so a test that rebuilds twice has to be explicit about
+  // the time in between rather than passing on whatever the wall clock did.
+  beforeEach(() => {
+    clock = fakeClock();
+  });
+
+  afterEach(() => {
+    clock.restore();
   });
 
   // The CUB-3599 regression: the orchestrator closed over the context of the
@@ -237,6 +271,11 @@ describe('driver cache invalidation', () => {
     await request({ token: 'token-b' });
 
     const preAgg = <FakeDriver> await driverFactory('default', true);
+
+    // Past the rebuild interval, so it is the alias bookkeeping that keeps these
+    // two on one driver rather than the rate limit masking a second rebuild.
+    clock.advancePastRebuildInterval();
+
     const regular = <FakeDriver> await driverFactory('default');
 
     await new Promise((resolve) => setImmediate(resolve));
@@ -333,6 +372,9 @@ describe('driver cache invalidation', () => {
     await driverFactory('default');
 
     for (let i = 1; i <= 50; i++) {
+      // Each rotation is its own, well clear of the previous rebuild, so all 50
+      // are acted on rather than rate-limited.
+      clock.advancePastRebuildInterval();
       // eslint-disable-next-line no-await-in-loop
       await request({ token: `token-${i}` }, `req-${i}`);
       // eslint-disable-next-line no-await-in-loop
@@ -382,6 +424,13 @@ describe('driver cache invalidation', () => {
       }
 
       await Promise.resolve(driverFactory('default')).catch(() => {});
+
+      // Each round's rebuild has to sit outside the rate-limiting window by the
+      // time the caller that lost the race retries — otherwise that retry is a
+      // cache hit rather than another probe, and the bound is never reached.
+      // Which is the rate limit working: displacement this rapid is what it
+      // exists to stop, so provoking the bound means stepping past it.
+      clock.advancePastRebuildInterval();
     };
 
     const resolved = <FakeDriver> await driverFactory('default');
@@ -414,6 +463,128 @@ describe('driver cache invalidation', () => {
 
     expect(await driverFactory('default')).toBe(first);
     expect(core.builtDrivers).toHaveLength(1);
+  });
+
+  // A `driverFactory` whose configuration is not stable across calls — a
+  // credential minted per call, a nonce — resolves as changed every time. That
+  // deployment works today, because the driver is resolved once and the
+  // difference is never noticed, and it must not become a pool teardown per
+  // query. Rebuilds are therefore rate-limited per data source, and inside the
+  // window the cached driver is served exactly as it was before.
+  test('rate-limits rebuilds, reporting the suppression once per window', async () => {
+    let nonce = 0;
+    const factory = jest.fn(() => {
+      nonce += 1;
+
+      return <any>{ type: 'postgres', password: `token-${nonce}` };
+    });
+    const { core, driverFactory, request, logged } = await createCore(
+      { driverFactory: factory },
+      { user: 'a' },
+    );
+
+    await driverFactory('default');
+
+    clock.advancePastRebuildInterval();
+    await request({ user: 'b' });
+    const rebuilt = <FakeDriver> await driverFactory('default');
+
+    expect(core.builtDrivers).toHaveLength(2);
+
+    const callsBeforeSuppression = factory.mock.calls.length;
+
+    // Three more contexts inside the window. Each would resolve a different
+    // configuration, and none may replace the driver.
+    for (const user of ['c', 'd', 'e']) {
+      // eslint-disable-next-line no-await-in-loop
+      await request({ user });
+      // eslint-disable-next-line no-await-in-loop
+      expect(await driverFactory('default')).toBe(rebuilt);
+    }
+
+    expect(core.builtDrivers).toHaveLength(2);
+    expect(rebuilt.release).not.toHaveBeenCalled();
+    // Not even asked: acting on the answer is what is rate-limited, and calling
+    // user code per query to discard the result would be its own cost.
+    expect(factory).toHaveBeenCalledTimes(callsBeforeSuppression);
+
+    const suppressions = logged('Driver rebuild suppressed');
+
+    // Once per window, not once per query.
+    expect(suppressions).toHaveLength(1);
+    expect(suppressions[0]).toMatchObject({ dataSource: 'default', rebuildCount: 1 });
+    expect(suppressions[0].warning).toContain('driverFactory');
+  });
+
+  test('rebuilds again once the interval has passed', async () => {
+    const { core, driverFactory, request } = await createCore({
+      driverFactory: (ctx: any) => (<any>{ type: 'postgres', password: ctx.securityContext.token }),
+    }, { token: 'token-a' });
+
+    await driverFactory('default');
+
+    clock.advancePastRebuildInterval();
+    await request({ token: 'token-b' });
+    const rebuilt = <FakeDriver> await driverFactory('default');
+
+    // A second rotation inside the window is held back...
+    await request({ token: 'token-c' });
+    expect(await driverFactory('default')).toBe(rebuilt);
+
+    // ...and picked up by the first resolution after it closes, so the rate
+    // limit delays a rotation rather than dropping it.
+    clock.advancePastRebuildInterval();
+    const latest = <FakeDriver> await driverFactory('default');
+
+    expect(latest).not.toBe(rebuilt);
+    expect(latest.builtFrom).toMatchObject({ password: 'token-c' });
+    expect(core.builtDrivers).toHaveLength(3);
+  });
+
+  // The probe can never observe a factory switching from configs to a
+  // constructed driver — `OptsHandler` rejects the second shape — but what that
+  // rejection must not do is fail a query. It surfaces as a probe failure, and
+  // the driver the deployment is already using keeps serving. Pinned because the
+  // staleness check is what put user code on a path that used to be a pure cache
+  // hit, and the driver it hands back must never be one nobody owns.
+  test('keeps serving the cached driver when the factory changes its return shape', async () => {
+    class ConstructedDriver extends BaseDriver {
+      public release = jest.fn(async () => {});
+
+      public testConnection = jest.fn(async () => {});
+
+      public async query<R = unknown>(): Promise<R[]> {
+        return [];
+      }
+    }
+
+    const constructed = new ConstructedDriver();
+    let returnDriver = false;
+    const factory = jest.fn((ctx: any) => (returnDriver
+      ? <any>constructed
+      : <any>{ type: 'postgres', password: ctx.securityContext.token }));
+
+    const { core, driverFactory, request, logged } = await createCore(
+      { driverFactory: factory },
+      { token: 'token-a' },
+    );
+
+    const built = <FakeDriver> await driverFactory('default');
+
+    returnDriver = true;
+    clock.advancePastRebuildInterval();
+    await request({ token: 'token-b' });
+
+    expect(await driverFactory('default')).toBe(built);
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(core.builtDrivers).toHaveLength(1);
+    expect(built.release).not.toHaveBeenCalled();
+    // Not touched either: whatever the factory constructed belongs to the
+    // factory, which may be handing out a singleton it expects to keep working.
+    expect(constructed.release).not.toHaveBeenCalled();
+    expect(logged('Driver staleness check error')).toHaveLength(1);
   });
 
   // The refresh scheduler's default context carries no security context at all,
