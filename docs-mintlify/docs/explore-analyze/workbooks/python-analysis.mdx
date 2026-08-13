@@ -3,6 +3,14 @@ title: Python analysis
 description: Attach a Python script to a report to run forecasting, regression, cohort, and other analysis that SQL can't express, and save the result as a re-runnable report.
 ---
 
+<Warning>
+
+Python analysis is currently in preview, and the user experience and the script
+contract may still change. Reach out to the [Cube support
+team](/admin/account-billing/support) to activate this feature for your account.
+
+</Warning>
+
 A report can carry an attached **Python script** that transforms the report's SQL
 result. The report's chart then renders the script's **output** instead of the raw
 SQL rows. This turns an analysis that would otherwise scroll away in a chat
@@ -38,24 +46,24 @@ SQL report, that is usually correct behavior.
 
 </Info>
 
-### In a workbook
+### From the toolbar
 
-Open the tab menu and choose **Add Python**. Cube seeds a starter script and
-reveals the code panel. **Remove Python** detaches the script, after which the tab
-behaves like any SQL-backed report again.
+Workbooks and [Explore](/docs/explore-analyze/explore) share the same flow.
+
+Click **Python** in the toolbar to open the Python panel, then **Add script** to
+attach one. Cube seeds a starter script and opens it on the **Script** tab.
+Opening the panel does not attach anything by itself — only **Add script** does.
+
+**Remove**, in the panel header, detaches the script, after which the report
+behaves like any SQL-backed one again.
 
 Attaching Python clears any existing SQL result: a python-backed report renders its
 last Python run, and a freshly attached script has none until you press **Run**.
 
-### In Explore
-
-Use the **Add Python** button in the header, with the same **Remove Python**
-counterpart.
-
-This is only available on a **saved** [exploration](/docs/explore-analyze/explore).
-On an unsaved one the button is disabled with the tooltip *"Save exploration before
-adding Python."* — **Run** executes server-persisted code, so the analysis needs a
-saved report to live on.
+Attaching Python in Explore is only available on a **saved** exploration. On an
+unsaved one the **Python** button is disabled with the tooltip *"Save the
+exploration to add Python"* — **Run** executes server-persisted code, so the
+analysis needs a saved report to live on.
 
 ## Writing the script
 
@@ -68,7 +76,7 @@ The script runs in a sandbox against a fixed contract:
 A top-level dict or object is rejected — flatten any nested structure into one
 array of uniform rows.
 
-{/* TODO: screenshot — the Add Python tab menu entry */}
+{/* TODO: screenshot — the Python panel's Add script button */}
 
 ## Python environment
 
@@ -100,7 +108,8 @@ adding packages to the environment is coming.
 
 ## Running and refreshing
 
-The code panel is editable in place, with line numbers.
+The panel's **Script** tab is editable in place, with line numbers. **Reset**
+restores the starter template.
 
 - **Edits do not run anything.** They save with the report, and the rendered result
   keeps showing the previous run.
@@ -109,10 +118,14 @@ The code panel is editable in place, with line numbers.
   after the last run. Run to refresh the saved result."*
 - **Run** executes the stored script in the sandbox and persists the refreshed
   result.
+- The **Output** tab shows what the last run printed — the script's stdout and
+  stderr, so `print()` is how you inspect intermediate values. Both are captured up
+  to the cap in [Limits](#limits), so a chatty script gets truncated.
 - The **input SQL panel is read-only** on a python report: that SQL is the
-  sandbox's input, not what gets charted.
-- **A failed run keeps the previous chart.** The error and the script's
-  stdout/stderr surface in the UI while the last good result stays rendered.
+  sandbox's input, not what gets charted. It still offers the **Semantic SQL** and
+  **Generated SQL** tabs, both derived from that input query.
+- **A failed run keeps the previous chart.** The error surfaces alongside the last
+  successful result, which stays rendered.
 
 **Run is the only way the saved result changes.** Opening the report, reloading the
 page, or viewing a dashboard never re-runs anything on its own.
