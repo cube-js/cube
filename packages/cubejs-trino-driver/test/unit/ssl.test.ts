@@ -1,3 +1,4 @@
+import { Agent as HttpAgent } from 'http';
 import { Agent as HttpsAgent } from 'https';
 import { TrinoDriver } from '../../src';
 
@@ -9,14 +10,8 @@ jest.mock('node-fetch', () => ({
 }));
 
 jest.mock('@cubejs-backend/schema-compiler', () => ({
-  PrestodbQuery: class { },
-}));
-
-jest.mock('presto-client', () => ({
-  Client: jest.fn().mockImplementation(() => ({
-    execute: jest.fn(),
-    nodes: jest.fn(),
-  })),
+  PrestodbQuery: class {},
+  TrinoQuery: class {},
 }));
 
 describe('TrinoDriver SSL', () => {
@@ -47,10 +42,13 @@ describe('TrinoDriver SSL', () => {
     expect(options.agent.options).toMatchObject({
       ca,
       rejectUnauthorized: false,
+      keepAlive: true,
     });
+
+    await driver.release();
   });
 
-  it('does not pass an agent when SSL is disabled', async () => {
+  it('uses a keep-alive http agent when SSL is disabled', async () => {
     const driver = new TrinoDriver({
       host: 'trino.local',
       port: '8080',
@@ -61,6 +59,9 @@ describe('TrinoDriver SSL', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, options] = mockFetch.mock.calls[0];
     expect(url).toBe('http://trino.local:8080/v1/info');
-    expect(options.agent).toBeUndefined();
+    expect(options.agent).toBeInstanceOf(HttpAgent);
+    expect(options.agent.options).toMatchObject({ keepAlive: true });
+
+    await driver.release();
   });
 });

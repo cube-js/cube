@@ -1042,6 +1042,53 @@ for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options].
 | ----------------- | ---------------------- | --------------------- |
 | A valid host name | N/A                    | N/A                   |
 
+## `CUBEJS_DB_TRINO_SOURCE`
+
+Value sent as the `X-Trino-Source` header so Trino query history identifies the
+client. Used by the Trino driver. Defaults to `nodejs-client`, matching the
+previous `presto-client` default.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A string        | `nodejs-client`        | `nodejs-client`       |
+
+## `CUBEJS_DB_TRINO_POLL_INITIAL_INTERVAL`
+
+First wait, in milliseconds, before the next `nextUri` poll while a Trino query
+is still queued or planning with no rows.
+
+| Possible Values     | Default in Development | Default in Production |
+| ------------------- | ---------------------- | --------------------- |
+| A positive integer  | `50`                   | `50`                  |
+
+## `CUBEJS_DB_TRINO_POLL_INCREMENT_STEP`
+
+Added to the wait-phase poll interval after
+[`CUBEJS_DB_TRINO_POLL_TRIES_BEFORE_INCREMENT`](#cubejs_db_trino_poll_tries_before_increment)
+empty polls.
+
+| Possible Values     | Default in Development | Default in Production |
+| ------------------- | ---------------------- | --------------------- |
+| A positive integer  | `50`                   | `50`                  |
+
+## `CUBEJS_DB_TRINO_POLL_MAX_INTERVAL`
+
+Cap on the wait-phase poll interval, in milliseconds.
+
+| Possible Values     | Default in Development | Default in Production |
+| ------------------- | ---------------------- | --------------------- |
+| A positive integer  | `500`                  | `500`                 |
+
+## `CUBEJS_DB_TRINO_POLL_TRIES_BEFORE_INCREMENT`
+
+Number of empty wait-phase polls at the current interval before increasing it.
+With the default initial interval of 50ms, the default of 10 keeps about 500ms
+of fine-grained polling.
+
+| Possible Values     | Default in Development | Default in Production |
+| ------------------- | ---------------------- | --------------------- |
+| A positive integer  | `10`                   | `10`                  |
+
 ## `CUBEJS_DB_TYPE`
 
 A database from the list of [supported databases][ref-config-db].

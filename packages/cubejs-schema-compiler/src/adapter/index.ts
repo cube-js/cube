@@ -17,6 +17,7 @@ export * from './MysqlQuery';
 export * from './PostgresQuery';
 export * from './MssqlQuery';
 export * from './PrestodbQuery';
+export * from './TrinoQuery';
 
 export { PreAggregationReferences } from '../compiler/CubeEvaluator';
 
