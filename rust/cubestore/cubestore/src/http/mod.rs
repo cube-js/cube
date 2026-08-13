@@ -13,7 +13,6 @@ use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
 use crate::util::WorkerLoop;
 use crate::{app_metrics, CubeError};
-use async_std::fs::File;
 use cubeshared::codegen::{
     root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
     HttpMessageArgs, HttpParameterValue, HttpQuery, HttpQueryArgs, HttpQueryResult,
@@ -23,7 +22,7 @@ use cubeshared::codegen::{
 };
 use cubeshared::flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
 use datafusion::cube_ext;
-use futures::{AsyncWriteExt, SinkExt, Stream, StreamExt};
+use futures::{SinkExt, Stream, StreamExt};
 use futures_timer::Delay;
 use hex::ToHex;
 use http_auth_basic::Credentials;
@@ -36,7 +35,8 @@ use std::convert::TryFrom;
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
 use tempfile::NamedTempFile;
-use tokio::io::BufReader;
+use tokio::fs::File;
+use tokio::io::{AsyncWriteExt, BufReader};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, Mutex};
 use tokio_util::sync::CancellationToken;
@@ -578,9 +578,6 @@ impl HttpServer {
                     .map_err(|e| CubeRejection::Internal(e.to_string()))?;
             }
             file.flush()
-                .await
-                .map_err(|e| CubeRejection::Internal(e.to_string()))?;
-            file.close()
                 .await
                 .map_err(|e| CubeRejection::Internal(e.to_string()))?;
         }
@@ -1145,6 +1142,90 @@ mod tests {
         async fn temp_uploads_dir(&self, _ctx: SqlQueryContext) -> Result<String, CubeError> {
             unimplemented!("Mock")
         }
+    }
+
+    /// Records what `upload_temp_file` found on disk, so a test can assert the
+    /// body had fully landed before the path was handed off.
+    struct UploadStubService {
+        dir: std::path::PathBuf,
+        seen: std::sync::Mutex<Option<Vec<u8>>>,
+    }
+    crate::di_service!(UploadStubService, [SqlService]);
+    #[async_trait]
+    impl SqlService for UploadStubService {
+        async fn exec_query(&self, _q: &str) -> Result<QueryResult, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn exec_query_with_context(
+            &self,
+            _ctx: SqlQueryContext,
+            _q: &str,
+        ) -> Result<QueryResult, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn plan_query(&self, _q: &str) -> Result<QueryPlans, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn plan_query_with_context(
+            &self,
+            _ctx: SqlQueryContext,
+            _q: &str,
+        ) -> Result<QueryPlans, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn upload_temp_file(
+            &self,
+            _ctx: SqlQueryContext,
+            _name: String,
+            path: &Path,
+        ) -> Result<(), CubeError> {
+            *self.seen.lock().unwrap() = Some(std::fs::read(path)?);
+            Ok(())
+        }
+        async fn temp_uploads_dir(&self, _ctx: SqlQueryContext) -> Result<String, CubeError> {
+            Ok(self.dir.to_string_lossy().to_string())
+        }
+    }
+
+    #[tokio::test]
+    async fn upload_writes_the_whole_body_before_handing_off_the_path() -> Result<(), CubeError> {
+        let dir = tempfile::tempdir()?;
+        let service = Arc::new(UploadStubService {
+            dir: dir.path().to_path_buf(),
+            seen: std::sync::Mutex::new(None),
+        });
+
+        // Many chunks well past the file's internal buffer: an unflushed tail
+        // would show up here as a short read.
+        let chunks: Vec<Vec<u8>> = (0..8u8).map(|i| vec![b'a' + i; 64 * 1024]).collect();
+        let expected: Vec<u8> = chunks.iter().flatten().copied().collect();
+        let body = futures::stream::iter(
+            chunks
+                .into_iter()
+                .map(|c| Ok::<bytes::Bytes, warp::Error>(bytes::Bytes::from(c))),
+        );
+
+        HttpServer::handle_upload(
+            service.clone(),
+            SqlQueryContext::default(),
+            UploadQuery {
+                name: "upload.csv".to_string(),
+            },
+            body,
+        )
+        .await
+        .map_err(|e| CubeError::internal(format!("{:?}", e)))?;
+
+        let seen = service
+            .seen
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("upload_temp_file was never reached");
+        // Compared without pretty_assertions to keep a failure from dumping 512KB.
+        assert_eq!(seen.len(), expected.len());
+        assert!(seen == expected, "uploaded bytes differ from the body");
+        Ok(())
     }
 
     fn build_types<'a: 'ma, 'ma>(

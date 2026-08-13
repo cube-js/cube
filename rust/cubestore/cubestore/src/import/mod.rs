@@ -1,13 +1,13 @@
 use core::mem;
 use memchr;
 use std::convert::TryFrom;
+use std::io::SeekFrom;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 
 use async_compression::tokio::bufread::GzipDecoder;
-use async_std::io::SeekFrom;
-use async_std::task::{Context, Poll};
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, Num};
 use datafusion::arrow::array::{ArrayBuilder, ArrayRef};
