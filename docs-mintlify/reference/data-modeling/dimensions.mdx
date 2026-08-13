@@ -268,7 +268,7 @@ For `string` dimensions:
 
 | Format | Description |
 |--------|-------------|
-| `imageUrl` | Display the value as an image |
+| `imageUrl` | Display the value as an image, using the value itself as the image URL |
 | `link` | Display the value as a hyperlink, using the value itself as the URL |
 
 The `link` format also accepts an object form — `format: { type: link, label: … }` — so the
@@ -276,6 +276,22 @@ cell shows a label instead of the raw URL (see `crm_link` in the example below).
 
 In [Workbooks][ref-workbooks], a `link`-formatted value renders as a clickable link in
 table cells. Values that aren't `http`, `https`, or `mailto` URLs render as plain text.
+
+In [Workbooks][ref-workbooks], an `imageUrl`-formatted value renders as an inline
+thumbnail in table cells, with no chart configuration needed. Height, shape, and fit can
+be adjusted per column on the chart's Style tab. Values that aren't `https` or
+`data:image/*` URLs render as plain text.
+
+<Info>
+
+Images at `https` URLs are fetched directly by the viewer's browser, so they must be
+publicly reachable — Cube does not proxy or cache them. `data:image/*` values are
+rendered inline and need no network access.
+
+</Info>
+
+A thumbnail is clickable only where the dimension also declares [`links`](#links). The
+`imageUrl` format makes a value an image source, not a destination.
 
 For `number` dimensions, you can use the same named formats and custom
 [d3-format][link-d3-format] specifiers as [measures](/reference/data-modeling/measures#format):
