@@ -45,6 +45,17 @@ pre-aggregation cache — on every rotation.
 
 <Note>
 
+Rebuilding the connection when the configuration changes requires Cube
+v1.7.20 or later. On earlier versions the connection resolved by the first
+request is kept until the deployment restarts, so a rotated token is only
+picked up by a redeploy — including the token itself in the orchestrator ID
+is then the only way to pick one up without restarting, at the cost of a
+fresh orchestrator per rotation.
+
+</Note>
+
+<Note>
+
 Return the resolved credential from `driver_factory`, not a function that
 fetches one. Cube compares the configuration values the factory returns,
 and a function compares as unchanged however the credential behind it
@@ -211,16 +222,22 @@ def _access_token(ctx: dict):
     creds = (cube_cloud.get("userCredentials") or {}).get("databricks") or {}
 
     access_token = creds.get("accessToken")
+    if not access_token:
+        return None
+
     expires_at = _parse_expiry(creds.get("accessTokenExpiresAt"))
 
     # Gate on the expiry rather than on `status`: a failed background refresh
     # can flag the record while the token already in hand is still valid, and
     # treating that as fatal drops the user onto the service account for no
     # reason.
-    if access_token and expires_at and expires_at > time.time() + EXPIRY_SKEW_SECONDS:
-        return access_token
+    if expires_at is not None:
+        return access_token if expires_at > time.time() + EXPIRY_SKEW_SECONDS else None
 
-    return None
+    # No expiry advertised, so there is nothing to compare against and `status`
+    # is all there is to go on. Requiring an expiry here would send every user
+    # of a provider that omits it to the service account.
+    return access_token if creds.get("status") == "active" else None
 
 
 @config("driver_factory")
@@ -261,6 +278,11 @@ const EXPIRY_SKEW_MS = 120 * 1000;
 function accessToken(securityContext) {
   // For other data sources, swap `databricks` for `snowflake`, etc.
   const creds = securityContext?.cubeCloud?.userCredentials?.databricks ?? {};
+
+  if (!creds.accessToken) {
+    return undefined;
+  }
+
   const raw = creds.accessTokenExpiresAt;
   // Epoch milliseconds if the value is far too large to be seconds. Reading
   // seconds as milliseconds would land in 1970 and reject every token.
@@ -272,12 +294,15 @@ function accessToken(securityContext) {
   // Gate on the expiry rather than on `status`: a failed background refresh can
   // flag the record while the token already in hand is still valid, and
   // treating that as fatal drops the user onto the service account for no
-  // reason. NaN fails this comparison, so an unparseable expiry falls back too.
-  if (creds.accessToken && expiresAt > Date.now() + EXPIRY_SKEW_MS) {
-    return creds.accessToken;
+  // reason.
+  if (!Number.isNaN(expiresAt)) {
+    return expiresAt > Date.now() + EXPIRY_SKEW_MS ? creds.accessToken : undefined;
   }
 
-  return undefined;
+  // No expiry advertised, so there is nothing to compare against and `status` is
+  // all there is to go on. Requiring an expiry here would send every user of a
+  // provider that omits it to the service account.
+  return creds.status === "active" ? creds.accessToken : undefined;
 }
 
 module.exports = {
@@ -328,6 +353,12 @@ module.exports = {
    connection they started on.
 
 ## Operational notes
+
+- **Replacements are rate-limited.** A data source is replaced at most once
+  every 30 seconds, and inside that window the current connection is reused
+  without asking `driver_factory` again. A credential that rotates hourly is
+  never held up by this; one that resolves to a different value on every call
+  degrades to reuse instead of reconnecting on every query.
 
 - **One orchestrator per user, not per token.** The orchestrator survives
   rotations, so pre-aggregation caches and queues stay warm and the
