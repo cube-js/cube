@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
 import ResultSet from './ResultSet.js';
 import SqlQuery from './SqlQuery.js';
 import Meta from './Meta.js';
@@ -303,7 +302,7 @@ class CubeApi {
   protected request(method: string, params?: any) {
     return this.transport.request(method, {
       ...params,
-      baseRequestId: params?.baseRequestId || uuidv4(),
+      baseRequestId: params?.baseRequestId || crypto.randomUUID(),
     });
   }
 
@@ -885,7 +884,7 @@ class CubeApi {
       method: 'POST',
       signal: options?.signal,
       fetchTimeout: options?.timeout,
-      baseRequestId: uuidv4(),
+      baseRequestId: crypto.randomUUID(),
       params: {
         query: sqlQuery,
         cache: options?.cache,

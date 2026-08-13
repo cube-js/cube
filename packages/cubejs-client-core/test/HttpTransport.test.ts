@@ -1,8 +1,7 @@
 /* eslint-disable import/first */
 import { vi, MockedFunction } from 'vitest';
-import fetch from 'cross-fetch';
 
-vi.mock('cross-fetch');
+vi.stubGlobal('fetch', vi.fn());
 
 import HttpTransport from '../src/HttpTransport.js';
 
