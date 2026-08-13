@@ -1,3 +1,4 @@
+use cubeclient::models::V1CubeMetaType;
 use datafusion::logical_plan::{plan::Extension, LogicalPlan};
 use pretty_assertions::assert_eq;
 
@@ -5,10 +6,13 @@ use super::LogicalPlanTestUtils;
 use crate::{
     compile::{
         engine::df::wrapper::CubeScanWrappedSqlNode,
-        test::{convert_select_to_query_plan, init_testing_logger},
-        DatabaseProtocol, Rewriter,
+        test::{
+            convert_select_to_query_plan, convert_select_to_query_plan_with_meta,
+            init_testing_logger,
+        },
+        DatabaseProtocol, QueryPlan, Rewriter,
     },
-    transport::TransportLoadRequestQuery,
+    transport::{CubeMeta, CubeMetaDimension, CubeMetaMeasure, TransportLoadRequestQuery},
 };
 
 #[tokio::test]
@@ -160,5 +164,266 @@ async fn test_powerbi_count_distinct_with_max_case_wrapped_subquery() {
          (no CubeScanWrapper), but it produced a wrapped SQL node -- re-check \
          whether the outer COUNT(DISTINCT) got reconstructed as literal SQL \
          text over the already-aggregated countDistinct value"
+    );
+}
+
+/// Meta for a single Cube `View` (`items_semantic_view`) exposing one dimension
+/// and one `countDistinct` measure, mirroring the bug reporter's schema
+/// (`item_count` = `COUNT(DISTINCT item_id)` with a filter, exposed through a
+/// View). Unlike `views_meta()` in test_cube_join_views.rs, this View does not
+/// combine multiple underlying cubes.
+fn items_semantic_view_meta() -> Vec<CubeMeta> {
+    vec![CubeMeta {
+        name: "items_semantic_view".to_string(),
+        description: None,
+        title: None,
+        r#type: V1CubeMetaType::View,
+        dimensions: vec![CubeMetaDimension {
+            name: "items_semantic_view.category_code".to_string(),
+            r#type: "string".to_string(),
+            alias_member: Some("items.category_code".to_string()),
+            ..CubeMetaDimension::default()
+        }],
+        measures: vec![CubeMetaMeasure {
+            name: "items_semantic_view.item_count".to_string(),
+            title: None,
+            short_title: None,
+            description: None,
+            r#type: "number".to_string(),
+            agg_type: Some("countDistinct".to_string()),
+            meta: None,
+            alias_member: Some("items.item_count".to_string()),
+            format: None,
+            format_description: None,
+            currency: None,
+        }],
+        segments: vec![],
+        joins: None,
+        folders: None,
+        nested_folders: None,
+        hierarchies: None,
+        meta: None,
+    }]
+}
+
+async fn plan_powerbi_count_distinct_variant(sql: &str) -> QueryPlan {
+    convert_select_to_query_plan_with_meta(sql.to_string(), items_semantic_view_meta()).await
+}
+
+fn is_wrapped_sql_node(logical_plan: &LogicalPlan) -> bool {
+    matches!(
+        logical_plan,
+        LogicalPlan::Extension(Extension { ref node })
+            if node.as_any().downcast_ref::<CubeScanWrappedSqlNode>().is_some()
+    )
+}
+
+// CONFIRMED repro for https://github.com/cube-js/cube/issues/11542.
+//
+// Being a Cube `View` (vs. a plain `Cube`) is *not* what triggers the bug --
+// see `test_powerbi_count_distinct_no_order_limit_is_not_wrapped` below, which
+// uses this exact View schema with the issue's literal query shape (a
+// passthrough subquery + PowerBI's `COUNT(DISTINCT m) + MAX(CASE WHEN m IS
+// NULL THEN 1 ELSE 0 END)` idiom) and resolves correctly via plain measure
+// pushdown, same as the plain-Cube case in
+// `test_powerbi_count_distinct_with_max_case_wrapped_subquery` above.
+//
+// The actual trigger is an outer `ORDER BY` + `LIMIT` on the query (which
+// PowerBI's paging/sorting typically adds, and which the reporter's "simplified"
+// repro SQL omitted). When both are present *together with* the PowerBI
+// COUNT(DISTINCT)+MAX(CASE...) idiom, the e-graph rewriter can no longer
+// express the query as a single grouped measure/dimension pushdown (the
+// combined `count_distinct + 0` expression can't be pushed down as a Load API
+// `order`), so it falls back to `CubeScanWrapperNode`: an *ungrouped*
+// (`"ungrouped": true`) CubeScan for the raw `item_count` measure, wrapped in
+// literal generated SQL that re-applies `COUNT(DISTINCT "rows"."item_count")`
+// and `MAX(CASE WHEN ... IS NULL THEN 1 ELSE 0 END)` itself
+// (rewrite/rules/wrapper/aggregate_function.rs::transform_agg_fun_expr, which
+// emits `COUNT_DISTINCT` as literal SQL text without the powerbi-idiom
+// simplification that the non-wrapper split rule in
+// rewrite/rules/split/aggregate_function.rs applies).
+//
+// Critically, requesting a `countDistinct` measure *ungrouped* from Cube's
+// Load API does not return the raw distinct values -- per
+// `packages/cubejs-schema-compiler/src/adapter/BaseQuery.js`,
+// `renderSqlMeasure()` (around line 3840), when `this.ungrouped` is true and
+// `symbol.type` is `count`/`countDistinct`/`countDistinctApprox`, the measure
+// is rendered as a `CASE WHEN (<expr>) IS NOT NULL THEN 1 END` presence
+// indicator (1/NULL per row) rather than the underlying expression. That
+// indicator is correct input for a later `SUM()` (reconstructing a `count`),
+// but is exactly what collapses a later `COUNT(DISTINCT ...)` down to 1, as
+// reported: all non-null rows become the literal value `1`, so
+// `COUNT(DISTINCT 1, 1, ..., 1) = 1` regardless of how many original distinct
+// values there were.
+//
+// This reproduces without needing a View spanning multiple cubes, and without
+// needing anything else PowerBI-specific beyond ORDER BY + LIMIT, which
+// PowerBI (and most BI tools paginating results) routinely add.
+#[tokio::test]
+async fn test_powerbi_count_distinct_with_order_by_limit_is_wrapped_and_wrong() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = plan_powerbi_count_distinct_variant(
+        r#"
+        select
+            rows.category_code as category_code,
+            count(distinct(rows.item_count)) + max(
+                case
+                    when rows.item_count is null then 1
+                    else 0
+                end
+            ) as value
+        from
+            (
+                select
+                    category_code,
+                    item_count
+                from
+                    items_semantic_view
+            ) as rows
+        group by
+            rows.category_code
+        order by
+            value desc
+        limit
+            1000001
+        ;"#,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert!(
+        is_wrapped_sql_node(&logical_plan),
+        "expected ORDER BY + LIMIT to force this query through \
+         CubeScanWrapperNode -- if this now fails, the rewriter has changed \
+         how it plans this query shape and this repro needs to be revisited"
+    );
+
+    let wrapped_sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    println!("wrapped sql:\n{}", wrapped_sql);
+
+    // The inner CubeScan requests the countDistinct measure *ungrouped*, which
+    // is the mechanism that causes the schema-compiler to materialize it as a
+    // 1/NULL presence indicator (see BaseQuery.js reference above) instead of
+    // the real distinct values.
+    assert!(
+        wrapped_sql.contains("\"ungrouped\": true"),
+        "expected the wrapped SQL's inner CubeScan request to be ungrouped -- \
+         this is the step that causes Cube to materialize the countDistinct \
+         measure as a 1/NULL indicator instead of the real distinct values. \
+         Wrapped SQL:\n{}",
+        wrapped_sql
+    );
+
+    // The outer wrapper SQL re-applies a literal COUNT(DISTINCT ...) over
+    // that already-collapsed indicator column -- this is the exact
+    // "COUNT(DISTINCT 1, 1, ..., 1) = 1" bug from the issue.
+    assert!(
+        wrapped_sql.contains("COUNT(DISTINCT \"rows\".\"item_count\")"),
+        "expected the wrapper to literally reconstruct COUNT(DISTINCT ...) as \
+         SQL text over the (already-collapsed) item_count column. Wrapped \
+         SQL:\n{}",
+        wrapped_sql
+    );
+}
+
+// Control: the same View, same PowerBI idiom, but *without* ORDER BY/LIMIT --
+// this is the issue's own "simplified" repro SQL verbatim. It does NOT
+// reproduce the bug: being a `View` is not sufficient on its own, matching
+// the plain-`Cube` finding in
+// `test_powerbi_count_distinct_with_max_case_wrapped_subquery` above.
+#[tokio::test]
+async fn test_powerbi_count_distinct_no_order_limit_is_not_wrapped() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = plan_powerbi_count_distinct_variant(
+        r#"
+        select
+            rows.category_code as category_code,
+            count(distinct(rows.item_count)) + max(
+                case
+                    when rows.item_count is null then 1
+                    else 0
+                end
+            ) as value
+        from
+            (
+                select
+                    category_code,
+                    item_count
+                from
+                    items_semantic_view
+            ) as rows
+        group by
+            rows.category_code
+        ;"#,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert!(
+        !is_wrapped_sql_node(&logical_plan),
+        "expected this query (no ORDER BY/LIMIT) to resolve via plain \
+         grouped measure pushdown even though the source is a View, but it \
+         produced a wrapped SQL node instead"
+    );
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        TransportLoadRequestQuery {
+            measures: Some(vec!["items_semantic_view.item_count".to_string()]),
+            dimensions: Some(vec!["items_semantic_view.category_code".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            ..Default::default()
+        }
+    );
+}
+
+// Control: ORDER BY + LIMIT *with* a plain `COUNT(DISTINCT ...)` (no
+// `MAX(CASE...)` idiom) still resolves via plain grouped measure pushdown --
+// i.e. ORDER BY + LIMIT alone are not enough; it's specifically the compound
+// `count_distinct + max_case` expression that the rewriter cannot push down
+// together with an ORDER BY/LIMIT, forcing the fallback to the wrapper.
+#[tokio::test]
+async fn test_plain_count_distinct_with_order_by_limit_is_not_wrapped() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = plan_powerbi_count_distinct_variant(
+        r#"
+        select
+            rows.category_code as category_code,
+            count(distinct(rows.item_count)) as value
+        from
+            (
+                select
+                    category_code,
+                    item_count
+                from
+                    items_semantic_view
+            ) as rows
+        group by
+            rows.category_code
+        order by
+            value desc
+        limit
+            1000001
+        ;"#,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert!(
+        !is_wrapped_sql_node(&logical_plan),
+        "expected plain COUNT(DISTINCT ...) with ORDER BY + LIMIT to still \
+         resolve via plain grouped measure pushdown, not the wrapper"
     );
 }
