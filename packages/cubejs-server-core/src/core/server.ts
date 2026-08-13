@@ -972,6 +972,18 @@ export class CubejsServerCore {
     const orchestratorApi = this.createOrchestratorApi(
       resolveDataSourceDriver,
       {
+        // Deliberately outside the staleness check that `resolveDataSourceDriver`
+        // applies to `requestContextRef.current`: this and `contextToDbType`
+        // below keep resolving from `context`, the request that created the
+        // orchestrator, and resolve once for its lifetime.
+        //
+        // Both were pinned that way before rebuilding existed, and neither is
+        // the shape the rebuild is for. The external store is Cube Store or a
+        // shared pre-aggregation warehouse — one connection the deployment owns,
+        // not one derived from who is asking — and a data source's type does not
+        // change per user, only its credentials do. Widening the rebuild to
+        // cover them would mean tearing down the pre-aggregation store's pool on
+        // a per-user signal that says nothing about it.
         externalDriverFactory: this.options.externalDriverFactory && (async () => {
           if (externalPreAggregationsDriverPromise) {
             return externalPreAggregationsDriverPromise;
