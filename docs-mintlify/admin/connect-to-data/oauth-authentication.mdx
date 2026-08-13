@@ -46,11 +46,11 @@ pre-aggregation cache — on every rotation.
 <Note>
 
 Rebuilding the connection when the configuration changes requires Cube
-v1.7.20 or later. On earlier versions the connection resolved by the first
-request is kept until the deployment restarts, so a rotated token is only
-picked up by a redeploy — including the token itself in the orchestrator ID
-is then the only way to pick one up without restarting, at the cost of a
-fresh orchestrator per rotation.
+v1.7.20 or later — if a rotated token is only picked up when you redeploy,
+your version predates it. On earlier versions the connection resolved by the
+first request is kept until the deployment restarts, so including the token
+itself in the orchestrator ID is the only way to pick up a rotation without
+restarting, at the cost of a fresh orchestrator per rotation.
 
 </Note>
 
@@ -234,9 +234,10 @@ def _access_token(ctx: dict):
     if expires_at is not None:
         return access_token if expires_at > time.time() + EXPIRY_SKEW_SECONDS else None
 
-    # No expiry advertised, so there is nothing to compare against and `status`
-    # is all there is to go on. Requiring an expiry here would send every user
-    # of a provider that omits it to the service account.
+    # No expiry advertised, or one that cannot be read, so there is nothing to
+    # compare against and `status` is all there is to go on. Requiring an expiry
+    # here would send every user of a provider that omits it to the service
+    # account.
     return access_token if creds.get("status") == "active" else None
 
 
@@ -299,9 +300,10 @@ function accessToken(securityContext) {
     return expiresAt > Date.now() + EXPIRY_SKEW_MS ? creds.accessToken : undefined;
   }
 
-  // No expiry advertised, so there is nothing to compare against and `status` is
-  // all there is to go on. Requiring an expiry here would send every user of a
-  // provider that omits it to the service account.
+  // No expiry advertised, or one that cannot be read, so there is nothing to
+  // compare against and `status` is all there is to go on. Requiring an expiry
+  // here would send every user of a provider that omits it to the service
+  // account.
   return creds.status === "active" ? creds.accessToken : undefined;
 }
 
