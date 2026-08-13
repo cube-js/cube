@@ -9,6 +9,7 @@ use futures::Future;
 use log::trace;
 use moka::future::{Cache, ConcurrentCacheExt, Iter};
 use std::collections::{HashMap, HashSet};
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{watch, Mutex};
@@ -120,7 +121,10 @@ impl SqlResultCache {
         });
 
         Self {
-            queue_cache: Mutex::new(lru::LruCache::new(queue_cache_max_capacity as usize)),
+            // `LruCache::new` takes NonZeroUsize since lru 0.9; a configured 0 would panic.
+            queue_cache: Mutex::new(lru::LruCache::new(
+                NonZeroUsize::new(queue_cache_max_capacity as usize).unwrap_or(NonZeroUsize::MIN),
+            )),
             result_cache: cache_builder
                 .max_capacity(capacity_bytes)
                 .weigher(sql_result_cache_sizeof)
@@ -419,6 +423,14 @@ mod tests {
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
     use std::time::Duration;
+
+    /// A configured capacity of 0 must not panic on startup.
+    #[test]
+    fn queue_cache_capacity_zero_does_not_panic() {
+        let cache = SqlResultCache::new(1 << 20, Some(120), 0, None);
+
+        assert_eq!(cache.queue_cache.blocking_lock().cap().get(), 1);
+    }
 
     #[tokio::test]
     async fn simple() -> Result<(), CubeError> {
