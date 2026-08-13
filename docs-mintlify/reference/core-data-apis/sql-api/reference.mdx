@@ -346,6 +346,28 @@ of the PostgreSQL documentation.
 | `LIKE` | Returns `TRUE` if the string matches the supplied pattern | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `REGEXP_SUBSTR` | Returns the substring that matches a POSIX regular expression pattern | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 
+### Casts
+
+<Info>
+
+Learn more in the
+[relevant section](https://www.postgresql.org/docs/current/datatype-oid.html)
+of the PostgreSQL documentation.
+
+</Info>
+
+The SQL API supports `::regtype` and `::regtype[]` casts, including standard
+type aliases (`int`, `int8`, `decimal`, `char`, `float`, etc.) and
+`pg_catalog`-qualified type names. This lets Postgres-compatible BI tools that
+introspect column types — for example, comparing `pg_attribute.atttypid`
+against a `regtype[]` literal to classify a table's columns — connect to the
+SQL API without erroring.
+
+```sql
+SELECT atttypid = ANY ('{int8,numeric,bool}'::regtype[])
+FROM pg_catalog.pg_attribute;
+```
+
 ### Data type formatting functions
 
 <Info>
