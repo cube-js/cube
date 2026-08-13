@@ -580,10 +580,6 @@ impl HttpServer {
             file.flush()
                 .await
                 .map_err(|e| CubeRejection::Internal(e.to_string()))?;
-            // tokio's File has no `close()`; sync_all is the closest equivalent.
-            file.sync_all()
-                .await
-                .map_err(|e| CubeRejection::Internal(e.to_string()))?;
         }
 
         sql_service
