@@ -122,9 +122,12 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
           - Charts
           - Text
           - Controls 
-            - Filter widget
-            - Time grain switcher
+            - Filter
+            - Time granularity
           - AI summary
+          - Layout
+            - Spacer
+            - Divider
     - **Dashboard**
       - Scheduled refresh
     - **Semantic Model**

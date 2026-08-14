@@ -1,0 +1,35 @@
+---
+title: Spacer & Divider
+description: Non-data layout elements — a spacer for whitespace and a divider line — that help you structure a dashboard.
+---
+
+<Warning>
+
+Spacer and divider widgets are currently in preview, and their behavior may still change. Reach out to the [Cube support team](/admin/account-billing/support) to activate them for your account.
+
+</Warning>
+
+Spacer and divider are non-data **layout** widgets. They carry no data of their own; you place them on the canvas alongside charts, text, and controls to add whitespace and visual structure to a dashboard.
+
+## Spacer
+
+A spacer is an empty, resizable box. Use it to add deliberate whitespace between widgets — for example, to separate a header row from the charts below it, or to push a widget into a particular column.
+
+A spacer is only visible while you are editing in the [dashboard builder][ref-workbooks]. On the published dashboard (including [embedded views](/embedding/iframe/dashboards)) it renders as empty space, so it never draws a card or border for viewers.
+
+## Divider
+
+A divider is a horizontal separator line that breaks up the layout flow — a lightweight way to signal the boundary between sections of a dashboard. Unlike other widgets, a divider is a fixed height and **cannot be resized** vertically.
+
+## Adding a layout widget
+
+In the [dashboard builder][ref-workbooks], open the **Add Widgets** menu in the toolbar and choose **Spacer** or **Divider**. The widget is added to the canvas, where you can drag it into place and (for a spacer) resize it.
+
+## Styling
+
+Both widgets follow the dashboard's [widget styling settings](/docs/explore-analyze/dashboards/styling):
+
+- The **divider** draws its line using the widget **border** width, style, and color.
+- A **spacer** picks up the same border and background settings while you are editing, so its bounds are easy to see.
+
+[ref-workbooks]: /docs/explore-analyze/workbooks
