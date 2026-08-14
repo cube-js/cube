@@ -37,6 +37,11 @@ pub struct Wait {
     /// Appended to the timeout error. Callers whose budget is NOT the user's
     /// `--timeout` should replace it — advising someone to raise a flag that cannot
     /// move the deadline sends them off to do something useless.
+    ///
+    /// Empty means "nothing to add": it only ever reaches the reader on the timeout
+    /// branch, so a caller that explains the failure and its recovery for EVERY
+    /// outcome (via `anyhow` context) would otherwise say it twice on that one
+    /// branch. See [`Wait::advising_nothing`].
     pub on_timeout: String,
 }
 
@@ -54,6 +59,12 @@ impl Wait {
     pub fn advising(mut self, advice: impl Into<String>) -> Self {
         self.on_timeout = advice.into();
         self
+    }
+
+    /// Add nothing to the timeout message, for a caller whose own error context
+    /// already carries the recovery on every outcome — see [`Wait::on_timeout`].
+    pub fn advising_nothing(self) -> Self {
+        self.advising("")
     }
 }
 
@@ -121,8 +132,13 @@ where
         let remaining = timeout.saturating_sub(started.elapsed());
         if remaining.is_zero() {
             bail!(
-                "timed out after {}s waiting for {what}. {on_timeout}{}",
+                "timed out after {}s waiting for {what}{}{}",
                 started.elapsed().as_secs(),
+                if on_timeout.is_empty() {
+                    String::new()
+                } else {
+                    format!(". {on_timeout}")
+                },
                 match &streak {
                     Some((_, err)) => format!(". Last error: {err}"),
                     None => String::new(),
@@ -295,6 +311,28 @@ mod tests {
         let message = err.to_string();
         assert!(message.contains("timed out after"), "got: {message}");
         assert!(!message.contains("Last error"), "got: {message}");
+    }
+
+    #[tokio::test]
+    async fn timeout_advice_is_the_default_unless_replaced() {
+        let default = poll(short_wait("thing", Duration::from_millis(5)), || {
+            std::future::ready(waiting::<()>("working"))
+        })
+        .await
+        .unwrap_err()
+        .to_string();
+        assert!(default.contains("raise --timeout"), "got: {default}");
+
+        // Silent: nothing appended, and no dangling separator where it would have
+        // gone — the caller's own context says it instead.
+        let silent = poll(
+            short_wait("thing", Duration::from_millis(5)).advising_nothing(),
+            || std::future::ready(waiting::<()>("working")),
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+        assert!(silent.ends_with("waiting for thing"), "got: {silent}");
     }
 
     #[tokio::test]
