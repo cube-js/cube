@@ -19,18 +19,16 @@ use crate::{output, util, Ctx};
 const BUILD_DONE: &[&str] = &["built"];
 const BUILD_FAILED: &[&str] = &["failed", "cancelled"];
 
-/// How long to tolerate "nothing is building this" before giving up.
+/// How long to tolerate an explicit `none`/`stopped` before giving up.
 ///
-/// A dev-mode branch reports `none`/`stopped` briefly after dev mode starts, before
-/// the worker begins spinning. It also reports exactly that, forever, for a SHARED
-/// branch nobody has opened in dev mode — the case a dbt-sync branch lands in — so
-/// the wait has to give up and say so rather than sit out its whole timeout on a
-/// branch nothing will ever build.
+/// The backstop, not the main defence: against a live deployment the cases that
+/// never finish — an unknown branch, a shared branch with no dev worker — report
+/// `building` with an `errorText`, which the loop catches directly and in seconds.
+/// This covers a worker that reports itself stopped instead, and gives a starting
+/// one a moment before concluding anything.
 ///
 /// Measured in TIME, not polls, so `--poll 1s` doesn't silently cut the window to
-/// six seconds and turn a slow worker start into the wrong diagnosis. Sixty seconds
-/// is a guess at the safe side of a cold start; it wants confirming against a real
-/// one.
+/// six seconds and turn a slow worker start into the wrong diagnosis.
 const IDLE_GRACE: Duration = Duration::from_secs(60);
 
 /// Poll build-status until the build (or dev-mode worker) reaches a terminal state.
@@ -51,6 +49,23 @@ async fn wait_for_build(
 
         if BUILD_DONE.contains(&status.as_str()) || BUILD_FAILED.contains(&status.as_str()) {
             return Ok(Progress::Done(res));
+        }
+
+        // A non-terminal status carrying an error is the endpoint saying "this is
+        // never going to finish" — and it is the ONLY reliable way to hear that.
+        // Observed against a live deployment: a branch that does not exist reports
+        // `building` with "Bad branch", and a shared branch nobody has opened in dev
+        // mode reports `building` with "Branch is not active". Both look exactly like
+        // a worker spinning up if you read the status alone, so waiting on either sat
+        // out the whole timeout in silence.
+        let error = output::field(&res, "errorText");
+        if !error.is_empty() {
+            anyhow::bail!(
+                "branch {} is not building: {error}. A branch only compiles once it is \
+                 opened in dev mode — run `cube data-model dev-mode <deployment> <branch>` \
+                 and wait on the dev-… branch it prints",
+                output::field(&res, "branchName")
+            );
         }
 
         if status == "none" || status == "stopped" {
