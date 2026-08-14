@@ -123,6 +123,15 @@ async fn wait_for_build(
             // message whose quoted cause doesn't support its own advice is what makes
             // someone doubt the tool. The fuller text is appended only when it says
             // something the verdict doesn't, which today it usually doesn't.
+            //
+            // Exact equality, not `contains`, and that asymmetry with the match above
+            // is deliberate: a decorated verdict ("Error: Bad branch") therefore
+            // prints twice, which is untidy, while `contains` would swallow a
+            // decoration that carries the detail ("Bad branch: refs/heads/typo not
+            // found" would print as the bare verdict). Between repeating a few words
+            // and dropping the one line that says WHICH ref was wrong, the repetition
+            // is the cheaper mistake. Neither shape is live: both known verdicts
+            // arrive bare.
             anyhow::bail!(
                 "branch {} is not building ({verdict}){}. {hint}",
                 output::field(&res, "branchName"),
