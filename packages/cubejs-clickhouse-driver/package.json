@@ -33,7 +33,7 @@
     "@cubejs-backend/shared": "1.7.19",
     "moment": "^2.24.0",
     "sqlstring": "^2.3.1",
-    "uuid": "^8.3.2"
+    "uuid": "^11.1.1"
   },
   "license": "Apache-2.0",
   "devDependencies": {

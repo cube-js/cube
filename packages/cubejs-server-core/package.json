@@ -58,7 +58,7 @@
     "semver": "^7.6.3",
     "serve-static": "^1.13.2",
     "sqlstring": "^2.3.1",
-    "uuid": "^8.3.2",
+    "uuid": "^11.1.1",
     "ws": "^7.5.3"
   },
   "devDependencies": {
@@ -72,7 +72,6 @@
     "@types/node": "^22",
     "@types/node-fetch": "^2.5.7",
     "@types/ramda": "^0.27.34",
-    "@types/uuid": "^8.3.0",
     "jest": "^29",
     "typescript": "~5.2.2"
   },
