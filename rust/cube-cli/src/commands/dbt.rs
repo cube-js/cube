@@ -268,10 +268,17 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 // raise `--timeout` would send someone after a flag that cannot move
                 // this deadline, and "it may still be running" describes a sync that
                 // has already reported COMPLETED.
+                //
+                // This tail is the ONLY place the recovery is spelled out. `main`
+                // renders the error chain with `{err:#}`, which joins the links with
+                // ": ", so the outer context below deliberately stops at what failed
+                // — saying it in both would print the same instruction twice in one
+                // line. It goes here rather than there because it lands last, where a
+                // reader looks for what to do next.
                 let fetched = wait::poll(
                     Wait::new("dbt sync result", RESULT_FETCH_TIMEOUT, poll).advising(format!(
-                        "The sync finished, so this is the result read failing, not the sync — \
-                         try `cube dbt result {deployment} {sync_job_id}`"
+                        "The sync itself succeeded — read the result with \
+                         `cube dbt result {deployment} {sync_job_id}`"
                     )),
                     || async {
                         match api.get_optional(&path, &Vec::new()).await? {
@@ -291,10 +298,11 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                             output::print_json(&wait_json(&started, &status, &branch_name, None));
                         }
 
+                        // States what failed and stops there; the wait's own tail
+                        // (above) carries what to do about it.
                         return Err(err.context(format!(
-                            "dbt sync {sync_job_id} completed on {branch_name}, but its result \
-                             could not be read. The sync itself succeeded — read it with \
-                             `cube dbt result {deployment} {sync_job_id}`"
+                            "dbt sync {sync_job_id} completed on {branch_name}, but its \
+                             result could not be read"
                         )));
                     }
                 }
