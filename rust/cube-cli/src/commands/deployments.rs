@@ -38,6 +38,24 @@ const NOT_BUILDING: &[(&str, &str)] = &[
     ),
 ];
 
+/// How much of a server complaint to keep. Long enough for the known verdicts and
+/// a sentence of context, short enough that one poll stays one line.
+const COMPLAINT_LIMIT: usize = 120;
+
+/// Squash arbitrary server text into a single short line.
+///
+/// Kept separate because both users care about different halves: the label needs it
+/// STABLE (it is a dedupe key), and the failure message needs it SHORT. Truncation
+/// keeps the leading text, which is where these verdicts put their meaning.
+fn one_line(text: &str, max_chars: usize) -> String {
+    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.chars().count() <= max_chars {
+        return collapsed;
+    }
+
+    collapsed.chars().take(max_chars).collect::<String>() + "…"
+}
+
 /// How long to tolerate an explicit `none`/`stopped` before giving up.
 ///
 /// The backstop, not the main defence: against a live deployment the cases that
@@ -82,30 +100,43 @@ async fn wait_for_build(
         // this side — and if it can, aborting on any error would fail a rebuild after
         // a red build, on its first poll. That is a worse failure than the wait it
         // replaces, and it would land exactly when CI retries. An unrecognised
-        // verdict is therefore surfaced once and waited through.
+        // verdict is therefore waited through, carried in the progress label below.
         let error = output::field(&res, "errorText");
-        if !error.is_empty() {
-            if let Some((_, hint)) = NOT_BUILDING
-                .iter()
-                .find(|(verdict, _)| error.contains(verdict))
-            {
-                anyhow::bail!(
-                    "branch {} is not building: {error}. {hint}",
-                    output::field(&res, "branchName")
-                );
-            }
+        if let Some((_, hint)) = NOT_BUILDING
+            .iter()
+            .find(|(verdict, _)| error.contains(verdict))
+        {
+            anyhow::bail!(
+                "branch {} is not building: {error}. {hint}",
+                output::field(&res, "branchName")
+            );
         }
+
+        // Normalised before it goes anywhere near the label, because the label is the
+        // dedupe key and this is arbitrary text from a worker: anything volatile in
+        // it — a counter, a rotating address — would make every poll a "change" and
+        // turn a 15-minute wait into a line per poll, which is exactly the promise
+        // `poll` makes. Collapsing whitespace also keeps a multi-line error from
+        // becoming several progress lines, or landing whole inside `(last seen: …)`.
+        let complaint = one_line(&error, COMPLAINT_LIMIT);
 
         if status == "none" || status == "stopped" {
             let since = idle_since.get().unwrap_or_else(std::time::Instant::now);
             idle_since.set(Some(since));
             if since.elapsed() > IDLE_GRACE {
                 anyhow::bail!(
-                    "nothing is building branch {} (status {status}). If the branch exists, \
+                    "nothing is building branch {} (status {status}{}). If the branch exists, \
                      it only compiles once it is opened in dev mode — run \
                      `cube data-model dev-mode <deployment> <branch>` and wait on the \
                      dev-… branch it prints",
-                    output::field(&res, "branchName")
+                    output::field(&res, "branchName"),
+                    // This branch bails instead of timing out, so the timeout's
+                    // "(last seen: …)" never speaks for it.
+                    if complaint.is_empty() {
+                        String::new()
+                    } else {
+                        format!(": {complaint}")
+                    }
                 );
             }
         } else {
@@ -117,10 +148,10 @@ async fn wait_for_build(
         // this surfaces a new complaint, stays quiet while it persists, and — since
         // the timeout names the last label — leaves the eventual failure explaining
         // itself instead of pointing at a line printed fifteen minutes earlier.
-        Ok(Progress::Waiting(if error.is_empty() {
+        Ok(Progress::Waiting(if complaint.is_empty() {
             status
         } else {
-            format!("{status} ({error})")
+            format!("{status} ({complaint})")
         }))
     })
     .await
@@ -476,4 +507,35 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn one_line_collapses_and_truncates() {
+        assert_eq!(
+            one_line("Branch is not active", 120),
+            "Branch is not active"
+        );
+        assert_eq!(one_line("", 120), "");
+        // A multi-line error becomes one progress line, not several.
+        assert_eq!(
+            one_line("Build failed:\n  cube orders\n  line 3", 120),
+            "Build failed: cube orders line 3"
+        );
+        // Long text is cut, keeping the leading meaning.
+        let long = "x".repeat(200);
+        let cut = one_line(&long, 10);
+        assert_eq!(cut.chars().count(), 11, "10 chars plus the ellipsis");
+        assert!(cut.starts_with("xxxxxxxxxx"));
+    }
+
+    #[test]
+    fn one_line_counts_characters_not_bytes() {
+        // Truncating on bytes would panic mid-character here.
+        let cut = one_line(&"é".repeat(50), 10);
+        assert_eq!(cut.chars().count(), 11);
+    }
 }
