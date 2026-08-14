@@ -19,6 +19,25 @@ use crate::{output, util, Ctx};
 const BUILD_DONE: &[&str] = &["built"];
 const BUILD_FAILED: &[&str] = &["failed", "cancelled"];
 
+/// The `errorText` verdicts that mean this branch will never build, each paired
+/// with what to actually do about it.
+///
+/// Both were measured against a live deployment. They need different advice, which
+/// is why they aren't one message: "not active" is fixed by opening the branch in
+/// dev mode, while "Bad branch" means there is no such branch — and telling someone
+/// who mistyped a name to open it in dev mode sends them somewhere that cannot help.
+const NOT_BUILDING: &[(&str, &str)] = &[
+    (
+        "Bad branch",
+        "There is no such branch — check the name with `cube data-model branches <deployment>`",
+    ),
+    (
+        "Branch is not active",
+        "A branch only compiles once it is opened in dev mode — run \
+         `cube data-model dev-mode <deployment> <branch>` and wait on the dev-… branch it prints",
+    ),
+];
+
 /// How long to tolerate an explicit `none`/`stopped` before giving up.
 ///
 /// The backstop, not the main defence: against a live deployment the cases that
@@ -42,6 +61,9 @@ async fn wait_for_build(
     interval: Duration,
 ) -> Result<serde_json::Value> {
     let idle_since = std::cell::Cell::new(None::<std::time::Instant>);
+    // An unrecognised `errorText` is worth seeing, but only once — it repeats on
+    // every poll for as long as the condition lasts.
+    let reported_error = std::cell::Cell::new(false);
 
     wait::poll(Wait::new("build", timeout, interval), || async {
         let res = api.get(path, query).await?;
@@ -51,21 +73,35 @@ async fn wait_for_build(
             return Ok(Progress::Done(res));
         }
 
-        // A non-terminal status carrying an error is the endpoint saying "this is
-        // never going to finish" — and it is the ONLY reliable way to hear that.
-        // Observed against a live deployment: a branch that does not exist reports
-        // `building` with "Bad branch", and a shared branch nobody has opened in dev
-        // mode reports `building` with "Branch is not active". Both look exactly like
-        // a worker spinning up if you read the status alone, so waiting on either sat
-        // out the whole timeout in silence.
+        // A non-terminal status carrying one of the known verdicts is the endpoint
+        // saying "this will never finish", and it is the only way to hear it: both
+        // look exactly like a worker spinning up if you read the status alone, so
+        // waiting on either sat out the whole timeout in silence.
+        //
+        // Matched against known verdicts rather than "any errorText", because a
+        // healthy in-progress build is NOT guaranteed to carry an empty one. The
+        // field is the dev worker's own status proxied through, so whether it can
+        // still hold a PREVIOUS failure while a new build runs isn't knowable from
+        // this side — and if it can, aborting on any error would fail a rebuild after
+        // a red build, on its first poll. That is a worse failure than the wait it
+        // replaces, and it would land exactly when CI retries. An unrecognised
+        // verdict is therefore surfaced once and waited through.
         let error = output::field(&res, "errorText");
         if !error.is_empty() {
-            anyhow::bail!(
-                "branch {} is not building: {error}. A branch only compiles once it is \
-                 opened in dev mode — run `cube data-model dev-mode <deployment> <branch>` \
-                 and wait on the dev-… branch it prints",
-                output::field(&res, "branchName")
-            );
+            let branch = output::field(&res, "branchName");
+            match NOT_BUILDING
+                .iter()
+                .find(|(verdict, _)| error.contains(verdict))
+            {
+                Some((_, hint)) => {
+                    anyhow::bail!("branch {branch} is not building: {error}. {hint}")
+                }
+                None if !reported_error.get() => {
+                    reported_error.set(true);
+                    eprintln!("build: {branch} reports \"{error}\" while {status} — still waiting");
+                }
+                None => {}
+            }
         }
 
         if status == "none" || status == "stopped" {
