@@ -5,7 +5,7 @@ use clap::Subcommand;
 use serde_json::Value;
 
 use crate::client::{Client, Query};
-use crate::wait::{self, Progress};
+use crate::wait::{self, Progress, Wait};
 use crate::{output, util, Ctx};
 
 /// Run a deployment's dbt sync: pull the dbt project, convert its models into
@@ -178,7 +178,7 @@ async fn wait_for_sync(
     // are strictly sequential.
     let missing_since = std::cell::Cell::new(None::<Instant>);
 
-    wait::poll("dbt sync", timeout, interval, || async {
+    wait::poll(Wait::new("dbt sync", timeout, interval), || async {
         let Some(status) = api.get_optional(&path, &Vec::new()).await? else {
             let since = missing_since.get().unwrap_or_else(Instant::now);
             missing_since.set(Some(since));
@@ -264,12 +264,22 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 None
             } else {
                 let path = format!("{}/{sync_job_id}/result", base(deployment));
-                let fetched = wait::poll("dbt sync result", RESULT_FETCH_TIMEOUT, poll, || async {
-                    match api.get_optional(&path, &Vec::new()).await? {
-                        Some(result) => Ok(Progress::Done(result)),
-                        None => Ok(Progress::Waiting("result not available yet".to_string())),
-                    }
-                })
+                // Its own advice: this budget is a const, so the default counsel to
+                // raise `--timeout` would send someone after a flag that cannot move
+                // this deadline, and "it may still be running" describes a sync that
+                // has already reported COMPLETED.
+                let fetched = wait::poll(
+                    Wait::new("dbt sync result", RESULT_FETCH_TIMEOUT, poll).advising(format!(
+                        "The sync finished, so this is the result read failing, not the sync — \
+                         try `cube dbt result {deployment} {sync_job_id}`"
+                    )),
+                    || async {
+                        match api.get_optional(&path, &Vec::new()).await? {
+                            Some(result) => Ok(Progress::Done(result)),
+                            None => Ok(Progress::Waiting("result not available yet".to_string())),
+                        }
+                    },
+                )
                 .await;
 
                 match fetched {

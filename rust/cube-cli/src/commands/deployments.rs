@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::Subcommand;
 
 use crate::client::{Client, Query};
-use crate::wait::{self, Progress};
+use crate::wait::{self, Progress, Wait};
 use crate::{output, util, Ctx};
 
 /// The states this endpoint reports, split by what a wait should do with them.
@@ -45,7 +45,7 @@ async fn wait_for_build(
 ) -> Result<serde_json::Value> {
     let idle_since = std::cell::Cell::new(None::<std::time::Instant>);
 
-    wait::poll("build", timeout, interval, || async {
+    wait::poll(Wait::new("build", timeout, interval), || async {
         let res = api.get(path, query).await?;
         let status = output::field(&res, "status");
 
