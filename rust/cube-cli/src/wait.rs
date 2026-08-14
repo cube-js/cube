@@ -14,6 +14,10 @@ use crate::client;
 /// closure itself reached — is not retried at all (see `client::is_transient`).
 const MAX_TRANSIENT_FAILURES: u32 = 5;
 
+/// Ceiling on the backed-off sleep between retries, so a long `--poll` plus
+/// doubling can't overshoot the wait it belongs to.
+const BACKOFF_CAP: Duration = Duration::from_secs(60);
+
 /// What one poll attempt learned.
 pub enum Progress<T> {
     /// Still running. The string is a short label — a stage name, a status — used
@@ -43,6 +47,10 @@ where
     let started = Instant::now();
     let mut last_label: Option<String> = None;
     let mut transient_failures = 0;
+    // Kept for the timeout message: a wait that expires while absorbing failures
+    // would otherwise report only "timed out", leaving the actual cause in stderr
+    // lines nobody correlates with the exit.
+    let mut last_transient: Option<String> = None;
 
     loop {
         match attempt().await {
@@ -58,6 +66,7 @@ where
                 if client::is_transient(&err) && transient_failures < MAX_TRANSIENT_FAILURES =>
             {
                 transient_failures += 1;
+                last_transient = Some(format!("{err:#}"));
                 eprintln!(
                     "{what}: {err:#} (retrying, {transient_failures}/{MAX_TRANSIENT_FAILURES})"
                 );
@@ -74,13 +83,39 @@ where
         if remaining.is_zero() {
             bail!(
                 "timed out after {}s waiting for {what}. It may still be running — \
-                 re-run the status command to check, or raise --timeout",
-                started.elapsed().as_secs()
+                 re-run the status command to check, or raise --timeout{}",
+                started.elapsed().as_secs(),
+                match &last_transient {
+                    Some(err) => format!(". Last error: {err}"),
+                    None => String::new(),
+                }
             );
         }
 
-        tokio::time::sleep(interval.min(remaining)).await;
+        tokio::time::sleep(backoff(interval, transient_failures).min(remaining)).await;
     }
+}
+
+/// How long to wait before the next attempt: the caller's interval normally, and
+/// double it per consecutive failure while retrying.
+///
+/// Retrying at the failing cadence is the wrong response to the one status that
+/// says the cadence itself is the problem — a 429 answered five more times a poll
+/// apart just postpones the failure. (`Retry-After` would be better still, but the
+/// header isn't carried on the error; the backoff is the part that helps without
+/// plumbing headers through.) Progress resets it, so a recovered wait goes straight
+/// back to the interval the user asked for.
+fn backoff(interval: Duration, consecutive_failures: u32) -> Duration {
+    if consecutive_failures == 0 {
+        return interval;
+    }
+
+    let factor = 1u32 << (consecutive_failures - 1).min(16);
+
+    interval
+        .checked_mul(factor)
+        .unwrap_or(BACKOFF_CAP)
+        .min(BACKOFF_CAP)
 }
 
 #[cfg(test)]
@@ -180,6 +215,45 @@ mod tests {
 
         assert!(err.to_string().contains("no such sync"));
         assert_eq!(calls.get(), 1);
+    }
+
+    #[test]
+    fn backoff_doubles_while_failing_and_resets_on_progress() {
+        let interval = Duration::from_secs(5);
+        assert_eq!(backoff(interval, 0), interval);
+        assert_eq!(backoff(interval, 1), Duration::from_secs(5));
+        assert_eq!(backoff(interval, 2), Duration::from_secs(10));
+        assert_eq!(backoff(interval, 3), Duration::from_secs(20));
+        // Capped, and an absurd interval can't overflow into a tiny sleep.
+        assert_eq!(backoff(Duration::from_secs(3600), 5), BACKOFF_CAP);
+        assert_eq!(backoff(Duration::MAX, 4), BACKOFF_CAP);
+    }
+
+    #[tokio::test]
+    async fn a_timeout_while_absorbing_failures_reports_the_last_one() {
+        // Alternating error/progress keeps the consecutive count below the limit, so
+        // the wait ends on the deadline rather than on the failures — the case where
+        // the cause would otherwise live only in stderr.
+        let calls = Cell::new(0);
+        let err = poll(
+            "thing",
+            Duration::from_millis(30),
+            Duration::from_millis(1),
+            || {
+                calls.set(calls.get() + 1);
+                std::future::ready(if calls.get() % 2 == 0 {
+                    Err(transient())
+                } else {
+                    waiting::<()>("working")
+                })
+            },
+        )
+        .await
+        .unwrap_err();
+
+        let message = err.to_string();
+        assert!(message.contains("timed out after"));
+        assert!(message.contains("Last error: request to"));
     }
 
     #[tokio::test]

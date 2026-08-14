@@ -94,6 +94,11 @@ const FAILED: &str = "FAILED";
 /// who tightened it to `--poll 1s`.
 const MISSING_GRACE: Duration = Duration::from_secs(60);
 
+/// Budget for reading the result of a sync that has already reported COMPLETED.
+/// Short on purpose: nothing is being waited for here, it only buys enough room to
+/// ride out a transient failure on the gate's final request.
+const RESULT_FETCH_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// One line summarising a status payload, for progress output.
 fn status_label(status: &Value) -> String {
     let state = output::field(status, "status");
@@ -230,13 +235,19 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
 
             // COMPLETED: the result is available immediately, so fold it into the
             // same command rather than making the caller ask again.
+            //
+            // Through `wait::poll` for its transient tolerance, not because this
+            // needs waiting: it is the LAST request of the gate, and a single 502
+            // here would fail a job whose sync already succeeded — the same
+            // single-blip failure the poll loop exists to absorb. First answer wins,
+            // including "no result", so a genuinely absent one still ends at once.
             let result = if failed {
                 None
             } else {
-                api.get_optional(
-                    &format!("{}/{sync_job_id}/result", base(deployment)),
-                    &Vec::new(),
-                )
+                let path = format!("{}/{sync_job_id}/result", base(deployment));
+                wait::poll("dbt sync result", RESULT_FETCH_TIMEOUT, poll, || async {
+                    Ok(Progress::Done(api.get_optional(&path, &Vec::new()).await?))
+                })
                 .await?
             };
 
