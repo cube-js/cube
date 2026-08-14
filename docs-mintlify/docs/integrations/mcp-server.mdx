@@ -229,7 +229,7 @@ neither `listDeployments` nor the `chat` selection can reach an excluded deploym
 
 ## Available actions
 
-The MCP server exposes 20 tools, grouped below.
+The MCP server exposes 23 tools, grouped below.
 
 Every tool runs as the authenticated user. Queries respect the same
 [permissions][ref-roles] as the rest of Cube, including row-level security — MCP is a new
@@ -239,9 +239,10 @@ way to reach your data, not a new access surface.
 
 Each tool is annotated as read-only or destructive. MCP clients that honor these
 annotations — including Claude — run read-only tools automatically and **always ask for
-confirmation** before any of the four destructive ones: `updateDashboard`,
-`publishDashboard`, `writeDataModelFile`, and `deleteDataModelFile`. Nothing that changes
-a dashboard or your data model happens without an explicit approval.
+confirmation** before any of the six destructive ones: `updateReport`, `deleteReport`,
+`updateDashboard`, `publishDashboard`, `writeDataModelFile`, and `deleteDataModelFile`.
+Nothing that changes a report, a dashboard, or your data model happens without an explicit
+approval.
 
 ### Deployments and chat
 
@@ -274,12 +275,22 @@ programmatically. Creating and editing workbooks requires the Explorer role or h
 | `readWorkbook` | Reads a workbook — its name and its current dashboard draft and published configs. | Read-only |
 | `createWorkbook` | Creates a new empty workbook, the container that holds reports and a dashboard. | Write |
 | `createReport` | Saves a query plus its visualization as a report inside a workbook, and returns the `reportId` a chart widget references. | Write |
+| `readReport` | Reads one saved report by id — its title, SQL, chart spec, placement, and a shareable URL. | Read-only |
+| `updateReport` | Edits an existing report in place, keeping its `reportId`. Send only the fields you want to change. | Destructive — prompts |
+| `deleteReport` | Deletes a report. | Destructive — prompts |
 | `updateDashboard` | Saves the dashboard layout to the workbook **draft**. Replaces the full widget set and does not go live. | Destructive — prompts |
 | `publishDashboard` | Publishes the current draft to make it live. Idempotent — republishing an unchanged draft is a no-op. | Destructive — prompts |
 
 Drafts are the safety net here: `updateDashboard` only ever writes to the draft, so a
 published dashboard keeps serving its previous version until you approve
 `publishDashboard`. See [Build a dashboard](#build-a-dashboard) for the full sequence.
+
+**To change an existing report, use `updateReport` — never recreate it.** A dashboard's
+chart widget points at a specific `reportId`, so replacing a report with a new one orphans
+every widget referencing it. The same caution applies to moving a report between workbooks:
+a widget resolves its report from its *own* workbook's report list, so changing a report's
+`workbookId` empties the tiles on the old workbook's dashboard. Call `readWorkbook` and
+re-point those widgets with `updateDashboard` first.
 
 ### Data model editing
 
@@ -398,7 +409,9 @@ The five dashboard tools are designed to be used in order.
 </Steps>
 
 To change a dashboard later, call `readWorkbook` first and edit on top of the current
-draft rather than overwriting it.
+draft rather than overwriting it. To change one chart rather than the layout, call
+`readReport` on the widget's `reportId` and edit it with `updateReport` — that keeps the
+id, so every widget pointing at it keeps rendering.
 
 ### Edit the data model
 
