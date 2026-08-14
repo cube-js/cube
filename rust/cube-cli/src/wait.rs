@@ -18,6 +18,45 @@ const MAX_TRANSIENT_FAILURES: u32 = 5;
 /// doubling can't overshoot the wait it belongs to.
 const BACKOFF_CAP: Duration = Duration::from_secs(60);
 
+/// The advice appended to a timeout when the caller doesn't say otherwise: true
+/// whenever the budget is the user's own `--timeout`.
+const DEFAULT_TIMEOUT_ADVICE: &str =
+    "It may still be running — re-run the status command to check, or raise --timeout";
+
+/// How a wait is configured.
+///
+/// A struct rather than positional arguments because two of the three are
+/// `Duration`s: `poll(what, timeout, interval, …)` compiles just as happily with
+/// those two swapped, and a wait that polls every 30 minutes for 5 seconds fails in
+/// a way that looks like a server problem. Named fields make that unwritable.
+pub struct Wait {
+    /// What is being waited for; prefixes each progress line.
+    pub what: String,
+    pub timeout: Duration,
+    pub interval: Duration,
+    /// Appended to the timeout error. Callers whose budget is NOT the user's
+    /// `--timeout` should replace it — advising someone to raise a flag that cannot
+    /// move the deadline sends them off to do something useless.
+    pub on_timeout: String,
+}
+
+impl Wait {
+    pub fn new(what: impl Into<String>, timeout: Duration, interval: Duration) -> Self {
+        Self {
+            what: what.into(),
+            timeout,
+            interval,
+            on_timeout: DEFAULT_TIMEOUT_ADVICE.to_string(),
+        }
+    }
+
+    /// Replace the timeout advice — see [`Wait::on_timeout`].
+    pub fn advising(mut self, advice: impl Into<String>) -> Self {
+        self.on_timeout = advice.into();
+        self
+    }
+}
+
 /// What one poll attempt learned.
 pub enum Progress<T> {
     /// Still running. The string is a short label — a stage name, a status — used
@@ -34,16 +73,17 @@ pub enum Progress<T> {
 /// parseable document, and a CI log wants the movement interleaved with everything
 /// else it prints. Only label CHANGES are written, so a fifteen-minute wait
 /// produces a handful of lines rather than one per poll.
-pub async fn poll<T, F, Fut>(
-    what: &str,
-    timeout: Duration,
-    interval: Duration,
-    mut attempt: F,
-) -> Result<T>
+pub async fn poll<T, F, Fut>(wait: Wait, mut attempt: F) -> Result<T>
 where
     F: FnMut() -> Fut,
     Fut: std::future::Future<Output = Result<Progress<T>>>,
 {
+    let Wait {
+        what,
+        timeout,
+        interval,
+        on_timeout,
+    } = wait;
     let started = Instant::now();
     let mut last_label: Option<String> = None;
     // The CURRENT failure streak: how many consecutive transient failures, and the
@@ -81,8 +121,7 @@ where
         let remaining = timeout.saturating_sub(started.elapsed());
         if remaining.is_zero() {
             bail!(
-                "timed out after {}s waiting for {what}. It may still be running — \
-                 re-run the status command to check, or raise --timeout{}",
+                "timed out after {}s waiting for {what}. {on_timeout}{}",
                 started.elapsed().as_secs(),
                 match &streak {
                     Some((_, err)) => format!(". Last error: {err}"),
@@ -132,6 +171,11 @@ mod tests {
         Ok(Progress::Waiting(label.to_string()))
     }
 
+    /// A wait with a 1ms interval, for tests that only care about the outcome.
+    fn short_wait(what: &str, timeout: Duration) -> Wait {
+        Wait::new(what, timeout, Duration::from_millis(1))
+    }
+
     fn transient() -> anyhow::Error {
         anyhow::Error::new(client::TransportError {
             url: "https://tenant.example/api".to_string(),
@@ -141,12 +185,9 @@ mod tests {
 
     #[tokio::test]
     async fn returns_the_first_terminal_value() {
-        let value = poll(
-            "thing",
-            Duration::from_secs(5),
-            Duration::from_millis(1),
-            || std::future::ready(done(7)),
-        )
+        let value = poll(short_wait("thing", Duration::from_secs(5)), || {
+            std::future::ready(done(7))
+        })
         .await
         .unwrap();
 
@@ -156,19 +197,14 @@ mod tests {
     #[tokio::test]
     async fn absorbs_transient_failures_and_then_succeeds() {
         let calls = Cell::new(0);
-        let value = poll(
-            "thing",
-            Duration::from_secs(5),
-            Duration::from_millis(1),
-            || {
-                calls.set(calls.get() + 1);
-                std::future::ready(if calls.get() <= MAX_TRANSIENT_FAILURES {
-                    Err(transient())
-                } else {
-                    done(7)
-                })
-            },
-        )
+        let value = poll(short_wait("thing", Duration::from_secs(5)), || {
+            calls.set(calls.get() + 1);
+            std::future::ready(if calls.get() <= MAX_TRANSIENT_FAILURES {
+                Err(transient())
+            } else {
+                done(7)
+            })
+        })
         .await
         .unwrap();
 
@@ -179,15 +215,10 @@ mod tests {
     #[tokio::test]
     async fn gives_up_once_transient_failures_stop_being_occasional() {
         let calls = Cell::new(0);
-        let err = poll(
-            "thing",
-            Duration::from_secs(5),
-            Duration::from_millis(1),
-            || {
-                calls.set(calls.get() + 1);
-                std::future::ready(Err::<Progress<()>, _>(transient()))
-            },
-        )
+        let err = poll(short_wait("thing", Duration::from_secs(5)), || {
+            calls.set(calls.get() + 1);
+            std::future::ready(Err::<Progress<()>, _>(transient()))
+        })
         .await
         .unwrap_err();
 
@@ -201,15 +232,10 @@ mod tests {
         // The whole reason retrying is a whitelist: a closure that has decided the
         // sync does not exist must not be asked again until the timeout.
         let calls = Cell::new(0);
-        let err = poll(
-            "thing",
-            Duration::from_secs(5),
-            Duration::from_millis(1),
-            || {
-                calls.set(calls.get() + 1);
-                std::future::ready(Err::<Progress<()>, _>(anyhow::anyhow!("no such sync")))
-            },
-        )
+        let err = poll(short_wait("thing", Duration::from_secs(5)), || {
+            calls.set(calls.get() + 1);
+            std::future::ready(Err::<Progress<()>, _>(anyhow::anyhow!("no such sync")))
+        })
         .await
         .unwrap_err();
 
@@ -236,9 +262,7 @@ mod tests {
         // short enough to expire before the failure limit is reached, puts the wait
         // on the deadline branch every time.
         let err = poll(
-            "thing",
-            Duration::from_millis(5),
-            Duration::from_millis(2),
+            Wait::new("thing", Duration::from_millis(5), Duration::from_millis(2)),
             || std::future::ready(Err::<Progress<()>, _>(transient())),
         )
         .await
@@ -254,19 +278,17 @@ mod tests {
         // The failure is absorbed, the wait then runs healthily to its deadline, and
         // the timeout must not point at a blip that is long past.
         let calls = Cell::new(0);
-        let err = poll(
-            "thing",
-            Duration::from_millis(30),
-            Duration::from_millis(1),
-            || {
-                calls.set(calls.get() + 1);
-                std::future::ready(if calls.get() == 1 {
-                    Err(transient())
-                } else {
-                    waiting::<()>("working")
-                })
-            },
-        )
+        // 300ms, not 30: the assertion holds only once a `waiting` attempt has
+        // landed, so a single scheduler stall right after the failing first attempt
+        // — ordinary on a loaded CI runner — would otherwise flip it.
+        let err = poll(short_wait("thing", Duration::from_millis(300)), || {
+            calls.set(calls.get() + 1);
+            std::future::ready(if calls.get() == 1 {
+                Err(transient())
+            } else {
+                waiting::<()>("working")
+            })
+        })
         .await
         .unwrap_err();
 
@@ -281,9 +303,7 @@ mod tests {
         // reports the elapsed time rather than the configured timeout.
         let calls = Cell::new(0);
         let err = poll(
-            "thing",
-            Duration::from_millis(20),
-            Duration::from_secs(30),
+            Wait::new("thing", Duration::from_millis(20), Duration::from_secs(30)),
             || {
                 calls.set(calls.get() + 1);
                 std::future::ready(waiting::<()>("working"))
