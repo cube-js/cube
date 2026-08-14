@@ -101,24 +101,27 @@ async fn wait_for_build(
         // a red build, on its first poll. That is a worse failure than the wait it
         // replaces, and it would land exactly when CI retries. An unrecognised
         // verdict is therefore waited through, carried in the progress label below.
+        // Two forms of the same field, and the split is deliberate. Matching reads the
+        // RAW text, since the match is `contains` and truncating first could cut off a
+        // verdict that arrives after some prefix — losing the fatal case. Everything
+        // that a human reads uses the normalised one: the label is a dedupe key and
+        // this is arbitrary text from a worker, so anything volatile in it — a counter,
+        // a rotating address — would make every poll a "change" and turn a 15-minute
+        // wait into a line per poll, which is exactly the promise `poll` makes.
+        // Collapsing whitespace also keeps a multi-line error from becoming several
+        // progress lines, or landing whole inside `(last seen: …)` or a failure.
         let error = output::field(&res, "errorText");
+        let complaint = one_line(&error, COMPLAINT_LIMIT);
+
         if let Some((_, hint)) = NOT_BUILDING
             .iter()
             .find(|(verdict, _)| error.contains(verdict))
         {
             anyhow::bail!(
-                "branch {} is not building: {error}. {hint}",
+                "branch {} is not building: {complaint}. {hint}",
                 output::field(&res, "branchName")
             );
         }
-
-        // Normalised before it goes anywhere near the label, because the label is the
-        // dedupe key and this is arbitrary text from a worker: anything volatile in
-        // it — a counter, a rotating address — would make every poll a "change" and
-        // turn a 15-minute wait into a line per poll, which is exactly the promise
-        // `poll` makes. Collapsing whitespace also keeps a multi-line error from
-        // becoming several progress lines, or landing whole inside `(last seen: …)`.
-        let complaint = one_line(&error, COMPLAINT_LIMIT);
 
         if status == "none" || status == "stopped" {
             let since = idle_since.get().unwrap_or_else(std::time::Instant::now);
