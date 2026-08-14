@@ -7,6 +7,36 @@ use serde_json::Value;
 use crate::error::api_bail;
 use crate::oauth;
 
+/// A 404 from the API.
+///
+/// A distinct type purely so `get_optional` can recognise it by downcast instead
+/// of matching on message text, which would break the moment the wording changed.
+/// Its `Display` is the message `get` has always produced, so nothing that just
+/// prints the error reads any differently.
+#[derive(Debug)]
+pub struct NotFound {
+    pub method: Method,
+    pub path: String,
+    pub detail: String,
+}
+
+impl std::fmt::Display for NotFound {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "not found (404): {} {}. {}",
+            self.method, self.path, self.detail
+        )
+    }
+}
+
+impl std::error::Error for NotFound {}
+
+/// True when the failure was a 404 (see {@link NotFound}).
+fn is_not_found(err: &anyhow::Error) -> bool {
+    err.downcast_ref::<NotFound>().is_some()
+}
+
 /// Thin HTTP client over the Cube Cloud public REST API.
 ///
 /// All endpoints take/return JSON; commands work with `serde_json::Value`
@@ -201,7 +231,13 @@ impl Client {
                     "unauthorized (401): session expired — run `cube login` (or set CUBE_API_KEY). {detail}"
                 ),
                 StatusCode::FORBIDDEN => api_bail!("forbidden (403): {detail}"),
-                StatusCode::NOT_FOUND => api_bail!("not found (404): {method} {path}. {detail}"),
+                StatusCode::NOT_FOUND => {
+                    return Err(anyhow::Error::new(NotFound {
+                        method: method.clone(),
+                        path: path.to_string(),
+                        detail,
+                    }))
+                }
                 _ => api_bail!("{method} {path} failed with {status}: {detail}"),
             }
         }
@@ -258,6 +294,22 @@ impl Client {
 
     pub async fn get(&self, path: &str, query: &Query) -> Result<Value> {
         self.request(Method::GET, path, query, None).await
+    }
+
+    /// GET where a 404 is an ANSWER rather than a failure, returned as `None`.
+    ///
+    /// For endpoints whose "not there" is a normal state a caller polls through —
+    /// a dbt sync that has just started and is not yet visible, or one still
+    /// running and so without a result. `get` turns every non-2xx into an error,
+    /// which is right for a one-shot read and wrong inside a wait loop, where it
+    /// would abort the wait instead of continuing it. Every other status still
+    /// errors, so a 401 or a 500 stays loud.
+    pub async fn get_optional(&self, path: &str, query: &Query) -> Result<Option<Value>> {
+        match self.request(Method::GET, path, query, None).await {
+            Ok(value) => Ok(Some(value)),
+            Err(err) if is_not_found(&err) => Ok(None),
+            Err(err) => Err(err),
+        }
     }
 
     pub async fn post(&self, path: &str, body: Option<&Value>) -> Result<Value> {

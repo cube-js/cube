@@ -177,6 +177,7 @@ Run `cube <command> --help` for the full options of any command.
 | `regions` | List available deployment regions |
 | `github` (`gh`) | GitHub integration: `status`, `installations`, `repos`, `branches`, `connect` |
 | `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `enable-branch`/`disable-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
+| `dbt` | dbt sync: `sync` (`--ref`, `--wait`), `status`, `result`, `cancel` |
 | `environments` | Deployment environments and environment tokens |
 | `variables` | Deployment environment variables |
 | `folders`, `workbooks`, `reports`, `workspace` | Workspace content management |
@@ -301,6 +302,97 @@ their API credentials.
 cube data-model enable-branch DEPLOYMENT_ID my-branch
 cube data-model disable-branch DEPLOYMENT_ID my-branch
 ```
+
+## dbt sync
+
+Pull a dbt project's models in as cubes. The repository, credential and
+warehouse settings come from the deployment's dbt integration, so a sync needs
+only the deployment:
+
+```bash
+cube dbt sync DEPLOYMENT_ID --wait
+```
+
+Each sync creates a **new branch** for the generated cubes and prints its name.
+`--wait` polls until the sync finishes, reporting each stage, then prints the
+generated files; it exits non-zero if the sync fails. Without `--wait` it returns
+a `syncJobId` you can follow yourself:
+
+```bash
+cube dbt status DEPLOYMENT_ID SYNC_JOB_ID --wait
+cube dbt result DEPLOYMENT_ID SYNC_JOB_ID
+cube dbt cancel DEPLOYMENT_ID SYNC_JOB_ID
+```
+
+`--ref` syncs a specific branch or tag of the dbt repository instead of the one
+saved on the integration — which is what makes a pull-request gate meaningful,
+since otherwise every run would compile the tracked branch:
+
+```bash
+cube dbt sync DEPLOYMENT_ID --ref feature/orders-model --wait
+```
+
+<Note>
+
+`--ref` takes a branch or tag, not a commit SHA. Syncs are not free — each one
+provisions a sandbox and parses the project — so prefer one per push over one per
+commit.
+
+</Note>
+
+### dbt sync as a CI test gate
+
+Sync the branch under review, compile it, query it, and fail the job if any step
+breaks — without touching production:
+
+```yaml
+env:
+  CUBE_API_URL: ${{ secrets.CUBE_API_URL }}
+  CUBE_API_KEY: ${{ secrets.CUBE_API_KEY }}
+  DEPLOYMENT_ID: ${{ vars.CUBE_DEPLOYMENT_ID }}
+
+steps:
+  - name: Sync the dbt branch under review
+    run: |
+      cube dbt sync "$DEPLOYMENT_ID" --ref "$GITHUB_HEAD_REF" --wait --json > sync.json
+      echo "BRANCH=$(jq -r .branchName sync.json)" >> "$GITHUB_ENV"
+
+  - name: Compile and query the generated model
+    run: |
+      DEV_BRANCH=$(cube data-model dev-mode "$DEPLOYMENT_ID" "$BRANCH" --json | jq -r .branchName)
+      cube deployments build-status "$DEPLOYMENT_ID" --branch "$DEV_BRANCH" --wait
+      TOKEN=$(cube deployments token "$DEPLOYMENT_ID")
+      curl -sfG "$CUBE_API_URL/dev-mode/$DEV_BRANCH/cubejs-api/v1/load" \
+        -H "Authorization: $TOKEN" \
+        --data-urlencode 'query={"measures":["orders.count"]}'
+```
+
+With `--wait --json`, the sync writes one document carrying both the branch to
+compile and how the sync ended, which is why the branch name is available to the
+next step. Compile and query share a step because the dev-mode branch name is
+only known at runtime.
+
+<Warning>
+
+The compile step has to run against the **dev-mode branch**, not the branch the
+sync created. A sync lands on a shared branch, and a shared branch has nothing
+compiling it until someone opens it in dev mode — `build-status` reports `none`
+for it forever. `cube data-model dev-mode` forks a personal `dev-…` branch and
+prints the name to wait on.
+
+</Warning>
+
+The API key needs `SchemaUpdate` on the deployment to start or cancel a sync, and
+`SchemaRead` to follow one. Any failure — a failed sync, a failed compile, a
+timeout — exits non-zero, so the job fails without extra scripting.
+
+<Info>
+
+A gate that runs per pull request accumulates the branches its syncs create.
+There is no CLI command to delete a branch yet, so prune them from the data model
+UI periodically, or merge the ones you want to keep.
+
+</Info>
 
 ## Environment variables
 
