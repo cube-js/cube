@@ -125,6 +125,9 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
             - Filter widget
             - Time grain switcher
           - AI summary
+          - Layout
+            - Spacer
+            - Divider
     - **Dashboard**
       - Scheduled refresh
     - **Semantic Model**
