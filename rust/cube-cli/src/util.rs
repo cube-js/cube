@@ -135,6 +135,32 @@ pub fn body(map: Map<String, Value>) -> Value {
     Value::Object(map)
 }
 
+/// Parse a wait duration: a bare number of seconds, or a number with a `s`/`m`/`h`
+/// suffix (`90`, `30s`, `15m`, `1h`).
+///
+/// Written for the `--wait` flags, whose useful range spans seconds (a poll
+/// interval) to tens of minutes (a dbt sync). A bare number would have to pick one
+/// of those as its unit and silently surprise anyone who meant the other, so the
+/// suffix carries it — with seconds as the bare-number default, since that is what
+/// every other CLI does.
+pub fn parse_duration(s: &str) -> Result<std::time::Duration, String> {
+    let raw = s.trim();
+    let (digits, multiplier) = match raw.chars().last() {
+        Some('s') => (&raw[..raw.len() - 1], 1),
+        Some('m') => (&raw[..raw.len() - 1], 60),
+        Some('h') => (&raw[..raw.len() - 1], 3600),
+        _ => (raw, 1),
+    };
+    let value: u64 = digits
+        .parse()
+        .map_err(|_| format!("`{s}` is not a duration (try 30s, 15m, or 1h)"))?;
+    if value == 0 {
+        return Err(format!("`{s}` must be greater than zero"));
+    }
+
+    Ok(std::time::Duration::from_secs(value * multiplier))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,6 +206,28 @@ mod tests {
             "http://localhost:4000"
         );
         assert_eq!(normalize_url(""), "");
+    }
+
+    #[test]
+    fn parse_duration_reads_the_unit_suffix() {
+        use std::time::Duration;
+        assert_eq!(parse_duration("90").unwrap(), Duration::from_secs(90));
+        assert_eq!(parse_duration("30s").unwrap(), Duration::from_secs(30));
+        assert_eq!(parse_duration("15m").unwrap(), Duration::from_secs(900));
+        assert_eq!(parse_duration("1h").unwrap(), Duration::from_secs(3600));
+        assert_eq!(parse_duration(" 5m ").unwrap(), Duration::from_secs(300));
+    }
+
+    #[test]
+    fn parse_duration_rejects_what_it_cannot_honour() {
+        // A zero interval would spin, and a zero timeout would expire before the
+        // first poll — both are mistakes, not configurations.
+        assert!(parse_duration("0").is_err());
+        assert!(parse_duration("0m").is_err());
+        assert!(parse_duration("").is_err());
+        assert!(parse_duration("soon").is_err());
+        assert!(parse_duration("-5s").is_err());
+        assert!(parse_duration("5d").is_err());
     }
 
     #[test]

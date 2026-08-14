@@ -404,6 +404,19 @@ deployment is shown in the dbt settings card, ready to drop into a CI step.
   />
 </Frame>
 
+The [Cube CLI](/reference/cli#dbt-sync) wraps the same endpoint and can **wait** for
+the sync to finish, which is what turns it into a test gate: sync the ref under
+review, compile it, and fail the job before anything reaches production.
+
+```bash
+cube dbt sync DEPLOYMENT_ID --ref "$GITHUB_HEAD_REF" --wait
+```
+
+`--wait` exits non-zero if the sync fails, and `--ref` syncs the branch being
+reviewed rather than the one saved on the integration. See [dbt sync as a CI test
+gate](/reference/cli#dbt-sync-as-a-ci-test-gate) for the full pipeline, including
+the compile and query steps.
+
 ### Trigger on every push
 
 Register a webhook on your dbt repository so Cube syncs automatically whenever the

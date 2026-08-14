@@ -1,7 +1,65 @@
+use std::time::Duration;
+
 use anyhow::Result;
 use clap::Subcommand;
 
+use crate::client::{Client, Query};
+use crate::wait::{self, Progress};
 use crate::{output, util, Ctx};
+
+/// Build/worker states that end a wait successfully.
+const BUILD_DONE: &[&str] = &["built"];
+/// …and unsuccessfully.
+const BUILD_FAILED: &[&str] = &["failed", "cancelled"];
+
+/// How many consecutive "nothing is building" answers to tolerate while waiting.
+///
+/// A dev-mode branch reports `none`/`stopped` for a moment after dev mode starts,
+/// before the worker begins spinning. It also reports exactly that, forever, for a
+/// SHARED branch that no one has opened in dev mode — the case a dbt-sync branch
+/// lands in — so the wait has to give up and say so rather than sit out its whole
+/// timeout on a branch nothing is ever going to build.
+const IDLE_GRACE_POLLS: u32 = 6;
+
+/// Poll build-status until the build (or dev-mode worker) reaches a terminal state.
+/// Returns the terminal payload; whether that state is a failure is the caller's
+/// call, since only it knows what the exit should be.
+async fn wait_for_build(
+    api: &Client,
+    path: &str,
+    query: &Query,
+    timeout: Duration,
+    interval: Duration,
+) -> Result<serde_json::Value> {
+    let idle = std::cell::Cell::new(0u32);
+
+    wait::poll("build", timeout, interval, || async {
+        let res = api.get(path, query).await?;
+        let status = output::field(&res, "status");
+
+        if BUILD_DONE.contains(&status.as_str()) || BUILD_FAILED.contains(&status.as_str()) {
+            return Ok(Progress::Done(res));
+        }
+
+        if status == "none" || status == "stopped" {
+            idle.set(idle.get() + 1);
+            if idle.get() > IDLE_GRACE_POLLS {
+                anyhow::bail!(
+                    "nothing is building branch {} (status {status}). A shared branch \
+                     only compiles once it is opened in dev mode — run \
+                     `cube data-model dev-mode <deployment> <branch>` and wait on the \
+                     dev-… branch it prints",
+                    output::field(&res, "branchName")
+                );
+            }
+        } else {
+            idle.set(0);
+        }
+
+        Ok(Progress::Waiting(status))
+    })
+    .await
+}
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -113,6 +171,16 @@ enum Cmd {
         /// Branch (defaults to the active dev-mode branch, else the deploy branch)
         #[arg(long)]
         branch: Option<String>,
+        /// Wait for the build (or dev-mode worker) to finish, exiting non-zero if
+        /// it fails
+        #[arg(long)]
+        wait: bool,
+        /// Give up waiting after this long (30s, 15m, 1h)
+        #[arg(long, default_value = "15m", value_parser = util::parse_duration)]
+        timeout: std::time::Duration,
+        /// How often to poll while waiting
+        #[arg(long, default_value = "5s", value_parser = util::parse_duration)]
+        poll: std::time::Duration,
     },
     /// Advance onboarding to a target creation step
     AdvanceStep {
@@ -278,16 +346,40 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 output::success(&format!("Deleted deployment {deployment}"));
             }
         }
-        Cmd::BuildStatus { deployment, branch } => {
+        Cmd::BuildStatus {
+            deployment,
+            branch,
+            wait,
+            timeout,
+            poll,
+        } => {
             let mut query = Vec::new();
             util::push(&mut query, "branchName", &branch);
-            let res = api
-                .get(
-                    &format!("/api/v1/deployments/{deployment}/build-status"),
-                    &query,
-                )
-                .await?;
+            let path = format!("/api/v1/deployments/{deployment}/build-status");
+
+            if !wait {
+                let res = api.get(&path, &query).await?;
+                output::print_json(&res);
+
+                return Ok(());
+            }
+
+            let res = wait_for_build(&api, &path, &query, timeout, poll).await?;
             output::print_json(&res);
+
+            let status = output::field(&res, "status");
+            if BUILD_FAILED.contains(&status.as_str()) {
+                let error = output::field(&res, "errorText");
+                anyhow::bail!(
+                    "build {status} for branch {}{}",
+                    output::field(&res, "branchName"),
+                    if error.is_empty() {
+                        String::new()
+                    } else {
+                        format!(": {error}")
+                    }
+                );
+            }
         }
         Cmd::AdvanceStep { deployment, step } => {
             let res = api
