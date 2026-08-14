@@ -132,8 +132,15 @@ where
         let remaining = timeout.saturating_sub(started.elapsed());
         if remaining.is_zero() {
             bail!(
-                "timed out after {}s waiting for {what}{}{}",
+                "timed out after {}s waiting for {what}{}{}{}",
                 started.elapsed().as_secs(),
+                // What the wait was looking at when it gave up. Without it, a CI log
+                // puts the explanation however many minutes above the failure, and
+                // the failure itself describes nothing.
+                match &last_label {
+                    Some(label) => format!(" (last seen: {label})"),
+                    None => String::new(),
+                },
                 if on_timeout.is_empty() {
                     String::new()
                 } else {
@@ -311,6 +318,8 @@ mod tests {
         let message = err.to_string();
         assert!(message.contains("timed out after"), "got: {message}");
         assert!(!message.contains("Last error"), "got: {message}");
+        // …and it still says what the wait was looking at when it gave up.
+        assert!(message.contains("(last seen: working)"), "got: {message}");
     }
 
     #[tokio::test]
@@ -332,7 +341,10 @@ mod tests {
         .await
         .unwrap_err()
         .to_string();
-        assert!(silent.ends_with("waiting for thing"), "got: {silent}");
+        assert!(
+            silent.ends_with("waiting for thing (last seen: working)"),
+            "got: {silent}"
+        );
     }
 
     #[tokio::test]

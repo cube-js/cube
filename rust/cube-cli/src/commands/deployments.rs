@@ -61,9 +61,6 @@ async fn wait_for_build(
     interval: Duration,
 ) -> Result<serde_json::Value> {
     let idle_since = std::cell::Cell::new(None::<std::time::Instant>);
-    // An unrecognised `errorText` is worth seeing, but only once — it repeats on
-    // every poll for as long as the condition lasts.
-    let reported_error = std::cell::Cell::new(false);
 
     wait::poll(Wait::new("build", timeout, interval), || async {
         let res = api.get(path, query).await?;
@@ -88,19 +85,14 @@ async fn wait_for_build(
         // verdict is therefore surfaced once and waited through.
         let error = output::field(&res, "errorText");
         if !error.is_empty() {
-            let branch = output::field(&res, "branchName");
-            match NOT_BUILDING
+            if let Some((_, hint)) = NOT_BUILDING
                 .iter()
                 .find(|(verdict, _)| error.contains(verdict))
             {
-                Some((_, hint)) => {
-                    anyhow::bail!("branch {branch} is not building: {error}. {hint}")
-                }
-                None if !reported_error.get() => {
-                    reported_error.set(true);
-                    eprintln!("build: {branch} reports \"{error}\" while {status} — still waiting");
-                }
-                None => {}
+                anyhow::bail!(
+                    "branch {} is not building: {error}. {hint}",
+                    output::field(&res, "branchName")
+                );
             }
         }
 
@@ -109,8 +101,8 @@ async fn wait_for_build(
             idle_since.set(Some(since));
             if since.elapsed() > IDLE_GRACE {
                 anyhow::bail!(
-                    "nothing is building branch {} (status {status}). A shared branch \
-                     only compiles once it is opened in dev mode — run \
+                    "nothing is building branch {} (status {status}). If the branch exists, \
+                     it only compiles once it is opened in dev mode — run \
                      `cube data-model dev-mode <deployment> <branch>` and wait on the \
                      dev-… branch it prints",
                     output::field(&res, "branchName")
@@ -120,7 +112,16 @@ async fn wait_for_build(
             idle_since.set(None);
         }
 
-        Ok(Progress::Waiting(status))
+        // An unrecognised complaint rides along in the label rather than being
+        // announced once and forgotten: the loop reports labels when they CHANGE, so
+        // this surfaces a new complaint, stays quiet while it persists, and — since
+        // the timeout names the last label — leaves the eventual failure explaining
+        // itself instead of pointing at a line printed fifteen minutes earlier.
+        Ok(Progress::Waiting(if error.is_empty() {
+            status
+        } else {
+            format!("{status} ({error})")
+        }))
     })
     .await
 }
