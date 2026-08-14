@@ -114,6 +114,8 @@ pub trait ConfigObj: DIService + Debug {
 
     fn non_streaming_query_max_row_limit(&self) -> i32;
 
+    fn fail_on_limitless_post_processing(&self) -> bool;
+
     fn cube_scan_max_batch_rows(&self) -> usize;
 
     fn max_sessions(&self) -> usize;
@@ -140,6 +142,7 @@ pub struct ConfigObjImpl {
     pub push_down_pull_up_split: bool,
     pub stream_mode: bool,
     pub non_streaming_query_max_row_limit: i32,
+    pub fail_on_limitless_post_processing: bool,
     pub cube_scan_max_batch_rows: usize,
     pub max_sessions: usize,
     pub no_implicit_order: bool,
@@ -201,6 +204,10 @@ impl ConfigObjImpl {
                 .unwrap_or(sql_push_down),
             stream_mode: env_parse("CUBESQL_STREAM_MODE", false),
             non_streaming_query_max_row_limit,
+            fail_on_limitless_post_processing: env_parse(
+                "CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING",
+                false,
+            ),
             cube_scan_max_batch_rows: env_parse("CUBESQL_CUBE_SCAN_MAX_BATCH_ROWS", 65536),
             max_sessions: env_parse("CUBEJS_MAX_SESSIONS", 1024),
             no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", true),
@@ -268,6 +275,10 @@ impl ConfigObj for ConfigObjImpl {
         self.non_streaming_query_max_row_limit
     }
 
+    fn fail_on_limitless_post_processing(&self) -> bool {
+        self.fail_on_limitless_post_processing
+    }
+
     fn cube_scan_max_batch_rows(&self) -> usize {
         self.cube_scan_max_batch_rows
     }
@@ -314,6 +325,7 @@ impl Config {
                 push_down_pull_up_split: true,
                 stream_mode: false,
                 non_streaming_query_max_row_limit: 50000,
+                fail_on_limitless_post_processing: false,
                 cube_scan_max_batch_rows: 65536,
                 max_sessions: 1024,
                 no_implicit_order: true,

@@ -1563,6 +1563,28 @@ Queries with a `LIMIT` at or below that limit are not streamed.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |
 
+## `CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING`
+
+If `true`, the [SQL API][ref-sql-api] rejects a query when part of it has to run outside
+the data source over a Cube query with no `LIMIT` clause, or with one above the maximum
+row limit set by
+[`CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`](#cubesql_non_streaming_query_max_row_limit).
+
+Such a query is capped at that limit, without any ordering, and a `LIMIT` above it is
+clamped back down to it. Sorting, filtering, or joining that capped result outside the
+data source treats an arbitrary slice of the rows as if it were the whole population, so
+the answer is wrong rather than merely short. The SQL API pushes these queries down to
+the data source whenever it can; this option controls what happens when it cannot. Leave
+it `false` to keep returning the truncated result, or set it to `true` to fail with an
+error instead.
+
+Queries that are streamed (see [`CUBESQL_STREAM_MODE`](#cubesql_stream_mode)) are never
+capped, so this option has no effect on them.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBESQL_CUBE_SCAN_MAX_BATCH_ROWS`
 
 Specifies the maximum number of rows in a single record batch produced when the
