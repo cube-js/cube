@@ -146,6 +146,21 @@ fn print_result(json: bool, result: &Value) {
     }
 }
 
+/// The `--wait --json` document: one object carrying BOTH halves a caller needs —
+/// which branch to compile next, and how the sync ended. Waiting otherwise forced a
+/// choice between the start payload (which names the branch) and the result (which
+/// does not), and a CI job needs both.
+fn wait_json(started: &Value, status: &Value, branch_name: &str, result: Option<&Value>) -> Value {
+    serde_json::json!({
+        "syncJobId": output::field(started, "syncJobId"),
+        "workflowId": output::field(started, "workflowId"),
+        "branchName": branch_name,
+        "status": output::field(status, "status"),
+        "error": status.get("error").cloned().unwrap_or(Value::Null),
+        "result": result.cloned().unwrap_or(Value::Null),
+    })
+}
+
 /// Poll until the sync reaches a terminal state, reporting movement as it goes.
 /// Returns the terminal status payload; a FAILED sync is returned, not raised, so
 /// the caller decides what a failure means for its own exit.
@@ -233,37 +248,50 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let status = wait_for_sync(&api, deployment, &sync_job_id, timeout, poll).await?;
             let failed = output::field(&status, "status") == FAILED;
 
-            // COMPLETED: the result is available immediately, so fold it into the
-            // same command rather than making the caller ask again.
+            // COMPLETED: fold the result into the same command rather than making
+            // the caller ask again.
             //
-            // Through `wait::poll` for its transient tolerance, not because this
-            // needs waiting: it is the LAST request of the gate, and a single 502
-            // here would fail a job whose sync already succeeded — the same
-            // single-blip failure the poll loop exists to absorb. First answer wins,
-            // including "no result", so a genuinely absent one still ends at once.
+            // Through `wait::poll` for two reasons. Its transient tolerance covers
+            // the LAST request of the gate, where a single 502 would otherwise fail a
+            // job whose sync already succeeded. And an absent result is treated as
+            // "not yet" rather than as an answer: a result is normally readable the
+            // instant the status says COMPLETED, but not guaranteed to be — the run
+            // is still closing, and a worker that can't answer for a moment yields a
+            // 404. Returning `null` with exit 0 there would hand a gate a document
+            // whose `result.generatedFiles` is missing, which is the one shape of
+            // failure `--wait` exists to make loud.
             let result = if failed {
                 None
             } else {
                 let path = format!("{}/{sync_job_id}/result", base(deployment));
-                wait::poll("dbt sync result", RESULT_FETCH_TIMEOUT, poll, || async {
-                    Ok(Progress::Done(api.get_optional(&path, &Vec::new()).await?))
+                let fetched = wait::poll("dbt sync result", RESULT_FETCH_TIMEOUT, poll, || async {
+                    match api.get_optional(&path, &Vec::new()).await? {
+                        Some(result) => Ok(Progress::Done(result)),
+                        None => Ok(Progress::Waiting("result not available yet".to_string())),
+                    }
                 })
-                .await?
+                .await;
+
+                match fetched {
+                    Ok(result) => Some(result),
+                    Err(err) => {
+                        // Still emit the document: the sync itself succeeded, and the
+                        // branch name in it is what a caller needs to carry on with.
+                        if ctx.json {
+                            output::print_json(&wait_json(&started, &status, &branch_name, None));
+                        }
+
+                        return Err(err.context(format!(
+                            "dbt sync {sync_job_id} completed on {branch_name}, but its result \
+                             could not be read. The sync itself succeeded — read it with \
+                             `cube dbt result {deployment} {sync_job_id}`"
+                        )));
+                    }
+                }
             };
 
             if ctx.json {
-                // One document carrying BOTH halves a caller needs: which branch to
-                // compile next, and how the sync ended. Waiting otherwise forced a
-                // choice between the start payload (which names the branch) and the
-                // result (which does not), and a CI job needs both.
-                output::print_json(&serde_json::json!({
-                    "syncJobId": sync_job_id,
-                    "workflowId": output::field(&started, "workflowId"),
-                    "branchName": branch_name,
-                    "status": output::field(&status, "status"),
-                    "error": status.get("error").cloned().unwrap_or(Value::Null),
-                    "result": result.clone().unwrap_or(Value::Null),
-                }));
+                output::print_json(&wait_json(&started, &status, &branch_name, result.as_ref()));
             }
 
             if failed {

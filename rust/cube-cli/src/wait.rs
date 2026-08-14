@@ -46,30 +46,29 @@ where
 {
     let started = Instant::now();
     let mut last_label: Option<String> = None;
-    let mut transient_failures = 0;
-    // Kept for the timeout message: a wait that expires while absorbing failures
-    // would otherwise report only "timed out", leaving the actual cause in stderr
-    // lines nobody correlates with the exit.
-    let mut last_transient: Option<String> = None;
+    // The CURRENT failure streak: how many consecutive transient failures, and the
+    // most recent one's message. One variable rather than two, because the count and
+    // the message are only ever meaningful together — and keeping a message past the
+    // streak that produced it is how a blip recovered from at minute 1 ends up blamed
+    // for a timeout at minute 30. `None` between streaks says exactly that.
+    let mut streak: Option<(u32, String)> = None;
 
     loop {
+        let failures = streak.as_ref().map_or(0, |(count, _)| *count);
+
         match attempt().await {
             Ok(Progress::Done(value)) => return Ok(value),
             Ok(Progress::Waiting(label)) => {
-                transient_failures = 0;
+                streak = None;
                 if last_label.as_deref() != Some(label.as_str()) {
                     eprintln!("{what}: {label}");
                     last_label = Some(label);
                 }
             }
-            Err(err)
-                if client::is_transient(&err) && transient_failures < MAX_TRANSIENT_FAILURES =>
-            {
-                transient_failures += 1;
-                last_transient = Some(format!("{err:#}"));
-                eprintln!(
-                    "{what}: {err:#} (retrying, {transient_failures}/{MAX_TRANSIENT_FAILURES})"
-                );
+            Err(err) if client::is_transient(&err) && failures < MAX_TRANSIENT_FAILURES => {
+                let count = failures + 1;
+                eprintln!("{what}: {err:#} (retrying, {count}/{MAX_TRANSIENT_FAILURES})");
+                streak = Some((count, format!("{err:#}")));
                 // The label is deliberately left alone, so recovering doesn't
                 // reprint the stage the wait was already sitting on.
             }
@@ -85,14 +84,15 @@ where
                 "timed out after {}s waiting for {what}. It may still be running — \
                  re-run the status command to check, or raise --timeout{}",
                 started.elapsed().as_secs(),
-                match &last_transient {
-                    Some(err) => format!(". Last error: {err}"),
+                match &streak {
+                    Some((_, err)) => format!(". Last error: {err}"),
                     None => String::new(),
                 }
             );
         }
 
-        tokio::time::sleep(backoff(interval, transient_failures).min(remaining)).await;
+        let consecutive_failures = streak.as_ref().map_or(0, |(count, _)| *count);
+        tokio::time::sleep(backoff(interval, consecutive_failures).min(remaining)).await;
     }
 }
 
@@ -231,9 +231,28 @@ mod tests {
 
     #[tokio::test]
     async fn a_timeout_while_absorbing_failures_reports_the_last_one() {
-        // Alternating error/progress keeps the consecutive count below the limit, so
-        // the wait ends on the deadline rather than on the failures — the case where
-        // the cause would otherwise live only in stderr.
+        // Deliberately NOT alternating error/progress: which of the two landed last
+        // before the deadline would be a race. Failing throughout, with a timeout
+        // short enough to expire before the failure limit is reached, puts the wait
+        // on the deadline branch every time.
+        let err = poll(
+            "thing",
+            Duration::from_millis(5),
+            Duration::from_millis(2),
+            || std::future::ready(Err::<Progress<()>, _>(transient())),
+        )
+        .await
+        .unwrap_err();
+
+        let message = err.to_string();
+        assert!(message.contains("timed out after"), "got: {message}");
+        assert!(message.contains("Last error: request to"), "got: {message}");
+    }
+
+    #[tokio::test]
+    async fn a_recovered_blip_is_not_blamed_for_a_later_timeout() {
+        // The failure is absorbed, the wait then runs healthily to its deadline, and
+        // the timeout must not point at a blip that is long past.
         let calls = Cell::new(0);
         let err = poll(
             "thing",
@@ -241,7 +260,7 @@ mod tests {
             Duration::from_millis(1),
             || {
                 calls.set(calls.get() + 1);
-                std::future::ready(if calls.get() % 2 == 0 {
+                std::future::ready(if calls.get() == 1 {
                     Err(transient())
                 } else {
                     waiting::<()>("working")
@@ -252,8 +271,8 @@ mod tests {
         .unwrap_err();
 
         let message = err.to_string();
-        assert!(message.contains("timed out after"));
-        assert!(message.contains("Last error: request to"));
+        assert!(message.contains("timed out after"), "got: {message}");
+        assert!(!message.contains("Last error"), "got: {message}");
     }
 
     #[tokio::test]
