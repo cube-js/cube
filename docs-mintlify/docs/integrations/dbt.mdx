@@ -61,9 +61,11 @@ an opt-in option that reads real column types from your warehouse.
 - **Read access to that repository** — either a personal access token (PAT) for
   HTTPS, or the ability to register a read-only deploy key for SSH.
 - For the generated cubes to return data, the dbt models must already be **built into
-  your warehouse** (via your normal production `dbt run`) in the schema you configure
-  below. dbt pull generates cube definitions that point at `schema.<model>`; it does
-  not create the underlying tables.
+  your warehouse** by your normal production `dbt run`. dbt pull generates cube
+  definitions that point at each model's relation; it does not create the underlying
+  tables. Models may live in **several schemas** — the schema is resolved per model
+  from your dbt project, not taken from a single setting (see
+  [Models in several schemas](#models-in-several-schemas)).
 
 ## Connect your dbt repository
 
@@ -85,7 +87,8 @@ Expand the **dbt project** section.
 | **Repository URL** | The clone URL of the repo that contains your dbt project, e.g. `https://github.com/your-org/your-repo.git` or `git@github.com:your-org/your-repo.git`. |
 | **Project path** | The path to the dbt project inside the repository (the folder containing `dbt_project.yml`). Use `.` if the project is at the repository root. |
 | **Branch** | The branch of the dbt repository to sync. Defaults to the repository's default branch. |
-| **dbt models schema** | The schema or dataset where your production dbt run builds its tables. Generated cubes will query the models in this schema. |
+| **dbt target schema** | Your dbt **target schema** — the default for models that don't declare a schema of their own. Models that set a custom schema in dbt resolve to that schema instead; see [Models in several schemas](#models-in-several-schemas). |
+| **dbt target** | *Optional.* The name of the dbt target to run as, matching an output in your dbt project. Defaults to `dev`. Set this if your project picks schemas per environment — see [Models in several schemas](#models-in-several-schemas). |
 
 </Step>
 
@@ -131,6 +134,40 @@ Click **Save dbt settings**.
 </Steps>
 
 Saving these settings does not restart your deployment.
+
+## Models in several schemas
+
+Generated cubes take their schema **per model**, from what dbt resolved for that
+model — so a project that builds into `analytics`, `reports` and `intermediate`
+produces cubes pointing at all three. **dbt target schema** is not applied to every
+model; it is the default for models that don't declare a schema of their own.
+
+dbt decides each model's schema at parse time by calling its `generate_schema_name`
+macro, so what you get depends on which macro your project uses:
+
+| Your dbt project | A model with `+schema: analytics` resolves to |
+| --- | --- |
+| No custom schemas anywhere | *(n/a — every model uses the target schema)* |
+| dbt's **default** `generate_schema_name` | `<target schema>_analytics` — the custom name is **appended** to your target schema |
+| A `generate_schema_name` override that returns the custom name in production | `analytics` |
+
+The second row is dbt's documented default and is often not what people expect;
+the third is the common override
+([dbt: custom schemas](https://docs.getdbt.com/docs/build/custom-schemas)).
+
+<Warning>
+If your project overrides `generate_schema_name` and keys it on the environment —
+the widespread `{% if target.name == 'prod' %}` pattern — you **must** set **dbt
+target** to that production target name. Otherwise the macro takes its fallback
+branch and every model collapses onto the **dbt target schema** value, so every
+generated cube points at one schema.
+</Warning>
+
+To see what a pull actually resolved, open any generated `.yml` and read its
+`sql_table` — the schema in it is the one dbt picked for that model. If every cube
+carries the same schema and your project expects several, that's the misconfigured
+target described in the warning above. (Cube support can also see a per-model
+declared-vs-resolved breakdown in the sync logs for a given pull.)
 
 ## Configure pull settings
 
@@ -403,12 +440,15 @@ For each dbt model in your project:
   `<name prefix><model name>` with title `<title prefix><model alias or name>`.
 - **`sql_table`** is set to the model's fully-qualified relation,
   `database.schema.model` (empty parts are dropped, so e.g. Postgres and Athena
-  yield `schema.model`). On Databricks, the first segment is the catalog: the
+  yield `schema.model`). The **`schema` is taken per model** from what dbt resolved
+  for it, so a project whose models build into several schemas produces cubes
+  pointing at several schemas — see [Models in several schemas](#models-in-several-schemas).
+  On Databricks, the first segment is the catalog: the
   value of the deployment's `CUBEJS_DB_DATABRICKS_CATALOG` environment variable,
   or `hive_metastore` if it isn't set. On ClickHouse, cubes also yield
-  `schema.model`: the **dbt models schema** you configure *is* the ClickHouse
-  database, so `CUBEJS_DB_NAME` doesn't affect the generated `sql_table` (it still
-  sets the connection's default database).
+  `schema.model`: on ClickHouse a schema *is* a database, so `CUBEJS_DB_NAME`
+  doesn't affect the generated `sql_table` (it still sets the connection's default
+  database).
 - **Each column becomes a dimension.** The dimension type is inferred from the
   column's `data_type` where available, then — if
   [Infer column types from dbt catalog](#infer-column-types-from-dbt-catalog) is
@@ -711,9 +751,12 @@ Check that:
 
 <Accordion title="The pull succeeded but Playground returns no data">
 
-dbt pull generates cube definitions that point at `schema.<model>`, but it doesn't
-build the tables. Make sure your production `dbt run` has materialized the models
-into the **dbt models schema** you configured, and that the schema matches.
+dbt pull generates cube definitions that point at each model's relation, but it
+doesn't build the tables. Make sure your production `dbt run` has materialized the
+models, and that the schema each generated cube names is where they actually landed.
+Open a generated `.yml` and compare its `sql_table` against your warehouse — if the
+schema is wrong, see [A generated cube points at the wrong table or
+schema](#a-generated-cube-points-at-the-wrong-table-or-schema).
 
 </Accordion>
 
@@ -744,9 +787,23 @@ it. Enable **Also generate reverse joins** in the pull settings and re-run the p
 
 <Accordion title="A generated cube points at the wrong table or schema">
 
-The `sql_table` is derived from your dbt project and the **dbt models schema**
-setting. Verify that **dbt models schema** matches where your models actually land,
-and that any per-model schema/database overrides in dbt are what you expect.
+The `sql_table` is whatever dbt resolved for that model, so start by asking which
+schema dbt picked rather than which one you typed.
+
+**Every cube points at the same schema, and it's the value you put in dbt target
+schema.** Your project almost certainly overrides `generate_schema_name` and keys it
+on the environment (`{% if target.name == 'prod' %}`), while the pull ran under the
+default `dev` target — so every model took the macro's fallback branch. Set **dbt
+target** to your production target name and re-run the pull. See
+[Models in several schemas](#models-in-several-schemas).
+
+**Every cube points at `<dbt target schema>_<something>`.** That's dbt's *default*
+`generate_schema_name`, which appends a model's custom schema to the target schema.
+It's working as dbt documents. If you want the bare custom names, override the macro
+in your dbt project — Cube uses whatever your project resolves.
+
+**One cube is wrong, the rest are fine.** Check that model's own `+schema` /
+`+database` config in dbt.
 
 On Databricks, the catalog segment comes from the deployment's
 `CUBEJS_DB_DATABRICKS_CATALOG` environment variable and defaults to
