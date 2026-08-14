@@ -1,0 +1,68 @@
+---
+title: Grid container
+description: Group widgets into a nested grid so you can arrange, resize, and move them together on a dashboard.
+---
+
+<Warning>
+
+The grid container widget is currently in preview, and its behavior may still change. Reach out to the [Cube support team](/admin/account-billing/support) to activate it for your account.
+
+</Warning>
+
+A grid container is a widget that holds other widgets in its own grid. Use it to group related tiles — a chart with its controls, a section of KPIs, a labelled block of text and visuals — so they can be arranged, moved, and resized as a unit. Containers can be nested, letting you build structured, multi-section layouts on a single dashboard.
+
+## Adding a grid container
+
+In the [dashboard builder][ref-workbooks], open the **Add Widgets** group in the toolbar and drag the **Grid** entry onto the canvas. The container is added with an empty inner grid, and its settings panel opens so you can size the grid right away.
+
+<Steps>
+  <Step title="Drag a Grid onto the canvas">
+    Open **Add Widgets** in the toolbar and drop the **Grid** entry where you want the container.
+  </Step>
+  <Step title="Set the inner grid size">
+    In the settings panel that opens, set the number of **Columns** and **Rows** for the container's inner grid. It starts as a 2 × 2 grid.
+  </Step>
+  <Step title="Add widgets into it">
+    Drag charts and other widgets straight into the container — see [Adding widgets to a container](#adding-widgets-to-a-container) below.
+  </Step>
+</Steps>
+
+## The inner grid
+
+Each container has its own grid, independent of the dashboard's grid. The **Columns** and **Rows** you set describe that inner grid, and it fills the whole container surface — so the container's cells resize with it rather than being tied to the dashboard's column width. Grid lines are shown while you're editing so you can see where widgets will land.
+
+The grid grows a new row automatically when a widget is placed or resized past the current bottom edge, so you never run out of room while arranging.
+
+## Adding widgets to a container
+
+You can add most widget types to a container — charts, text, AI summaries, controls, spacers, and dividers, as well as other grid containers.
+
+- **From the toolbar** — drag a widget from the **Add Widgets** or **Add Controls** group and drop it directly onto the container, in one step.
+- **Charts** — pick a report from the **Charts** picker and drop it onto the container.
+- **Move an existing widget in** — drag a widget already on the dashboard into the container to move it inside.
+
+Dropped widgets snap to the container's grid cells, and you can resize and rearrange them afterwards like any other widget.
+
+## Arranging widgets
+
+- **Move the container** — drag the container on the dashboard; its child widgets keep their positions relative to each other.
+- **Resize the container** — drag the resize grip on its bottom-right corner. Shrinking the container scales its children down to keep them in view.
+- **Resize a child** — drag a child widget's resize grip to change its width or height within the grid.
+- **Move a widget out** — drag a child out of the container and onto the dashboard to promote it back to a top-level widget. The dashboard reflows to make room below the drop point.
+
+## Distribute evenly
+
+Turn on **Distribute evenly** in the container's settings to give every child the same width and height, laying them out as an even grid. This is handy when a container holds a set of comparable tiles — for example a row of KPIs — that should all be the same size. With it off, each child keeps the size you gave it.
+
+## Nesting containers
+
+A grid container can hold another grid container. Drop a **Grid** into an existing container the same way you'd add any other widget, then add widgets into the nested grid. Use nesting to build sections within sections — for example, a top-level container per dashboard area, each holding its own arranged set of charts and controls.
+
+## Editing and removing
+
+Every container shows a settings gear on its top-right corner. Click it to open the menu:
+
+- **Edit** — open the settings panel to change the **Columns**, **Rows**, or **Distribute evenly** options.
+- **Delete** — remove the container and everything inside it from the dashboard.
+
+[ref-workbooks]: /docs/explore-analyze/workbooks
