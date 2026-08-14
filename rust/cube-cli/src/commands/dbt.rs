@@ -246,10 +246,33 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
 
             eprintln!("dbt sync {sync_job_id} started on {branch_name}");
             let status = wait_for_sync(&api, deployment, &sync_job_id, timeout, poll).await?;
-            let failed = output::field(&status, "status") == FAILED;
 
-            // COMPLETED: fold the result into the same command rather than making
-            // the caller ask again.
+            if output::field(&status, "status") == FAILED {
+                if ctx.json {
+                    output::print_json(&wait_json(&started, &status, &branch_name, None));
+                }
+
+                // The only signal a CI gate needs is the non-zero exit. The message
+                // carries the workflow's own reason, which is what a human reading
+                // the failed job actually wants.
+                let error = output::field(&status, "error");
+                bail!(
+                    "dbt sync {sync_job_id} failed: {}",
+                    if error.is_empty() {
+                        "(no reason reported)".to_string()
+                    } else {
+                        error
+                    }
+                );
+            }
+
+            // COMPLETED from here on, so the result is a value rather than a
+            // possibility: a sync that produced none leaves through the `Err` branch
+            // below. Handling the failure above rather than carrying an `Option` this
+            // far is what makes that structural instead of merely true.
+            //
+            // Fold the result into the same command rather than making the caller ask
+            // again.
             //
             // Through `wait::poll` for two reasons. Its transient tolerance covers
             // the LAST request of the gate, where a single 502 would otherwise fail a
@@ -260,9 +283,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             // 404. Returning `null` with exit 0 there would hand a gate a document
             // whose `result.generatedFiles` is missing, which is the one shape of
             // failure `--wait` exists to make loud.
-            let result = if failed {
-                None
-            } else {
+            let result = {
                 let path = format!("{}/{sync_job_id}/result", base(deployment));
                 // No tail of its own. The default counsel to raise `--timeout` would be
                 // wrong twice over — this budget is a const, and the sync has already
@@ -284,7 +305,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 .await;
 
                 match fetched {
-                    Ok(result) => Some(result),
+                    Ok(result) => result,
                     Err(err) => {
                         // Still emit the document: the sync itself succeeded, and the
                         // branch name in it is what a caller needs to carry on with.
@@ -306,32 +327,12 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             };
 
             if ctx.json {
-                output::print_json(&wait_json(&started, &status, &branch_name, result.as_ref()));
-            }
-
-            if failed {
-                // The only signal a CI gate needs is the non-zero exit. The message
-                // carries the workflow's own reason, which is what a human reading
-                // the failed job actually wants.
-                let error = output::field(&status, "error");
-                bail!(
-                    "dbt sync {sync_job_id} failed: {}",
-                    if error.is_empty() {
-                        "(no reason reported)".to_string()
-                    } else {
-                        error
-                    }
-                );
-            }
-
-            if !ctx.json {
+                output::print_json(&wait_json(&started, &status, &branch_name, Some(&result)));
+            } else {
                 output::success(&format!(
                     "dbt sync {sync_job_id} completed on {branch_name}"
                 ));
-                match &result {
-                    Some(result) => print_result(false, result),
-                    None => println!("(no result reported)"),
-                }
+                print_result(false, &result);
             }
         }
         Cmd::Status {
