@@ -35,6 +35,10 @@ From the IDE, users can pull semantic views from Snowflake and turn them into cu
 
 This allows you to leverage existing Snowflake semantic views in Cube without manual conversion, ensuring consistency between your Snowflake and Cube definitions.
 
+To pull only specific views instead of the whole schema, enter their names
+(comma-separated, `*` wildcards supported) in the **Views** field of the pull dialog.
+Leave it empty to pull every semantic view in the schema, as before.
+
 ## Push Integration
 
 Alternatively, you can push Cube views into Snowflake as native semantic views. The push integration creates DDL from Cube's definitions and executes it in Snowflake, creating Snowflake Semantic Views that match your Cube schema.
