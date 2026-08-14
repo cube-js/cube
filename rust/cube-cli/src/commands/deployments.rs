@@ -113,13 +113,24 @@ async fn wait_for_build(
         let error = output::field(&res, "errorText");
         let complaint = one_line(&error, COMPLAINT_LIMIT);
 
-        if let Some((_, hint)) = NOT_BUILDING
+        if let Some((verdict, hint)) = NOT_BUILDING
             .iter()
             .find(|(verdict, _)| error.contains(verdict))
         {
+            // Name the verdict, not just the text: matching reads raw while printing
+            // is truncated, so in the very case raw matching exists for — a verdict
+            // after a long prefix — the printed complaint need not contain it, and a
+            // message whose quoted cause doesn't support its own advice is what makes
+            // someone doubt the tool. The fuller text is appended only when it says
+            // something the verdict doesn't, which today it usually doesn't.
             anyhow::bail!(
-                "branch {} is not building: {complaint}. {hint}",
-                output::field(&res, "branchName")
+                "branch {} is not building ({verdict}){}. {hint}",
+                output::field(&res, "branchName"),
+                if complaint == *verdict {
+                    String::new()
+                } else {
+                    format!(": {complaint}")
+                }
             );
         }
 
