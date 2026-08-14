@@ -88,7 +88,7 @@ Expand the **dbt project** section.
 | **Project path** | The path to the dbt project inside the repository (the folder containing `dbt_project.yml`). Use `.` if the project is at the repository root. |
 | **Branch** | The branch of the dbt repository to sync. Defaults to the repository's default branch. |
 | **dbt target schema** | Your dbt **target schema** — the default for models that don't declare a schema of their own. Models that set a custom schema in dbt resolve to that schema instead; see [Models in several schemas](#models-in-several-schemas). |
-| **dbt target** | *Optional.* The name of the dbt target to run as, matching an output in your dbt project. Defaults to `dev`. Set this if your project picks schemas per environment — see [Models in several schemas](#models-in-several-schemas). |
+| **dbt target** | *Optional.* The dbt target name the pull runs as. Defaults to `dev`. It doesn't have to match anything in your repository — Cube generates its own `profiles.yml` for the pull — but it is what your project's `generate_schema_name` macro sees as `target.name`. Set it if your project picks schemas per environment; see [Models in several schemas](#models-in-several-schemas). |
 
 </Step>
 
@@ -147,12 +147,11 @@ macro, so what you get depends on which macro your project uses:
 
 | Your dbt project | A model with `+schema: analytics` resolves to |
 | --- | --- |
-| No custom schemas anywhere | *(n/a — every model uses the target schema)* |
 | dbt's **default** `generate_schema_name` | `<target schema>_analytics` — the custom name is **appended** to your target schema |
 | A `generate_schema_name` override that returns the custom name in production | `analytics` |
 
-The second row is dbt's documented default and is often not what people expect;
-the third is the common override
+The first row is dbt's documented default and is often not what people expect;
+the second is the common override
 ([dbt: custom schemas](https://docs.getdbt.com/docs/build/custom-schemas)).
 
 <Warning>
@@ -755,8 +754,7 @@ dbt pull generates cube definitions that point at each model's relation, but it
 doesn't build the tables. Make sure your production `dbt run` has materialized the
 models, and that the schema each generated cube names is where they actually landed.
 Open a generated `.yml` and compare its `sql_table` against your warehouse — if the
-schema is wrong, see [A generated cube points at the wrong table or
-schema](#a-generated-cube-points-at-the-wrong-table-or-schema).
+schema is wrong, see *A generated cube points at the wrong table or schema* below.
 
 </Accordion>
 
