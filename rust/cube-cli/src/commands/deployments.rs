@@ -7,19 +7,31 @@ use crate::client::{Client, Query};
 use crate::wait::{self, Progress};
 use crate::{output, util, Ctx};
 
-/// Build/worker states that end a wait successfully.
+/// The states this endpoint reports, split by what a wait should do with them.
+///
+/// The API normalises its internal build-job and dev-worker states into one set:
+/// `built` (a finished build, or a running dev worker), `building` (queued, in
+/// progress, or a worker spinning up), `warmup`, `failed`, `cancelled`, `stopped`,
+/// and `none`. Only the first group ends a wait happily and only the second ends it
+/// unhappily; everything else is progress or absence, handled below. An unknown
+/// value counts as progress on purpose — a new state server-side should slow a wait
+/// down, never make an older CLI call a build finished.
 const BUILD_DONE: &[&str] = &["built"];
-/// …and unsuccessfully.
 const BUILD_FAILED: &[&str] = &["failed", "cancelled"];
 
-/// How many consecutive "nothing is building" answers to tolerate while waiting.
+/// How long to tolerate "nothing is building this" before giving up.
 ///
-/// A dev-mode branch reports `none`/`stopped` for a moment after dev mode starts,
-/// before the worker begins spinning. It also reports exactly that, forever, for a
-/// SHARED branch that no one has opened in dev mode — the case a dbt-sync branch
-/// lands in — so the wait has to give up and say so rather than sit out its whole
-/// timeout on a branch nothing is ever going to build.
-const IDLE_GRACE_POLLS: u32 = 6;
+/// A dev-mode branch reports `none`/`stopped` briefly after dev mode starts, before
+/// the worker begins spinning. It also reports exactly that, forever, for a SHARED
+/// branch nobody has opened in dev mode — the case a dbt-sync branch lands in — so
+/// the wait has to give up and say so rather than sit out its whole timeout on a
+/// branch nothing will ever build.
+///
+/// Measured in TIME, not polls, so `--poll 1s` doesn't silently cut the window to
+/// six seconds and turn a slow worker start into the wrong diagnosis. Sixty seconds
+/// is a guess at the safe side of a cold start; it wants confirming against a real
+/// one.
+const IDLE_GRACE: Duration = Duration::from_secs(60);
 
 /// Poll build-status until the build (or dev-mode worker) reaches a terminal state.
 /// Returns the terminal payload; whether that state is a failure is the caller's
@@ -31,7 +43,7 @@ async fn wait_for_build(
     timeout: Duration,
     interval: Duration,
 ) -> Result<serde_json::Value> {
-    let idle = std::cell::Cell::new(0u32);
+    let idle_since = std::cell::Cell::new(None::<std::time::Instant>);
 
     wait::poll("build", timeout, interval, || async {
         let res = api.get(path, query).await?;
@@ -42,8 +54,9 @@ async fn wait_for_build(
         }
 
         if status == "none" || status == "stopped" {
-            idle.set(idle.get() + 1);
-            if idle.get() > IDLE_GRACE_POLLS {
+            let since = idle_since.get().unwrap_or_else(std::time::Instant::now);
+            idle_since.set(Some(since));
+            if since.elapsed() > IDLE_GRACE {
                 anyhow::bail!(
                     "nothing is building branch {} (status {status}). A shared branch \
                      only compiles once it is opened in dev mode — run \
@@ -53,7 +66,7 @@ async fn wait_for_build(
                 );
             }
         } else {
-            idle.set(0);
+            idle_since.set(None);
         }
 
         Ok(Progress::Waiting(status))

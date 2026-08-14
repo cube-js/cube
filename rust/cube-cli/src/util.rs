@@ -145,7 +145,9 @@ pub fn body(map: Map<String, Value>) -> Value {
 /// every other CLI does.
 pub fn parse_duration(s: &str) -> Result<std::time::Duration, String> {
     let raw = s.trim();
-    let (digits, multiplier) = match raw.chars().last() {
+    // Case-insensitive: `30S` and `15M` are obviously meant, and rejecting them
+    // teaches nothing.
+    let (digits, multiplier) = match raw.chars().last().map(|c| c.to_ascii_lowercase()) {
         Some('s') => (&raw[..raw.len() - 1], 1),
         Some('m') => (&raw[..raw.len() - 1], 60),
         Some('h') => (&raw[..raw.len() - 1], 3600),
@@ -157,8 +159,14 @@ pub fn parse_duration(s: &str) -> Result<std::time::Duration, String> {
     if value == 0 {
         return Err(format!("`{s}` must be greater than zero"));
     }
+    // Checked: the whole job of this function is to reject input it can't honour,
+    // so it must not be the thing that panics (debug) or wraps to a nonsense
+    // duration (release) on an absurd number of hours.
+    let seconds = value
+        .checked_mul(multiplier)
+        .ok_or_else(|| format!("`{s}` is longer than this can represent"))?;
 
-    Ok(std::time::Duration::from_secs(value * multiplier))
+    Ok(std::time::Duration::from_secs(seconds))
 }
 
 #[cfg(test)]
@@ -216,6 +224,8 @@ mod tests {
         assert_eq!(parse_duration("15m").unwrap(), Duration::from_secs(900));
         assert_eq!(parse_duration("1h").unwrap(), Duration::from_secs(3600));
         assert_eq!(parse_duration(" 5m ").unwrap(), Duration::from_secs(300));
+        assert_eq!(parse_duration("30S").unwrap(), Duration::from_secs(30));
+        assert_eq!(parse_duration("15M").unwrap(), Duration::from_secs(900));
     }
 
     #[test]
@@ -228,6 +238,9 @@ mod tests {
         assert!(parse_duration("soon").is_err());
         assert!(parse_duration("-5s").is_err());
         assert!(parse_duration("5d").is_err());
+        // Rejected, not panicked on in debug or wrapped in release.
+        assert!(parse_duration("9999999999999999999h").is_err());
+        assert!(parse_duration(&format!("{}h", u64::MAX)).is_err());
     }
 
     #[test]

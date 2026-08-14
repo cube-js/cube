@@ -1,10 +1,10 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::{bail, Result};
 use clap::Subcommand;
 use serde_json::Value;
 
-use crate::client::Query;
+use crate::client::{Client, Query};
 use crate::wait::{self, Progress};
 use crate::{output, util, Ctx};
 
@@ -83,12 +83,16 @@ fn base(deployment: i64) -> String {
 const COMPLETED: &str = "COMPLETED";
 const FAILED: &str = "FAILED";
 
-/// How many consecutive "no such sync" answers to tolerate before giving up.
+/// How long to tolerate "no such sync" before giving up on it.
 ///
 /// A sync is briefly invisible right after it starts, so a poll loop has to accept
 /// 404 for a moment. It must not accept it forever, or a mistyped id would wait out
 /// the whole timeout instead of saying what was wrong.
-const MISSING_GRACE_POLLS: u32 = 10;
+///
+/// Measured in TIME, not polls: `--poll` is the user's dial for responsiveness, and
+/// counting attempts would silently shrink this window to six seconds for anyone
+/// who tightened it to `--poll 1s`.
+const MISSING_GRACE: Duration = Duration::from_secs(60);
 
 /// One line summarising a status payload, for progress output.
 fn status_label(status: &Value) -> String {
@@ -141,33 +145,34 @@ fn print_result(json: bool, result: &Value) {
 /// Returns the terminal status payload; a FAILED sync is returned, not raised, so
 /// the caller decides what a failure means for its own exit.
 async fn wait_for_sync(
-    ctx: &Ctx,
+    api: &Client,
     deployment: i64,
     sync_job_id: &str,
     timeout: Duration,
     interval: Duration,
 ) -> Result<Value> {
-    let api = ctx.api()?;
     let path = format!("{}/{}", base(deployment), sync_job_id);
-    // A Cell, not a plain counter: the poll closure hands back a future that
+    // A Cell, not a plain variable: the poll closure hands back a future that
     // borrows what it captures, and a mutable capture would make each call borrow
     // the closure itself — which the borrow checker rejects even though the calls
     // are strictly sequential.
-    let missing = std::cell::Cell::new(0u32);
+    let missing_since = std::cell::Cell::new(None::<Instant>);
 
     wait::poll("dbt sync", timeout, interval, || async {
         let Some(status) = api.get_optional(&path, &Vec::new()).await? else {
-            missing.set(missing.get() + 1);
-            if missing.get() > MISSING_GRACE_POLLS {
+            let since = missing_since.get().unwrap_or_else(Instant::now);
+            missing_since.set(Some(since));
+            if since.elapsed() > MISSING_GRACE {
                 bail!(
-                    "no dbt sync {sync_job_id} on deployment {deployment} \
-                     (it may belong to another deployment, or have aged out)"
+                    "no dbt sync {sync_job_id} on deployment {deployment}. It may belong \
+                     to another deployment, have aged out, or this tenant may not serve \
+                     the dbt-sync endpoints yet"
                 );
             }
 
             return Ok(Progress::Waiting("starting".to_string()));
         };
-        missing.set(0);
+        missing_since.set(None);
 
         let state = output::field(&status, "status");
         if state == COMPLETED || state == FAILED {
@@ -220,7 +225,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             }
 
             eprintln!("dbt sync {sync_job_id} started on {branch_name}");
-            let status = wait_for_sync(ctx, deployment, &sync_job_id, timeout, poll).await?;
+            let status = wait_for_sync(&api, deployment, &sync_job_id, timeout, poll).await?;
             let failed = output::field(&status, "status") == FAILED;
 
             // COMPLETED: the result is available immediately, so fold it into the
@@ -283,7 +288,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             poll,
         } => {
             if wait {
-                let status = wait_for_sync(ctx, deployment, &sync_job_id, timeout, poll).await?;
+                let status = wait_for_sync(&api, deployment, &sync_job_id, timeout, poll).await?;
                 print_status(ctx.json, &status);
                 if output::field(&status, "status") == FAILED {
                     let error = output::field(&status, "error");
@@ -329,9 +334,14 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             deployment,
             sync_job_id,
         } => {
-            api.delete(&format!("{}/{sync_job_id}", base(deployment)), None)
+            let res = api
+                .delete(&format!("{}/{sync_job_id}", base(deployment)), None)
                 .await?;
-            output::success(&format!("Cancelled dbt sync {sync_job_id}"));
+            if ctx.json {
+                output::print_json(&res);
+            } else {
+                output::success(&format!("Cancelled dbt sync {sync_job_id}"));
+            }
         }
     }
 

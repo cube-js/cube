@@ -6,34 +6,80 @@ use serde_json::Value;
 
 use crate::oauth;
 
-/// A 404 from the API.
+/// The API answered, with a status that isn't a success.
 ///
-/// A distinct type purely so `get_optional` can recognise it by downcast instead
-/// of matching on message text, which would break the moment the wording changed.
-/// Its `Display` is the message `get` has always produced, so nothing that just
-/// prints the error reads any differently.
+/// Typed, rather than a bare message, so callers can branch on the status without
+/// matching on wording: [`Client::get_optional`] recognises a 404, and
+/// [`is_transient`] tells a wait loop whether retrying could possibly help. The
+/// `Display` reproduces exactly the message each status produced before, so
+/// anything that only prints the error reads the same.
 #[derive(Debug)]
-pub struct NotFound {
+pub struct ApiError {
+    pub status: StatusCode,
     pub method: Method,
     pub path: String,
     pub detail: String,
 }
 
-impl std::fmt::Display for NotFound {
+impl std::fmt::Display for ApiError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "not found (404): {} {}. {}",
-            self.method, self.path, self.detail
-        )
+        let Self {
+            status,
+            method,
+            path,
+            detail,
+        } = self;
+        match *status {
+            StatusCode::UNAUTHORIZED => write!(
+                f,
+                "unauthorized (401): session expired — run `cube login` (or set CUBE_API_KEY). {detail}"
+            ),
+            StatusCode::FORBIDDEN => write!(f, "forbidden (403): {detail}"),
+            StatusCode::NOT_FOUND => write!(f, "not found (404): {method} {path}. {detail}"),
+            _ => write!(f, "{method} {path} failed with {status}: {detail}"),
+        }
     }
 }
 
-impl std::error::Error for NotFound {}
+impl std::error::Error for ApiError {}
 
-/// True when the failure was a 404 (see {@link NotFound}).
+/// The request never got an answer — DNS, TLS, a dropped connection, a timeout.
+#[derive(Debug)]
+pub struct TransportError {
+    pub url: String,
+    pub source: String,
+}
+
+impl std::fmt::Display for TransportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "request to {} failed: {}", self.url, self.source)
+    }
+}
+
+impl std::error::Error for TransportError {}
+
+/// True when the failure was a 404 (see [`ApiError`]).
 fn is_not_found(err: &anyhow::Error) -> bool {
-    err.downcast_ref::<NotFound>().is_some()
+    matches!(err.downcast_ref::<ApiError>(), Some(e) if e.status == StatusCode::NOT_FOUND)
+}
+
+/// Whether retrying the same request could plausibly succeed — for wait loops,
+/// which poll hundreds of times and must not fail a whole job over one blip.
+///
+/// Deliberately a WHITELIST of "the server was there but unwell" (5xx) plus the
+/// two statuses that explicitly mean "later" (408, 429), and requests that never
+/// landed at all. Everything else is fatal, which matters most for the errors this
+/// function never sees the inside of: a wait closure that has decided something is
+/// wrong — an unknown sync id, a branch nothing is building — raises a plain error,
+/// and treating THAT as transient would retry a settled verdict until the timeout.
+pub fn is_transient(err: &anyhow::Error) -> bool {
+    if let Some(api) = err.downcast_ref::<ApiError>() {
+        return api.status.is_server_error()
+            || api.status == StatusCode::REQUEST_TIMEOUT
+            || api.status == StatusCode::TOO_MANY_REQUESTS;
+    }
+
+    err.downcast_ref::<TransportError>().is_some()
 }
 
 /// Thin HTTP client over the Cube Cloud public REST API.
@@ -147,10 +193,12 @@ impl Client {
                 .header(reqwest::header::CONTENT_LENGTH, "0")
                 .body(Vec::<u8>::new());
         }
-        let res = req
-            .send()
-            .await
-            .map_err(|e| anyhow!("request to {url} failed: {e}"))?;
+        let res = req.send().await.map_err(|e| {
+            anyhow::Error::new(TransportError {
+                url: url.clone(),
+                source: e.to_string(),
+            })
+        })?;
         let status = res.status();
         let text = res.text().await.unwrap_or_default();
         Ok((status, text))
@@ -225,20 +273,12 @@ impl Client {
                         .map(|m| m.to_string())
                 })
                 .unwrap_or_else(|| text.clone());
-            match status {
-                StatusCode::UNAUTHORIZED => bail!(
-                    "unauthorized (401): session expired — run `cube login` (or set CUBE_API_KEY). {detail}"
-                ),
-                StatusCode::FORBIDDEN => bail!("forbidden (403): {detail}"),
-                StatusCode::NOT_FOUND => {
-                    return Err(anyhow::Error::new(NotFound {
-                        method: method.clone(),
-                        path: path.to_string(),
-                        detail,
-                    }))
-                }
-                _ => bail!("{method} {path} failed with {status}: {detail}"),
-            }
+            return Err(anyhow::Error::new(ApiError {
+                status,
+                method: method.clone(),
+                path: path.to_string(),
+                detail,
+            }));
         }
 
         if text.trim().is_empty() {
