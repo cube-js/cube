@@ -72,6 +72,35 @@ export function asPortNumber(input: number, envName: string) {
 }
 
 /**
+ * Parse an env var as a base-10 integer. Rejects empty strings, floats,
+ * scientific notation (`1e2`), and unit suffixes (`50ms`) that `parseInt`
+ * would otherwise silently truncate.
+ */
+export function parseNonNegativeIntEnv(
+  envName: string,
+  defaultValue: string,
+  min: number = 0,
+): number {
+  const raw = get(envName).default(defaultValue).asString();
+  if (!/^\d+$/.test(raw)) {
+    throw new InvalidConfiguration(
+      envName,
+      raw,
+      `Must be an integer >= ${min}.`
+    );
+  }
+  const value = parseInt(raw, 10);
+  if (value < min) {
+    throw new InvalidConfiguration(
+      envName,
+      raw,
+      `Must be an integer >= ${min}.`
+    );
+  }
+  return value;
+}
+
+/**
  * Determines whether multiple data sources were declared or not.
  */
 function isMultipleDataSources(): boolean {
@@ -1802,6 +1831,73 @@ const variables: Record<string, (...args: any) => any> = {
     preAggregations,
   }: DataSourceOpts) => (
     get(keyByDataSource('CUBEJS_DB_PRESTO_AUTH_TOKEN', dataSource, preAggregations)).asString()
+  ),
+
+  /**
+   * Value sent as the `X-Trino-Source` header. Identifies the client in
+   * Trino's query history. Default: `nodejs-client` (same as `presto-client`).
+   */
+  trinoSource: ({
+    dataSource,
+    preAggregations,
+  }: DataSourceOpts) => (
+    get(keyByDataSource('CUBEJS_DB_TRINO_SOURCE', dataSource, preAggregations)).asString()
+  ),
+
+  /**
+   * First wait (ms) before the next `nextUri` poll while the query is still
+   * queued/planning with no rows. Default: 50.
+   */
+  trinoPollInitialInterval: ({
+    dataSource,
+    preAggregations,
+  }: DataSourceOpts) => (
+    parseNonNegativeIntEnv(
+      keyByDataSource('CUBEJS_DB_TRINO_POLL_INITIAL_INTERVAL', dataSource, preAggregations),
+      '50',
+    )
+  ),
+
+  /**
+   * Added to the wait-phase poll interval after `trinoPollTriesBeforeIncrement`
+   * empty polls. Default: 50.
+   */
+  trinoPollIncrementStep: ({
+    dataSource,
+    preAggregations,
+  }: DataSourceOpts) => (
+    parseNonNegativeIntEnv(
+      keyByDataSource('CUBEJS_DB_TRINO_POLL_INCREMENT_STEP', dataSource, preAggregations),
+      '50',
+    )
+  ),
+
+  /**
+   * Cap on wait-phase poll interval (ms). Default: 500.
+   */
+  trinoPollMaxInterval: ({
+    dataSource,
+    preAggregations,
+  }: DataSourceOpts) => (
+    parseNonNegativeIntEnv(
+      keyByDataSource('CUBEJS_DB_TRINO_POLL_MAX_INTERVAL', dataSource, preAggregations),
+      '500',
+    )
+  ),
+
+  /**
+   * Empty wait-phase polls at the current interval before increasing it.
+   * Default: 10 (so 50ms × 10 ≈ 500ms of fine-grained polling).
+   */
+  trinoPollTriesBeforeIncrement: ({
+    dataSource,
+    preAggregations,
+  }: DataSourceOpts) => (
+    parseNonNegativeIntEnv(
+      keyByDataSource('CUBEJS_DB_TRINO_POLL_TRIES_BEFORE_INCREMENT', dataSource, preAggregations),
+      '10',
+      1,
+    )
   ),
 
   /** ***************************************************************

@@ -178,3 +178,85 @@ describe('getEnv(apiSecret / apiSecrets)', () => {
     expect(getEnv('apiSecrets')).toEqual(['only']);
   });
 });
+
+const TRINO_POLL_ENV = {
+  trinoPollInitialInterval: 'CUBEJS_DB_TRINO_POLL_INITIAL_INTERVAL',
+  trinoPollIncrementStep: 'CUBEJS_DB_TRINO_POLL_INCREMENT_STEP',
+  trinoPollMaxInterval: 'CUBEJS_DB_TRINO_POLL_MAX_INTERVAL',
+  trinoPollTriesBeforeIncrement: 'CUBEJS_DB_TRINO_POLL_TRIES_BEFORE_INCREMENT',
+} as const;
+
+describe('getEnv(trino poll / source)', () => {
+  const opts = { dataSource: 'default' as const };
+
+  afterEach(() => {
+    delete process.env.CUBEJS_DB_TRINO_SOURCE;
+    Object.values(TRINO_POLL_ENV).forEach((key) => {
+      delete process.env[key];
+    });
+  });
+
+  test('defaults', () => {
+    expect(getEnv('trinoSource', opts)).toBeUndefined();
+    expect(getEnv('trinoPollInitialInterval', opts)).toBe(50);
+    expect(getEnv('trinoPollIncrementStep', opts)).toBe(50);
+    expect(getEnv('trinoPollMaxInterval', opts)).toBe(500);
+    expect(getEnv('trinoPollTriesBeforeIncrement', opts)).toBe(10);
+  });
+
+  test('valid overrides', () => {
+    process.env.CUBEJS_DB_TRINO_SOURCE = 'my-app';
+    process.env.CUBEJS_DB_TRINO_POLL_INITIAL_INTERVAL = '25';
+    process.env.CUBEJS_DB_TRINO_POLL_INCREMENT_STEP = '0';
+    process.env.CUBEJS_DB_TRINO_POLL_MAX_INTERVAL = '1000';
+    process.env.CUBEJS_DB_TRINO_POLL_TRIES_BEFORE_INCREMENT = '3';
+
+    expect(getEnv('trinoSource', opts)).toBe('my-app');
+    expect(getEnv('trinoPollInitialInterval', opts)).toBe(25);
+    expect(getEnv('trinoPollIncrementStep', opts)).toBe(0);
+    expect(getEnv('trinoPollMaxInterval', opts)).toBe(1000);
+    expect(getEnv('trinoPollTriesBeforeIncrement', opts)).toBe(3);
+  });
+
+  test('empty source is empty string (driver falls back to nodejs-client)', () => {
+    process.env.CUBEJS_DB_TRINO_SOURCE = '';
+    expect(getEnv('trinoSource', opts)).toBe('');
+  });
+
+  test.each(Object.entries(TRINO_POLL_ENV))(
+    '%s rejects improper values',
+    (getter, envKey) => {
+      const read = () => getEnv(getter as keyof typeof TRINO_POLL_ENV, opts);
+
+      process.env[envKey] = '-1';
+      expect(read).toThrow(/Must be an integer >= /);
+
+      process.env[envKey] = 'abc';
+      expect(read).toThrow(/Must be an integer >= /);
+
+      process.env[envKey] = '';
+      expect(read).toThrow(/Must be an integer >= /);
+
+      process.env[envKey] = '1.5';
+      expect(read).toThrow(/Must be an integer >= /);
+
+      process.env[envKey] = '50ms';
+      expect(read).toThrow(/Must be an integer >= /);
+
+      process.env[envKey] = '1e2';
+      expect(read).toThrow(/Must be an integer >= /);
+    }
+  );
+
+  test('triesBeforeIncrement rejects 0', () => {
+    process.env.CUBEJS_DB_TRINO_POLL_TRIES_BEFORE_INCREMENT = '0';
+    expect(() => getEnv('trinoPollTriesBeforeIncrement', opts)).toThrow(
+      /Must be an integer >= 1/
+    );
+  });
+
+  test('interval 0 is allowed (poll immediately)', () => {
+    process.env.CUBEJS_DB_TRINO_POLL_INITIAL_INTERVAL = '0';
+    expect(getEnv('trinoPollInitialInterval', opts)).toBe(0);
+  });
+});

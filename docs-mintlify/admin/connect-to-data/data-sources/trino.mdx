@@ -1,6 +1,6 @@
 ---
 title: Trino
-description: Map Cube to Trino with host credentials plus catalog, schema, SSL, and optional bearer-token variables on the shared Presto driver.
+description: Map Cube to Trino with host credentials plus catalog, schema, SSL, optional bearer-token variables, and configurable query polling.
 ---
 
 ## Prerequisites
@@ -34,6 +34,11 @@ CUBEJS_DB_SCHEMA=my_trino_schema
 | [`CUBEJS_DB_PASS`](/reference/configuration/environment-variables#cubejs_db_pass)           | The password used to connect to the database                                        | A valid database password                     |    ✅    |
 | [`CUBEJS_DB_PRESTO_CATALOG`](/reference/configuration/environment-variables#cubejs_db_presto_catalog) | The catalog within Presto to connect to                                             | A valid catalog name within a Presto database |    ✅    |
 | [`CUBEJS_DB_PRESTO_AUTH_TOKEN`](/reference/configuration/environment-variables#cubejs_db_presto_auth_token) | The authentication token to use when connecting to Presto/Trino. It will be sent in the `Authorization` header. | A valid authentication token |    ❌    |
+| [`CUBEJS_DB_TRINO_SOURCE`](/reference/configuration/environment-variables#cubejs_db_trino_source) | Value sent as the `X-Trino-Source` header | A string | ❌ |
+| [`CUBEJS_DB_TRINO_POLL_INITIAL_INTERVAL`](/reference/configuration/environment-variables#cubejs_db_trino_poll_initial_interval) | First wait (ms) between status polls while a query is queued with no rows | A positive integer | ❌ |
+| [`CUBEJS_DB_TRINO_POLL_INCREMENT_STEP`](/reference/configuration/environment-variables#cubejs_db_trino_poll_increment_step) | Added to the wait-phase poll interval after enough empty polls | A positive integer | ❌ |
+| [`CUBEJS_DB_TRINO_POLL_MAX_INTERVAL`](/reference/configuration/environment-variables#cubejs_db_trino_poll_max_interval) | Cap on wait-phase poll interval (ms) | A positive integer | ❌ |
+| [`CUBEJS_DB_TRINO_POLL_TRIES_BEFORE_INCREMENT`](/reference/configuration/environment-variables#cubejs_db_trino_poll_tries_before_increment) | Empty wait-phase polls at the current interval before increasing it | A positive integer | ❌ |
 | [`CUBEJS_DB_SCHEMA`](/reference/configuration/environment-variables#cubejs_db_schema)         | The schema within the database to connect to                                        | A valid schema name within a Presto database  |    ✅    |
 | [`CUBEJS_DB_SSL`](/reference/configuration/environment-variables#cubejs_db_ssl)            | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`                               |    ❌    |
 | [`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool)       | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number                                |    ❌    |
@@ -130,7 +135,8 @@ protocol][trino-docs-client-protocol] for the list of headers accepted by Trino.
 
 Custom headers can't be configured via environment variables. Instead, use the
 [`driver_factory`](/reference/configuration/config#driver_factory) configuration
-option to pass a `headers` object to the driver:
+option to pass a `headers` object to the driver. Headers are sent on the initial
+statement POST and on every follow-up `nextUri` poll.
 
 <CodeGroup>
 
@@ -198,6 +204,65 @@ module.exports = {
 ```
 
 </CodeGroup>
+
+## Query polling
+
+The Trino driver talks to Trino's HTTP protocol directly. While a query is
+queued or planning (no rows yet), it polls `nextUri` with a short progressive
+backoff: 50ms for the first ten empty polls, then 100ms, up to 500ms. After the
+first rows arrive, it drains remaining pages with no extra delay.
+
+Tune this with environment variables, or pass a `pollBackoff` object (and
+optional `drainInterval`, in milliseconds) from
+[`driver_factory`](/reference/configuration/config#driver_factory):
+
+<CodeGroup>
+
+```python title="Python"
+from cube import config
+
+@config('driver_factory')
+def driver_factory(ctx: dict) -> dict:
+  return {
+    'type': 'trino',
+    'pollBackoff': {
+      'initialInterval': 50,
+      'incrementStep': 50,
+      'maxInterval': 500,
+      'triesBeforeIncrement': 10
+    },
+    'drainInterval': 0
+  }
+```
+
+```javascript title="JavaScript"
+module.exports = {
+  driverFactory: () => ({
+    type: "trino",
+    pollBackoff: {
+      initialInterval: 50,
+      incrementStep: 50,
+      maxInterval: 500,
+      triesBeforeIncrement: 10
+    },
+    drainInterval: 0
+  })
+};
+```
+
+</CodeGroup>
+
+To restore constant-interval polling (the previous `presto-client` default of
+800ms between every poll, including while draining rows), set `checkInterval`:
+
+```javascript
+module.exports = {
+  driverFactory: () => ({
+    type: "trino",
+    checkInterval: 800
+  })
+};
+```
 
 [trino-docs-client-protocol]: https://trino.io/docs/current/develop/client-protocol.html
 
