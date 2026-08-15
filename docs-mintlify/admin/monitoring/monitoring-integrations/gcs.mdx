@@ -1,0 +1,174 @@
+---
+title: Integration with Google Cloud Storage
+sidebarTitle: Google Cloud Storage
+description: Google Cloud Storage is a popular object storage system. This guide demonstrates how to set up Cube to export logs and Query History data to a Google Cloud Storage bucket.
+---
+
+[Google Cloud Storage](https://cloud.google.com/storage) is a popular object
+storage system. This guide demonstrates how to set up Cube to export logs and
+[Query History][ref-query-history-export] data to a Google Cloud Storage bucket.
+
+## Configuration
+
+First, enable [monitoring integrations][ref-monitoring-integrations].
+
+### Authentication
+
+The [`gcp_cloud_storage`][vector-docs-sinks-gcs] sink authenticates on its own,
+independently from the credentials of your [data sources][ref-data-sources]. A
+deployment that queries BigQuery does not reuse its BigQuery service account for
+log export, so you have to provide credentials for the sink explicitly.
+
+<Info>
+
+The Vector agent runs inside Cube's infrastructure, so the fallbacks that Google
+Cloud client libraries usually rely on—the `GOOGLE_APPLICATION_CREDENTIALS`
+environment variable and the service account of the underlying compute
+instance—do not resolve to a service account in your Google Cloud project. Use
+the `credentials_base64` option described below.
+
+</Info>
+
+<Steps>
+
+<Step title="Create a service account">
+
+Create a [service account][google-docs-create-svc-account] in the Google Cloud
+project that owns the bucket and grant it a role that allows writing objects to
+the bucket, e.g. **Storage Object Creator** (`roles/storage.objectCreator`).
+Then, create a JSON key for that service account.
+
+</Step>
+
+<Step title="Encode the key file">
+
+Encode the JSON key file using Base64:
+
+```bash
+cat /path/to/my/keyfile.json | base64
+```
+
+</Step>
+
+<Step title="Store the key as an environment variable">
+
+Add the result as an [environment variable][ref-env-vars] to your deployment,
+using a name prefixed with `CUBE_CLOUD_MONITORING_`, e.g.
+`CUBE_CLOUD_MONITORING_GCS_CREDENTIALS`. This keeps the key out of your
+repository.
+
+</Step>
+
+<Step title="Reference the credentials from the sink">
+
+Use the [`credentials_base64`][ref-monitoring-integrations-creds] option to
+reference the environment variable, and point the sink's `credentials_path`
+option at the file that Cube mounts for you.
+
+</Step>
+
+</Steps>
+
+### Exporting logs
+
+To export logs to Google Cloud Storage, start by creating a bucket for your
+logs.
+
+Then, configure the [`gcp_cloud_storage`][vector-docs-sinks-gcs] sink in your
+[`vector.toml` configuration file][ref-monitoring-integrations-conf].
+
+Example configuration:
+
+```toml
+[sinks.gcs]
+type = "gcp_cloud_storage"
+inputs = [
+  "cubejs-server",
+  "refresh-scheduler",
+  "warmup-job",
+  "cubestore"
+]
+bucket = "your-gcs-bucket-name"
+credentials_base64 = "$CUBE_CLOUD_MONITORING_GCS_CREDENTIALS"
+credentials_path = "/etc/credentials/gcs.json"
+compression = "gzip"
+
+[sinks.gcs.encoding]
+codec = "json"
+
+[sinks.gcs.healthcheck]
+enabled = false
+```
+
+Note that `credentials_path` matches the name of the sink: because the sink above
+is named `gcs`, its credentials are mounted at `/etc/credentials/gcs.json`. See
+[credentials files][ref-monitoring-integrations-creds] for details.
+
+Commit the configuration for Vector, it should take effect in a minute. Then,
+navigate to your bucket and watch the logs coming.
+
+### Exporting Query History
+
+To export [Query History][ref-query-history] data to the same bucket, add the
+`query-history` input to the sink configuration:
+
+```toml
+[sinks.gcs]
+type = "gcp_cloud_storage"
+inputs = [
+  "query-history"
+]
+bucket = "your-gcs-bucket-name"
+credentials_base64 = "$CUBE_CLOUD_MONITORING_GCS_CREDENTIALS"
+credentials_path = "/etc/credentials/gcs.json"
+compression = "gzip"
+
+[sinks.gcs.encoding]
+codec = "json"
+
+[sinks.gcs.healthcheck]
+enabled = false
+```
+
+See [Query History export][ref-query-history-export-conf] for the list of
+exported fields.
+
+## Troubleshooting
+
+### Credentials are not picked up
+
+If the sink reports authentication errors, or Vector logs show that it is falling
+back to an instance service account, check the following:
+
+- The environment variable referenced by `credentials_base64` exists in the
+  deployment and contains Base64-encoded JSON. Cube ignores the option if the
+  decoded value does not parse as JSON.
+- `credentials_path` matches the name of the sink, e.g.
+  `/etc/credentials/gcs.json` for a sink named `gcs`.
+- The name of the sink contains only lowercase letters, numbers, and dashes.
+  Names with underscores, e.g. `gcp_cloud_storage`, are not supported for sinks
+  that use `credentials_base64`.
+
+### Permission denied on the bucket
+
+Make sure the service account has a role that allows writing objects to the
+bucket, and that the bucket named in the `bucket` option belongs to the same
+Google Cloud project as the service account.
+
+If you keep the sink's healthcheck enabled, the service account also needs
+permission to read the bucket's metadata, e.g. **Storage Legacy Bucket Reader**
+(`roles/storage.legacyBucketReader`).
+
+
+[ref-monitoring-integrations]: /admin/monitoring/monitoring-integrations
+[ref-monitoring-integrations-conf]: /admin/monitoring/monitoring-integrations#configuration
+[ref-monitoring-integrations-creds]: /admin/monitoring/monitoring-integrations#credentials-files
+[ref-query-history]: /admin/monitoring/query-history
+[ref-query-history-export]: /admin/monitoring/query-history-export
+[ref-query-history-export-conf]: /admin/monitoring/monitoring-integrations#query-history-export
+[ref-data-sources]: /admin/connect-to-data/data-sources
+[ref-env-vars]: /admin/deployment#environment-variables
+[vector-docs-sinks-gcs]:
+  https://vector.dev/docs/reference/configuration/sinks/gcp_cloud_storage/
+[google-docs-create-svc-account]:
+  https://cloud.google.com/iam/docs/service-accounts-create
