@@ -66,25 +66,35 @@ options sidebar warns you to update those links.)
 
 </Note>
 
-## Download as PNG or PDF
+## Download as PNG, PDF, or CSV {#download-as-png-or-pdf}
 
 Open a published dashboard, click the **More actions** (`⋯`) button in the
 header, and choose **Download as PNG** or **Download as PDF**. The file is
 named after the dashboard's title.
 
-The download is a server-rendered snapshot — Cube re-opens the dashboard,
-waits for every widget to finish rendering, and captures the result. This
-can take up to a couple of minutes for large dashboards. Filter or time
-grain selections you change in your browser before clicking **Download**
-are not applied; the snapshot uses the dashboard's saved state.
+To export a **single chart** instead of the whole dashboard, hover the chart
+widget, open its **⋮** menu, and choose **Download as PNG** or **Download as
+PDF** — the same menu also offers **Download as CSV** for the chart's
+underlying data. The image captures just that chart, named after the chart's
+title.
 
-Available to users with **Manage** permission on the workbook that owns
-the dashboard. The same screenshot mechanism powers PNG/PDF attachments on
-[notifications][ref-notifications] sent after a [scheduled
-refresh][ref-scheduled-refreshes].
+PNG and PDF downloads are server-rendered snapshots — Cube re-opens the
+dashboard (or, for a single chart, that chart on its own), waits for rendering
+to finish, and captures the result. This can take up to a couple of minutes
+for large dashboards. The filter and time-grain selections you currently have
+applied in your browser are carried into the export. (CSV is generated from the
+data already loaded in the chart and downloads immediately.)
+
+Downloading the whole dashboard requires **Manage** permission on the workbook
+that owns it; exporting a single chart requires the **Download data**
+permission. Both are hidden entirely when an admin turns off the account-wide
+[data download controls][ref-data-download-controls]. The same screenshot
+mechanism powers PNG/PDF attachments on [notifications][ref-notifications] sent
+after a [scheduled refresh][ref-scheduled-refreshes].
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-widgets]: /docs/explore-analyze/dashboards/widgets
 [ref-dimension-links]: /docs/data-modeling/dimensions#links
 [ref-notifications]: /docs/explore-analyze/notifications
 [ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
+[ref-data-download-controls]: /admin/users-and-permissions/roles-and-permissions#restricting-data-downloads
