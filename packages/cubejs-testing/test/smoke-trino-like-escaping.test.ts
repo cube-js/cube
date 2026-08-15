@@ -19,15 +19,13 @@ import {
  *
  *  - `LikeDirect` has no pre-aggregation, so the query runs against Trino. Trino
  *    has no default LIKE escape character, so the value must be escaped AND the
- *    statement must carry an explicit `ESCAPE '\'` clause. This path is correct.
+ *    statement must carry an explicit `ESCAPE '\'` clause.
  *  - `LikeRollup` is answered from its pre-aggregation, so the outer query is
- *    generated for Cube Store instead. That path does NOT escape the value: only
- *    PrestodbQuery defines the `filters/like_escape_char` template, and the
- *    native planner skips escaping entirely when it is absent
- *    (rust/cube/cubesqlplanner/.../physical_plan/filter/operators/like.rs). The
- *    wildcard leaks, and the cases below marked `it.failing` document exactly
- *    which filters that breaks. They will start failing - and so need flipping
- *    back to `it` - once the escaping gap is closed.
+ *    generated for Cube Store instead, which escapes with a backslash and no
+ *    clause. That path used to skip escaping altogether - the native planner
+ *    only escapes when the dialect defines `filters/like_escape_char`, and for
+ *    a long time PrestodbQuery was the only one that did - so a `%` typed by a
+ *    user reached the pattern as a wildcard and matched every row.
  */
 describe('trino LIKE filter escaping', () => {
   jest.setTimeout(15 * 60 * 1000);
@@ -106,25 +104,12 @@ describe('trino LIKE filter escaping', () => {
     ['still matches values with no special characters', 'contains', 'discount', 2],
   ];
 
-  // On the Cube Store path the value reaches the pattern unescaped. `contains`
-  // then matches all 7 rows and `notContains` none of them. The other cases pass
-  // only by accident of this fixture - e.g. `startsWith '100%'` becomes `100%%`,
-  // which still matches just the one row - so they are NOT evidence that path is
-  // sound.
-  const ROLLUP_KNOWN_BROKEN = new Set([
-    'contains treats % as a literal, not a wildcard',
-    'contains treats _ as a literal, not a single-char wildcard',
-    'notContains treats % as a literal, not a wildcard',
-  ]);
-
   describe.each([
-    ['LikeDirect', 'queried against Trino', new Set<string>()],
-    ['LikeRollup', 'served from a pre-aggregation', ROLLUP_KNOWN_BROKEN],
-  ])('%s (%s)', (cube, _description, knownBroken) => {
+    ['LikeDirect', 'queried against Trino'],
+    ['LikeRollup', 'served from a pre-aggregation'],
+  ])('%s (%s)', (cube) => {
     CASES.forEach(([title, operator, value, expected]) => {
-      const runner = knownBroken.has(title) ? it.failing : it;
-
-      runner(title, async () => {
+      it(title, async () => {
         expect(await countMatching(cube, operator, value)).toBe(expected);
       });
     });
@@ -162,9 +147,11 @@ describe('trino LIKE filter escaping', () => {
     expect(direct.text).toContain("ESCAPE '\\'");
     expect(direct.params).toEqual(['\\%']);
 
-    // Cube Store: reads the rollup table, and receives the value unescaped -
-    // this is the defect the `it.failing` cases above pin down.
+    // Cube Store: reads the rollup table, and escapes with a backslash and no
+    // clause - it treats backslash as the escape character by default, and its
+    // parser rejects an explicit ESCAPE clause outright.
     expect(rollup.text).toMatch(/pre_aggregations/);
-    expect(rollup.params).toEqual(['%']);
+    expect(rollup.text).not.toMatch(/ESCAPE/i);
+    expect(rollup.params).toEqual(['\\%']);
   });
 });

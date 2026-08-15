@@ -335,7 +335,11 @@ export class MssqlQuery extends BaseQuery {
       'WHERE DATEADD({{ minimal_time_unit }}, 1, date_from) <= max_date';
 
     // MSSQL uses OFFSET/FETCH instead of LIMIT/OFFSET
-    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})';
+    // T-SQL has no default LIKE escape character, so the escaping the planner
+    // applies to the value (see BaseQuery's `like_escape_char`) only takes
+    // effect with an explicit clause. It goes on the predicate rather than in
+    // `like_pattern` because the pattern is wrapped in LOWER(...) here.
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }}) ESCAPE \'\\\'';
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
     templates.statements.select = '{% if ctes %} WITH \n' +
       '{{ ctes | join(\',\n\') }}\n' +
