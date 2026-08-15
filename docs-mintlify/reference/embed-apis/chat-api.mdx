@@ -33,7 +33,7 @@ tab, also reachable from the **Chat** entry on the deployment's **Status** page.
 
 The two forms differ in which authentication they accept:
 
-| | [API key](#api-key-authentication) | [Cube token](#cube-token-authentication) |
+| URL form | [API key](#api-key-authentication) | [Cube token](#cube-token-authentication) |
 |---|:---:|:---:|
 | `/agents/{agentId}/…` | ✓ | ✓ |
 | `/deployments/{deploymentId}/…` | — | ✓ |
@@ -41,7 +41,10 @@ The two forms differ in which authentication they accept:
 The deployment form is served **only** through the Cube token exchange, which is
 what resolves the Auto agent — an API key carries no agent, so a request without
 `{agentId}` in the path is rejected with `403 agentId is required for Api-Key
-authentication`. Request body and streaming response are identical for both.
+authentication`. Because [Cube token authentication](#cube-token-authentication)
+is disabled by default, the deployment form works only once it is enabled in
+**Settings** → **Configuration** → **Use Cube authentication for Chat and
+embedding APIs**. Request body and streaming response are identical for both.
 
 
 ## Overview
@@ -156,8 +159,8 @@ and the `X-Cube-Auth-Token` header is ignored. Send exactly one of the two.
 
 </Warning>
 
-To be accepted by the Chat API, the token must be valid for the agent's
-deployment and include the following claims in its payload:
+To be accepted by the Chat API, the token must be valid for the deployment and
+include the following claims in its payload:
 
 - `externalId` (required) — unique identifier for the external user.
   Normalized to lowercase, so ids that differ only in casing map to the same
@@ -969,7 +972,8 @@ stream.
 
 Supports the same authentication methods as the Chat API: an
 [API key](#api-key-authentication) or, when enabled for your deployment, a
-[Cube token](#cube-token-authentication).
+[Cube token](#cube-token-authentication). As with `stream-chat-state`, the
+`/deployments/{deploymentId}/…` form accepts only a Cube token.
 
 ### Request Body
 

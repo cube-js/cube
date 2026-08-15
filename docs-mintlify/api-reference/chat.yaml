@@ -5,12 +5,16 @@ info:
   description: |-
     Real-time streaming conversations with Cube Cloud AI agents for analytics and
     data exploration. Copy the exact Chat API URL from your agent settings
-    (Admin → Agents → Chat API URL).
+    (Admin → Agents → Chat API URL), or — to talk to a deployment's Auto agent —
+    from the deployment's Settings → API credentials → Chat API tab.
+
+    The deployment-scoped base URL accepts only Cube token authentication; an API
+    key carries no agent, so it cannot resolve the Auto agent.
 servers:
   - url: https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/agents/{agentId}
     description: >-
-      Chat API base URL. Copy the exact URL from your agent settings (Admin → Agents → Chat API
-      URL).
+      Agent-scoped base URL — talks to that specific agent. Copy the exact URL from your agent
+      settings (Admin → Agents → Chat API URL). Accepts an API key or a Cube token.
     variables:
       cloudRegion:
         default: gcp-us-central1
@@ -21,6 +25,22 @@ servers:
       agentId:
         default: '1'
         description: AI agent identifier (Admin → Agents)
+  - url: https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/deployments/{deploymentId}
+    description: >-
+      Deployment-scoped base URL — talks to the deployment's Auto agent. Copy the exact URL from
+      Settings → API credentials → Chat API. Accepts only Cube token authentication, which is
+      disabled by default (Settings → Configuration → Use Cube authentication for Chat and
+      embedding APIs).
+    variables:
+      cloudRegion:
+        default: gcp-us-central1
+        description: Cloud region identifier
+      accountName:
+        default: your-account
+        description: Your Cube Cloud account/tenant name
+      deploymentId:
+        default: '1'
+        description: Deployment identifier (from the deployment URL, e.g. /d/9)
 security:
   - apiKey: []
   - cubeToken: []
