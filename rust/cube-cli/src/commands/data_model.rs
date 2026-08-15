@@ -104,7 +104,7 @@ enum Cmd {
         branch: String,
     },
     /// Disable a branch: its staging environment is active only while the
-    /// branch is viewed in Cube Cloud
+    /// branch is viewed in the Cube UI
     DisableBranch {
         /// Deployment id
         deployment: i64,
@@ -238,10 +238,10 @@ fn write_body(
 
 /// Enabling a branch keeps its staging environment always active and accessible
 /// at `<deploymentUrl>/dev-mode/<branch>/cubejs-api/v1`; disabled (the default)
-/// it is only active while someone views the branch in Cube Cloud. Enabled
-/// branches are the ones `cube environments list --type staging` reports. Only
-/// shared branches qualify — personal dev branches are served as your own
-/// development environment, and the deploy branch is production.
+/// it is only active while someone views the branch in the Cube UI. Enabled
+/// branches are the ones `cube environments list <deployment> --type staging`
+/// reports. Only shared branches qualify — personal dev branches are served as
+/// your own development environment, and the deploy branch is production.
 async fn set_branch_enabled(
     api: &Client,
     ctx: &Ctx,
