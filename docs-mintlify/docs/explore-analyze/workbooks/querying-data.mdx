@@ -219,7 +219,9 @@ granularity — a month grain offers **Previous period**, **Same period
 previous quarter**, and **Same period previous year** — so the comparison
 period always aligns exactly with the current buckets. A measure can have
 several comparisons active at once, such as month over month and year over
-year side by side.
+year side by side. If the query has more than one time dimension, the same
+comparison can also be applied under each of them independently — each
+combination gets its own derived columns.
 
 Each comparison adds derived columns next to the measure. Choose which ones
 to show under **Comparison columns** in the same menu:
