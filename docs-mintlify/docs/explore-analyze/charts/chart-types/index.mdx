@@ -51,7 +51,7 @@ Cube checks these in order and takes the first that matches.
 
 | Recommendation | When |
 | -- | -- |
-| **Map** | The query contains latitude and longitude, or category values that match the regions of a map already in use |
+| **Map** | The query contains latitude and longitude |
 | **KPI** | One measure, no dimensions, and a single row |
 | **Line** | A measure over a time dimension, optionally split by one category of up to 10 values |
 | **Scatter** | Two or more measures with no time dimension — the shape for correlating them |
@@ -59,12 +59,15 @@ Cube checks these in order and takes the first that matches.
 | **Heatmap** | One measure split by two larger categories that fill enough of the grid to be worth drawing |
 | **Bar** | One measure across a few categories with short labels |
 | **Horizontal bar** | The same, where the labels are long or the categories too many for a vertical axis |
-| **Pie** | One measure across a few categories, read as parts of a whole |
 | **Table** | The query has no measure, two time dimensions, three or more dimensions, a category past 30 values, or a result over 5,000 rows |
+
+Pie is not recommended. Its shape — one measure across a few categories — is the same one Bar
+answers, and a bar chart compares those values more accurately, so Cube recommends Bar and leaves
+Pie to you. It remains available in the picker like any other chart type.
 
 Table's conditions are disqualifiers rather than a last preference: a query that meets any of them
 has no chart encoding that reads well, so the table is the honest answer. Maps are the exception —
-a map has no category axis to crowd, so a choropleth over 40 regions is normal rather than
+a map has no category axis to crowd, so a large number of plotted places is normal rather than
 unreadable.
 
 ### When nothing is recommended
@@ -75,11 +78,11 @@ Cube suppresses the recommendation rather than guessing. You will see no outline
 - a value it needs is still unknown, such as the number of distinct values in a dimension;
 - the result was truncated by a row limit, so the counts it would read are incomplete;
 - the best fit is the chart type you already applied;
-- you have already picked a type by hand in this session.
+- you have already picked a type by hand in the picker you are looking at.
 
 Automatic application on an empty report clears a higher bar than the outline does. It happens only
 for Map, KPI, Line, Scatter and vertical Bar, only when no threshold sits within 20% of the observed
 value — so a row either way would not change the answer — and never on a truncated result. Stacked
-bar, heatmap, horizontal bar and pie are offered but never applied for you: stacking asserts that
-the parts compose the whole, which Cube cannot verify from a filtered result, and the others turn on
-a judgment of Cube's own.
+bar, heatmap and horizontal bar are offered but never applied for you: stacking asserts that the
+parts compose the whole, which Cube cannot verify from a filtered result, and the others turn on a
+judgment of Cube's own.
