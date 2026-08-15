@@ -39,7 +39,7 @@ servers:
         default: your-account
         description: Your Cube Cloud account/tenant name
       deploymentId:
-        default: '1'
+        default: '9'
         description: Deployment identifier (from the deployment URL, e.g. /d/9)
 security:
   - apiKey: []
