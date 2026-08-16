@@ -50,10 +50,13 @@ describe('PinotQuery SQL templates', () => {
     expect(sql.indexOf('LIMIT 10')).toBeLessThan(sql.indexOf('OFFSET 5'));
   });
 
-  // Pinot has no default LIKE escape character. The native planner escapes `%`,
-  // `_` and `\` in the filter value (BaseQuery's `like_escape_char`), so the
-  // statement has to carry the clause that interprets that escaping - otherwise
-  // a user searching for a literal `%` gets a wildcard and matches every row.
+  // Pinot reads backslash as the LIKE escape character by default and rejects an
+  // explicit ESCAPE clause - `LIKE '%\_%' ESCAPE '\'` fails at execution, while
+  // the same pattern without the clause matches a literal underscore. So the
+  // value must still be escaped (BaseQuery's `like_escape_char`), but the
+  // statement must NOT carry a clause. Both halves are pinned here: dropping the
+  // escaping would make `%` a wildcard again, and adding the clause back would
+  // make every LIKE filter error.
   it.each([['legacy', false], ['tesseract', true]])(
     'escapes LIKE wildcards in filter values on the %s planner',
     async (_name, useNativeSqlPlanner) => {
@@ -92,8 +95,7 @@ describe('PinotQuery SQL templates', () => {
       const [sql, params] = query.buildSqlAndParams();
 
       expect(params).toEqual(['\\%']);
-      // eslint-disable-next-line quotes -- double quotes keep the SQL readable
-      expect(sql).toContain("ESCAPE '\\'");
+      expect(sql).not.toContain('ESCAPE');
     }
   );
 });
