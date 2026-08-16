@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.20](https://github.com/cube-js/cube/compare/v1.7.19...v1.7.20) (2026-08-16)
+
+### Bug Fixes
+
+- **cubestore:** bump lru to 0.18.2 to clear two use-after-free advisories ([#11531](https://github.com/cube-js/cube/issues/11531)) ([387e1ad](https://github.com/cube-js/cube/commit/387e1ad644030401d12bafd01f991e06fd97f441))
+- **cubestore:** drop async-std to clear the crossbeam advisories ([#11546](https://github.com/cube-js/cube/issues/11546)) ([58f3cd7](https://github.com/cube-js/cube/commit/58f3cd7825a1a8c0fb2d031ee021ce01173584e5))
+- **deps:** bump uuid from 8.3.2 to 11.1.1 across the packages that declare it ([#11534](https://github.com/cube-js/cube/issues/11534)) ([c66cbbe](https://github.com/cube-js/cube/commit/c66cbbe06c0269351395583cef8df64c0d1720ab))
+- **deps:** float handlebars, form-data and tar to clear two criticals ([#11549](https://github.com/cube-js/cube/issues/11549)) ([33c8828](https://github.com/cube-js/cube/commit/33c88288728ba29244ecc950107bb5f9d16d6bde)), closes [#7891](https://github.com/cube-js/cube/issues/7891) [#7589](https://github.com/cube-js/cube/issues/7589) [#11109](https://github.com/cube-js/cube/issues/11109) [#7589](https://github.com/cube-js/cube/issues/7589) [#8252](https://github.com/cube-js/cube/issues/8252)
+- **schema-compiler:** escape LIKE wildcards on the native planner ([#11569](https://github.com/cube-js/cube/issues/11569)) ([f050c08](https://github.com/cube-js/cube/commit/f050c080aab52eefbd7c20fef257f3852c66f634)), closes [#11570](https://github.com/cube-js/cube/issues/11570)
+- **shared,templates:** replace the unmaintained decompress package ([#11532](https://github.com/cube-js/cube/issues/11532)) ([f7822ca](https://github.com/cube-js/cube/commit/f7822cac0d4b16d8ee197e793192f5068cb8895a))
+- **tesseract:** project a primary key once in the keys subquery ([#11527](https://github.com/cube-js/cube/issues/11527)) ([528d755](https://github.com/cube-js/cube/commit/528d755d8ef4502917d86b545bf42b8a352775be)), closes [#11455](https://github.com/cube-js/cube/issues/11455)
+
 ## [1.7.19](https://github.com/cube-js/cube/compare/v1.7.18...v1.7.19) (2026-08-12)
 
 ### Bug Fixes

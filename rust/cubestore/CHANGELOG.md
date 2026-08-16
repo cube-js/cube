@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.20](https://github.com/cube-js/cube/compare/v1.7.19...v1.7.20) (2026-08-16)
+
+### Bug Fixes
+
+- **cubestore:** bump lru to 0.18.2 to clear two use-after-free advisories ([#11531](https://github.com/cube-js/cube/issues/11531)) ([387e1ad](https://github.com/cube-js/cube/commit/387e1ad644030401d12bafd01f991e06fd97f441))
+- **cubestore:** drop async-std to clear the crossbeam advisories ([#11546](https://github.com/cube-js/cube/issues/11546)) ([58f3cd7](https://github.com/cube-js/cube/commit/58f3cd7825a1a8c0fb2d031ee021ce01173584e5))
+
 ## [1.7.19](https://github.com/cube-js/cube/compare/v1.7.18...v1.7.19) (2026-08-12)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

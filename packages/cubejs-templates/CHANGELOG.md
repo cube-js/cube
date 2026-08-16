@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.20](https://github.com/cube-js/cube/compare/v1.7.19...v1.7.20) (2026-08-16)
+
+### Bug Fixes
+
+- **shared,templates:** replace the unmaintained decompress package ([#11532](https://github.com/cube-js/cube/issues/11532)) ([f7822ca](https://github.com/cube-js/cube/commit/f7822cac0d4b16d8ee197e793192f5068cb8895a))
+
 ## [1.7.19](https://github.com/cube-js/cube/compare/v1.7.18...v1.7.19) (2026-08-12)
 
 **Note:** Version bump only for package @cubejs-backend/templates

@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.20](https://github.com/cube-js/cube/compare/v1.7.19...v1.7.20) (2026-08-16)
+
+### Bug Fixes
+
+- **schema-compiler:** escape LIKE wildcards on the native planner ([#11569](https://github.com/cube-js/cube/issues/11569)) ([f050c08](https://github.com/cube-js/cube/commit/f050c080aab52eefbd7c20fef257f3852c66f634)), closes [#11570](https://github.com/cube-js/cube/issues/11570)
+
 ## [1.7.19](https://github.com/cube-js/cube/compare/v1.7.18...v1.7.19) (2026-08-12)
 
 **Note:** Version bump only for package @cubejs-backend/testing-drivers
