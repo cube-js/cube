@@ -365,12 +365,26 @@ steps:
       curl -sfG "$CUBE_API_URL/dev-mode/$DEV_BRANCH/cubejs-api/v1/load" \
         -H "Authorization: $TOKEN" \
         --data-urlencode 'query={"measures":["orders.count"]}'
+
+  - name: Release the dev-mode session
+    if: always()
+    run: cube data-model exit-dev-mode "$DEPLOYMENT_ID"
 ```
 
 With `--wait --json`, the sync writes one document carrying both the branch to
 compile and how the sync ended, which is why the branch name is available to the
 next step. Compile and query share a step because the dev-mode branch name is
 only known at runtime.
+
+<Warning>
+
+**Give the gate its own API key, and always release the session.** Dev mode is
+per-credential state — one active branch per credential — so a gate that shares a
+key with anything else will re-point that session, and two pull requests running
+at once will re-point each other's. The `if: always()` step above releases it even
+when the compile or query fails.
+
+</Warning>
 
 <Warning>
 
