@@ -70,6 +70,13 @@ export class DuckDBQuery extends BaseQuery {
     delete templates.functions.WIDTH_BUCKET;
     templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     templates.expressions.ilike = '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
+    // DuckDB has no default LIKE escape character - the `default_escape` gate on
+    // the two templates above exists for exactly that reason. The native planner
+    // escapes filter values with a backslash (BaseQuery's `like_escape_char`), so
+    // the filter path needs the clause unconditionally to interpret it; without
+    // one, `contains '%'` matches nothing instead of the rows containing a
+    // literal percent sign.
+    templates.tesseract.ilike = '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }} ESCAPE \'\\\'';
     // DuckDB `/` performs float division even for integer operands (since v0.8);
     // `//` is integer division truncating toward zero (-7 // 2 = -3), matching
     // PostgreSQL

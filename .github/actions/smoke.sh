@@ -44,6 +44,7 @@ echo "::endgroup::"
 
 echo "::group::Trino"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:trino
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:trino-like-escaping
 echo "::endgroup::"
 
 echo "::group::MS SQL"

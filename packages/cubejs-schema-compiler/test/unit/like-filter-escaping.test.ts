@@ -88,9 +88,12 @@ describe('LIKE filter wildcard escaping', () => {
     it.each(NEEDS_EXPLICIT_CLAUSE)('%s escapes the value and emits an explicit ESCAPE clause', async (dialect, QueryClass, clause) => {
       const { sql, params } = await buildFilter(QueryClass, native);
 
-      // MSSQL's legacy path escapes by bracketing rather than by backslash; both
-      // are correct, so only the native planner's form is pinned exactly.
-      if (!(dialect === 'MSSQL' && !native)) {
+      if (dialect === 'MSSQL' && !native) {
+        // MSSQL's legacy path escapes by bracketing rather than by backslash, so
+        // it carries no clause. Both forms are correct; pin each rather than
+        // skipping, so this case still asserts something.
+        expect(params).toEqual(['[%]']);
+      } else {
         expect(params).toEqual(['\\%']);
         expect(sql).toContain(clause);
       }
