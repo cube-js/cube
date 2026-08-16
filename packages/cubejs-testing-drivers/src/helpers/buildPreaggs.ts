@@ -86,6 +86,9 @@ export async function buildPreaggs(
         return;
       }
       let timeout: NodeJS.Timeout;
+      // Every path that settles the outer promise goes through this, so neither the
+      // poll nor the backstop outlives the result.
+      let stop: () => void;
       const interval = setInterval(async () => {
         const inProcess = [];
         let statusBody = '';
@@ -104,7 +107,7 @@ export async function buildPreaggs(
           statusBody = (await readData(get)).toString();
           statuses = JSON.parse(statusBody);
         } catch (e) {
-          clearInterval(interval);
+          stop();
           reject(`Cube pre-aggregations build failed: ${statusBody || e}`);
           return;
         }
@@ -113,26 +116,40 @@ export async function buildPreaggs(
         // interval and leave the build to fail by timeout with the actual cause
         // never surfacing. Reject with the body instead.
         if (statuses.error) {
-          clearInterval(interval);
+          stop();
           reject(`Cube pre-aggregations build failed: ${statusBody}`);
+          return;
+        }
+        // Checked before the tally rather than inside it: a `failure` status is
+        // neither `done` nor `missing_partition`, so rejecting from within the loop
+        // left `inProcess` non-empty and both timers armed, and the helper went on
+        // polling for the remaining ~120s after the promise had already settled -
+        // interleaving its noise with the output someone is reading to find out why
+        // the build failed.
+        const failed = Object.keys(statuses).find(
+          (t: string) => statuses[t].status.indexOf('failure') >= 0
+        );
+        if (failed) {
+          stop();
+          reject(`Cube pre-aggregations build failed: ${statuses[failed].status}`);
           return;
         }
         Object.keys(statuses).forEach((t: string) => {
           const { status } = statuses[t];
-          if (status.indexOf('failure') >= 0) {
-            reject(`Cube pre-aggregations build failed: ${status}`);
-          }
           if (status !== 'done' && status !== 'missing_partition') {
             inProcess.push(t);
           }
         });
         if (inProcess.length === 0) {
-          clearInterval(interval);
-          clearTimeout(timeout);
+          stop();
           resolve(true);
         }
       }, 1000);
 
+      stop = () => {
+        clearInterval(interval);
+        clearTimeout(timeout);
+      };
       timeout = setTimeout(() => {
         clearInterval(interval);
         reject('Cube pre-aggregations build failed: timeout.');
