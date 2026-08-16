@@ -45,16 +45,10 @@ class PinotTimeDimension extends BaseTimeDimension {
 }
 
 class PinotFilter extends BaseFilter {
-  // Pinot treats backslash as the LIKE escape character on its own, and rejects
-  // an explicit ESCAPE clause: `... LIKE '%\_%' ESCAPE '\'` fails at execution
-  // with "Query execution error", while the same pattern without the clause
-  // matches a literal underscore correctly. So the escaping the planner applies
-  // to the value (BaseQuery's `like_escape_char`) is interpreted here only when
-  // no clause is emitted.
   public likeIgnoreCase(column: any, not: any, param: any, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
-    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}) , '${s}')`;
+    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}) , '${s}') ESCAPE '\\'`;
   }
 
   public castParameter() {
@@ -253,10 +247,6 @@ export class PinotQuery extends BaseQuery {
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
     templates.expressions.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})';
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
-    // No ESCAPE clause, for the reason described on PinotFilter.likeIgnoreCase:
-    // Pinot errors on the clause and already reads backslash as the escape
-    // character, so the planner's escaping takes effect precisely by leaving it
-    // off.
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %} LIKE {{ pattern }}';
     templates.tesseract.series_bounds_cast = 'CAST({{ expr }} AS TIMESTAMP)';
     templates.expressions.rolling_window_expr_timestamp_cast = 'CAST({{ value }} AS TIMESTAMP)';

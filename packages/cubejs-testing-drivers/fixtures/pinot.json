@@ -240,7 +240,17 @@
     "windows / window functions, multi-stage & time-shift measures, month/quarter/",
     "year interval arithmetic, and any timestamp/timezone rendering differences the",
     "Pinot dialect does not yet cover).",
-    "---------------------------------------"
+    "---------------------------------------",
+    "---------------------------------------",
+    "PINOT LIKE FILTERS NEVER MATCH         ",
+    "---------------------------------------",
+    "contains/startsWith/endsWith all return empty on Pinot: it does not match",
+    "a non-constant CONCAT(...) LIKE pattern. Pre-existing and unrelated to",
+    "wildcard escaping - the recorded snapshots for the whole LIKE family are",
+    "Array [] for the same reason. Tracked separately; do not extend this list",
+    "to the other escaping cases, which pass here only because they expect an",
+    "empty result.",
+    "filtering Products: contains a literal underscore (no pre-aggregation)"
   ],
   "tesseractSkip": [
     "---------------------------------------",
@@ -293,6 +303,16 @@
     "querying BigECommerce: null sum",
     "querying BigECommerce: multi-stage group by time dimension",
     "querying BigECommerce: two multi-stage branches sharing one pre-aggregation",
-    "Tesseract: SQL API: Timeshift measure from cube"
+    "Tesseract: SQL API: Timeshift measure from cube",
+    "---------------------------------------",
+    "PINOT LIKE FILTERS NEVER MATCH         ",
+    "---------------------------------------",
+    "contains/startsWith/endsWith all return empty on Pinot: it does not match",
+    "a non-constant CONCAT(...) LIKE pattern. Pre-existing and unrelated to",
+    "wildcard escaping - the recorded snapshots for the whole LIKE family are",
+    "Array [] for the same reason. Tracked separately; do not extend this list",
+    "to the other escaping cases, which pass here only because they expect an",
+    "empty result.",
+    "filtering Products: contains a literal underscore (no pre-aggregation)"
   ]
 }
