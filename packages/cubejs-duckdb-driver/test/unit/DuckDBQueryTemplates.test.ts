@@ -1,5 +1,5 @@
 import { prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
-import { DuckDBQuery } from '../src/DuckDBQuery';
+import { DuckDBQuery } from '../../src/DuckDBQuery';
 
 const prepareCompiler = (content: string) => originalPrepareCompiler({
   localPath: () => __dirname,
