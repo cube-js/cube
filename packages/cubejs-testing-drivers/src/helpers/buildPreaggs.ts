@@ -59,8 +59,18 @@ export async function buildPreaggs(
       token,
       { action: 'post', selector },
     ).then((post) => {
-      readData(post).then((_jobs) => {
-        const jobs = <string[]>JSON.parse(_jobs.toString());
+      readData(post).then((_body) => {
+        const body = _body.toString();
+        const jobs = <string[]>JSON.parse(body);
+        // A rejected selector (e.g. naming a pre-aggregation the fixture does not
+        // declare) answers with an error object rather than a token array. Without
+        // this check that object is forwarded as `tokens` on the next request and
+        // the build dies 120s later on an unrelated complaint about `tokens`, hiding
+        // the selector that actually failed.
+        if (!Array.isArray(jobs)) {
+          reject(`Cube pre-aggregations build failed: ${body}`);
+          return;
+        }
         if (jobs.length === 0) {
           resolve(true);
         } else {
@@ -72,7 +82,17 @@ export async function buildPreaggs(
               token,
               { action: 'get', resType: 'object', tokens: jobs },
             );
-            const statuses = JSON.parse((await readData(get)).toString());
+            const statusBody = (await readData(get)).toString();
+            const statuses = JSON.parse(statusBody);
+            // An error response ({"error": "..."}) has no per-token job objects, so
+            // reading `status` off it would throw an opaque TypeError from inside this
+            // interval and leave the build to fail by timeout with the actual cause
+            // never surfacing. Reject with the body instead.
+            if (statuses.error) {
+              clearInterval(interval);
+              reject(`Cube pre-aggregations build failed: ${statusBody}`);
+              return;
+            }
             Object.keys(statuses).forEach((t: string) => {
               const { status } = statuses[t];
               if (status.indexOf('failure') >= 0) {

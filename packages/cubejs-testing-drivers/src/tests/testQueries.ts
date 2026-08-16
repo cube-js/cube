@@ -564,6 +564,68 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(servedByRollupStore(filtered)).toBe(false);
     });
 
+    execute('filtering Products: startsWith a literal percent sign (no pre-aggregation)', async () => {
+      const response = await client.load({
+        dimensions: [
+          'Products.productName'
+        ],
+        filters: [
+          {
+            member: 'Products.productName',
+            operator: 'startsWith',
+            values: ['%'],
+          },
+        ],
+      });
+      // `startsWith` only appends the trailing wildcard, so an unescaped `%`
+      // leaves the pattern `%%` and matches every row rather than none.
+      expect(response.rawData()).toEqual([]);
+      expect(servedByRollupStore(response)).toBe(false);
+    });
+
+    execute('filtering Products: endsWith a literal percent sign (no pre-aggregation)', async () => {
+      const response = await client.load({
+        dimensions: [
+          'Products.productName'
+        ],
+        filters: [
+          {
+            member: 'Products.productName',
+            operator: 'endsWith',
+            values: ['%'],
+          },
+        ],
+      });
+      // The leading-wildcard mirror of the case above.
+      expect(response.rawData()).toEqual([]);
+      expect(servedByRollupStore(response)).toBe(false);
+    });
+
+    execute('filtering ECommerce: notContains a literal percent sign (pre-aggregated)', async () => {
+      const [filtered, all] = await Promise.all([
+        client.load({
+          measures: ['ECommerce.totalQuantity'],
+          dimensions: ['ECommerce.productName'],
+          filters: [
+            {
+              member: 'ECommerce.productName',
+              operator: 'notContains',
+              values: ['%'],
+            },
+          ],
+        }),
+        client.load({
+          measures: ['ECommerce.totalQuantity'],
+          dimensions: ['ECommerce.productName'],
+        }),
+      ]);
+      // Same mirror image as the Products case, but rendered by the Cube Store
+      // dialect because the rollup answers it.
+      expect(filtered.rawData().length).toEqual(all.rawData().length);
+      expect(filtered.rawData().length).toBeGreaterThan(0);
+      expect(servedByRollupStore(filtered)).toBe(true);
+    });
+
     execute('filtering ECommerce: contains a literal percent sign (pre-aggregated)', async () => {
       const response = await client.load({
         measures: [
