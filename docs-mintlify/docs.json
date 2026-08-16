@@ -1243,6 +1243,10 @@
     {
       "source": "/docs/integrations/power-bi/ntlm",
       "destination": "/reference/core-data-apis/dax-api/ntlm"
+    },
+    {
+      "source": "/api-reference/workbooks/update-published-dashboard-ai-widget-thread",
+      "destination": "/api-reference/workbooks/update-workbook-dashboard"
     }
   ]
 }

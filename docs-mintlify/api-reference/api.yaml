@@ -1664,12 +1664,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/DeploymentSettings'
           description: ''
-      summary: >-
-        Read every setting of a deployment - the full contents of the console Settings pages
-        (general, configuration flags, deploy, launchpad, Cube Store private storage). Secrets are
-        excluded; read environment variables through `/env-vars` instead.
+      summary: Get deployment settings
       tags:
         - Deployments
+      x-mint:
+        content: >-
+          Every setting of a deployment in one payload — the full contents of the console Settings
+          pages (general, configuration flags, deploy, launchpad, Cube Store private storage), plus
+          the read-only values displayed alongside them. Secrets are excluded; read environment
+          variables through `/env-vars` instead.
     put:
       operationId: updateDeploymentSettings
       parameters:
@@ -1692,11 +1695,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/DeploymentSettings'
           description: ''
-      summary: >-
-        Update any subset of a deployment's settings and read the full settings back. Omitted fields
-        are left alone, and `templateVariables` is merged key-by-key rather than replaced.
+      summary: Update deployment settings
       tags:
         - Deployments
+      x-mint:
+        content: >-
+          Update any subset of a deployment’s settings and read the full settings back. Fields you
+          omit are left alone, and `templateVariables` is merged key-by-key rather than replaced, so
+          setting one configuration flag never clears the others.
   /api/v1/deployments/{deploymentId}/shared-workspace:
     get:
       operationId: sharedWorkspaceObjects
@@ -6416,10 +6422,6 @@ components:
           oneOf:
             - $ref: '#/components/schemas/DeploymentSettingsRepoType'
             - type: 'null'
-        shaderConfig:
-          oneOf:
-            - $ref: '#/components/schemas/ShaderConfig'
-            - type: 'null'
         targetPlatform:
           oneOf:
             - type: string
@@ -8325,64 +8327,6 @@ components:
       required:
         - env_variables
       type: object
-    ShaderConfig:
-      properties:
-        chatModel:
-          oneOf:
-            - $ref: '#/components/schemas/ShaderConfigChatModel'
-            - type: 'null'
-        ragModel:
-          oneOf:
-            - $ref: '#/components/schemas/ShaderConfigRagModel'
-            - type: 'null'
-      type: object
-    ShaderConfigChatModel:
-      enum:
-        - gemini_1_5_pro
-        - gemini_2_0_flash_lite_preview
-        - gemini_2_0_flash_001
-        - gemini_2_0_flash_thinking_exp
-        - gemini_2_0_pro
-        - gemini_2_5_pro
-        - claude_3_5_sonnet
-        - claude_3_5_sonnetv2
-        - claude_3_7_sonnet
-      type: string
-    ShaderConfigInput:
-      properties:
-        chatModel:
-          oneOf:
-            - $ref: '#/components/schemas/ShaderConfigInputChatModel'
-            - type: 'null'
-        ragModel:
-          oneOf:
-            - $ref: '#/components/schemas/ShaderConfigInputRagModel'
-            - type: 'null'
-      type: object
-    ShaderConfigInputChatModel:
-      enum:
-        - gemini_1_5_pro
-        - gemini_2_0_flash_lite_preview
-        - gemini_2_0_flash_001
-        - gemini_2_0_flash_thinking_exp
-        - gemini_2_0_pro
-        - gemini_2_5_pro
-        - claude_3_5_sonnet
-        - claude_3_5_sonnetv2
-        - claude_3_7_sonnet
-      type: string
-    ShaderConfigInputRagModel:
-      enum:
-        - gemini_1_5_flash
-        - gemini_2_0_flash_lite_preview
-        - gemini_2_0_flash_001
-      type: string
-    ShaderConfigRagModel:
-      enum:
-        - gemini_1_5_flash
-        - gemini_2_0_flash_lite_preview
-        - gemini_2_0_flash_001
-      type: string
     SheetsUiSettings:
       properties:
         showAppliedFilters:
@@ -8627,10 +8571,6 @@ components:
         releaseChannelVersionHold:
           oneOf:
             - type: boolean
-            - type: 'null'
-        shaderConfig:
-          oneOf:
-            - $ref: '#/components/schemas/ShaderConfigInput'
             - type: 'null'
         template:
           oneOf:
