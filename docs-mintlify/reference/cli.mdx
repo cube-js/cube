@@ -368,7 +368,8 @@ steps:
 
   - name: Release the dev-mode session
     if: always()
-    run: cube data-model exit-dev-mode "$DEPLOYMENT_ID" || true
+    continue-on-error: true
+    run: cube data-model exit-dev-mode "$DEPLOYMENT_ID"
 ```
 
 With `--wait --json`, the sync writes one document carrying both the branch to
@@ -381,8 +382,10 @@ only known at runtime.
 **Give the gate its own API key, and always release the session.** Dev mode is
 per-credential state — one active branch per credential — so a gate that shares a
 key with anything else will re-point that session, and two pull requests running
-at once will re-point each other's. The `if: always()` step above releases it even
-when the compile or query fails.
+at once will re-point each other's. The step above releases it even when the
+compile or query fails, and `continue-on-error` keeps a failed release visible
+without blaming it for the job — releasing may legitimately do nothing if the gate
+never got as far as entering dev mode.
 
 </Warning>
 
