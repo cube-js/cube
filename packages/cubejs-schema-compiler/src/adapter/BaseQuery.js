@@ -4689,7 +4689,9 @@ export class BaseQuery {
         // default escape character add the explicit clause themselves: Presto and
         // Trino in `like_pattern`, MSSQL, Oracle and Snowflake in
         // `tesseract.ilike` (their pattern is wrapped, so the clause cannot go
-        // inside it).
+        // inside it), and DuckDB and Pinot likewise in `tesseract.ilike` - those
+        // two live in their driver packages rather than in this directory, so a
+        // sweep of only this directory will miss them.
         like_escape_char: '\\',
         always_true: '1 = 1'
 

@@ -200,6 +200,10 @@ export class PrestodbQuery extends BaseQuery {
     templates.tesseract.bool_param_cast = 'CAST({{ expr }} AS BOOLEAN)';
     templates.tesseract.number_param_cast = 'CAST({{ expr }} AS DOUBLE)';
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %}) ESCAPE \'\\\'';
+    // Deliberately restated even though it currently matches the base value:
+    // the ESCAPE clause in the like_pattern above hardcodes this character, so
+    // the two have to move together. Inheriting it would let a change to the
+    // base silently desynchronise the escaping from the clause interpreting it.
     templates.filters.like_escape_char = '\\';
     templates.statements.time_series_select = 'SELECT from_iso8601_timestamp(dates.f) date_from, from_iso8601_timestamp(dates.t) date_to \n' +
     'FROM (\n' +

@@ -49,4 +49,51 @@ describe('PinotQuery SQL templates', () => {
     // Pinot expects LIMIT before OFFSET.
     expect(sql.indexOf('LIMIT 10')).toBeLessThan(sql.indexOf('OFFSET 5'));
   });
+
+  // Pinot has no default LIKE escape character. The native planner escapes `%`,
+  // `_` and `\` in the filter value (BaseQuery's `like_escape_char`), so the
+  // statement has to carry the clause that interprets that escaping - otherwise
+  // a user searching for a literal `%` gets a wildcard and matches every row.
+  it.each([['legacy', false], ['tesseract', true]])(
+    'escapes LIKE wildcards in filter values on the %s planner',
+    async (_name, useNativeSqlPlanner) => {
+      const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+        cube('orders', {
+          sql_table: 'orders',
+
+          measures: {
+            count: {
+              type: 'count',
+            },
+          },
+
+          dimensions: {
+            id: {
+              sql: 'id',
+              type: 'number',
+              primary_key: true,
+            },
+            status: {
+              sql: 'status',
+              type: 'string',
+            },
+          },
+        });
+      `);
+
+      await compiler.compile();
+
+      const query = new PinotQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['orders.count'],
+        filters: [{ member: 'orders.status', operator: 'contains', values: ['%'] }],
+        useNativeSqlPlanner,
+      });
+
+      const [sql, params] = query.buildSqlAndParams();
+
+      expect(params).toEqual(['\\%']);
+      // eslint-disable-next-line quotes -- double quotes keep the SQL readable
+      expect(sql).toContain("ESCAPE '\\'");
+    }
+  );
 });
