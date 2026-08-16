@@ -803,6 +803,7 @@
                 "pages": [
                   "GET /build/api/v1/deployments/{deploymentId}/branches",
                   "POST /build/api/v1/deployments/{deploymentId}/branches",
+                  "PUT /build/api/v1/deployments/{deploymentId}/branches/staging-environment",
                   "POST /build/api/v1/deployments/{deploymentId}/commit",
                   "GET /build/api/v1/deployments/{deploymentId}/data-model/files",
                   "PUT /build/api/v1/deployments/{deploymentId}/data-model/files",
@@ -846,7 +847,10 @@
                 "group": "dbt Sync",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
-                  "POST /api/v1/deployments/{deploymentId}/dbt-sync"
+                  "POST /api/v1/deployments/{deploymentId}/dbt-sync",
+                  "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}",
+                  "DELETE /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}",
+                  "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/result"
                 ]
               },
               {
@@ -885,7 +889,6 @@
                   "PUT /api/v1/deployments/{deploymentId}/workbooks/{workbookId}",
                   "DELETE /api/v1/deployments/{deploymentId}/workbooks/{workbookId}",
                   "PUT /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard",
-                  "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread",
                   "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate",
                   "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/publish"
                 ]
