@@ -186,6 +186,15 @@ SET TIME ZONE 'UTC';
 Use `DEFAULT` to reset the time zone to its default. The `LOCAL` form
 (`SET TIME ZONE LOCAL`) is not supported.
 
+### Type casts
+
+Casting a value to `regtype` or `regtype[]` resolves it to the matching
+Postgres [object identifier (OID)][link-postgres-oid], e.g., `'int4'::regtype`
+or `'{int,int8}'::regtype[]`. Both `pg_type.typname` values (`int4`) and their
+canonical or SQL-standard aliases (`integer`, `int`) are understood. This
+supports BI tools that inspect column types by casting to `regtype` as part of
+their introspection queries.
+
 ## SQL functions and operators
 
 SQL API currently implements a subset of functions and operators [supported by
@@ -538,3 +547,4 @@ See the [XIRR recipe](/recipes/data-modeling/xirr) for more details.
 [link-github-new-sql-api-issue]: https://github.com/cube-js/cube/issues/new?assignees=&labels=&projects=&template=sql_api_query_issue.md&title=
 [link-xirr]: https://support.microsoft.com/en-us/office/xirr-function-de1242ec-6477-445b-b11b-a303ad9adc9d
 [ref-sql-cache-control]: /reference/core-data-apis/sql-api#cache-control
+[link-postgres-oid]: https://www.postgresql.org/docs/current/datatype-oid.html

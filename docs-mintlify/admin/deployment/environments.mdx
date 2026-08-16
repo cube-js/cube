@@ -52,6 +52,11 @@ regardless of user activity.
   <img src="https://ucarecdn.com/e0dcce34-a53a-4087-b021-25dbaf730a92/" />
 </Frame>
 
+The same toggle is available from the [CLI][ref-cli] (`cube data-model
+enable-branch`/`disable-branch`) and the [Platform API][ref-platform-api], so
+a shared branch's staging environment can also be kept always active from a
+script or CI job.
+
 ### Resources and costs
 
 Staging environments run on Shared deployments, incurring [relevant
@@ -116,3 +121,5 @@ credentials**][ref-credentials].
 [ref-credentials]: /admin/connect-to-data/visualization-tools
 [ref-version]: /admin/deployment#cube-version
 [ref-version-channel]: /admin/deployment#update-channels
+[ref-cli]: /reference/cli
+[ref-platform-api]: /api-reference/introduction
