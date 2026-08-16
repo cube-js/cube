@@ -181,22 +181,33 @@ export async function hookPreaggs(
     let timeout: NodeJS.Timeout;
     let stop: () => void;
     const interval = setInterval(async () => {
-      const selectors: {
+      let selectors: {
         token: string,
         table: string,
         status: string,
         selector: any,
-      }[] = await core
-        .apiGateway()
-        .preAggregationsJobsGET(
-          {
-            authInfo: { tenantId: 'tenant1' },
-            securityContext: { tenantId: 'tenant1' },
-            requestId: 'XXX',
-          },
-          tokens,
-        );
-  
+      }[];
+      // Without this the orchestrator and compiler errors this call can raise are
+      // unhandled rejections thrown out of an async interval callback: `stop()`
+      // never runs, the poll carries on, and the build dies 60s later on `timeout.`
+      // with the real error never printed. Mirrors the guard in `buildPreaggs`.
+      try {
+        selectors = await core
+          .apiGateway()
+          .preAggregationsJobsGET(
+            {
+              authInfo: { tenantId: 'tenant1' },
+              securityContext: { tenantId: 'tenant1' },
+              requestId: 'XXX',
+            },
+            tokens,
+          );
+      } catch (e) {
+        stop();
+        reject(`Cube pre-aggregations build failed: ${e}`);
+        return;
+      }
+
       const failed = selectors.find((info) => info.status.indexOf('failure') >= 0);
       if (failed) {
         stop();
