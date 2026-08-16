@@ -561,6 +561,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       // the row count of the fixture.
       expect(filtered.rawData().length).toEqual(all.rawData().length);
       expect(filtered.rawData().length).toBeGreaterThan(0);
+      expect(servedByRollupStore(filtered)).toBe(false);
     });
 
     execute('filtering ECommerce: contains a literal percent sign (pre-aggregated)', async () => {
