@@ -343,7 +343,7 @@ steps:
 
   - name: Release the dev-mode session
     if: always()
-    run: cube data-model exit-dev-mode "$DEPLOYMENT_ID"
+    run: cube data-model exit-dev-mode "$DEPLOYMENT_ID" || true
 ```
 
 With `--wait --json`, the sync writes one document carrying both the branch to
@@ -365,8 +365,11 @@ when the compile or query fails.
 
 The compile step has to run against the **dev-mode branch**, not the branch the
 sync created. A sync lands on a shared branch, and a shared branch has nothing
-compiling it until someone opens it in dev mode. `cube data-model dev-mode` forks
-a personal `dev-…` branch and prints the name to wait on.
+compiling it until someone opens it in dev mode — unless its [staging
+environment](/admin/deployment/environments#staging-environments) has been kept
+active with `enable-branch`, which needs a recent enough server, so this recipe
+uses dev mode. `cube data-model dev-mode` forks a personal `dev-…` branch and
+prints the name to wait on.
 
 Waiting on the wrong branch fails quickly rather than hanging: `build-status`
 reports such a branch as `building` with an error of `Branch is not active` (or
