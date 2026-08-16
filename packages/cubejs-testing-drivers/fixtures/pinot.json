@@ -250,7 +250,7 @@
     "Array [] for the same reason. Tracked in #11570.",
     "Do not extend this list to the other escaping cases. What decides whether",
     "one is meaningful here is which engine answers it, not how it asserts:",
-    "  - the two ECommerce (pre-aggregated) cases are answered by Cube Store,",
+    "  - the three ECommerce (pre-aggregated) cases are answered by Cube Store,",
     "    so Pinot LIKE never runs and this defect cannot reach them. They are",
     "    as protective on Pinot as anywhere else, and the underscore one is the",
     "    strongest case in the group: it asserts a specific non-empty row from",
@@ -258,9 +258,10 @@
     "  - Products: notContains a literal percent sign is answered by Pinot and",
     "    passes on a real non-empty result, arrived at by the complement of the",
     "    defect - NOT LIKE over a never-matching pattern returns every row.",
-    "  - Products: contains a literal percent sign is answered by Pinot and is",
-    "    the only vacuous one: it expects an empty result, which is what Pinot",
-    "    returns for everything.",
+    "  - the three remaining Products cases - contains, startsWith and endsWith",
+    "    a literal percent sign - are answered by Pinot and are vacuous: each",
+    "    expects an empty result, which is what Pinot returns for everything.",
+    "    They still discriminate on every other engine, which is why they stay.",
     "filtering Products: contains a literal underscore (no pre-aggregation)"
   ],
   "tesseractSkip": [
@@ -324,7 +325,7 @@
     "Array [] for the same reason. Tracked in #11570.",
     "Do not extend this list to the other escaping cases. What decides whether",
     "one is meaningful here is which engine answers it, not how it asserts:",
-    "  - the two ECommerce (pre-aggregated) cases are answered by Cube Store,",
+    "  - the three ECommerce (pre-aggregated) cases are answered by Cube Store,",
     "    so Pinot LIKE never runs and this defect cannot reach them. They are",
     "    as protective on Pinot as anywhere else, and the underscore one is the",
     "    strongest case in the group: it asserts a specific non-empty row from",
@@ -332,9 +333,10 @@
     "  - Products: notContains a literal percent sign is answered by Pinot and",
     "    passes on a real non-empty result, arrived at by the complement of the",
     "    defect - NOT LIKE over a never-matching pattern returns every row.",
-    "  - Products: contains a literal percent sign is answered by Pinot and is",
-    "    the only vacuous one: it expects an empty result, which is what Pinot",
-    "    returns for everything.",
+    "  - the three remaining Products cases - contains, startsWith and endsWith",
+    "    a literal percent sign - are answered by Pinot and are vacuous: each",
+    "    expects an empty result, which is what Pinot returns for everything.",
+    "    They still discriminate on every other engine, which is why they stay.",
     "filtering Products: contains a literal underscore (no pre-aggregation)"
   ]
 }
