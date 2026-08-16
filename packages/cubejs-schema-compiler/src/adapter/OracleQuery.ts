@@ -259,7 +259,11 @@ export class OracleQuery extends BaseQuery {
 
     templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     delete templates.expressions.ilike;
-    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }}){% if default_escape %} ESCAPE \'\\\'{% endif %}';
+    // Unconditional, unlike the `expressions.like` variant above: the native
+    // planner's filter path never sets `default_escape`, so gating on it left
+    // Oracle - which has no default LIKE escape character - applying the
+    // planner's escaping with nothing to interpret it.
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }}) ESCAPE \'\\\'';
 
     // Oracle has no `STRING` type (used by the default in CAST(... AS STRING),
     // e.g. the multi-column count() concatenation). CAST to VARCHAR2 requires a

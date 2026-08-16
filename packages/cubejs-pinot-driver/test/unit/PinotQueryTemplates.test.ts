@@ -1,5 +1,5 @@
 import { prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
-import { PinotQuery } from '../src/PinotQuery';
+import { PinotQuery } from '../../src/PinotQuery';
 
 const prepareCompiler = (content: string) => originalPrepareCompiler({
   localPath: () => __dirname,

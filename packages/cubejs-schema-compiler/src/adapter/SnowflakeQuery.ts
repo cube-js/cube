@@ -130,6 +130,11 @@ export class SnowflakeQuery extends BaseQuery {
     templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\\\'{% endif %}';
     templates.expressions.ilike = '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\\\'{% endif %}';
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
+    // Snowflake has no default LIKE escape character, so the escaping the
+    // planner applies to the value needs an explicit clause - the same one
+    // SnowflakeFilter.likeIgnoreCase emits on the legacy path, and doubled for
+    // the same reason described there.
+    templates.tesseract.ilike = '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }} ESCAPE \'\\\\\'';
     templates.tesseract.join_types_full = 'FULL';
     delete templates.types.interval;
     return templates;

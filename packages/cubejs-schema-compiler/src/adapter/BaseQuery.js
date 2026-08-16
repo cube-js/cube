@@ -4678,6 +4678,21 @@ export class BaseQuery {
         lt: '{{ column }} < {{ param }}',
         lte: '{{ column }} <= {{ param }}',
         like_pattern: '{% if start_wild %}\'%\' || {% endif %}{{ value }}{% if end_wild %}|| \'%\'{% endif %}',
+        // Character the native planner uses to escape `%`, `_` and itself inside
+        // a user-supplied LIKE value, mirroring what BaseFilter.escapeWildcardChars
+        // does on the legacy path. Without it the planner skips escaping entirely
+        // and a user searching for a literal `%` gets a wildcard instead, matching
+        // every row. Backslash is the default LIKE escape character in Postgres,
+        // MySQL, BigQuery, ClickHouse and Cube Store, so no ESCAPE clause is
+        // needed here - and Cube Store's parser rejects one outright, which is
+        // why this must stay a bare escape character. Dialects whose LIKE has no
+        // default escape character add the explicit clause themselves: Presto and
+        // Trino in `like_pattern`, MSSQL, Oracle and Snowflake in
+        // `tesseract.ilike` (their pattern is wrapped, so the clause cannot go
+        // inside it), and DuckDB and Pinot likewise in `tesseract.ilike` - those
+        // two live in their driver packages rather than in this directory, so a
+        // sweep of only this directory will miss them.
+        like_escape_char: '\\',
         always_true: '1 = 1'
 
       },
