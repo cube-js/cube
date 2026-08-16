@@ -178,8 +178,9 @@ export async function hookPreaggs(
     );
 
   return new Promise((resolve, reject) => {
+    let timeout: NodeJS.Timeout;
+    let stop: () => void;
     const interval = setInterval(async () => {
-      const inProcess = [];
       const selectors: {
         token: string,
         table: string,
@@ -196,22 +197,31 @@ export async function hookPreaggs(
           tokens,
         );
   
-      selectors.forEach((info) => {
-        const { status } = info;
-        if (status.indexOf('failure') >= 0) {
-          reject(`Cube pre-aggregations build failed: ${status}`);
-        }
-        if (status !== 'done' && status !== 'missing_partition') {
-          inProcess.push(info);
-        }
-        if (inProcess.length === 0) {
-          clearInterval(interval);
-          resolve(true);
-        }
-      });
+      const failed = selectors.find((info) => info.status.indexOf('failure') >= 0);
+      if (failed) {
+        stop();
+        reject(`Cube pre-aggregations build failed: ${failed.status}`);
+        return;
+      }
+      // Counted over the whole array rather than inside a loop over it.
+      // `postBuildJobs` returns one token per partition, and the tally used to be
+      // tested after each element, so a first token reporting `done` resolved the
+      // build while later partitions were still scheduled - and the suite then
+      // queried a rollup table that did not exist yet.
+      const inProcess = selectors.filter(
+        (info) => info.status !== 'done' && info.status !== 'missing_partition'
+      );
+      if (inProcess.length === 0) {
+        stop();
+        resolve(true);
+      }
     }, 1000);
 
-    setTimeout(() => {
+    stop = () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+    timeout = setTimeout(() => {
       clearInterval(interval);
       reject('Cube pre-aggregations build failed: timeout.');
     }, 60000);
