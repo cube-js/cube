@@ -485,6 +485,23 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     // These assert exact result sets rather than snapshots deliberately: the
     // wrong answer here is a *superset*, and a snapshot would have recorded that
     // superset as expected without anyone noticing.
+    //
+    // Each case also pins which engine answered. Without that the pairing is
+    // only an intention: `contains '%'` returns nothing on both paths, so if the
+    // rollup ever stopped matching, the pre-aggregated cases would keep passing
+    // as duplicates of the ones above and the rollup-store escaping path would
+    // quietly lose its only coverage here.
+    //
+    // `external` is the field that carries this - it is true only when a
+    // pre-aggregation in the rollup store served the query. (`usedPreAggregations`
+    // would be more explicit, but the gateway only emits it in dev mode, which
+    // this suite does not enable.)
+    function servedByRollupStore(response: any): boolean {
+      // `loadResponse` is not part of the public ResultSet type.
+      const [result] = response.loadResponse?.results ?? [];
+      return Boolean(result?.external);
+    }
+
     execute('filtering Products: contains a literal percent sign (no pre-aggregation)', async () => {
       const response = await client.load({
         dimensions: [
@@ -501,6 +518,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       // No product name contains a percent sign. An unescaped `%` would make the
       // pattern `%%%` and match every row.
       expect(response.rawData()).toEqual([]);
+      expect(servedByRollupStore(response)).toBe(false);
     });
 
     execute('filtering Products: contains a literal underscore (no pre-aggregation)', async () => {
@@ -521,6 +539,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(
         response.rawData().map((row: any) => row['Products.productName'])
       ).toEqual(['Logitech di_Novo Edge Keyboard']);
+      expect(servedByRollupStore(response)).toBe(false);
     });
 
     execute('filtering Products: notContains a literal percent sign (no pre-aggregation)', async () => {
@@ -561,6 +580,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         ],
       });
       expect(response.rawData()).toEqual([]);
+      expect(servedByRollupStore(response)).toBe(true);
     });
 
     execute('filtering ECommerce: contains a literal underscore (pre-aggregated)', async () => {
@@ -582,6 +602,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(
         response.rawData().map((row: any) => row['ECommerce.productName'])
       ).toEqual(['Logitech di_Novo Edge Keyboard']);
+      expect(servedByRollupStore(response)).toBe(true);
     });
 
     execute('filtering Customers: endsWith filter + dimensions, first', async () => {
