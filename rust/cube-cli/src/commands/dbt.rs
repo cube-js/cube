@@ -356,7 +356,18 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
 
             if !wait {
                 if ctx.json {
-                    output::print_json(&started);
+                    // The same reason `wait_json` carries it: a pipeline that starts a
+                    // sync here and follows it with `dbt status --wait` elsewhere has no
+                    // `--ref` left to check, so this document is its only chance to learn
+                    // the ref wasn't confirmed.
+                    let mut doc = started.clone();
+                    if let Some(obj) = doc.as_object_mut() {
+                        obj.insert(
+                            "refVerified".into(),
+                            ref_verified.map(Value::Bool).unwrap_or(Value::Null),
+                        );
+                    }
+                    output::print_json(&doc);
                 } else {
                     output::success(&format!("Started dbt sync {sync_job_id} on {branch_name}"));
                     println!(
