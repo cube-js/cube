@@ -7,7 +7,12 @@ import DriverDependencies from './DriverDependencies';
 const timezoneSchema = Joi.string().custom((value, helpers) => {
   if (!moment.tz.zone(value)) {
     return helpers.message({ custom: `{{#label}} must be a valid IANA time zone name, got "${value}"` });
+const timezoneSchema = Joi.string().custom((value, helpers) => {
+  if (!moment.tz.zone(value)) {
+    return helpers.message({ custom: '{{#label}} must be a valid IANA time zone name, got "{{#tz}}"' }, { tz: value });
   }
+  return value;
+}, 'timezone');
   return value;
 }, 'timezone');
 
