@@ -273,6 +273,37 @@ Example response:
 The same operation is available in the [CLI][ref-cli] as
 `cube data-model enable-branch` / `cube data-model disable-branch`.
 
+### `/api/v1/spec`
+
+Send a `GET` request to retrieve the OpenAPI 3.1 document for this API. The
+response describes every endpoint, parameter, request body, and schema — the
+same document that backs the [API reference](/api-reference/introduction),
+served by the build handling the request, so a deployment on an older release
+advertises the surface it actually has.
+
+This is intended for runtime discovery: code generators, API clients, and AI
+agents can read the contract instead of having it hardcoded. The
+[CLI][ref-cli]'s `cube spec` command wraps this endpoint with filtering.
+
+Example request:
+
+```bash
+curl \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  "https://YOUR_CUBE_CLOUD_HOST/api/v1/spec"
+```
+
+The response is the OpenAPI document as JSON:
+
+```json
+{
+  "openapi": "3.1.0",
+  "info": { "title": "Console Server Public API", "version": "1.0.0" },
+  "paths": { "/api/v1/deployments": { "get": { "...": "..." } } },
+  "components": { "schemas": { "...": "..." } }
+}
+```
+
 ### `/api/v1/audit-logs/export`
 
 Send a `GET` request to export [audit log][ref-audit-log] events as a CSV

@@ -159,12 +159,60 @@ Run `cube <command> --help` for the full options of any command.
 | `tenant`, `notifications`, `integrations`, `oidc`, `api-keys` | Account administration |
 | `embed` | Embed sessions, tokens, embed tenants; `enable-dashboard`/`disable-dashboard` toggle signed embedding for a dashboard |
 | `agents`, `app`, `meta`, `scim` | Agents, app config, model metadata, SCIM v2 |
+| `spec` | Show the API's OpenAPI specification — see [Discovering the API](#discovering-the-api) |
 | `api` | Raw authenticated API request (escape hatch): `cube api GET /api/v1/... -q key=value -d '{...}'` |
 | `update` | Update the CLI to the latest release |
 | `completion` | Generate shell completions |
 
 List commands print tables by default; pass `--json` anywhere for raw JSON
 output, suitable for piping to `jq`.
+
+## Discovering the API
+
+`cube spec` prints the OpenAPI specification of the API you are logged into, so
+neither you nor an AI agent has to guess an endpoint's parameters. It reads
+`/api/v1/spec` from the deployment itself, which means the contract you get is
+the one that build actually serves.
+
+With no arguments it lists every operation:
+
+```bash
+cube spec
+```
+
+```
+METHOD  PATH                                            SUMMARY
+GET     /api/v1/deployments                             Get deployments
+PUT     /api/v1/deployments/{deploymentId}/settings     Update deployment settings
+...
+```
+
+Pass a pattern to narrow it down. The match is case-insensitive and covers the
+method, path, summary, and operation id:
+
+```bash
+cube spec settings
+```
+
+Add `--json` to get OpenAPI instead of a table. Unfiltered, that is the entire
+document — pipe it into a code generator or a validator. Filtered, it is a
+smaller but still valid document containing just the matching operations plus
+every schema they reference, transitively:
+
+```bash
+cube spec "deployments/{deploymentId}/settings" --json
+```
+
+That last form is the one to reach for when you want an endpoint's full
+parameter list: the request body's schema is included rather than left as a
+`$ref` pointing into a document you would then have to fetch in full.
+
+<Tip>
+
+Point an agent at `cube spec <topic> --json` and it can construct a correct
+request without any hardcoded knowledge of the API.
+
+</Tip>
 
 ## Data model Git workflow
 
