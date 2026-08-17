@@ -40,7 +40,7 @@ export class OptsHandler {
     private createOptions: CreateOptions,
     private systemOptions?: SystemOptions,
   ) {
-    const options = this.validateOptions(cloneDeep(this.createOptions));
+    const options = this.sanitizeOptions(cloneDeep(this.createOptions));
     const driverFactory = this.getDriverFactory(options);
     options.driverFactory = driverFactory;
     options.dbType = this.getDbType(driverFactory);
@@ -60,7 +60,7 @@ export class OptsHandler {
 
   private initializedOptions: ServerCoreInitializedOptions;
 
-  private validateOptions<T extends CreateOptions>(opts: T): T {
+  private sanitizeOptions<T extends CreateOptions>(opts: T): T {
     if ((opts as any).dbType) {
       throw new Error(
         'CreateOptions.dbType was removed in v1.7.0. ' +
