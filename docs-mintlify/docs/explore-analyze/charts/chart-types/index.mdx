@@ -25,16 +25,15 @@ When your query returns a result, Cube outlines the one chart type that best fit
 **Recommended**. It is a suggestion: every other available type stays selectable, and the outline
 disappears once you pick a type yourself.
 
-On a report that has no chart yet, a recommendation Cube is confident about is applied for you, and
-the report names the rule it followed — for example, *Applied Line — a measure over time*. Anywhere
-else the recommendation is only outlined, never applied.
+Cube never applies a chart type for you. The recommendation is always only outlined, wherever the
+picker appears, and choosing a type is always your action.
 
 ### What Cube looks at
 
 The recommendation reads the shape of your query and its result: how many measures, dimensions and
-time dimensions you selected, how many distinct values each dimension has, how long the category
-labels are, and how many rows came back. Nothing is sent anywhere and nothing is saved — the
-suggestion lasts for the current session only.
+time dimensions you selected, how many distinct values each dimension has, and how long the
+category labels are. Nothing is sent anywhere and nothing is saved — the suggestion lasts for the
+current session only.
 
 Where a threshold is involved, it comes from
 [Draco](https://ieeexplore.ieee.org/document/8440847) (Moritz et al., *Formalizing Visualization
@@ -42,8 +41,12 @@ Design Knowledge as Constraints*, IEEE VIS 2018), which encodes established visu
 as rules: a category axis becomes crowded past 12 values, a color or stacking channel saturates
 past 10 series, and no axis reads past 30 values.
 
-Two numbers are Cube's own rather than Draco's, and are tuned by us: a mean label length of **16
-characters** counts as long, and a result over **5,000 rows** counts as large.
+One number is Cube's own rather than Draco's, and is tuned by us: a mean label length of **16
+characters** counts as long.
+
+The number of rows in the result is deliberately not a condition. It follows from the granularity
+you chose rather than from the shape of the query, so counting it would recommend a different chart
+for the same measure over the same time dimension simply because you switched from years to days.
 
 ### The conditions
 
@@ -59,7 +62,7 @@ Cube checks these in order and takes the first that matches.
 | **Heatmap** | One measure split by two larger categories that fill enough of the grid to be worth drawing |
 | **Bar** | One measure across a few categories with short labels |
 | **Horizontal bar** | The same, where the labels are long or the categories too many for a vertical axis |
-| **Table** | The query has no measure, two time dimensions, three or more dimensions, a category past 30 values, or a result over 5,000 rows |
+| **Table** | The query has no measure, two time dimensions, three or more dimensions, or a category past 30 values |
 
 Pie is not recommended. Its shape — one measure across a few categories — is the same one Bar
 answers, and a bar chart compares those values more accurately, so Cube recommends Bar and leaves
@@ -77,12 +80,7 @@ Cube suppresses the recommendation rather than guessing. You will see no outline
 - no rule matches the query cleanly;
 - a value it needs is still unknown, such as the number of distinct values in a dimension;
 - the result was truncated by a row limit, so the counts it would read are incomplete;
-- the best fit is the chart type you already applied;
 - you have already picked a type by hand in the picker you are looking at.
 
-Automatic application on an empty report clears a higher bar than the outline does. It happens only
-for Map, KPI, Line, Scatter and vertical Bar, only when no threshold sits within 20% of the observed
-value — so a row either way would not change the answer — and never on a truncated result. Stacked
-bar, heatmap and horizontal bar are offered but never applied for you: stacking asserts that the
-parts compose the whole, which Cube cannot verify from a filtered result, and the others turn on a
-judgment of Cube's own.
+The chart type you have applied is not one of these cases: when the best fit is the type already on
+screen, Cube still marks it, confirming the choice rather than leaving the picker silent.
