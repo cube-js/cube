@@ -517,7 +517,8 @@ these values can result in application instability and/or downtime.
 </Warning>
 
 You can pass this object to set advanced options for the query orchestrator. It can also
-be set to a function of the request context (`Callable[[RequestContext], Dict]`) to vary
+be set to a function of the request context (`Callable[[RequestContext], Dict]` in Python,
+`(context) => object` in JavaScript) to vary
 the options per tenant — with the caveat that only the object form is validated. Bounds
 documented below, such as the maximum for `continueWaitTimeout`, are not enforced on the
 dict a function returns, and nothing clamps the values downstream.
