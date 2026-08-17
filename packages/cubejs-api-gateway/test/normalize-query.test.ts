@@ -1,5 +1,10 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { normalizeQuery } from '../src/query';
+import {
+  normalizeQuery,
+  normalizeQueryPreAggregations,
+  normalizeQueryPreAggregationPreview,
+  normalizeTimezone,
+} from '../src/query';
 
 const baseQuery = {
   measures: ['Foo.count'],
@@ -42,7 +47,61 @@ describe('timezone validation', () => {
   test.each([
     'Not/AZone',
     '+05:00',
-  ])('rejects invalid/injection timezone %j', (tz) => {
+    'foo/bar',
+  ])('rejects invalid timezone %j', (tz) => {
     expect(() => normalizeQuery({ ...baseQuery, timezone: tz }, false)).toThrow(/Invalid query format/);
+  });
+});
+
+describe('normalizeQueryPreAggregations timezone handling', () => {
+  test('normalizes timezone to canonical IANA name', () => {
+    const result = normalizeQueryPreAggregations({ timezone: 'america/new_york' }, undefined);
+    expect(result.timezones).toEqual(['America/New_York']);
+  });
+
+  test('normalizes timezones array to canonical IANA names', () => {
+    const result = normalizeQueryPreAggregations({ timezones: ['utc', 'europe/berlin'] }, undefined);
+    expect(result.timezones).toEqual(['UTC', 'Europe/Berlin']);
+  });
+
+  test('rejects invalid timezone', () => {
+    expect(() => normalizeQueryPreAggregations({ timezones: ['Not/AZone'] }, undefined)).toThrow(/Invalid query format/);
+  });
+});
+
+describe('normalizeQueryPreAggregationPreview timezone handling', () => {
+  const previewQuery = {
+    preAggregationId: 'cube.preAgg',
+    versionEntry: { content_version: 'a', structure_version: 'b' },
+  };
+
+  test('normalizes timezone to canonical IANA name', () => {
+    const result = normalizeQueryPreAggregationPreview({ ...previewQuery, timezone: 'america/new_york' });
+    expect(result.timezone).toBe('America/New_York');
+  });
+
+  test('rejects invalid timezone', () => {
+    expect(() => normalizeQueryPreAggregationPreview({ ...previewQuery, timezone: 'Not/AZone' })).toThrow(/Invalid query format/);
+  });
+});
+
+describe('normalizeTimezone helper', () => {
+  test.each([
+    ['america/new_york', 'America/New_York'],
+    ['UTC', 'UTC'],
+    ['uTc', 'UTC'],
+  ])('normalizes %j -> %j', (tz, expected) => {
+    expect(normalizeTimezone(tz)).toBe(expected);
+  });
+
+  test.each([undefined, null, ''])('passes through empty value %j', (tz) => {
+    expect(normalizeTimezone(tz as any)).toBe(tz);
+  });
+
+  test.each([
+    'Not/AZone',
+    'foo/bar',
+  ])('throws on invalid timezone %j', (tz) => {
+    expect(() => normalizeTimezone(tz)).toThrow(/valid IANA time zone/);
   });
 });

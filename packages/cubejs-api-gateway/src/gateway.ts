@@ -92,6 +92,7 @@ import {
   normalizeQueryCancelPreAggregations,
   normalizeQueryPreAggregationPreview,
   normalizeQueryPreAggregations,
+  normalizeTimezone,
   parseInputMemberExpression,
   preAggsJobsRequestSchema,
   remapToQueryAdapterFormat,
@@ -480,7 +481,9 @@ class ApiGateway {
         try {
           await this.assertApiScope('data', req.context?.securityContext);
 
-          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext, req.body.cache, req.body.timezone, req.body.throwContinueWait, req.context?.requestId);
+          const timezone = normalizeTimezone(req.body.timezone);
+
+          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext, req.body.cache, timezone, req.body.throwContinueWait, req.context?.requestId);
         } catch (e: any) {
           // Quickfix for https://github.com/cube-js/cube/issues/10450,
           // Right now, it's too complicated to fix the issue correctly, because
@@ -985,7 +988,7 @@ class ApiGateway {
         throw new UserError('No job description provided');
       }
 
-      const { error } = preAggsJobsRequestSchema.validate(query);
+      const { error, value } = preAggsJobsRequestSchema.validate(query);
       if (error) {
         throw new UserError(`Invalid Job query format: ${error.message || error.toString()}`);
       }
@@ -994,7 +997,8 @@ class ApiGateway {
         case 'post':
           result = await this.preAggregationsJobsPOST(
             context,
-            <PreAggsSelector>query.selector
+            // Use the selector normalized by the schema (canonical IANA timezones).
+            <PreAggsSelector>value.selector
           );
           if (result.length === 0) {
             throw new UserError(

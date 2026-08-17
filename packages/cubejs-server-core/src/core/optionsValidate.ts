@@ -1,5 +1,15 @@
 import Joi from 'joi';
+import moment from 'moment-timezone';
 import DriverDependencies from './DriverDependencies';
+
+// Reject anything that is not a known IANA timezone name (matched case-insensitively),
+// so a misconfigured zone fails fast at startup instead of deep in the refresh scheduler.
+const timezoneSchema = Joi.string().custom((value, helpers) => {
+  if (!moment.tz.zone(value)) {
+    return helpers.message({ custom: `{{#label}} must be a valid IANA time zone name, got "${value}"` });
+  }
+  return value;
+}, 'timezone');
 
 const schemaQueueOptions = Joi.object().strict(true).keys({
   concurrency: Joi.number().min(1).integer(),
@@ -96,7 +106,7 @@ const schemaOptions = Joi.object().keys({
     Joi.number().min(0).integer()
   ),
   scheduledRefreshTimeZones: Joi.alternatives().try(
-    Joi.array().items(Joi.string()),
+    Joi.array().items(timezoneSchema),
     Joi.func()
   ),
   scheduledRefreshContexts: Joi.func(),

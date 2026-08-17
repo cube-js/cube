@@ -56,15 +56,42 @@ const evaluatedPatchMeasureExpression = parsedPatchMeasureExpression.keys({
 });
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
-const timezoneSchema = Joi.string().custom((value, helpers) => {
+const canonicalTimezone = (value) => {
   const zone = moment.tz.zone(value);
-  if (!zone) {
-    return helpers.error('any.invalid');
+  if (zone) {
+    // Normalize to the canonical IANA name.
+    return zone.name;
   }
 
-  // Normalize to the canonical IANA name (case-insensitively).
-  return zone.name;
+  return null;
+};
+
+const timezoneSchema = Joi.string().custom((value, helpers) => {
+  const name = canonicalTimezone(value);
+  if (!name) {
+    return helpers.message(`{{#label}} must be a valid IANA time zone, got "${value}"`);
+  }
+
+  // Normalize to the canonical IANA name.
+  return name;
 }, 'timezone');
+
+/**
+ * @param {string|undefined} value
+ * @returns {string|undefined}
+ */
+export const normalizeTimezone = (value) => {
+  if (!value) {
+    return value;
+  }
+
+  const name = canonicalTimezone(value);
+  if (!name) {
+    throw new UserError(`timezone must be a valid IANA time zone, got "${value}"`);
+  }
+
+  return name;
+};
 
 // It might be member name, td+granularity or member expression
 const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
@@ -426,7 +453,7 @@ function normalizeQueryCacheMode(query, cacheMode) {
 const normalizeQuery = (query, persistent, cacheMode) => {
   query = normalizeQueryCacheMode(query, cacheMode);
   query.timezone = query.timezone || getEnv('defaultTimezone');
-  const { error } = querySchema.validate(query);
+  const { error, value } = querySchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
@@ -444,10 +471,9 @@ const normalizeQuery = (query, persistent, cacheMode) => {
     dimension: d.split('.').slice(0, 2).join('.'),
     granularity: d.split('.')[2]
   }));
-  // query.timezone is already validated as a known zone above; normalize it to the
-  // canonical IANA name (moment matches zones case-insensitively).
-  const rawTimezone = query.timezone || 'UTC';
-  const timezone = moment.tz.zone(rawTimezone)?.name || rawTimezone;
+  // Use the timezone normalized by the schema (canonical IANA name); the raw request
+  // may carry a different casing.
+  const timezone = value.timezone || 'UTC';
 
   const def = getEnv('dbQueryDefaultLimit') <= getEnv('dbQueryLimit')
     ? getEnv('dbQueryDefaultLimit')
@@ -522,14 +548,15 @@ const queryPreAggregationsSchema = Joi.object().keys({
 });
 
 const normalizeQueryPreAggregations = (query, defaultValues) => {
-  const { error } = queryPreAggregationsSchema.validate(query);
+  const { error, value } = queryPreAggregationsSchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
 
+  // Use timezones normalized by the schema (canonical IANA names).
   return {
     metadata: query.metadata,
-    timezones: query.timezones || (query.timezone && [query.timezone]) || defaultValues?.timezones || ['UTC'],
+    timezones: value.timezones || (value.timezone && [value.timezone]) || defaultValues?.timezones || ['UTC'],
     preAggregations: query.preAggregations,
     expand: query.expand
   };
@@ -549,12 +576,13 @@ const queryPreAggregationPreviewSchema = Joi.object().keys({
 });
 
 const normalizeQueryPreAggregationPreview = (query) => {
-  const { error } = queryPreAggregationPreviewSchema.validate(query);
+  const { error, value } = queryPreAggregationPreviewSchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
 
-  return query;
+  // Use the timezone normalized by the schema (canonical IANA name).
+  return { ...query, timezone: value.timezone };
 };
 
 const queryCancelPreAggregationPreviewSchema = Joi.object().keys({

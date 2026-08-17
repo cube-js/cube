@@ -299,7 +299,7 @@ export class BaseQuery {
     this.timezone = this.options.timezone;
 
     if (this.timezone && !moment.tz.zone(this.timezone)) {
-      throw new UserError(`Incorrect timezone: ${this.timezone}`);
+      throw new UserError(`Incorrect timezone ${this.timezone}`);
     }
 
     this.rowLimit = this.options.rowLimit;

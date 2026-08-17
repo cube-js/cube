@@ -124,55 +124,47 @@ describe('SQL Generation', () => {
       expect(queryAndParams[0]).toContain('ORDER BY  2');
     });
 
-    it('validate timezone', async () => {
+    const buildTimezoneQuery = (timezone: string) => new PostgresQuery(compilers, {
+      measures: ['cards.count'],
+      timeDimensions: [
+        {
+          dimension: 'cards.createdAt',
+          granularity: 'day',
+          dateRange: ['2021-01-01', '2021-01-02']
+        }
+      ],
+      timezone,
+      filters: [],
+    });
+
+    it.each([
+      'Not/AZone',
+      '+05:00',
+      '+05',
+      '05',
+      'foo/bar',
+    ])('rejects invalid timezone %j', async (timezone) => {
       await compilers.compiler.compile();
+      expect(() => buildTimezoneQuery(timezone)).toThrow(UserError);
+    });
 
-      const maliciousTimezones = [
-        'Not/AZone',
-        '+05:00',
-        '+05',
-        '05'
-      ];
+    // Valid IANA zones are accepted regardless of case (normalization to the
+    // canonical name happens at the API gateway input layer, not in BaseQuery).
+    it.each([
+      'America/New_York',
+      'america/new_york',
+      'AMERICA/NEW_YORK',
+      'utc',
+      'uTc',
+    ])('accepts valid timezone regardless of case: %s', async (timezone) => {
+      await compilers.compiler.compile();
+      expect(() => buildTimezoneQuery(timezone)).not.toThrow();
+    });
 
-      for (const timezone of maliciousTimezones) {
-        expect(() => new PostgresQuery(compilers, {
-          measures: ['cards.count'],
-          timeDimensions: [
-            {
-              dimension: 'cards.createdAt',
-              granularity: 'day',
-              dateRange: ['2021-01-01', '2021-01-02']
-            }
-          ],
-          timezone,
-          filters: [],
-        })).toThrow(UserError);
-      }
-
-      // Valid IANA zones are accepted regardless of case (normalization to the
-      // canonical name happens at the API gateway input layer).
-      const validTimezones = [
-        'America/New_York',
-        'america/new_york',
-        'AMERICA/NEW_YORK',
-        'utc',
-        'uTc',
-      ];
-
-      for (const timezone of validTimezones) {
-        expect(() => new PostgresQuery(compilers, {
-          measures: ['cards.count'],
-          timeDimensions: [
-            {
-              dimension: 'cards.createdAt',
-              granularity: 'day',
-              dateRange: ['2021-01-01', '2021-01-02']
-            }
-          ],
-          timezone,
-          filters: [],
-        })).not.toThrow();
-      }
+    it('renders a canonical timezone into SQL', async () => {
+      await compilers.compiler.compile();
+      const [sql] = buildTimezoneQuery('America/New_York').buildSqlAndParams();
+      expect(sql).toContain("AT TIME ZONE 'America/New_York'");
     });
 
     it('Simple query - complex measure', async () => {
