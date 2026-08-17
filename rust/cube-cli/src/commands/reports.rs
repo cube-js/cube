@@ -26,10 +26,10 @@ enum Cmd {
         /// External workbook
         #[arg(long)]
         external_workbook: Option<String>,
-        /// Maximum number of items to return
+        /// Deprecated: maximum number of items to return (use --first)
         #[arg(long)]
         limit: Option<u64>,
-        /// Page number
+        /// Deprecated: page number (use --after)
         #[arg(long)]
         page: Option<u64>,
         /// Sort by: name, createdAt, updatedAt, lastViewedAt

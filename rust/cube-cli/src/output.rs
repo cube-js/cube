@@ -1,3 +1,4 @@
+use anyhow::{bail, Result};
 use owo_colors::OwoColorize;
 use serde_json::Value;
 
@@ -9,13 +10,20 @@ pub fn print_json(value: &Value) {
     );
 }
 
+/// The rows a wrapped list response carries, under the canonical `items` or
+/// the deprecated `data` alias. `None` for anything that isn't one of those
+/// envelopes — including an envelope carrying neither array.
+pub fn list_field(value: &Value) -> Option<Vec<Value>> {
+    ["items", "data"]
+        .iter()
+        .find_map(|key| value.get(key).and_then(Value::as_array).cloned())
+}
+
 /// Extract the list payload from a response. The public API wraps lists as
 /// `{items: [...]}` and/or `{data: [...]}`; older endpoints return bare arrays.
 pub fn items(value: &Value) -> Vec<Value> {
-    for key in ["items", "data"] {
-        if let Some(arr) = value.get(key).and_then(Value::as_array) {
-            return arr.clone();
-        }
+    if let Some(rows) = list_field(value) {
+        return rows;
     }
     match value {
         Value::Array(arr) => arr.clone(),
@@ -80,33 +88,56 @@ pub fn table(headers: &[&str], rows: Vec<Vec<String>>) {
 /// Print a list response: raw JSON in `--json` mode, otherwise a table with
 /// the given columns (header, field path).
 pub fn print_list(json: bool, response: &Value, columns: &[(&str, &str)]) {
-    print_list_from(json, response, None, columns);
+    // The canonical field always resolves, so this cannot fail.
+    let _ = print_list_from(json, response, None, columns);
 }
 
-/// Like [`print_list`], but reads the rows from `key` when the response
-/// carries it. Needed where `items` and the deprecated `data` are two
-/// *different* pages of the same list: on the endpoints that still accept
-/// `offset`/`limit`, only `data` honors it while `items` is the cursor page.
-pub fn print_list_from(json: bool, response: &Value, key: Option<&str>, columns: &[(&str, &str)]) {
+/// Like [`print_list`], but reads the rows from `key` when the caller asked
+/// for a specific envelope field. Needed where `items` and the deprecated
+/// `data` are two *different* pages of the same list: on the endpoints that
+/// still accept `offset`/`limit`, only `data` honors it while `items` is the
+/// cursor page.
+///
+/// `--json` is raw passthrough, as everywhere else in the CLI: it emits the
+/// whole response, both envelope fields included, and leaves the choice to
+/// whatever consumes it.
+pub fn print_list_from(
+    json: bool,
+    response: &Value,
+    key: Option<&str>,
+    columns: &[(&str, &str)],
+) -> Result<()> {
     if json {
         print_json(response);
-        return;
+        return Ok(());
     }
     let headers: Vec<&str> = columns.iter().map(|(h, _)| *h).collect();
-    let rows = rows_from(response, key)
+    let rows = rows_from(response, key)?
         .iter()
         .map(|item| columns.iter().map(|(_, f)| field(item, f)).collect())
         .collect();
     table(&headers, rows);
+    Ok(())
 }
 
-/// The rows a list response should be rendered from: `key` when it names an
-/// array the response carries, otherwise the usual `items`/`data` resolution.
-fn rows_from(response: &Value, key: Option<&str>) -> Vec<Value> {
-    key.and_then(|k| response.get(k))
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_else(|| items(response))
+/// The rows a list response should be rendered from: `key` when the caller
+/// asked for one, otherwise the usual `items`/`data` resolution.
+///
+/// A requested `key` is strict. Falling back to `items` when it is missing
+/// would silently reintroduce the bug this exists to fix — the day an
+/// endpoint drops its deprecated `data`, `--limit 5` would quietly print the
+/// whole cursor page instead. Fail with the replacement flags instead.
+fn rows_from(response: &Value, key: Option<&str>) -> Result<Vec<Value>> {
+    let Some(key) = key else {
+        return Ok(items(response));
+    };
+    match response.get(key).and_then(Value::as_array) {
+        Some(rows) => Ok(rows.clone()),
+        None => bail!(
+            "this endpoint no longer returns `{key}`, so --offset/--limit cannot be \
+             honored — use --first/--after instead"
+        ),
+    }
 }
 
 pub fn success(message: &str) {
@@ -141,12 +172,39 @@ mod tests {
     fn a_requested_key_overrides_the_canonical_field() {
         // `--offset/--limit` slice only `data`; `items` is the whole cursor page.
         let res = json!({ "items": [{"id": 1}, {"id": 2}], "data": [{"id": 2}] });
-        assert_eq!(rows_from(&res, Some("data")), vec![json!({"id": 2})]);
         assert_eq!(
-            rows_from(&res, None),
+            rows_from(&res, Some("data")).unwrap(),
+            vec![json!({"id": 2})]
+        );
+        assert_eq!(
+            rows_from(&res, None).unwrap(),
             vec![json!({"id": 1}), json!({"id": 2})]
         );
-        // A field the response doesn't carry falls back to the usual resolution.
-        assert_eq!(rows_from(&res, Some("nope")).len(), 2);
+    }
+
+    #[test]
+    fn a_requested_key_the_response_dropped_is_an_error_not_a_fallback() {
+        // The day an endpoint removes its deprecated `data`, --offset/--limit
+        // must fail loudly rather than print the whole `items` page.
+        let migrated = json!({ "items": [{"id": 1}, {"id": 2}], "pageInfo": {} });
+        let err = rows_from(&migrated, Some("data")).unwrap_err().to_string();
+        assert!(err.contains("--first/--after"), "got: {err}");
+        // Still fine for the caller that didn't ask for a specific field.
+        assert_eq!(rows_from(&migrated, None).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn list_field_ignores_envelopes_carrying_neither_array() {
+        assert_eq!(
+            list_field(&json!({ "items": [{"id": 1}] })),
+            Some(vec![json!({"id": 1})])
+        );
+        assert_eq!(
+            list_field(&json!({ "data": [{"id": 2}] })),
+            Some(vec![json!({"id": 2})])
+        );
+        // Unlike `items`, no catch-all: an envelope with neither is not a list.
+        assert_eq!(list_field(&json!({ "pageInfo": {} })), None);
+        assert_eq!(list_field(&json!([{"id": 3}])), None);
     }
 }

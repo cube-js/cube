@@ -225,9 +225,13 @@ fn same_path(a: &str, b: &str) -> bool {
 /// Flatten the whole tree the files endpoint returned. The CLI never asks for
 /// a page, so `items` (the canonical field, cursor-sliced over the *top-level*
 /// nodes only) carries every root, same as the deprecated `data`.
+///
+/// `list_field` rather than `items` because only a real array of roots is a
+/// tree: `items` would hand back an envelope carrying neither array as a lone
+/// node, rendering one blank row where "No results" is the honest answer.
 fn tree_nodes(res: &serde_json::Value) -> Vec<serde_json::Value> {
     let mut out = Vec::new();
-    flatten(&output::items(res), &mut out);
+    flatten(&output::list_field(res).unwrap_or_default(), &mut out);
     out
 }
 

@@ -17,10 +17,10 @@ enum Cmd {
         /// Filter by creation step (repeatable): project, upload, schema, github, ssh, databases, ready, demo
         #[arg(long = "creation-step")]
         creation_step: Vec<String>,
-        /// Pagination offset
+        /// Deprecated: pagination offset (use --after)
         #[arg(long)]
         offset: Option<u64>,
-        /// Maximum number of items to return
+        /// Deprecated: maximum number of items to return (use --first)
         #[arg(long)]
         limit: Option<u64>,
         /// Page size for cursor-based pagination

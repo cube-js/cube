@@ -43,19 +43,34 @@ pub fn push<T: ToString>(query: &mut Query, key: &str, value: &Option<T>) {
     }
 }
 
-/// Resolve which paging style a list command was invoked with, returning
-/// `true` for the deprecated `offset`/`limit` one.
+/// Which response field a list command should render, given the paging flags
+/// it was invoked with (in `--offset --limit --first --after` order).
+/// `Some("data")` selects the deprecated offset-sliced page; `None` means the
+/// canonical `items`.
 ///
-/// The API deprecated `offset`/`limit` in favor of the `first`/`after`
-/// cursor and the two address different pages of the same response, so an
-/// endpoint given both either rejects the request (deployments) or silently
-/// honors just one (environments, user attributes). Reject it here instead,
-/// so the CLI never prints a page the caller did not ask for.
-pub fn offset_paging(uses_offset: bool, uses_cursor: bool) -> Result<bool> {
+/// The API deprecated `offset`/`limit` in favor of the `first`/`after` cursor
+/// and the two address different pages of the same response, so an endpoint
+/// given both either rejects the request (deployments) or silently honors
+/// just one (environments, user attributes). Reject it here instead, so the
+/// CLI never prints a page the caller did not ask for.
+///
+/// Selecting `data` is right for every endpoint that still takes
+/// `offset`/`limit`, whether or not its `items` is also sliced: where the
+/// paging happens in the database (environment tokens, user attributes) the
+/// two fields hold the same rows, and where the list is assembled in memory
+/// (deployment environments) only `data` is sliced at all.
+pub fn paging_field(
+    offset: Option<u64>,
+    limit: Option<u64>,
+    first: Option<u64>,
+    after: Option<&str>,
+) -> Result<Option<&'static str>> {
+    let uses_offset = offset.is_some() || limit.is_some();
+    let uses_cursor = first.is_some() || after.is_some();
     if uses_offset && uses_cursor {
         bail!("--offset/--limit are deprecated and cannot be combined with --first/--after");
     }
-    Ok(uses_offset)
+    Ok(uses_offset.then_some("data"))
 }
 
 /// Normalize a user-supplied Cube Cloud URL: trim whitespace and trailing
@@ -139,10 +154,21 @@ mod tests {
     }
 
     #[test]
-    fn offset_paging_rejects_mixing_the_two_styles() {
-        assert!(!offset_paging(false, false).unwrap());
-        assert!(offset_paging(true, false).unwrap());
-        assert!(!offset_paging(false, true).unwrap());
-        assert!(offset_paging(true, true).is_err());
+    fn paging_field_selects_data_only_for_the_deprecated_style() {
+        let none = paging_field(None, None, None, None).unwrap();
+        assert_eq!(none, None, "no flags renders the canonical items");
+
+        for (offset, limit) in [(Some(10), None), (None, Some(5)), (Some(10), Some(5))] {
+            let field = paging_field(offset, limit, None, None).unwrap();
+            assert_eq!(field, Some("data"), "offset paging renders data");
+        }
+
+        for (first, after) in [(Some(5), None), (None, Some("cursor"))] {
+            let field = paging_field(None, None, first, after).unwrap();
+            assert_eq!(field, None, "cursor paging renders the canonical items");
+        }
+
+        assert!(paging_field(Some(10), None, Some(5), None).is_err());
+        assert!(paging_field(None, Some(5), None, Some("cursor")).is_err());
     }
 }

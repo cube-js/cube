@@ -83,10 +83,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             first,
             after,
         } => {
-            let legacy = util::offset_paging(
-                offset.is_some() || limit.is_some(),
-                first.is_some() || after.is_some(),
-            )?;
+            let page_field = util::paging_field(offset, limit, first, after.as_deref())?;
             let mut query = Vec::new();
             util::push(&mut query, "type", &env_type);
             util::push(&mut query, "offset", &offset);
@@ -105,14 +102,14 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             output::print_list_from(
                 ctx.json,
                 &res,
-                legacy.then_some("data"),
+                page_field,
                 &[
                     ("ID", "id"),
                     ("TYPE", "type"),
                     ("BRANCH", "branch"),
                     ("USER", "user"),
                 ],
-            );
+            )?;
         }
         Cmd::Tokens {
             deployment,
@@ -122,10 +119,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             first,
             after,
         } => {
-            util::offset_paging(
-                offset.is_some() || limit.is_some(),
-                first.is_some() || after.is_some(),
-            )?;
+            let page_field = util::paging_field(offset, limit, first, after.as_deref())?;
             let mut query = Vec::new();
             util::push(&mut query, "offset", &offset);
             util::push(&mut query, "limit", &limit);
@@ -137,15 +131,19 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     &query,
                 )
                 .await?;
-            output::print_list(
+            // Tokens page in the database, so `items` and `data` hold the same
+            // rows either way — read the same field as every other list so the
+            // deprecated one can't quietly stop being honored.
+            output::print_list_from(
                 ctx.json,
                 &res,
+                page_field,
                 &[
                     ("TOKEN", "token"),
                     ("CREATED", "created_at"),
                     ("EXPIRES", "expires_at"),
                 ],
-            );
+            )?;
         }
         Cmd::CreateToken {
             deployment,

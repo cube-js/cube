@@ -108,10 +108,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             name,
             attr_type,
         } => {
-            util::offset_paging(
-                offset.is_some() || limit.is_some(),
-                first.is_some() || after.is_some(),
-            )?;
+            let page_field = util::paging_field(offset, limit, first, after.as_deref())?;
             let mut query = Vec::new();
             util::push(&mut query, "offset", &offset);
             util::push(&mut query, "limit", &limit);
@@ -120,9 +117,13 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             util::push(&mut query, "name", &name);
             util::push(&mut query, "type", &attr_type);
             let res = api.get("/api/v1/user-attributes/", &query).await?;
-            output::print_list(
+            // Attributes page in the database, so `items` and `data` hold the
+            // same rows either way — read the same field as every other list so
+            // the deprecated one can't quietly stop being honored.
+            output::print_list_from(
                 ctx.json,
                 &res,
+                page_field,
                 &[
                     ("ID", "id"),
                     ("NAME", "name"),
@@ -130,7 +131,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     ("DISPLAY NAME", "displayName"),
                     ("DEFAULT", "defaultValue"),
                 ],
-            );
+            )?;
         }
         Cmd::Create {
             name,
