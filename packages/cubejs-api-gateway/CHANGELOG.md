@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.21](https://github.com/cube-js/cube/compare/v1.7.20...v1.7.21) (2026-08-17)
+
+### Features
+
+- **cube-cli:** add `cube spec`, and regenerate the Platform API reference ([#11571](https://github.com/cube-js/cube/issues/11571)) ([71b48e4](https://github.com/cube-js/cube/commit/71b48e4f6ca9cf7a1f79ba63f15f3fc829de16c3))
+
 ## [1.7.20](https://github.com/cube-js/cube/compare/v1.7.19...v1.7.20) (2026-08-16)
 
 ### Bug Fixes
