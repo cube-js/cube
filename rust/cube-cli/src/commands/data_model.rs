@@ -472,9 +472,14 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     println!("{}", dev_branch_hint(&dev_branch));
                 } else if dev_mode {
                     // Say what happened: this re-points per-credential state, and
-                    // silence here reads exactly like a plain `create-branch`.
+                    // silence here reads exactly like a plain `create-branch`. Worded
+                    // as the request, not the outcome, because this arm fires on the
+                    // flag we sent — the response's `active` is false here whether or
+                    // not `--dev-mode` was passed, so it can't confirm the session
+                    // moved, and asserting it would invent the state the message
+                    // exists to stop hiding.
                     output::success(&format!(
-                        "Created branch {name}; your dev-mode session now points at it"
+                        "Created branch {name} and asked to enter dev mode on it"
                     ));
                     println!(
                         "File writes still need a dev-… branch: run \
