@@ -30,7 +30,7 @@ import {
 } from './types';
 import { lookupDriverClass, isDriver } from './DriverResolvers';
 import type { CubejsServerCore } from './server';
-import optionsValidate from './optionsValidate';
+import { validateOptions } from './optionsValidate';
 
 const { version } = require('../../../package.json');
 
@@ -46,8 +46,7 @@ export class OptsHandler {
     private createOptions: CreateOptions,
     private systemOptions?: SystemOptions,
   ) {
-    this.assertOptions(createOptions);
-    const options = cloneDeep(this.createOptions);
+    const options = this.assertOptions(cloneDeep(this.createOptions));
     const driverFactory = this.getDriverFactory(options);
     options.driverFactory = driverFactory;
     options.dbType = this.getDbType(driverFactory);
@@ -77,9 +76,10 @@ export class OptsHandler {
   private initializedOptions: ServerCoreInitializedOptions;
 
   /**
-   * Assert create options.
+   * Assert create options and return the sanitized copy: joi coercions (canonical time zone
+   * names) only land for callers that use the returned value.
    */
-  private assertOptions(opts: CreateOptions) {
+  private assertOptions<T extends CreateOptions>(opts: T): T {
     if ((opts as any).dbType) {
       throw new Error(
         'CreateOptions.dbType was removed in v1.7.0. ' +
@@ -89,7 +89,7 @@ export class OptsHandler {
       );
     }
 
-    optionsValidate(opts);
+    const validated = validateOptions(opts);
 
     // Probed for its throw: the only consumer is per-request code (normalizeQuery), so an
     // operator typo would otherwise surface as a client error on every query instead of
@@ -106,6 +106,8 @@ export class OptsHandler {
         'Either CUBEJS_DB_TYPE or CreateOptions.driverFactory must be specified'
       );
     }
+
+    return validated;
   }
 
   /**

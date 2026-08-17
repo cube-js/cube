@@ -1,25 +1,47 @@
-import optionsValidate from '../../src/core/optionsValidate';
+import { validateOptions } from '../../src/core/optionsValidate';
 
-describe('optionsValidate scheduledRefreshTimeZones', () => {
+describe('validateOptions scheduledRefreshTimeZones', () => {
   test('accepts valid IANA timezones', () => {
-    expect(() => optionsValidate({ scheduledRefreshTimeZones: ['UTC', 'America/New_York'] })).not.toThrow();
+    expect(() => validateOptions({ scheduledRefreshTimeZones: ['UTC', 'America/New_York'] })).not.toThrow();
   });
 
   test('accepts a function', () => {
-    expect(() => optionsValidate({ scheduledRefreshTimeZones: async () => ['UTC'] })).not.toThrow();
+    expect(() => validateOptions({ scheduledRefreshTimeZones: async () => ['UTC'] })).not.toThrow();
   });
 
   test('accepts timezones case-insensitively', () => {
-    expect(() => optionsValidate({ scheduledRefreshTimeZones: ['utc', 'america/new_york'] })).not.toThrow();
+    expect(() => validateOptions({ scheduledRefreshTimeZones: ['utc', 'america/new_york'] })).not.toThrow();
+  });
+
+  test('returns canonical timezone names', () => {
+    expect(validateOptions({ scheduledRefreshTimeZones: ['utc', 'america/new_york'] }))
+      .toEqual({ scheduledRefreshTimeZones: ['UTC', 'America/New_York'] });
   });
 
   test('rejects an invalid timezone with a descriptive message', () => {
-    expect(() => optionsValidate({ scheduledRefreshTimeZones: ['Not/AZone'] }))
+    expect(() => validateOptions({ scheduledRefreshTimeZones: ['Not/AZone'] }))
       .toThrow(/valid IANA time zone name/);
   });
 
   test('names the offending value in the error message', () => {
-    expect(() => optionsValidate({ scheduledRefreshTimeZones: ['UTC', 'Europ/Berlin'] }))
+    expect(() => validateOptions({ scheduledRefreshTimeZones: ['UTC', 'Europ/Berlin'] }))
       .toThrow(/Europ\/Berlin/);
+  });
+});
+
+describe('validateOptions sanitized result', () => {
+  test('preserves function options by reference', () => {
+    const driverFactory = () => ({ type: 'postgres' });
+    const validated = validateOptions({ driverFactory });
+
+    expect(validated.driverFactory).toBe(driverFactory);
+  });
+
+  test('does not mutate the input', () => {
+    const options = { scheduledRefreshTimeZones: ['utc'] };
+    const validated = validateOptions(options);
+
+    expect(options.scheduledRefreshTimeZones).toEqual(['utc']);
+    expect(validated).not.toBe(options);
   });
 });

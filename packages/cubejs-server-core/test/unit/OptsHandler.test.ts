@@ -1235,4 +1235,20 @@ describe('OptsHandler timezone env validation', () => {
     expect(() => new CubejsServerCoreExposed(conf))
       .toThrow(/CUBEJS_SCHEDULED_REFRESH_TIMEZONES/);
   });
+
+  test('must throw at construction if CreateOptions.scheduledRefreshTimeZones has an invalid entry', () => {
+    expect(() => new CubejsServerCoreExposed({
+      ...conf,
+      scheduledRefreshTimeZones: ['UTC', 'Nope/Zone'],
+    })).toThrow(/valid IANA time zone name/);
+  });
+
+  test('must canonicalize CreateOptions.scheduledRefreshTimeZones', () => {
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      scheduledRefreshTimeZones: ['utc', 'america/new_york'],
+    });
+
+    expect(core.options.scheduledRefreshTimeZones).toEqual(['UTC', 'America/New_York']);
+  });
 });

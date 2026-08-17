@@ -160,9 +160,11 @@ const schemaOptions = Joi.object().keys({
   fastReload: Joi.boolean(),
 });
 
-export default (options: any) => {
-  const { error } = schemaOptions.validate(options, { abortEarly: false });
+export function validateOptions<T>(options: T): T {
+  const { error, value } = schemaOptions.validate(options, { abortEarly: false });
   if (error) {
     throw new Error(`Invalid cube-server-core options: ${error.message || error.toString()}`);
   }
-};
+
+  return value;
+}
