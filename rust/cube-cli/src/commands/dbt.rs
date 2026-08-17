@@ -110,27 +110,34 @@ const RESULT_FETCH_TIMEOUT: Duration = Duration::from_secs(30);
 /// | `main`                                             | `main`                                     |
 /// | `refs/heads/main`                                  | `refs-heads-main`                          |
 /// | `release/2026.08`                                  | `release-2026.08`  (dot kept)              |
+/// | `feat_x_orders`                                    | `feat_x_orders`    (underscore kept)       |
+/// | `UPPER_lower`                                      | `UPPER_lower`      (case kept)             |
+/// | `feat x orders`                                    | `feat-x-orders`    (space replaced)        |
+/// | `feat~x`                                           | `feat-x`           (tilde replaced)        |
 /// | `feature/CUB-1234-add-orders-fact-table-and-more`  | `feature-CUB-1234-add-orders-fact-table-a` |
 ///
-/// So: `/` becomes `-`, dots and case survive, and the segment is cut at 40 characters.
-/// Comparing whole refs therefore fails healthy syncs — a prefix is what survives all
-/// four shapes, and it keeps the property that matters, since a sync that ignored the
-/// ref contains *nothing* from it.
+/// So alphanumerics, `_`, `.` and `-` survive with their case; `/`, space and `~` become
+/// `-`; and the segment is cut at 40 characters. Comparing whole refs therefore fails
+/// healthy syncs — a prefix is what survives every shape, and it keeps the property that
+/// matters, since a sync that ignored the ref contains *nothing* from it.
 const REF_PREFIX: usize = 12;
 
 /// The leading part of a ref as it should appear in a server-generated branch name.
 fn ref_fingerprint(value: &str) -> String {
-    let mapped: String = value
+    value
         .chars()
-        .map(|ch| {
-            if ch == '/' {
-                '-'
-            } else {
-                ch.to_ascii_lowercase()
-            }
+        .map(|ch| match ch {
+            // Measured as replaced by the server.
+            '/' | ' ' | '~' => '-',
+            // Measured as kept; compared case-insensitively.
+            ch => ch.to_ascii_lowercase(),
         })
-        .collect();
-    mapped.chars().take(REF_PREFIX).collect()
+        // Stop at the first character nobody measured — `:`, `#`, `^` and friends could
+        // be replaced or kept, and guessing either way risks failing a healthy sync. A
+        // shorter fingerprint is the safe direction: it can only under-check.
+        .take_while(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'))
+        .take(REF_PREFIX)
+        .collect()
 }
 
 /// Fail if the branch the server created shows no sign of the ref we asked for.
@@ -144,7 +151,13 @@ fn ref_fingerprint(value: &str) -> String {
 /// is the caller's own and carries no ref to look for.
 fn verify_ref_applied(requested: &str, branch_name: &str, sync_job_id: &str) -> Result<()> {
     let fingerprint = ref_fingerprint(requested);
-    if fingerprint.is_empty() || branch_name.to_ascii_lowercase().contains(&fingerprint) {
+    // Only the generated segment, not the whole name: `dbt-sync/` and the trailing
+    // timestamp-hash would match short fingerprints (`sync`, `dbt`, `1`, `2026`, `f`)
+    // for a sync that ignored the ref entirely — a false pass, which is the expensive
+    // direction for this check. An unrecognised shape falls back to the whole name.
+    let lowered = branch_name.to_ascii_lowercase();
+    let segment = lowered.strip_prefix("dbt-sync/").unwrap_or(&lowered);
+    if fingerprint.is_empty() || segment.starts_with(&fingerprint) {
         return Ok(());
     }
 
@@ -500,6 +513,19 @@ mod tests {
                 "feature/CUB-1234-add-orders-fact-table-and-more",
                 "dbt-sync/feature-CUB-1234-add-orders-fact-table-a-20260817141039-facd2053",
             ),
+            (
+                "feat_x_orders",
+                "dbt-sync/feat_x_orders-20260817142925-8e26c377",
+            ),
+            (
+                "feat x orders",
+                "dbt-sync/feat-x-orders-20260817142930-1ca54ad4",
+            ),
+            ("feat~x", "dbt-sync/feat-x-20260817142936-a4e47002"),
+            (
+                "UPPER_lower",
+                "dbt-sync/UPPER_lower-20260817142942-eb6730ca",
+            ),
         ] {
             assert!(
                 verify_ref_applied(requested, branch, "job").is_ok(),
@@ -526,6 +552,25 @@ mod tests {
             ref_fingerprint("feature/CUB-1234-add-orders"),
             "feature-cub-"
         );
+        assert_eq!(ref_fingerprint("feat_x_orders"), "feat_x_order");
+        assert_eq!(ref_fingerprint("feat x orders"), "feat-x-order");
+        assert_eq!(ref_fingerprint("UPPER_lower"), "upper_lower");
+        // Unmeasured characters cut the fingerprint short rather than guessing.
+        assert_eq!(ref_fingerprint("feat:x"), "feat");
+        assert_eq!(ref_fingerprint("#1"), "");
+    }
+
+    /// A short ref must still be checked: searching the whole branch name matched the
+    /// constant `dbt-sync/` prefix or the trailing hash, so these used to pass against a
+    /// sync that ignored the ref entirely.
+    #[test]
+    fn a_short_ref_is_not_satisfied_by_the_branch_name_boilerplate() {
+        for requested in ["sync", "dbt", "b", "1", "2026", "f"] {
+            assert!(
+                verify_ref_applied(requested, "dbt-sync/main-20260817-abcd1234", "job").is_err(),
+                "{requested} was satisfied by the boilerplate around the ref segment"
+            );
+        }
     }
 
     #[test]
