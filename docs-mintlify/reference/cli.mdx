@@ -357,9 +357,17 @@ steps:
       cube deployments build-status "$DEPLOYMENT_ID" --branch "$DEV_BRANCH" --wait
       API=$(cube deployments get "$DEPLOYMENT_ID" --json | jq -r .deploymentUrl)
       TOKEN=$(cube deployments token "$DEPLOYMENT_ID")
-      curl -sfG "$API/dev-mode/$DEV_BRANCH/cubejs-api/v1/load" \
-        -H "Authorization: $TOKEN" \
-        --data-urlencode 'query={"measures":["dbt_fct_orders.count"]}' | jq -e '.data'
+      OK=
+      for _ in $(seq 30); do
+        RES=$(curl -sG --fail-with-body "$API/dev-mode/$DEV_BRANCH/cubejs-api/v1/load" \
+          -H "Authorization: $TOKEN" \
+          --data-urlencode 'query={"measures":["dbt_fct_orders.count"]}') \
+          || { echo "$RES"; exit 1; }
+        if jq -e '.data' <<<"$RES"; then OK=1; break; fi
+        jq -e '.error == "Continue wait"' <<<"$RES" >/dev/null || { echo "$RES"; exit 1; }
+        sleep 5
+      done
+      [ -n "$OK" ] || { echo "query never returned data: $RES"; exit 1; }
 
   - name: Release the dev-mode session
     if: always()
@@ -379,10 +387,21 @@ only known at runtime.
 
 The query goes to the **deployment's own host** (`deploymentUrl`), not to
 `CUBE_API_URL` — that one is the Cube Cloud API, and it answers this path with `200`
-and an HTML page, which `curl -sf` accepts happily. Piping to `jq -e '.data'` is what
-turns "some 200 came back" into "the model answered a query", so the gate fails on an
-error body instead of passing. Name a measure the sync generated, not one that already
-existed, or the step passes without testing the new model at all.
+and an HTML page, which `curl -sf` accepts happily. Asserting on the body is what turns
+"some 200 came back" into "the model answered a query".
+
+The loop is there because not every `200` is an answer: a query that takes longer than
+`CUBEJS_CONTINUE_WAIT_TIMEOUT` returns [`Continue
+wait`](/reference/core-data-apis/rest-api#continue-wait) with status 200, and clients
+are expected to retry until a result appears. A first query against a cold dev-mode
+environment and an uncached warehouse is exactly when that happens, so treating it as a
+failure would fail the gate on a model that is fine. `--fail-with-body` rather than `-f`
+keeps the diagnostic on a 4xx — with `-f` the body is discarded, and naming a measure
+the sync didn't generate fails with an empty log instead of *"Cube 'nope' not found for
+path 'nope.count'"*.
+
+Name a measure the sync generated, not one that already existed, or the step passes
+without testing the new model at all.
 
 <Warning>
 
