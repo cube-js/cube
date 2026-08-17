@@ -21,7 +21,7 @@ pub struct Args {
     directory: PathBuf,
     /// Branch to deploy to (defaults to the active dev-mode branch, else the
     /// deploy branch)
-    #[arg(long)]
+    #[arg(long, value_parser = util::nonempty)]
     branch: Option<String>,
     /// Keep remote files that don't exist locally (default prunes them)
     #[arg(long)]
@@ -81,8 +81,6 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         bail!("no deployable files found in {}", args.directory.display());
     }
     files.sort();
-
-    util::require_nonempty_opt("--branch", &args.branch)?;
 
     // Hash local files and diff against the server's content hashes.
     let mut query = Vec::new();

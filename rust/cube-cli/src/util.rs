@@ -135,40 +135,49 @@ pub fn body(map: Map<String, Value>) -> Value {
     Value::Object(map)
 }
 
-/// Reject a branch name or git ref that was supplied but empty.
+/// Reject a supplied-but-empty branch, ref, or name at parse time.
 ///
-/// "Omitted" and "empty" must not collapse into the same request. Both travel as a
-/// present-but-empty field, and the server reads that as absent — so the value does
-/// not fail, it silently falls back to whatever the server would have picked anyway:
-/// the deployment's active or deploy branch for `branchName`, the dbt integration's
-/// tracked branch for `ref`. Both were measured against a live tenant; neither
-/// errors. That is the one failure mode a CI gate must not have, because the run
-/// still exits 0 — green for code it never looked at.
+/// Attached to flag declarations as a clap `value_parser`, so it holds for a flag
+/// the moment the flag exists — including through `Option<String>`, where `None`
+/// stays legal and `Some("")` can no longer be constructed. Sixteen hand-written
+/// call sites did not hold: this check was added three times, and each round found
+/// another flag that had been missed (`github import --branch` sends its value
+/// under the key `branch`, so it escaped even a grep for `branchName`).
 ///
-/// Empty values reach the CLI from scripts, not just typos: `$GITHUB_HEAD_REF` is
-/// empty on every trigger except `pull_request`, and `jq -r` prints nothing at all
-/// for empty input. (A missing *field* prints `null`, which travels as a literal
-/// name and gets a 404 — loud, and the right answer.)
+/// The reason it is worth rejecting at all: an empty value is not dropped, it is
+/// sent as an empty field, and what an empty field means is then the server's
+/// choice rather than the caller's. Where that choice has actually been measured,
+/// `nonempty_target` says so instead.
+pub fn nonempty(s: &str) -> Result<String, String> {
+    if s.trim().is_empty() {
+        return Err("an empty value is still sent, as an empty field — what it \
+                    then means is the server's choice rather than yours"
+            .to_string());
+    }
+
+    Ok(s.to_string())
+}
+
+/// `nonempty` for the two flags whose empty-value behaviour was measured against a
+/// live tenant: `--branch` on `deployments build-status` and `--ref` on `dbt sync`.
 ///
-/// Every flag carrying a branch or a ref goes through here before it is sent.
-pub fn require_nonempty(flag: &str, value: &str) -> Result<()> {
-    if value.trim().is_empty() {
-        bail!(
-            "{flag} cannot be empty — the server reads an empty value as \
-             \"not specified\" and falls back to the branch it would have picked \
-             anyway, so this would silently run against the wrong code"
+/// Both are read as "not specified" and fall back to something that already exists —
+/// the deployment's active or deploy branch, and the dbt integration's tracked
+/// branch. Neither errors: the empty-ref sync ran to COMPLETED with four cubes and
+/// exit 0. That is what makes an empty value dangerous rather than untidy in a CI
+/// gate, and it is reachable without anything failing, since `$GITHUB_HEAD_REF` is
+/// empty on every trigger except `pull_request`.
+pub fn nonempty_target(s: &str) -> Result<String, String> {
+    if s.trim().is_empty() {
+        return Err(
+            "an empty value is read as \"not specified\" and falls back to \
+                    the branch the server would have picked anyway, so this would \
+                    run against code you did not name"
+                .to_string(),
         );
     }
 
-    Ok(())
-}
-
-/// `require_nonempty` for an optional flag: only checks a value that was supplied.
-pub fn require_nonempty_opt(flag: &str, value: &Option<String>) -> Result<()> {
-    match value {
-        Some(v) => require_nonempty(flag, v),
-        None => Ok(()),
-    }
+    Ok(s.to_string())
 }
 
 /// Parse a wait duration: a bare number of seconds, or a number with a `s`/`m`/`h`
@@ -253,20 +262,92 @@ mod tests {
     }
 
     #[test]
-    fn require_nonempty_rejects_supplied_but_empty() {
-        assert!(require_nonempty("--branch", "main").is_ok());
-        assert!(require_nonempty("--ref", "dbt-sync/x").is_ok());
-        assert!(require_nonempty("--branch", "").is_err());
-        assert!(require_nonempty("--ref", "   ").is_err());
+    fn nonempty_rejects_supplied_but_empty() {
+        assert!(nonempty("main").is_ok());
+        assert!(nonempty("dbt-sync/x").is_ok());
+        assert!(nonempty("").is_err());
+        assert!(nonempty("   ").is_err());
+        assert!(nonempty_target("main").is_ok());
+        assert!(nonempty_target("").is_err());
+        assert!(nonempty_target("\t").is_err());
     }
 
+    /// Holds the promise the doc comment makes, which sixteen hand-written calls
+    /// could not: every `--branch`/`--ref` in the whole command tree refuses an
+    /// empty value. A new branch-taking flag is a copy of a declaration, so this
+    /// fails the moment one is declared without the parser.
+    ///
+    /// It goes through real argument parsing rather than introspecting the parser
+    /// (clap keeps `ValueParser::parse_ref` private), filling every other required
+    /// argument with a placeholder so that the only thing left to object to is the
+    /// empty value.
     #[test]
-    fn require_nonempty_opt_distinguishes_omitted_from_empty() {
-        // The whole point: `None` is fine, `Some("")` is not.
-        assert!(require_nonempty_opt("--ref", &None).is_ok());
-        assert!(require_nonempty_opt("--ref", &Some("main".into())).is_ok());
-        assert!(require_nonempty_opt("--ref", &Some(String::new())).is_err());
-        assert!(require_nonempty_opt("--ref", &Some(" ".into())).is_err());
+    fn every_branch_and_ref_flag_refuses_an_empty_value() {
+        use clap::{CommandFactory, Parser};
+
+        fn takes_a_value(arg: &clap::Arg) -> bool {
+            arg.get_num_args().is_none_or(|n| n.takes_values())
+        }
+
+        /// `cube <path...>` with `target` empty and every other required argument at
+        /// a placeholder. Options come before positionals, which clap requires.
+        fn argv(path: &[String], cmd: &clap::Command, target: &clap::Arg) -> Vec<String> {
+            let mut opts = Vec::new();
+            let mut positionals = Vec::new();
+            for arg in cmd.get_arguments() {
+                let is_target = arg.get_id() == target.get_id();
+                if !is_target && !arg.is_required_set() {
+                    continue;
+                }
+                let value = if is_target { "" } else { "1" };
+                if arg.is_positional() {
+                    positionals.push(value.to_string());
+                } else {
+                    opts.push(format!(
+                        "--{}",
+                        arg.get_long().unwrap_or(arg.get_id().as_str())
+                    ));
+                    if takes_a_value(arg) {
+                        opts.push(value.to_string());
+                    }
+                }
+            }
+            [path, &opts[..], &positionals[..]].concat()
+        }
+
+        fn walk(cmd: &clap::Command, path: Vec<String>, checked: &mut Vec<String>) {
+            for arg in cmd.get_arguments() {
+                let id = arg.get_id().as_str();
+                if id != "branch" && id != "ref" {
+                    continue;
+                }
+                let flag = format!("{} --{id}", path.join(" "));
+                let err = crate::Cli::try_parse_from(argv(&path, cmd, arg))
+                    .err()
+                    .map(|e| e.to_string())
+                    .unwrap_or_default();
+                assert!(
+                    err.contains("an empty value"),
+                    "{flag} accepts an empty value — add \
+                     `value_parser = util::nonempty` to the declaration.\n\
+                     Got instead: {err}"
+                );
+                checked.push(flag);
+            }
+            for sub in cmd.get_subcommands() {
+                let mut path = path.clone();
+                path.push(sub.get_name().to_string());
+                walk(sub, path, checked);
+            }
+        }
+
+        let mut checked = Vec::new();
+        walk(&crate::Cli::command(), vec!["cube".into()], &mut checked);
+        // A guard that silently stopped finding flags would be worse than none.
+        assert!(
+            checked.len() >= 18,
+            "expected to check every branch/ref flag, only reached: {checked:#?}"
+        );
     }
 
     #[test]

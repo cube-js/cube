@@ -49,7 +49,7 @@ enum Cmd {
         #[arg(long)]
         installation: i64,
         /// Branch to import (defaults to the repository's default branch)
-        #[arg(long)]
+        #[arg(long, value_parser = util::nonempty)]
         branch: Option<String>,
         /// Extra request body fields as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]

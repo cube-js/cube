@@ -288,7 +288,7 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Branch (defaults to the active dev-mode branch, else the deploy branch)
-        #[arg(long)]
+        #[arg(long, value_parser = util::nonempty_target)]
         branch: Option<String>,
         /// Wait for the build (or dev-mode worker) to finish, exiting non-zero if
         /// it fails
@@ -472,12 +472,6 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             timeout,
             poll,
         } => {
-            // An empty `--branch` is NOT the same as omitting it: the server reads
-            // an empty `branchName` as absent and answers for the active or deploy
-            // branch, so a gate whose branch variable came out empty would get a
-            // green production build for a compile that never ran.
-            util::require_nonempty_opt("--branch", &branch)?;
-
             let mut query = Vec::new();
             util::push(&mut query, "branchName", &branch);
             let path = format!("/api/v1/deployments/{deployment}/build-status");
