@@ -280,6 +280,63 @@ describe('test authorization', () => {
     expectSecurityContext(handlerMock.mock.calls[0][0].context.authInfo);
   });
 
+  describe('signedWithPlaygroundAuthSecret requires the isDevToken claim', () => {
+    const playgroundAuthSecret = 'playgroundSecret';
+    const loggerMock = jest.fn(() => {
+      //
+    });
+
+    // The playground secret signs every token a Cube Cloud deployment mints,
+    // including ones handed to end users and external BI tools, so the
+    // signature alone must not unlock the developer affordances gated on this
+    // flag (hidden meta members, generated SQL, pre-aggregation debug info).
+    const flagFor = async (payload: Record<string, any>) => {
+      const seen: boolean[] = [];
+      const handlerMock = jest.fn((req, res) => {
+        seen.push(req.context.signedWithPlaygroundAuthSecret);
+        res.status(200).end();
+      });
+
+      const { app } = createApiGateway(handlerMock, loggerMock, { playgroundAuthSecret });
+
+      await request(app)
+        .get('/test-auth-fake')
+        .set('Authorization', `Authorization: ${generateAuthToken(payload, {}, playgroundAuthSecret)}`)
+        .expect(200);
+
+      return seen[0];
+    };
+
+    test('is false for a playground-signed token without the claim', async () => {
+      expect(await flagFor({ uid: 5 })).toBe(false);
+    });
+
+    test('is true for a playground-signed token carrying isDevToken', async () => {
+      expect(await flagFor({ uid: 5, isDevToken: true })).toBe(true);
+    });
+
+    test('is false when isDevToken is present but not exactly true', async () => {
+      expect(await flagFor({ uid: 5, isDevToken: 'true' })).toBe(false);
+      expect(await flagFor({ uid: 5, isDevToken: false })).toBe(false);
+    });
+
+    test('is false for a token signed with the main api secret, claim or not', async () => {
+      const handlerMock = jest.fn((req, res) => {
+        expect(req.context.signedWithPlaygroundAuthSecret).toBe(false);
+        res.status(200).end();
+      });
+
+      const { app } = createApiGateway(handlerMock, loggerMock, { playgroundAuthSecret });
+
+      await request(app)
+        .get('/test-auth-fake')
+        .set('Authorization', `Authorization: ${generateAuthToken({ uid: 5, isDevToken: true }, {})}`)
+        .expect(200);
+
+      expect(handlerMock.mock.calls.length).toEqual(1);
+    });
+  });
+
   test('default authorization with JWT token and securityContext in u', async () => {
     const loggerMock = jest.fn(() => {
       //
