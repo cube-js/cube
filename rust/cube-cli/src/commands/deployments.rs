@@ -69,9 +69,25 @@ enum Cmd {
         /// Name
         #[arg(long)]
         name: Option<String>,
+        /// Release channel: latest, release
+        #[arg(long)]
+        release_channel: Option<String>,
+        /// Cube version to run — see `cube deployments versions <id>`
+        #[arg(long)]
+        release_channel_version: Option<String>,
         /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: Option<String>,
+    },
+    /// Show every setting of a deployment
+    Settings {
+        /// Deployment id
+        deployment: i64,
+    },
+    /// List the Cube versions a deployment can switch to
+    Versions {
+        /// Deployment id
+        deployment: i64,
     },
     /// Delete a deployment
     #[command(alias = "rm")]
@@ -181,10 +197,14 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         Cmd::Update {
             deployment,
             name,
+            release_channel,
+            release_channel_version,
             data,
         } => {
             let mut body = util::parse_data(data.as_deref())?;
             util::set(&mut body, "name", &name);
+            util::set(&mut body, "releaseChannel", &release_channel);
+            util::set(&mut body, "releaseChannelVersion", &release_channel_version);
             let res = api
                 .put(
                     &format!("/api/v1/deployments/{deployment}"),
@@ -192,6 +212,34 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 )
                 .await?;
             output::print_json(&res);
+        }
+        Cmd::Settings { deployment } => {
+            let res = api
+                .get(
+                    &format!("/api/v1/deployments/{deployment}/settings"),
+                    &Vec::new(),
+                )
+                .await?;
+            output::print_json(&res);
+        }
+        Cmd::Versions { deployment } => {
+            let res = api
+                .get(
+                    &format!("/api/v1/deployments/{deployment}/versions"),
+                    &Vec::new(),
+                )
+                .await?;
+            output::print_list(
+                ctx.json,
+                &res,
+                &[
+                    ("VERSION", "version"),
+                    ("CHANNEL", "releaseChannel"),
+                    ("LATEST", "isLatestInChannel"),
+                    ("CURRENT", "isCurrent"),
+                    ("PASS AS", "releaseChannelVersion"),
+                ],
+            );
         }
         Cmd::Delete { deployment } => {
             let res = api

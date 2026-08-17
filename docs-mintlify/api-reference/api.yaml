@@ -44,6 +44,7 @@ tags:
   - name: Embed
   - name: Embed Tenants
   - name: Dashboard Embed Access
+  - name: OpenAPI Spec
 paths:
   /api/v1/app-config:
     get:
@@ -1801,6 +1802,32 @@ paths:
       summary: Deployment token
       tags:
         - Deployments
+  /api/v1/deployments/{deploymentId}/versions:
+    get:
+      operationId: listDeploymentVersions
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentVersionsResponse'
+          description: ''
+      summary: List available Cube versions
+      tags:
+        - Deployments
+      x-mint:
+        content: >-
+          Every Cube version this deployment can be switched to — the same set the console’s version
+          picker offers: the head of each release channel, plus the older versions the tenant has
+          run before (its release history). Pass a listed `releaseChannelVersion` to `PUT
+          /:deploymentId/settings`; anything else is rejected. The container image is resolved
+          server-side and is not part of the write surface.
   /api/v1/deployments/{deploymentId}/workbooks:
     get:
       operationId: getWorkbooks
@@ -3426,6 +3453,25 @@ paths:
       summary: List regions
       tags:
         - Regions
+  /api/v1/spec:
+    get:
+      operationId: getSpec
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+          description: The OpenAPI 3.1 document
+      summary: Get the OpenAPI specification
+      tags:
+        - OpenAPI Spec
+      x-mint:
+        content: >-
+          The full OpenAPI 3.1 document for this API, as served by the build handling the request —
+          every path, parameter, request body and schema. Intended for runtime discovery by clients
+          and agents; `cube spec` wraps it with filtering.
   /api/v1/tenant/settings:
     get:
       operationId: getTenantSettings
@@ -6487,6 +6533,39 @@ components:
       required:
         - cubeApiToken
       type: object
+    DeploymentVersion:
+      properties:
+        isCurrent:
+          type: boolean
+        isLatestInChannel:
+          type: boolean
+        releaseChannel:
+          $ref: '#/components/schemas/DeploymentVersionReleaseChannel'
+        releaseChannelVersion:
+          type: string
+        version:
+          type: string
+      required:
+        - releaseChannelVersion
+        - version
+        - releaseChannel
+        - isLatestInChannel
+        - isCurrent
+      type: object
+    DeploymentVersionReleaseChannel:
+      enum:
+        - latest
+        - release
+      type: string
+    DeploymentVersionsResponse:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/DeploymentVersion'
+          type: array
+      required:
+        - data
+      type: object
     DeploymentsListResponse:
       properties:
         count:
@@ -8513,10 +8592,6 @@ components:
         cspsConfig:
           oneOf:
             - $ref: '#/components/schemas/CspsConfigInput'
-            - type: 'null'
-        cubeImageCloud:
-          oneOf:
-            - type: string
             - type: 'null'
         customDomain:
           oneOf:

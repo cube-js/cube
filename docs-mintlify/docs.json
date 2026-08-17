@@ -764,7 +764,8 @@
                   "GET /api/v1/deployments/{deploymentId}/pods",
                   "GET /api/v1/deployments/{deploymentId}/settings",
                   "PUT /api/v1/deployments/{deploymentId}/settings",
-                  "POST /api/v1/deployments/{deploymentId}/token"
+                  "POST /api/v1/deployments/{deploymentId}/token",
+                  "GET /api/v1/deployments/{deploymentId}/versions"
                 ]
               },
               {
@@ -1028,6 +1029,13 @@
                 "pages": [
                   "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/embed-access",
                   "PUT /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/embed-access"
+                ]
+              },
+              {
+                "group": "OpenAPI Spec",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/spec"
                 ]
               },
               {

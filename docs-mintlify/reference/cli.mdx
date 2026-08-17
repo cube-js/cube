@@ -146,7 +146,7 @@ Run `cube <command> --help` for the full options of any command.
 | Command | Description |
 | --- | --- |
 | `login`, `logout`, `whoami`, `context` | Authentication and saved contexts |
-| `deployments` | List, get, create, update, delete deployments; `token`, `build-status`, `advance-step`, `reset-step` |
+| `deployments` | List, get, create, update, delete deployments; `settings`, `versions`, `token`, `build-status`, `advance-step`, `reset-step` |
 | `deploy` | Upload a local project directory and build it |
 | `logs` | Tail deployment pod logs (`--pod`, `-c/--container`, `--source production\|dev`) |
 | `regions` | List available deployment regions |
@@ -166,6 +166,34 @@ Run `cube <command> --help` for the full options of any command.
 
 List commands print tables by default; pass `--json` anywhere for raw JSON
 output, suitable for piping to `jq`.
+
+## Changing the Cube version
+
+`cube deployments versions` lists the Cube versions a deployment can switch to
+— the head of each [update channel][ref-update-channels], plus the older
+versions your account has run before:
+
+```bash
+cube deployments versions DEPLOYMENT_ID
+```
+
+```
+VERSION  CHANNEL  LATEST  CURRENT  PASS AS
+1.7.20   latest   true    true     cubejs/cube:v1.7.20
+1.6.69   latest   false   false    cubejs/cube:v1.6.69
+```
+
+Apply one with `update`. Any of `1.7.20`, `v1.7.20` or `cubejs/cube:v1.7.20` is
+accepted; a version that is not on the list is rejected. The container image is
+resolved from the version, so there is nothing else to set:
+
+```bash
+cube deployments update DEPLOYMENT_ID --release-channel-version 1.7.20
+cube deployments update DEPLOYMENT_ID --release-channel release  # move to a channel's latest
+```
+
+`cube deployments settings DEPLOYMENT_ID` reads back every setting, including
+the version and channel currently in effect.
 
 ## Discovering the API
 
@@ -272,3 +300,4 @@ or explicitly with `CUBE_NO_TELEMETRY=1` (or the legacy `CUBEJS_TELEMETRY=false`
 [ref-api-keys]: /admin/account-billing/api-keys
 [ref-rest-api]: /reference/core-data-apis/rest-api/index
 [ref-staging-env]: /admin/deployment/environments#staging-environments
+[ref-update-channels]: /admin/deployment#update-channels
