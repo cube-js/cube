@@ -360,6 +360,7 @@ steps:
   - name: Compile and query the generated model
     run: |
       DEV_BRANCH=$(cube data-model dev-mode "$DEPLOYMENT_ID" "$BRANCH" --json | jq -r .branchName)
+      echo "DEV_BRANCH=$DEV_BRANCH" >> "$GITHUB_ENV"
       cube deployments build-status "$DEPLOYMENT_ID" --branch "$DEV_BRANCH" --wait
       TOKEN=$(cube deployments token "$DEPLOYMENT_ID")
       curl -sfG "$CUBE_API_URL/dev-mode/$DEV_BRANCH/cubejs-api/v1/load" \
@@ -371,8 +372,10 @@ steps:
     continue-on-error: true
     run: cube data-model exit-dev-mode "$DEPLOYMENT_ID"
 
-  - name: Prune the branch the sync created
-    run: cube data-model delete-branch "$DEPLOYMENT_ID" "$BRANCH"
+  - name: Prune the branches the gate created
+    run: |
+      cube data-model delete-branch "$DEPLOYMENT_ID" "$DEV_BRANCH"
+      cube data-model delete-branch "$DEPLOYMENT_ID" "$BRANCH"
 ```
 
 With `--wait --json`, the sync writes one document carrying both the branch to
@@ -414,10 +417,16 @@ timeout — exits non-zero, so the job fails without extra scripting.
 
 <Info>
 
-Each sync creates a branch, so a gate that runs per pull request would accumulate
-them — hence the prune step. It deliberately has no `if: always()`: on a **failure**
-the branch is the evidence, holding the generated cubes that broke the build, so it
-is left for someone to open. On success it has served its purpose.
+A gate run creates **two** branches — the sync's own, and the personal `dev-…` fork
+that entering dev mode makes. The fork is not reused between runs: it is looked up
+by parent branch, and the parent is a new sync branch every time. So both are pruned,
+the fork first, since deleting a parent only re-parents its children rather than
+removing them.
+
+The step deliberately has no `if: always()`: on a **failure** those branches are the
+evidence — they hold the generated cubes that broke the build, and the failed build
+belongs to the fork — so they are left for someone to open. On success they have
+served their purpose.
 
 For a deployment connected to a git provider, add `--remove-on-upstream` to delete
 the pushed ref as well; without it the branch is removed from Cube only. Deleting
