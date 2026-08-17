@@ -99,45 +99,65 @@ const MISSING_GRACE: Duration = Duration::from_secs(60);
 /// ride out a transient failure on the gate's final request.
 const RESULT_FETCH_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Normalise a git ref for comparison against a server-generated branch name:
-/// lowercase, every run of non-alphanumerics collapsed to a single `-`.
-fn slug(value: &str) -> String {
-    let mut out = String::new();
-    for ch in value.chars() {
-        if ch.is_ascii_alphanumeric() {
-            out.push(ch.to_ascii_lowercase());
-        } else if !out.ends_with('-') {
-            out.push('-');
-        }
-    }
-    out.trim_matches('-').to_string()
+/// How much of a ref to expect in a branch name.
+///
+/// Measured against a live deployment rather than inferred, because the first version of
+/// this check guessed and rejected two of three legitimate refs. What the server does
+/// with `--ref X`, in `dbt-sync/<X>-<timestamp>-<hash>`:
+///
+/// | requested                                          | branch segment                             |
+/// |----------------------------------------------------|--------------------------------------------|
+/// | `main`                                             | `main`                                     |
+/// | `refs/heads/main`                                  | `refs-heads-main`                          |
+/// | `release/2026.08`                                  | `release-2026.08`  (dot kept)              |
+/// | `feature/CUB-1234-add-orders-fact-table-and-more`  | `feature-CUB-1234-add-orders-fact-table-a` |
+///
+/// So: `/` becomes `-`, dots and case survive, and the segment is cut at 40 characters.
+/// Comparing whole refs therefore fails healthy syncs — a prefix is what survives all
+/// four shapes, and it keeps the property that matters, since a sync that ignored the
+/// ref contains *nothing* from it.
+const REF_PREFIX: usize = 12;
+
+/// The leading part of a ref as it should appear in a server-generated branch name.
+fn ref_fingerprint(value: &str) -> String {
+    let mapped: String = value
+        .chars()
+        .map(|ch| {
+            if ch == '/' {
+                '-'
+            } else {
+                ch.to_ascii_lowercase()
+            }
+        })
+        .collect();
+    mapped.chars().take(REF_PREFIX).collect()
 }
 
 /// Fail if the branch the server created shows no sign of the ref we asked for.
 ///
-/// A deployment that predates `ref` support strips the field silently and syncs the
+/// A deployment that predates `ref` support drops the field silently and syncs the
 /// integration's tracked branch instead — the sync succeeds, the gate passes, and the
-/// pull request's dbt models were never compiled. Nothing in the response says which
-/// ref was used, so the branch name is the only evidence available: the server embeds
-/// the requested ref in it (`--ref main` produces `dbt-sync/main-<timestamp>-<hash>`),
-/// and a sync with no ref produces `dbt-sync/<timestamp>-<hash>`.
+/// pull request's dbt models were never compiled. Nothing in the response says which ref
+/// was used, so the branch name is the only evidence available (see [`REF_PREFIX`]).
 ///
-/// Only checked when the caller let the server name the branch: with `--branch` the
-/// name is the caller's own and carries no ref to look for.
+/// Only checked when the caller let the server name the branch: with `--branch` the name
+/// is the caller's own and carries no ref to look for.
 fn verify_ref_applied(requested: &str, branch_name: &str, sync_job_id: &str) -> Result<()> {
-    let slug = slug(requested);
-    if slug.is_empty() || branch_name.to_ascii_lowercase().contains(&slug) {
+    let fingerprint = ref_fingerprint(requested);
+    if fingerprint.is_empty() || branch_name.to_ascii_lowercase().contains(&fingerprint) {
         return Ok(());
     }
 
     anyhow::bail!(
-        "the sync started on {branch_name}, which doesn't mention the ref you asked \
-         for ({requested}) — this deployment may predate `ref` support and be syncing \
-         the branch saved on the dbt integration instead, which would compile the \
-         wrong code and still pass. Stopping rather than reporting a result for a ref \
-         that may not have been used. Cancel it with `cube dbt cancel <deployment> \
-         {sync_job_id}`, and check the deployment's version — or pass --branch to name \
-         the branch yourself, which skips this check."
+        "the sync started on {branch_name}, which doesn't begin with the ref you asked \
+         for ({requested}). Either this deployment predates `ref` support — in which case \
+         it is syncing the branch saved on the dbt integration, compiling the wrong code \
+         and still passing — or it names branches differently than this check expects. \
+         Stopping rather than reporting a result for a ref that may not have been used. \
+         The sync is still running: cancel it with `cube dbt cancel <deployment> \
+         {sync_job_id}`, and delete the branch with `cube data-model delete-branch \
+         <deployment> {branch_name}`. Pass --branch to name the branch yourself, which \
+         skips this check."
     )
 }
 
@@ -463,30 +483,49 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    /// Every row is a branch name a live deployment actually returned.
     #[test]
-    fn slug_collapses_everything_a_ref_can_contain() {
-        assert_eq!(slug("main"), "main");
-        assert_eq!(slug("feature/CUB-123_fix"), "feature-cub-123-fix");
-        assert_eq!(slug("v1.2.3"), "v1-2-3");
-        assert_eq!(slug("---"), "");
-    }
-
-    #[test]
-    fn verify_ref_applied_accepts_a_branch_naming_the_ref() {
-        assert!(verify_ref_applied("main", "dbt-sync/main-20260817-abcd1234", "j").is_ok());
-        assert!(
-            verify_ref_applied("feature/x", "dbt-sync/feature-x-20260817-abcd1234", "j").is_ok()
-        );
+    fn verify_ref_applied_accepts_what_the_server_really_produces() {
+        for (requested, branch) in [
+            ("main", "dbt-sync/main-20260817140209-9351635f"),
+            (
+                "refs/heads/main",
+                "dbt-sync/refs-heads-main-20260817141045-ca062f89",
+            ),
+            (
+                "release/2026.08",
+                "dbt-sync/release-2026.08-20260817141042-5800f094",
+            ),
+            (
+                "feature/CUB-1234-add-orders-fact-table-and-more",
+                "dbt-sync/feature-CUB-1234-add-orders-fact-table-a-20260817141039-facd2053",
+            ),
+        ] {
+            assert!(
+                verify_ref_applied(requested, branch, "job").is_ok(),
+                "rejected a healthy sync: {requested} → {branch}"
+            );
+        }
     }
 
     #[test]
     fn verify_ref_applied_rejects_a_branch_that_ignored_it() {
-        // What an older deployment produces: the tracked branch, or no ref at all.
+        // What an older deployment produces: the tracked branch, or no ref segment.
         let err = verify_ref_applied("feature/x", "dbt-sync/main-20260817-abcd1234", "job-1")
             .expect_err("a branch naming a different ref must not pass");
-        assert!(err.to_string().contains("may predate"), "{err}");
+        assert!(err.to_string().contains("predates `ref` support"), "{err}");
         assert!(err.to_string().contains("job-1"), "{err}");
         assert!(verify_ref_applied("feature/x", "dbt-sync/20260817-abcd1234", "j").is_err());
+    }
+
+    #[test]
+    fn ref_fingerprint_matches_the_server_convention() {
+        assert_eq!(ref_fingerprint("main"), "main");
+        assert_eq!(ref_fingerprint("release/2026.08"), "release-2026");
+        assert_eq!(
+            ref_fingerprint("feature/CUB-1234-add-orders"),
+            "feature-cub-"
+        );
     }
 
     #[test]
