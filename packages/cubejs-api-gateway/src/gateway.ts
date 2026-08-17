@@ -130,32 +130,16 @@ function systemAsyncHandler(handler: (req: Request & { context: ExtendedRequestC
   };
 }
 
-/**
- * Whether a token carries the `isDevToken` claim, which is what actually
- * unlocks the developer affordances behind `signedWithPlaygroundAuthSecret`:
- * meta members hidden by `public: false` / access policies, generated SQL and
- * pre-aggregation debug info on load responses, and request ids in errors.
- *
- * Being signed with the playground secret is necessary but no longer
- * sufficient. That secret is shared by every token a Cube Cloud deployment
- * mints — including ones handed to end users and external tools — so keying the
- * bypass off the signature alone handed developer-level visibility to anyone
- * who could obtain any such token. The claim is added only for the
- * developer-facing console surfaces, and only for users who hold
- * deployment-manage permissions; every other playground-secret-signed token now
- * resolves to an ordinary, non-privileged context.
- *
- * `devMode` is unaffected: every affordance gated on the flag already ORs it
- * with `getEnv('devMode')`, so a local `cube dev` server keeps full visibility.
- * The one place that reads the flag alone is the `isPlayground` field on Load
- * Request logs, which correspondingly now marks only developer traffic.
- */
-function hasDevTokenClaim(securityContext: unknown): boolean {
-  return (
-    typeof securityContext === 'object' &&
-    securityContext !== null &&
-    (<Record<string, any>>securityContext).isDevToken === true
-  );
+const DEV_TOKEN_SCOPE = 'dev-token';
+
+function hasDevTokenScope(securityContext: unknown): boolean {
+  if (typeof securityContext !== 'object' || securityContext === null) {
+    return false;
+  }
+
+  const { scope } = <Record<string, any>>securityContext;
+
+  return Array.isArray(scope) && scope.includes(DEV_TOKEN_SCOPE);
 }
 
 // Prepared CheckAuthFn, default or from config: always async
@@ -2644,7 +2628,7 @@ class ApiGateway {
         try {
           req.securityContext = await checkAuthFn(auth);
           req.signedWithPlaygroundAuthSecret =
-            Boolean(internalOptions?.isPlaygroundCheckAuth) && hasDevTokenClaim(req.securityContext);
+            Boolean(internalOptions?.isPlaygroundCheckAuth) && hasDevTokenScope(req.securityContext);
         } catch (e: any) {
           if (this.enforceSecurityChecks) {
             throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token', e);

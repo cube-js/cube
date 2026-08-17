@@ -280,7 +280,7 @@ describe('test authorization', () => {
     expectSecurityContext(handlerMock.mock.calls[0][0].context.authInfo);
   });
 
-  describe('signedWithPlaygroundAuthSecret requires the isDevToken claim', () => {
+  describe('signedWithPlaygroundAuthSecret requires the dev-token scope', () => {
     const playgroundAuthSecret = 'playgroundSecret';
     const loggerMock = jest.fn(() => {
       //
@@ -307,20 +307,26 @@ describe('test authorization', () => {
       return seen[0];
     };
 
-    test('is false for a playground-signed token without the claim', async () => {
+    test('is false for a playground-signed token with no scope at all', async () => {
       expect(await flagFor({ uid: 5 })).toBe(false);
     });
 
-    test('is true for a playground-signed token carrying isDevToken', async () => {
-      expect(await flagFor({ uid: 5, isDevToken: true })).toBe(true);
+    test('is false for a playground-signed token scoped to something else', async () => {
+      expect(await flagFor({ uid: 5, scope: ['sql-runner', 'agents-config'] })).toBe(false);
     });
 
-    test('is false when isDevToken is present but not exactly true', async () => {
-      expect(await flagFor({ uid: 5, isDevToken: 'true' })).toBe(false);
-      expect(await flagFor({ uid: 5, isDevToken: false })).toBe(false);
+    test('is true for a playground-signed token carrying the dev-token scope', async () => {
+      expect(await flagFor({ uid: 5, scope: ['dev-token'] })).toBe(true);
+      // Alongside the service scopes it is minted with in practice.
+      expect(await flagFor({ uid: 5, scope: ['sql-runner', 'dev-token'] })).toBe(true);
     });
 
-    test('is false for a token signed with the main api secret, claim or not', async () => {
+    test('is false when scope is not an array of scope names', async () => {
+      expect(await flagFor({ uid: 5, scope: 'dev-token' })).toBe(false);
+      expect(await flagFor({ uid: 5, scope: { 'dev-token': true } })).toBe(false);
+    });
+
+    test('is false for a token signed with the main api secret, scope or not', async () => {
       const handlerMock = jest.fn((req, res) => {
         expect(req.context.signedWithPlaygroundAuthSecret).toBe(false);
         res.status(200).end();
@@ -330,7 +336,7 @@ describe('test authorization', () => {
 
       await request(app)
         .get('/test-auth-fake')
-        .set('Authorization', `Authorization: ${generateAuthToken({ uid: 5, isDevToken: true }, {})}`)
+        .set('Authorization', `Authorization: ${generateAuthToken({ uid: 5, scope: ['dev-token'] }, {})}`)
         .expect(200);
 
       expect(handlerMock.mock.calls.length).toEqual(1);
