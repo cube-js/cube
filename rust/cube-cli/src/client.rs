@@ -74,6 +74,8 @@ fn is_not_found(err: &anyhow::Error) -> bool {
 /// function never sees the inside of: a wait closure that has decided something is
 /// wrong — an unknown sync id, a branch nothing is building — raises a plain error,
 /// and treating THAT as transient would retry a settled verdict until the timeout.
+/// Note one failure this cannot see: a 200 whose body isn't JSON is an untyped error
+/// from `finish_response`, treated as permanent on purpose — see the comment there.
 pub fn is_transient(err: &anyhow::Error) -> bool {
     if let Some(api) = err.downcast_ref::<ApiError>() {
         return api.status.is_server_error()
@@ -118,12 +120,15 @@ impl Client {
         Ok(Self {
             http: reqwest::Client::builder()
                 .user_agent(concat!("cube-cli/", env!("CUBE_CLI_VERSION")))
-                // A server that accepts the connection and never answers would
-                // otherwise hang a CI step until the job's own timeout. Generous
-                // rather than tight: `deploy` uploads an entire project through this
-                // client. Waits bound their own attempts on top of this.
+                // Bound stalls, not transfers. A total `timeout` would also cap
+                // `deploy`, whose upload is legitimately long and has no flag to raise
+                // a ceiling, so a large project would start failing at whatever number
+                // was picked here. `read_timeout` applies between reads instead: a
+                // server that accepts the connection and then says nothing fails, while
+                // an upload making progress runs as long as it needs. Waits bound their
+                // own attempts at the caller's `--timeout` on top of this.
                 .connect_timeout(Duration::from_secs(30))
-                .timeout(Duration::from_secs(600))
+                .read_timeout(Duration::from_secs(120))
                 .build()?,
             base_url,
             token: Mutex::new(token.to_string()),
@@ -311,6 +316,11 @@ impl Client {
                  running an older version)"
             );
         }
+        // Deliberately NOT one of the typed errors `is_transient` inspects: a body that
+        // arrived in full and still isn't JSON is a server that answers this route with
+        // something else (a gateway page, a plain-text error), which retrying cannot
+        // fix. Bodies lost mid-transfer surface as `TransportError` from `res.text()`
+        // instead, and those ARE retried.
         serde_json::from_str(&text).map_err(|e| {
             let snippet: String = text.chars().take(200).collect();
             anyhow!(

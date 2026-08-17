@@ -548,8 +548,10 @@ trigger `--ref` gets an empty string, which is why the run stops there.
 The API key needs more than the sync itself: `SchemaUpdate` to start or cancel a sync,
 enter dev mode and delete branches, `SchemaRead` to follow a sync and read the data model,
 and `DeploymentRead` to read build status, resolve the deployment's URL and mint a Core
-Data APIs token. A key scoped to the deployment with a role carrying those three covers
-every step above; `All` covers it too, at the cost of granting everything else. Its
+Data APIs token. `SchemaUpdateDevBranches` exists as a separate action for dev-branch
+edits, and the gate's middle steps are dev-branch operations — whether `SchemaUpdate`
+subsumes it isn't something this page has verified, so include it if your role separates
+the two. `All` avoids the question at the cost of granting everything else. Its
 scope must include this deployment — see [API keys][ref-api-keys] and [custom
 roles][ref-custom-roles]. Any failure — a failed sync, a failed compile, a
 timeout — exits non-zero, so the job fails without extra scripting.
