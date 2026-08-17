@@ -484,11 +484,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             // nothing at all for EMPTY input, so a truncated or empty document gives
             // an empty variable. (A missing FIELD prints `null`, which travels as a
             // literal branch name and gets a 404 — loud, and the right answer.)
-            anyhow::ensure!(
-                !branch.trim().is_empty(),
-                "a branch name is required — an empty one would leave the server to \
-                 decide what `branchName=` means"
-            );
+            util::require_branch("BRANCH", &branch)?;
             let mut query: Query = vec![("branchName".to_string(), branch.clone())];
             if remove_on_upstream {
                 query.push(("removeOnUpstream".to_string(), "true".to_string()));
