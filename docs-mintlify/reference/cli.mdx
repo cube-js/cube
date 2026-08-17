@@ -363,7 +363,7 @@ steps:
         CODE=$(curl -sSG -o res.json -w '%{http_code}' --max-time 95 \
           "$API/dev-mode/$DEV_BRANCH/cubejs-api/v1/load" \
           -H "Authorization: $TOKEN" \
-          --data-urlencode 'query={"measures":["dbt_fct_orders.count"]}') || CODE=000
+          --data-urlencode 'query={"measures":["dbt_fct_orders.count"]}') || CODE=curl-$?
         if [ "$CODE" = 200 ] && jq -e '.data' res.json; then OK=1; break; fi
         if jq -e '.error == "Continue wait"' res.json >/dev/null 2>&1; then sleep 5; continue; fi
         if jq -e '.error' res.json >/dev/null 2>&1; then cat res.json; exit 1; fi
@@ -438,8 +438,12 @@ minutes before the loop gives up.
 The compile and SQL generation ahead of the long poll are unbounded and add to it, so on a
 cold first query the two can still cross 95s even at an accepted value. The next attempt
 finds the compile already done, so in a log that shows up as a first attempt aborting at
-`--max-time` with `no answer from the API (000)` on a gate that then passes — not a
-network fault.
+`--max-time` on a gate that then passes — not a network fault. That is why the loop keeps
+curl's exit status rather than flattening every failure to one code: an abort logs
+`no answer from the API (curl-28)`, a name-resolution failure `(curl-6)`, a reset
+`(curl-56)`, so the line itself tells you which you are looking at. (`-sS` also leaves
+curl's own message on stderr, but stderr interleaving in CI logs is not something to rely
+on.)
 
 The body is deleted before each attempt because curl leaves the previous file in place when
 it fails before the transfer starts (`--remove-on-error` does not change that), and
