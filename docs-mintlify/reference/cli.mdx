@@ -353,6 +353,10 @@ steps:
   - name: Sync the dbt branch under review
     run: |
       cube dbt sync "$DEPLOYMENT_ID" --ref "$GITHUB_HEAD_REF" --wait --json > sync.json
+      # The gate only means anything if the sync used the ref, so refuse to continue
+      # when `dbt sync` could not confirm it — a ref starting with `#` or `@`, say.
+      jq -e '.refVerified == true' sync.json >/dev/null \
+        || { echo "sync not verified to have used $GITHUB_HEAD_REF"; exit 1; }
       BRANCH=$(jq -r .branchName sync.json)
       echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
 
@@ -490,10 +494,14 @@ because then the branch name is yours and carries no ref to look for.
 
 A few legal ref names can't be checked this way — `#1234-fix` and `@release` begin with
 characters whose treatment isn't known, so there's nothing to compare. Those syncs run,
-with a warning on stderr and `"refVerified": false` in the `--wait --json` document; a
-verified run reports `true`, and `null` means there was nothing to verify. If you're
-choosing a branch convention for a gate, one starting with a letter or digit is the one
-that gets checked.
+with a warning on stderr and `"refVerified": false` in the JSON document — from `--wait`
+or from a bare `--json` start, since a pipeline that follows the sync in a later step has
+no `--ref` left to check. A verified run reports `true`, and `null` means
+there was nothing to verify. The recipe above asserts `refVerified == true` rather than
+trusting it, which also fails on `null`: that recipe always passes `--ref` and never
+`--branch`, so `null` would mean something changed underneath it. If you're choosing a
+branch convention for a gate, one starting with a letter or digit is the one that gets
+checked.
 
 </Warning>
 
