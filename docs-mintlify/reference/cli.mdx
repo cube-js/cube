@@ -337,6 +337,13 @@ Sync the branch under review, compile it, query it, and fail the job if any step
 breaks — without touching production:
 
 ```yaml
+# Dev mode is per credential, so two runs of this gate on one deployment would
+# re-point each other's session. Serialise them, and don't cancel a run in flight:
+# a cancelled run skips its prune step and leaves a branch and a live session behind.
+concurrency:
+  group: cube-dbt-gate-${{ vars.CUBE_DEPLOYMENT_ID }}
+  cancel-in-progress: false
+
 env:
   CUBE_API_URL: ${{ secrets.CUBE_API_URL }}
   CUBE_API_KEY: ${{ secrets.CUBE_API_KEY }}
@@ -472,6 +479,19 @@ strand the session, and the prune doesn't need the release to have succeeded.
 
 <Warning>
 
+**`--ref` is verified, not assumed.** A deployment that predates `ref` support drops the
+field silently and syncs the branch saved on the dbt integration, which would compile the
+wrong code and still pass. The response doesn't say which ref was used, so `dbt sync`
+checks the branch the server created: the requested ref appears in it (`--ref main` gives
+`dbt-sync/main-…`), and a sync that ignored the ref doesn't mention it. When it doesn't
+match, the command fails instead of reporting a result for code it can't confirm was
+compiled, and names the sync so you can cancel it. Passing `--branch` skips the check,
+because then the branch name is yours and carries no ref to look for.
+
+</Warning>
+
+<Warning>
+
 The compile step has to run against the **dev-mode branch**, not the branch the
 sync created. A sync lands on a shared branch, and a shared branch has nothing
 compiling it until someone opens it in dev mode — unless its [staging
@@ -500,8 +520,13 @@ fails instead of reporting green — but failing at the source beats failing lat
 Note that `$GITHUB_HEAD_REF` is only set on `pull_request` events; on any other
 trigger `--ref` gets an empty string, which is why the run stops there.
 
-The API key needs `SchemaUpdate` on the deployment to start or cancel a sync, and
-`SchemaRead` to follow one. Any failure — a failed sync, a failed compile, a
+The API key needs more than the sync itself: `SchemaUpdate` to start or cancel a sync,
+enter dev mode and delete branches, `SchemaRead` to follow a sync and read the data model,
+and `DeploymentRead` to read build status, resolve the deployment's URL and mint a Core
+Data APIs token. A key scoped to the deployment with a role carrying those three covers
+every step above; `All` covers it too, at the cost of granting everything else. Its
+scope must include this deployment — see [API keys][ref-api-keys] and [custom
+roles][ref-custom-roles]. Any failure — a failed sync, a failed compile, a
 timeout — exits non-zero, so the job fails without extra scripting.
 
 <Info>
@@ -552,6 +577,7 @@ is a hash of the OS machine id. Telemetry is disabled automatically in CI,
 or explicitly with `CUBE_NO_TELEMETRY=1` (or the legacy `CUBEJS_TELEMETRY=false`).
 
 [ref-api-keys]: /admin/account-billing/api-keys
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
 [ref-conf-orchestrator-opts]: /reference/configuration/config#orchestrator_options
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-rest-api-continue-wait]: /reference/core-data-apis/rest-api#continue-wait

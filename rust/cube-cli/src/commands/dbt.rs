@@ -99,6 +99,48 @@ const MISSING_GRACE: Duration = Duration::from_secs(60);
 /// ride out a transient failure on the gate's final request.
 const RESULT_FETCH_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// Normalise a git ref for comparison against a server-generated branch name:
+/// lowercase, every run of non-alphanumerics collapsed to a single `-`.
+fn slug(value: &str) -> String {
+    let mut out = String::new();
+    for ch in value.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+        } else if !out.ends_with('-') {
+            out.push('-');
+        }
+    }
+    out.trim_matches('-').to_string()
+}
+
+/// Fail if the branch the server created shows no sign of the ref we asked for.
+///
+/// A deployment that predates `ref` support strips the field silently and syncs the
+/// integration's tracked branch instead — the sync succeeds, the gate passes, and the
+/// pull request's dbt models were never compiled. Nothing in the response says which
+/// ref was used, so the branch name is the only evidence available: the server embeds
+/// the requested ref in it (`--ref main` produces `dbt-sync/main-<timestamp>-<hash>`),
+/// and a sync with no ref produces `dbt-sync/<timestamp>-<hash>`.
+///
+/// Only checked when the caller let the server name the branch: with `--branch` the
+/// name is the caller's own and carries no ref to look for.
+fn verify_ref_applied(requested: &str, branch_name: &str, sync_job_id: &str) -> Result<()> {
+    let slug = slug(requested);
+    if slug.is_empty() || branch_name.to_ascii_lowercase().contains(&slug) {
+        return Ok(());
+    }
+
+    anyhow::bail!(
+        "the sync started on {branch_name}, which doesn't mention the ref you asked \
+         for ({requested}) — this deployment may predate `ref` support and be syncing \
+         the branch saved on the dbt integration instead, which would compile the \
+         wrong code and still pass. Stopping rather than reporting a result for a ref \
+         that may not have been used. Cancel it with `cube dbt cancel <deployment> \
+         {sync_job_id}`, and check the deployment's version — or pass --branch to name \
+         the branch yourself, which skips this check."
+    )
+}
+
 /// One line summarising a status payload, for progress output.
 fn status_label(status: &Value) -> String {
     let state = output::field(status, "status");
@@ -223,6 +265,11 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let sync_job_id = output::field(&started, "syncJobId");
             let branch_name = output::field(&started, "branchName");
 
+            // Fail closed if the server didn't honour --ref (see `verify_ref_applied`).
+            if let (Some(requested), None) = (&r#ref, &branch) {
+                verify_ref_applied(requested, &branch_name, &sync_job_id)?;
+            }
+
             if !wait {
                 if ctx.json {
                     output::print_json(&started);
@@ -297,8 +344,16 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     Wait::new("dbt sync result", RESULT_FETCH_TIMEOUT, poll).advising_nothing(),
                     || async {
                         match api.get_optional(&path, &Vec::new()).await? {
-                            Some(result) => Ok(Progress::Done(result)),
-                            None => Ok(Progress::Waiting("result not available yet".to_string())),
+                            // Only an object is a result. A 200 carrying `null` — or
+                            // an empty object — is the workflow saying "nothing yet",
+                            // and treating it as done reported success with
+                            // `result: null` in the document.
+                            Some(result)
+                                if result.as_object().is_some_and(|map| !map.is_empty()) =>
+                            {
+                                Ok(Progress::Done(result))
+                            }
+                            _ => Ok(Progress::Waiting("result not available yet".to_string())),
                         }
                     },
                 )
@@ -407,6 +462,32 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn slug_collapses_everything_a_ref_can_contain() {
+        assert_eq!(slug("main"), "main");
+        assert_eq!(slug("feature/CUB-123_fix"), "feature-cub-123-fix");
+        assert_eq!(slug("v1.2.3"), "v1-2-3");
+        assert_eq!(slug("---"), "");
+    }
+
+    #[test]
+    fn verify_ref_applied_accepts_a_branch_naming_the_ref() {
+        assert!(verify_ref_applied("main", "dbt-sync/main-20260817-abcd1234", "j").is_ok());
+        assert!(
+            verify_ref_applied("feature/x", "dbt-sync/feature-x-20260817-abcd1234", "j").is_ok()
+        );
+    }
+
+    #[test]
+    fn verify_ref_applied_rejects_a_branch_that_ignored_it() {
+        // What an older deployment produces: the tracked branch, or no ref at all.
+        let err = verify_ref_applied("feature/x", "dbt-sync/main-20260817-abcd1234", "job-1")
+            .expect_err("a branch naming a different ref must not pass");
+        assert!(err.to_string().contains("may predate"), "{err}");
+        assert!(err.to_string().contains("job-1"), "{err}");
+        assert!(verify_ref_applied("feature/x", "dbt-sync/20260817-abcd1234", "j").is_err());
+    }
 
     #[test]
     fn status_label_reads_like_progress() {

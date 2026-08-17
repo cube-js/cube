@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 
 use crate::client;
 
@@ -104,10 +104,42 @@ where
     // for a timeout at minute 30. `None` between streaks says exactly that.
     let mut streak: Option<(u32, String)> = None;
 
+    // Same message whether the deadline lands between attempts or inside one.
+    let timed_out =
+        |elapsed: Duration, last_label: &Option<String>, streak: &Option<(u32, String)>| {
+            anyhow::anyhow!(
+                "timed out after {}s waiting for {what}{}{}{}",
+                elapsed.as_secs(),
+                match last_label {
+                    Some(label) => format!(" (last seen: {label})"),
+                    None => String::new(),
+                },
+                if on_timeout.is_empty() {
+                    String::new()
+                } else {
+                    format!(". {on_timeout}")
+                },
+                match streak {
+                    Some((_, err)) => format!(". Last error: {err}"),
+                    None => String::new(),
+                }
+            )
+        };
+
+    let deadline = tokio::time::Instant::now() + timeout;
+
     loop {
         let failures = streak.as_ref().map_or(0, |(count, _)| *count);
 
-        match attempt().await {
+        let outcome = match tokio::time::timeout_at(deadline, attempt()).await {
+            Ok(outcome) => outcome,
+            // The request itself outlived the budget. Nothing arriving later can be
+            // trusted as "within --timeout", so this ends the wait rather than
+            // looping back to check the clock.
+            Err(_) => return Err(timed_out(started.elapsed(), &last_label, &streak)),
+        };
+
+        match outcome {
             Ok(Progress::Done(value)) => return Ok(value),
             Ok(Progress::Waiting(label)) => {
                 streak = None;
@@ -131,26 +163,7 @@ where
         // early. `Instant::elapsed` is monotonic, so a clock change can't skew it.
         let remaining = timeout.saturating_sub(started.elapsed());
         if remaining.is_zero() {
-            bail!(
-                "timed out after {}s waiting for {what}{}{}{}",
-                started.elapsed().as_secs(),
-                // What the wait was looking at when it gave up. Without it, a CI log
-                // puts the explanation however many minutes above the failure, and
-                // the failure itself describes nothing.
-                match &last_label {
-                    Some(label) => format!(" (last seen: {label})"),
-                    None => String::new(),
-                },
-                if on_timeout.is_empty() {
-                    String::new()
-                } else {
-                    format!(". {on_timeout}")
-                },
-                match &streak {
-                    Some((_, err)) => format!(". Last error: {err}"),
-                    None => String::new(),
-                }
-            );
+            return Err(timed_out(started.elapsed(), &last_label, &streak));
         }
 
         let consecutive_failures = streak.as_ref().map_or(0, |(count, _)| *count);
@@ -204,6 +217,57 @@ mod tests {
             url: "https://tenant.example/api".to_string(),
             source: "connection reset".to_string(),
         })
+    }
+
+    /// The budget has to bound the attempt, not just the gap between attempts. Before
+    /// `timeout_at`, a request that never answered outlived `--timeout` entirely and
+    /// hung the caller — in CI, until the job's own timeout hours later.
+    #[tokio::test]
+    async fn a_never_answering_attempt_still_times_out() {
+        let started = Instant::now();
+        let err = poll(
+            Wait::new(
+                "a hung request",
+                Duration::from_millis(80),
+                Duration::from_millis(10),
+            ),
+            || async {
+                std::future::pending::<()>().await;
+                #[allow(unreachable_code)]
+                Ok::<Progress<serde_json::Value>, anyhow::Error>(unreachable!(
+                    "the deadline must fire first"
+                ))
+            },
+        )
+        .await
+        .expect_err("must not wait past the deadline");
+
+        assert!(err.to_string().contains("timed out"), "{err}");
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "returned after {:?} — the deadline did not bound the attempt",
+            started.elapsed()
+        );
+    }
+
+    /// A response that arrives after the deadline is not "within --timeout" either.
+    #[tokio::test]
+    async fn an_answer_after_the_deadline_is_not_accepted() {
+        let err = poll(
+            Wait::new(
+                "a late answer",
+                Duration::from_millis(50),
+                Duration::from_millis(10),
+            ),
+            || async {
+                tokio::time::sleep(Duration::from_millis(400)).await;
+                Ok(Progress::Done(serde_json::json!({"late": true})))
+            },
+        )
+        .await
+        .expect_err("a late success must not count");
+
+        assert!(err.to_string().contains("timed out"), "{err}");
     }
 
     #[tokio::test]
