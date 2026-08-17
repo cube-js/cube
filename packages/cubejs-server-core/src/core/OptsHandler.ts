@@ -34,33 +34,21 @@ import { validateOptions } from './optionsValidate';
 
 const { version } = require('../../../package.json');
 
-/**
- * Driver service class.
- */
 export class OptsHandler {
-  /**
-   * Class constructor.
-   */
   public constructor(
     private core: CubejsServerCore,
     private createOptions: CreateOptions,
     private systemOptions?: SystemOptions,
   ) {
-    const options = this.assertOptions(cloneDeep(this.createOptions));
+    const options = this.validateOptions(cloneDeep(this.createOptions));
     const driverFactory = this.getDriverFactory(options);
     options.driverFactory = driverFactory;
     options.dbType = this.getDbType(driverFactory);
     this.initializedOptions = this.initializeCoreOptions(options);
   }
 
-  /**
-   * Decorated driverFactory flag.
-   */
   private decoratedFactory = false;
 
-  /**
-   * Returns true if the user provided a custom driverFactory.
-   */
   public isCustomDriverFactory(): boolean {
     return !this.decoratedFactory;
   }
@@ -70,16 +58,9 @@ export class OptsHandler {
    */
   private driverFactoryType: undefined | 'BaseDriver' | 'DriverConfig';
 
-  /**
-   * Initialized options.
-   */
   private initializedOptions: ServerCoreInitializedOptions;
 
-  /**
-   * Assert create options and return the sanitized copy: joi coercions (canonical time zone
-   * names) only land for callers that use the returned value.
-   */
-  private assertOptions<T extends CreateOptions>(opts: T): T {
+  private validateOptions<T extends CreateOptions>(opts: T): T {
     if ((opts as any).dbType) {
       throw new Error(
         'CreateOptions.dbType was removed in v1.7.0. ' +
@@ -91,10 +72,7 @@ export class OptsHandler {
 
     const validated = validateOptions(opts);
 
-    // Probed for its throw: the only consumer is per-request code (normalizeQuery), so an
-    // operator typo would otherwise surface as a client error on every query instead of
-    // failing the boot. CUBEJS_SCHEDULED_REFRESH_TIMEZONES needs none — initializeCoreOptions
-    // reads it eagerly.
+    // Probed for its throw: the only consumer is per-request code (normalizeQuery)
     getEnv('defaultTimezone');
 
     if (
