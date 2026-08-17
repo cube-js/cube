@@ -271,7 +271,7 @@ fn wait_json(
         "status": output::field(status, "status"),
         "error": status.get("error").cloned().unwrap_or(Value::Null),
         "result": result.cloned().unwrap_or(Value::Null),
-        "refVerified": ref_verified.map(Value::Bool).unwrap_or(Value::Null),
+        "refVerified": Value::from(ref_verified),
     })
 }
 
@@ -361,11 +361,15 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     // `--ref` left to check, so this document is its only chance to learn
                     // the ref wasn't confirmed.
                     let mut doc = started.clone();
+                    // `or_insert`, not `insert`: if a future server echoes the resolved
+                    // ref and reports this itself, its answer is better evidence than
+                    // this client's prefix comparison and should win. A document that
+                    // isn't an object silently goes without the field — lossy on purpose,
+                    // and safe for the documented `jq -e '.refVerified == true'`, which
+                    // fails on a missing field.
                     if let Some(obj) = doc.as_object_mut() {
-                        obj.insert(
-                            "refVerified".into(),
-                            ref_verified.map(Value::Bool).unwrap_or(Value::Null),
-                        );
+                        obj.entry("refVerified")
+                            .or_insert_with(|| Value::from(ref_verified));
                     }
                     output::print_json(&doc);
                 } else {
@@ -374,12 +378,13 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                         "Watch it with `cube dbt status {deployment} {sync_job_id} --wait`, \
                          or re-run sync with --wait."
                     );
-                    // Each sync deliberately creates a FRESH branch, and no endpoint
-                    // deletes one yet — a job running per pull request accumulates
-                    // them, so say so rather than let them pile up unnoticed. Worth
-                    // revisiting if branch deletion becomes available.
+                    // Each sync deliberately creates a FRESH branch, so a job running
+                    // per pull request accumulates them — say so, and name the command
+                    // that removes one, rather than let them pile up unnoticed.
                     println!(
-                        "The branch is not removed automatically — prune it when you're done."
+                        "The branch is not removed automatically — prune it with \
+                         `cube data-model delete-branch {deployment} {branch_name}` \
+                         when you're done."
                     );
                 }
 
