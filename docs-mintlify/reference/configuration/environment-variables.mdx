@@ -1104,8 +1104,7 @@ The default [time zone][ref-time-zone] for queries.
 | A valid time zone name | `UTC`                  | `UTC`                 |
 
 You can set the time zone name in the [TZ Database Name][link-tzdb] format, e.g.,
-`America/Los_Angeles`. Names are matched case-insensitively and normalized to their
-canonical form, so `america/los_angeles` resolves to `America/Los_Angeles`.
+`America/Los_Angeles`.
 
 <Warning>
 
@@ -1418,13 +1417,6 @@ for][ref-config-sched-refresh-timer].
 
 It can be also set using the [`scheduled_refresh_time_zones` configuration
 option](/reference/configuration/config#scheduled_refresh_time_zones).
-
-<Warning>
-
-An invalid entry fails at server startup. Names are matched case-insensitively and
-normalized to their canonical form.
-
-</Warning>
 
 ## `CUBEJS_SCHEMA_PATH`
 
