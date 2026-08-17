@@ -480,8 +480,10 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             // Checked here rather than left to the server: a query parameter can be
             // present-but-empty, and what `branchName=` means is then entirely the
             // server's choice — not something to discover with a DELETE. It is also
-            // reachable from a script rather than only from a typo, since
-            // `jq -r .branchName` yields an empty string when the field is missing.
+            // reachable from a script rather than only from a typo: `jq -r` prints
+            // nothing at all for EMPTY input, so a truncated or empty document gives
+            // an empty variable. (A missing FIELD prints `null`, which travels as a
+            // literal branch name and gets a 404 — loud, and the right answer.)
             anyhow::ensure!(
                 !branch.trim().is_empty(),
                 "a branch name is required — an empty one would leave the server to \
