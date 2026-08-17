@@ -4,6 +4,8 @@ use anyhow::{Context as _, Result};
 use clap::Subcommand;
 use serde_json::json;
 
+use reqwest::Method;
+
 use crate::client::{Client, Query};
 use crate::{output, util, Ctx};
 
@@ -108,6 +110,17 @@ enum Cmd {
         deployment: i64,
         /// Branch to enable (a shared branch — not a personal dev branch)
         branch: String,
+    },
+    /// Delete a branch and its Cube-side git ref
+    DeleteBranch {
+        /// Deployment id
+        deployment: i64,
+        /// Branch to delete
+        branch: String,
+        /// Also delete the branch on the connected git provider (GitHub/GitLab).
+        /// Off by default, so your own remote is left alone unless you say so.
+        #[arg(long)]
+        remove_on_upstream: bool,
     },
     /// Disable a branch: its staging environment is active only while the
     /// branch is viewed in the Cube UI
@@ -454,6 +467,36 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         }
         Cmd::EnableBranch { deployment, branch } => {
             set_branch_enabled(&api, ctx, deployment, &branch, true).await?;
+        }
+        Cmd::DeleteBranch {
+            deployment,
+            branch,
+            remove_on_upstream,
+        } => {
+            // `branchName` travels as a query parameter, not a path segment: branch
+            // names contain slashes (`dbt-sync/main-…`). `Client::delete` takes no
+            // query, so this goes through `request` directly.
+            let mut query: Query = vec![("branchName".to_string(), branch.clone())];
+            if remove_on_upstream {
+                query.push(("removeOnUpstream".to_string(), "true".to_string()));
+            }
+            let res = api
+                .request(
+                    Method::DELETE,
+                    &format!("/build/api/v1/deployments/{deployment}/branches"),
+                    &query,
+                    None,
+                )
+                .await?;
+            if ctx.json {
+                output::print_json(&res);
+            } else if remove_on_upstream {
+                output::success(&format!(
+                    "Deleted branch {branch}, including its ref on the git provider"
+                ));
+            } else {
+                output::success(&format!("Deleted branch {branch}"));
+            }
         }
         Cmd::DisableBranch { deployment, branch } => {
             set_branch_enabled(&api, ctx, deployment, &branch, false).await?;

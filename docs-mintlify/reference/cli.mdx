@@ -151,7 +151,7 @@ Run `cube <command> --help` for the full options of any command.
 | `logs` | Tail deployment pod logs (`--pod`, `-c/--container`, `--source production\|dev`) |
 | `regions` | List available deployment regions |
 | `github` (`gh`) | GitHub integration: `status`, `installations`, `repos`, `branches`, `connect` |
-| `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `enable-branch`/`disable-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
+| `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `delete-branch`, `enable-branch`/`disable-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
 | `dbt` | dbt sync: `sync` (`--ref`, `--wait`), `status`, `result`, `cancel` |
 | `environments` | Deployment environments and environment tokens |
 | `variables` | Deployment environment variables |
@@ -345,6 +345,9 @@ steps:
     if: always()
     continue-on-error: true
     run: cube data-model exit-dev-mode "$DEPLOYMENT_ID"
+
+  - name: Prune the branch the sync created
+    run: cube data-model delete-branch "$DEPLOYMENT_ID" "$BRANCH"
 ```
 
 With `--wait --json`, the sync writes one document carrying both the branch to
@@ -386,9 +389,15 @@ timeout — exits non-zero, so the job fails without extra scripting.
 
 <Info>
 
-A gate that runs per pull request accumulates the branches its syncs create.
-There is no CLI command to delete a branch yet, so prune them from the data model
-UI periodically, or merge the ones you want to keep.
+Each sync creates a branch, so a gate that runs per pull request would accumulate
+them — hence the prune step. It deliberately has no `if: always()`: on a **failure**
+the branch is the evidence, holding the generated cubes that broke the build, so it
+is left for someone to open. On success it has served its purpose.
+
+For a deployment connected to a git provider, add `--remove-on-upstream` to delete
+the pushed ref as well; without it the branch is removed from Cube only. Deleting
+the deploy branch is refused, and an unknown branch is a 404 — so a re-run of a
+gate that already pruned fails loudly rather than silently.
 
 </Info>
 
