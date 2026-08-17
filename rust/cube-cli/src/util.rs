@@ -359,7 +359,15 @@ mod tests {
                 // that don't exist, and this message is the whole interface of the
                 // test — someone reading it in CI greps for what it printed.
                 let flag = if arg.is_positional() {
-                    format!("{} <{}>", path.join(" "), id.to_uppercase())
+                    // Ask clap here too: an explicit `value_name` on a branchy
+                    // positional would otherwise be reported as a placeholder that
+                    // appears nowhere in --help.
+                    let name = arg
+                        .get_value_names()
+                        .and_then(|names| names.first())
+                        .map(|name| name.to_string())
+                        .unwrap_or_else(|| id.to_uppercase());
+                    format!("{} <{name}>", path.join(" "))
                 } else {
                     format!("{} --{}", path.join(" "), arg.get_long().unwrap_or(id))
                 };
