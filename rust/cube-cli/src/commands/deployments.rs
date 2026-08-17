@@ -88,6 +88,12 @@ enum Cmd {
     Versions {
         /// Deployment id
         deployment: i64,
+        /// Page size for cursor-based pagination
+        #[arg(long)]
+        first: Option<u64>,
+        /// Cursor for the next page (from a previous pageInfo.endCursor)
+        #[arg(long)]
+        after: Option<String>,
     },
     /// Delete a deployment
     #[command(alias = "rm")]
@@ -222,11 +228,18 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 .await?;
             output::print_json(&res);
         }
-        Cmd::Versions { deployment } => {
+        Cmd::Versions {
+            deployment,
+            first,
+            after,
+        } => {
+            let mut query = Vec::new();
+            util::push(&mut query, "first", &first);
+            util::push(&mut query, "after", &after);
             let res = api
                 .get(
                     &format!("/api/v1/deployments/{deployment}/versions"),
-                    &Vec::new(),
+                    &query,
                 )
                 .await?;
             output::print_list(

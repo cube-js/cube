@@ -19,12 +19,18 @@ enum Cmd {
         /// Filter by type: production, staging, development
         #[arg(long = "type")]
         env_type: Option<String>,
-        /// Pagination offset
+        /// Deprecated: pagination offset (use --after)
         #[arg(long)]
         offset: Option<u64>,
-        /// Maximum number of items to return
+        /// Deprecated: maximum number of items to return (use --first)
         #[arg(long)]
         limit: Option<u64>,
+        /// Page size for cursor-based pagination
+        #[arg(long)]
+        first: Option<u64>,
+        /// Cursor for the next page (from a previous pageInfo.endCursor)
+        #[arg(long)]
+        after: Option<String>,
     },
     /// List tokens issued for an environment
     Tokens {
@@ -32,12 +38,18 @@ enum Cmd {
         deployment: i64,
         /// Environment id
         environment: i64,
-        /// Pagination offset
+        /// Deprecated: pagination offset (use --after)
         #[arg(long)]
         offset: Option<u64>,
-        /// Maximum number of items to return
+        /// Deprecated: maximum number of items to return (use --first)
         #[arg(long)]
         limit: Option<u64>,
+        /// Page size for cursor-based pagination
+        #[arg(long)]
+        first: Option<u64>,
+        /// Cursor for the next page (from a previous pageInfo.endCursor)
+        #[arg(long)]
+        after: Option<String>,
     },
     /// Create an environment token
     CreateToken {
@@ -68,20 +80,32 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             env_type,
             offset,
             limit,
+            first,
+            after,
         } => {
+            let legacy = util::offset_paging(
+                offset.is_some() || limit.is_some(),
+                first.is_some() || after.is_some(),
+            )?;
             let mut query = Vec::new();
             util::push(&mut query, "type", &env_type);
             util::push(&mut query, "offset", &offset);
             util::push(&mut query, "limit", &limit);
+            util::push(&mut query, "first", &first);
+            util::push(&mut query, "after", &after);
             let res = api
                 .get(
                     &format!("/api/v1/deployments/{deployment}/environments"),
                     &query,
                 )
                 .await?;
-            output::print_list(
+            // The environment list is assembled in memory, so `items` is the
+            // cursor page (the whole list unless --first is given) while only
+            // the deprecated `data` is sliced by offset/limit.
+            output::print_list_from(
                 ctx.json,
                 &res,
+                legacy.then_some("data"),
                 &[
                     ("ID", "id"),
                     ("TYPE", "type"),
@@ -95,10 +119,18 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             environment,
             offset,
             limit,
+            first,
+            after,
         } => {
+            util::offset_paging(
+                offset.is_some() || limit.is_some(),
+                first.is_some() || after.is_some(),
+            )?;
             let mut query = Vec::new();
             util::push(&mut query, "offset", &offset);
             util::push(&mut query, "limit", &limit);
+            util::push(&mut query, "first", &first);
+            util::push(&mut query, "after", &after);
             let res = api
                 .get(
                     &format!("/api/v1/deployments/{deployment}/environments/{environment}/tokens"),

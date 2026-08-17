@@ -43,6 +43,21 @@ pub fn push<T: ToString>(query: &mut Query, key: &str, value: &Option<T>) {
     }
 }
 
+/// Resolve which paging style a list command was invoked with, returning
+/// `true` for the deprecated `offset`/`limit` one.
+///
+/// The API deprecated `offset`/`limit` in favor of the `first`/`after`
+/// cursor and the two address different pages of the same response, so an
+/// endpoint given both either rejects the request (deployments) or silently
+/// honors just one (environments, user attributes). Reject it here instead,
+/// so the CLI never prints a page the caller did not ask for.
+pub fn offset_paging(uses_offset: bool, uses_cursor: bool) -> Result<bool> {
+    if uses_offset && uses_cursor {
+        bail!("--offset/--limit are deprecated and cannot be combined with --first/--after");
+    }
+    Ok(uses_offset)
+}
+
 /// Normalize a user-supplied Cube Cloud URL: trim whitespace and trailing
 /// slashes, and default to `https://` when no scheme is given (reqwest
 /// otherwise fails with "relative URL without a base").
@@ -121,5 +136,13 @@ mod tests {
         set(&mut map, "absent", &None::<String>);
         assert_eq!(map.get("present"), Some(&json!("v")));
         assert!(!map.contains_key("absent"));
+    }
+
+    #[test]
+    fn offset_paging_rejects_mixing_the_two_styles() {
+        assert!(!offset_paging(false, false).unwrap());
+        assert!(offset_paging(true, false).unwrap());
+        assert!(!offset_paging(false, true).unwrap());
+        assert!(offset_paging(true, true).is_err());
     }
 }
