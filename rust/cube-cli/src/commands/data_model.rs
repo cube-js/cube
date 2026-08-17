@@ -27,7 +27,7 @@ enum Cmd {
         #[arg(long)]
         content: bool,
         /// Branch to read (defaults to the deployment's default branch)
-        #[arg(long)]
+        #[arg(long, value_parser = util::nonempty)]
         branch: Option<String>,
     },
     /// Print a single file's content
@@ -37,7 +37,7 @@ enum Cmd {
         /// File path within the project, e.g. model/cubes/orders.yml
         path: String,
         /// Branch name (defaults to the deployment default branch)
-        #[arg(long)]
+        #[arg(long, value_parser = util::nonempty)]
         branch: Option<String>,
     },
     /// Create or overwrite a file (writes require a dev-mode branch)
@@ -54,7 +54,7 @@ enum Cmd {
         content: Option<String>,
         /// Dev-mode branch to write to, as returned by `dev-mode` (defaults to
         /// your active dev-mode branch)
-        #[arg(long)]
+        #[arg(long, value_parser = util::nonempty)]
         branch: Option<String>,
     },
     /// Delete files (writes require a dev-mode branch)
@@ -67,7 +67,7 @@ enum Cmd {
         paths: Vec<String>,
         /// Dev-mode branch to write to, as returned by `dev-mode` (defaults to
         /// your active dev-mode branch)
-        #[arg(long)]
+        #[arg(long, value_parser = util::nonempty)]
         branch: Option<String>,
     },
     /// Rename (move) a file (writes require a dev-mode branch)
@@ -80,7 +80,7 @@ enum Cmd {
         to: String,
         /// Dev-mode branch to write to, as returned by `dev-mode` (defaults to
         /// your active dev-mode branch)
-        #[arg(long)]
+        #[arg(long, value_parser = util::nonempty)]
         branch: Option<String>,
     },
     /// List branches
@@ -99,6 +99,7 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Name
+        #[arg(value_parser = util::nonempty)]
         name: String,
         /// Enter dev mode on the new branch
         #[arg(long)]
@@ -109,6 +110,7 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Branch to enable (a shared branch — not a personal dev branch)
+        #[arg(value_parser = util::nonempty)]
         branch: String,
     },
     /// Delete a branch and its Cube-side git ref
@@ -116,6 +118,7 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Branch to delete
+        #[arg(value_parser = util::nonempty)]
         branch: String,
         /// Also delete the branch on the connected git provider (GitHub/GitLab).
         /// Off by default, so your own remote is left alone unless you say so.
@@ -128,6 +131,7 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Branch to disable
+        #[arg(value_parser = util::nonempty)]
         branch: String,
     },
     /// Enter dev mode on a branch (prints the personal dev-mode branch that
@@ -136,6 +140,7 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Branch to base dev mode on (required by the API)
+        #[arg(value_parser = util::nonempty)]
         branch: String,
     },
     /// Exit dev mode
@@ -151,7 +156,7 @@ enum Cmd {
         #[arg(long, short = 'm')]
         message: Option<String>,
         /// Branch to commit (defaults to the active dev-mode branch)
-        #[arg(long)]
+        #[arg(long, value_parser = util::nonempty)]
         branch: Option<String>,
     },
     /// List server-side content hashes of data model files
@@ -159,7 +164,7 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Branch name (defaults to the deployment default branch)
-        #[arg(long)]
+        #[arg(long, value_parser = util::nonempty)]
         branch: Option<String>,
     },
     /// Sync a branch from its remote and rebuild if it moved
@@ -167,7 +172,7 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Branch name (defaults to the deployment default branch)
-        #[arg(long)]
+        #[arg(long, value_parser = util::nonempty)]
         branch: Option<String>,
     },
     /// Merge a branch into its parent branch
@@ -175,7 +180,7 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Branch to merge (defaults to the active dev-mode branch)
-        #[arg(long)]
+        #[arg(long, value_parser = util::nonempty)]
         branch: Option<String>,
         /// Squash commits into one
         #[arg(long)]
@@ -192,7 +197,7 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Branch to merge (defaults to the active dev-mode branch)
-        #[arg(long)]
+        #[arg(long, value_parser = util::nonempty)]
         branch: Option<String>,
         /// Commit message
         #[arg(long, short = 'm')]
@@ -253,12 +258,11 @@ fn tree_nodes(res: &serde_json::Value) -> Vec<serde_json::Value> {
 fn write_body(
     mut body: serde_json::Map<String, serde_json::Value>,
     branch: &Option<String>,
-) -> Result<serde_json::Value> {
-    util::require_nonempty_opt("--branch", branch)?;
+) -> serde_json::Value {
     if let Some(b) = branch {
         body.insert("branchName".into(), json!(b));
     }
-    Ok(util::body(body))
+    util::body(body)
 }
 
 /// Enabling a branch keeps its staging environment always active and accessible
@@ -274,7 +278,6 @@ async fn set_branch_enabled(
     branch: &str,
     enabled: bool,
 ) -> Result<()> {
-    util::require_nonempty("BRANCH", branch)?;
     let body = json!({ "branchName": branch, "enabled": enabled });
     let res = api
         .put(
@@ -320,7 +323,6 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             content,
             branch,
         } => {
-            util::require_nonempty_opt("--branch", &branch)?;
             let mut query: Query = Vec::new();
             if content {
                 query.push(("withContent".into(), "true".into()));
@@ -346,7 +348,6 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             path,
             branch,
         } => {
-            util::require_nonempty_opt("--branch", &branch)?;
             let mut query: Query = vec![("withContent".into(), "true".into())];
             util::push(&mut query, "branchName", &branch);
             let res = api.get(&base(deployment), &query).await?;
@@ -369,7 +370,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let mut map = serde_json::Map::new();
             map.insert("files".into(), json!([{ "path": path, "content": text }]));
             let res = api
-                .put(&base(deployment), Some(&write_body(map, &branch)?))
+                .put(&base(deployment), Some(&write_body(map, &branch)))
                 .await?;
             if ctx.json {
                 output::print_json(&res);
@@ -387,7 +388,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let mut map = serde_json::Map::new();
             map.insert("files".into(), json!(files));
             let res = api
-                .delete(&base(deployment), Some(&write_body(map, &branch)?))
+                .delete(&base(deployment), Some(&write_body(map, &branch)))
                 .await?;
             if ctx.json {
                 output::print_json(&res);
@@ -408,7 +409,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let res = api
                 .post(
                     &format!("{}/rename", base(deployment)),
-                    Some(&write_body(map, &branch)?),
+                    Some(&write_body(map, &branch)),
                 )
                 .await?;
             if ctx.json {
@@ -446,7 +447,6 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             name,
             dev_mode,
         } => {
-            util::require_nonempty("NAME", &name)?;
             let body = json!({ "name": name, "enterDevMode": dev_mode });
             let res = api
                 .post(
@@ -482,10 +482,6 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             // names contain slashes (`dbt-sync/main-…`). `Client::delete` takes no
             // query, so this goes through `request` directly.
             //
-            // Not left to the server: what `branchName=` means is then the server's
-            // choice, and a DELETE is not the place to find out. See
-            // `util::require_nonempty`.
-            util::require_nonempty("BRANCH", &branch)?;
             let mut query: Query = vec![("branchName".to_string(), branch.clone())];
             if remove_on_upstream {
                 query.push(("removeOnUpstream".to_string(), "true".to_string()));
@@ -512,9 +508,6 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             set_branch_enabled(&api, ctx, deployment, &branch, false).await?;
         }
         Cmd::DevMode { deployment, branch } => {
-            // An empty branch here would enter dev mode on the deploy branch, and
-            // every later step of a CI gate would then be checking production.
-            util::require_nonempty("BRANCH", &branch)?;
             let body = json!({ "branchName": branch });
             let res = api
                 .post(
@@ -552,7 +545,6 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             branch,
         } => {
             let mut body = serde_json::Map::new();
-            util::require_nonempty_opt("--branch", &branch)?;
             util::set(&mut body, "message", &message);
             util::set(&mut body, "branchName", &branch);
             let res = api
@@ -568,7 +560,6 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             }
         }
         Cmd::FileHashes { deployment, branch } => {
-            util::require_nonempty_opt("--branch", &branch)?;
             let mut query = Vec::new();
             util::push(&mut query, "branchName", &branch);
             let res = api
@@ -580,7 +571,6 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             output::print_json(&res);
         }
         Cmd::Pull { deployment, branch } => {
-            util::require_nonempty_opt("--branch", &branch)?;
             let body = branch.as_ref().map(|b| json!({ "branchName": b }));
             let res = api
                 .post(
@@ -608,7 +598,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let res = api
                 .post(
                     &format!("/build/api/v1/deployments/{deployment}/merge"),
-                    Some(&write_body(map, &branch)?),
+                    Some(&write_body(map, &branch)),
                 )
                 .await?;
             output::print_json(&res);
@@ -625,7 +615,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let res = api
                 .post(
                     &format!("/build/api/v1/deployments/{deployment}/merge-to-default"),
-                    Some(&write_body(map, &branch)?),
+                    Some(&write_body(map, &branch)),
                 )
                 .await?;
             output::print_json(&res);
