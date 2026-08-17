@@ -271,17 +271,13 @@ const variables: Record<string, (...args: any) => any> = {
   refreshWorkerConcurrency: () => get('CUBEJS_REFRESH_WORKER_CONCURRENCY')
     .asIntPositive(),
   scheduledRefreshTimezones: () => {
-    const timezones = get('CUBEJS_SCHEDULED_REFRESH_TIMEZONES').asString();
-    // Unset must stay `undefined`, not `null`: CreateOptions.scheduledRefreshTimeZones is an
-    // optional property, and optionsValidate's Joi.alternatives() rejects null — which would
-    // break boot if option validation is ever moved after the env defaults are merged.
-    if (!timezones) {
-      return undefined;
-    }
+    const timezones = get('CUBEJS_SCHEDULED_REFRESH_TIMEZONES')
+      .default('')
+      .asArray()
+      .map(timezone => timezone.trim())
+      .filter(Boolean);
 
-    return timezones.split(',').map(t => {
-      const raw = t.trim();
-
+    return timezones.map(raw => {
       const timezone = canonicalTimezone(raw);
       if (!timezone) {
         throw new InvalidConfiguration(

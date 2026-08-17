@@ -224,9 +224,9 @@ describe('getEnv(defaultTimezone / scheduledRefreshTimezones)', () => {
     );
   });
 
-  test('scheduledRefreshTimezones - unset resolves to undefined', () => {
+  test('scheduledRefreshTimezones - unset resolves to an empty list', () => {
     delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES;
-    expect(getEnv('scheduledRefreshTimezones')).toBeUndefined();
+    expect(getEnv('scheduledRefreshTimezones')).toEqual([]);
   });
 
   test('scheduledRefreshTimezones - trims and normalizes each entry', () => {
@@ -235,6 +235,30 @@ describe('getEnv(defaultTimezone / scheduledRefreshTimezones)', () => {
 
     process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = 'America/New_York';
     expect(getEnv('scheduledRefreshTimezones')).toEqual(['America/New_York']);
+  });
+
+  // Trailing/repeated separators are common in .env files and compose YAML, so they must
+  // not be read as an empty zone.
+  test('scheduledRefreshTimezones - ignores empty entries', () => {
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = 'UTC,';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual(['UTC']);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = 'UTC,,America/Los_Angeles';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual(['UTC', 'America/Los_Angeles']);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = ' UTC , ';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual(['UTC']);
+  });
+
+  test('scheduledRefreshTimezones - blank resolves to an empty list', () => {
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = '';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual([]);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = '   ';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual([]);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = ',';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual([]);
   });
 
   test('scheduledRefreshTimezones(exception)', () => {

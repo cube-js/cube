@@ -2,7 +2,6 @@ import Joi from 'joi';
 import { canonicalTimezone } from '@cubejs-backend/shared';
 import DriverDependencies from './DriverDependencies';
 
-// Fails fast at startup instead of deep in the refresh scheduler.
 const timezoneSchema = Joi.string().custom((value, helpers) => {
   const name = canonicalTimezone(value);
   if (!name) {
