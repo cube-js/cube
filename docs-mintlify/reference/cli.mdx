@@ -421,9 +421,11 @@ hour at worst. The per-attempt cap matters because without one a host that accep
 connection and never answers would hang until the *job* timeout — six hours by default —
 and a gate that never returns is worse than one that fails.
 
-95 is deliberate: `continueWaitTimeout` is capped at 90 where Cube validates it, so no
-accepted value can outlast a single attempt and the two numbers never need keeping in
-sync. That cap applies to an `orchestrator_options` **object** — the function form used
+95 is deliberate: `continueWaitTimeout` — the only part of a request Cube bounds — is
+capped at 90 where Cube validates it, so no accepted value can make the long poll itself
+outlast a single attempt. The compile and SQL generation ahead of it are unbounded and
+add to that, which on a cold first query is where the two could still cross 95s; the next
+attempt finds the compile already done. That cap applies to an `orchestrator_options` **object** — the function form used
 for multi-tenancy is validated as a function, so the options it returns are never checked
 and nothing clamps them downstream. If yours returns something larger, `--max-time` has
 to clear it.
