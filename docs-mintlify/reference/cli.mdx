@@ -419,7 +419,7 @@ and an HTML page, which `curl -sf` accepts happily. Asserting on the body is wha
 "some 200 came back" into "the model answered a query".
 
 The loop exists because not every `200` is an answer: a query that takes longer than the
-`continueWaitTimeout` [queue option][ref-conf-queue-opts] returns [`Continue
+`continueWaitTimeout` [orchestrator option][ref-conf-orchestrator-opts] returns [`Continue
 wait`][ref-rest-api-continue-wait]
 with status 200, and clients are expected to retry until a result appears. A first query
 against a cold dev-mode environment and an uncached warehouse is exactly when that
@@ -446,8 +446,12 @@ hour at worst. The per-attempt cap matters because without one a host that accep
 connection and never answers would hang until the *job* timeout — six hours by default —
 and a gate that never returns is worse than one that fails.
 
-95 is deliberate: `continueWaitTimeout` is capped at 90 by the server, so no accepted
-value of it can outlast a single attempt, and the two numbers never need keeping in sync.
+95 is deliberate: `continueWaitTimeout` is capped at 90 where Cube validates it, so no
+accepted value can outlast a single attempt and the two numbers never need keeping in
+sync. That cap applies to an `orchestrator_options` **object** — the function form used
+for multi-tenancy is validated as a function, so the options it returns are never checked
+and nothing clamps them downstream. If yours returns something larger, `--max-time` has
+to clear it.
 Shorten `--max-time` below that ceiling and you reintroduce the coupling — curl would
 abort each long poll before Cube could answer, and the loop would report a network failure
 for what is really two timeouts disagreeing. Raising it instead multiplies the budget by
@@ -560,7 +564,7 @@ is a hash of the OS machine id. Telemetry is disabled automatically in CI,
 or explicitly with `CUBE_NO_TELEMETRY=1` (or the legacy `CUBEJS_TELEMETRY=false`).
 
 [ref-api-keys]: /admin/account-billing/api-keys
-[ref-conf-queue-opts]: /reference/configuration/config#queueoptions
+[ref-conf-orchestrator-opts]: /reference/configuration/config#orchestrator_options
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-rest-api-continue-wait]: /reference/core-data-apis/rest-api#continue-wait
 [ref-staging-env]: /admin/deployment/environments#staging-environments
