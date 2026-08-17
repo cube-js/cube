@@ -278,10 +278,15 @@ DEV=$(cube data-model dev-mode DEPLOYMENT_ID my-branch --json | jq -r .branchNam
 cube data-model put DEPLOYMENT_ID model/cubes/orders.yml --file orders.yml --branch "$DEV"
 cube data-model commit DEPLOYMENT_ID --branch "$DEV" -m "add orders cube"
 cube data-model merge-to-default DEPLOYMENT_ID --branch my-branch -m "add orders cube"
+cube data-model exit-dev-mode DEPLOYMENT_ID
+cube data-model delete-branch DEPLOYMENT_ID "$DEV"
 ```
 
 `commit` pushes the dev branch's edits to the shared branch it was forked from, and
 `merge-to-default` merges that branch into the deploy branch and rebuilds production.
+The last two lines matter as much as the rest: dev mode is per-credential state, so
+while a session stays open every command that omits `--branch` targets that dev branch
+instead of the deploy branch, and each pass through this leaves a `dev-…` fork behind.
 
 <Info>
 
