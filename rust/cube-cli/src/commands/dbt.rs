@@ -119,6 +119,12 @@ const RESULT_FETCH_TIMEOUT: Duration = Duration::from_secs(30);
 /// (`git check-ref-format` rejects a space, so that row measures the server rather than
 /// anything `--ref` can carry; `~` earns its place — `main~1` is a legal revision.)
 ///
+/// One observation deliberately *not* encoded: `#1-fix` produced `1-fix`, so a leading `#`
+/// is dropped rather than replaced. One probe of one character is how the first two
+/// versions of this check went wrong, so `#` stays in the unmeasured set and reports the
+/// sync unverified instead. Extending the mapping wants the same treatment the table got:
+/// measure the class, then encode it.
+///
 /// So alphanumerics, `_`, `.` and `-` survive with their case; `/`, space and `~` become
 /// `-`; and the segment is cut at 40 characters. Comparing whole refs therefore fails
 /// healthy syncs — a prefix is what survives every shape, and it keeps the property that
@@ -152,31 +158,35 @@ fn ref_fingerprint(value: &str) -> String {
 ///
 /// Only checked when the caller let the server name the branch: with `--branch` the name
 /// is the caller's own and carries no ref to look for.
-fn verify_ref_applied(requested: &str, branch_name: &str, sync_job_id: &str) -> Result<()> {
+///
+/// `Ok(true)` when the branch name confirms the ref, `Ok(false)` when the ref left nothing
+/// comparable — the caller warns and reports it as `refVerified: false` — and `Err` when
+/// the name contradicts the ref.
+fn verify_ref_applied(requested: &str, branch_name: &str, sync_job_id: &str) -> Result<bool> {
     let fingerprint = ref_fingerprint(requested);
     // A ref beginning with a character nobody measured leaves nothing to compare. That's
-    // a legal ref (`#1234-fix`, `@release`), and returning Ok silently would mean the
-    // gate ran unverified with no way to tell — so say so.
+    // a legal ref (`#1234-fix`, `@release`), and a silent Ok would mean the gate ran
+    // unverified with no way to tell.
     if fingerprint.is_empty() {
-        eprintln!(
-            "warning: no part of `{requested}` can be checked against the branch name, \
-             so this sync is not verified to have used it"
-        );
-        return Ok(());
+        return Ok(false);
     }
 
     let lowered = branch_name.to_ascii_lowercase();
-    let matched = match lowered.strip_prefix("dbt-sync/") {
-        // The strictness is only here to stop short fingerprints matching the constant
-        // prefix or the trailing timestamp-hash.
-        Some(segment) => segment.starts_with(&fingerprint),
-        // A name shaped differently has none of that boilerplate, so the reason for the
-        // strictness is gone. Falling back to a contains check keeps a server that
-        // renames the prefix from failing every healthy sync after the POST.
+    let matched = match lowered.split_once("dbt-sync/") {
+        // Anchored on the marker rather than the start of the name, so a nested
+        // `myorg/dbt-sync/…` still gets the strict check: the ref segment begins right
+        // after it, and requiring `starts_with` there is what stops a short fingerprint
+        // matching the trailing timestamp-hash.
+        Some((_, segment)) => segment.starts_with(&fingerprint),
+        // No marker to anchor on — a renamed prefix. Weaker on purpose, and knowingly:
+        // the trailing `-<timestamp>-<hash>` outlives any rename, so a short fingerprint
+        // (`1`, `2026`, a hex character) can still be satisfied by it. Preferred over
+        // failing every healthy sync after the POST, which is what anchoring on a
+        // literal did.
         None => lowered.contains(&fingerprint),
     };
     if matched {
-        return Ok(());
+        return Ok(true);
     }
 
     anyhow::bail!(
@@ -243,7 +253,17 @@ fn print_result(json: bool, result: &Value) {
 /// which branch to compile next, and how the sync ended. Waiting otherwise forced a
 /// choice between the start payload (which names the branch) and the result (which
 /// does not), and a CI job needs both.
-fn wait_json(started: &Value, status: &Value, branch_name: &str, result: Option<&Value>) -> Value {
+/// `ref_verified` is false when `--ref` was given but nothing in it could be checked
+/// against the branch name (see [`verify_ref_applied`]) — a warning on stderr is
+/// invisible to the `jq` consumer this document exists for, which would otherwise read
+/// identically to a verified run. `null` when no `--ref` was given.
+fn wait_json(
+    started: &Value,
+    status: &Value,
+    branch_name: &str,
+    result: Option<&Value>,
+    ref_verified: Option<bool>,
+) -> Value {
     serde_json::json!({
         "syncJobId": output::field(started, "syncJobId"),
         "workflowId": output::field(started, "workflowId"),
@@ -251,6 +271,7 @@ fn wait_json(started: &Value, status: &Value, branch_name: &str, result: Option<
         "status": output::field(status, "status"),
         "error": status.get("error").cloned().unwrap_or(Value::Null),
         "result": result.cloned().unwrap_or(Value::Null),
+        "refVerified": ref_verified.map(Value::Bool).unwrap_or(Value::Null),
     })
 }
 
@@ -317,9 +338,21 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let branch_name = output::field(&started, "branchName");
 
             // Fail closed if the server didn't honour --ref (see `verify_ref_applied`).
-            if let (Some(requested), None) = (&r#ref, &branch) {
-                verify_ref_applied(requested, &branch_name, &sync_job_id)?;
-            }
+            // `None` when there was nothing to verify: no --ref, or the caller named the
+            // branch themselves.
+            let ref_verified = match (&r#ref, &branch) {
+                (Some(requested), None) => {
+                    let verified = verify_ref_applied(requested, &branch_name, &sync_job_id)?;
+                    if !verified {
+                        eprintln!(
+                            "warning: no part of `{requested}` can be checked against the \
+                             branch name, so this sync is not verified to have used it"
+                        );
+                    }
+                    Some(verified)
+                }
+                _ => None,
+            };
 
             if !wait {
                 if ctx.json {
@@ -347,7 +380,13 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
 
             if output::field(&status, "status") == FAILED {
                 if ctx.json {
-                    output::print_json(&wait_json(&started, &status, &branch_name, None));
+                    output::print_json(&wait_json(
+                        &started,
+                        &status,
+                        &branch_name,
+                        None,
+                        ref_verified,
+                    ));
                 }
 
                 // The only signal a CI gate needs is the non-zero exit. The message
@@ -416,7 +455,13 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                         // Still emit the document: the sync itself succeeded, and the
                         // branch name in it is what a caller needs to carry on with.
                         if ctx.json {
-                            output::print_json(&wait_json(&started, &status, &branch_name, None));
+                            output::print_json(&wait_json(
+                                &started,
+                                &status,
+                                &branch_name,
+                                None,
+                                ref_verified,
+                            ));
                         }
 
                         // Carries the recovery for EVERY way the read can fail, not
@@ -433,7 +478,13 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             };
 
             if ctx.json {
-                output::print_json(&wait_json(&started, &status, &branch_name, Some(&result)));
+                output::print_json(&wait_json(
+                    &started,
+                    &status,
+                    &branch_name,
+                    Some(&result),
+                    ref_verified,
+                ));
             } else {
                 output::success(&format!(
                     "dbt sync {sync_job_id} completed on {branch_name}"
@@ -546,8 +597,8 @@ mod tests {
             ),
         ] {
             assert!(
-                verify_ref_applied(requested, branch, "job").is_ok(),
-                "rejected a healthy sync: {requested} → {branch}"
+                verify_ref_applied(requested, branch, "job").unwrap_or(false),
+                "rejected or failed to verify a healthy sync: {requested} → {branch}"
             );
         }
     }
@@ -580,16 +631,23 @@ mod tests {
 
     #[test]
     fn an_uncheckable_ref_passes_but_says_so() {
-        // `#1` fingerprints to nothing; the caller is told rather than left believing
-        // the sync was verified.
-        assert!(verify_ref_applied("#1", "dbt-sync/main-20260817-abcd1234", "job").is_ok());
+        // `#1` fingerprints to nothing, so the sync is allowed but reported unverified —
+        // asserting `is_ok()` alone would pass against the silent version this replaced.
+        assert!(
+            !verify_ref_applied("#1", "dbt-sync/main-20260817-abcd1234", "job").unwrap(),
+            "an uncheckable ref must be reported as unverified, not as verified"
+        );
     }
 
     #[test]
     fn an_unrecognised_branch_shape_falls_back_to_a_contains_check() {
         // If the server ever renames or nests the prefix, a healthy sync must not fail.
-        assert!(verify_ref_applied("main", "myorg/dbt-sync/main-20260817-abcd1234", "j").is_ok());
-        assert!(verify_ref_applied("main", "sync-main-20260817-abcd1234", "j").is_ok());
+        // A nested prefix still contains the marker, so it keeps the STRICT check — which
+        // is what stops a short ref matching the trailing timestamp-hash.
+        assert!(verify_ref_applied("main", "myorg/dbt-sync/main-20260817-abcd1234", "j").unwrap());
+        assert!(verify_ref_applied("1", "myorg/dbt-sync/main-20260817-abcd1234", "j").is_err());
+        // A renamed prefix has no marker: permissive, and knowingly weaker.
+        assert!(verify_ref_applied("main", "sync-main-20260817-abcd1234", "j").unwrap());
         // And it still catches a name with no trace of the ref at all.
         assert!(verify_ref_applied("feature/x", "some-other-shape-2026", "j").is_err());
     }
