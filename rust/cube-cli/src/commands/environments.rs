@@ -83,8 +83,13 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             first,
             after,
         } => {
-            let page_field =
-                util::paging_field("--offset/--limit", offset, limit, first, after.as_deref())?;
+            let page_field = util::paging_field(
+                util::OFFSET_LIMIT_DATA_ONLY,
+                offset,
+                limit,
+                first,
+                after.as_deref(),
+            )?;
             let mut query = Vec::new();
             util::push(&mut query, "type", &env_type);
             util::push(&mut query, "offset", &offset);
@@ -120,8 +125,13 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             first,
             after,
         } => {
-            let page_field =
-                util::paging_field("--offset/--limit", offset, limit, first, after.as_deref())?;
+            let page_field = util::paging_field(
+                util::OFFSET_LIMIT_IN_QUERY,
+                offset,
+                limit,
+                first,
+                after.as_deref(),
+            )?;
             let mut query = Vec::new();
             util::push(&mut query, "offset", &offset);
             util::push(&mut query, "limit", &limit);
@@ -133,9 +143,11 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     &query,
                 )
                 .await?;
-            // Tokens page in the database, so `items` and `data` hold the same
-            // rows either way — read the same field as every other list so the
-            // deprecated one can't quietly stop being honored.
+            // Tokens page in the database: `items` already holds exactly the
+            // requested page and keeps doing so once the deprecated `data` is
+            // removed, so render `items`. Asking for `data` here would turn a
+            // future no-op into a failure on a command the server still honors.
+            // The flags are still validated: the two paging styles can't mix.
             output::print_list_from(
                 ctx.json,
                 &res,
