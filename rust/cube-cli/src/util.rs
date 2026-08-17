@@ -135,6 +135,25 @@ pub fn body(map: Map<String, Value>) -> Value {
     Value::Object(map)
 }
 
+/// Reject a branch name that was supplied but empty.
+///
+/// "Omitted" and "empty" must not collapse into the same request. A query parameter
+/// can be present-but-empty, and the server is free to read that as absent — which
+/// for `branchName` means the deployment's active or deploy branch. So an empty
+/// value doesn't fail, it silently retargets: a compile that was meant to check a
+/// branch reports on production instead, and reports it green.
+pub fn require_branch(flag: &str, value: &str) -> Result<()> {
+    if value.trim().is_empty() {
+        bail!(
+            "{flag} cannot be empty — the server reads an empty branch as \
+             \"no branch\", which silently targets the deployment's own branch \
+             rather than the one you meant"
+        );
+    }
+
+    Ok(())
+}
+
 /// Parse a wait duration: a bare number of seconds, or a number with a `s`/`m`/`h`
 /// suffix (`90`, `30s`, `15m`, `1h`).
 ///
@@ -214,6 +233,14 @@ mod tests {
             "http://localhost:4000"
         );
         assert_eq!(normalize_url(""), "");
+    }
+
+    #[test]
+    fn require_branch_rejects_supplied_but_empty() {
+        assert!(require_branch("--branch", "main").is_ok());
+        assert!(require_branch("--branch", "dbt-sync/x").is_ok());
+        assert!(require_branch("--branch", "").is_err());
+        assert!(require_branch("--branch", "   ").is_err());
     }
 
     #[test]

@@ -333,6 +333,7 @@ steps:
       echo "BRANCH=$(jq -r .branchName sync.json)" >> "$GITHUB_ENV"
 
   - name: Compile and query the generated model
+    shell: bash   # for -o pipefail: a failed `cube … | jq` must not yield an empty variable
     run: |
       DEV_BRANCH=$(cube data-model dev-mode "$DEPLOYMENT_ID" "$BRANCH" --json | jq -r .branchName)
       echo "DEV_BRANCH=$DEV_BRANCH" >> "$GITHUB_ENV"
@@ -385,6 +386,12 @@ reports such a branch as `building` with an error of `Branch is not active` (or
 `Bad branch` if it doesn't exist), and `--wait` stops and says so.
 
 </Warning>
+
+`shell: bash` is there for `pipefail`. Actions' default `run:` shell is `bash -e`
+**without** it, so in `cube … | jq -r .branchName` the pipeline takes `jq`'s exit
+status: a failed `cube` call would pass silently and leave the variable empty. The
+CLI refuses an empty `--branch` rather than letting it mean "whichever branch the
+deployment is on", but failing at the source beats failing three steps later.
 
 The API key needs `SchemaUpdate` on the deployment to start or cancel a sync, and
 `SchemaRead` to follow one. Any failure — a failed sync, a failed compile, a
