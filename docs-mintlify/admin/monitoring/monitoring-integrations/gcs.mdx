@@ -56,12 +56,13 @@ navigate to your bucket and watch the logs coming.
 ### Authentication
 
 The `gcp_cloud_storage` sink reads its service account key from a file, so
-authentication takes two options that work together:
+authentication takes two options that work together — one handled by Cube, one by
+Vector:
 
-| Option | Description |
-| --- | --- |
-| `credentials_base64` | The base64-encoded service account key, or a reference to an environment variable holding it (e.g. `$CUBE_CLOUD_MONITORING_GCS_CREDENTIALS`). Cube decodes it and mounts it into the Vector agent at `/etc/credentials/<sink-name>.json`. |
-| `credentials_path` | Where the sink reads the key from. Set it to the same `/etc/credentials/<sink-name>.json` path. |
+| Option | Handled by | Description |
+| --- | --- | --- |
+| `credentials_base64` | Cube | The base64-encoded service account key, or a reference to an environment variable holding it (e.g. `$CUBE_CLOUD_MONITORING_GCS_CREDENTIALS`). Cube decodes it, mounts it into the Vector agent at `/etc/credentials/<sink-name>.json`, and removes the option from the configuration it passes on — which is why it does not appear in [Vector's own sink reference][vector-docs-sinks-gcs]. |
+| `credentials_path` | Vector | Where the sink reads the key from. Set it to the same `/etc/credentials/<sink-name>.json` path. |
 
 <Warning>
 
@@ -78,10 +79,13 @@ The example above sets `healthcheck.enabled = false`. Vector's
 `gcp_cloud_storage` healthcheck sends a `HEAD` request to the bucket root, which
 requires the `storage.objects.list` permission — write access alone, such as
 `roles/storage.objectCreator`, does not grant it. Without this, the sink fails to
-start with `Healthcheck endpoint forbidden` even though it could write objects
+start with a forbidden-healthcheck error even though it could write objects
 successfully.
 
-## Exporting Query History
+With the healthcheck disabled, the sink always starts and reports healthy, so check
+the bucket itself to confirm that data is arriving.
+
+### Exporting Query History
 
 Add the `query-history` input to the sink to bring [Query History
 export][ref-query-history-export] data to the same bucket.
@@ -99,3 +103,5 @@ logged anywhere.
 [ref-monitoring-integrations]: /admin/monitoring/monitoring-integrations
 [ref-monitoring-integrations-conf]: /admin/monitoring/monitoring-integrations#configuration
 [ref-query-history-export]: /admin/monitoring/monitoring-integrations#query-history-export
+[vector-docs-sinks-gcs]:
+  https://vector.dev/docs/reference/configuration/sinks/gcp_cloud_storage/
