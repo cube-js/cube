@@ -63,6 +63,10 @@ already exists and no action is needed.
 aws iam create-service-linked-role --aws-service-name rds.amazonaws.com
 ```
 
+If the command itself is denied by an SCP, the same denial will block Cube during
+provisioning — ask your AWS organization administrator to permit
+`iam:CreateServiceLinkedRole` for `rds.amazonaws.com` in this account.
+
 </Warning>
 
 ## Provisioning access
