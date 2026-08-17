@@ -116,6 +116,9 @@ const RESULT_FETCH_TIMEOUT: Duration = Duration::from_secs(30);
 /// | `feat~x`                                           | `feat-x`           (tilde replaced)        |
 /// | `feature/CUB-1234-add-orders-fact-table-and-more`  | `feature-CUB-1234-add-orders-fact-table-a` |
 ///
+/// (`git check-ref-format` rejects a space, so that row measures the server rather than
+/// anything `--ref` can carry; `~` earns its place — `main~1` is a legal revision.)
+///
 /// So alphanumerics, `_`, `.` and `-` survive with their case; `/`, space and `~` become
 /// `-`; and the segment is cut at 40 characters. Comparing whole refs therefore fails
 /// healthy syncs — a prefix is what survives every shape, and it keeps the property that
@@ -151,13 +154,28 @@ fn ref_fingerprint(value: &str) -> String {
 /// is the caller's own and carries no ref to look for.
 fn verify_ref_applied(requested: &str, branch_name: &str, sync_job_id: &str) -> Result<()> {
     let fingerprint = ref_fingerprint(requested);
-    // Only the generated segment, not the whole name: `dbt-sync/` and the trailing
-    // timestamp-hash would match short fingerprints (`sync`, `dbt`, `1`, `2026`, `f`)
-    // for a sync that ignored the ref entirely — a false pass, which is the expensive
-    // direction for this check. An unrecognised shape falls back to the whole name.
+    // A ref beginning with a character nobody measured leaves nothing to compare. That's
+    // a legal ref (`#1234-fix`, `@release`), and returning Ok silently would mean the
+    // gate ran unverified with no way to tell — so say so.
+    if fingerprint.is_empty() {
+        eprintln!(
+            "warning: no part of `{requested}` can be checked against the branch name, \
+             so this sync is not verified to have used it"
+        );
+        return Ok(());
+    }
+
     let lowered = branch_name.to_ascii_lowercase();
-    let segment = lowered.strip_prefix("dbt-sync/").unwrap_or(&lowered);
-    if fingerprint.is_empty() || segment.starts_with(&fingerprint) {
+    let matched = match lowered.strip_prefix("dbt-sync/") {
+        // The strictness is only here to stop short fingerprints matching the constant
+        // prefix or the trailing timestamp-hash.
+        Some(segment) => segment.starts_with(&fingerprint),
+        // A name shaped differently has none of that boilerplate, so the reason for the
+        // strictness is gone. Falling back to a contains check keeps a server that
+        // renames the prefix from failing every healthy sync after the POST.
+        None => lowered.contains(&fingerprint),
+    };
+    if matched {
         return Ok(());
     }
 
@@ -558,6 +576,22 @@ mod tests {
         // Unmeasured characters cut the fingerprint short rather than guessing.
         assert_eq!(ref_fingerprint("feat:x"), "feat");
         assert_eq!(ref_fingerprint("#1"), "");
+    }
+
+    #[test]
+    fn an_uncheckable_ref_passes_but_says_so() {
+        // `#1` fingerprints to nothing; the caller is told rather than left believing
+        // the sync was verified.
+        assert!(verify_ref_applied("#1", "dbt-sync/main-20260817-abcd1234", "job").is_ok());
+    }
+
+    #[test]
+    fn an_unrecognised_branch_shape_falls_back_to_a_contains_check() {
+        // If the server ever renames or nests the prefix, a healthy sync must not fail.
+        assert!(verify_ref_applied("main", "myorg/dbt-sync/main-20260817-abcd1234", "j").is_ok());
+        assert!(verify_ref_applied("main", "sync-main-20260817-abcd1234", "j").is_ok());
+        // And it still catches a name with no trace of the ref at all.
+        assert!(verify_ref_applied("feature/x", "some-other-shape-2026", "j").is_err());
     }
 
     /// A short ref must still be checked: searching the whole branch name matched the
