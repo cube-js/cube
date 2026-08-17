@@ -1,7 +1,7 @@
 import R from 'ramda';
 import moment from 'moment-timezone';
 import Joi from 'joi';
-import { getEnv } from '@cubejs-backend/shared';
+import { canonicalTimezone, getEnv } from '@cubejs-backend/shared';
 
 import { UserError } from './user-error';
 import { dateParser } from './date-parser';
@@ -56,15 +56,6 @@ const evaluatedPatchMeasureExpression = parsedPatchMeasureExpression.keys({
 });
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
-const canonicalTimezone = (value) => {
-  const zone = moment.tz.zone(value);
-  if (zone) {
-    // Normalize to the canonical IANA name.
-    return zone.name;
-  }
-
-  return null;
-};
 
 const timezoneSchema = Joi.string().custom((value, helpers) => {
   const name = canonicalTimezone(value);
@@ -72,7 +63,6 @@ const timezoneSchema = Joi.string().custom((value, helpers) => {
     return helpers.message({ custom: '{{#label}} must be a valid IANA time zone, got "{{#tz}}"' }, { tz: value });
   }
 
-  // Normalize to the canonical IANA name.
   return name;
 }, 'timezone');
 
@@ -471,8 +461,6 @@ const normalizeQuery = (query, persistent, cacheMode) => {
     dimension: d.split('.').slice(0, 2).join('.'),
     granularity: d.split('.')[2]
   }));
-  // Use the timezone normalized by the schema (canonical IANA name); the raw request
-  // may carry a different casing.
   const timezone = value.timezone || 'UTC';
 
   const def = getEnv('dbQueryDefaultLimit') <= getEnv('dbQueryLimit')
@@ -553,7 +541,6 @@ const normalizeQueryPreAggregations = (query, defaultValues) => {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
 
-  // Use timezones normalized by the schema (canonical IANA names).
   return {
     metadata: query.metadata,
     timezones: value.timezones || (value.timezone && [value.timezone]) || defaultValues?.timezones || ['UTC'],
@@ -581,7 +568,6 @@ const normalizeQueryPreAggregationPreview = (query) => {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
 
-  // Use the timezone normalized by the schema (canonical IANA name).
   return { ...query, timezone: value.timezone };
 };
 

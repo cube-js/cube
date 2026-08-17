@@ -91,6 +91,12 @@ export class OptsHandler {
 
     optionsValidate(opts);
 
+    // Probed for its throw: the only consumer is per-request code (normalizeQuery), so an
+    // operator typo would otherwise surface as a client error on every query instead of
+    // failing the boot. CUBEJS_SCHEDULED_REFRESH_TIMEZONES needs none — initializeCoreOptions
+    // reads it eagerly.
+    getEnv('defaultTimezone');
+
     if (
       !this.isDevMode() &&
       !process.env.CUBEJS_DB_TYPE &&

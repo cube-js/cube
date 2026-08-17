@@ -997,7 +997,6 @@ class ApiGateway {
         case 'post':
           result = await this.preAggregationsJobsPOST(
             context,
-            // Use the selector normalized by the schema (canonical IANA timezones).
             <PreAggsSelector>value.selector
           );
           if (result.length === 0) {

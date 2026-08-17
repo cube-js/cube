@@ -51,6 +51,28 @@ describe('timezone validation', () => {
   ])('rejects invalid timezone %j', (tz) => {
     expect(() => normalizeQuery({ ...baseQuery, timezone: tz }, false)).toThrow(/Invalid query format/);
   });
+
+  describe('default timezone fallback', () => {
+    afterEach(() => {
+      delete process.env.CUBEJS_DEFAULT_TIMEZONE;
+    });
+
+    test('falls back to UTC when CUBEJS_DEFAULT_TIMEZONE is unset', () => {
+      delete process.env.CUBEJS_DEFAULT_TIMEZONE;
+
+      const { timezone, ...queryWithoutTimezone } = baseQuery;
+      const result = normalizeQuery(queryWithoutTimezone, false);
+      expect(result.timezone).toBe('UTC');
+    });
+
+    test('uses the canonicalized CUBEJS_DEFAULT_TIMEZONE when set', () => {
+      process.env.CUBEJS_DEFAULT_TIMEZONE = 'america/new_york';
+
+      const { timezone, ...queryWithoutTimezone } = baseQuery;
+      const result = normalizeQuery(queryWithoutTimezone, false);
+      expect(result.timezone).toBe('America/New_York');
+    });
+  });
 });
 
 describe('normalizeQueryPreAggregations timezone handling', () => {

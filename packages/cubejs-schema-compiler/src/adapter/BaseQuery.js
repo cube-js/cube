@@ -18,6 +18,7 @@ import {
   FROM_PARTITION_RANGE,
   MAX_SOURCE_ROW_LIMIT,
   QueryAlias,
+  canonicalTimezone,
   getEnv,
   localTimestampToUtc,
   timeSeries as timeSeriesBase,
@@ -298,7 +299,10 @@ export class BaseQuery {
     this.multiStageQuery = this.options.multiStageQuery;
     this.timezone = this.options.timezone;
 
-    if (this.timezone && !moment.tz.zone(this.timezone)) {
+    // Backstop guard for every dialect convertTz() sink. Deliberately does not canonicalize:
+    // rewriting this.timezone would change generated SQL and pre-agg partition keys for
+    // non-gateway callers (queryRewrite, refresh scheduler). Message matches the native planner.
+    if (this.timezone && !canonicalTimezone(this.timezone)) {
       throw new UserError(`Incorrect timezone ${this.timezone}`);
     }
 

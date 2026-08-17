@@ -178,3 +178,69 @@ describe('getEnv(apiSecret / apiSecrets)', () => {
     expect(getEnv('apiSecrets')).toEqual(['only']);
   });
 });
+
+describe('getEnv(defaultTimezone / scheduledRefreshTimezones)', () => {
+  afterEach(() => {
+    delete process.env.CUBEJS_DEFAULT_TIMEZONE;
+    delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES;
+  });
+
+  // env-var's .default() does not fire for a *present but blank* value, and it does not trim.
+  // Blank/padded values are common in .env and compose YAML, so they must keep booting.
+  test('defaultTimezone - unset / blank / padded resolve to UTC', () => {
+    delete process.env.CUBEJS_DEFAULT_TIMEZONE;
+    expect(getEnv('defaultTimezone')).toBe('UTC');
+
+    process.env.CUBEJS_DEFAULT_TIMEZONE = '';
+    expect(getEnv('defaultTimezone')).toBe('UTC');
+
+    process.env.CUBEJS_DEFAULT_TIMEZONE = '   ';
+    expect(getEnv('defaultTimezone')).toBe('UTC');
+
+    process.env.CUBEJS_DEFAULT_TIMEZONE = ' UTC ';
+    expect(getEnv('defaultTimezone')).toBe('UTC');
+  });
+
+  test('defaultTimezone - normalizes to the canonical IANA name', () => {
+    process.env.CUBEJS_DEFAULT_TIMEZONE = 'America/Los_Angeles';
+    expect(getEnv('defaultTimezone')).toBe('America/Los_Angeles');
+
+    process.env.CUBEJS_DEFAULT_TIMEZONE = 'america/los_angeles';
+    expect(getEnv('defaultTimezone')).toBe('America/Los_Angeles');
+
+    process.env.CUBEJS_DEFAULT_TIMEZONE = 'utc';
+    expect(getEnv('defaultTimezone')).toBe('UTC');
+  });
+
+  test('defaultTimezone(exception)', () => {
+    process.env.CUBEJS_DEFAULT_TIMEZONE = 'Europ/Berlin';
+    expect(() => getEnv('defaultTimezone')).toThrowError(
+      'Value "Europ/Berlin" is not valid for CUBEJS_DEFAULT_TIMEZONE. Must be a valid IANA time zone name, e.g. UTC or America/Los_Angeles.'
+    );
+
+    process.env.CUBEJS_DEFAULT_TIMEZONE = '+05:00';
+    expect(() => getEnv('defaultTimezone')).toThrowError(
+      'Value "+05:00" is not valid for CUBEJS_DEFAULT_TIMEZONE. Must be a valid IANA time zone name, e.g. UTC or America/Los_Angeles.'
+    );
+  });
+
+  test('scheduledRefreshTimezones - unset resolves to undefined', () => {
+    delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES;
+    expect(getEnv('scheduledRefreshTimezones')).toBeUndefined();
+  });
+
+  test('scheduledRefreshTimezones - trims and normalizes each entry', () => {
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = 'utc, europe/berlin';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual(['UTC', 'Europe/Berlin']);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = 'America/New_York';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual(['America/New_York']);
+  });
+
+  test('scheduledRefreshTimezones(exception)', () => {
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = 'UTC,Nope/Zone';
+    expect(() => getEnv('scheduledRefreshTimezones')).toThrowError(
+      'Value "Nope/Zone" is not valid for CUBEJS_SCHEDULED_REFRESH_TIMEZONES. Must be a comma-separated list of valid IANA time zone names, e.g. UTC,America/Los_Angeles.'
+    );
+  });
+});

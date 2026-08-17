@@ -1,19 +1,15 @@
 import Joi from 'joi';
-import moment from 'moment-timezone';
+import { canonicalTimezone } from '@cubejs-backend/shared';
 import DriverDependencies from './DriverDependencies';
 
-// Reject anything that is not a known IANA timezone name (matched case-insensitively),
-// so a misconfigured zone fails fast at startup instead of deep in the refresh scheduler.
+// Fails fast at startup instead of deep in the refresh scheduler.
 const timezoneSchema = Joi.string().custom((value, helpers) => {
-  if (!moment.tz.zone(value)) {
-    return helpers.message({ custom: `{{#label}} must be a valid IANA time zone name, got "${value}"` });
-const timezoneSchema = Joi.string().custom((value, helpers) => {
-  if (!moment.tz.zone(value)) {
+  const name = canonicalTimezone(value);
+  if (!name) {
     return helpers.message({ custom: '{{#label}} must be a valid IANA time zone name, got "{{#tz}}"' }, { tz: value });
   }
-  return value;
-}, 'timezone');
-  return value;
+
+  return name;
 }, 'timezone');
 
 const schemaQueueOptions = Joi.object().strict(true).keys({

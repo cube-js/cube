@@ -148,8 +148,6 @@ describe('SQL Generation', () => {
       expect(() => buildTimezoneQuery(timezone)).toThrow(UserError);
     });
 
-    // Valid IANA zones are accepted regardless of case (normalization to the
-    // canonical name happens at the API gateway input layer, not in BaseQuery).
     it.each([
       'America/New_York',
       'america/new_york',
@@ -165,6 +163,27 @@ describe('SQL Generation', () => {
       await compilers.compiler.compile();
       const [sql] = buildTimezoneQuery('America/New_York').buildSqlAndParams();
       expect(sql).toContain("AT TIME ZONE 'America/New_York'");
+    });
+
+    // Counterpart: query_tools.rs `format!("Incorrect timezone {}", timezone)`.
+    it('reports the invalid zone with the same message as the native planner', async () => {
+      await compilers.compiler.compile();
+      expect(() => buildTimezoneQuery('Not/AZone')).toThrow('Incorrect timezone Not/AZone');
+    });
+
+    it('validates without canonicalizing the timezone', async () => {
+      await compilers.compiler.compile();
+      const query = buildTimezoneQuery('utc');
+      expect(query.timezone).toBe('utc');
+    });
+
+    it.each([
+      123,
+      {},
+      true,
+    ])('rejects non-string timezone %j as a UserError', async (timezone) => {
+      await compilers.compiler.compile();
+      expect(() => buildTimezoneQuery(timezone as any)).toThrow(UserError);
     });
 
     it('Simple query - complex measure', async () => {

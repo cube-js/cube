@@ -9,8 +9,17 @@ describe('optionsValidate scheduledRefreshTimeZones', () => {
     expect(() => optionsValidate({ scheduledRefreshTimeZones: async () => ['UTC'] })).not.toThrow();
   });
 
+  test('accepts timezones case-insensitively', () => {
+    expect(() => optionsValidate({ scheduledRefreshTimeZones: ['utc', 'america/new_york'] })).not.toThrow();
+  });
+
   test('rejects an invalid timezone with a descriptive message', () => {
     expect(() => optionsValidate({ scheduledRefreshTimeZones: ['Not/AZone'] }))
       .toThrow(/valid IANA time zone name/);
+  });
+
+  test('names the offending value in the error message', () => {
+    expect(() => optionsValidate({ scheduledRefreshTimeZones: ['UTC', 'Europ/Berlin'] }))
+      .toThrow(/Europ\/Berlin/);
   });
 });
