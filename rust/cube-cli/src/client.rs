@@ -1,4 +1,5 @@
 use std::sync::Mutex;
+use std::time::Duration;
 
 use anyhow::{anyhow, bail, Result};
 use reqwest::{Method, StatusCode};
@@ -117,6 +118,12 @@ impl Client {
         Ok(Self {
             http: reqwest::Client::builder()
                 .user_agent(concat!("cube-cli/", env!("CUBE_CLI_VERSION")))
+                // A server that accepts the connection and never answers would
+                // otherwise hang a CI step until the job's own timeout. Generous
+                // rather than tight: `deploy` uploads an entire project through this
+                // client. Waits bound their own attempts on top of this.
+                .connect_timeout(Duration::from_secs(30))
+                .timeout(Duration::from_secs(600))
                 .build()?,
             base_url,
             token: Mutex::new(token.to_string()),
@@ -201,7 +208,10 @@ impl Client {
             })
         })?;
         let status = res.status();
-        let text = res.text().await.unwrap_or_default();
+        let text = res.text().await.map_err(|e| TransportError {
+            url: url.clone(),
+            source: e.to_string(),
+        })?;
         Ok((status, text))
     }
 
@@ -243,7 +253,10 @@ impl Client {
                     .await
                     .map_err(|e| anyhow!("request to {url} failed: {e}"))?;
                 let status = res.status();
-                let text = res.text().await.unwrap_or_default();
+                let text = res
+                    .text()
+                    .await
+                    .map_err(|e| anyhow!("reading the response from {url} failed: {e}"))?;
                 Ok::<_, anyhow::Error>((status, text))
             }
         };
@@ -298,7 +311,13 @@ impl Client {
                  running an older version)"
             );
         }
-        Ok(serde_json::from_str(&text).unwrap_or(Value::String(text)))
+        serde_json::from_str(&text).map_err(|e| {
+            let snippet: String = text.chars().take(200).collect();
+            anyhow!(
+                "{method} {path} returned a body that is not JSON ({e}): {}",
+                snippet.replace('\n', " ")
+            )
+        })
     }
 
     /// Attempt to refresh the access token. Returns `true` if a new token was
