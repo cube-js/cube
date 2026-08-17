@@ -44,31 +44,36 @@ pub fn push<T: ToString>(query: &mut Query, key: &str, value: &Option<T>) {
 }
 
 /// Which response field a list command should render, given the paging flags
-/// it was invoked with (in `--offset --limit --first --after` order).
+/// it was invoked with: the two deprecated ones first (named by `deprecated`
+/// for the error message, since they are `--offset/--limit` on most commands
+/// but `--limit/--page` on `reports list`), then `--first`/`--after`.
 /// `Some("data")` selects the deprecated offset-sliced page; `None` means the
 /// canonical `items`.
 ///
-/// The API deprecated `offset`/`limit` in favor of the `first`/`after` cursor
+/// The API deprecated offset paging in favor of the `first`/`after` cursor
 /// and the two address different pages of the same response, so an endpoint
-/// given both either rejects the request (deployments) or silently honors
-/// just one (environments, user attributes). Reject it here instead, so the
-/// CLI never prints a page the caller did not ask for.
+/// given both either rejects the request (deployments, reports) or silently
+/// honors just one (environments, user attributes). Reject it here instead,
+/// so the CLI never prints a page the caller did not ask for.
 ///
-/// Selecting `data` is right for every endpoint that still takes
-/// `offset`/`limit`, whether or not its `items` is also sliced: where the
-/// paging happens in the database (environment tokens, user attributes) the
-/// two fields hold the same rows, and where the list is assembled in memory
-/// (deployment environments) only `data` is sliced at all.
+/// Selecting `data` is right for every endpoint that still takes offset
+/// paging, whether or not its `items` is also sliced: where the paging
+/// happens in the database (deployments, reports, environment tokens, user
+/// attributes) the two fields hold the same rows, and where the list is
+/// assembled in memory (deployment environments) only `data` is sliced at
+/// all. Routing every one of them through here means none can quietly stop
+/// honoring the flags when its `data` is eventually removed.
 pub fn paging_field(
-    offset: Option<u64>,
-    limit: Option<u64>,
+    deprecated: &str,
+    first_deprecated: Option<u64>,
+    second_deprecated: Option<u64>,
     first: Option<u64>,
     after: Option<&str>,
 ) -> Result<Option<&'static str>> {
-    let uses_offset = offset.is_some() || limit.is_some();
+    let uses_offset = first_deprecated.is_some() || second_deprecated.is_some();
     let uses_cursor = first.is_some() || after.is_some();
     if uses_offset && uses_cursor {
-        bail!("--offset/--limit are deprecated and cannot be combined with --first/--after");
+        bail!("{deprecated} are deprecated and cannot be combined with --first/--after");
     }
     Ok(uses_offset.then_some("data"))
 }
@@ -155,20 +160,32 @@ mod tests {
 
     #[test]
     fn paging_field_selects_data_only_for_the_deprecated_style() {
-        let none = paging_field(None, None, None, None).unwrap();
+        const FLAGS: &str = "--offset/--limit";
+
+        let none = paging_field(FLAGS, None, None, None, None).unwrap();
         assert_eq!(none, None, "no flags renders the canonical items");
 
         for (offset, limit) in [(Some(10), None), (None, Some(5)), (Some(10), Some(5))] {
-            let field = paging_field(offset, limit, None, None).unwrap();
+            let field = paging_field(FLAGS, offset, limit, None, None).unwrap();
             assert_eq!(field, Some("data"), "offset paging renders data");
         }
 
         for (first, after) in [(Some(5), None), (None, Some("cursor"))] {
-            let field = paging_field(None, None, first, after).unwrap();
+            let field = paging_field(FLAGS, None, None, first, after).unwrap();
             assert_eq!(field, None, "cursor paging renders the canonical items");
         }
 
-        assert!(paging_field(Some(10), None, Some(5), None).is_err());
-        assert!(paging_field(None, Some(5), None, Some("cursor")).is_err());
+        assert!(paging_field(FLAGS, Some(10), None, Some(5), None).is_err());
+        assert!(paging_field(FLAGS, None, Some(5), None, Some("cursor")).is_err());
+    }
+
+    #[test]
+    fn paging_field_names_the_command_s_own_deprecated_flags() {
+        // `reports list` deprecates --limit/--page, not --offset/--limit.
+        let err = paging_field("--limit/--page", Some(50), None, Some(5), None)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("--limit/--page"), "got: {err}");
+        assert!(err.contains("--first/--after"), "got: {err}");
     }
 }

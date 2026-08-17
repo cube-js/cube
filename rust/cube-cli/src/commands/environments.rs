@@ -83,7 +83,8 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             first,
             after,
         } => {
-            let page_field = util::paging_field(offset, limit, first, after.as_deref())?;
+            let page_field =
+                util::paging_field("--offset/--limit", offset, limit, first, after.as_deref())?;
             let mut query = Vec::new();
             util::push(&mut query, "type", &env_type);
             util::push(&mut query, "offset", &offset);
@@ -119,7 +120,8 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             first,
             after,
         } => {
-            let page_field = util::paging_field(offset, limit, first, after.as_deref())?;
+            let page_field =
+                util::paging_field("--offset/--limit", offset, limit, first, after.as_deref())?;
             let mut query = Vec::new();
             util::push(&mut query, "offset", &offset);
             util::push(&mut query, "limit", &limit);

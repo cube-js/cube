@@ -88,36 +88,43 @@ pub fn table(headers: &[&str], rows: Vec<Vec<String>>) {
 /// Print a list response: raw JSON in `--json` mode, otherwise a table with
 /// the given columns (header, field path).
 pub fn print_list(json: bool, response: &Value, columns: &[(&str, &str)]) {
-    // The canonical field always resolves, so this cannot fail.
-    let _ = print_list_from(json, response, None, columns);
+    render(json, response, items(response), columns);
 }
 
 /// Like [`print_list`], but reads the rows from `key` when the caller asked
 /// for a specific envelope field. Needed where `items` and the deprecated
 /// `data` are two *different* pages of the same list: on the endpoints that
-/// still accept `offset`/`limit`, only `data` honors it while `items` is the
+/// still accept offset paging, only `data` honors it while `items` is the
 /// cursor page.
 ///
-/// `--json` is raw passthrough, as everywhere else in the CLI: it emits the
-/// whole response, both envelope fields included, and leaves the choice to
-/// whatever consumes it.
+/// The key is resolved before `--json` is considered, so a caller whose flags
+/// can no longer be honored gets the error in both modes. Raw passthrough is
+/// still the rule for the response itself — it just isn't a licence to answer
+/// a page nobody asked for.
 pub fn print_list_from(
     json: bool,
     response: &Value,
     key: Option<&str>,
     columns: &[(&str, &str)],
 ) -> Result<()> {
+    render(json, response, rows_from(response, key)?, columns);
+    Ok(())
+}
+
+/// Render `rows` as a table, or the whole `response` as raw JSON under
+/// `--json`. Both entry points feed this, so neither has a `Result` to
+/// discard on the rendering itself.
+fn render(json: bool, response: &Value, rows: Vec<Value>, columns: &[(&str, &str)]) {
     if json {
         print_json(response);
-        return Ok(());
+        return;
     }
     let headers: Vec<&str> = columns.iter().map(|(h, _)| *h).collect();
-    let rows = rows_from(response, key)?
+    let cells = rows
         .iter()
         .map(|item| columns.iter().map(|(_, f)| field(item, f)).collect())
         .collect();
-    table(&headers, rows);
-    Ok(())
+    table(&headers, cells);
 }
 
 /// The rows a list response should be rendered from: `key` when the caller
@@ -134,8 +141,8 @@ fn rows_from(response: &Value, key: Option<&str>) -> Result<Vec<Value>> {
     match response.get(key).and_then(Value::as_array) {
         Some(rows) => Ok(rows.clone()),
         None => bail!(
-            "this endpoint no longer returns `{key}`, so --offset/--limit cannot be \
-             honored — use --first/--after instead"
+            "this endpoint no longer returns `{key}`, so the deprecated paging flags \
+             cannot be honored — use --first/--after instead"
         ),
     }
 }

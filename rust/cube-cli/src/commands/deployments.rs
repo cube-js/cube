@@ -138,6 +138,8 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             first,
             after,
         } => {
+            let page_field =
+                util::paging_field("--offset/--limit", offset, limit, first, after.as_deref())?;
             let mut query = Vec::new();
             for step in creation_step {
                 query.push(("creationStep".to_string(), step));
@@ -147,16 +149,22 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             util::push(&mut query, "first", &first);
             util::push(&mut query, "after", &after);
             let res = api.get("/api/v1/deployments/", &query).await?;
-            output::print_list(
+            // Deployments page in the database, so `items` and `data` hold the
+            // same rows either way — read the same field as every other list so
+            // the deprecated one can't quietly stop being honored. The server
+            // also rejects mixing the two styles; catching it here saves the
+            // round-trip and names the flags.
+            output::print_list_from(
                 ctx.json,
                 &res,
+                page_field,
                 &[
                     ("ID", "id"),
                     ("NAME", "name"),
                     ("URL", "deploymentUrl"),
                     ("STEP", "creationStep"),
                 ],
-            );
+            )?;
         }
         Cmd::Get { deployment } => {
             let res = api
