@@ -1,0 +1,101 @@
+---
+title: Integration with Google Cloud Storage
+sidebarTitle: Google Cloud Storage
+description: Google Cloud Storage is a popular object storage system. This guide demonstrates how to set up Cube to export logs to Google Cloud Storage.
+---
+
+[Google Cloud Storage](https://cloud.google.com/storage) is a popular object
+storage system. This guide demonstrates how to set up Cube to export logs to
+Google Cloud Storage.
+
+## Configuration
+
+First, enable [monitoring integrations][ref-monitoring-integrations] in Cube.
+
+### Exporting logs
+
+To export logs to Google Cloud Storage, start by creating a bucket for Cube logs
+and a service account that can write to it.
+
+Then, put the service account key in an environment variable under **Settings →
+Environment variables**, base64-encoded:
+
+```bash
+CUBE_CLOUD_MONITORING_GCS_CREDENTIALS=eyJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIsIC4uLn0=
+```
+
+Finally, configure the [`gcp_cloud_storage`](https://vector.dev/docs/reference/configuration/sinks/gcp_cloud_storage/)
+sink in your [`vector.toml` configuration file][ref-monitoring-integrations-conf].
+
+Example configuration:
+
+```toml
+[sinks.gcp-cloud-storage]
+type = "gcp_cloud_storage"
+inputs = [
+  "cubejs-server",
+  "refresh-scheduler",
+  "warmup-job",
+  "cubestore"
+]
+bucket = "your-gcs-bucket-name"
+compression = "gzip"
+credentials_base64 = "$CUBE_CLOUD_MONITORING_GCS_CREDENTIALS"
+credentials_path = "/etc/credentials/gcp-cloud-storage.json"
+
+[sinks.gcp-cloud-storage.encoding]
+codec = "json"
+
+[sinks.gcp-cloud-storage.healthcheck]
+enabled = false
+```
+
+Commit the configuration for Vector, it should take effect in a minute. Then,
+navigate to your bucket and watch the logs coming.
+
+### Authentication
+
+The `gcp_cloud_storage` sink reads its service account key from a file, so
+authentication takes two options that work together:
+
+| Option | Description |
+| --- | --- |
+| `credentials_base64` | The base64-encoded service account key, or a reference to an environment variable holding it (e.g. `$CUBE_CLOUD_MONITORING_GCS_CREDENTIALS`). Cube decodes it and mounts it into the Vector agent at `/etc/credentials/<sink-name>.json`. |
+| `credentials_path` | Where the sink reads the key from. Set it to the same `/etc/credentials/<sink-name>.json` path. |
+
+<Warning>
+
+The sink name becomes the name of a Kubernetes object, so it must be lowercase
+alphanumeric characters and dashes only — **no underscores**. A sink named
+`query_history_gcs` will not get a credentials file; name it
+`query-history-gcs` instead.
+
+</Warning>
+
+### Healthcheck
+
+The example above sets `healthcheck.enabled = false`. Vector's
+`gcp_cloud_storage` healthcheck sends a `HEAD` request to the bucket root, which
+requires the `storage.objects.list` permission — write access alone, such as
+`roles/storage.objectCreator`, does not grant it. Without this, the sink fails to
+start with `Healthcheck endpoint forbidden` even though it could write objects
+successfully.
+
+## Exporting Query History
+
+Add the `query-history` input to the sink to bring [Query History
+export][ref-query-history-export] data to the same bucket.
+
+<Warning>
+
+Query History export additionally requires the **Monitoring Integrations Tier** of
+your deployment to be set to **Medium (Up to 50 GB/mo)**. On a lower tier it fails
+silently — the sink reports healthy and the bucket stays empty, with no error
+logged anywhere.
+
+</Warning>
+
+
+[ref-monitoring-integrations]: /admin/monitoring/monitoring-integrations
+[ref-monitoring-integrations-conf]: /admin/monitoring/monitoring-integrations#configuration
+[ref-query-history-export]: /admin/monitoring/monitoring-integrations#query-history-export
