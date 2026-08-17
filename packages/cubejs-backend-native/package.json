@@ -52,7 +52,7 @@
   "dependencies": {
     "@cubejs-backend/cubesql": "1.7.21",
     "@cubejs-backend/shared": "1.7.21",
-    "@cubejs-infra/post-installer": "^0.0.7"
+    "@cubejs-infra/post-installer": "^0.1.2"
   },
   "resources": {
     "vars": {
