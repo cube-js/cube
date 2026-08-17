@@ -513,6 +513,13 @@ match, the command fails instead of reporting a result for code it can't confirm
 compiled, and names the sync so you can cancel it. Passing `--branch` skips the check,
 because then the branch name is yours and carries no ref to look for.
 
+A few legal ref names can't be checked this way — `#1234-fix` and `@release` begin with
+characters whose treatment isn't known, so there's nothing to compare. Those syncs run,
+with a warning on stderr and `"refVerified": false` in the `--wait --json` document; a
+verified run reports `true`, and `null` means there was nothing to verify. If you're
+choosing a branch convention for a gate, one starting with a letter or digit is the one
+that gets checked.
+
 </Warning>
 
 <Warning>
