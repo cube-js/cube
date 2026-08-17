@@ -146,7 +146,7 @@ Run `cube <command> --help` for the full options of any command.
 | Command | Description |
 | --- | --- |
 | `login`, `logout`, `whoami`, `context` | Authentication and saved contexts |
-| `deployments` | List, get, create, update, delete deployments; `token`, `build-status`, `advance-step`, `reset-step` |
+| `deployments` | List, get, create, update, delete deployments; `settings`, `versions`, `token`, `build-status`, `advance-step`, `reset-step` |
 | `deploy` | Upload a local project directory and build it |
 | `logs` | Tail deployment pod logs (`--pod`, `-c/--container`, `--source production\|dev`) |
 | `regions` | List available deployment regions |
@@ -159,12 +159,88 @@ Run `cube <command> --help` for the full options of any command.
 | `tenant`, `notifications`, `integrations`, `oidc`, `api-keys` | Account administration |
 | `embed` | Embed sessions, tokens, embed tenants; `enable-dashboard`/`disable-dashboard` toggle signed embedding for a dashboard |
 | `agents`, `app`, `meta`, `scim` | Agents, app config, model metadata, SCIM v2 |
+| `spec` | Show the API's OpenAPI specification — see [Discovering the API](#discovering-the-api) |
 | `api` | Raw authenticated API request (escape hatch): `cube api GET /api/v1/... -q key=value -d '{...}'` |
 | `update` | Update the CLI to the latest release |
 | `completion` | Generate shell completions |
 
 List commands print tables by default; pass `--json` anywhere for raw JSON
 output, suitable for piping to `jq`.
+
+## Changing the Cube version
+
+`cube deployments versions` lists the Cube versions a deployment can switch to
+— the head of each [update channel][ref-update-channels], plus the older
+versions your account has run before:
+
+```bash
+cube deployments versions DEPLOYMENT_ID
+```
+
+```
+VERSION  CHANNEL  LATEST  CURRENT  PASS AS
+1.7.20   latest   true    true     cubejs/cube:v1.7.20
+1.6.69   latest   false   false    cubejs/cube:v1.6.69
+```
+
+Apply one with `update`. Any of `1.7.20`, `v1.7.20` or `cubejs/cube:v1.7.20` is
+accepted; a version that is not on the list is rejected. The container image is
+resolved from the version, so there is nothing else to set:
+
+```bash
+cube deployments update DEPLOYMENT_ID --release-channel-version 1.7.20
+cube deployments update DEPLOYMENT_ID --release-channel release  # move to a channel's latest
+```
+
+`cube deployments settings DEPLOYMENT_ID` reads back every setting, including
+the version and channel currently in effect.
+
+## Discovering the API
+
+`cube spec` prints the OpenAPI specification of the API you are logged into, so
+neither you nor an AI agent has to guess an endpoint's parameters. It reads
+`/api/v1/spec` from the deployment itself, which means the contract you get is
+the one that build actually serves.
+
+With no arguments it lists every operation:
+
+```bash
+cube spec
+```
+
+```
+METHOD  PATH                                            SUMMARY
+GET     /api/v1/deployments                             Get deployments
+PUT     /api/v1/deployments/{deploymentId}              Update a deployment
+...
+```
+
+Pass a pattern to narrow it down. The match is case-insensitive and covers the
+method, path, summary, and operation id:
+
+```bash
+cube spec settings
+```
+
+Add `--json` to get OpenAPI instead of a table. Unfiltered, that is the entire
+document — pipe it into a code generator or a validator. Filtered, it is a
+smaller but still valid document containing just the matching operations plus
+every schema they reference, transitively:
+
+```bash
+cube spec updateDeployment --json
+```
+
+That last form is the one to reach for when you want an endpoint's full
+parameter list: the request body's schema is included rather than left as a
+`$ref` pointing into a document you would then have to fetch in full.
+
+<Tip>
+
+Point an agent at `cube spec <topic> --json` and it can construct a correct
+request without any hardcoded knowledge of the API.
+
+</Tip>
 
 ## Data model Git workflow
 
@@ -224,3 +300,4 @@ or explicitly with `CUBE_NO_TELEMETRY=1` (or the legacy `CUBEJS_TELEMETRY=false`
 [ref-api-keys]: /admin/account-billing/api-keys
 [ref-rest-api]: /reference/core-data-apis/rest-api/index
 [ref-staging-env]: /admin/deployment/environments#staging-environments
+[ref-update-channels]: /admin/deployment#update-channels

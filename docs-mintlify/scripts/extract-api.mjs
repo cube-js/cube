@@ -175,6 +175,8 @@ const TAG_MAP = {
   'Deployments Build Public': 'Deployment Creation',
   'Uploads Public': 'Data Model Uploads',
   'Git Hub Deployment Public': 'GitHub Connection',
+  // Auto-cleaning title-cases the controller name into "Open Api Spec".
+  'Open Api Spec Public': 'OpenAPI Spec',
 };
 // Preferred nav order. Tags not listed here are appended alphabetically, so the
 // docs stay complete even when the upstream spec adds new areas.
@@ -186,6 +188,7 @@ const TAG_ORDER = [
   'User Attributes', 'User Attribute Values', 'Resource Policies', 'Tenant Settings',
   'OAuth Integrations', 'User OAuth Tokens', 'OIDC Token Configs',
   'App Theme', 'AI Engineer', 'Embed', 'Embed Tenants', 'Dashboard Embed Access',
+  'OpenAPI Spec',
 ];
 
 // Mintlify renders the OpenAPI operation `description` as a plain-text node — it

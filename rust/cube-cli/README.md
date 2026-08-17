@@ -128,7 +128,7 @@ Every endpoint of the Console Server public API is covered:
 
 | Group | Endpoints |
 |---|---|
-| `deployments` | list, get, create (`--bootstrap` scaffolds + builds a serving deployment), update, delete, token, advance-step, reset-step |
+| `deployments` | list, get, create (`--bootstrap` scaffolds + builds a serving deployment), update (`--release-channel`, `--release-channel-version`), settings, versions, delete, token, advance-step, reset-step |
 | `regions` | list available deployment regions |
 | `logs` | tail deployment pod logs (`--pod`, `-c/--container`; defaults to the Cube API container) |
 | `github` (`gh`) | status, installations, repos, branches, connect (import a repo into a deployment + first build) |
@@ -152,6 +152,7 @@ Every endpoint of the Console Server public API is covered:
 | `app` | config, theme |
 | `meta` | POST /api/v1/meta/ |
 | `scim` | Users/Groups CRUD + patch, resource-types, schemas, service-provider-config |
+| `spec` | the API's own OpenAPI document from `/api/v1/spec`: bare lists every operation, `<pattern>` filters on method/path/summary/operationId, `--json` prints OpenAPI (filtered = matching operations + the transitive schema closure) |
 | `api` | raw escape hatch: `cube api GET /api/v1/... -q key=value -d '{...}'` |
 
 Conventions:

@@ -190,6 +190,8 @@ enum Command {
     /// SCIM v2 user and group provisioning
     Scim(commands::scim::Args),
 
+    /// Show this API's OpenAPI specification (endpoints, parameters, schemas)
+    Spec(commands::spec::Args),
     /// Make an authenticated raw API request (escape hatch)
     Api(commands::api::Args),
     /// Update the CLI to the latest release
@@ -239,6 +241,7 @@ impl Command {
             App(_) => "app",
             Meta(_) => "meta",
             Scim(_) => "scim",
+            Spec(_) => "spec",
             Api(_) => "api",
             Update(_) => "update",
             Completion(_) => "completion",
@@ -335,6 +338,7 @@ async fn run(global: GlobalArgs, command: Command) -> Result<()> {
         App(args) => commands::app::command(args, &ctx).await,
         Meta(args) => commands::meta::command(args, &ctx).await,
         Scim(args) => commands::scim::command(args, &ctx).await,
+        Spec(args) => commands::spec::command(args, &ctx).await,
         Api(args) => commands::api::command(args, &ctx).await,
         Update(args) => commands::update::command(args, &ctx).await,
         Completion(args) => commands::completion::command(args),

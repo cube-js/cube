@@ -280,6 +280,69 @@ describe('test authorization', () => {
     expectSecurityContext(handlerMock.mock.calls[0][0].context.authInfo);
   });
 
+  describe('signedWithPlaygroundAuthSecret requires the dev-token scope', () => {
+    const playgroundAuthSecret = 'playgroundSecret';
+    const loggerMock = jest.fn(() => {
+      //
+    });
+
+    // The playground secret signs every token a Cube Cloud deployment mints,
+    // including ones handed to end users and external BI tools, so the
+    // signature alone must not unlock the developer affordances gated on this
+    // flag (hidden meta members, generated SQL, pre-aggregation debug info).
+    const flagFor = async (payload: Record<string, any>) => {
+      const seen: boolean[] = [];
+      const handlerMock = jest.fn((req, res) => {
+        seen.push(req.context.signedWithPlaygroundAuthSecret);
+        res.status(200).end();
+      });
+
+      const { app } = createApiGateway(handlerMock, loggerMock, { playgroundAuthSecret });
+
+      await request(app)
+        .get('/test-auth-fake')
+        .set('Authorization', `Authorization: ${generateAuthToken(payload, {}, playgroundAuthSecret)}`)
+        .expect(200);
+
+      return seen[0];
+    };
+
+    test('is false for a playground-signed token with no scope at all', async () => {
+      expect(await flagFor({ uid: 5 })).toBe(false);
+    });
+
+    test('is false for a playground-signed token scoped to something else', async () => {
+      expect(await flagFor({ uid: 5, scope: ['sql-runner', 'agents-config'] })).toBe(false);
+    });
+
+    test('is true for a playground-signed token carrying the dev-token scope', async () => {
+      expect(await flagFor({ uid: 5, scope: ['dev-token'] })).toBe(true);
+      // Alongside the service scopes it is minted with in practice.
+      expect(await flagFor({ uid: 5, scope: ['sql-runner', 'dev-token'] })).toBe(true);
+    });
+
+    test('is false when scope is not an array of scope names', async () => {
+      expect(await flagFor({ uid: 5, scope: 'dev-token' })).toBe(false);
+      expect(await flagFor({ uid: 5, scope: { 'dev-token': true } })).toBe(false);
+    });
+
+    test('is false for a token signed with the main api secret, scope or not', async () => {
+      const handlerMock = jest.fn((req, res) => {
+        expect(req.context.signedWithPlaygroundAuthSecret).toBe(false);
+        res.status(200).end();
+      });
+
+      const { app } = createApiGateway(handlerMock, loggerMock, { playgroundAuthSecret });
+
+      await request(app)
+        .get('/test-auth-fake')
+        .set('Authorization', `Authorization: ${generateAuthToken({ uid: 5, scope: ['dev-token'] }, {})}`)
+        .expect(200);
+
+      expect(handlerMock.mock.calls.length).toEqual(1);
+    });
+  });
+
   test('default authorization with JWT token and securityContext in u', async () => {
     const loggerMock = jest.fn(() => {
       //

@@ -24,6 +24,7 @@ pub mod policies;
 pub mod regions;
 pub mod reports;
 pub mod scim;
+pub mod spec;
 pub mod tenant;
 pub mod update;
 pub mod users;
