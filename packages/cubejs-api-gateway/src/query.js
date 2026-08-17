@@ -57,10 +57,13 @@ const evaluatedPatchMeasureExpression = parsedPatchMeasureExpression.keys({
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
 const timezoneSchema = Joi.string().custom((value, helpers) => {
-  if (!moment.tz.zone(value)) {
+  const zone = moment.tz.zone(value);
+  if (!zone) {
     return helpers.error('any.invalid');
   }
-  return value;
+
+  // Normalize to the canonical IANA name (case-insensitively).
+  return zone.name;
 }, 'timezone');
 
 // It might be member name, td+granularity or member expression
@@ -441,7 +444,10 @@ const normalizeQuery = (query, persistent, cacheMode) => {
     dimension: d.split('.').slice(0, 2).join('.'),
     granularity: d.split('.')[2]
   }));
-  const timezone = query.timezone || 'UTC';
+  // query.timezone is already validated as a known zone above; normalize it to the
+  // canonical IANA name (moment matches zones case-insensitively).
+  const rawTimezone = query.timezone || 'UTC';
+  const timezone = moment.tz.zone(rawTimezone)?.name || rawTimezone;
 
   const def = getEnv('dbQueryDefaultLimit') <= getEnv('dbQueryLimit')
     ? getEnv('dbQueryDefaultLimit')

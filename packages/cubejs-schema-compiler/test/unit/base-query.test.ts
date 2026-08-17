@@ -148,6 +148,31 @@ describe('SQL Generation', () => {
           filters: [],
         })).toThrow(UserError);
       }
+
+      // Valid IANA zones are accepted regardless of case (normalization to the
+      // canonical name happens at the API gateway input layer).
+      const validTimezones = [
+        'America/New_York',
+        'america/new_york',
+        'AMERICA/NEW_YORK',
+        'utc',
+        'uTc',
+      ];
+
+      for (const timezone of validTimezones) {
+        expect(() => new PostgresQuery(compilers, {
+          measures: ['cards.count'],
+          timeDimensions: [
+            {
+              dimension: 'cards.createdAt',
+              granularity: 'day',
+              dateRange: ['2021-01-01', '2021-01-02']
+            }
+          ],
+          timezone,
+          filters: [],
+        })).not.toThrow();
+      }
     });
 
     it('Simple query - complex measure', async () => {

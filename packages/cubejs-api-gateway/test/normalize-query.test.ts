@@ -30,6 +30,16 @@ describe('timezone validation', () => {
   );
 
   test.each([
+    ['america/new_york', 'America/New_York'],
+    ['AMERICA/NEW_YORK', 'America/New_York'],
+    ['utc', 'UTC'],
+    ['uTc', 'UTC'],
+  ])('accepts timezone case-insensitively and normalizes it: %s -> %s', (tz, expected) => {
+    const result = normalizeQuery({ ...baseQuery, timezone: tz }, false);
+    expect(result.timezone).toBe(expected);
+  });
+
+  test.each([
     'Not/AZone',
     '+05:00',
   ])('rejects invalid/injection timezone %j', (tz) => {
