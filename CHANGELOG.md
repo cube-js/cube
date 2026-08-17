@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.71](https://github.com/cube-js/cube/compare/v1.6.70...v1.6.71) (2026-08-17)
+
+### Bug Fixes
+
+- **api-gateway:** require an isDevToken scope for the playground bypass ([#11579](https://github.com/cube-js/cube/issues/11579)) ([ff7c674](https://github.com/cube-js/cube/commit/ff7c67433837e282a12cb5381ea7e1f05df6102c))
+
 ## [1.6.70](https://github.com/cube-js/cube/compare/v1.6.69...v1.6.70) (2026-07-28)
 
 ### Bug Fixes

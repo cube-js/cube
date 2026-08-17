@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.71](https://github.com/cube-js/cube/compare/v1.6.70...v1.6.71) (2026-08-17)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
 ## [1.6.70](https://github.com/cube-js/cube/compare/v1.6.69...v1.6.70) (2026-07-28)
 
 **Note:** Version bump only for package @cubejs-backend/testing-drivers
