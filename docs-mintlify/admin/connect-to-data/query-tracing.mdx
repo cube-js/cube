@@ -1,0 +1,85 @@
+---
+title: Query tracing
+description: Trace a Cube API request through to the queries it runs on your data source.
+---
+
+Cube can tag the queries it sends to your data source with a `trace_id` SQL
+comment, letting you match a query in your data source's query history back to
+the API request that caused it.
+
+This is useful when one API request fans out into several data source
+queries — every one of them carries the same `trace_id`.
+
+## Configuration
+
+Set [`CUBEJS_SQL_INCLUDE_TRACE_ID`](/reference/configuration/environment-variables#cubejs_sql_include_trace_id)
+to `true`:
+
+```dotenv
+CUBEJS_SQL_INCLUDE_TRACE_ID=true
+```
+
+Queries then reach your data source with the comment appended:
+
+```sql
+SELECT ...
+/* trace_id: f47ac10b-58cc-4372-a567-0e02b2c3d479 */
+```
+
+`trace_id` identifies the API request and matches the field of the same name in
+the [Query History export][ref-query-history-export].
+
+Trace ids longer than 128 characters are truncated, and any character outside
+`A-Z a-z 0-9 . _ : -` is removed.
+
+<Warning>
+
+A unique comment per request makes each query textually distinct, which
+prevents your data source from reusing cached results — Snowflake's persisted
+query results and BigQuery's result cache both require identical query text.
+Expect more queries to actually execute, and on Snowflake a warehouse that
+would have stayed suspended may resume.
+
+</Warning>
+
+## Finding the comment in your data source
+
+Some query history views truncate long SQL, and a few omit comments entirely.
+If you can't find the `trace_id`, check where you're reading it from:
+
+- **Snowflake**: `QUERY_HISTORY`. Note that Snowflake strips *leading* comments,
+  which is why Cube appends.
+- **Redshift**: `SYS_QUERY_TEXT`, reassembled with `LISTAGG`.
+  `SYS_QUERY_HISTORY` and `STL_QUERY` truncate at 4000 characters.
+- **BigQuery**: `INFORMATION_SCHEMA.JOBS`. Cloud Audit Logs truncate at 50K
+  characters.
+- **Databricks**: `system.query.history`. Empty when customer-managed keys are
+  enabled.
+- **Postgres**: server logs (`log_statement`). `pg_stat_activity.query`
+  truncates at `track_activity_query_size` (1024 bytes by default).
+- **MySQL**: the general or slow query log.
+
+## Supplying your own identifier
+
+Clients calling the [REST (JSON) API](/reference/core-data-apis/rest-api) can
+supply their own identifier through the `x-request-id` or `traceparent` request
+header, letting you trace a query back to a request in your own application.
+Otherwise Cube generates one.
+
+## Scope
+
+Queries issued to serve an API request are tagged. Pre-aggregation builds,
+export bucket operations, refresh keys, background refreshes, and Cube's own
+internal queries are left untagged, since there is no API request to trace them
+back to.
+
+A single request usually produces one tagged query, but not always — a query
+reading a lambda pre-aggregation's source table, for instance, is tagged too.
+Match on `trace_id` rather than assuming one row per request.
+
+Not every request produces a tagged query to find: one served from the cache or
+from a pre-aggregation never reaches your data source, and when identical
+queries arrive together Cube runs them once, under whichever request got there
+first.
+
+[ref-query-history-export]: /admin/monitoring/monitoring-integrations#query-history-export

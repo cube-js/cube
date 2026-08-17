@@ -224,8 +224,10 @@ module.exports = {
 ```
 
 The tag is set once per connection, not per query — all queries issued over
-that connection carry the same tag.
+that connection carry the same tag. To identify the individual API request
+behind a query, use [query tracing][ref-query-tracing] instead.
 
+[ref-query-tracing]: /admin/connect-to-data/query-tracing
 [ref-dedicated-infra]: /admin/deployment/infrastructure#dedicated-infrastructure
 [ref-cloud-conf-vpc]: /admin/deployment/dedicated
 ## Environment Variables
