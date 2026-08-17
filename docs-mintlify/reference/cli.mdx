@@ -448,23 +448,28 @@ and a gate that never returns is worse than one that fails.
 
 95 is deliberate: `continueWaitTimeout` — the only part of a request Cube bounds — is
 capped at 90 where Cube validates it, so no accepted value can make the long poll itself
-outlast a single attempt. The compile and SQL generation ahead of it are unbounded and
-add to that, which on a cold first query is where the two could still cross 95s. The next
-attempt finds the compile already done, so what this looks like in a log is a first
-attempt aborting at `--max-time` with `no answer from the API (000)` on a gate that then
-passes — not a network fault. That cap applies to an `orchestrator_options` **object** — the function form used
-for multi-tenancy is validated as a function, so the options it returns are never checked
-and nothing clamps them downstream. If yours returns something larger, `--max-time` has
-to clear it.
+outlast a single attempt, and the two numbers never need keeping in sync. That cap applies
+to an `orchestrator_options` **object**: the function form used for multi-tenancy is
+validated as a function, so the options it returns are never checked and nothing clamps
+them downstream. If yours returns something larger, `--max-time` has to clear it.
+
 Shorten `--max-time` below that ceiling and you reintroduce the coupling — curl would
 abort each long poll before Cube could answer, and the loop would report a network failure
-for what is really two timeouts disagreeing. Raising it instead multiplies the budget by
-the attempt count, which is why the attempts came down from 30 as the cap went up. With
-the default `continueWaitTimeout` of 10s, a query that keeps long-polling gets about five
-minutes before the loop gives up. The body is deleted before each attempt because curl leaves the previous file in
-place when it fails before the transfer starts (`--remove-on-error` does not change
-that), and without the `rm` a later transport failure would re-read an earlier body —
-making a stale `Continue wait` look like work still in progress.
+for what is really two timeouts disagreeing. Raising it instead multiplies the budget by the
+attempt count, which is why the attempts came down from 30 as the cap went up. With the
+default `continueWaitTimeout` of 10s, a query that keeps long-polling gets about five
+minutes before the loop gives up.
+
+The compile and SQL generation ahead of the long poll are unbounded and add to it, so on a
+cold first query the two can still cross 95s even at an accepted value. The next attempt
+finds the compile already done, so in a log that shows up as a first attempt aborting at
+`--max-time` with `no answer from the API (000)` on a gate that then passes — not a
+network fault.
+
+The body is deleted before each attempt because curl leaves the previous file in place when
+it fails before the transfer starts (`--remove-on-error` does not change that), and
+without the `rm` a later transport failure would re-read an earlier body — making a stale
+`Continue wait` look like work still in progress.
 
 Name a measure the sync generated, not one that already existed, or the step passes
 without testing the new model at all.
