@@ -383,9 +383,9 @@ steps:
       API=$(cube deployments get "$DEPLOYMENT_ID" --json | jq -r .deploymentUrl)
       TOKEN=$(cube deployments token "$DEPLOYMENT_ID")
       OK=
-      for _ in $(seq 30); do
+      for _ in $(seq 20); do
         rm -f res.json
-        CODE=$(curl -sSG -o res.json -w '%{http_code}' --max-time 60 \
+        CODE=$(curl -sSG -o res.json -w '%{http_code}' --max-time 95 \
           "$API/dev-mode/$DEV_BRANCH/cubejs-api/v1/load" \
           -H "Authorization: $TOKEN" \
           --data-urlencode 'query={"measures":["dbt_fct_orders.count"]}') || CODE=000
@@ -418,8 +418,9 @@ The query goes to the **deployment's own host** (`deploymentUrl`), not to
 and an HTML page, which `curl -sf` accepts happily. Asserting on the body is what turns
 "some 200 came back" into "the model answered a query".
 
-The loop exists because not every `200` is an answer: a query that takes longer than
-`CUBEJS_CONTINUE_WAIT_TIMEOUT` returns [`Continue wait`][ref-rest-api-continue-wait]
+The loop exists because not every `200` is an answer: a query that takes longer than the
+`continueWaitTimeout` [queue option][ref-conf-queue-opts] returns [`Continue
+wait`][ref-rest-api-continue-wait]
 with status 200, and clients are expected to retry until a result appears. A first query
 against a cold dev-mode environment and an uncached warehouse is exactly when that
 happens, so failing on it would fail the gate on a model that is fine.
@@ -440,15 +441,19 @@ Anything else — a reset, a DNS failure, an ingress error page — is retried, 
 keeps curl's message visible instead of leaving a blank line where the reason should be.
 Exhausting the retries fails too, so a query that never answers can't pass quietly.
 
-The step's own budget is `--max-time 60` per attempt, 30 attempts, 5s apart: about half
-an hour at worst, which matters because without a per-attempt cap a host that accepts the
-connection and never answers would hang until the *job* timeout (six hours by default) —
-a gate that never returns is worse than one that fails.
-`CUBEJS_CONTINUE_WAIT_TIMEOUT` decides how many of those attempts a cold first query
-spends — but only while it stays below `--max-time`. It defaults to 10s, so 60s is
-comfortably clear of it; if your deployment has raised it past 60s, raise `--max-time`
-too, or curl aborts every long poll before Cube can answer and the loop reports a network
-failure for what is really two timeouts disagreeing. The body is deleted before each attempt because curl leaves the previous file in
+The step's own budget is `--max-time 95` per attempt, 20 attempts, 5s apart: about half an
+hour at worst. The per-attempt cap matters because without one a host that accepts the
+connection and never answers would hang until the *job* timeout — six hours by default —
+and a gate that never returns is worse than one that fails.
+
+95 is deliberate: `continueWaitTimeout` is capped at 90 by the server, so no accepted
+value of it can outlast a single attempt, and the two numbers never need keeping in sync.
+Shorten `--max-time` below that ceiling and you reintroduce the coupling — curl would
+abort each long poll before Cube could answer, and the loop would report a network failure
+for what is really two timeouts disagreeing. Raising it instead multiplies the budget by
+the attempt count, which is why the attempts came down from 30 as the cap went up. With
+the default `continueWaitTimeout` of 10s, a query that keeps long-polling gets about five
+minutes before the loop gives up. The body is deleted before each attempt because curl leaves the previous file in
 place when it fails before the transfer starts (`--remove-on-error` does not change
 that), and without the `rm` a later transport failure would re-read an earlier body —
 making a stale `Continue wait` look like work still in progress.
@@ -555,6 +560,7 @@ is a hash of the OS machine id. Telemetry is disabled automatically in CI,
 or explicitly with `CUBE_NO_TELEMETRY=1` (or the legacy `CUBEJS_TELEMETRY=false`).
 
 [ref-api-keys]: /admin/account-billing/api-keys
+[ref-conf-queue-opts]: /reference/configuration/config#queueoptions
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-rest-api-continue-wait]: /reference/core-data-apis/rest-api#continue-wait
 [ref-staging-env]: /admin/deployment/environments#staging-environments
