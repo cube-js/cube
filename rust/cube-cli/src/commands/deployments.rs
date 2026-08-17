@@ -205,18 +205,12 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             util::set(&mut body, "name", &name);
             util::set(&mut body, "releaseChannel", &release_channel);
             util::set(&mut body, "releaseChannelVersion", &release_channel_version);
-            // Both routes share the same request handling, but they differ in
-            // what they hand back: `PUT /:id` responds with the four-field
-            // deployment summary, which carries no version at all. A version
-            // change would print a body in which the thing that changed is
-            // invisible — so route those through /settings, whose response is
-            // the full settings payload and answers "did it switch?".
-            let path = if release_channel.is_some() || release_channel_version.is_some() {
-                format!("/api/v1/deployments/{deployment}/settings")
-            } else {
-                format!("/api/v1/deployments/{deployment}")
-            };
-            let res = api.put(&path, Some(&util::body(body))).await?;
+            let res = api
+                .put(
+                    &format!("/api/v1/deployments/{deployment}"),
+                    Some(&util::body(body)),
+                )
+                .await?;
             output::print_json(&res);
         }
         Cmd::Settings { deployment } => {

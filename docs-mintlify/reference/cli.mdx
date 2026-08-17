@@ -211,7 +211,7 @@ cube spec
 ```
 METHOD  PATH                                            SUMMARY
 GET     /api/v1/deployments                             Get deployments
-PUT     /api/v1/deployments/{deploymentId}/settings     Update deployment settings
+PUT     /api/v1/deployments/{deploymentId}              Update a deployment
 ...
 ```
 
@@ -228,7 +228,7 @@ smaller but still valid document containing just the matching operations plus
 every schema they reference, transitively:
 
 ```bash
-cube spec "deployments/{deploymentId}/settings" --json
+cube spec "deployments/{deploymentId}" --json
 ```
 
 That last form is the one to reach for when you want an endpoint's full

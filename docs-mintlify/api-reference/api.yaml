@@ -185,11 +185,22 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Deployment'
+                $ref: '#/components/schemas/DeploymentSettings'
           description: ''
-      summary: Update deployment
+      summary: Update a deployment
       tags:
         - Deployments
+      x-mint:
+        content: >-
+          Update any subset of a deployment’s settings — everything the console’s Settings pages own
+          — and read the full settings back. Fields you omit are left alone, and `templateVariables`
+          is merged key-by-key rather than replaced, so setting one configuration flag never clears
+          the others. `releaseChannelVersion` must be one of the versions `GET
+          /:deploymentId/versions` lists for the target channel (in any of the forms it reports) —
+          anything else is a 400, and the container image is resolved from the version rather than
+          sent. Choosing a version that is not the channel’s latest also sets
+          `releaseChannelVersionHold` unless you send it explicitly, so auto-upgrade does not undo
+          the pin.
   /api/v1/deployments/{deploymentId}/build-status:
     get:
       operationId: buildStatus
@@ -1673,37 +1684,8 @@ paths:
           Every setting of a deployment in one payload — the full contents of the console Settings
           pages (general, configuration flags, deploy, launchpad, Cube Store private storage), plus
           the read-only values displayed alongside them. Secrets are excluded; read environment
-          variables through `/env-vars` instead.
-    put:
-      operationId: updateDeploymentSettings
-      parameters:
-        - in: path
-          name: deploymentId
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateDeploymentInput'
-        description: UpdateDeploymentInput
-        required: false
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DeploymentSettings'
-          description: ''
-      summary: Update deployment settings
-      tags:
-        - Deployments
-      x-mint:
-        content: >-
-          Update any subset of a deployment’s settings and read the full settings back. Fields you
-          omit are left alone, and `templateVariables` is merged key-by-key rather than replaced, so
-          setting one configuration flag never clears the others.
+          variables through `/env-vars` instead. Writes go to `PUT /:deploymentId`, which accepts
+          the same fields and returns this payload.
   /api/v1/deployments/{deploymentId}/shared-workspace:
     get:
       operationId: sharedWorkspaceObjects
@@ -1826,8 +1808,8 @@ paths:
           Every Cube version this deployment can be switched to — the same set the console’s version
           picker offers: the head of each release channel, plus the older versions the tenant has
           run before (its release history). Pass a listed `releaseChannelVersion` to `PUT
-          /:deploymentId/settings`; anything else is rejected. The container image is resolved
-          server-side and is not part of the write surface.
+          /:deploymentId`; anything else is rejected. The container image is resolved server-side
+          and is not part of the write surface.
   /api/v1/deployments/{deploymentId}/workbooks:
     get:
       operationId: getWorkbooks

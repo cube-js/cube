@@ -312,8 +312,8 @@ Example response:
 ```
 
 To change the version, send a listed value as `releaseChannelVersion` to
-`PUT /api/v1/deployments/{deployment_id}/settings`. Any of `1.7.20`, `v1.7.20`
-or `cubejs/cube:v1.7.20` is accepted; a version that is not on the list is
+`PUT /api/v1/deployments/{deployment_id}`. Any of `1.7.20`, `v1.7.20` or
+`cubejs/cube:v1.7.20` is accepted; a version that is not on the list is
 rejected with a `400`. The container image is resolved from the version
 server-side and cannot be set directly.
 
