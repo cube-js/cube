@@ -69,7 +69,7 @@ const canonicalTimezone = (value) => {
 const timezoneSchema = Joi.string().custom((value, helpers) => {
   const name = canonicalTimezone(value);
   if (!name) {
-    return helpers.message(`{{#label}} must be a valid IANA time zone, got "${value}"`);
+    return helpers.message({ custom: '{{#label}} must be a valid IANA time zone, got "{{#tz}}"' }, { tz: value });
   }
 
   // Normalize to the canonical IANA name.
