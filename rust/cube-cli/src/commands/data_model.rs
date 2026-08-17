@@ -101,7 +101,8 @@ enum Cmd {
         /// Name
         #[arg(value_parser = util::nonempty)]
         name: String,
-        /// Enter dev mode on the new branch
+        /// Point your dev-mode session at the new branch (file writes still need
+        /// the `dev-…` name that `dev-mode` returns)
         #[arg(long)]
         dev_mode: bool,
     },
@@ -457,8 +458,12 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             if ctx.json {
                 output::print_json(&res);
             } else {
-                // With --dev-mode the server forks a personal dev-mode branch off
-                // the new branch; that's the branch file writes must target.
+                // The server points the session at the new branch rather than
+                // forking a personal dev branch off it, so `branchName` comes back
+                // equal to `name` and this hint stays silent — measured against a
+                // live tenant, where writes to that name are then rejected with
+                // "is not a dev-mode branch". Kept for the case where a server does
+                // fork, since the forked name is what writes would have to target.
                 let dev_branch = output::field(&res, "branchName");
                 if dev_mode && !dev_branch.is_empty() && dev_branch != name {
                     output::success(&format!(

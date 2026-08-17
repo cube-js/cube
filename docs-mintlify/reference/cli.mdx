@@ -248,20 +248,27 @@ request without any hardcoded knowledge of the API.
 Edit the data model through branches without touching production:
 
 ```bash
-cube data-model create-branch DEPLOYMENT_ID my-branch --dev-mode
-cube data-model put DEPLOYMENT_ID model/cubes/orders.yml --file orders.yml --branch my-branch
+cube data-model create-branch DEPLOYMENT_ID my-branch
+DEV=$(cube data-model dev-mode DEPLOYMENT_ID my-branch --json | jq -r .branchName)
+cube data-model put DEPLOYMENT_ID model/cubes/orders.yml --file orders.yml --branch "$DEV"
+cube data-model commit DEPLOYMENT_ID --branch "$DEV" -m "add orders cube"
 cube data-model merge-to-default DEPLOYMENT_ID --branch my-branch -m "add orders cube"
 ```
 
-`merge-to-default` merges into the deploy branch and rebuilds production.
+`commit` pushes the dev branch's edits to the shared branch it was forked from, and
+`merge-to-default` merges that branch into the deploy branch and rebuilds production.
 
 <Info>
 
-File writes (`put`, `delete`, `rename`) only land on a **dev-mode branch**. With
-`--dev-mode`, `create-branch` (and `dev-mode`) forks a personal `dev-…` branch and
-prints it — pass that printed name via `--branch`, not the name you gave
-`create-branch`, or omit `--branch` to use your active dev-mode branch. Writes
-targeting any other branch are rejected by the API.
+File writes (`put`, `delete`, `rename`) only land on a personal **`dev-…` branch**,
+which is what `dev-mode` forks and prints. Pass that name via `--branch`, or omit
+`--branch` to use your active dev-mode branch. Writes to any other branch are
+rejected by the API.
+
+`create-branch --dev-mode` is not a shortcut for this: it points your session at the
+new branch without forking, so writes to the name you gave it are rejected with
+*"Branch … is not a dev-mode branch"* even though `build-status` reports that branch
+as `dev_mode`. Run `dev-mode` on it to get a name you can write to.
 
 </Info>
 
@@ -369,6 +376,11 @@ at once will re-point each other's. The step above releases it even when the
 compile or query fails, and `continue-on-error` keeps a failed release visible
 without blaming it for the job — releasing may legitimately do nothing if the gate
 never got as far as entering dev mode.
+
+The prune step is a second line of defence for the same thing: deleting a `dev-…`
+branch works while its session is still active, and ends that session — the
+deployment falls back to its production build. So a release that failed doesn't
+strand the session, and the prune doesn't need the release to have succeeded.
 
 </Warning>
 
