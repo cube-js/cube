@@ -476,6 +476,17 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             // `branchName` travels as a query parameter, not a path segment: branch
             // names contain slashes (`dbt-sync/main-…`). `Client::delete` takes no
             // query, so this goes through `request` directly.
+            //
+            // Checked here rather than left to the server: a query parameter can be
+            // present-but-empty, and what `branchName=` means is then entirely the
+            // server's choice — not something to discover with a DELETE. It is also
+            // reachable from a script rather than only from a typo, since
+            // `jq -r .branchName` yields an empty string when the field is missing.
+            anyhow::ensure!(
+                !branch.trim().is_empty(),
+                "a branch name is required — an empty one would leave the server to \
+                 decide what `branchName=` means"
+            );
             let mut query: Query = vec![("branchName".to_string(), branch.clone())];
             if remove_on_upstream {
                 query.push(("removeOnUpstream".to_string(), "true".to_string()));
