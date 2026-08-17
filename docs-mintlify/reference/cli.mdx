@@ -445,7 +445,10 @@ an hour at worst, which matters because without a per-attempt cap a host that ac
 connection and never answers would hang until the *job* timeout (six hours by default) —
 a gate that never returns is worse than one that fails.
 `CUBEJS_CONTINUE_WAIT_TIMEOUT` decides how many of those attempts a cold first query
-spends. The body is deleted before each attempt because curl leaves the previous file in
+spends — but only while it stays below `--max-time`. It defaults to 10s, so 60s is
+comfortably clear of it; if your deployment has raised it past 60s, raise `--max-time`
+too, or curl aborts every long poll before Cube can answer and the loop reports a network
+failure for what is really two timeouts disagreeing. The body is deleted before each attempt because curl leaves the previous file in
 place when it fails before the transfer starts (`--remove-on-error` does not change
 that), and without the `rm` a later transport failure would re-read an earlier body —
 making a stale `Continue wait` look like work still in progress.
