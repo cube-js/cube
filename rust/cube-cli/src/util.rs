@@ -336,13 +336,21 @@ mod tests {
 
         fn walk(cmd: &clap::Command, path: Vec<String>, checked: &mut Vec<String>) {
             for arg in cmd.get_arguments() {
-                // Matched by name, not by exact id: the count catches a branchy flag
-                // being renamed away, but only this catches one being *added* under a
-                // different name (`--base-branch` on a command that already has
-                // `--branch` is the plausible next edit). `takes_a_value` keeps the
+                // Matched by name, not by exact id, so a flag *added* under a name I
+                // did not anticipate is caught too — `--base-branch` alongside an
+                // existing `--branch` is the plausible next edit. `branch` is safe as
+                // a substring (`base_branch`, `source_branch`, `branch_name` all mean
+                // a branch); `ref` is not, since `prefix` and `refresh` contain it,
+                // and a false positive here is worse than a gap — it would fail
+                // confidently on an ordinary `--prefix` and invite a parser whose
+                // message describes nothing about that flag. `takes_a_value` keeps the
                 // `--delete-branch`-style bools out.
                 let id = arg.get_id().as_str();
-                if !takes_a_value(arg) || !(id.contains("branch") || id.contains("ref")) {
+                let branchy = id.contains("branch")
+                    || id == "ref"
+                    || id.ends_with("_ref")
+                    || id.starts_with("ref_");
+                if !takes_a_value(arg) || !branchy {
                     continue;
                 }
                 let flag = format!("{} --{id}", path.join(" "));
@@ -367,10 +375,10 @@ mod tests {
 
         let mut checked = Vec::new();
         walk(&crate::Cli::command(), vec!["cube".into()], &mut checked);
-        // Exact, not a floor: the filter keys on the id being `branch` or `ref`, so
-        // renaming a field to `base_branch` would drop it from the walk, and a floor
-        // would absorb that silently — the same naming mismatch that let
-        // `github connect --branch` escape in the first place.
+        // Exact, not a floor: the filter can only see ids that name a branch or a
+        // ref, so a rename out of that family (`branch` → `name`, as
+        // `create-branch <name>` already is) or an outright removal would shrink the
+        // walk, and a floor would absorb that silently.
         assert_eq!(
             checked.len(),
             20,
