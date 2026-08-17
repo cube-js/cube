@@ -271,7 +271,14 @@ fn wait_json(
         "status": output::field(status, "status"),
         "error": status.get("error").cloned().unwrap_or(Value::Null),
         "result": result.cloned().unwrap_or(Value::Null),
-        "refVerified": Value::from(ref_verified),
+        // Same rule as the bare-start path: a server that reports this itself has
+        // better evidence than the client's prefix comparison, so it wins. Checked on
+        // both documents because either could carry it.
+        "refVerified": started
+            .get("refVerified")
+            .or_else(|| status.get("refVerified"))
+            .cloned()
+            .unwrap_or_else(|| Value::from(ref_verified)),
     })
 }
 
@@ -363,7 +370,8 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     let mut doc = started.clone();
                     // `or_insert`, not `insert`: if a future server echoes the resolved
                     // ref and reports this itself, its answer is better evidence than
-                    // this client's prefix comparison and should win. A document that
+                    // this client's prefix comparison and should win — `wait_json`
+                    // defers the same way, so both documents follow one rule. A document that
                     // isn't an object silently goes without the field — lossy on purpose,
                     // and safe for the documented `jq -e '.refVerified == true'`, which
                     // fails on a missing field.
@@ -378,14 +386,19 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                         "Watch it with `cube dbt status {deployment} {sync_job_id} --wait`, \
                          or re-run sync with --wait."
                     );
-                    // Each sync deliberately creates a FRESH branch, so a job running
-                    // per pull request accumulates them — say so, and name the command
-                    // that removes one, rather than let them pile up unnoticed.
-                    println!(
-                        "The branch is not removed automatically — prune it with \
-                         `cube data-model delete-branch {deployment} {branch_name}` \
-                         when you're done."
-                    );
+                    // Only when the server named the branch: with `--branch` it is the
+                    // caller's own, may be long-lived, and this sync didn't create it —
+                    // so a filled-in `delete-branch` would be pointing at their branch.
+                    if branch.is_none() {
+                        // Each sync deliberately creates a FRESH branch, so a job running
+                        // per pull request accumulates them — say so, and name the command
+                        // that removes one, rather than let them pile up unnoticed.
+                        println!(
+                            "The branch is not removed automatically — prune it with \
+                             `cube data-model delete-branch {deployment} {branch_name}` \
+                             when you're done."
+                        );
+                    }
                 }
 
                 return Ok(());
@@ -643,6 +656,21 @@ mod tests {
         // Unmeasured characters cut the fingerprint short rather than guessing.
         assert_eq!(ref_fingerprint("feat:x"), "feat");
         assert_eq!(ref_fingerprint("#1"), "");
+    }
+
+    #[test]
+    fn wait_json_prefers_a_server_reported_verification() {
+        let started = json!({"syncJobId": "j", "refVerified": true});
+        let status = json!({"status": "COMPLETED"});
+        // Client says it couldn't verify; the server says it did. The server wins.
+        let doc = wait_json(&started, &status, "dbt-sync/x", None, Some(false));
+        assert_eq!(doc["refVerified"], json!(true));
+
+        // With no server field, the client's answer is what's reported.
+        let doc = wait_json(&json!({}), &status, "dbt-sync/x", None, Some(false));
+        assert_eq!(doc["refVerified"], json!(false));
+        let doc = wait_json(&json!({}), &status, "dbt-sync/x", None, None);
+        assert_eq!(doc["refVerified"], json!(null));
     }
 
     #[test]

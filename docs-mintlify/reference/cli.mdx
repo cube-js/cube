@@ -377,12 +377,14 @@ env:
 steps:
   - name: Sync the dbt branch under review
     run: |
-      # `dbt sync` can only verify a ref whose first character it has measured, so a
+      # `dbt sync` can only verify a ref whose first character it recognises, so a
       # convention it can't check would run this gate unverified. Reject it here, before
-      # a sync spends minutes creating a branch this step would then abandon.
+      # a sync spends minutes creating a branch this step would then abandon. LC_ALL=C
+      # keeps the range ASCII on shells that would otherwise match by collation.
+      export LC_ALL=C
       case "$GITHUB_HEAD_REF" in
-        [A-Za-z0-9]*) ;;
-        *) echo "branch names for this gate must start with a letter or digit: $GITHUB_HEAD_REF"; exit 1;;
+        [A-Za-z0-9_.-]*) ;;
+        *) echo "this gate needs a branch name starting with a letter, digit, _, . or -: $GITHUB_HEAD_REF"; exit 1;;
       esac
       cube dbt sync "$DEPLOYMENT_ID" --ref "$GITHUB_HEAD_REF" --wait --json > sync.json
       # The gate only means anything if the sync used the ref, so refuse to continue
@@ -531,7 +533,9 @@ or from a bare `--json` start, since a pipeline that follows the sync in a later
 no `--ref` left to check. A verified run reports `true`, and `null` means
 there was nothing to verify. The recipe above rejects an uncheckable branch name *before* syncing, because whether a
 ref can be checked depends only on the ref — paying for a sync first would leave a branch
-behind that the failed step can no longer name. It then still asserts `refVerified == true`
+behind that the failed step can no longer name. Its character set mirrors the CLI's, which
+is the source of truth: if that set grows, the shell guard is the copy that goes stale, and
+the assertion after the sync is what still holds either way. It then still asserts `refVerified == true`
 rather than trusting it, which also fails on `null`: that recipe always passes `--ref` and
 never `--branch`, so `null` would mean something changed underneath it. If you're choosing a
 branch convention for a gate, one starting with a letter or digit is the one that gets
