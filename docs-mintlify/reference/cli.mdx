@@ -384,7 +384,8 @@ steps:
       TOKEN=$(cube deployments token "$DEPLOYMENT_ID")
       OK=
       for _ in $(seq 30); do
-        CODE=$(curl -sSG -o res.json -w '%{http_code}' \
+        rm -f res.json
+        CODE=$(curl -sSG -o res.json -w '%{http_code}' --max-time 60 \
           "$API/dev-mode/$DEV_BRANCH/cubejs-api/v1/load" \
           -H "Authorization: $TOKEN" \
           --data-urlencode 'query={"measures":["dbt_fct_orders.count"]}') || CODE=000
@@ -393,7 +394,8 @@ steps:
         if jq -e '.error' res.json >/dev/null 2>&1; then cat res.json; exit 1; fi
         echo "no answer from the API ($CODE), retrying"; sleep 5
       done
-      [ -n "$OK" ] || { echo "query never returned data (last status $CODE):"; cat res.json; exit 1; }
+      [ -n "$OK" ] || { echo "query never returned data (last status $CODE):"
+                        cat res.json 2>/dev/null; exit 1; }
 
   - name: Release the dev-mode session
     if: always()
@@ -425,12 +427,28 @@ happens, so failing on it would fail the gate on a model that is fine.
 What it retries is decided by **who wrote the body**, not by the status code, because
 the status doesn't separate the two cases: an unknown member comes back as `500` with
 Cube's own `{"error": …}`, the same class of status an overloaded ingress returns with no
-JSON at all. So a body carrying `error` is Cube answering — the gate fails immediately
-and prints it, which for a mistyped measure means *"Cube 'nope' not found for path
-'nope.count'"* in one second rather than after two minutes of retries. Anything else —
-a reset, a DNS failure, an ingress error page — is retried, and `-sS` keeps curl's
-message visible instead of leaving a blank line where the reason should be. Exhausting
-the retries fails too, so a query that never answers can't pass quietly.
+JSON at all. So a body carrying `error` is Cube answering, and Cube's errors are treated
+as permanent — the gate fails immediately and prints it, which for a mistyped measure
+means *"Cube 'nope' not found for path 'nope.count'"* in one second rather than after
+minutes of retries. `Continue wait` is the one exception the loop knows about. Note the
+trade: orchestrator and warehouse failures arrive in the same shape (as a `400`), so a
+genuinely transient data-path failure fails the gate rather than being retried — re-run
+the job if the message points at the warehouse rather than at the model. Narrowing this
+by matching error strings would be worse than re-running.
+
+Anything else — a reset, a DNS failure, an ingress error page — is retried, and `-sS`
+keeps curl's message visible instead of leaving a blank line where the reason should be.
+Exhausting the retries fails too, so a query that never answers can't pass quietly.
+
+The step's own budget is `--max-time 60` per attempt, 30 attempts, 5s apart: about half
+an hour at worst, which matters because without a per-attempt cap a host that accepts the
+connection and never answers would hang until the *job* timeout (six hours by default) —
+a gate that never returns is worse than one that fails.
+`CUBEJS_CONTINUE_WAIT_TIMEOUT` decides how many of those attempts a cold first query
+spends. The body is deleted before each attempt because curl leaves the previous file in
+place when it fails before the transfer starts (`--remove-on-error` does not change
+that), and without the `rm` a later transport failure would re-read an earlier body —
+making a stale `Continue wait` look like work still in progress.
 
 Name a measure the sync generated, not one that already existed, or the step passes
 without testing the new model at all.
