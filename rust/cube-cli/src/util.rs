@@ -353,7 +353,16 @@ mod tests {
                 if !takes_a_value(arg) || !branchy {
                     continue;
                 }
-                let flag = format!("{} --{id}", path.join(" "));
+                // As the user would type it, not as the field is named: ids are
+                // snake_case, so `--{id}` prints `--base_ref` for a `--base-ref`, and
+                // `--branch` for the four positional BRANCH arguments. Both are flags
+                // that don't exist, and this message is the whole interface of the
+                // test — someone reading it in CI greps for what it printed.
+                let flag = if arg.is_positional() {
+                    format!("{} <{}>", path.join(" "), id.to_uppercase())
+                } else {
+                    format!("{} --{}", path.join(" "), arg.get_long().unwrap_or(id))
+                };
                 let err = crate::Cli::try_parse_from(argv(&path, cmd, arg))
                     .err()
                     .map(|e| e.to_string())
