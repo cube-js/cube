@@ -152,7 +152,7 @@ Every endpoint of the Console Server public API is covered:
 | `app` | config, theme |
 | `meta` | POST /api/v1/meta/ |
 | `scim` | Users/Groups CRUD + patch, resource-types, schemas, service-provider-config |
-| `spec` | the API's own OpenAPI document, read from `/api/v1/spec` — so the contract comes from the build being talked to, not a pinned copy. Bare `cube spec` lists every operation; `cube spec <pattern>` filters on method/path/summary/operationId. `--json` prints OpenAPI: the whole document unfiltered, or — filtered — a valid document holding just the matching operations plus the transitive closure of the schemas they reference, which is what makes `cube spec <topic> --json` enough for an agent to build a correct request |
+| `spec` | the API's own OpenAPI document from `/api/v1/spec`: bare lists every operation, `<pattern>` filters on method/path/summary/operationId, `--json` prints OpenAPI (filtered = matching operations + the transitive schema closure) |
 | `api` | raw escape hatch: `cube api GET /api/v1/... -q key=value -d '{...}'` |
 
 Conventions:

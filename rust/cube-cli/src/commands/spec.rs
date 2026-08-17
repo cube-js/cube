@@ -12,6 +12,7 @@ const METHODS: [&str; 8] = [
 ];
 
 const SCHEMA_REF_PREFIX: &str = "#/components/schemas/";
+const COMPONENT_REF_PREFIX: &str = "#/components/";
 
 /// Fetch the API's own OpenAPI document, so every endpoint, parameter and
 /// schema can be discovered at runtime rather than guessed.
@@ -146,12 +147,25 @@ fn filtered_document(spec: &Value, matched: &[&Operation<'_>]) -> Value {
     let mut seeds = BTreeSet::new();
     for op in matched {
         collect_refs(op.op, &mut seeds);
-        paths
+        let item = paths
             .entry(op.path.to_string())
             .or_insert_with(|| json!({}))
             .as_object_mut()
-            .expect("path item is an object")
-            .insert(op.method.to_string(), op.op.clone());
+            .expect("path item is an object");
+        item.insert(op.method.to_string(), op.op.clone());
+
+        // A path item may declare `parameters` that apply to every operation
+        // under it. Dropping them would silently shrink the parameter list —
+        // the one thing this command exists to report — so they come along and
+        // their refs are seeded too.
+        if let Some(shared) = spec
+            .get("paths")
+            .and_then(|p| p.get(op.path))
+            .and_then(|i| i.get("parameters"))
+        {
+            collect_refs(shared, &mut seeds);
+            item.insert("parameters".into(), shared.clone());
+        }
     }
 
     let names = schema_closure(spec, seeds);
@@ -190,6 +204,66 @@ fn filtered_document(spec: &Value, matched: &[&Operation<'_>]) -> Value {
     Value::Object(doc)
 }
 
+/// Every `#/components/<bucket>/<name>` ref in `value`, as (bucket, name).
+fn collect_component_refs(value: &Value, out: &mut BTreeSet<(String, String)>) {
+    match value {
+        Value::Object(map) => {
+            for (key, child) in map {
+                if key == "$ref" {
+                    if let Some(rest) = child
+                        .as_str()
+                        .and_then(|r| r.strip_prefix(COMPONENT_REF_PREFIX))
+                    {
+                        if let Some((bucket, name)) = rest.split_once('/') {
+                            out.insert((bucket.to_string(), name.to_string()));
+                        }
+                    }
+                }
+                collect_component_refs(child, out);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                collect_component_refs(item, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Refuse to emit a document whose `$ref`s don't resolve inside it.
+///
+/// The closure only follows `#/components/schemas/`, which is everything the
+/// current spec uses. If an operation ever references another bucket
+/// (`parameters`, `responses`, `requestBodies`, …), the filtered document would
+/// still carry the `$ref` but not its target: a validator rejects it and an
+/// agent resolves it to nothing. Since this output is meant to be consumed
+/// unattended, fail loudly rather than hand back something quietly wrong.
+fn check_no_dangling_refs(doc: &Value) -> Result<()> {
+    let mut refs = BTreeSet::new();
+    collect_component_refs(doc, &mut refs);
+
+    let dangling: Vec<String> = refs
+        .into_iter()
+        .filter(|(bucket, name)| {
+            doc.get("components")
+                .and_then(|c| c.get(bucket))
+                .and_then(|b| b.get(name))
+                .is_none()
+        })
+        .map(|(bucket, name)| format!("#/components/{bucket}/{name}"))
+        .collect();
+
+    if !dangling.is_empty() {
+        bail!(
+            "internal error building the filtered spec: unresolved {} — \
+             re-run without a pattern to get the whole document",
+            dangling.join(", ")
+        );
+    }
+    Ok(())
+}
+
 pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
     let spec = ctx.api()?.get("/api/v1/spec", &Vec::new()).await?;
 
@@ -213,7 +287,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
     }
 
     if ctx.json {
-        output::print_json(&filtered_document(&spec, &matched));
+        let doc = filtered_document(&spec, &matched);
+        check_no_dangling_refs(&doc)?;
+        output::print_json(&doc);
     } else {
         print_index(&matched);
     }
@@ -318,5 +394,47 @@ mod tests {
         assert_eq!(doc["openapi"], "3.1.0");
         assert!(doc["info"].is_object());
         assert!(doc["components"]["securitySchemes"]["bearerAuth"].is_object());
+        // Nothing points outside the document it just built.
+        check_no_dangling_refs(&doc).unwrap();
+    }
+
+    #[test]
+    fn filtered_document_keeps_path_level_parameters() {
+        let spec = spec();
+        let ops = operations(&spec);
+        let matched: Vec<&Operation<'_>> = ops.iter().filter(|o| o.matches("settings")).collect();
+        let doc = filtered_document(&spec, &matched);
+
+        // `id` is declared once on the path item, not per operation. Losing it
+        // would understate the endpoint's parameters — the exact thing this
+        // command is supposed to report.
+        let params = doc["paths"]["/api/v1/deployments/{id}/settings"]["parameters"]
+            .as_array()
+            .expect("path-level parameters survive filtering");
+        assert_eq!(params.len(), 1);
+        assert_eq!(params[0]["name"], "id");
+    }
+
+    #[test]
+    fn dangling_component_refs_are_rejected() {
+        // A ref into a bucket the closure doesn't follow: the document keeps the
+        // `$ref` but not its target, so it must be refused rather than emitted.
+        let doc = json!({
+            "openapi": "3.1.0",
+            "paths": { "/x": { "get": {
+                "parameters": [{ "$ref": "#/components/parameters/Missing" }] } } },
+            "components": { "schemas": {} }
+        });
+        let err = check_no_dangling_refs(&doc).unwrap_err().to_string();
+        assert!(err.contains("#/components/parameters/Missing"), "{err}");
+
+        // A resolvable ref in a non-schema bucket is fine.
+        let ok = json!({
+            "openapi": "3.1.0",
+            "paths": { "/x": { "get": {
+                "parameters": [{ "$ref": "#/components/parameters/Present" }] } } },
+            "components": { "parameters": { "Present": { "name": "p", "in": "query" } } }
+        });
+        check_no_dangling_refs(&ok).unwrap();
     }
 }
