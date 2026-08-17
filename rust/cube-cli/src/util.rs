@@ -135,19 +135,32 @@ pub fn body(map: Map<String, Value>) -> Value {
     Value::Object(map)
 }
 
-/// Reject a supplied-but-empty branch, ref, or name at parse time.
+/// Reject a supplied-but-empty branch or ref at parse time.
 ///
 /// Attached to flag declarations as a clap `value_parser`, so it holds for a flag
 /// the moment the flag exists — including through `Option<String>`, where `None`
-/// stays legal and `Some("")` can no longer be constructed. Sixteen hand-written
-/// call sites did not hold: this check was added three times, and each round found
-/// another flag that had been missed (`github import --branch` sends its value
-/// under the key `branch`, so it escaped even a grep for `branchName`).
+/// stays legal and `Some("")` can no longer be constructed. Hand-written calls in
+/// match arms did not hold: this check was added three times, and each round found
+/// another flag that had been missed. The last one was `github connect --branch`,
+/// which sends its value under the key `branch` and so escaped even a grep for
+/// `branchName`. There are 20 such flags;
+/// `every_branch_and_ref_flag_refuses_an_empty_value` counts them.
 ///
 /// The reason it is worth rejecting at all: an empty value is not dropped, it is
 /// sent as an empty field, and what an empty field means is then the server's
 /// choice rather than the caller's. Where that choice has actually been measured,
 /// `nonempty_target` says so instead.
+///
+/// Empty values reach the CLI from scripts, not just from typos: `jq -r` prints
+/// nothing at all for empty input, and `$GITHUB_HEAD_REF` is empty on every trigger
+/// but `pull_request`. (A missing *field* prints `null`, which travels as a literal
+/// name and gets a 404 — loud, and the right answer.) The reachable case is not a
+/// mistyped flag; it is `data-model dev-mode ""` from a CI gate whose branch
+/// variable came out empty, which without this would enter dev mode on the deploy
+/// branch and leave every later step of the gate checking production.
+///
+/// Also used for `create-branch <name>`, which the walk's id filter does not reach —
+/// that one guard is a local decision, not a property the test holds.
 pub fn nonempty(s: &str) -> Result<String, String> {
     if s.trim().is_empty() {
         return Err("an empty value is still sent, as an empty field — what it \
@@ -343,10 +356,15 @@ mod tests {
 
         let mut checked = Vec::new();
         walk(&crate::Cli::command(), vec!["cube".into()], &mut checked);
-        // A guard that silently stopped finding flags would be worse than none.
-        assert!(
-            checked.len() >= 18,
-            "expected to check every branch/ref flag, only reached: {checked:#?}"
+        // Exact, not a floor: the filter keys on the id being `branch` or `ref`, so
+        // renaming a field to `base_branch` would drop it from the walk, and a floor
+        // would absorb that silently — the same naming mismatch that let
+        // `github connect --branch` escape in the first place.
+        assert_eq!(
+            checked.len(),
+            20,
+            "a branch/ref flag was added, removed or renamed — update the count and \
+             check the new one carries `value_parser = util::nonempty`: {checked:#?}"
         );
     }
 
