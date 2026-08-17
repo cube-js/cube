@@ -252,16 +252,20 @@ cube data-model create-branch DEPLOYMENT_ID my-branch
 DEV=$(cube data-model dev-mode DEPLOYMENT_ID my-branch --json | jq -r .branchName)
 cube data-model put DEPLOYMENT_ID model/cubes/orders.yml --file orders.yml --branch "$DEV"
 cube data-model commit DEPLOYMENT_ID --branch "$DEV" -m "add orders cube"
-cube data-model merge-to-default DEPLOYMENT_ID --branch my-branch -m "add orders cube"
 cube data-model exit-dev-mode DEPLOYMENT_ID
 cube data-model delete-branch DEPLOYMENT_ID "$DEV"
+cube data-model merge-to-default DEPLOYMENT_ID --branch my-branch -m "add orders cube"
 ```
 
 `commit` pushes the dev branch's edits to the shared branch it was forked from, and
-`merge-to-default` merges that branch into the deploy branch and rebuilds production.
-The last two lines matter as much as the rest: dev mode is per-credential state, so
-while a session stays open every command that omits `--branch` targets that dev branch
-instead of the deploy branch, and each pass through this leaves a `dev-…` fork behind.
+`merge-to-default` merges that branch into the deploy branch, rebuilds production, and
+**deletes the branch it merged** — pass `--keep-branch` to keep it.
+
+That accounts for `my-branch`; the two lines before it account for what you'd otherwise
+leave behind. Dev mode is per-credential state, so while a session stays open every
+command that omits `--branch` targets that dev branch instead of the deploy branch, and
+each pass through this workflow forks another `dev-…` branch. Releasing and pruning
+before the merge also keeps the fork's parent around until the fork is gone.
 
 <Info>
 
@@ -351,10 +355,11 @@ steps:
       DEV_BRANCH=$(cube data-model dev-mode "$DEPLOYMENT_ID" "$BRANCH" --json | jq -r .branchName)
       echo "DEV_BRANCH=$DEV_BRANCH" >> "$GITHUB_ENV"
       cube deployments build-status "$DEPLOYMENT_ID" --branch "$DEV_BRANCH" --wait
+      API=$(cube deployments get "$DEPLOYMENT_ID" --json | jq -r .deploymentUrl)
       TOKEN=$(cube deployments token "$DEPLOYMENT_ID")
-      curl -sfG "$CUBE_API_URL/dev-mode/$DEV_BRANCH/cubejs-api/v1/load" \
+      curl -sfG "$API/dev-mode/$DEV_BRANCH/cubejs-api/v1/load" \
         -H "Authorization: $TOKEN" \
-        --data-urlencode 'query={"measures":["orders.count"]}'
+        --data-urlencode 'query={"measures":["dbt_fct_orders.count"]}' | jq -e '.data'
 
   - name: Release the dev-mode session
     if: always()
@@ -371,6 +376,13 @@ With `--wait --json`, the sync writes one document carrying both the branch to
 compile and how the sync ended, which is why the branch name is available to the
 next step. Compile and query share a step because the dev-mode branch name is
 only known at runtime.
+
+The query goes to the **deployment's own host** (`deploymentUrl`), not to
+`CUBE_API_URL` — that one is the Cube Cloud API, and it answers this path with `200`
+and an HTML page, which `curl -sf` accepts happily. Piping to `jq -e '.data'` is what
+turns "some 200 came back" into "the model answered a query", so the gate fails on an
+error body instead of passing. Name a measure the sync generated, not one that already
+existed, or the step passes without testing the new model at all.
 
 <Warning>
 
