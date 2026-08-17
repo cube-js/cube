@@ -360,6 +360,33 @@ of the PostgreSQL documentation.
 | --- | --- | --- | --- |
 | `TO_CHAR` | Converts a timestamp to string according to the given format | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 
+### Type casts
+
+<Info>
+
+Learn more about the `regtype` pseudo-type in the
+[relevant section](https://www.postgresql.org/docs/current/datatype-oid.html)
+of the PostgreSQL documentation.
+
+</Info>
+
+| Cast | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
+| --- | --- | --- | --- |
+| `::regtype` | Casts a type name or OID to the `regtype` pseudo-type, e.g., `atttypid::regtype` | ✅ Yes | ❌ No |
+| `::regtype[]` | Casts an array literal of type names to `regtype[]`, e.g., `'{int8,numeric,bool}'::regtype[]` | ✅ Yes | ❌ No |
+
+<Note>
+
+`regtype` and `regtype[]` casts accept `pg_type.typname` values, canonical type
+names, common SQL aliases (`int`, `decimal`, `char`, `float`), an optional
+`pg_catalog.` qualifier, and a trailing type modifier. They exist mainly for
+compatibility with BI tools that introspect the schema over the SQL API's
+PostgreSQL wire protocol — for example, a query of the form `atttypid = ANY
+('{int8,numeric,bool}'::regtype[])` against `pg_catalog.pg_attribute` — rather
+than for use in hand-written queries.
+
+</Note>
+
 ### Date/time functions
 
 <Info>
