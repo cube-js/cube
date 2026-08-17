@@ -41,6 +41,40 @@ the `CubeCloudBYOC` IAM role that would allow Cube to:
 - Manage CloudWatch Logs
 - Create and manage RDS PostgreSQL instances
 
+<Warning>
+
+**If this account has never run Amazon RDS, create the RDS service-linked role
+before handing the account over.**
+
+Amazon RDS requires a service-linked role named `AWSServiceRoleForRDS` to exist in
+the account. AWS normally creates it automatically the first time you create a
+database — but that happens under *your* credentials, at a moment when Cube is
+provisioning under the `CubeCloudBYOC` role. If that role cannot create it, the
+database creation fails with a message that names a parameter rather than a
+permission:
+
+```
+InvalidParameterValue: Unable to create the resource.
+Verify that you have permission to create service linked role.
+```
+
+Run this once, in the target account, before granting Cube access:
+
+```bash
+aws iam create-service-linked-role --aws-service-name rds.amazonaws.com
+```
+
+If it returns `InvalidInput: Service role name AWSServiceRoleForRDS has been taken
+in this account`, the role already exists and there is nothing to do.
+
+The policy below does grant `iam:CreateServiceLinkedRole` for `rds.amazonaws.com`,
+so an account whose role carries the current policy can create it on demand. This
+step matters for accounts provisioned against an **earlier version** of the policy,
+and for organisations whose SCPs restrict IAM writes — in both cases the grant is
+present in the document but not effective in the account.
+
+</Warning>
+
 ## Provisioning access
 
 ### Create a CubeCloudBYOC policy
