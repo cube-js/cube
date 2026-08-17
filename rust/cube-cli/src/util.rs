@@ -135,23 +135,40 @@ pub fn body(map: Map<String, Value>) -> Value {
     Value::Object(map)
 }
 
-/// Reject a branch name that was supplied but empty.
+/// Reject a branch name or git ref that was supplied but empty.
 ///
-/// "Omitted" and "empty" must not collapse into the same request. A query parameter
-/// can be present-but-empty, and the server is free to read that as absent — which
-/// for `branchName` means the deployment's active or deploy branch. So an empty
-/// value doesn't fail, it silently retargets: a compile that was meant to check a
-/// branch reports on production instead, and reports it green.
-pub fn require_branch(flag: &str, value: &str) -> Result<()> {
+/// "Omitted" and "empty" must not collapse into the same request. Both travel as a
+/// present-but-empty field, and the server reads that as absent — so the value does
+/// not fail, it silently falls back to whatever the server would have picked anyway:
+/// the deployment's active or deploy branch for `branchName`, the dbt integration's
+/// tracked branch for `ref`. Both were measured against a live tenant; neither
+/// errors. That is the one failure mode a CI gate must not have, because the run
+/// still exits 0 — green for code it never looked at.
+///
+/// Empty values reach the CLI from scripts, not just typos: `$GITHUB_HEAD_REF` is
+/// empty on every trigger except `pull_request`, and `jq -r` prints nothing at all
+/// for empty input. (A missing *field* prints `null`, which travels as a literal
+/// name and gets a 404 — loud, and the right answer.)
+///
+/// Every flag carrying a branch or a ref goes through here before it is sent.
+pub fn require_nonempty(flag: &str, value: &str) -> Result<()> {
     if value.trim().is_empty() {
         bail!(
-            "{flag} cannot be empty — the server reads an empty branch as \
-             \"no branch\", which silently targets the deployment's own branch \
-             rather than the one you meant"
+            "{flag} cannot be empty — the server reads an empty value as \
+             \"not specified\" and falls back to the branch it would have picked \
+             anyway, so this would silently run against the wrong code"
         );
     }
 
     Ok(())
+}
+
+/// `require_nonempty` for an optional flag: only checks a value that was supplied.
+pub fn require_nonempty_opt(flag: &str, value: &Option<String>) -> Result<()> {
+    match value {
+        Some(v) => require_nonempty(flag, v),
+        None => Ok(()),
+    }
 }
 
 /// Parse a wait duration: a bare number of seconds, or a number with a `s`/`m`/`h`
@@ -236,11 +253,20 @@ mod tests {
     }
 
     #[test]
-    fn require_branch_rejects_supplied_but_empty() {
-        assert!(require_branch("--branch", "main").is_ok());
-        assert!(require_branch("--branch", "dbt-sync/x").is_ok());
-        assert!(require_branch("--branch", "").is_err());
-        assert!(require_branch("--branch", "   ").is_err());
+    fn require_nonempty_rejects_supplied_but_empty() {
+        assert!(require_nonempty("--branch", "main").is_ok());
+        assert!(require_nonempty("--ref", "dbt-sync/x").is_ok());
+        assert!(require_nonempty("--branch", "").is_err());
+        assert!(require_nonempty("--ref", "   ").is_err());
+    }
+
+    #[test]
+    fn require_nonempty_opt_distinguishes_omitted_from_empty() {
+        // The whole point: `None` is fine, `Some("")` is not.
+        assert!(require_nonempty_opt("--ref", &None).is_ok());
+        assert!(require_nonempty_opt("--ref", &Some("main".into())).is_ok());
+        assert!(require_nonempty_opt("--ref", &Some(String::new())).is_err());
+        assert!(require_nonempty_opt("--ref", &Some(" ".into())).is_err());
     }
 
     #[test]

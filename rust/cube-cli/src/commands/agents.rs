@@ -61,6 +61,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             space,
             branch,
         } => {
+            util::require_nonempty_opt("--branch", &branch)?;
             let mut query = Vec::new();
             util::push(&mut query, "space", &space);
             util::push(&mut query, "branchName", &branch);

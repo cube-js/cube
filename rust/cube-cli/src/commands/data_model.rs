@@ -253,11 +253,12 @@ fn tree_nodes(res: &serde_json::Value) -> Vec<serde_json::Value> {
 fn write_body(
     mut body: serde_json::Map<String, serde_json::Value>,
     branch: &Option<String>,
-) -> serde_json::Value {
+) -> Result<serde_json::Value> {
+    util::require_nonempty_opt("--branch", branch)?;
     if let Some(b) = branch {
         body.insert("branchName".into(), json!(b));
     }
-    util::body(body)
+    Ok(util::body(body))
 }
 
 /// Enabling a branch keeps its staging environment always active and accessible
@@ -273,6 +274,7 @@ async fn set_branch_enabled(
     branch: &str,
     enabled: bool,
 ) -> Result<()> {
+    util::require_nonempty("BRANCH", branch)?;
     let body = json!({ "branchName": branch, "enabled": enabled });
     let res = api
         .put(
@@ -318,6 +320,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             content,
             branch,
         } => {
+            util::require_nonempty_opt("--branch", &branch)?;
             let mut query: Query = Vec::new();
             if content {
                 query.push(("withContent".into(), "true".into()));
@@ -343,6 +346,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             path,
             branch,
         } => {
+            util::require_nonempty_opt("--branch", &branch)?;
             let mut query: Query = vec![("withContent".into(), "true".into())];
             util::push(&mut query, "branchName", &branch);
             let res = api.get(&base(deployment), &query).await?;
@@ -365,7 +369,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let mut map = serde_json::Map::new();
             map.insert("files".into(), json!([{ "path": path, "content": text }]));
             let res = api
-                .put(&base(deployment), Some(&write_body(map, &branch)))
+                .put(&base(deployment), Some(&write_body(map, &branch)?))
                 .await?;
             if ctx.json {
                 output::print_json(&res);
@@ -383,7 +387,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let mut map = serde_json::Map::new();
             map.insert("files".into(), json!(files));
             let res = api
-                .delete(&base(deployment), Some(&write_body(map, &branch)))
+                .delete(&base(deployment), Some(&write_body(map, &branch)?))
                 .await?;
             if ctx.json {
                 output::print_json(&res);
@@ -404,7 +408,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let res = api
                 .post(
                     &format!("{}/rename", base(deployment)),
-                    Some(&write_body(map, &branch)),
+                    Some(&write_body(map, &branch)?),
                 )
                 .await?;
             if ctx.json {
@@ -442,6 +446,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             name,
             dev_mode,
         } => {
+            util::require_nonempty("NAME", &name)?;
             let body = json!({ "name": name, "enterDevMode": dev_mode });
             let res = api
                 .post(
@@ -477,14 +482,10 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             // names contain slashes (`dbt-sync/main-…`). `Client::delete` takes no
             // query, so this goes through `request` directly.
             //
-            // Checked here rather than left to the server: a query parameter can be
-            // present-but-empty, and what `branchName=` means is then entirely the
-            // server's choice — not something to discover with a DELETE. It is also
-            // reachable from a script rather than only from a typo: `jq -r` prints
-            // nothing at all for EMPTY input, so a truncated or empty document gives
-            // an empty variable. (A missing FIELD prints `null`, which travels as a
-            // literal branch name and gets a 404 — loud, and the right answer.)
-            util::require_branch("BRANCH", &branch)?;
+            // Not left to the server: what `branchName=` means is then the server's
+            // choice, and a DELETE is not the place to find out. See
+            // `util::require_nonempty`.
+            util::require_nonempty("BRANCH", &branch)?;
             let mut query: Query = vec![("branchName".to_string(), branch.clone())];
             if remove_on_upstream {
                 query.push(("removeOnUpstream".to_string(), "true".to_string()));
@@ -511,6 +512,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             set_branch_enabled(&api, ctx, deployment, &branch, false).await?;
         }
         Cmd::DevMode { deployment, branch } => {
+            // An empty branch here would enter dev mode on the deploy branch, and
+            // every later step of a CI gate would then be checking production.
+            util::require_nonempty("BRANCH", &branch)?;
             let body = json!({ "branchName": branch });
             let res = api
                 .post(
@@ -548,6 +552,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             branch,
         } => {
             let mut body = serde_json::Map::new();
+            util::require_nonempty_opt("--branch", &branch)?;
             util::set(&mut body, "message", &message);
             util::set(&mut body, "branchName", &branch);
             let res = api
@@ -563,6 +568,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             }
         }
         Cmd::FileHashes { deployment, branch } => {
+            util::require_nonempty_opt("--branch", &branch)?;
             let mut query = Vec::new();
             util::push(&mut query, "branchName", &branch);
             let res = api
@@ -574,6 +580,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             output::print_json(&res);
         }
         Cmd::Pull { deployment, branch } => {
+            util::require_nonempty_opt("--branch", &branch)?;
             let body = branch.as_ref().map(|b| json!({ "branchName": b }));
             let res = api
                 .post(
@@ -601,7 +608,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let res = api
                 .post(
                     &format!("/build/api/v1/deployments/{deployment}/merge"),
-                    Some(&write_body(map, &branch)),
+                    Some(&write_body(map, &branch)?),
                 )
                 .await?;
             output::print_json(&res);
@@ -618,7 +625,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let res = api
                 .post(
                     &format!("/build/api/v1/deployments/{deployment}/merge-to-default"),
-                    Some(&write_body(map, &branch)),
+                    Some(&write_body(map, &branch)?),
                 )
                 .await?;
             output::print_json(&res);

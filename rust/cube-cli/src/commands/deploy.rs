@@ -82,6 +82,8 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
     }
     files.sort();
 
+    util::require_nonempty_opt("--branch", &args.branch)?;
+
     // Hash local files and diff against the server's content hashes.
     let mut query = Vec::new();
     util::push(&mut query, "branchName", &args.branch);
