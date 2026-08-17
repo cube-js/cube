@@ -297,6 +297,11 @@ export class BaseQuery {
     this.from = this.options.from;
     this.multiStageQuery = this.options.multiStageQuery;
     this.timezone = this.options.timezone;
+
+    if (this.timezone && !moment.tz.zone(this.timezone)) {
+      throw new UserError(`Incorrect timezone: ${this.timezone}`);
+    }
+
     this.rowLimit = this.options.rowLimit;
     this.offset = this.options.offset;
     /** @type {import('./PreAggregations').PreAggregations} */

@@ -19,3 +19,20 @@ describe('responseFormat validation', () => {
     expect(() => normalizeQuery({ ...baseQuery, responseFormat: 'arrow' }, false)).toThrow(/Invalid query format/);
   });
 });
+
+describe('timezone validation', () => {
+  test.each(['UTC', 'America/New_York', 'Europe/Berlin', 'Asia/Tokyo'])(
+    'accepts valid IANA timezone %s',
+    (tz) => {
+      const result = normalizeQuery({ ...baseQuery, timezone: tz }, false);
+      expect(result.timezone).toBe(tz);
+    }
+  );
+
+  test.each([
+    'Not/AZone',
+    '+05:00',
+  ])('rejects invalid/injection timezone %j', (tz) => {
+    expect(() => normalizeQuery({ ...baseQuery, timezone: tz }, false)).toThrow(/Invalid query format/);
+  });
+});

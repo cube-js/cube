@@ -95,6 +95,7 @@ describe('SQL Generation', () => {
           'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
+
     it('Simple query - time dimension', async () => {
       await compilers.compiler.compile();
 
@@ -122,6 +123,33 @@ describe('SQL Generation', () => {
       expect(queryAndParams[0]).toContain('GROUP BY 1, 2');
       expect(queryAndParams[0]).toContain('ORDER BY  2');
     });
+
+    it('validate timezone', async () => {
+      await compilers.compiler.compile();
+
+      const maliciousTimezones = [
+        'Not/AZone',
+        '+05:00',
+        '+05',
+        '05'
+      ];
+
+      for (const timezone of maliciousTimezones) {
+        expect(() => new PostgresQuery(compilers, {
+          measures: ['cards.count'],
+          timeDimensions: [
+            {
+              dimension: 'cards.createdAt',
+              granularity: 'day',
+              dateRange: ['2021-01-01', '2021-01-02']
+            }
+          ],
+          timezone,
+          filters: [],
+        })).toThrow(UserError);
+      }
+    });
+
     it('Simple query - complex measure', async () => {
       await compilers.compiler.compile();
 
@@ -137,6 +165,7 @@ describe('SQL Generation', () => {
           'FROM  card_tbl  AS "cards"';
       expect(queryAndParams[0]).toEqual(expected);
     });
+
     it('Simple query - complex dimension', async () => {
       await compilers.compiler.compile();
 
@@ -157,6 +186,7 @@ describe('SQL Generation', () => {
           'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
+
     it('Simple query - CUBE dimension', async () => {
       await compilers.compiler.compile();
 
@@ -177,6 +207,7 @@ describe('SQL Generation', () => {
           'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
+
     it('Simple query - CUBE id', async () => {
       await compilers.compiler.compile();
 
@@ -197,6 +228,7 @@ describe('SQL Generation', () => {
           'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
+
     it('Simple query - simple filter', async () => {
       await compilers.compiler.compile();
 
@@ -241,6 +273,7 @@ describe('SQL Generation', () => {
       const expectedParams = ['type_value', 'not_type_value', 'type_value'];
       expect(queryAndParams[1]).toEqual(expectedParams);
     });
+
     it('Simple query - null and many equals filter', async () => {
       await compilers.compiler.compile();
 
