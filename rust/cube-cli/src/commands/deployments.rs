@@ -476,9 +476,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             // an empty `branchName` as absent and answers for the active or deploy
             // branch, so a gate whose branch variable came out empty would get a
             // green production build for a compile that never ran.
-            if let Some(branch) = &branch {
-                util::require_branch("--branch", branch)?;
-            }
+            util::require_nonempty_opt("--branch", &branch)?;
 
             let mut query = Vec::new();
             util::push(&mut query, "branchName", &branch);

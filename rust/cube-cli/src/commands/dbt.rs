@@ -216,6 +216,14 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             poll,
         } => {
             let mut body = serde_json::Map::new();
+            // Measured against a live tenant: `--ref ""` is accepted and the sync
+            // completes against the integration's tracked branch, exit 0. Reachable
+            // with nothing failing — `$GITHUB_HEAD_REF` is empty on every trigger
+            // except `pull_request`, so a `push` or `workflow_dispatch` run of the
+            // same workflow would compile the tracked branch and report the gate green
+            // for a change it never saw.
+            util::require_nonempty_opt("--branch", &branch)?;
+            util::require_nonempty_opt("--ref", &r#ref)?;
             util::set(&mut body, "branchName", &branch);
             util::set(&mut body, "ref", &r#ref);
             let started = api.post(&base(deployment), Some(&util::body(body))).await?;
