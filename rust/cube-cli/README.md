@@ -128,7 +128,7 @@ Every endpoint of the Console Server public API is covered:
 
 | Group | Endpoints |
 |---|---|
-| `deployments` | list, get, create (`--bootstrap` scaffolds + builds a serving deployment), update, settings, versions, delete, token, advance-step, reset-step. `settings` reads every setting in one payload; `versions` lists the Cube versions the deployment can switch to, and `update --release-channel-version <v>` (accepting `1.7.20`, `v1.7.20` or `cubejs/cube:v1.7.20`) is validated against it — the container image is resolved server-side and is not settable |
+| `deployments` | list, get, create (`--bootstrap` scaffolds + builds a serving deployment), update (`--release-channel`, `--release-channel-version`), settings, versions, delete, token, advance-step, reset-step |
 | `regions` | list available deployment regions |
 | `logs` | tail deployment pod logs (`--pod`, `-c/--container`; defaults to the Cube API container) |
 | `github` (`gh`) | status, installations, repos, branches, connect (import a repo into a deployment + first build) |
