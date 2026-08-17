@@ -130,6 +130,18 @@ function systemAsyncHandler(handler: (req: Request & { context: ExtendedRequestC
   };
 }
 
+const DEV_TOKEN_SCOPE = 'dev-token';
+
+function hasDevTokenScope(securityContext: unknown): boolean {
+  if (typeof securityContext !== 'object' || securityContext === null) {
+    return false;
+  }
+
+  const { scope } = <Record<string, any>>securityContext;
+
+  return Array.isArray(scope) && scope.includes(DEV_TOKEN_SCOPE);
+}
+
 // Prepared CheckAuthFn, default or from config: always async
 type PreparedCheckAuthFn = (ctx: any, authorization?: string) => Promise<{
   securityContext: any;
@@ -2595,7 +2607,8 @@ class ApiGateway {
       if (auth) {
         try {
           req.securityContext = await checkAuthFn(auth);
-          req.signedWithPlaygroundAuthSecret = Boolean(internalOptions?.isPlaygroundCheckAuth);
+          req.signedWithPlaygroundAuthSecret =
+            Boolean(internalOptions?.isPlaygroundCheckAuth) && hasDevTokenScope(req.securityContext);
         } catch (e: any) {
           if (this.enforceSecurityChecks) {
             throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token', e);
