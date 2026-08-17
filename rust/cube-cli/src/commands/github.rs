@@ -15,12 +15,17 @@ enum Cmd {
     Status,
     /// List the user's GitHub App installations
     #[command(alias = "ls")]
-    Installations,
+    Installations {
+        #[command(flatten)]
+        page: Page,
+    },
     /// List repositories available to an installation
     #[command(alias = "repositories")]
     Repos {
         /// GitHub App installation id (see `cube github installations`)
         installation: i64,
+        #[command(flatten)]
+        page: Page,
     },
     /// List branches of a repository
     Branches {
@@ -29,6 +34,8 @@ enum Cmd {
         /// GitHub App installation id the repository belongs to
         #[arg(long)]
         installation: i64,
+        #[command(flatten)]
+        page: Page,
     },
     /// Connect a deployment to a GitHub repo: clones it into the
     /// deployment's git storage and triggers the first build
@@ -50,6 +57,26 @@ enum Cmd {
     },
 }
 
+/// Cursor pagination shared by the three GitHub list commands.
+#[derive(clap::Args)]
+struct Page {
+    /// Page size for cursor-based pagination
+    #[arg(long)]
+    first: Option<u64>,
+    /// Cursor for the next page (from a previous pageInfo.endCursor)
+    #[arg(long)]
+    after: Option<String>,
+}
+
+impl Page {
+    fn query(&self) -> crate::client::Query {
+        let mut query = Vec::new();
+        util::push(&mut query, "first", &self.first);
+        util::push(&mut query, "after", &self.after);
+        query
+    }
+}
+
 /// Split an `owner/repo` argument into its two parts.
 fn split_repo(repo: &str) -> Result<(&str, &str)> {
     repo.split_once('/')
@@ -64,26 +91,33 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let res = api.get("/api/v1/github/status", &Vec::new()).await?;
             output::print_json(&res);
         }
-        Cmd::Installations => {
-            let res = api.get("/api/v1/github/installations", &Vec::new()).await?;
+        Cmd::Installations { page } => {
+            let res = api
+                .get("/api/v1/github/installations", &page.query())
+                .await?;
             output::print_list(
                 ctx.json,
                 &res,
                 &[("INSTALLATION", "installationId"), ("ACCOUNT", "login")],
             );
         }
-        Cmd::Repos { installation } => {
+        Cmd::Repos { installation, page } => {
             let res = api
                 .get(
                     &format!("/api/v1/github/installations/{installation}/repositories"),
-                    &Vec::new(),
+                    &page.query(),
                 )
                 .await?;
             output::print_list(ctx.json, &res, &[("NAME", "name"), ("URL", "htmlUrl")]);
         }
-        Cmd::Branches { repo, installation } => {
+        Cmd::Branches {
+            repo,
+            installation,
+            page,
+        } => {
             let (owner, name) = split_repo(&repo)?;
-            let query = vec![("installationId".to_string(), installation.to_string())];
+            let mut query = page.query();
+            query.push(("installationId".to_string(), installation.to_string()));
             let res = api
                 .get(
                     &format!("/api/v1/github/repositories/{owner}/{name}/branches"),

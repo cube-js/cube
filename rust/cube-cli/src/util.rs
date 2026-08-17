@@ -43,6 +43,74 @@ pub fn push<T: ToString>(query: &mut Query, key: &str, value: &Option<T>) {
     }
 }
 
+/// How one endpoint implements the deprecated offset paging it still accepts,
+/// which is what decides whether the CLI has to read the deprecated `data`
+/// field to honor it. Verified per endpoint against the server, not assumed —
+/// the two shapes want opposite handling, so there is no safe blanket answer.
+#[derive(Clone, Copy)]
+pub struct ListPaging {
+    /// The command's own deprecated flag names, for the error message.
+    flags: &'static str,
+    /// Whether `data` alone is sliced. When false the slicing happens in the
+    /// query, so `items` already holds exactly the requested page.
+    data_only: bool,
+}
+
+/// Sliced by the database query: `items` and `data` hold the same rows, so
+/// render `items` and stay correct after `data` is eventually removed.
+pub const OFFSET_LIMIT_IN_QUERY: ListPaging = ListPaging {
+    flags: "--offset/--limit",
+    data_only: false,
+};
+
+/// As [`OFFSET_LIMIT_IN_QUERY`], for `reports list`, which deprecates a
+/// different pair of flags.
+pub const LIMIT_PAGE_IN_QUERY: ListPaging = ListPaging {
+    flags: "--limit/--page",
+    data_only: false,
+};
+
+/// Applied in memory to `data` alone, while `items` is the full cursor page
+/// regardless of the flags. Only reading `data` honors them.
+pub const OFFSET_LIMIT_DATA_ONLY: ListPaging = ListPaging {
+    flags: "--offset/--limit",
+    data_only: true,
+};
+
+/// Which response field a list command should render, given how its endpoint
+/// pages and the flags it was invoked with — the two deprecated ones (in the
+/// order `paging` names them), then `--first`/`--after`. `Some("data")`
+/// selects the deprecated offset-sliced page; `None` the canonical `items`.
+///
+/// The API deprecated offset paging in favor of the `first`/`after` cursor
+/// and the two address different pages of the same response, so an endpoint
+/// given both either rejects the request (deployments, reports) or silently
+/// honors just one (environments, user attributes). Reject it here instead,
+/// so the CLI never prints a page the caller did not ask for.
+///
+/// Reading `data` is only ever right for a [`ListPaging::data_only`]
+/// endpoint. Doing it everywhere "for uniformity" would be actively harmful:
+/// on a query-sliced endpoint `items` is already the requested page and stays
+/// so after `data` is dropped, whereas asking for `data` would then fail a
+/// command the server still honors perfectly well.
+pub fn paging_field(
+    paging: ListPaging,
+    deprecated_a: Option<u64>,
+    deprecated_b: Option<u64>,
+    first: Option<u64>,
+    after: Option<&str>,
+) -> Result<Option<&'static str>> {
+    let uses_offset = deprecated_a.is_some() || deprecated_b.is_some();
+    let uses_cursor = first.is_some() || after.is_some();
+    if uses_offset && uses_cursor {
+        bail!(
+            "{} are deprecated and cannot be combined with --first/--after",
+            paging.flags
+        );
+    }
+    Ok((uses_offset && paging.data_only).then_some("data"))
+}
+
 /// Normalize a user-supplied Cube Cloud URL: trim whitespace and trailing
 /// slashes, and default to `https://` when no scheme is given (reqwest
 /// otherwise fails with "relative URL without a base").
@@ -121,5 +189,52 @@ mod tests {
         set(&mut map, "absent", &None::<String>);
         assert_eq!(map.get("present"), Some(&json!("v")));
         assert!(!map.contains_key("absent"));
+    }
+
+    #[test]
+    fn only_a_data_only_endpoint_renders_the_deprecated_field() {
+        // The in-memory list: `items` ignores offset paging, so `data` it is.
+        for (a, b) in [(Some(10), None), (None, Some(5)), (Some(10), Some(5))] {
+            let field = paging_field(OFFSET_LIMIT_DATA_ONLY, a, b, None, None).unwrap();
+            assert_eq!(field, Some("data"));
+        }
+
+        // Query-sliced endpoints must NOT ask for `data`: `items` is already
+        // the requested page, and stays right after `data` is removed —
+        // asking would fail a command the server still honors.
+        for paging in [OFFSET_LIMIT_IN_QUERY, LIMIT_PAGE_IN_QUERY] {
+            let field = paging_field(paging, Some(10), Some(5), None, None).unwrap();
+            assert_eq!(field, None);
+        }
+    }
+
+    #[test]
+    fn paging_field_renders_items_whenever_offset_paging_is_unused() {
+        for paging in [
+            OFFSET_LIMIT_DATA_ONLY,
+            OFFSET_LIMIT_IN_QUERY,
+            LIMIT_PAGE_IN_QUERY,
+        ] {
+            assert_eq!(paging_field(paging, None, None, None, None).unwrap(), None);
+            for (first, after) in [(Some(5), None), (None, Some("cursor"))] {
+                assert_eq!(
+                    paging_field(paging, None, None, first, after).unwrap(),
+                    None
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn paging_field_rejects_mixing_and_names_the_command_s_own_flags() {
+        assert!(paging_field(OFFSET_LIMIT_DATA_ONLY, Some(10), None, Some(5), None).is_err());
+        assert!(paging_field(OFFSET_LIMIT_IN_QUERY, None, Some(5), None, Some("cursor")).is_err());
+
+        // `reports list` deprecates --limit/--page, not --offset/--limit.
+        let err = paging_field(LIMIT_PAGE_IN_QUERY, Some(50), None, Some(5), None)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("--limit/--page"), "got: {err}");
+        assert!(err.contains("--first/--after"), "got: {err}");
     }
 }

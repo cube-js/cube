@@ -17,10 +17,10 @@ enum Cmd {
         /// Filter by creation step (repeatable): project, upload, schema, github, ssh, databases, ready, demo
         #[arg(long = "creation-step")]
         creation_step: Vec<String>,
-        /// Pagination offset
+        /// Deprecated: pagination offset (use --after)
         #[arg(long)]
         offset: Option<u64>,
-        /// Maximum number of items to return
+        /// Deprecated: maximum number of items to return (use --first)
         #[arg(long)]
         limit: Option<u64>,
         /// Page size for cursor-based pagination
@@ -88,6 +88,12 @@ enum Cmd {
     Versions {
         /// Deployment id
         deployment: i64,
+        /// Page size for cursor-based pagination
+        #[arg(long)]
+        first: Option<u64>,
+        /// Cursor for the next page (from a previous pageInfo.endCursor)
+        #[arg(long)]
+        after: Option<String>,
     },
     /// Delete a deployment
     #[command(alias = "rm")]
@@ -132,6 +138,13 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             first,
             after,
         } => {
+            let page_field = util::paging_field(
+                util::OFFSET_LIMIT_IN_QUERY,
+                offset,
+                limit,
+                first,
+                after.as_deref(),
+            )?;
             let mut query = Vec::new();
             for step in creation_step {
                 query.push(("creationStep".to_string(), step));
@@ -141,16 +154,23 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             util::push(&mut query, "first", &first);
             util::push(&mut query, "after", &after);
             let res = api.get("/api/v1/deployments/", &query).await?;
-            output::print_list(
+            // Deployments page in the database: `items` already holds exactly the
+            // requested page and keeps doing so once the deprecated `data` is
+            // removed, so render `items`. Asking for `data` here would turn a
+            // future no-op into a failure on a command the server still honors.
+            // The flags are still validated: the two paging styles can't mix.
+            // The server rejects that too; catching it here names the flags.
+            output::print_list_from(
                 ctx.json,
                 &res,
+                page_field,
                 &[
                     ("ID", "id"),
                     ("NAME", "name"),
                     ("URL", "deploymentUrl"),
                     ("STEP", "creationStep"),
                 ],
-            );
+            )?;
         }
         Cmd::Get { deployment } => {
             let res = api
@@ -222,11 +242,18 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 .await?;
             output::print_json(&res);
         }
-        Cmd::Versions { deployment } => {
+        Cmd::Versions {
+            deployment,
+            first,
+            after,
+        } => {
+            let mut query = Vec::new();
+            util::push(&mut query, "first", &first);
+            util::push(&mut query, "after", &after);
             let res = api
                 .get(
                     &format!("/api/v1/deployments/{deployment}/versions"),
-                    &Vec::new(),
+                    &query,
                 )
                 .await?;
             output::print_list(

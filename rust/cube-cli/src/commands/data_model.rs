@@ -85,6 +85,12 @@ enum Cmd {
     Branches {
         /// Deployment id
         deployment: i64,
+        /// Page size for cursor-based pagination
+        #[arg(long)]
+        first: Option<u64>,
+        /// Cursor for the next page (from a previous pageInfo.endCursor)
+        #[arg(long)]
+        after: Option<String>,
     },
     /// Create a branch (optionally entering dev mode)
     CreateBranch {
@@ -188,9 +194,9 @@ fn base(deployment: i64) -> String {
     format!("/build/api/v1/deployments/{deployment}/data-model/files")
 }
 
-/// The files endpoint returns a nested tree under `data`, each node carrying
-/// `path`, `type` (file|directory), `content`, and `children`. Flatten it
-/// depth-first into a single list of nodes.
+/// The files endpoint returns a nested tree, each node carrying `path`,
+/// `type` (file|directory), `content`, and `children`. Flatten it depth-first
+/// into a single list of nodes.
 fn flatten(nodes: &[serde_json::Value], out: &mut Vec<serde_json::Value>) {
     for n in nodes {
         out.push(n.clone());
@@ -216,11 +222,16 @@ fn same_path(a: &str, b: &str) -> bool {
     a.trim_start_matches('/') == b.trim_start_matches('/')
 }
 
+/// Flatten the whole tree the files endpoint returned. The CLI never asks for
+/// a page, so `items` (the canonical field, cursor-sliced over the *top-level*
+/// nodes only) carries every root, same as the deprecated `data`.
+///
+/// `list_field` rather than `items` because only a real array of roots is a
+/// tree: `items` would hand back an envelope carrying neither array as a lone
+/// node, rendering one blank row where "No results" is the honest answer.
 fn tree_nodes(res: &serde_json::Value) -> Vec<serde_json::Value> {
     let mut out = Vec::new();
-    if let Some(arr) = res.get("data").and_then(|d| d.as_array()) {
-        flatten(arr, &mut out);
-    }
+    flatten(&output::list_field(res).unwrap_or_default(), &mut out);
     out
 }
 
@@ -389,11 +400,18 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 output::success(&format!("Renamed {from} -> {to}"));
             }
         }
-        Cmd::Branches { deployment } => {
+        Cmd::Branches {
+            deployment,
+            first,
+            after,
+        } => {
+            let mut query: Query = Vec::new();
+            util::push(&mut query, "first", &first);
+            util::push(&mut query, "after", &after);
             let res = api
                 .get(
                     &format!("/build/api/v1/deployments/{deployment}/branches"),
-                    &Vec::new(),
+                    &query,
                 )
                 .await?;
             output::print_list(
