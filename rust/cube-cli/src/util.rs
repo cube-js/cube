@@ -143,8 +143,8 @@ pub fn body(map: Map<String, Value>) -> Value {
 /// match arms did not hold: this check was added three times, and each round found
 /// another flag that had been missed. The last one was `github connect --branch`,
 /// which sends its value under the key `branch` and so escaped even a grep for
-/// `branchName`. There are 20 such flags;
-/// `every_branch_and_ref_flag_refuses_an_empty_value` counts them.
+/// `branchName`. `every_branch_and_ref_flag_refuses_an_empty_value` counts the flags
+/// and holds the property, so the number lives in that assertion and nowhere else.
 ///
 /// The reason it is worth rejecting at all: an empty value is not dropped, it is
 /// sent as an empty field, and what an empty field means is then the server's
@@ -285,8 +285,8 @@ mod tests {
         assert!(nonempty_target("\t").is_err());
     }
 
-    /// Holds the promise the doc comment makes, which sixteen hand-written calls
-    /// could not: every `--branch`/`--ref` in the whole command tree refuses an
+    /// Holds the promise the doc comment makes, which hand-written calls in match
+    /// arms could not: every `--branch`/`--ref` in the whole command tree refuses an
     /// empty value. A new branch-taking flag is a copy of a declaration, so this
     /// fails the moment one is declared without the parser.
     ///
@@ -298,8 +298,14 @@ mod tests {
     fn every_branch_and_ref_flag_refuses_an_empty_value() {
         use clap::{CommandFactory, Parser};
 
+        // On the action, not on `get_num_args()`: the derive leaves num_args
+        // unresolved until `Command::build`, so an unbuilt tree reports `None` for
+        // `--delete-branch`-style bools and they read as value-taking.
         fn takes_a_value(arg: &clap::Arg) -> bool {
-            arg.get_num_args().is_none_or(|n| n.takes_values())
+            matches!(
+                arg.get_action(),
+                clap::ArgAction::Set | clap::ArgAction::Append
+            )
         }
 
         /// `cube <path...>` with `target` empty and every other required argument at
@@ -330,8 +336,13 @@ mod tests {
 
         fn walk(cmd: &clap::Command, path: Vec<String>, checked: &mut Vec<String>) {
             for arg in cmd.get_arguments() {
+                // Matched by name, not by exact id: the count catches a branchy flag
+                // being renamed away, but only this catches one being *added* under a
+                // different name (`--base-branch` on a command that already has
+                // `--branch` is the plausible next edit). `takes_a_value` keeps the
+                // `--delete-branch`-style bools out.
                 let id = arg.get_id().as_str();
-                if id != "branch" && id != "ref" {
+                if !takes_a_value(arg) || !(id.contains("branch") || id.contains("ref")) {
                     continue;
                 }
                 let flag = format!("{} --{id}", path.join(" "));
