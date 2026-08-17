@@ -470,6 +470,16 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                         "Created branch {name}; entered dev mode on {dev_branch}"
                     ));
                     println!("{}", dev_branch_hint(&dev_branch));
+                } else if dev_mode {
+                    // Say what happened: this re-points per-credential state, and
+                    // silence here reads exactly like a plain `create-branch`.
+                    output::success(&format!(
+                        "Created branch {name}; your dev-mode session now points at it"
+                    ));
+                    println!(
+                        "File writes still need a dev-… branch: run \
+                         `cube data-model dev-mode {deployment} {name}`."
+                    );
                 } else {
                     output::success(&format!("Created branch {name}"));
                 }
