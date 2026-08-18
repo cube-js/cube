@@ -147,6 +147,53 @@ describe('PostgresDriver', () => {
     }
   });
 
+  test('stream (user defined type)', async () => {
+    await driver.query('CREATE TYPE CUBEJS_TEST_POINT AS (x int, y int);', []);
+    // Postgres reports the base type oid in RowDescription rather than the domain one.
+    await driver.query('CREATE DOMAIN CUBEJS_TEST_INT AS int;', []);
+
+    // A driver of its own, the shared one loaded its types before this type existed.
+    const freshDriver = new PostgresDriver({
+      host: container.getHost(),
+      port: container.getMappedPort(5432),
+      user: 'test',
+      password: 'test',
+      database: 'test',
+    });
+
+    try {
+      const tableData = await freshDriver.stream(
+        `SELECT
+          ARRAY[CAST(ROW(1, 2) as CUBEJS_TEST_POINT)] as points,
+          CAST(5 as CUBEJS_TEST_INT) as aliased`,
+        [],
+        {
+          highWaterMark: 1000,
+        }
+      );
+
+      try {
+        expect(await tableData.types).toEqual([
+          {
+            name: 'points',
+            type: 'text'
+          },
+          {
+            name: 'aliased',
+            type: 'int'
+          },
+        ]);
+        expect(await streamToArray(tableData.rowStream)).toEqual([
+          { points: '{"(1,2)"}', aliased: 5 },
+        ]);
+      } finally {
+        await (<any> tableData).release();
+      }
+    } finally {
+      await freshDriver.release();
+    }
+  });
+
   test('stream (exception)', async () => {
     try {
       await driver.stream('select * from test.random_name_for_table_that_doesnot_exist_sql_must_fail', [], {
