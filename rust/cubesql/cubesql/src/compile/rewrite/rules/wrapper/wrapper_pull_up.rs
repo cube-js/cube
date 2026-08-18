@@ -4,9 +4,8 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::{members::MemberRules, wrapper::WrapperRules},
         transforming_rewrite, wrapped_select, wrapped_select_having_expr_empty_tail,
-        wrapped_select_joins_empty_tail, wrapper_pullup_replacer, wrapper_replacer_context,
-        LogicalPlanLanguage, WrappedSelectAlias, WrappedSelectSelectType, WrappedSelectType,
-        WrapperReplacerContextAliasToCube,
+        wrapper_pullup_replacer, wrapper_replacer_context, LogicalPlanLanguage, WrappedSelectAlias,
+        WrappedSelectSelectType, WrappedSelectType, WrapperReplacerContextAliasToCube,
     },
     var, var_iter, var_list_iter,
 };
@@ -276,8 +275,7 @@ impl WrapperRules {
                             ),
                         ),
                         wrapper_pullup_replacer(
-                            // TODO handle non-empty joins
-                            wrapped_select_joins_empty_tail(),
+                            "?joins",
                             wrapper_replacer_context(
                                 "?alias_to_cube",
                                 "?push_to_cube",
@@ -351,7 +349,7 @@ impl WrapperRules {
                                 "?inner_push_to_cube",
                                 "?inner_ungrouped_scan",
                             ),
-                            wrapped_select_joins_empty_tail(),
+                            "?joins",
                             "?filter_expr",
                             wrapped_select_having_expr_empty_tail(),
                             "WrappedSelectLimit:None",
@@ -381,6 +379,7 @@ impl WrapperRules {
                     "?projection_expr",
                     "?group_expr",
                     "?aggr_expr",
+                    "?joins",
                     "?inner_select_type",
                     "?inner_projection_expr",
                     "?inner_group_expr",
@@ -455,6 +454,7 @@ impl WrapperRules {
         projection_expr_var: &'static str,
         _group_expr_var: &'static str,
         _aggr_expr_var: &'static str,
+        joins_var: &'static str,
         inner_select_type_var: &'static str,
         inner_projection_expr_var: &'static str,
         _inner_group_expr_var: &'static str,
@@ -465,6 +465,7 @@ impl WrapperRules {
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let select_type_var = var!(select_type_var);
         let projection_expr_var = var!(projection_expr_var);
+        let joins_var = var!(joins_var);
         let inner_select_type_var = var!(inner_select_type_var);
         let inner_projection_expr_var = var!(inner_projection_expr_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
@@ -479,6 +480,12 @@ impl WrapperRules {
                 alias_to_cube_out_var,
             ) {
                 return false;
+            }
+
+            // A select that joins something on top of another select is never a no-op
+            // wrapper around it, no matter how similar the two projections look
+            if egraph[subst[joins_var]].data.non_empty_joins {
+                return true;
             }
 
             for select_type in
