@@ -130,7 +130,14 @@ fn failure_detail(text: &str) -> String {
         .and_then(|v| {
             v.get("message")
                 .or_else(|| v.get("error"))
-                .map(|m| m.to_string())
+                .map(|m| match m.as_str() {
+                    // A string message IS the text: `to_string` would render it as a
+                    // JSON value and print the quotes around it, in the common case.
+                    Some(text) => text.to_string(),
+                    // Anything else — an object, a list of validation errors — has no
+                    // plainer form, so JSON is the honest rendering.
+                    None => m.to_string(),
+                })
         })
         .unwrap_or_else(|| text.to_string());
 
@@ -348,10 +355,13 @@ impl Client {
         // fix. Bodies lost mid-transfer surface as `TransportError` from `res.text()`
         // instead, and those ARE retried.
         serde_json::from_str(&text).map_err(|e| {
-            let snippet: String = text.chars().take(200).collect();
             anyhow!(
+                // The same rule as `failure_detail`, which this predated: `replace('\n',
+                // …)` collapses newlines only, so an indented gateway page kept its
+                // indentation runs, and a hand-rolled `take` cut without saying it had.
+                // Same producer as the 502 case, on a status the branch above lets by.
                 "{method} {path} returned a body that is not JSON ({e}): {}",
-                snippet.replace('\n', " ")
+                util::one_line(&text, util::REASON_LIMIT)
             )
         })
     }
@@ -508,10 +518,18 @@ mod tests {
     fn a_real_api_message_survives_whole() {
         // The common path: short, already one line, and the part worth reading.
         let detail = failure_detail(r#"{"message":"deployment 42 not found"}"#);
-        assert_eq!(detail, "\"deployment 42 not found\"");
+        assert_eq!(
+            detail, "deployment 42 not found",
+            "no JSON quotes around it"
+        );
         assert_eq!(
             failure_detail(r#"{"error":"branch is not active"}"#),
-            "\"branch is not active\""
+            "branch is not active"
+        );
+        // A message that isn't a string has no plainer form than JSON.
+        assert_eq!(
+            failure_detail(r#"{"message":{"field":"ref","problem":"unknown"}}"#),
+            r#"{"field":"ref","problem":"unknown"}"#
         );
     }
 }
