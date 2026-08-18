@@ -222,10 +222,11 @@ fn says_nothing(value: &Value) -> bool {
 /// reason the catch-all arm of [`failure_detail`] gives for keeping the body verbatim,
 /// and the pair of assertions in
 /// `a_response_that_explains_nothing_does_not_promise_that_it_will`. The nested one flips,
-/// and the comment above it goes with it — that is where the asymmetry is written down.
-/// The other keeps passing with its own comment true word for word; what it loses is the
-/// thing it was for, since with both orders preserved it no longer contrasts with
-/// anything, so the question there is whether it still earns its place.
+/// along with the sentence above it saying the keys come back sorted — though not the
+/// recovery note beneath that, which is the one thing there that becomes live rather than
+/// stale. The other assertion keeps passing with its own comment true word for word; what
+/// it loses is the thing it was for, since with both orders preserved it no longer
+/// contrasts with anything, so the question there is whether it still earns its place.
 fn explains(value: &Value) -> Option<String> {
     if says_nothing(value) {
         return None;
@@ -658,10 +659,9 @@ mod tests {
         // all there, only the order is the crate's rather than the server's.
         //
         // If this ever fails with the keys IN ORDER, nothing regressed: something in the
-        // graph turned on `serde_json/preserve_order`. Swap the expectation, then read
-        // `explains`' "On key order", which lists everything else that assumed otherwise
-        // — including the assertion above, which goes on passing and would survive a
-        // sweep driven by this failure, while quietly ceasing to contrast with anything.
+        // graph turned on `serde_json/preserve_order`. Swap the expectation, then work
+        // through `explains`' "On key order", which lists what else assumed otherwise —
+        // including one claim this failure can't surface, because it keeps passing.
         assert_eq!(
             failure_detail(r#"{"error":{"z":1,"a":2}}"#),
             r#"{"a":2,"z":1}"#
