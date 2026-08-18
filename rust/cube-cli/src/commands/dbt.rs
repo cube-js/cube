@@ -235,8 +235,14 @@ fn status_label(status: &Value) -> String {
         &output::field(status, "progress.stage"),
         util::COMPLAINT_LIMIT,
     );
-    // A number: nothing to collapse, and a cap would only ever cut a malformed one.
-    let percent = output::field(status, "progress.percentComplete");
+    // Through the same rule, despite being a number: `output::field` stringifies whatever
+    // arrived, so a server sending it as a STRING can put whitespace in it — which is the
+    // shape the test fixture below uses. Exempting one field would make the label's
+    // one-line guarantee depend on another field's type.
+    let percent = util::one_line(
+        &output::field(status, "progress.percentComplete"),
+        util::COMPLAINT_LIMIT,
+    );
     let message = util::one_line(
         &output::field(status, "progress.message"),
         util::COMPLAINT_LIMIT,
@@ -250,7 +256,7 @@ fn status_label(status: &Value) -> String {
         format!("{state} ({stage})")
     };
     if !util::is_blank(&percent) {
-        label.push_str(&format!(" {}%", percent.trim()));
+        label.push_str(&format!(" {percent}%"));
     }
     if !util::is_blank(&message) {
         label.push_str(&format!(" — {message}"));
