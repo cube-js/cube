@@ -176,7 +176,7 @@ async fn wait_for_build(
                      wait on the dev-… branch it prints",
                     // This branch bails instead of timing out, so the timeout's
                     // "(last seen: …)" never speaks for it.
-                    if complaint.is_empty() {
+                    if util::is_blank(&complaint) {
                         String::new()
                     } else {
                         format!(": {complaint}")
@@ -193,7 +193,7 @@ async fn wait_for_build(
         // this surfaces a new complaint, stays quiet while it persists, and — since
         // the timeout names the last label — leaves the eventual failure explaining
         // itself instead of pointing at a line printed fifteen minutes earlier.
-        Ok(Progress::Waiting(if complaint.is_empty() {
+        Ok(Progress::Waiting(if util::is_blank(&complaint) {
             status
         } else {
             format!("{status} ({complaint})")
