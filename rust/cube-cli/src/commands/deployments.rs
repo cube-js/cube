@@ -103,7 +103,7 @@ async fn wait_for_build(
 
     wait::poll(Wait::new("build", timeout, interval), || async {
         let res = api.get(path, query).await?;
-        let status = output::field(&res, "status");
+        let status = util::status_of(&res, "status");
 
         if BUILD_DONE.contains(&status.as_str()) || BUILD_FAILED.contains(&status.as_str()) {
             return Ok(Progress::Done(res));
@@ -508,14 +508,22 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let res = wait_for_build(&api, deployment, &path, &query, timeout, poll).await?;
             output::print_json(&res);
 
-            let status = output::field(&res, "status");
+            let status = util::status_of(&res, "status");
             if BUILD_FAILED.contains(&status.as_str()) {
-                let error = output::field(&res, "errorText");
+                // Normalised like the two sites in `wait_for_build`, and this is the one
+                // that needs it most: those quote a short worker verdict, while this is a
+                // FAILED BUILD, so the text is a compile error that can arrive long and
+                // multi-line. Nothing matches against it here — the status already said
+                // what happened — so the raw/normalised split those sites keep for
+                // `contains` doesn't apply.
+                let error = one_line(&output::field(&res, "errorText"), COMPLAINT_LIMIT);
                 anyhow::bail!(
                     "build {status} for branch {}{}",
                     named_branch(&res),
-                    // `is_blank`: a reason of blanks would append a bare colon and then
-                    // say nothing after it, which reads worse than the no-reason form.
+                    // Still `is_blank` rather than `is_empty`, though `one_line` has
+                    // already collapsed blanks to nothing: one rule at every site that
+                    // picks an arm is cheaper to keep true than one with an exception
+                    // whose safety depends on a call two lines up.
                     if util::is_blank(&error) {
                         String::new()
                     } else {

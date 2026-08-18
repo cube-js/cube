@@ -235,6 +235,18 @@ pub fn is_blank(s: &str) -> bool {
     s.trim().is_empty()
 }
 
+/// A status field, read for comparison against the states a wait knows.
+///
+/// Trimmed for the reason every other comparison on this branch is: padding is a spelling
+/// of the same value, not a different one. It matters more here than in a message, though
+/// — an untrimmed `"COMPLETED "` matches no known state, and a wait treats what it doesn't
+/// know as progress ON PURPOSE, so the sync would be over and the CLI would poll it until
+/// the timeout. Trimming can't cause the failure that rule protects against: it recognises
+/// a state, it never invents one.
+pub fn status_of(res: &serde_json::Value, path: &str) -> String {
+    crate::output::field(res, path).trim().to_string()
+}
+
 /// Wrap a value so it survives being pasted into a shell.
 ///
 /// The CLI's failure messages hand over commands to run — `delete-branch <branch>`,
@@ -292,6 +304,16 @@ pub fn parse_duration(s: &str) -> Result<std::time::Duration, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_padded_status_still_names_the_state_it_reports() {
+        // The consequential half of the same rule: a wait treats an unrecognised state as
+        // progress on purpose, so an untrimmed "COMPLETED " would leave a finished sync
+        // being polled until the timeout.
+        let res = serde_json::json!({"status": " COMPLETED\n"});
+        assert_eq!(status_of(&res, "status"), "COMPLETED");
+        assert_eq!(status_of(&serde_json::json!({}), "status"), "");
+    }
+
     #[test]
     fn blanks_say_nothing() {
         assert!(!is_blank("main"));
