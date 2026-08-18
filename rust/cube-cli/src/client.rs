@@ -202,8 +202,8 @@ fn says_nothing(value: &Value) -> bool {
 ///
 /// # On key order
 ///
-/// This is the one place that spells the rule out; the two other sites that depend on it
-/// point here rather than restating it, so there is a single thing to revisit.
+/// This is the one place that spells the rule out; every other site that depends on it
+/// points here rather than restating it, so there is a single thing to revisit.
 ///
 /// An object candidate is re-rendered from the parsed value, and `serde_json`'s map is a
 /// `BTreeMap` here, so its keys come back SORTED. The fallback in [`failure_detail`]
@@ -221,8 +221,11 @@ fn says_nothing(value: &Value) -> bool {
 /// the whole dependency graph, and it pins versions rather than the features they are
 /// built with — so if it ever arrives, three things want revisiting: this paragraph, the
 /// reason the catch-all arm of [`failure_detail`] gives for keeping the body verbatim,
-/// and the pair of assertions in `a_response_that_explains_nothing_does_not_promise_that_it_will`,
-/// one of which flips while the other keeps passing for a new reason.
+/// and the pair of assertions in
+/// `a_response_that_explains_nothing_does_not_promise_that_it_will`. The nested one flips.
+/// The other keeps passing with its stated reason intact — what it loses is the thing it
+/// was for: with both orders preserved the pair no longer contrasts, and documents an
+/// asymmetry that has stopped existing.
 fn explains(value: &Value) -> Option<String> {
     if says_nothing(value) {
         return None;
@@ -706,8 +709,8 @@ mod tests {
         // If this ever fails with the keys IN ORDER, nothing regressed: something in the
         // graph turned on `serde_json/preserve_order`. Swap the expectation, then read
         // `explains`' "On key order", which lists everything else that assumed otherwise
-        // — including the assertion above, which keeps passing for a different reason and
-        // so would survive a sweep driven by this failure alone.
+        // — including the assertion above, which goes on passing and would survive a
+        // sweep driven by this failure, while quietly ceasing to contrast with anything.
         assert_eq!(
             failure_detail(r#"{"error":{"z":1,"a":2}}"#),
             r#"{"a":2,"z":1}"#
