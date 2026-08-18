@@ -258,6 +258,9 @@ mod tests {
         assert_eq!(shell_quote("feat#1234"), "'feat#1234'");
         assert_eq!(shell_quote("a;rm -rf b"), "'a;rm -rf b'");
         assert_eq!(shell_quote("$HOME"), "'$HOME'");
+        // An empty value stays visible rather than vanishing into the command line —
+        // `deployments::named_branch`'s fallback reasons from this.
+        assert_eq!(shell_quote(""), "''");
         // A single quote is legal too, so it can't simply be wrapped: close, escape,
         // reopen — the only form that works inside single quotes.
         assert_eq!(shell_quote("it's"), r"'it'\''s'");

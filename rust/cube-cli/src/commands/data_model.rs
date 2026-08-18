@@ -227,10 +227,16 @@ fn flatten(nodes: &[serde_json::Value], out: &mut Vec<serde_json::Value>) {
 
 /// Printed after entering dev mode, so the user knows which branch the write
 /// commands accept.
+///
+/// Quoted like every other value this CLI hands back inside a command (see
+/// [`util::shell_quote`]). A `dev-…` name is server-generated and so far always safe,
+/// which is exactly the "usually fine" the convention exists to stop relying on: the
+/// exemption isn't written anywhere, so the next reader has to re-derive it.
 fn dev_branch_hint(dev_branch: &str) -> String {
     format!(
-        "Data-model writes target it: pass --branch {dev_branch} \
-         (or omit --branch to use your active dev-mode branch)."
+        "Data-model writes target it: pass --branch {} \
+         (or omit --branch to use your active dev-mode branch).",
+        util::shell_quote(dev_branch)
     )
 }
 
