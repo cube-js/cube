@@ -679,7 +679,8 @@ mod tests {
             failure_detail(r#"{"message":"Bad gateway"}"#),
             "Bad gateway"
         );
-        // And an object keeps the order the server sent, which re-serialising would sort.
+        // And an object keeps the order the server sent — today, because re-serialising
+        // would sort it; see the note below for what else that premise holds up.
         assert_eq!(
             failure_detail(r#"{"z":1,"a":2}"#),
             r#"{"z":1,"a":2}"#,
@@ -693,10 +694,12 @@ mod tests {
         //
         // If this ever fails with the keys IN ORDER, nothing regressed HERE: something in
         // the graph turned on `serde_json/preserve_order`, which closes this asymmetry.
-        // Swap the expectation and drop the key-order caveats on BOTH comments that rest
-        // on it: `explains`'s, and the reason `failure_detail`'s catch-all arm gives for
-        // keeping the body verbatim. Under `preserve_order` that arm's premise — that
-        // re-rendering would sort the keys — is simply false.
+        // Swap the expectation, and revisit every claim resting on that premise, which
+        // `preserve_order` makes false: `explains`'s caveat, the reason
+        // `failure_detail`'s catch-all arm gives for keeping the body verbatim, and the
+        // clause on the assertion above. The first two stop being true; the third keeps
+        // passing for a different reason, which is why it needs listing here rather than
+        // left to a failing test to surface.
         //
         // The feature was left off on purpose, and not because of this asymmetry: it also
         // reorders every `--json` document this CLI prints, since `output::print_json`
