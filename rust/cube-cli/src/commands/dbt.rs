@@ -251,7 +251,8 @@ fn print_result(json: bool, result: &Value) {
 
 /// Each sync deliberately creates a FRESH branch which outlives the command, so a job
 /// running per pull request accumulates them — say so, and name the command that removes
-/// one, rather than let them pile up unnoticed. Printed from every path that ends well,
+/// one, rather than let them pile up unnoticed. Printed from every path that ends well and
+/// speaks to a human — never into `--json`, where a document is no place for advice —
 /// through one function so they can't drift into saying different things.
 ///
 /// `sync_created_it` is false when the caller passed `--branch`: the branch is then
@@ -271,13 +272,16 @@ fn print_prune_hint(sync_created_it: bool, deployment: i64, branch_name: &str) {
 /// BOTH `--json` documents defer to, kept in one place so they cannot come to disagree.
 ///
 /// A server that echoes the resolved ref has better evidence than this client's prefix
-/// comparison, so its answer wins. An explicit `null` is not an answer: `null` is exactly
-/// what this CLI renders for "there was nothing to verify", and the documented
-/// `jq -e '.refVerified == true'` treats it as fatal — so a server that spells "not
-/// applicable" that way must not turn a client-verified sync into a red gate.
+/// comparison, so its answer wins. But only a BOOLEAN counts as one, because only a
+/// boolean is something the documented `jq -e '.refVerified == true'` can act on: it
+/// fails on `null`, and equally on `"true"`, `1` or an object. An unspecified future
+/// contract is the reason to be strict about this rather than lenient — deferring to a
+/// value that assertion can't read would turn a sync this client verified into a red
+/// gate, which is the whole failure this rule exists to avoid. `false` stays an answer;
+/// anything else falls back to the client's own comparison, which is at least a verdict.
 fn reported_ref_verified(doc: &Value) -> Option<&Value> {
     doc.get("refVerified")
-        .filter(|reported| !reported.is_null())
+        .filter(|reported| reported.is_boolean())
 }
 
 /// The `--wait --json` document: one object carrying BOTH halves a caller needs —
@@ -715,7 +719,7 @@ mod tests {
     }
 
     #[test]
-    fn an_explicit_null_from_the_server_is_not_an_answer() {
+    fn only_a_boolean_from_the_server_is_an_answer() {
         // `null` is what this CLI itself renders for "nothing to verify", and the
         // documented `jq -e '.refVerified == true'` fails on it. So a server that spells
         // "not applicable" that way must not overwrite a sync this client DID verify —
@@ -723,6 +727,15 @@ mod tests {
         // since serde_json tells absent apart from present-and-null.
         assert!(reported_ref_verified(&json!({"refVerified": null})).is_none());
         assert!(reported_ref_verified(&json!({})).is_none());
+        // And every other non-boolean fails that same assertion for the same reason, so
+        // the rule is "a verdict", not "not null" — a distinction worth pinning, since
+        // filtering nulls alone reads as if it were complete.
+        for spelling in [json!("true"), json!(1), json!({"ok": true}), json!([])] {
+            assert!(
+                reported_ref_verified(&json!({"refVerified": spelling})).is_none(),
+                "a non-boolean is not a verdict the documented jq assertion can act on"
+            );
+        }
         assert_eq!(
             reported_ref_verified(&json!({"refVerified": false})),
             Some(&json!(false)),
