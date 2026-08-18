@@ -204,6 +204,12 @@ pub fn nonempty_target(s: &str) -> Result<String, String> {
 /// Single quotes rather than escaping each metacharacter, because inside them the shell
 /// interprets nothing — except a single quote, which is itself legal in a ref name, so it
 /// is closed, escaped and reopened the POSIX way.
+///
+/// The convention is every user-supplied value inside a suggested command, not only the
+/// ones whose character set is known to be dangerous. Sync ids are opaque hex in practice
+/// and a wrong one 404s loudly rather than acting on the wrong thing — but branch names
+/// were "usually fine" too, until a ref called `#1234-fix` turned up, and a rule with an
+/// exemption list is one somebody has to re-derive at each new call site.
 pub fn shell_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', r"'\''"))
 }

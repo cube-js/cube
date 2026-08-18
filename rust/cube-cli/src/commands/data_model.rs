@@ -316,6 +316,24 @@ fn read_content(file: Option<String>, content: Option<String>) -> Result<String>
     }
 }
 
+/// The command that opens a branch for compilation, rendered in one place.
+///
+/// Three messages hand it over — the `Branch is not active` verdict and the
+/// `none`/`stopped` backstop in [`crate::commands::deployments`], and `create-branch
+/// --dev-mode` below — and their prose deliberately differs: one answers a verdict, one
+/// answers absence, one follows a branch that was just created. What a reader COPIES
+/// shouldn't differ, so only the sentences around it are written three times. It lives
+/// here because this module owns the subcommand it names.
+///
+/// The branch is user-supplied and goes into a command meant to be pasted, so it is
+/// quoted — see [`util::shell_quote`] for what a legal ref name can do unquoted.
+pub fn dev_mode_command(deployment: i64, branch: &str) -> String {
+    format!(
+        "`cube data-model dev-mode {deployment} {}`",
+        util::shell_quote(branch)
+    )
+}
+
 pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
     let api = ctx.api()?;
     match args.cmd {
@@ -482,8 +500,8 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                         "Created branch {name} and asked to enter dev mode on it"
                     ));
                     println!(
-                        "File writes still need a dev-… branch: run \
-                         `cube data-model dev-mode {deployment} {name}`."
+                        "File writes still need a dev-… branch: run {}.",
+                        dev_mode_command(deployment, &name)
                     );
                 } else {
                     output::success(&format!("Created branch {name}"));
@@ -642,4 +660,20 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_dev_mode_command_survives_a_branch_name_with_a_metacharacter() {
+        // Three messages hand this over, and a ref may legally carry `#` — which
+        // unquoted comments out the rest of the line, so the command runs against the
+        // wrong branch and looks to the reader like it worked.
+        assert_eq!(
+            dev_mode_command(42, "feat#1234"),
+            "`cube data-model dev-mode 42 'feat#1234'`"
+        );
+    }
 }

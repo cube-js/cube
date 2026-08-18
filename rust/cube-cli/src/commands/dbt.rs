@@ -204,10 +204,10 @@ fn verify_ref_applied(
          it is syncing the branch saved on the dbt integration, compiling the wrong code \
          and still passing — or it names branches differently than this check expects. \
          Stopping rather than reporting a result for a ref that may not have been used. \
-         The sync is still running: cancel it with `cube dbt cancel {deployment} \
-         {sync_job_id}`, and delete the branch with `cube data-model delete-branch \
-         {deployment} {}`. Pass --branch to name the branch yourself, which \
-         skips this check.",
+         The sync is still running: cancel it with `cube dbt cancel {deployment} {}`, \
+         and delete the branch with `cube data-model delete-branch {deployment} {}`. \
+         Pass --branch to name the branch yourself, which skips this check.",
+        util::shell_quote(sync_job_id),
         util::shell_quote(branch_name)
     )
 }
@@ -442,8 +442,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 } else {
                     output::success(&format!("Started dbt sync {sync_job_id} on {branch_name}"));
                     println!(
-                        "Watch it with `cube dbt status {deployment} {sync_job_id} --wait`, \
-                         or re-run sync with --wait."
+                        "Watch it with `cube dbt status {deployment} {} --wait`, \
+                         or re-run sync with --wait.",
+                        util::shell_quote(&sync_job_id)
                     );
                     print_prune_hint(branch.is_none(), deployment, &branch_name);
                 }
@@ -547,7 +548,8 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                         return Err(err.context(format!(
                             "dbt sync {sync_job_id} completed on {branch_name}, but its result \
                              could not be read. The sync itself succeeded — read the result with \
-                             `cube dbt result {deployment} {sync_job_id}`"
+                             `cube dbt result {deployment} {}`",
+                            util::shell_quote(&sync_job_id)
                         )));
                     }
                 }
@@ -619,7 +621,8 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 // sync that does not exist — point at the status either way.
                 None => bail!(
                     "no result for dbt sync {sync_job_id} yet — check \
-                     `cube dbt status {deployment} {sync_job_id}`"
+                     `cube dbt status {deployment} {}`",
+                    util::shell_quote(&sync_job_id)
                 ),
             }
         }
@@ -694,7 +697,7 @@ mod tests {
         // Both recovery commands must be runnable as printed: this lands in a CI log,
         // where nobody is around to substitute a placeholder for the deployment.
         assert!(
-            err.to_string().contains("cube dbt cancel 42 job-1"),
+            err.to_string().contains("cube dbt cancel 42 'job-1'"),
             "{err}"
         );
         assert!(
