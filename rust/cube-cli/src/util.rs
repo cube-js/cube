@@ -193,6 +193,25 @@ pub fn nonempty_target(s: &str) -> Result<String, String> {
     Ok(s.to_string())
 }
 
+/// A branch name to PRINT, when the payload might not have carried one.
+///
+/// Only for prose and suggested commands, never for a JSON document: a gate reading
+/// `.branchName` must see the empty string it was actually given rather than a plausible
+/// name it would then try to use.
+///
+/// Quoting already handles the command half — an empty name renders as a visible `''`.
+/// This exists for the half quoting can't reach: the same name is interpolated into the
+/// sentence around the command, where `branch  is not building` reads as a formatting bug
+/// rather than as a payload that named nothing. These messages are read out of CI logs
+/// after the fact, where the message is all the reader gets.
+pub fn branch_or_placeholder(branch: &str) -> String {
+    if branch.is_empty() {
+        "<branch>".to_string()
+    } else {
+        branch.to_string()
+    }
+}
+
 /// Wrap a value so it survives being pasted into a shell.
 ///
 /// The CLI's failure messages hand over commands to run — `delete-branch <branch>`,
