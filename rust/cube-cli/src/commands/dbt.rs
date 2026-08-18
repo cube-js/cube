@@ -223,15 +223,19 @@ fn status_label(status: &Value) -> String {
     let percent = output::field(status, "progress.percentComplete");
     let message = output::field(status, "progress.message");
 
-    let mut label = if stage.is_empty() || stage == state {
+    // `is_blank` throughout: every one of these is server text being appended to a
+    // sentence, so blanks would add empty brackets, a bare `%`, or a dash with nothing
+    // after it — and this label is also `poll`'s dedupe key, so an all-blank stage that
+    // varies in width would count as movement and print a line per poll.
+    let mut label = if util::is_blank(&stage) || stage == state {
         state
     } else {
         format!("{state} ({stage})")
     };
-    if !percent.is_empty() {
+    if !util::is_blank(&percent) {
         label.push_str(&format!(" {percent}%"));
     }
-    if !message.is_empty() {
+    if !util::is_blank(&message) {
         label.push_str(&format!(" — {message}"));
     }
 
@@ -480,11 +484,13 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
 
                 // The only signal a CI gate needs is the non-zero exit. The message
                 // carries the workflow's own reason, which is what a human reading
-                // the failed job actually wants.
+                // the failed job actually wants — and `is_blank` rather than `is_empty`
+                // because a reason of blanks would fill the slot without answering it,
+                // on the one line somebody reads when the gate goes red.
                 let error = output::field(&status, "error");
                 bail!(
                     "dbt sync {sync_job_id} failed: {}",
-                    if error.is_empty() {
+                    if util::is_blank(&error) {
                         "(no reason reported)".to_string()
                     } else {
                         error
@@ -599,7 +605,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     let error = output::field(&status, "error");
                     bail!(
                         "dbt sync {sync_job_id} failed: {}",
-                        if error.is_empty() {
+                        if util::is_blank(&error) {
                             "(no reason reported)".to_string()
                         } else {
                             error
@@ -800,6 +806,24 @@ mod tests {
             Some(true),
         );
         assert_eq!(doc["refVerified"], json!(false));
+    }
+
+    #[test]
+    fn a_blank_stage_does_not_become_empty_brackets() {
+        // Also `poll`'s dedupe key: blanks that vary in width would read as movement and
+        // print a line per poll, which is the thing `poll` exists to avoid.
+        assert_eq!(
+            status_label(&json!({"status": "BUILDING", "progress": {"stage": "  "}})),
+            "BUILDING"
+        );
+        assert_eq!(
+            status_label(&json!({"status": "BUILDING", "progress": {"message": " "}})),
+            "BUILDING"
+        );
+        assert_eq!(
+            status_label(&json!({"status": "BUILDING", "progress": {"stage": "compile"}})),
+            "BUILDING (compile)"
+        );
     }
 
     #[test]
