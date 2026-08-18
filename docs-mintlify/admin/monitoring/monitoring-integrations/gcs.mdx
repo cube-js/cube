@@ -56,24 +56,20 @@ navigate to your bucket and watch the logs coming.
 
 ### Authentication
 
-Authenticate with the `credentials_base64` option, set to the name of the
-environment variable holding the base64-encoded service account key:
+Authenticate with the `credentials_base64` option, referencing the environment
+variable that holds the base64-encoded service account key, as in the example above.
+This is the only supported way to give the sink its credentials.
 
-```toml
-credentials_base64 = "$CUBE_CLOUD_MONITORING_GCS_CREDENTIALS"
-```
-
-This is the only supported way to give the sink its credentials. `credentials_base64`
-is specific to Cube — it does not appear in [Vector's own sink
+`credentials_base64` is specific to Cube — it does not appear in [Vector's own sink
 reference][vector-docs-sinks-gcs]. Cube decodes the key and provides it to the Vector
-agent as a file named after the sink, so there is no path for you to configure.
+agent as a file named after the sink.
 
 <Warning>
 
-Because the credentials file is named after the sink, the sink name must be lowercase
-alphanumeric characters and dashes only — **no underscores**. A sink named
-`query_history_gcs` will not get a credentials file; name it `query-history-gcs`
-instead.
+The sink name becomes the name of a Kubernetes object that carries the credentials
+file, so it must be lowercase alphanumeric characters and dashes only — **no
+underscores**. A sink named `query_history_gcs` will not get a credentials file; name
+it `query-history-gcs` instead.
 
 </Warning>
 
