@@ -737,12 +737,14 @@ describe('driver cache invalidation', () => {
     await request({ token: 'token-b' }, 'req-2');
     expect(await driverFactory('default')).toBe(first);
 
+    clock.advance(4 * 60 * 1000);
     await request({ token: 'token-c' }, 'req-3');
     expect(await driverFactory('default')).toBe(first);
 
-    // Sustained past the grace window: the driver is given up, and the caller
+    // Sustained past the grace window — and with no gap long enough to have
+    // aged the earlier refusals out. The driver is given up, and the caller
     // sees the factory's own error rather than a connection it refused to build.
-    clock.advance(31 * 1000);
+    clock.advance(4 * 60 * 1000);
     await request({ token: 'token-d' }, 'req-4');
 
     await expect(driverFactory('default')).rejects.toThrow('credential is unusable');
@@ -751,10 +753,11 @@ describe('driver cache invalidation', () => {
     expect((<FakeDriver>first).release).toHaveBeenCalled();
     expect(core.builtDrivers).toHaveLength(1);
 
-    const released = logged('Releasing driver after repeated staleness check failures');
+    const released = logged('Rebuilding driver')
+      .filter((params: any) => params.reason === 'repeated staleness check failures');
 
     expect(released).toHaveLength(1);
-    expect(released[0]).toMatchObject({ dataSource: 'default', failureCount: 3 });
+    expect(released[0]).toMatchObject({ dataSource: 'default', rebuildCount: 1 });
 
     // And once the credential is usable again, the next request rebuilds.
     shouldFail = false;
@@ -800,5 +803,121 @@ describe('driver cache invalidation', () => {
 
     expect(await driverFactory('default')).toBe(first);
     expect(core.builtDrivers).toHaveLength(1);
+  });
+
+  // Probes only run when the security context changes, so in a quiet deployment
+  // they can be hours apart. A counter that only ever went up would read three
+  // unrelated flakes on three different days as one sustained outage and tear
+  // down a working pool for it.
+  test('refusals spread beyond the window do not accumulate', async () => {
+    let shouldFail = false;
+    const { core, driverFactory, request, logged } = await createCore({
+      driverFactory: (ctx: any) => {
+        if (shouldFail) {
+          throw new Error('secret store unreachable');
+        }
+
+        return <any>{ type: 'postgres', password: ctx.securityContext.token };
+      },
+    }, { token: 'token-a' });
+
+    const first = await driverFactory('default');
+
+    shouldFail = true;
+
+    // Well past the grace window between each, so every refusal opens a fresh
+    // window rather than extending the one before it. Six of them, twice the
+    // bound, and the driver is still there.
+    for (const token of ['token-b', 'token-c', 'token-d', 'token-e', 'token-f', 'token-g']) {
+      clock.advance(6 * 60 * 1000);
+      // eslint-disable-next-line no-await-in-loop
+      await request({ token }, `req-${token}`);
+      // eslint-disable-next-line no-await-in-loop
+      expect(await driverFactory('default')).toBe(first);
+    }
+
+    expect(core.builtDrivers).toHaveLength(1);
+    expect((<FakeDriver>first).release).not.toHaveBeenCalled();
+    expect(logged('Rebuilding driver')).toHaveLength(0);
+  });
+
+  // Giving a driver up tears down the same pool a configuration change does, so
+  // it has to answer to the same rate limit. Bypassing it let a factory that
+  // fails probes but succeeds when called directly churn a pool every window,
+  // with nothing in the logs that read as churn.
+  test('rate-limits repeated give-ups', async () => {
+    let shouldFailProbe = false;
+    const { core, driverFactory, request, logged } = await createCore({
+      driverFactory: (ctx: any) => {
+        if (shouldFailProbe) {
+          throw new Error('secret store unreachable');
+        }
+
+        return <any>{ type: 'postgres', password: ctx.securityContext.token };
+      },
+    }, { token: 'token-a' });
+
+    await driverFactory('default');
+
+    // Three refusals spanning the grace window give the driver up. The build
+    // that follows succeeds, because it calls the factory directly.
+    shouldFailProbe = true;
+
+    for (const token of ['token-b', 'token-c']) {
+      // eslint-disable-next-line no-await-in-loop
+      await request({ token }, `req-${token}`);
+      // eslint-disable-next-line no-await-in-loop
+      await driverFactory('default');
+      clock.advance(4 * 60 * 1000);
+    }
+
+    await request({ token: 'token-d' }, 'req-d');
+    shouldFailProbe = false;
+
+    const rebuilt = await driverFactory('default');
+
+    expect(logged('Rebuilding driver')).toHaveLength(1);
+    expect(core.builtDrivers).toHaveLength(2);
+
+    // The give-up opened a suppression window like any other replacement, so
+    // the next changed context reuses rather than tearing the new pool down.
+    await request({ token: 'token-e' }, 'req-e');
+
+    expect(await driverFactory('default')).toBe(rebuilt);
+    expect(core.builtDrivers).toHaveLength(2);
+    expect(logged('Driver rebuild suppressed')).toHaveLength(1);
+  });
+
+  // Replacing a driver cannot move a deadline the factory keeps re-asserting.
+  // Honouring one would find the new driver stale the moment its suppression
+  // window closed, for the life of the process.
+  test('ignores a lifetime that has already elapsed', async () => {
+    const { core, driverFactory, request, logged } = await createCore({
+      driverFactory: (ctx: any) => (<any>{
+        type: 'postgres',
+        password: ctx.securityContext.token,
+        // A factory passing the provider's expiry straight through, on a
+        // credential whose refresh has already stopped.
+        expiresAt: Date.now() - 60 * 1000,
+      }),
+    }, { token: 'token-a' });
+
+    const first = await driverFactory('default');
+
+    expect(logged('Driver configuration expired on arrival')).toHaveLength(1);
+
+    // Past any suppression window: an honoured deadline would rebuild here, and
+    // again on every window after it.
+    clock.advancePastRebuildInterval();
+    await request({ token: 'token-a' }, 'req-2');
+
+    expect(await driverFactory('default')).toBe(first);
+
+    clock.advancePastRebuildInterval();
+    await request({ token: 'token-a' }, 'req-3');
+
+    expect(await driverFactory('default')).toBe(first);
+    expect(core.builtDrivers).toHaveLength(1);
+    expect(logged('Rebuilding driver')).toHaveLength(0);
   });
 });

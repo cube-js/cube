@@ -431,6 +431,15 @@ module.exports = {
   replaced on its own deadline; a factory that raises instead of falling back
   is given up after it has refused for long enough, so the error reaches the
   caller rather than 401s from a pool nobody rebuilds.
+- **A `driver_factory` that reaches an external dependency should catch its
+  own failures.** Sustained refusal is read as the factory declining to serve
+  the connection: after several minutes of raising on every check, the pooled
+  connection is released and the error surfaces to the caller. That is the
+  intended behaviour for a credential that has genuinely stopped working, but
+  nothing here can tell it apart from a secret store that is briefly
+  unreachable. If yours fetches from Vault, a token endpoint or anything else
+  that can blink, catch the error and return the last known-good credential
+  (or the service account) rather than letting it propagate.
 - **Falling back is silent.** A missing or near-expired token sends the
   query to the service account instead of failing, so results reflect the
   service account's permissions rather than the user's. If that is not
