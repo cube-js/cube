@@ -7,6 +7,7 @@ mod chained_subquery;
 mod combinations;
 mod cubestore;
 mod custom_granularities;
+mod filter_member_operand;
 mod filtered_measures;
 mod filters_segments;
 mod joins;
