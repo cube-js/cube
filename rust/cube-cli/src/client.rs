@@ -693,12 +693,17 @@ mod tests {
         //
         // If this ever fails with the keys IN ORDER, nothing regressed HERE: something in
         // the graph turned on `serde_json/preserve_order`, which closes this asymmetry.
-        // Swap the expectation and drop the caveat on `explains` — but the same feature
-        // also reorders every `--json` document this CLI prints, since `output::print_json`
-        // serialises the same `Value`, and that wider promise is why it wasn't turned on
-        // deliberately. The lockfile doesn't prevent it either: features unify across the
-        // whole dependency graph, and it pins versions rather than the features they are
-        // built with.
+        // Swap the expectation and drop the key-order caveats on BOTH comments that rest
+        // on it: `explains`'s, and the reason `failure_detail`'s catch-all arm gives for
+        // keeping the body verbatim. Under `preserve_order` that arm's premise — that
+        // re-rendering would sort the keys — is simply false.
+        //
+        // The feature was left off on purpose, and not because of this asymmetry: it also
+        // reorders every `--json` document this CLI prints, since `output::print_json`
+        // serialises the same `Value`, and that is a wider promise to move than an error
+        // message is worth. The lockfile doesn't prevent it either: features unify across
+        // the whole dependency graph, and it pins versions rather than the features they
+        // are built with.
         assert_eq!(
             failure_detail(r#"{"error":{"z":1,"a":2}}"#),
             r#"{"a":2,"z":1}"#
