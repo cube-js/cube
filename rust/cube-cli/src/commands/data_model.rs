@@ -489,7 +489,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 // "is not a dev-mode branch". Kept for the case where a server does
                 // fork, since the forked name is what writes would have to target.
                 let dev_branch = output::field(&res, "branchName");
-                if dev_mode && !dev_branch.is_empty() && dev_branch != name {
+                if dev_mode && util::names_a_branch(&dev_branch) && dev_branch != name {
                     output::success(&format!(
                         "Created branch {name}; entered dev mode on {dev_branch}"
                     ));
@@ -565,7 +565,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 // Dev mode runs on a personal `dev-…` branch forked from the
                 // requested one — expose it, since file writes only accept it.
                 let dev_branch = output::field(&res, "branchName");
-                if dev_branch.is_empty() || dev_branch == branch {
+                if !util::names_a_branch(&dev_branch) || dev_branch == branch {
                     output::success(&format!("Entered dev mode on {branch}"));
                 } else {
                     output::success(&format!(
