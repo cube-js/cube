@@ -1,8 +1,26 @@
-import fetch, { RequestInit } from 'node-fetch';
+import fetch, { RequestInit, Response } from 'node-fetch';
 import FormData from 'form-data';
 import path from 'path';
 import { ReadStream } from 'fs';
 import { DotenvParseOutput } from '@cubejs-backend/dotenv';
+import { ApiError } from '@cubejs-backend/shared';
+
+async function throwApiError(response: Response, url: string): Promise<never> {
+  let body: string | undefined;
+
+  try {
+    body = (await response.text()).trim() || undefined;
+  } catch {
+    body = undefined;
+  }
+
+  throw new ApiError(
+    `HTTP error! status: ${response.status}${body ? `, response: ${body}` : ''}`,
+    response.status,
+    url,
+    body,
+  );
+}
 
 export type AuthObject = {
   auth: string,
@@ -44,13 +62,11 @@ export class CubeCloudClient {
     (restOptions.headers as any).authorization = authorization.auth;
     (restOptions.headers as any)['Content-type'] = 'application/json';
 
-    const response = await fetch(
-      `${authorization.url}/${url(authorization.deploymentId || '')}`,
-      restOptions,
-    );
+    const requestUrl = `${authorization.url}/${url(authorization.deploymentId || '')}`;
+    const response = await fetch(requestUrl, restOptions);
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      await throwApiError(response, requestUrl);
     }
 
     return await response.json() as Promise<T>;
@@ -65,8 +81,9 @@ export class CubeCloudClient {
   }
 
   public async getDeploymentToken(authToken: string) {
+    const requestUrl = `${process.env.CUBE_CLOUD_HOST || 'https://cubecloud.dev'}/v1/token`;
     const response = await fetch(
-      `${process.env.CUBE_CLOUD_HOST || 'https://cubecloud.dev'}/v1/token`,
+      requestUrl,
       {
         method: 'POST',
         headers: { 'Content-type': 'application/json' },
@@ -75,7 +92,7 @@ export class CubeCloudClient {
     );
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      await throwApiError(response, requestUrl);
     }
 
     const res = await response.json() as any;

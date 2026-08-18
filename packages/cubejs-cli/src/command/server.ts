@@ -4,5 +4,5 @@ import { displayError } from '../utils';
 
 export async function configureServerCommand(program: CommanderStatic) {
   return proxyCommand(program, 'server')
-    .catch(e => displayError(e.stack || e));
+    .catch(e => displayError(e.stack || e, {}, e));
 }

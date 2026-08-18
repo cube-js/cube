@@ -84,7 +84,7 @@ export function configureTokenCommand(program: CommanderStatic) {
     .description('Create JWT token')
     .action(
       (options) => token(options)
-        .catch(e => displayError(e.stack || e))
+        .catch(e => displayError(e.stack || e, {}, e))
     )
     .on('--help', () => {
       console.log('');

@@ -74,7 +74,7 @@ export function configureDeployCommand(program: CommanderStatic) {
         ...options,
         directory: path.join(process.cwd(), options.directory)
       })
-        .catch(e => displayError(e.stack || e))
+        .catch(e => displayError(e.stack || e, {}, e))
     )
     .on('--help', () => {
       console.log('');

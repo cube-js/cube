@@ -1,6 +1,7 @@
 import type { CommanderStatic } from 'commander';
 import fs from 'fs-extra';
 import fetch from 'node-fetch';
+import { ApiError } from '@cubejs-backend/shared';
 
 import { displayError, event } from '../utils';
 
@@ -73,9 +74,21 @@ const generateQueryTypes = async (apiUrl, { token }) => {
         }
       }
     );
+
+    if (!response.ok) {
+      const body = (await response.text()).trim();
+
+      throw new ApiError(
+        `HTTP error! status: ${response.status}${body ? `, response: ${body}` : ''}`,
+        response.status,
+        `${apiUrl}/meta`,
+        body || undefined,
+      );
+    }
+
     meta = await response.json();
   } catch (e: any) {
-    await displayError(e.error.error);
+    await displayError(e.error?.error || e.message || e, {}, e);
   }
 
   if (meta.cubes.length === 0) {
@@ -109,7 +122,7 @@ export function configureTypegenCommand(program: CommanderStatic): void {
     .option('--token <token>', 'A valid JWT for your Cube project')
     .action(
       (apiUrl, options) => generateQueryTypes(apiUrl, options)
-        .catch(e => displayError(e.stack || e))
+        .catch(e => displayError(e.stack || e, {}, e))
     )
     .on('--help', () => {
       console.log('');
