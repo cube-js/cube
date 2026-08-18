@@ -127,15 +127,24 @@ fn failure_detail(text: &str) -> String {
     let detail = serde_json::from_str::<Value>(text)
         .ok()
         .and_then(|v| {
-            v.get("message")
-                .or_else(|| v.get("error"))
-                .map(|m| match m.as_str() {
+            // Each candidate is tried for what it SAYS, not for being present. A key that
+            // is there and blank — or there and null — is the server declining to
+            // explain, so it must not win over the next candidate or over the body: the
+            // same rule `reported_ref_verified` and `is_blank` settled elsewhere on this
+            // branch. Taking presence as an answer rendered `{"message":null,"error":…}`
+            // as the literal `null` and never reached the error beside it.
+            ["message", "error"]
+                .iter()
+                .filter_map(|key| v.get(*key))
+                .find_map(|m| match m.as_str() {
                     // A string message IS the text: `to_string` would render it as a
                     // JSON value and print the quotes around it, in the common case.
-                    Some(text) => text.to_string(),
+                    Some(said) if !util::is_blank(said) => Some(said.to_string()),
+                    Some(_) => None,
+                    None if m.is_null() => None,
                     // Anything else — an object, a list of validation errors — has no
                     // plainer form, so JSON is the honest rendering.
-                    None => m.to_string(),
+                    None => Some(m.to_string()),
                 })
         })
         .unwrap_or_else(|| text.to_string());
@@ -480,6 +489,27 @@ mod tests {
         assert_eq!(
             failure_detail(r#"{"message":{"field":"ref","problem":"unknown"}}"#),
             r#"{"field":"ref","problem":"unknown"}"#
+        );
+    }
+
+    #[test]
+    fn a_key_that_says_nothing_does_not_win_over_one_that_does() {
+        // Present-but-empty is the server declining to explain, so the next candidate —
+        // and failing that the body — is what a reader needs. Rendering the literal
+        // `null` beside a perfectly good `error` was the shape this replaced.
+        assert_eq!(
+            failure_detail(r#"{"message":null,"error":"branch is not active"}"#),
+            "branch is not active"
+        );
+        assert_eq!(
+            failure_detail(r#"{"message":"  ","error":"branch is not active"}"#),
+            "branch is not active"
+        );
+        // Nothing useful anywhere: the body beats a message rendering as empty, which
+        // would print `failed with 400: ` and stop.
+        assert_eq!(
+            failure_detail(r#"{"message":"","statusCode":400}"#),
+            r#"{"message":"","statusCode":400}"#
         );
     }
 }
