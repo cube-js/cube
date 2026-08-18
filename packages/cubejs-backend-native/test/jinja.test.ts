@@ -157,6 +157,7 @@ suite('Jinja (new api)', () => {
     loadTemplateFile(jinjaEngine, 'variables.yml.jinja');
     loadTemplateFile(jinjaEngine, 'filters.yml.jinja');
     loadTemplateFile(jinjaEngine, 'template_error_python.jinja');
+    loadTemplateFile(jinjaEngine, 'template_panic.jinja');
 
     for (let i = 1; i < 9; i++) {
       loadTemplateFile(jinjaEngine, `0${i}.yml.jinja`);
@@ -192,4 +193,21 @@ suite('Jinja (new api)', () => {
   for (let i = 1; i < 9; i++) {
     testTemplateBySnapshot(initJinjaEngine, `0${i}.yml.jinja`, {});
   }
+
+  // A panic inside a worker thread used to kill it, which left the promise
+  // pending forever and reduced the pool by one worker
+  test('render template_panic.jinja', async () => {
+    const { jinjaEngine } = await initJinjaEngine();
+
+    await expect(
+      jinjaEngine.renderTemplate('template_panic.jinja', { js_fn: () => 'unsupported' }, null)
+    ).rejects.toThrow(
+      'Unexpected panic while rendering jinja template. Reason: Converting from JsFunction to minijinja::Value is not supported'
+    );
+
+    // The worker must survive a panic and continue to process the next jobs
+    await expect(
+      jinjaEngine.renderTemplate('01.yml.jinja', {}, null)
+    ).resolves.toBeDefined();
+  });
 });
