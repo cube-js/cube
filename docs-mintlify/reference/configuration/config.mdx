@@ -450,7 +450,11 @@ string — and in JavaScript, a `Date`. In Python, pass `dt.timestamp()` or
 the driver.
 
 A deadline that has already passed is ignored, with a warning: replacing a
-driver cannot move a deadline the factory keeps re-asserting.
+driver cannot move a deadline the factory keeps re-asserting. So is one less
+than 30 seconds away — replacements are rate-limited to that interval, so a
+shorter lifetime could only ever be honoured by replacing the connection on
+every window. A credential rotating that fast is picked up by its configuration
+changing instead.
 
 A driver is resolved once and then cached, and replaced when the configuration
 `driver_factory` returns changes. A connection built from a credential that
