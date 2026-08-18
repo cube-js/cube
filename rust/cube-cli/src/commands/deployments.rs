@@ -26,16 +26,28 @@ const BUILD_FAILED: &[&str] = &["failed", "cancelled"];
 /// is why they aren't one message: "not active" is fixed by opening the branch in
 /// dev mode, while "Bad branch" means there is no such branch — and telling someone
 /// who mistyped a name to open it in dev mode sends them somewhere that cannot help.
-const NOT_BUILDING: &[(&str, &str)] = &[
-    (
-        "Bad branch",
-        "There is no such branch — check the name with `cube data-model branches <deployment>`",
-    ),
-    (
-        "Branch is not active",
-        "A branch only compiles once it is opened in dev mode — run \
-         `cube data-model dev-mode <deployment> <branch>` and wait on the dev-… branch it prints",
-    ),
+///
+/// The advice is a formatter rather than a string because these commands are read in a
+/// CI log — `build-status --wait` is half the documented gate — where nobody is left to
+/// substitute a placeholder. A `&'static str` can't interpolate, and a template plus a
+/// `replace` at the bail would put the placeholder's spelling in two places, free to
+/// drift apart in silence. Non-capturing closures coerce to `fn`, so the table stays a
+/// const with nothing left to fill in.
+type Hint = fn(deployment: i64, branch: &str) -> String;
+const NOT_BUILDING: &[(&str, Hint)] = &[
+    ("Bad branch", |deployment, _| {
+        format!(
+            "There is no such branch — check the name with \
+             `cube data-model branches {deployment}`"
+        )
+    }),
+    ("Branch is not active", |deployment, branch| {
+        format!(
+            "A branch only compiles once it is opened in dev mode — run \
+             `cube data-model dev-mode {deployment} {branch}` and wait on the dev-… \
+             branch it prints"
+        )
+    }),
 ];
 
 /// How much of a server complaint to keep. Long enough for the known verdicts and
@@ -68,11 +80,27 @@ fn one_line(text: &str, max_chars: usize) -> String {
 /// six seconds and turn a slow worker start into the wrong diagnosis.
 const IDLE_GRACE: Duration = Duration::from_secs(60);
 
+/// The branch a failure should name, for both the prose and the command it suggests.
+///
+/// Falls back to the placeholder when the payload doesn't name one: a command that is
+/// visibly missing an argument sends the reader to look it up, while `cube data-model
+/// dev-mode 42 ` silently runs against the wrong thing — the whole point of filling these
+/// in is that they are pasted out of a CI log unread.
+fn named_branch(res: &serde_json::Value) -> String {
+    let branch = output::field(res, "branchName");
+    if branch.is_empty() {
+        "<branch>".to_string()
+    } else {
+        branch
+    }
+}
+
 /// Poll build-status until the build (or dev-mode worker) reaches a terminal state.
 /// Returns the terminal payload; whether that state is a failure is the caller's
 /// call, since only it knows what the exit should be.
 async fn wait_for_build(
     api: &Client,
+    deployment: i64,
     path: &str,
     query: &Query,
     timeout: Duration,
@@ -132,14 +160,15 @@ async fn wait_for_build(
             // and dropping the one line that says WHICH ref was wrong, the repetition
             // is the cheaper mistake. Neither shape is live: both known verdicts
             // arrive bare.
+            let branch = named_branch(&res);
             anyhow::bail!(
-                "branch {} is not building ({verdict}){}. {hint}",
-                output::field(&res, "branchName"),
+                "branch {branch} is not building ({verdict}){}. {}",
                 if complaint == *verdict {
                     String::new()
                 } else {
                     format!(": {complaint}")
-                }
+                },
+                hint(deployment, &branch)
             );
         }
 
@@ -147,12 +176,12 @@ async fn wait_for_build(
             let since = idle_since.get().unwrap_or_else(std::time::Instant::now);
             idle_since.set(Some(since));
             if since.elapsed() > IDLE_GRACE {
+                let branch = named_branch(&res);
                 anyhow::bail!(
-                    "nothing is building branch {} (status {status}{}). If the branch exists, \
-                     it only compiles once it is opened in dev mode — run \
-                     `cube data-model dev-mode <deployment> <branch>` and wait on the \
+                    "nothing is building branch {branch} (status {status}{}). If the branch \
+                     exists, it only compiles once it is opened in dev mode — run \
+                     `cube data-model dev-mode {deployment} {branch}` and wait on the \
                      dev-… branch it prints",
-                    output::field(&res, "branchName"),
                     // This branch bails instead of timing out, so the timeout's
                     // "(last seen: …)" never speaks for it.
                     if complaint.is_empty() {
@@ -483,7 +512,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 return Ok(());
             }
 
-            let res = wait_for_build(&api, &path, &query, timeout, poll).await?;
+            let res = wait_for_build(&api, deployment, &path, &query, timeout, poll).await?;
             output::print_json(&res);
 
             let status = output::field(&res, "status");
@@ -535,6 +564,43 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_hint_is_runnable_as_printed() {
+        // These are read out of a CI job log, where nobody is left to substitute a
+        // placeholder — so the table must not carry one, whichever verdict fires.
+        for (verdict, hint) in NOT_BUILDING {
+            let advice = hint(42, "release-2026");
+            assert!(
+                !advice.contains('<') && !advice.contains('>'),
+                "{verdict}'s advice still has a placeholder: {advice}"
+            );
+            assert!(
+                advice.contains("42"),
+                "{verdict}'s advice drops the deployment"
+            );
+        }
+        // Only the dev-mode advice needs the branch; `branches` lists them all, so
+        // requiring it everywhere would pin a command that doesn't take one.
+        assert!(NOT_BUILDING
+            .iter()
+            .any(|(_, hint)| hint(42, "release-2026").contains("dev-mode 42 release-2026")));
+    }
+
+    #[test]
+    fn a_payload_with_no_branch_says_so_rather_than_dropping_the_argument() {
+        // `cube data-model dev-mode 42 ` would look complete and run against the wrong
+        // thing; a visible placeholder sends the reader to look the name up.
+        assert_eq!(named_branch(&serde_json::json!({})), "<branch>");
+        assert_eq!(
+            named_branch(&serde_json::json!({"branchName": ""})),
+            "<branch>"
+        );
+        assert_eq!(
+            named_branch(&serde_json::json!({"branchName": "main"})),
+            "main"
+        );
+    }
 
     #[test]
     fn one_line_collapses_and_truncates() {
