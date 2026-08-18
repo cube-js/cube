@@ -162,7 +162,16 @@ fn ref_fingerprint(value: &str) -> String {
 /// `Ok(true)` when the branch name confirms the ref, `Ok(false)` when the ref left nothing
 /// comparable — the caller warns and reports it as `refVerified: false` — and `Err` when
 /// the name contradicts the ref.
-fn verify_ref_applied(requested: &str, branch_name: &str, sync_job_id: &str) -> Result<bool> {
+///
+/// `deployment` is carried for the error message alone: it bails on a running sync that
+/// has already made a branch, so both recovery commands have to be runnable exactly as
+/// printed — this lands in a CI log, not a shell with someone in front of it.
+fn verify_ref_applied(
+    deployment: i64,
+    requested: &str,
+    branch_name: &str,
+    sync_job_id: &str,
+) -> Result<bool> {
     let fingerprint = ref_fingerprint(requested);
     // A ref beginning with a character nobody measured leaves nothing to compare. That's
     // a legal ref (`#1234-fix`, `@release`), and a silent Ok would mean the gate ran
@@ -195,9 +204,9 @@ fn verify_ref_applied(requested: &str, branch_name: &str, sync_job_id: &str) -> 
          it is syncing the branch saved on the dbt integration, compiling the wrong code \
          and still passing — or it names branches differently than this check expects. \
          Stopping rather than reporting a result for a ref that may not have been used. \
-         The sync is still running: cancel it with `cube dbt cancel <deployment> \
+         The sync is still running: cancel it with `cube dbt cancel {deployment} \
          {sync_job_id}`, and delete the branch with `cube data-model delete-branch \
-         <deployment> {branch_name}`. Pass --branch to name the branch yourself, which \
+         {deployment} {branch_name}`. Pass --branch to name the branch yourself, which \
          skips this check."
     )
 }
@@ -389,7 +398,8 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             // branch themselves.
             let ref_verified = match (&r#ref, &branch) {
                 (Some(requested), None) => {
-                    let verified = verify_ref_applied(requested, &branch_name, &sync_job_id)?;
+                    let verified =
+                        verify_ref_applied(deployment, requested, &branch_name, &sync_job_id)?;
                     if !verified {
                         eprintln!(
                             "warning: no part of `{requested}` can be checked against the \
@@ -666,7 +676,7 @@ mod tests {
             ),
         ] {
             assert!(
-                verify_ref_applied(requested, branch, "job").unwrap_or(false),
+                verify_ref_applied(7, requested, branch, "job").unwrap_or(false),
                 "rejected or failed to verify a healthy sync: {requested} → {branch}"
             );
         }
@@ -675,11 +685,22 @@ mod tests {
     #[test]
     fn verify_ref_applied_rejects_a_branch_that_ignored_it() {
         // What an older deployment produces: the tracked branch, or no ref segment.
-        let err = verify_ref_applied("feature/x", "dbt-sync/main-20260817-abcd1234", "job-1")
+        let err = verify_ref_applied(42, "feature/x", "dbt-sync/main-20260817-abcd1234", "job-1")
             .expect_err("a branch naming a different ref must not pass");
         assert!(err.to_string().contains("predates `ref` support"), "{err}");
         assert!(err.to_string().contains("job-1"), "{err}");
-        assert!(verify_ref_applied("feature/x", "dbt-sync/20260817-abcd1234", "j").is_err());
+        // Both recovery commands must be runnable as printed: this lands in a CI log,
+        // where nobody is around to substitute a placeholder for the deployment.
+        assert!(
+            err.to_string().contains("cube dbt cancel 42 job-1"),
+            "{err}"
+        );
+        assert!(
+            err.to_string()
+                .contains("cube data-model delete-branch 42 dbt-sync/main-20260817-abcd1234"),
+            "{err}"
+        );
+        assert!(verify_ref_applied(7, "feature/x", "dbt-sync/20260817-abcd1234", "j").is_err());
     }
 
     #[test]
@@ -771,7 +792,7 @@ mod tests {
         // `#1` fingerprints to nothing, so the sync is allowed but reported unverified —
         // asserting `is_ok()` alone would pass against the silent version this replaced.
         assert!(
-            !verify_ref_applied("#1", "dbt-sync/main-20260817-abcd1234", "job").unwrap(),
+            !verify_ref_applied(7, "#1", "dbt-sync/main-20260817-abcd1234", "job").unwrap(),
             "an uncheckable ref must be reported as unverified, not as verified"
         );
     }
@@ -781,12 +802,14 @@ mod tests {
         // If the server ever renames or nests the prefix, a healthy sync must not fail.
         // A nested prefix still contains the marker, so it keeps the STRICT check — which
         // is what stops a short ref matching the trailing timestamp-hash.
-        assert!(verify_ref_applied("main", "myorg/dbt-sync/main-20260817-abcd1234", "j").unwrap());
-        assert!(verify_ref_applied("1", "myorg/dbt-sync/main-20260817-abcd1234", "j").is_err());
+        assert!(
+            verify_ref_applied(7, "main", "myorg/dbt-sync/main-20260817-abcd1234", "j").unwrap()
+        );
+        assert!(verify_ref_applied(7, "1", "myorg/dbt-sync/main-20260817-abcd1234", "j").is_err());
         // A renamed prefix has no marker: permissive, and knowingly weaker.
-        assert!(verify_ref_applied("main", "sync-main-20260817-abcd1234", "j").unwrap());
+        assert!(verify_ref_applied(7, "main", "sync-main-20260817-abcd1234", "j").unwrap());
         // And it still catches a name with no trace of the ref at all.
-        assert!(verify_ref_applied("feature/x", "some-other-shape-2026", "j").is_err());
+        assert!(verify_ref_applied(7, "feature/x", "some-other-shape-2026", "j").is_err());
     }
 
     /// A short ref must still be checked: searching the whole branch name matched the
@@ -796,7 +819,7 @@ mod tests {
     fn a_short_ref_is_not_satisfied_by_the_branch_name_boilerplate() {
         for requested in ["sync", "dbt", "b", "1", "2026", "f"] {
             assert!(
-                verify_ref_applied(requested, "dbt-sync/main-20260817-abcd1234", "job").is_err(),
+                verify_ref_applied(7, requested, "dbt-sync/main-20260817-abcd1234", "job").is_err(),
                 "{requested} was satisfied by the boilerplate around the ref segment"
             );
         }
