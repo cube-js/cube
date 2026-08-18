@@ -825,11 +825,11 @@ describe('driver cache invalidation', () => {
 
     shouldFail = true;
 
-    // Well past the grace window between each, so every refusal opens a fresh
-    // window rather than extending the one before it. Six of them, twice the
-    // bound, and the driver is still there.
+    // Past retention between each, so every refusal opens a fresh window rather
+    // than extending the one before it. Six of them, twice the bound, and the
+    // driver is still there.
     for (const token of ['token-b', 'token-c', 'token-d', 'token-e', 'token-f', 'token-g']) {
-      clock.advance(6 * 60 * 1000);
+      clock.advance(31 * 60 * 1000);
       // eslint-disable-next-line no-await-in-loop
       await request({ token }, `req-${token}`);
       // eslint-disable-next-line no-await-in-loop
@@ -886,6 +886,46 @@ describe('driver cache invalidation', () => {
     expect(await driverFactory('default')).toBe(rebuilt);
     expect(core.builtDrivers).toHaveLength(2);
     expect(logged('Driver rebuild suppressed')).toHaveLength(1);
+  });
+
+  // The other half of that contract. Probes only fire when the security context
+  // changes, so a few-user deployment may probe far slower than the grace
+  // window — and a dead credential there has to be given up eventually, which
+  // is what retention being longer than the grace window buys.
+  test('gives up a refusal that is sustained but slow', async () => {
+    let shouldFail = false;
+    const { driverFactory, request, logged } = await createCore({
+      driverFactory: (ctx: any) => {
+        if (shouldFail) {
+          throw new Error('credential is unusable');
+        }
+
+        return <any>{ type: 'postgres', password: ctx.securityContext.token };
+      },
+    }, { token: 'token-a' });
+
+    const first = await driverFactory('default');
+
+    shouldFail = true;
+
+    // Ten minutes apart: slower than the grace window, well inside retention.
+    for (const token of ['token-b', 'token-c']) {
+      // eslint-disable-next-line no-await-in-loop
+      await request({ token }, `req-${token}`);
+      // eslint-disable-next-line no-await-in-loop
+      expect(await driverFactory('default')).toBe(first);
+      clock.advance(10 * 60 * 1000);
+    }
+
+    await request({ token: 'token-d' }, 'req-d');
+
+    await expect(driverFactory('default')).rejects.toThrow('credential is unusable');
+
+    await new Promise(process.nextTick);
+    expect((<FakeDriver>first).release).toHaveBeenCalled();
+    expect(logged('Rebuilding driver')
+      .filter((params: any) => params.reason === 'repeated staleness check failures'))
+      .toHaveLength(1);
   });
 
   // Replacing a driver cannot move a deadline the factory keeps re-asserting.
@@ -979,6 +1019,36 @@ describe('driver cache invalidation', () => {
 
     expect(core.builtDrivers).toHaveLength(1);
     expect(logged('Rebuilding driver')).toHaveLength(0);
+  });
+
+  // The lower bound judges what the factory states, not how much of an accepted
+  // deadline is left. Re-judging on the carry-over would drop a good deadline as
+  // it entered its final window, switching the lifetime off in exactly the
+  // stretch it exists to cover.
+  test('keeps a deadline that a probe lands inside the final window of', async () => {
+    const expiresAt = Date.now() + 60 * 60 * 1000;
+    const { core, driverFactory, request, logged } = await createCore({
+      // Ignores the context, so the configuration compares equal and the probe
+      // takes the carry-over path.
+      driverFactory: () => (<any>{ type: 'postgres', password: 'static', expiresAt }),
+    }, { token: 'token-a' });
+
+    const first = await driverFactory('default');
+
+    // A re-issued JWT ten seconds before the deadline: inside the replacement
+    // interval, but this deadline was judged an hour ago and accepted.
+    clock.advance(60 * 60 * 1000 - 10 * 1000);
+    await request({ token: 'token-b' }, 'req-2');
+
+    expect(await driverFactory('default')).toBe(first);
+    expect(logged('Driver lifetime ignored')).toHaveLength(0);
+
+    // And the deadline it kept still fires.
+    clock.advance(11 * 1000);
+    await request({ token: 'token-c' }, 'req-3');
+
+    expect(await driverFactory('default')).not.toBe(first);
+    expect(core.builtDrivers).toHaveLength(2);
   });
 
   // The other half of the lifetime contract: a deadline the rate limiter can

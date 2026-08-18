@@ -126,8 +126,7 @@ const DRIVER_REBUILD_MIN_INTERVAL_MS = 30 * 1000;
 const MAX_CONSECUTIVE_PROBE_FAILURES = 3;
 
 /**
- * How long those failures must span before the driver is given up, and how long
- * one of them stays on the record.
+ * How long those failures must span before the driver is given up.
  *
  * The count alone is not a duration: under load three concurrent probes can
  * fail inside the same blink of a dependency. Requiring both keeps a burst from
@@ -143,6 +142,23 @@ const MAX_CONSECUTIVE_PROBE_FAILURES = 3;
  * to the second, so the bar is set where a dependency can restart under it.
  */
 const PROBE_FAILURE_GRACE_MS = 5 * 60 * 1000;
+
+/**
+ * How long one refusal stays on the record before it is forgotten.
+ *
+ * Deliberately separate from the grace window, because the two pull opposite
+ * ways. The grace window wants to be long, so a dependency can restart under
+ * it. Retention wants to be long enough that a *sparse* deployment can still
+ * reach the bound: probes are only issued when the security context fingerprint
+ * changes, so a few-user deployment may probe once every several minutes, and
+ * if a refusal expired at the grace window such a deployment would reset to one
+ * every time and never give up a credential however permanently dead it was.
+ *
+ * Longer than the grace window, then, but far short of the days-apart flakes
+ * that made a never-expiring record wrong: a refusal half an hour stale is not
+ * evidence about the one happening now.
+ */
+const PROBE_FAILURE_RETENTION_MS = 30 * 60 * 1000;
 
 /**
  * What a cached driver was built from. `null` on either fingerprint means
@@ -166,11 +182,12 @@ type DriverOrigin = {
  * Probe failures for one alias set inside one rolling window: how many, when
  * the window opened, and when it was last extended.
  *
- * `lastFailureAt` is what makes the window rolling. Probes are only issued when
- * the security context fingerprint changes, so in a quiet deployment two of
- * them can be hours apart with nothing in between to clear the count — and
- * three unrelated flakes on three different days are not a sustained refusal,
- * however they look to a counter that only ever goes up.
+ * `lastFailureAt` is what makes the window rolling, against
+ * `PROBE_FAILURE_RETENTION_MS`. Probes are only issued when the security
+ * context fingerprint changes, so in a quiet deployment two of them can be
+ * hours apart with nothing in between to clear the count — and three unrelated
+ * flakes on three different days are not a sustained refusal, however they look
+ * to a counter that only ever goes up.
  */
 type DriverProbeFailures = {
   count: number;
@@ -1017,8 +1034,10 @@ export class CubejsServerCore {
           // A rolling window, not a running total. Probes are only issued when
           // the context changes, so a record that is never re-based would add
           // up occasional flakes weeks apart and read them as one outage.
+          // Retention rather than the grace window, so that a deployment
+          // probing less often than the grace window can still reach the bound.
           const failures = previousFailures
-            && now - previousFailures.lastFailureAt < PROBE_FAILURE_GRACE_MS
+            && now - previousFailures.lastFailureAt < PROBE_FAILURE_RETENTION_MS
             ? previousFailures
             : { count: 0, firstFailureAt: now, lastFailureAt: now };
 
@@ -1461,6 +1480,16 @@ export class CubejsServerCore {
       return undefined;
     }
 
+    // Already judged when it was installed. This also runs on every probe that
+    // carries an unchanged configuration over, where what is left of the
+    // deadline is a measure of time passing rather than of anything the factory
+    // stated. Measuring it there would drop a perfectly good deadline once it
+    // entered its final window — and leave the driver with no lifetime at all,
+    // in precisely the stretch the lifetime exists to cover.
+    if (expiresAt === origin.expiresAt) {
+      return expiresAt;
+    }
+
     const remainingMs = expiresAt - Date.now();
 
     if (remainingMs >= DRIVER_REBUILD_MIN_INTERVAL_MS) {
@@ -1476,7 +1505,7 @@ export class CubejsServerCore {
       this.logger('Driver lifetime ignored', {
         dataSource,
         expiresAt: new Date(expiresAt).toISOString(),
-        warning: remainingMs < 0
+        warning: remainingMs <= 0
           ? 'driverFactory returned a configuration whose expiresAt has already '
             + 'passed. Using the connection anyway and ignoring the lifetime: '
             + 'replacing a driver cannot move a deadline the factory keeps '
