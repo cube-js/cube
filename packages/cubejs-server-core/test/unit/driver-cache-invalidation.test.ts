@@ -928,6 +928,44 @@ describe('driver cache invalidation', () => {
       .toHaveLength(1);
   });
 
+  // Retention outliving the grace window must not make the bound reachable
+  // across unrelated incidents. Concurrent probes all fail on one blink of a
+  // dependency, so a burst is one refusal — otherwise two brief outages half an
+  // hour apart would drain a working pool.
+  test('counts a burst of refusals as one incident', async () => {
+    let shouldFail = false;
+    const { core, driverFactory, request } = await createCore({
+      driverFactory: (ctx: any) => {
+        if (shouldFail) {
+          throw new Error('secret store unreachable');
+        }
+
+        return <any>{ type: 'postgres', password: ctx.securityContext.token };
+      },
+    }, { token: 'token-a' });
+
+    const first = await driverFactory('default');
+
+    shouldFail = true;
+
+    // Three refusals at the same instant: one dependency blink under load.
+    for (const token of ['token-b', 'token-c', 'token-d']) {
+      // eslint-disable-next-line no-await-in-loop
+      await request({ token }, `req-${token}`);
+      // eslint-disable-next-line no-await-in-loop
+      expect(await driverFactory('default')).toBe(first);
+    }
+
+    // A second, unrelated blink six minutes later. Two incidents, not four
+    // refusals, so the bound is not reached and the pool survives.
+    clock.advance(6 * 60 * 1000);
+    await request({ token: 'token-e' }, 'req-e');
+
+    expect(await driverFactory('default')).toBe(first);
+    expect((<FakeDriver>first).release).not.toHaveBeenCalled();
+    expect(core.builtDrivers).toHaveLength(1);
+  });
+
   // Replacing a driver cannot move a deadline the factory keeps re-asserting.
   // Honouring one would find the new driver stale the moment its suppression
   // window closed, for the life of the process.
@@ -1044,6 +1082,36 @@ describe('driver cache invalidation', () => {
     expect(logged('Driver lifetime ignored')).toHaveLength(0);
 
     // And the deadline it kept still fires.
+    clock.advance(11 * 1000);
+    await request({ token: 'token-c' }, 'req-3');
+
+    expect(await driverFactory('default')).not.toBe(first);
+    expect(core.builtDrivers).toHaveLength(2);
+  });
+
+  // A deadline is excluded from the fingerprint, so an unchanged credential can
+  // arrive with a moved one. If that new deadline cannot be honoured, the one
+  // this driver was already held to still can — dropping to no deadline at all
+  // is the failure the stated-not-aged rule exists to prevent.
+  test('keeps the accepted deadline when a newly stated one cannot be honoured', async () => {
+    const accepted = Date.now() + 60 * 60 * 1000;
+    let expiresAt = accepted;
+    const { core, driverFactory, request } = await createCore({
+      driverFactory: () => (<any>{ type: 'postgres', password: 'static', expiresAt }),
+    }, { token: 'token-a' });
+
+    const first = await driverFactory('default');
+
+    // Ten seconds before the accepted deadline, the factory re-states the same
+    // credential with a slightly different deadline — inside the interval, so
+    // unhonourable as a new lifetime.
+    clock.advance(60 * 60 * 1000 - 10 * 1000);
+    expiresAt = accepted + 5 * 1000;
+    await request({ token: 'token-b' }, 'req-2');
+
+    expect(await driverFactory('default')).toBe(first);
+
+    // The accepted deadline still fires.
     clock.advance(11 * 1000);
     await request({ token: 'token-c' }, 'req-3');
 
