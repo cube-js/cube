@@ -966,6 +966,52 @@ describe('driver cache invalidation', () => {
     expect(core.builtDrivers).toHaveLength(1);
   });
 
+  // The other end of the traffic range from the burst case. Under steady load
+  // refusals arrive faster than the coalescing window, so they are all one
+  // incident — and an incident that never ends must be caught by having lasted,
+  // or a permanently dead credential is never given up where it costs most.
+  test('gives up an unbroken refusal stream under steady traffic', async () => {
+    let shouldFail = false;
+    const { driverFactory, request } = await createCore({
+      driverFactory: (ctx: any) => {
+        if (shouldFail) {
+          throw new Error('credential is unusable');
+        }
+
+        return <any>{ type: 'postgres', password: ctx.securityContext.token };
+      },
+    }, { token: 'token-a' });
+
+    const first = await driverFactory('default');
+
+    shouldFail = true;
+
+    const startedAt = Date.now();
+    let gaveUpAfterMs: number | undefined;
+
+    // A refusal every 1.5s — inside the coalescing window, so nothing here ever
+    // starts a second incident.
+    for (let i = 0; i < 400 && gaveUpAfterMs === undefined; i++) {
+      clock.advance(1500);
+      // eslint-disable-next-line no-await-in-loop
+      await request({ token: `token-${i}` }, `req-${i}`);
+
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await driverFactory('default');
+      } catch (error) {
+        gaveUpAfterMs = Date.now() - startedAt;
+      }
+    }
+
+    // Given up once the incident had itself run the grace window, not before.
+    expect(gaveUpAfterMs).toBeGreaterThanOrEqual(5 * 60 * 1000);
+    expect(gaveUpAfterMs).toBeLessThan(6 * 60 * 1000);
+
+    await new Promise(process.nextTick);
+    expect((<FakeDriver>first).release).toHaveBeenCalled();
+  });
+
   // Replacing a driver cannot move a deadline the factory keeps re-asserting.
   // Honouring one would find the new driver stale the moment its suppression
   // window closed, for the life of the process.

@@ -176,7 +176,10 @@ const PROBE_FAILURE_RETENTION_MS = 30 * 60 * 1000;
  * outages.
  *
  * Counting incidents rather than refusals removes that without giving the
- * sparse case back: a burst is one, and the bound still wants three.
+ * sparse case back: a burst is one, and the bound still wants three. An
+ * incident is bounded by its own duration as well as by the count, so a
+ * refusal stream arriving faster than this window is caught by having lasted
+ * rather than by being counted.
  */
 const PROBE_FAILURE_COALESCE_MS = 2 * 1000;
 
@@ -213,6 +216,13 @@ type DriverProbeFailures = {
   count: number;
   firstFailureAt: number;
   lastFailureAt: number;
+  /**
+   * When the incident being counted began — the first refusal of the current
+   * unbroken run, rather than of the window. An incident that has itself lasted
+   * the grace window is no longer a blink, which is what keeps a continuous
+   * stream of refusals from coalescing into one uncountable incident forever.
+   */
+  incidentStartedAt: number;
 };
 
 /** A `driverFactory` result together with the context that produced it. */
@@ -1059,15 +1069,21 @@ export class CubejsServerCore {
           const failures = previousFailures
             && now - previousFailures.lastFailureAt < PROBE_FAILURE_RETENTION_MS
             ? previousFailures
-            : { count: 0, firstFailureAt: now, lastFailureAt: now };
+            : {
+              count: 0, firstFailureAt: now, lastFailureAt: now, incidentStartedAt: now,
+            };
 
           // Requests that arrived together and failed on the same blink of a
-          // dependency are one refusal, not one each.
+          // dependency are one refusal, not one each. The gap is measured
+          // against the last refusal seen rather than the last one counted, so
+          // that a continuous stream stays one incident — which is only sound
+          // because an incident is also bounded by its own duration below.
           if (
             failures.count === 0 ||
             now - failures.lastFailureAt >= PROBE_FAILURE_COALESCE_MS
           ) {
             failures.count += 1;
+            failures.incidentStartedAt = now;
           }
 
           failures.lastFailureAt = now;
@@ -1075,12 +1091,19 @@ export class CubejsServerCore {
 
           const failingForMs = now - failures.firstFailureAt;
 
+          // Two shapes of sustained refusal, because either alone leaves a
+          // traffic profile uncovered. Repeated incidents catch a deployment
+          // whose probes are sparse enough that each refusal stands alone; one
+          // unbroken incident catches a busy deployment, where refusals arrive
+          // faster than the coalescing window and would otherwise count once
+          // however long the credential stayed dead.
+          const sustainedIncident = now - failures.incidentStartedAt >= PROBE_FAILURE_GRACE_MS;
+          const repeatedIncidents = failures.count >= MAX_CONSECUTIVE_PROBE_FAILURES
+            && failingForMs >= PROBE_FAILURE_GRACE_MS;
+
           // Transient, as far as anything here can tell. Reuse, exactly as
           // before this bound existed.
-          if (
-            failures.count < MAX_CONSECUTIVE_PROBE_FAILURES ||
-            failingForMs < PROBE_FAILURE_GRACE_MS
-          ) {
+          if (!sustainedIncident && !repeatedIncidents) {
             return cached;
           }
 
