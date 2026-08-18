@@ -8,7 +8,7 @@ use crate::{
         rules::utils::granularity_str_to_int_order, CubeScanLimit, CubeScanUngrouped,
         CubeScanWrapped, DimensionName, LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun,
         TimeDimensionGranularity, WrappedSelectLimit, WrappedSelectPushToCube,
-        WrappedSelectUngroupedScan,
+        WrappedSelectUngroupedScan, WRAPPED_SELECT_LIMIT,
     },
     transport::{MetaContext, V1CubeMetaDimensionExt},
 };
@@ -493,8 +493,9 @@ impl CubePlanCost {
     ) -> Self {
         // `wrapper_depth` counts this node, so a wrapper is inside another at depth two
         let plan_node_inside_wrapper = wrapper_depth > 0 && is_post_processing_node(enode);
-        // A wrapper inside a wrapper is how a pushed down union reads its queries: it
-        // renders as the query it holds, not as another wrapper, so it costs like none
+        // A wrapper inside a wrapper is how a pushed down union reads its queries and how a
+        // wrapped select holds a joined side: it renders as the plan it holds, so it costs
+        // like none
         let nested_wrapper =
             wrapper_depth > 1 && matches!(enode, LogicalPlanLanguage::CubeScanWrapper(_));
         let ast_size_outside_wrapper = match state {
@@ -997,7 +998,7 @@ impl CubePlanTopDownState {
         A: Analysis<LogicalPlanLanguage>,
     {
         let limit_id = match node {
-            LogicalPlanLanguage::WrappedSelect(params) => params[10],
+            LogicalPlanLanguage::WrappedSelect(params) => params[WRAPPED_SELECT_LIMIT],
             LogicalPlanLanguage::CubeScan(params) => params[4],
             _ => return false,
         };

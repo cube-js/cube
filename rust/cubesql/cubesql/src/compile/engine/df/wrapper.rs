@@ -877,7 +877,7 @@ impl CubeScanWrapperNode {
                         .iter()
                         .any(|input| Self::has_ungrouped_wrapped_node(input))
                 } else if let Some(wrapper) = node.as_any().downcast_ref::<CubeScanWrapperNode>() {
-                    // A query of a pushed down union
+                    // A query of a pushed down union, or a joined side of a wrapped select
                     Self::has_ungrouped_wrapped_node(wrapper.wrapped_plan.as_ref())
                 } else {
                     false
@@ -1257,8 +1257,8 @@ impl CubeScanWrapperNode {
                         )
                         .await
                 } else if let Some(wrapper) = node_any.downcast_ref::<CubeScanWrapperNode>() {
-                    // The queries of a pushed down union are the wrappers they were pulled
-                    // up into, and each renders as the query it holds
+                    // The queries of a pushed down union and the joined sides of a wrapped select
+                    // are the wrappers they were pulled up into; each renders as the plan it holds
                     Self::generate_sql_for_node_rec(
                         meta,
                         transport,
@@ -4204,7 +4204,16 @@ impl WrappedSelectNode {
         let join_subqueries = {
             let mut join_subqueries = vec![];
             for (lp, cond, join_type) in &self.joins {
-                match lp.as_ref() {
+                // A join can hold a nested wrapper of the joined side
+                let mut joined = lp.as_ref();
+                while let LogicalPlan::Extension(Extension { node }) = joined {
+                    let Some(wrapper) = node.as_any().downcast_ref::<CubeScanWrapperNode>() else {
+                        break;
+                    };
+                    joined = wrapper.wrapped_plan.as_ref();
+                }
+
+                match joined {
                     LogicalPlan::Extension(Extension { node }) => {
                         if let Some(join_cube_scan) = node.as_any().downcast_ref::<CubeScanNode>() {
                             if join_cube_scan.request.ungrouped == Some(true) {
@@ -4818,14 +4827,18 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
     fn fmt_for_explain(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "WrappedSelect: select_type={:?}, projection_expr={:?}, group_expr={:?}, aggregate_expr={:?}, window_expr={:?}, from={:?}, joins={:?}, filter_expr={:?}, having_expr={:?}, limit={:?}, offset={:?}, order_expr={:?}, alias={:?}, distinct={:?}",
+            "WrappedSelect: select_type={:?}, projection_expr={:?}, group_expr={:?}, aggregate_expr={:?}, window_expr={:?}, joins={:?}, filter_expr={:?}, having_expr={:?}, limit={:?}, offset={:?}, order_expr={:?}, alias={:?}, distinct={:?}",
             self.select_type,
             self.projection_expr,
             self.group_expr,
             self.aggr_expr,
             self.window_expr,
-            self.from,
-            self.joins,
+            // `from` and the joined plans are inputs, printed below this node; printing them
+            // here as well renders every nested select once per level above it
+            self.joins
+                .iter()
+                .map(|(_, expr, join_type)| (expr, join_type))
+                .collect::<Vec<_>>(),
             self.filter_expr,
             self.having_expr,
             self.limit,

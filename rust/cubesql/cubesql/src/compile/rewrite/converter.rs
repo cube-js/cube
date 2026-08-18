@@ -30,7 +30,13 @@ use crate::{
             ValuesValues, WindowFunctionExprFun, WindowFunctionExprWindowFrame, WrappedSelectAlias,
             WrappedSelectDistinct, WrappedSelectJoinJoinType, WrappedSelectLimit,
             WrappedSelectOffset, WrappedSelectPushToCube, WrappedSelectSelectType,
-            WrappedSelectType, WrappedUnionAlias, WrappedUnionDistinct,
+            WrappedSelectType, WrappedSelectUngroupedScan, WrappedUnionAlias, WrappedUnionDistinct,
+            WRAPPED_SELECT_AGGR_EXPR, WRAPPED_SELECT_ALIAS, WRAPPED_SELECT_DISTINCT,
+            WRAPPED_SELECT_FILTER_EXPR, WRAPPED_SELECT_FROM, WRAPPED_SELECT_GROUP_EXPR,
+            WRAPPED_SELECT_HAVING_EXPR, WRAPPED_SELECT_JOINS, WRAPPED_SELECT_LIMIT,
+            WRAPPED_SELECT_OFFSET, WRAPPED_SELECT_ORDER_EXPR, WRAPPED_SELECT_PROJECTION_EXPR,
+            WRAPPED_SELECT_PUSH_TO_CUBE, WRAPPED_SELECT_SELECT_TYPE, WRAPPED_SELECT_SUBQUERIES,
+            WRAPPED_SELECT_UNGROUPED_SCAN, WRAPPED_SELECT_WINDOW_EXPR,
         },
         CubeContext,
     },
@@ -57,7 +63,7 @@ use datafusion::{
     scalar::ScalarValue,
     sql::planner::ContextProvider,
 };
-use egg::{Id, RecExpr};
+use egg::{Id, Language, RecExpr};
 use itertools::Itertools;
 use serde_json::json;
 use std::{
@@ -1009,6 +1015,57 @@ pub fn is_expr_node(node: &LogicalPlanLanguage) -> bool {
         LogicalPlanLanguage::OuterColumnExpr(_) => true,
         _ => false,
     }
+}
+
+/// A select that only joins subqueries to its `from`: no columns, filters, grouping, ordering,
+/// limit or alias of its own, and nothing pushed to Cube
+fn is_plain_join_select(
+    node_by_id: &impl Index<Id, Output = LogicalPlanLanguage>,
+    params: &[Id],
+) -> bool {
+    let empty = |position: usize| node_by_id[params[position]].children().is_empty();
+    matches!(
+        node_by_id[params[WRAPPED_SELECT_SELECT_TYPE]],
+        LogicalPlanLanguage::WrappedSelectSelectType(WrappedSelectSelectType(
+            WrappedSelectType::Projection
+        ))
+    ) && [
+        WRAPPED_SELECT_PROJECTION_EXPR,
+        WRAPPED_SELECT_SUBQUERIES,
+        WRAPPED_SELECT_GROUP_EXPR,
+        WRAPPED_SELECT_AGGR_EXPR,
+        WRAPPED_SELECT_WINDOW_EXPR,
+        WRAPPED_SELECT_FILTER_EXPR,
+        WRAPPED_SELECT_HAVING_EXPR,
+        WRAPPED_SELECT_ORDER_EXPR,
+    ]
+    .iter()
+    .all(|position| empty(*position))
+        && !empty(WRAPPED_SELECT_JOINS)
+        && matches!(
+            node_by_id[params[WRAPPED_SELECT_LIMIT]],
+            LogicalPlanLanguage::WrappedSelectLimit(WrappedSelectLimit(None))
+        )
+        && matches!(
+            node_by_id[params[WRAPPED_SELECT_OFFSET]],
+            LogicalPlanLanguage::WrappedSelectOffset(WrappedSelectOffset(None))
+        )
+        && matches!(
+            node_by_id[params[WRAPPED_SELECT_ALIAS]],
+            LogicalPlanLanguage::WrappedSelectAlias(WrappedSelectAlias(None))
+        )
+        && matches!(
+            node_by_id[params[WRAPPED_SELECT_DISTINCT]],
+            LogicalPlanLanguage::WrappedSelectDistinct(WrappedSelectDistinct(false))
+        )
+        && matches!(
+            node_by_id[params[WRAPPED_SELECT_PUSH_TO_CUBE]],
+            LogicalPlanLanguage::WrappedSelectPushToCube(WrappedSelectPushToCube(false))
+        )
+        && matches!(
+            node_by_id[params[WRAPPED_SELECT_UNGROUPED_SCAN]],
+            LogicalPlanLanguage::WrappedSelectUngroupedScan(WrappedSelectUngroupedScan(false))
+        )
 }
 
 pub fn node_to_expr(
@@ -2158,29 +2215,65 @@ impl LanguageToLogicalPlanConverter {
                 })
             }
             LogicalPlanLanguage::WrappedSelect(params) => {
-                let select_type = match_data_node!(node_by_id, params[0], WrappedSelectSelectType);
+                let select_type = match_data_node!(
+                    node_by_id,
+                    params[WRAPPED_SELECT_SELECT_TYPE],
+                    WrappedSelectSelectType
+                );
                 let projection_expr = match_expr_list_node!(
                     node_by_id,
                     to_expr,
-                    params[1],
+                    params[WRAPPED_SELECT_PROJECTION_EXPR],
                     WrappedSelectProjectionExpr
                 );
-                let subqueries =
-                    match_list_node_ids!(node_by_id, params[2], WrappedSelectSubqueries)
-                        .into_iter()
-                        .map(|j| {
-                            let input = Arc::new(self.to_logical_plan(j)?);
-                            Ok(input)
-                        })
-                        .collect::<Result<Vec<_>, CubeError>>()?;
-                let group_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[3], WrappedSelectGroupExpr);
-                let aggr_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[4], WrappedSelectAggrExpr);
-                let window_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[5], WrappedSelectWindowExpr);
-                let from = Arc::new(self.to_logical_plan(params[6])?);
-                let joins = match_list_node!(node_by_id, params[7], WrappedSelectJoins)
+                let subqueries = match_list_node_ids!(
+                    node_by_id,
+                    params[WRAPPED_SELECT_SUBQUERIES],
+                    WrappedSelectSubqueries
+                )
+                .into_iter()
+                .map(|j| {
+                    let input = Arc::new(self.to_logical_plan(j)?);
+                    Ok(input)
+                })
+                .collect::<Result<Vec<_>, CubeError>>()?;
+                let group_expr = match_expr_list_node!(
+                    node_by_id,
+                    to_expr,
+                    params[WRAPPED_SELECT_GROUP_EXPR],
+                    WrappedSelectGroupExpr
+                );
+                let aggr_expr = match_expr_list_node!(
+                    node_by_id,
+                    to_expr,
+                    params[WRAPPED_SELECT_AGGR_EXPR],
+                    WrappedSelectAggrExpr
+                );
+                let window_expr = match_expr_list_node!(
+                    node_by_id,
+                    to_expr,
+                    params[WRAPPED_SELECT_WINDOW_EXPR],
+                    WrappedSelectWindowExpr
+                );
+                // The rewrite nests a select per join of a chain; render the stack as one select
+                // joining all of them, without recursing into each level
+                let mut from_id = params[WRAPPED_SELECT_FROM];
+                let mut join_lists = vec![params[WRAPPED_SELECT_JOINS]];
+                if is_plain_join_select(node_by_id, params) {
+                    while let LogicalPlanLanguage::WrappedSelect(inner) = &node_by_id[from_id] {
+                        if !is_plain_join_select(node_by_id, inner) {
+                            break;
+                        }
+                        join_lists.push(inner[WRAPPED_SELECT_JOINS]);
+                        from_id = inner[WRAPPED_SELECT_FROM];
+                    }
+                }
+                let from = Arc::new(self.to_logical_plan(from_id)?);
+                let mut join_nodes = vec![];
+                for join_list in join_lists.into_iter().rev() {
+                    join_nodes.extend(match_list_node!(node_by_id, join_list, WrappedSelectJoins));
+                }
+                let joins = join_nodes
                     .into_iter()
                     .map(|j| {
                         if let LogicalPlanLanguage::WrappedSelectJoin(params) = j {
@@ -2195,18 +2288,43 @@ impl LanguageToLogicalPlanConverter {
                     })
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let filter_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[8], WrappedSelectFilterExpr);
-                let having_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[9], WrappedSelectHavingExpr);
-                let limit = match_data_node!(node_by_id, params[10], WrappedSelectLimit);
-                let offset = match_data_node!(node_by_id, params[11], WrappedSelectOffset);
-                let order_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[12], WrappedSelectOrderExpr);
-                let alias = match_data_node!(node_by_id, params[13], WrappedSelectAlias);
-                let distinct = match_data_node!(node_by_id, params[14], WrappedSelectDistinct);
-                let push_to_cube =
-                    match_data_node!(node_by_id, params[15], WrappedSelectPushToCube);
+                let filter_expr = match_expr_list_node!(
+                    node_by_id,
+                    to_expr,
+                    params[WRAPPED_SELECT_FILTER_EXPR],
+                    WrappedSelectFilterExpr
+                );
+                let having_expr = match_expr_list_node!(
+                    node_by_id,
+                    to_expr,
+                    params[WRAPPED_SELECT_HAVING_EXPR],
+                    WrappedSelectHavingExpr
+                );
+                let limit =
+                    match_data_node!(node_by_id, params[WRAPPED_SELECT_LIMIT], WrappedSelectLimit);
+                let offset = match_data_node!(
+                    node_by_id,
+                    params[WRAPPED_SELECT_OFFSET],
+                    WrappedSelectOffset
+                );
+                let order_expr = match_expr_list_node!(
+                    node_by_id,
+                    to_expr,
+                    params[WRAPPED_SELECT_ORDER_EXPR],
+                    WrappedSelectOrderExpr
+                );
+                let alias =
+                    match_data_node!(node_by_id, params[WRAPPED_SELECT_ALIAS], WrappedSelectAlias);
+                let distinct = match_data_node!(
+                    node_by_id,
+                    params[WRAPPED_SELECT_DISTINCT],
+                    WrappedSelectDistinct
+                );
+                let push_to_cube = match_data_node!(
+                    node_by_id,
+                    params[WRAPPED_SELECT_PUSH_TO_CUBE],
+                    WrappedSelectPushToCube
+                );
 
                 let filter_expr = normalize_cols(
                     replace_qualified_col_with_flat_name_if_missing(
