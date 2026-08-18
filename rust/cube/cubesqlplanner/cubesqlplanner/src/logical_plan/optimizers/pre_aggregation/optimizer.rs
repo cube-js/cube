@@ -496,8 +496,7 @@ impl PreAggregationOptimizer {
                         // Apply time shift for this dimension if present.
                         // SQL renders `column + interval`, so actual data range is `date - interval`.
                         if let Some(interval) = time_shifts
-                            .dimensions_shifts
-                            .get(&base_filter.member_name())
+                            .get_for_symbol(base_filter.raw_member_evaluator_ref())
                             .and_then(|s| s.interval.as_ref())
                         {
                             let tz = query_tools.timezone();

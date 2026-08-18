@@ -1,7 +1,10 @@
+use crate::planner::filter::typed_filter::resolve_base_symbol;
 use crate::planner::symbols::CalendarDimensionTimeShift;
+use crate::planner::symbols::MemberSymbol;
 use crate::planner::DimensionTimeShift;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 /// Per-dimension time-shift accumulator used during multi-stage
 /// planning. Keyed by dimension full name; aggregates the shifts
@@ -14,6 +17,14 @@ pub struct TimeShiftState {
 impl TimeShiftState {
     pub fn is_empty(&self) -> bool {
         self.dimensions_shifts.is_empty()
+    }
+
+    /// Looks up the shift for a symbol that may still be wrapped in a
+    /// `TimeDimension` or be a reference to the shifted member, bringing
+    /// the probe to the same fully resolved form the keys are built from.
+    pub fn get_for_symbol(&self, symbol: &Rc<MemberSymbol>) -> Option<&DimensionTimeShift> {
+        let resolved = resolve_base_symbol(symbol).resolve_reference_chain();
+        self.dimensions_shifts.get(&resolved.full_name())
     }
 
     /// Splits the accumulated shifts into two maps: regular
