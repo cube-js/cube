@@ -227,7 +227,7 @@ fn status_label(status: &Value) -> String {
     // sentence, so blanks would add empty brackets, a bare `%`, or a dash with nothing
     // after it — and this label is also `poll`'s dedupe key, so an all-blank stage that
     // varies in width would count as movement and print a line per poll.
-    let mut label = if util::is_blank(&stage) || stage == state {
+    let mut label = if util::is_blank(&stage) || stage.trim() == state.trim() {
         state
     } else {
         format!("{state} ({stage})")
@@ -377,7 +377,7 @@ async fn wait_for_sync(
         };
         missing_since.set(None);
 
-        let state = output::field(&status, "status");
+        let state = util::status_of(&status, "status");
         if state == COMPLETED || state == FAILED {
             return Ok(Progress::Done(status));
         }
@@ -471,7 +471,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             eprintln!("dbt sync {sync_job_id} started on {shown}");
             let status = wait_for_sync(&api, deployment, &sync_job_id, timeout, poll).await?;
 
-            if output::field(&status, "status") == FAILED {
+            if util::status_of(&status, "status") == FAILED {
                 if ctx.json {
                     output::print_json(&wait_json(
                         &started,
@@ -601,7 +601,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             if wait {
                 let status = wait_for_sync(&api, deployment, &sync_job_id, timeout, poll).await?;
                 print_status(ctx.json, &status);
-                if output::field(&status, "status") == FAILED {
+                if util::status_of(&status, "status") == FAILED {
                     let error = output::field(&status, "error");
                     bail!(
                         "dbt sync {sync_job_id} failed: {}",
@@ -823,6 +823,13 @@ mod tests {
         assert_eq!(
             status_label(&json!({"status": "BUILDING", "progress": {"stage": "compile"}})),
             "BUILDING (compile)"
+        );
+        // Padded but equal: naming the stage again would say the payload reported two
+        // things when it reported one — and a stage alternating between the two
+        // spellings would flip the rendering and read as movement to `poll`.
+        assert_eq!(
+            status_label(&json!({"status": "BUILDING", "progress": {"stage": "BUILDING "}})),
+            "BUILDING"
         );
     }
 
