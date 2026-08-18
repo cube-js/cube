@@ -513,8 +513,10 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 let error = output::field(&res, "errorText");
                 anyhow::bail!(
                     "build {status} for branch {}{}",
-                    output::field(&res, "branchName"),
-                    if error.is_empty() {
+                    named_branch(&res),
+                    // `is_blank`: a reason of blanks would append a bare colon and then
+                    // say nothing after it, which reads worse than the no-reason form.
+                    if util::is_blank(&error) {
                         String::new()
                     } else {
                         format!(": {error}")

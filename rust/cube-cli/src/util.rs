@@ -213,22 +213,26 @@ pub fn nonempty_target(s: &str) -> Result<String, String> {
 /// `'  x  '`, so the padding is visible rather than silently eaten; ugly and true beats
 /// tidy and wrong.
 pub fn branch_or_placeholder(branch: &str) -> String {
-    if names_a_branch(branch) {
-        branch.to_string()
-    } else {
+    if is_blank(branch) {
         "<branch>".to_string()
+    } else {
+        branch.to_string()
     }
 }
 
-/// Whether a payload actually named a branch.
+/// Whether a server said nothing in a field a message is about to quote.
 ///
-/// Trim-aware, like `nonempty` above: a name of blanks is the other spelling of "named
-/// nothing", and the only one that an `is_empty` check still reads as a name. That matters
-/// most where the answer picks BETWEEN two sentences rather than filling one in — taking
-/// the wrong arm prints both a hole mid-sentence and a suggested command that can't work,
-/// which is worse than either alone.
-pub fn names_a_branch(branch: &str) -> bool {
-    !branch.trim().is_empty()
+/// Trim-aware, like `nonempty` above: blanks are the other spelling of "said nothing", and
+/// the only one an `is_empty` check still reads as an answer. "Named no branch" and
+/// "reported no reason" are the same question, so they get the same predicate rather than
+/// one each — the second was written as `is_empty` precisely because the first's rule
+/// lived somewhere it couldn't be reused.
+///
+/// It matters most where the answer picks BETWEEN two sentences rather than filling one
+/// in: taking the wrong arm states something false — a fork that didn't happen, a reason
+/// that isn't there — where filling one in merely leaves a hole.
+pub fn is_blank(s: &str) -> bool {
+    s.trim().is_empty()
 }
 
 /// Wrap a value so it survives being pasted into a shell.
@@ -289,13 +293,14 @@ pub fn parse_duration(s: &str) -> Result<std::time::Duration, String> {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn blanks_do_not_name_a_branch() {
-        assert!(names_a_branch("main"));
-        assert!(!names_a_branch(""));
-        // The spelling an `is_empty` guard mistakes for a name: it would print
-        // "Entered dev mode on     (forked from main)" and suggest `--branch '   '`.
-        assert!(!names_a_branch("   "));
-        assert!(!names_a_branch("\n"));
+    fn blanks_say_nothing() {
+        assert!(!is_blank("main"));
+        assert!(is_blank(""));
+        // The spelling an `is_empty` guard mistakes for an answer: it would print
+        // "Entered dev mode on     (forked from main)", suggest `--branch '   '`, and
+        // report a failed sync as "failed: " with the reason slot full of blanks.
+        assert!(is_blank("   "));
+        assert!(is_blank("\n"));
         assert_eq!(branch_or_placeholder("   "), "<branch>");
         assert_eq!(branch_or_placeholder("main"), "main");
         // Padded but real: returned verbatim, because the same name goes into a

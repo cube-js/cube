@@ -489,7 +489,12 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 // "is not a dev-mode branch". Kept for the case where a server does
                 // fork, since the forked name is what writes would have to target.
                 let dev_branch = output::field(&res, "branchName");
-                if dev_mode && util::names_a_branch(&dev_branch) && dev_branch != name {
+                // Both halves decide on trimmed text, or the condition would hold two
+                // ideas of what a name IS: `nonempty` passes `--branch 'x '` through
+                // unchanged, so a server that trims before echoing makes an equal pair
+                // look different — and this arm would announce a fork that didn't happen.
+                // The printed value stays raw; only the decision trims.
+                if dev_mode && !util::is_blank(&dev_branch) && dev_branch.trim() != name.trim() {
                     output::success(&format!(
                         "Created branch {name}; entered dev mode on {dev_branch}"
                     ));
@@ -565,7 +570,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 // Dev mode runs on a personal `dev-…` branch forked from the
                 // requested one — expose it, since file writes only accept it.
                 let dev_branch = output::field(&res, "branchName");
-                if !util::names_a_branch(&dev_branch) || dev_branch == branch {
+                // Trimmed on both sides, for the reason given at the `create-branch`
+                // arm above: an equal pair must not read as a fork.
+                if util::is_blank(&dev_branch) || dev_branch.trim() == branch.trim() {
                     output::success(&format!("Entered dev mode on {branch}"));
                 } else {
                     output::success(&format!(
