@@ -443,8 +443,14 @@ in the drivers' [source code][link-github-cube-drivers].
 <Info>
 
 The optional `expiresAt` element states when the connection this configuration
-describes stops being usable, as epoch milliseconds (or seconds), an ISO 8601
-string, or a date. It is not passed to the driver.
+describes stops being usable, as epoch milliseconds (or seconds) or an ISO 8601
+string — and in JavaScript, a `Date`. In Python, pass `dt.timestamp()` or
+`dt.isoformat()`: a `datetime` cannot cross the config bridge and raises
+`Unable to represent PyDateTime type as CLR from Python`. It is not passed to
+the driver.
+
+A deadline that has already passed is ignored, with a warning: replacing a
+driver cannot move a deadline the factory keeps re-asserting.
 
 A driver is resolved once and then cached, and replaced when the configuration
 `driver_factory` returns changes. A connection built from a credential that
