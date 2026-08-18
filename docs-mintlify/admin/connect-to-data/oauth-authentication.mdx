@@ -45,12 +45,17 @@ pre-aggregation cache — on every rotation.
 
 <Note>
 
-Rebuilding the connection when the configuration changes requires Cube
-v1.7.20 or later — if a rotated token is only picked up when you redeploy,
-your version predates it. On earlier versions the connection resolved by the
-first request is kept until the deployment restarts, so including the token
-itself in the orchestrator ID is the only way to pick up a rotation without
-restarting, at the cost of a fresh orchestrator per rotation.
+Rebuilding the connection needs a Cube version that supports it. If a rotated
+token is only picked up when you redeploy, yours predates it: the connection
+resolved by the first request is kept until the deployment restarts.
+
+On those versions, putting the credential's **expiry** in the orchestrator ID
+is the only way to pick up a rotation without restarting — at the cost of a
+fresh orchestrator per rotation. Add a coarse clock to it once that expiry has
+passed, for example `int(time.time() // 300)`, because a credential whose
+refresh is failing upstream stops rotating altogether: an ID that changes only
+with the credential would pin the dead connection for as long as the process
+runs.
 
 </Note>
 
@@ -215,11 +220,17 @@ def _parse_expiry(value):
     return parsed.timestamp()
 
 
-def _access_token(ctx: dict):
-    """The user's OAuth token, or None to fall back to the service account."""
+def _credentials(ctx: dict) -> dict:
+    """The user's credentials for this data source, or an empty dict."""
     # For other data sources, swap "databricks" for "snowflake", etc.
     cube_cloud = (ctx.get("securityContext") or {}).get("cubeCloud") or {}
-    creds = (cube_cloud.get("userCredentials") or {}).get("databricks") or {}
+
+    return (cube_cloud.get("userCredentials") or {}).get("databricks") or {}
+
+
+def _access_token(ctx: dict):
+    """The user's OAuth token, or None to fall back to the service account."""
+    creds = _credentials(ctx)
 
     access_token = creds.get("accessToken")
     if not access_token:
@@ -243,12 +254,29 @@ def _access_token(ctx: dict):
 
 @config("driver_factory")
 def driver_factory(ctx: dict) -> dict:
+    access_token = _access_token(ctx)
+    creds = _credentials(ctx)
+
     # Cube rebuilds this connection whenever the returned configuration
     # changes, so returning a rotated token here is enough to replace it.
+    #
+    # `expiresAt` covers what a comparison cannot see. A credential whose
+    # refresh is failing upstream stops rotating: it resolves to an identical
+    # configuration indefinitely while the connection built from it is already
+    # dead. Stating the deadline replaces that connection anyway.
+    #
+    # Only for the user's own token — the service-account credential below has
+    # no deadline of its own, and giving it the user's would rebuild the
+    # fallback connection forever.
     return {
         "type": "databricks-jdbc",
         "url": os.environ["CUBEJS_DB_DATABRICKS_URL"],
-        "token": _access_token(ctx) or os.environ["CUBEJS_DB_DATABRICKS_TOKEN"],
+        "token": access_token or os.environ["CUBEJS_DB_DATABRICKS_TOKEN"],
+        **(
+            {"expiresAt": creds.get("accessTokenExpiresAt")}
+            if access_token
+            else {}
+        ),
         "acceptPolicy": True,
         "catalog": os.environ.get("CUBEJS_DB_DATABRICKS_CATALOG"),
     }
@@ -310,14 +338,28 @@ function accessToken(securityContext) {
 module.exports = {
   // Cube rebuilds this connection whenever the returned configuration changes,
   // so returning a rotated token here is enough to replace it.
-  driverFactory: ({ securityContext }) => ({
-    type: "databricks-jdbc",
-    url: process.env.CUBEJS_DB_DATABRICKS_URL,
-    token:
-      accessToken(securityContext) ?? process.env.CUBEJS_DB_DATABRICKS_TOKEN,
-    acceptPolicy: true,
-    catalog: process.env.CUBEJS_DB_DATABRICKS_CATALOG,
-  }),
+  //
+  // `expiresAt` covers what a comparison cannot see. A credential whose refresh
+  // is failing upstream stops rotating: it resolves to an identical
+  // configuration indefinitely while the connection built from it is already
+  // dead. Stating the deadline replaces that connection anyway.
+  //
+  // Only for the user's own token — the service-account credential below has no
+  // deadline of its own, and giving it the user's would rebuild the fallback
+  // connection forever.
+  driverFactory: ({ securityContext }) => {
+    const token = accessToken(securityContext);
+    const creds = securityContext?.cubeCloud?.userCredentials?.databricks;
+
+    return {
+      type: "databricks-jdbc",
+      url: process.env.CUBEJS_DB_DATABRICKS_URL,
+      token: token ?? process.env.CUBEJS_DB_DATABRICKS_TOKEN,
+      ...(token ? { expiresAt: creds?.accessTokenExpiresAt } : {}),
+      acceptPolicy: true,
+      catalog: process.env.CUBEJS_DB_DATABRICKS_CATALOG,
+    };
+  },
 
   // One orchestrator per user: separate DB connections, execution queues and
   // pre-aggregation caches. Deliberately not keyed on the token — see the
@@ -354,6 +396,12 @@ module.exports = {
    replacement and drains the old pool, so in-flight queries finish on the
    connection they started on.
 
+5. **A stated lifetime replaces it even when nothing changed** — `expiresAt`
+   is enforced on its own, so a credential that stops rotating rather than
+   rotating to something new does not pin a dead connection. It is excluded
+   from the comparison in step 4, so a factory may recompute the deadline on
+   every call without that reading as a new connection.
+
 ## Operational notes
 
 - **Replacements are rate-limited.** A data source is replaced at most once
@@ -375,6 +423,14 @@ module.exports = {
   check.** If it has no access at all, liveness checks and any query that
   falls back to it fail with an opaque authorization error from the driver
   rather than something diagnosable.
+- **A credential that stops refreshing is the case to plan for.** Rotation is
+  the easy half: the configuration changes and the connection is replaced. A
+  refresh that starts failing upstream leaves the same credential in place
+  until it expires and beyond, which no comparison can distinguish from a
+  credential nobody has touched. Return `expiresAt` and the connection is
+  replaced on its own deadline; a factory that raises instead of falling back
+  is given up after it has refused for long enough, so the error reaches the
+  caller rather than 401s from a pool nobody rebuilds.
 - **Falling back is silent.** A missing or near-expired token sends the
   query to the service account instead of failing, so results reflect the
   service account's permissions rather than the user's. If that is not
