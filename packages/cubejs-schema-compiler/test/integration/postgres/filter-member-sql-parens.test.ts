@@ -9,20 +9,6 @@ import { dbRunner } from './PostgresDBRunner';
 // operator captures only the tail of the member expression. That is a syntax
 // error on some dialects and — for `AND`/`OR` members — valid SQL over a
 // different row set on all of them.
-//
-// Inline data (6 rows):
-//   id  grp  amount  flag   note
-//   1   g1   100     true   'alpha'
-//   2   g1   10      true   NULL
-//   3   g2   200     false  'beta'
-//   4   g2   10      false  NULL
-//   5   g3   100     NULL   'gamma'
-//   6   g3   10      NULL   NULL
-//
-// `big_and_flag` = `amount > 50 AND flag` evaluates to
-//   1: true  2: false  3: false  4: false  5: NULL  6: false
-// and `big_or_flag` = `amount > 50 OR flag` to
-//   1: true  2: true  3: true  4: false  5: true  6: NULL
 
 // The fix lives in the Tesseract planner; the legacy planner is out of scope.
 const tesseract = getEnv('nativeSqlPlanner');

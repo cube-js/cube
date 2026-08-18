@@ -260,3 +260,40 @@ impl<'a> FilterSqlContext<'a> {
 pub trait FilterOperationSql {
     fn to_sql(&self, ctx: &FilterSqlContext) -> Result<String, CubeError>;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::FilterSqlContext;
+
+    fn as_operand(member_sql: &str) -> String {
+        FilterSqlContext::as_operand(member_sql)
+    }
+
+    #[test]
+    fn atomic_expression_stays_bare() {
+        assert_eq!(as_operand("amount"), "amount");
+        assert_eq!(as_operand("sum(amount)"), "sum(amount)");
+        assert_eq!(as_operand(""), "");
+    }
+
+    #[test]
+    fn compound_expression_is_wrapped() {
+        assert_eq!(as_operand("amount > 50"), "(amount > 50)");
+        assert_eq!(
+            as_operand("sum(amount) IS NOT NULL"),
+            "(sum(amount) IS NOT NULL)"
+        );
+    }
+
+    // The closing parenthesis, not precedence, is what a trailing line comment
+    // threatens, so the comment decides before atomicity does.
+    #[test]
+    fn trailing_line_comment_wraps_on_its_own_line() {
+        assert_eq!(as_operand("amount -- as is"), "(amount -- as is\n)");
+        assert_eq!(
+            as_operand("amount + 1 -- one more"),
+            "(amount + 1 -- one more\n)"
+        );
+        assert_eq!(as_operand("amount -- note\n + 1"), "(amount -- note\n + 1)");
+    }
+}
