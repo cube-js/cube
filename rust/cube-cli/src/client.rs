@@ -169,9 +169,9 @@ fn failure_detail(text: &str) -> String {
         // Everything else verbatim rather than re-serialised: `serde_json`'s map is a
         // `BTreeMap` here, so rendering an object back would sort its keys, and the CLI
         // would print something the server never sent — a small surprise for anyone
-        // holding it next to `curl`. Verbatim in key order and inner spacing, that is:
-        // `one_line` still collapses the layout, so this keeps what a reader compares
-        // rather than the bytes.
+        // holding it next to `curl`. Verbatim in key ORDER, that is: `one_line` collapses
+        // every whitespace run to one space here as everywhere, so what this keeps is
+        // what a reader compares rather than the bytes.
         _ => text.to_string(),
     });
 
@@ -205,12 +205,12 @@ fn says_nothing(value: &Value) -> bool {
 ///
 /// One thing this can't match the fallback on: an object is re-rendered from the parsed
 /// value, and `serde_json`'s map is a `BTreeMap` here, so its keys come back SORTED. The
-/// fallback avoids that by keeping the raw text — its key order and inner spacing, though
-/// not its layout, which `one_line` collapses either way — and that text isn't available
-/// for a value nested inside it. Preserving order here would mean carrying the source
-/// slice through, for a difference that reorders a validation error rather than losing
-/// any of it. Worth knowing when holding the output next to `curl`; not worth the
-/// plumbing.
+/// fallback avoids that by keeping the raw text — its key ORDER, precisely: `one_line`
+/// collapses every whitespace run to one space, so nothing about the spacing survives
+/// either way — and that text isn't available for a value nested inside it. Preserving
+/// order here would mean carrying the source slice through, for a difference that
+/// reorders a validation error rather than losing any of it. Worth knowing when holding
+/// the output next to `curl`; not worth the plumbing.
 fn explains(value: &Value) -> Option<String> {
     if says_nothing(value) {
         return None;
@@ -691,11 +691,14 @@ mod tests {
         // the content is all there, only the order is the crate's rather than the
         // server's. See `explains`.
         //
-        // If this ever fails with the keys IN ORDER, nothing regressed: something in the
-        // graph turned on `serde_json/preserve_order`, which closes the asymmetry for
-        // free. Swap the expectation and drop the caveat on `explains`. The lockfile
-        // doesn't prevent it — features unify across the whole dependency graph, and it
-        // pins versions rather than the features they're built with.
+        // If this ever fails with the keys IN ORDER, nothing regressed HERE: something in
+        // the graph turned on `serde_json/preserve_order`, which closes this asymmetry.
+        // Swap the expectation and drop the caveat on `explains` — but the same feature
+        // also reorders every `--json` document this CLI prints, since `output::print_json`
+        // serialises the same `Value`, and that wider promise is why it wasn't turned on
+        // deliberately. The lockfile doesn't prevent it either: features unify across the
+        // whole dependency graph, and it pins versions rather than the features they are
+        // built with.
         assert_eq!(
             failure_detail(r#"{"error":{"z":1,"a":2}}"#),
             r#"{"a":2,"z":1}"#
