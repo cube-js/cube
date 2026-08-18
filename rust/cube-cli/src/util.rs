@@ -256,12 +256,37 @@ pub const REASON_LIMIT: usize = 800;
 /// turns one error into several lines with no shape. Truncation keeps the leading text,
 /// which is where these verdicts put their meaning.
 pub fn one_line(text: &str, max_chars: usize) -> String {
-    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    if collapsed.chars().count() <= max_chars {
-        return collapsed;
+    // Bounded as it goes, rather than collapsed and then cut. The inputs are response
+    // bodies, which can be megabytes, and collapsing first would materialise the whole of
+    // one twice over — a token per whitespace run plus the joined copy — to keep a few
+    // hundred characters. The per-character inner loop is what bounds the other shape,
+    // a body with no whitespace in it at all.
+    let mut out = String::new();
+    let mut len = 0;
+    let mut cut = false;
+    'words: for word in text.split_whitespace() {
+        if !out.is_empty() {
+            if len == max_chars {
+                cut = true;
+                break;
+            }
+            out.push(' ');
+            len += 1;
+        }
+        for c in word.chars() {
+            if len == max_chars {
+                cut = true;
+                break 'words;
+            }
+            out.push(c);
+            len += 1;
+        }
+    }
+    if cut {
+        out.push('…');
     }
 
-    collapsed.chars().take(max_chars).collect::<String>() + "…"
+    out
 }
 
 /// A status field, read for comparison against the states a wait knows — or for the
@@ -368,6 +393,24 @@ mod tests {
             one_line(reason, COMPLAINT_LIMIT).ends_with('…'),
             "the label limit would have cut it, which is why they differ"
         );
+    }
+
+    #[test]
+    fn one_line_stops_reading_once_it_has_enough() {
+        // Bounded work, not just a bounded result: these are response bodies, and a
+        // gateway can send megabytes. Both shapes have to stop early — many small tokens,
+        // and one token with no whitespace to break it up.
+        let many = "word ".repeat(500_000);
+        let one = "x".repeat(5_000_000);
+        for input in [many, one] {
+            let cut = one_line(&input, 40);
+            assert_eq!(cut.chars().count(), 41, "40 chars plus the ellipsis");
+            assert!(cut.ends_with('…'));
+        }
+        // And the boundary the flag depends on: input ending exactly at the budget was
+        // not cut, so it must not claim it was.
+        assert_eq!(one_line("abcde", 5), "abcde");
+        assert_eq!(one_line("abcdef", 5), "abcde…");
     }
 
     #[test]
