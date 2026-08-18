@@ -13992,6 +13992,64 @@ ORDER BY "source"."str0" ASC
         insta::assert_snapshot!(context.execute_query(query).await.unwrap());
     }
 
+    /// `LIMIT 0` should reach the transport as `limit: 0` (and not as the default row
+    /// limit), and execute into an empty result
+    #[tokio::test]
+    async fn test_cube_scan_exec_limit_zero() {
+        init_testing_logger();
+
+        let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+        // language=PostgreSQL
+        let query = r#"
+            SELECT dim_str0
+            FROM MultiTypeCube
+            GROUP BY 1
+            LIMIT 0
+        "#;
+
+        let expected_cube_scan = V1LoadRequestQuery {
+            measures: Some(vec![]),
+            segments: Some(vec![]),
+            dimensions: Some(vec!["MultiTypeCube.dim_str0".to_string()]),
+            order: Some(vec![]),
+            limit: Some(0),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            context
+                .convert_sql_to_cube_query(query)
+                .await
+                .unwrap()
+                .as_logical_plan()
+                .find_cube_scan()
+                .request,
+            expected_cube_scan,
+        );
+
+        // Mock is matched by the exact request, so execution would fail here if anything
+        // downstream replaced `limit: 0` with a default limit
+        context
+            .add_cube_load_mock(
+                expected_cube_scan,
+                simple_load_response(vec!["MultiTypeCube.dim_str0"], vec![vec![]]),
+            )
+            .await;
+
+        let result = context.execute_query(query).await.unwrap();
+        assert_eq!(
+            result.trim(),
+            [
+                "+----------+",
+                "| dim_str0 |",
+                "+----------+",
+                "+----------+",
+            ]
+            .join("\n")
+        );
+    }
+
     #[tokio::test]
     async fn test_wrapper_tableau_week_number() {
         if !Rewriter::sql_push_down_enabled() {

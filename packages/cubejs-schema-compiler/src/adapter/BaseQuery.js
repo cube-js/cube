@@ -958,8 +958,10 @@ export class BaseQuery {
       securityContext: this.contextSymbols.securityContext,
       order,
       filters: this.options.filters,
-      limit: this.options.limit ? this.options.limit.toString() : null,
-      rowLimit: this.options.rowLimit ? this.options.rowLimit.toString() : null,
+      limit: this.options.limit != null ? this.options.limit.toString() : null,
+      // `rowLimit: 0` is a valid limit (BI tools use `LIMIT 0` as a schema probe),
+      // so it must not be collapsed into `null` (no limit) here
+      rowLimit: this.options.rowLimit != null ? this.options.rowLimit.toString() : null,
       offset: this.options.offset ? this.options.offset.toString() : null,
       baseTools: this,
       ungrouped: this.options.ungrouped,
@@ -1015,8 +1017,10 @@ export class BaseQuery {
       cubeEvaluator: this.cubeEvaluator,
       order,
       filters: this.options.filters,
-      limit: this.options.limit ? this.options.limit.toString() : null,
-      rowLimit: this.options.rowLimit ? this.options.rowLimit.toString() : null,
+      limit: this.options.limit != null ? this.options.limit.toString() : null,
+      // `rowLimit: 0` is a valid limit (BI tools use `LIMIT 0` as a schema probe),
+      // so it must not be collapsed into `null` (no limit) here
+      rowLimit: this.options.rowLimit != null ? this.options.rowLimit.toString() : null,
       offset: this.options.offset ? this.options.offset.toString() : null,
       baseTools: this,
       ungrouped: this.options.ungrouped,
@@ -3209,6 +3213,33 @@ export class BaseQuery {
   }
 
   topLimit() {
+    return '';
+  }
+
+  /**
+   * Row limit as a number, or `null` when it is not set at all. Unlike a truthy check
+   * this keeps `0` (a valid limit that returns no rows) distinct from "no limit", and
+   * unlike a bare `parseInt` it keeps a non-numeric `rowLimit` out of the rendered SQL.
+   * @protected
+   * @returns {number|null}
+   */
+  parsedRowLimit() {
+    if (this.rowLimit == null) {
+      return null;
+    }
+    const parsed = parseInt(this.rowLimit, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  /**
+   * Leading row-limit clause for statements that do not render `topLimit()` -- the legacy
+   * rollup query in `PreAggregations` is the one such statement. Only dialects that cannot
+   * express a zero row limit as a trailing clause (T-SQL, where FETCH NEXT must be >= 1)
+   * return anything here; every other dialect renders `LIMIT 0` and gets `''`.
+   * @public
+   * @returns {string}
+   */
+  zeroRowLimitTopClause() {
     return '';
   }
 

@@ -2140,11 +2140,6 @@ impl MemberRules {
                 fetch_value = *fetch;
                 break;
             }
-            // TODO support this case
-            if fetch_value == Some(0) {
-                // Broken and unsupported case for now
-                return false;
-            }
 
             let mut inner_skip_value = None;
             for inner_skip in var_iter!(egraph[subst[inner_skip_var]], CubeScanOffset) {
