@@ -1,3 +1,4 @@
+use cubesql::compile::engine::df::scan::parse_used_pre_aggregations;
 use cubesql::compile::parser::parse_sql_to_statement;
 use cubesql::compile::{convert_statement_to_cube_query, get_df_batches};
 use cubesql::config::processing_loop::ShutdownMode;
@@ -391,16 +392,21 @@ async fn handle_sql_query(
             // branch and never calls `load_data`, so neither the span nor the
             // stream schema carries the metadata and the header omits it.
             //
-            // Both values take the same precedence: whatever the span reported
+            // Every value takes the same precedence: whatever the span reported
             // wins outright, and the schema is consulted only when the span was
             // silent. `external` must not be OR-ed with the schema — a span that
             // folded to `false` because only some of its loads were external
             // would then be overridden back to `true`, undoing the conservative
             // fold in `SpanId::set_external`.
-            let (span_last_refresh_time, span_external) = match span_id_for_schema.as_ref() {
-                Some(span_id) => (span_id.last_refresh_time().await, span_id.external().await),
-                None => (None, None),
-            };
+            let (span_last_refresh_time, span_external, span_used_pre_aggregations) =
+                match span_id_for_schema.as_ref() {
+                    Some(span_id) => (
+                        span_id.last_refresh_time().await,
+                        span_id.external().await,
+                        span_id.used_pre_aggregations().await,
+                    ),
+                    None => (None, None, None),
+                };
 
             let last_refresh_time = span_last_refresh_time.or_else(|| {
                 stream
@@ -426,6 +432,22 @@ async fn handle_sql_query(
             });
             if external {
                 schema_response.insert("external".into(), serde_json::Value::Bool(true));
+            }
+
+            // Names the pre-aggregations behind the result so a client can join
+            // it to the build it is watching. Same precedence as above; the
+            // span already holds the union across every scan of the plan, while
+            // the stream schema only ever describes the last one.
+            let used_pre_aggregations = span_used_pre_aggregations.or_else(|| {
+                stream
+                    .schema()
+                    .metadata()
+                    .get("usedPreAggregations")
+                    .map(String::as_str)
+                    .and_then(parse_used_pre_aggregations)
+            });
+            if let Some(used_pre_aggregations) = used_pre_aggregations {
+                schema_response.insert("usedPreAggregations".into(), used_pre_aggregations);
             }
 
             write_jsonl_message(

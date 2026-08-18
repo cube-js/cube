@@ -462,6 +462,21 @@ components:
             type: "object"
         lastRefreshTime:
           type: "string"
+        external:
+          type: "boolean"
+          description: "`true` when the result was served from an external (CubeStore) pre-aggregation."
+        usedPreAggregations:
+          type: "object"
+          description: "Pre-aggregations this result was served from, keyed by pre-aggregation table name. Each entry carries `preAggregationId`, `lastUpdatedAt` and `type`. Absent when the query hit no pre-aggregation. In dev mode and for the Playground the entries also carry `targetTableName` and `refreshKeyValues`."
+          additionalProperties:
+            type: "object"
+            properties:
+              preAggregationId:
+                type: "string"
+              lastUpdatedAt:
+                type: "integer"
+              type:
+                type: "string"
     V1Error:
       type: "object"
       required:

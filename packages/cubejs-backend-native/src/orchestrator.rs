@@ -38,6 +38,7 @@ pub struct ResultWrapper {
     transformed_data: Option<TransformedData>,
     pub last_refresh_time: Option<String>,
     pub external: bool,
+    pub used_pre_aggregations: Option<serde_json::Value>,
 }
 
 impl ResultWrapper {
@@ -115,6 +116,7 @@ impl ResultWrapper {
             transformed_data: None,
             last_refresh_time: None,
             external: false,
+            used_pre_aggregations: None,
         })
     }
 

@@ -16,7 +16,7 @@ use async_trait::async_trait;
 use cubeorchestrator::query_result_transform::RequestResultData;
 use cubesql::compile::engine::df::scan::{
     build_response_schema, convert_transport_response, transform_response, CacheMode, MemberField,
-    RecordBatch, SchemaRef,
+    RecordBatch, ResultMetadata, SchemaRef,
 };
 use cubesql::compile::engine::df::wrapper::SqlQuery;
 use cubesql::transport::{
@@ -444,6 +444,7 @@ impl TransportService for NodeBridgeTransport {
 
                             wrapper.last_refresh_time = result_data.last_refresh_time;
                             wrapper.external = result_data.external.unwrap_or(false);
+                            wrapper.used_pre_aggregations = result_data.used_pre_aggregations;
 
                             native_wrapped_results.push(wrapper);
                         }
@@ -532,8 +533,11 @@ impl TransportService for NodeBridgeTransport {
                         .map(|mut wrapper| {
                             let updated_schema = build_response_schema(
                                 &schema,
-                                wrapper.last_refresh_time.clone(),
-                                wrapper.external,
+                                &ResultMetadata {
+                                    last_refresh_time: wrapper.last_refresh_time.clone(),
+                                    external: wrapper.external,
+                                    used_pre_aggregations: wrapper.used_pre_aggregations.clone(),
+                                },
                             );
 
                             transform_response(&mut wrapper, updated_schema, &member_fields)
