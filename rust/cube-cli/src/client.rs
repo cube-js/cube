@@ -165,12 +165,9 @@ fn failure_detail(text: &str) -> String {
         // object. The unwrapped shape is what a proxy sends (`send(JSON.stringify("Bad
         // gateway"))`), and proxies are what this fallback is for.
         Some(Value::String(said)) => said.to_string(),
-        // Everything else verbatim rather than re-serialised: `serde_json`'s map is a
-        // `BTreeMap` here, so rendering an object back would sort its keys, and the CLI
-        // would print something the server never sent — a small surprise for anyone
-        // holding it next to `curl`. Verbatim in key ORDER, that is: `one_line` collapses
-        // every whitespace run to one space here as everywhere, so what this keeps is
-        // what a reader compares rather than the bytes.
+        // Everything else verbatim rather than re-serialised, which is what keeps an
+        // object's keys in the order the server sent them. See `explains`' "On key order"
+        // for why that differs one level up, and for what would change it.
         _ => text.to_string(),
     });
 
@@ -202,14 +199,29 @@ fn says_nothing(value: &Value) -> bool {
 /// on. That reasoning is why the fallback does NOT reuse this — there, nothing sits
 /// beside it, and rejecting a bare scalar would drop the only thing the server said.
 ///
-/// One thing this can't match the fallback on: an object is re-rendered from the parsed
-/// value, and `serde_json`'s map is a `BTreeMap` here, so its keys come back SORTED. The
-/// fallback avoids that by keeping the raw text — its key ORDER, precisely: `one_line`
-/// collapses every whitespace run to one space, so nothing about the spacing survives
-/// either way — and that text isn't available for a value nested inside it. Preserving
-/// order here would mean carrying the source slice through, for a difference that
-/// reorders a validation error rather than losing any of it. Worth knowing when holding
+/// # On key order
+///
+/// This is the one place that spells the rule out; the two other sites that depend on it
+/// point here rather than restating it, so there is a single thing to revisit.
+///
+/// An object candidate is re-rendered from the parsed value, and `serde_json`'s map is a
+/// `BTreeMap` here, so its keys come back SORTED. The fallback in [`failure_detail`]
+/// escapes that by keeping the raw text — its key ORDER, precisely: `one_line` collapses
+/// every whitespace run to one space, so nothing about the spacing survives either way —
+/// and no such text exists for a value nested inside the body. Matching it here would
+/// mean carrying the source slice down to every candidate, for a difference that
+/// REORDERS a validation error rather than losing any of it. Worth knowing when holding
 /// the output next to `curl`; not worth the plumbing.
+///
+/// Enabling `serde_json/preserve_order` would close it for nothing, and it is deliberately
+/// off: `output::print_json` serialises the same `Value`, so the same feature reorders
+/// every `--json` document this CLI prints, which is a wider promise to move than an
+/// error message is worth. A lockfile doesn't prevent it either — features unify across
+/// the whole dependency graph, and it pins versions rather than the features they are
+/// built with — so if it ever arrives, three things want revisiting: this paragraph, the
+/// reason the catch-all arm of [`failure_detail`] gives for keeping the body verbatim,
+/// and the pair of assertions in `a_response_that_explains_nothing_does_not_promise_that_it_will`,
+/// one of which flips while the other keeps passing for a new reason.
 fn explains(value: &Value) -> Option<String> {
     if says_nothing(value) {
         return None;
@@ -629,34 +641,23 @@ mod tests {
             failure_detail(r#"{"message":"Bad gateway"}"#),
             "Bad gateway"
         );
-        // And an object keeps the order the server sent — today, because re-serialising
-        // would sort it; see the note below for what else that premise holds up.
+        // An object keeps the order the server sent, because the fallback hands back the
+        // raw text rather than re-rendering it. See `explains`' "On key order".
         assert_eq!(
             failure_detail(r#"{"z":1,"a":2}"#),
             r#"{"z":1,"a":2}"#,
             "keys in the order they arrived"
         );
         // A NESTED object can't: there is no raw slice for it, so it is re-rendered and
-        // `serde_json`'s `BTreeMap` sorts the keys. Asserted so the asymmetry with the
-        // line above is a documented fact rather than something a reader meets in a log —
-        // the content is all there, only the order is the crate's rather than the
-        // server's. See `explains`.
+        // the keys come back sorted. Asserted so the asymmetry with the line above is a
+        // documented fact rather than something a reader meets in a log — the content is
+        // all there, only the order is the crate's rather than the server's.
         //
-        // If this ever fails with the keys IN ORDER, nothing regressed HERE: something in
-        // the graph turned on `serde_json/preserve_order`, which closes this asymmetry.
-        // Swap the expectation, and revisit every claim resting on that premise, which
-        // `preserve_order` makes false: `explains`'s caveat, the reason
-        // `failure_detail`'s catch-all arm gives for keeping the body verbatim, and the
-        // clause on the assertion above. The first two stop being true; the third keeps
-        // passing for a different reason, which is why it needs listing here rather than
-        // left to a failing test to surface.
-        //
-        // The feature was left off on purpose, and not because of this asymmetry: it also
-        // reorders every `--json` document this CLI prints, since `output::print_json`
-        // serialises the same `Value`, and that is a wider promise to move than an error
-        // message is worth. The lockfile doesn't prevent it either: features unify across
-        // the whole dependency graph, and it pins versions rather than the features they
-        // are built with.
+        // If this ever fails with the keys IN ORDER, nothing regressed: something in the
+        // graph turned on `serde_json/preserve_order`. Swap the expectation, then read
+        // `explains`' "On key order", which lists everything else that assumed otherwise
+        // — including the assertion above, which keeps passing for a different reason and
+        // so would survive a sweep driven by this failure alone.
         assert_eq!(
             failure_detail(r#"{"error":{"z":1,"a":2}}"#),
             r#"{"a":2,"z":1}"#
