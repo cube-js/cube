@@ -226,22 +226,34 @@ fn verify_ref_applied(
 /// branch names, which print untrimmed precisely because a command addresses them.
 fn status_label(status: &Value) -> String {
     let state = util::status_of(status, "status");
-    let stage = output::field(status, "progress.stage");
+    // `one_line`, not `trim`: `trim` only takes whitespace off the ENDS, so an interior
+    // newline still breaks the one-line promise and an unbounded message is reproduced in
+    // full on every change. `deployments`' label has been capped for both reasons since it
+    // was written; this is the same loop's other waiter. `COMPLAINT_LIMIT`, because a
+    // label repeats and dedupes — a terminal reason is the one that earns the long budget.
+    let stage = util::one_line(
+        &output::field(status, "progress.stage"),
+        util::COMPLAINT_LIMIT,
+    );
+    // A number: nothing to collapse, and a cap would only ever cut a malformed one.
     let percent = output::field(status, "progress.percentComplete");
-    let message = output::field(status, "progress.message");
+    let message = util::one_line(
+        &output::field(status, "progress.message"),
+        util::COMPLAINT_LIMIT,
+    );
 
     // `is_blank`, not `is_empty`: blanks would add empty brackets, a bare `%`, or a dash
     // with nothing after it.
-    let mut label = if util::is_blank(&stage) || stage.trim() == state {
+    let mut label = if util::is_blank(&stage) || stage == state {
         state
     } else {
-        format!("{state} ({})", stage.trim())
+        format!("{state} ({stage})")
     };
     if !util::is_blank(&percent) {
         label.push_str(&format!(" {}%", percent.trim()));
     }
     if !util::is_blank(&message) {
-        label.push_str(&format!(" — {}", message.trim()));
+        label.push_str(&format!(" — {message}"));
     }
 
     label
@@ -861,6 +873,21 @@ mod tests {
         });
         assert_eq!(status_label(&padded), status_label(&clean));
         assert_eq!(status_label(&padded), "BUILDING (compile) 42% — x");
+        // Interior newlines are the half `trim` can't reach, and the label promises one
+        // line — to stderr on every change, and inside `poll`'s "(last seen: …)".
+        assert_eq!(
+            status_label(&json!({
+                "status": "BUILDING",
+                "progress": {"message": "Parsing dbt project\n  models/fct_orders.sql"}
+            })),
+            "BUILDING — Parsing dbt project models/fct_orders.sql"
+        );
+        // And length: an unbounded message would be reproduced in full on every change.
+        let long = status_label(&json!({
+            "status": "BUILDING",
+            "progress": {"message": "x".repeat(500)}
+        }));
+        assert!(long.ends_with('…'), "a long message is capped: {long}");
     }
 
     #[test]
