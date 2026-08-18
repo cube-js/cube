@@ -83,20 +83,9 @@ fn one_line(text: &str, max_chars: usize) -> String {
 const IDLE_GRACE: Duration = Duration::from_secs(60);
 
 /// The branch a failure should name, for both the prose and the command it suggests.
-///
-/// Falls back to a placeholder when the payload doesn't name one. Quoting already keeps
-/// that case from being dangerous — an empty name renders as a visible `''` rather than
-/// silently truncating the command — so what's left is which failure explains itself:
-/// `dev-mode 42 '<branch>'` 404s saying the branch wasn't named, `dev-mode 42 ''` 404s
-/// saying nothing. These are read out of CI logs after the fact, where the message is all
-/// the reader gets.
+/// See [`util::branch_or_placeholder`] for why an unnamed one gets a placeholder.
 fn named_branch(res: &serde_json::Value) -> String {
-    let branch = output::field(res, "branchName");
-    if branch.is_empty() {
-        "<branch>".to_string()
-    } else {
-        branch
-    }
+    util::branch_or_placeholder(&output::field(res, "branchName"))
 }
 
 /// Poll build-status until the build (or dev-mode worker) reaches a terminal state.
@@ -603,8 +592,8 @@ mod tests {
 
     #[test]
     fn a_payload_with_no_branch_says_so_rather_than_dropping_the_argument() {
-        // Quoting makes an empty name visible either way; the placeholder is what tells
-        // the reader WHY it's empty, in a log nobody can ask a question of.
+        // The command half is covered by quoting; this is the prose half, which it
+        // can't reach — see `util::branch_or_placeholder`.
         assert_eq!(named_branch(&serde_json::json!({})), "<branch>");
         assert_eq!(
             named_branch(&serde_json::json!({"branchName": ""})),

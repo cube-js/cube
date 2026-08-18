@@ -198,6 +198,10 @@ fn verify_ref_applied(
         return Ok(true);
     }
 
+    // The one site an unnamed branch genuinely reaches: this bails BECAUSE the comparison
+    // failed, and an empty name fails it. Only the message is affected — the `--wait`
+    // document keeps whatever the server sent (see `wait_json`).
+    let branch_name = &util::branch_or_placeholder(branch_name);
     anyhow::bail!(
         "the sync started on {branch_name}, which doesn't begin with the ref you asked \
          for ({requested}). Either this deployment predates `ref` support — in which case \
@@ -270,11 +274,12 @@ fn print_result(json: bool, result: &Value) {
 /// `delete-branch` would be pointing at their own branch.
 fn print_prune_hint(sync_created_it: bool, deployment: i64, branch_name: &str) {
     if sync_created_it {
+        let branch_name = util::branch_or_placeholder(branch_name);
         println!(
             "The branch is not removed automatically — prune it with \
              `cube data-model delete-branch {deployment} {}` \
              when you're done.",
-            util::shell_quote(branch_name)
+            util::shell_quote(&branch_name)
         );
     }
 }
@@ -316,6 +321,8 @@ fn wait_json(
     serde_json::json!({
         "syncJobId": output::field(started, "syncJobId"),
         "workflowId": output::field(started, "workflowId"),
+        // Raw, unlike the human-facing messages: a gate reads this field and acts on it,
+        // so an empty string it can test for beats a placeholder it would try to use.
         "branchName": branch_name,
         "status": output::field(status, "status"),
         "error": status.get("error").cloned().unwrap_or(Value::Null),
@@ -790,6 +797,20 @@ mod tests {
             Some(true),
         );
         assert_eq!(doc["refVerified"], json!(false));
+    }
+
+    #[test]
+    fn an_unnamed_branch_is_named_as_such_rather_than_left_blank() {
+        // Reachable: this bails because the comparison failed, and an empty name fails
+        // it. The sentence would otherwise read "the sync started on , which doesn't…".
+        let err = verify_ref_applied(42, "feature/x", "", "job-1")
+            .expect_err("an empty branch name cannot confirm a ref");
+        assert!(err.to_string().contains("started on <branch>"), "{err}");
+        assert!(
+            err.to_string()
+                .contains("cube data-model delete-branch 42 '<branch>'"),
+            "{err}"
+        );
     }
 
     #[test]
