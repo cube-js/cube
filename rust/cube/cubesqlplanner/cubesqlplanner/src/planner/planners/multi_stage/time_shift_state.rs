@@ -1,3 +1,4 @@
+use crate::planner::collectors::find_owned_by_cube_child;
 use crate::planner::filter::typed_filter::resolve_base_symbol;
 use crate::planner::symbols::CalendarDimensionTimeShift;
 use crate::planner::symbols::MemberSymbol;
@@ -20,11 +21,17 @@ impl TimeShiftState {
     }
 
     /// Looks up the shift for a symbol that may still be wrapped in a
-    /// `TimeDimension` or be a reference to the shifted member, bringing
-    /// the probe to the same fully resolved form the keys are built from.
+    /// `TimeDimension`, be a reference to the shifted member, or wrap it in
+    /// its own SQL. Keys are built either from the chain-resolved dimension
+    /// or, for dimension-specific shifts, from the owned member the declared
+    /// dimension wraps, so both forms are probed.
     pub fn get_for_symbol(&self, symbol: &Rc<MemberSymbol>) -> Option<&DimensionTimeShift> {
         let resolved = resolve_base_symbol(symbol).resolve_reference_chain();
-        self.dimensions_shifts.get(&resolved.full_name())
+        if let Some(shift) = self.dimensions_shifts.get(&resolved.full_name()) {
+            return Some(shift);
+        }
+        let owned = find_owned_by_cube_child(&resolved).ok()?;
+        self.dimensions_shifts.get(&owned.full_name())
     }
 
     /// Splits the accumulated shifts into two maps: regular

@@ -1,6 +1,7 @@
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
+use itertools::Itertools;
 
 const SEED: &str = "integration_multi_stage_tables.sql";
 const YAML: &str = "common/integration_multi_stage_multiplied_pre_agg.yaml";
@@ -308,6 +309,81 @@ async fn test_multi_stage_pre_agg_covering_multiplying_filter() {
     );
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+const DERIVED_YAML: &str = "common/integration_derived_time_dim_shift_pre_agg.yaml";
+const DERIVED_SEED: &str = "integration_derived_time_dim_shift_tables.sql";
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_time_shift_pre_agg_on_derived_time_dimension() {
+    // The shift is declared on a time dimension derived from another cube's
+    // time dimension, and the pre-aggregation materializes that derived
+    // dimension. The shift must reach both the widened date_range and the
+    // rollup column the shifted leaf reads.
+    let schema = MockSchema::from_yaml_file(DERIVED_YAML)
+        .only_pre_aggregations(&["value_by_return_day_month"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {r#"
+        measures:
+          - pa_customers.total_value
+          - pa_customers.total_value_prev_month
+        time_dimensions:
+          - dimension: pa_customers.return_day
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: pa_customers.return_day
+    "#};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    let names: Vec<&str> = pre_aggrs.iter().map(|u| u.name().as_str()).collect();
+
+    assert_eq!(
+        pre_aggrs.len(),
+        2,
+        "Expected 2 usages (shifted + unshifted leaf); got {:?}",
+        names
+    );
+
+    let shifted_range = Some((
+        "2023-12-01T00:00:00.000".to_string(),
+        "2024-02-29T23:59:59.999".to_string(),
+    ));
+    let original_range = Some((
+        "2024-01-01T00:00:00.000".to_string(),
+        "2024-03-31T23:59:59.999".to_string(),
+    ));
+    assert!(
+        pre_aggrs.iter().any(|u| u.date_range == shifted_range),
+        "Expected a usage with shifted date_range; got {:?}",
+        pre_aggrs.iter().map(|u| u.date_range.clone()).collect_vec()
+    );
+    assert!(
+        pre_aggrs.iter().any(|u| u.date_range == original_range),
+        "Expected a usage with original date_range; got {:?}",
+        pre_aggrs.iter().map(|u| u.date_range.clone()).collect_vec()
+    );
+
+    // The shifted leaf reads the rollup column, so the interval has to be
+    // applied to that column — the derived member's own SQL is never
+    // expanded here and cannot carry the shift.
+    assert!(
+        sql.contains(r#""pa_customers__return_day_month" + interval '1 month'"#),
+        "Shifted leaf must offset the pre-aggregation column:\n{}",
+        sql
+    );
+    assert!(
+        !sql.contains("interval '1 month') + interval '1 month'"),
+        "Shift must be applied once:\n{}",
+        sql
+    );
+
+    if let Some(result) = ctx.try_execute(query, DERIVED_SEED).await {
         insta::assert_snapshot!(result);
     }
 }
