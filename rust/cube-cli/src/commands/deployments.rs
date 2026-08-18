@@ -52,24 +52,6 @@ const NOT_BUILDING: &[(&str, Hint)] = &[
     }),
 ];
 
-/// How much of a server complaint to keep. Long enough for the known verdicts and
-/// a sentence of context, short enough that one poll stays one line.
-const COMPLAINT_LIMIT: usize = 120;
-
-/// Squash arbitrary server text into a single short line.
-///
-/// Kept separate because both users care about different halves: the label needs it
-/// STABLE (it is a dedupe key), and the failure message needs it SHORT. Truncation
-/// keeps the leading text, which is where these verdicts put their meaning.
-fn one_line(text: &str, max_chars: usize) -> String {
-    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    if collapsed.chars().count() <= max_chars {
-        return collapsed;
-    }
-
-    collapsed.chars().take(max_chars).collect::<String>() + "…"
-}
-
 /// How long to tolerate an explicit `none`/`stopped` before giving up.
 ///
 /// The backstop, not the main defence: against a live deployment the cases that
@@ -132,7 +114,7 @@ async fn wait_for_build(
         // Collapsing whitespace also keeps a multi-line error from becoming several
         // progress lines, or landing whole inside `(last seen: …)` or a failure.
         let error = output::field(&res, "errorText");
-        let complaint = one_line(&error, COMPLAINT_LIMIT);
+        let complaint = util::one_line(&error, util::COMPLAINT_LIMIT);
 
         if let Some((verdict, hint)) = NOT_BUILDING
             .iter()
@@ -516,7 +498,10 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 // multi-line. Nothing matches against it here — the status already said
                 // what happened — so the raw/normalised split those sites keep for
                 // `contains` doesn't apply.
-                let error = one_line(&output::field(&res, "errorText"), COMPLAINT_LIMIT);
+                // `REASON_LIMIT`, not `COMPLAINT_LIMIT`: the poll labels above are
+                // repeated and deduped, so they must stay short — this is printed once
+                // and is the whole point of the message.
+                let error = util::one_line(&output::field(&res, "errorText"), util::REASON_LIMIT);
                 anyhow::bail!(
                     "build {status} for branch {}{}",
                     named_branch(&res),
@@ -619,31 +604,5 @@ mod tests {
             named_branch(&serde_json::json!({"branchName": "main"})),
             "main"
         );
-    }
-
-    #[test]
-    fn one_line_collapses_and_truncates() {
-        assert_eq!(
-            one_line("Branch is not active", 120),
-            "Branch is not active"
-        );
-        assert_eq!(one_line("", 120), "");
-        // A multi-line error becomes one progress line, not several.
-        assert_eq!(
-            one_line("Build failed:\n  cube orders\n  line 3", 120),
-            "Build failed: cube orders line 3"
-        );
-        // Long text is cut, keeping the leading meaning.
-        let long = "x".repeat(200);
-        let cut = one_line(&long, 10);
-        assert_eq!(cut.chars().count(), 11, "10 chars plus the ellipsis");
-        assert!(cut.starts_with("xxxxxxxxxx"));
-    }
-
-    #[test]
-    fn one_line_counts_characters_not_bytes() {
-        // Truncating on bytes would panic mid-character here.
-        let cut = one_line(&"é".repeat(50), 10);
-        assert_eq!(cut.chars().count(), 11);
     }
 }
