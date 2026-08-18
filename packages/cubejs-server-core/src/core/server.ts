@@ -153,6 +153,13 @@ type DriverOrigin = {
   securityContextFingerprint: string | null;
   configFingerprint: string | null;
   expiresAt: number | undefined;
+  /**
+   * Whether this driver's unusable lifetime has been reported. The carry-over
+   * that resolves it runs on every security context change, with no rate limit
+   * of its own, so without this the warning is emitted per request — trading
+   * the pool churn this guard removes for log volume on the hot path.
+   */
+  lifetimeIgnoredReported: boolean;
 };
 
 /**
@@ -1076,6 +1083,7 @@ export class CubejsServerCore {
         securityContextFingerprint: null,
         configFingerprint: null,
         expiresAt: undefined,
+        lifetimeIgnoredReported: false,
       };
 
       aliasedKeys.forEach((key) => {
@@ -1101,7 +1109,7 @@ export class CubejsServerCore {
             ? driverConfigFingerprint(factoryConfig)
             : null;
           origin.expiresAt = factoryConfig
-            ? this.resolveBuiltDriverExpiry(factoryConfig, dataSource)
+            ? this.resolveBuiltDriverExpiry(factoryConfig, dataSource, origin)
             : undefined;
 
           driver = await this.createDriverFromFactoryResult(
@@ -1425,37 +1433,65 @@ export class CubejsServerCore {
    *
    * Rebuilding cannot fix a deadline the factory keeps re-asserting. Honouring
    * one would find the new driver stale the moment its suppression window
-   * closed, tear down a pool it had just stood up, and resolve the same elapsed
-   * deadline again, for the life of the process. A driver built from an expired
-   * configuration is no worse than the one it replaced, so the connection is
-   * kept and the lifetime dropped — the operator gets a warning naming the
-   * field rather than churn that never resolves.
+   * closed, tear down a pool it had just stood up, and resolve the same
+   * unusable deadline again, for the life of the process. A driver built from
+   * such a configuration is no worse than the one it replaced, so the
+   * connection is kept and the lifetime dropped — the operator gets a warning
+   * naming the field rather than churn that never resolves.
    *
-   * The documented recipe does not reach this: its `accessToken()` withholds a
+   * Two deadlines are unusable, and they produce the same loop. One has already
+   * passed. The other is shorter than the interval replacements are rate-limited
+   * to: the driver is stale again the moment its suppression window closes, so
+   * the rate limiter can never let this mechanism honour it. Dropping it strands
+   * nothing — a credential that short is rotating, and rotation changes the
+   * configuration, which is caught by comparison rather than by lifetime.
+   *
+   * The documented recipe does not reach either: its `accessToken()` withholds a
    * token that is already near expiry, so the configuration changes to the
    * service account, which names no lifetime, and converges. A factory passing
-   * the provider's `accessTokenExpiresAt` straight through does reach it.
+   * the provider's `accessTokenExpiresAt` straight through does reach them.
    */
   protected resolveBuiltDriverExpiry(
     config: DriverConfig,
     dataSource: string,
+    origin: DriverOrigin,
   ): number | undefined {
     const expiresAt = parseDriverExpiry(config.expiresAt);
 
-    if (expiresAt === undefined || Date.now() < expiresAt) {
+    if (expiresAt === undefined) {
+      return undefined;
+    }
+
+    const remainingMs = expiresAt - Date.now();
+
+    if (remainingMs >= DRIVER_REBUILD_MIN_INTERVAL_MS) {
       return expiresAt;
     }
 
-    this.logger('Driver configuration expired on arrival', {
-      dataSource,
-      expiresAt: new Date(expiresAt).toISOString(),
-      warning: 'driverFactory returned a configuration whose expiresAt has '
-        + 'already passed. Using the connection anyway and ignoring the '
-        + 'lifetime: replacing a driver cannot move a deadline the factory '
-        + 'keeps re-asserting, and honouring it would rebuild the pool for the '
-        + 'life of the process. expiresAt must state when the credential being '
-        + 'returned stops being usable, in the future.',
-    });
+    // Once per driver, not once per call: the carry-over path resolves this on
+    // every security context change, and the operator needs the field named
+    // once, not on every query that arrives with a fresh JWT.
+    if (!origin.lifetimeIgnoredReported) {
+      origin.lifetimeIgnoredReported = true;
+
+      this.logger('Driver lifetime ignored', {
+        dataSource,
+        expiresAt: new Date(expiresAt).toISOString(),
+        warning: remainingMs < 0
+          ? 'driverFactory returned a configuration whose expiresAt has already '
+            + 'passed. Using the connection anyway and ignoring the lifetime: '
+            + 'replacing a driver cannot move a deadline the factory keeps '
+            + 're-asserting, and honouring it would rebuild the pool for the life '
+            + 'of the process. expiresAt must state when the credential being '
+            + 'returned stops being usable, in the future.'
+          : 'driverFactory returned a configuration whose expiresAt is less than '
+            + `${DRIVER_REBUILD_MIN_INTERVAL_MS / 1000}s away, which is shorter `
+            + 'than the interval replacements are rate-limited to. Honouring it '
+            + 'would replace the connection once per window for the life of the '
+            + 'process, so the lifetime is ignored; a credential rotating that '
+            + 'fast is picked up by its configuration changing instead.',
+      });
+    }
 
     return undefined;
   }
@@ -1570,7 +1606,7 @@ export class CubejsServerCore {
       // elapsed deadline would otherwise reinstate it here on the next context
       // change, reopening the loop that guard exists to close.
       if (config) {
-        origin.expiresAt = this.resolveBuiltDriverExpiry(config, context.dataSource);
+        origin.expiresAt = this.resolveBuiltDriverExpiry(config, context.dataSource, origin);
       }
 
       return { stale: false };

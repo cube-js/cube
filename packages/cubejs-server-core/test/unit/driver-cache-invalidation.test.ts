@@ -904,7 +904,7 @@ describe('driver cache invalidation', () => {
 
     const first = await driverFactory('default');
 
-    expect(logged('Driver configuration expired on arrival')).toHaveLength(1);
+    expect(logged('Driver lifetime ignored')).toHaveLength(1);
 
     // Past any suppression window: an honoured deadline would rebuild here, and
     // again on every window after it.
@@ -919,5 +919,83 @@ describe('driver cache invalidation', () => {
     expect(await driverFactory('default')).toBe(first);
     expect(core.builtDrivers).toHaveLength(1);
     expect(logged('Rebuilding driver')).toHaveLength(0);
+  });
+
+  // The deadline is resolved again on every probe, and probes run whenever the
+  // security context changes. Reporting per call would trade the churn the
+  // guard removes for a warning on every query that arrives with a fresh JWT.
+  test('reports an ignored lifetime once, not once per probe', async () => {
+    const { core, driverFactory, request, logged } = await createCore({
+      // Ignores the context: the configuration never changes, only the elapsed
+      // deadline it keeps re-asserting.
+      driverFactory: () => (<any>{
+        type: 'postgres',
+        password: 'service-account',
+        expiresAt: Date.now() - 60 * 1000,
+      }),
+    }, { token: 'token-a' });
+
+    const first = await driverFactory('default');
+
+    // Each of these changes the fingerprint, so each one probes and each one
+    // carries the same unusable deadline over.
+    for (const token of ['token-b', 'token-c', 'token-d', 'token-e']) {
+      // eslint-disable-next-line no-await-in-loop
+      await request({ token }, `req-${token}`);
+      // eslint-disable-next-line no-await-in-loop
+      expect(await driverFactory('default')).toBe(first);
+    }
+
+    expect(logged('Driver lifetime ignored')).toHaveLength(1);
+    expect(core.builtDrivers).toHaveLength(1);
+  });
+
+  // A lifetime shorter than the replacement interval is the same loop as an
+  // elapsed one: stale the moment the suppression window closes, every window,
+  // for the life of the process.
+  test('ignores a lifetime shorter than the replacement interval', async () => {
+    const { core, driverFactory, request, logged } = await createCore({
+      driverFactory: () => (<any>{
+        type: 'postgres',
+        password: 'sts-credential',
+        // Genuinely in the future, and still too short for the rate limiter to
+        // ever let this mechanism act on it.
+        expiresAt: Date.now() + 10 * 1000,
+      }),
+    }, { token: 'token-a' });
+
+    const first = await driverFactory('default');
+
+    expect(logged('Driver lifetime ignored')).toHaveLength(1);
+
+    // Past the deadline and past any suppression window, twice over.
+    for (const requestId of ['req-2', 'req-3']) {
+      clock.advancePastRebuildInterval();
+      // eslint-disable-next-line no-await-in-loop
+      await request({ token: 'token-a' }, requestId);
+      // eslint-disable-next-line no-await-in-loop
+      expect(await driverFactory('default')).toBe(first);
+    }
+
+    expect(core.builtDrivers).toHaveLength(1);
+    expect(logged('Rebuilding driver')).toHaveLength(0);
+  });
+
+  // The other half of the lifetime contract: a deadline the rate limiter can
+  // honour is still honoured, so widening the guard did not disable the feature.
+  test('honours a lifetime longer than the replacement interval', async () => {
+    let expiresAt = Date.now() + 60 * 60 * 1000;
+    const { core, driverFactory, request } = await createCore({
+      driverFactory: () => (<any>{ type: 'postgres', password: 'static', expiresAt }),
+    }, { token: 'token-a' });
+
+    const first = await driverFactory('default');
+
+    clock.advance(61 * 60 * 1000);
+    expiresAt = Date.now() + 60 * 60 * 1000;
+    await request({ token: 'token-a' }, 'req-2');
+
+    expect(await driverFactory('default')).not.toBe(first);
+    expect(core.builtDrivers).toHaveLength(2);
   });
 });
