@@ -157,8 +157,28 @@ const PROBE_FAILURE_GRACE_MS = 5 * 60 * 1000;
  * Longer than the grace window, then, but far short of the days-apart flakes
  * that made a never-expiring record wrong: a refusal half an hour stale is not
  * evidence about the one happening now.
+ *
+ * Retention this long would, on its own, let two unrelated blinks half an hour
+ * apart reach the bound between them. What keeps that from happening is that
+ * the count is of incidents rather than of refusals — see
+ * `PROBE_FAILURE_COALESCE_MS`.
  */
 const PROBE_FAILURE_RETENTION_MS = 30 * 60 * 1000;
+
+/**
+ * How close together two refusals have to be to count as one.
+ *
+ * Retention outliving the grace window is what makes the bound reachable in a
+ * sparse deployment, but on its own it also makes it reachable across unrelated
+ * incidents: concurrent probes all fail on one blink of a dependency, and a
+ * burst of three plus a single refusal six minutes later would otherwise
+ * satisfy both conditions and drain a working pool for what was two brief
+ * outages.
+ *
+ * Counting incidents rather than refusals removes that without giving the
+ * sparse case back: a burst is one, and the bound still wants three.
+ */
+const PROBE_FAILURE_COALESCE_MS = 2 * 1000;
 
 /**
  * What a cached driver was built from. `null` on either fingerprint means
@@ -1041,7 +1061,15 @@ export class CubejsServerCore {
             ? previousFailures
             : { count: 0, firstFailureAt: now, lastFailureAt: now };
 
-          failures.count += 1;
+          // Requests that arrived together and failed on the same blink of a
+          // dependency are one refusal, not one each.
+          if (
+            failures.count === 0 ||
+            now - failures.lastFailureAt >= PROBE_FAILURE_COALESCE_MS
+          ) {
+            failures.count += 1;
+          }
+
           failures.lastFailureAt = now;
           driverProbeFailures[rebuildKey] = failures;
 
@@ -1521,7 +1549,12 @@ export class CubejsServerCore {
       });
     }
 
-    return undefined;
+    // Keep whatever was accepted, if anything. The newly stated deadline cannot
+    // be honoured, but one this driver is already held to can: an installed
+    // deadline is still in the future here, because an elapsed one returns
+    // `stale` from the lifetime check before the factory is ever asked. At the
+    // build path this is `undefined`, so nothing changes there.
+    return origin.expiresAt;
   }
 
   /**
