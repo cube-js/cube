@@ -217,26 +217,31 @@ fn verify_ref_applied(
 }
 
 /// One line summarising a status payload, for progress output.
+///
+/// Every field is normalised on the way in, not just compared as if it were. This label
+/// is `poll`'s dedupe key, so a value that alternates between two spellings of one thing
+/// — `"BUILDING"` and `"BUILDING "` — makes two keys, and a fifteen-minute sync prints a
+/// line per poll instead of the handful the loop exists to produce. Nothing here is ever
+/// acted on, only shown and compared, so normalising costs nothing: the opposite of the
+/// branch names, which print untrimmed precisely because a command addresses them.
 fn status_label(status: &Value) -> String {
-    let state = output::field(status, "status");
+    let state = util::status_of(status, "status");
     let stage = output::field(status, "progress.stage");
     let percent = output::field(status, "progress.percentComplete");
     let message = output::field(status, "progress.message");
 
-    // `is_blank` throughout: every one of these is server text being appended to a
-    // sentence, so blanks would add empty brackets, a bare `%`, or a dash with nothing
-    // after it — and this label is also `poll`'s dedupe key, so an all-blank stage that
-    // varies in width would count as movement and print a line per poll.
-    let mut label = if util::is_blank(&stage) || stage.trim() == state.trim() {
+    // `is_blank`, not `is_empty`: blanks would add empty brackets, a bare `%`, or a dash
+    // with nothing after it.
+    let mut label = if util::is_blank(&stage) || stage.trim() == state {
         state
     } else {
-        format!("{state} ({stage})")
+        format!("{state} ({})", stage.trim())
     };
     if !util::is_blank(&percent) {
-        label.push_str(&format!(" {percent}%"));
+        label.push_str(&format!(" {}%", percent.trim()));
     }
     if !util::is_blank(&message) {
-        label.push_str(&format!(" — {message}"));
+        label.push_str(&format!(" — {}", message.trim()));
     }
 
     label
@@ -328,7 +333,12 @@ fn wait_json(
         // Raw, unlike the human-facing messages: a gate reads this field and acts on it,
         // so an empty string it can test for beats a placeholder it would try to use.
         "branchName": branch_name,
-        "status": output::field(status, "status"),
+        // Normalised, unlike `branchName` above, and for the reason that rule gives: a
+        // gate ACTS on a branch name, so an empty string it can test for beats a
+        // placeholder it would use — while a status is only ever compared. Raw here would
+        // mean a gate copying the CLI's own check (`.status == "COMPLETED"`) failing on a
+        // value the CLI had just accepted as terminal.
+        "status": util::status_of(status, "status"),
         "error": status.get("error").cloned().unwrap_or(Value::Null),
         "result": result.cloned().unwrap_or(Value::Null),
         // Checked on both documents because either could carry it, and `started` first
@@ -831,6 +841,35 @@ mod tests {
             status_label(&json!({"status": "BUILDING", "progress": {"stage": "BUILDING "}})),
             "BUILDING"
         );
+        // Padding anywhere makes a second key for one state, and `poll` reports a CHANGED
+        // key — so the label a padded payload produces has to equal the one its clean
+        // spelling produces, or a fifteen-minute sync prints a line per poll.
+        let padded = json!({
+            "status": "BUILDING ",
+            "progress": {"stage": " compile", "percentComplete": " 42 ", "message": "x "}
+        });
+        let clean = json!({
+            "status": "BUILDING",
+            "progress": {"stage": "compile", "percentComplete": "42", "message": "x"}
+        });
+        assert_eq!(status_label(&padded), status_label(&clean));
+        assert_eq!(status_label(&padded), "BUILDING (compile) 42% — x");
+    }
+
+    #[test]
+    fn the_document_reports_the_state_the_cli_decided_on() {
+        // A gate copying the CLI's own check must not fail on a value the CLI just
+        // accepted as terminal — unlike `branchName`, which stays raw because a gate
+        // acts on it rather than only comparing it.
+        let doc = wait_json(
+            &json!({}),
+            &json!({"status": " COMPLETED\n", "branchName": "  x  "}),
+            "  x  ",
+            None,
+            None,
+        );
+        assert_eq!(doc["status"], json!("COMPLETED"));
+        assert_eq!(doc["branchName"], json!("  x  "));
     }
 
     #[test]
