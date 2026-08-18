@@ -14,8 +14,9 @@ use crate::util;
 /// Typed, rather than a bare message, so callers can branch on the status without
 /// matching on wording: [`Client::get_optional`] recognises a 404, and
 /// [`is_transient`] tells a wait loop whether retrying could possibly help. The
-/// `Display` reproduces exactly the message each status produced before, so
-/// anything that only prints the error reads the same.
+/// `Display` reproduces the message each status produced before, with one deliberate
+/// exception: a detail that says nothing takes its separator with it, rather than
+/// leaving a dangling `: ` promising a reason that never comes.
 #[derive(Debug)]
 pub struct ApiError {
     pub status: StatusCode,
@@ -151,11 +152,17 @@ fn failure_detail(text: &str) -> String {
     });
 
     let detail = said.unwrap_or_else(|| match body.as_ref() {
-        // No candidate explained anything, so the body itself is the next best thing —
-        // `{"message":400}` at least shows the number in context. Unless it says nothing
-        // either, where an empty detail is the honest answer and `Display` drops its
-        // separator rather than printing `failed with 502 Bad Gateway: ` and stopping.
-        Some(body) => explains(body).unwrap_or_default(),
+        // A different question down here, and `says_nothing` rather than `explains` is
+        // what asks it: not "does this explain better than what's beside it" — nothing is
+        // — but "did the server say anything at all". A body of `400` is a poor reason
+        // and the only one there is, and rejecting it would have printed less than both
+        // its neighbours: `{"message":400}` renders, and an unparseable `Bad Gateway`
+        // renders. When there is genuinely nothing, an empty detail is honest, and
+        // `Display` drops its separator rather than promising a reason that never comes.
+        Some(body) if says_nothing(body) => String::new(),
+        // The body verbatim, not its JSON rendering: `{"message":400}` should read as
+        // what arrived rather than as a re-serialisation of it.
+        Some(_) => text.to_string(),
         // Not JSON at all: a gateway page, a plain-text error, or nothing.
         None => text.to_string(),
     });
@@ -163,22 +170,38 @@ fn failure_detail(text: &str) -> String {
     util::one_line(&detail, util::REASON_LIMIT)
 }
 
-/// The explanation a JSON value carries, if it carries one.
-///
-/// A non-blank string is the text itself — rendering it as a JSON value would print the
-/// quotes around it, in the commonest case of all. A non-empty object or list has no
-/// plainer form, so JSON is the honest rendering: that is where validation errors arrive.
-///
-/// Everything else declines to explain. A blank string and a `null` are obvious; an empty
-/// container is the same thing one type wider. So is a bare number or bool, which reads
-/// like an explanation and isn't: a numeric `message` is a CODE, and `failed with 400 Bad
-/// Request: 400` adds nothing to a line that already said 400 — while the `error` one
-/// candidate along may be the sentence somebody can act on.
-fn explains(value: &Value) -> Option<String> {
+/// Whether a value is the server saying nothing at all: a `null`, an empty container, a
+/// blank string. The floor both levels of [`failure_detail`] share.
+fn says_nothing(value: &Value) -> bool {
     match value {
-        Value::String(said) if !util::is_blank(said) => Some(said.to_string()),
-        Value::Object(fields) if !fields.is_empty() => Some(value.to_string()),
-        Value::Array(items) if !items.is_empty() => Some(value.to_string()),
+        Value::Null => true,
+        Value::String(said) => util::is_blank(said),
+        Value::Object(fields) => fields.is_empty(),
+        Value::Array(items) => items.is_empty(),
+        _ => false,
+    }
+}
+
+/// The explanation a JSON value carries, if it carries one — the stricter of the two
+/// questions, asked where a BETTER candidate may sit beside this one.
+///
+/// A non-blank string is the text itself: rendering it as a JSON value would print the
+/// quotes around it, in the commonest case of all. A non-empty object or list has no
+/// plainer form, so JSON is the honest rendering — that is where validation errors arrive.
+///
+/// A bare number or bool is rejected here even though it says something, because what it
+/// says is a CODE: `failed with 400 Bad Request: 400` adds nothing to a line that already
+/// said 400, while the `error` one candidate along may be the sentence somebody can act
+/// on. That reasoning is why the fallback does NOT reuse this — there, nothing sits
+/// beside it, and rejecting a bare scalar would drop the only thing the server said.
+fn explains(value: &Value) -> Option<String> {
+    if says_nothing(value) {
+        return None;
+    }
+
+    match value {
+        Value::String(said) => Some(said.to_string()),
+        Value::Object(_) | Value::Array(_) => Some(value.to_string()),
         _ => None,
     }
 }
@@ -623,6 +646,15 @@ mod tests {
         assert_eq!(failure_detail(""), "");
         assert_eq!(failure_detail("{}"), "");
         assert_eq!(failure_detail("[]"), "");
+        assert_eq!(failure_detail("null"), "");
+        assert_eq!(failure_detail(r#""  ""#), "");
+
+        // But a poor reason is still a reason when it is the only one. Rejecting a bare
+        // scalar here would print less than either neighbour does: wrapped in an object
+        // it renders, and unparseable it renders.
+        assert_eq!(failure_detail("400"), "400");
+        assert_eq!(failure_detail("Bad Gateway"), "Bad Gateway");
+        assert_eq!(failure_detail(r#"{"code":400}"#), r#"{"code":400}"#);
 
         let err = ApiError {
             status: StatusCode::BAD_GATEWAY,
