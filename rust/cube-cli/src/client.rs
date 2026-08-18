@@ -31,14 +31,26 @@ impl std::fmt::Display for ApiError {
             path,
             detail,
         } = self;
+        // Each arm joins the detail with its own punctuation, and drops both when there
+        // is nothing to join: a 502 that answers with no body at all would otherwise end
+        // at `failed with 502 Bad Gateway: `, a separator promising a reason that never
+        // comes. Four arms, one rule, so it can't be fixed in three of them.
+        let tail = |separator: &str| {
+            if util::is_blank(detail) {
+                String::new()
+            } else {
+                format!("{separator}{detail}")
+            }
+        };
         match *status {
             StatusCode::UNAUTHORIZED => write!(
                 f,
-                "unauthorized (401): session expired — run `cube login` (or set CUBE_API_KEY). {detail}"
+                "unauthorized (401): session expired — run `cube login` (or set CUBE_API_KEY).{}",
+                tail(" ")
             ),
-            StatusCode::FORBIDDEN => write!(f, "forbidden (403): {detail}"),
-            StatusCode::NOT_FOUND => write!(f, "not found (404): {method} {path}. {detail}"),
-            _ => write!(f, "{method} {path} failed with {status}: {detail}"),
+            StatusCode::FORBIDDEN => write!(f, "forbidden (403){}", tail(": ")),
+            StatusCode::NOT_FOUND => write!(f, "not found (404): {method} {path}{}", tail(". ")),
+            _ => write!(f, "{method} {path} failed with {status}{}", tail(": ")),
         }
     }
 }
@@ -124,38 +136,50 @@ pub type Query = Vec<(String, String)>;
 /// whole, and the cap only ever bites on the body-as-detail case. Nothing matches on this
 /// text — it exists to be read — so collapsing costs nothing.
 fn failure_detail(text: &str) -> String {
-    let detail = serde_json::from_str::<Value>(text)
-        .ok()
-        .and_then(|v| {
-            // Each candidate is tried for what it SAYS, not for being present. A key that
-            // is there and blank — or there and null — is the server declining to
-            // explain, so it must not win over the next candidate or over the body: the
-            // same rule `reported_ref_verified` and `is_blank` settled elsewhere on this
-            // branch. Taking presence as an answer rendered `{"message":null,"error":…}`
-            // as the literal `null` and never reached the error beside it.
-            ["message", "error"]
-                .iter()
-                .filter_map(|key| v.get(*key))
-                .find_map(|m| match m.as_str() {
-                    // A string message IS the text: `to_string` would render it as a
-                    // JSON value and print the quotes around it, in the common case.
-                    Some(said) if !util::is_blank(said) => Some(said.to_string()),
-                    Some(_) => None,
-                    None if m.is_null() => None,
-                    // An EMPTY container is the same declining-to-explain, one type
-                    // wider: `{}` and `[]` render as themselves and would beat a good
-                    // `error` beside them. A number is not — `400` at least says
-                    // something — so this stays narrow rather than "anything falsy".
-                    None if m.as_object().is_some_and(|o| o.is_empty()) => None,
-                    None if m.as_array().is_some_and(|a| a.is_empty()) => None,
-                    // Anything else — an object, a list of validation errors — has no
-                    // plainer form, so JSON is the honest rendering.
-                    None => Some(m.to_string()),
-                })
-        })
-        .unwrap_or_else(|| text.to_string());
+    let body = serde_json::from_str::<Value>(text).ok();
+
+    // Each candidate is tried for what it SAYS, not for being present: a key that is
+    // there and empty is the server declining to explain, and must not win over the next
+    // candidate or over the body. Same rule `reported_ref_verified` and `is_blank`
+    // settled elsewhere on this branch.
+    let said = body.as_ref().and_then(|v| {
+        ["message", "error"]
+            .iter()
+            .filter_map(|key| v.get(*key))
+            .find_map(explains)
+    });
+
+    let detail = said.unwrap_or_else(|| match body.as_ref() {
+        // No candidate explained anything, so the body itself is the next best thing —
+        // `{"message":400}` at least shows the number in context. Unless it says nothing
+        // either, where an empty detail is the honest answer and `Display` drops its
+        // separator rather than printing `failed with 502 Bad Gateway: ` and stopping.
+        Some(body) => explains(body).unwrap_or_default(),
+        // Not JSON at all: a gateway page, a plain-text error, or nothing.
+        None => text.to_string(),
+    });
 
     util::one_line(&detail, util::REASON_LIMIT)
+}
+
+/// The explanation a JSON value carries, if it carries one.
+///
+/// A non-blank string is the text itself — rendering it as a JSON value would print the
+/// quotes around it, in the commonest case of all. A non-empty object or list has no
+/// plainer form, so JSON is the honest rendering: that is where validation errors arrive.
+///
+/// Everything else declines to explain. A blank string and a `null` are obvious; an empty
+/// container is the same thing one type wider. So is a bare number or bool, which reads
+/// like an explanation and isn't: a numeric `message` is a CODE, and `failed with 400 Bad
+/// Request: 400` adds nothing to a line that already said 400 — while the `error` one
+/// candidate along may be the sentence somebody can act on.
+fn explains(value: &Value) -> Option<String> {
+    match value {
+        Value::String(said) if !util::is_blank(said) => Some(said.to_string()),
+        Value::Object(fields) if !fields.is_empty() => Some(value.to_string()),
+        Value::Array(items) if !items.is_empty() => Some(value.to_string()),
+        _ => None,
+    }
 }
 
 impl Client {
@@ -526,8 +550,65 @@ mod tests {
             failure_detail(r#"{"message":[],"error":"branch is not active"}"#),
             "branch is not active"
         );
-        // But a value that says something still wins, whatever its type — the rule is
-        // "said nothing", not "is falsy".
-        assert_eq!(failure_detail(r#"{"message":400,"error":"x"}"#), "400");
+        // A bare number is a CODE, not an explanation: the status line already carries
+        // it, so it must not beat the sentence one candidate along.
+        assert_eq!(
+            failure_detail(r#"{"message":400,"error":"branch is not active"}"#),
+            "branch is not active"
+        );
+        // With nothing better anywhere, the body shows that number in context, which
+        // beats rendering it alone as though it were the reason.
+        assert_eq!(failure_detail(r#"{"message":400}"#), r#"{"message":400}"#);
+        // A structured message is an explanation — that is where validation errors live.
+        assert_eq!(
+            failure_detail(r#"{"message":["ref is unknown"],"error":"x"}"#),
+            r#"["ref is unknown"]"#
+        );
+    }
+
+    #[test]
+    fn a_response_that_explains_nothing_does_not_promise_that_it_will() {
+        // The likeliest empty answer of all: a gateway that returns the status and no
+        // body. `Display` must not end at `failed with 502 Bad Gateway: `.
+        assert_eq!(failure_detail(""), "");
+        assert_eq!(failure_detail("{}"), "");
+        assert_eq!(failure_detail("[]"), "");
+
+        let err = ApiError {
+            status: StatusCode::BAD_GATEWAY,
+            method: Method::POST,
+            path: "/api/v1/deployments/42/dbt-sync".to_string(),
+            detail: String::new(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "POST /api/v1/deployments/42/dbt-sync failed with 502 Bad Gateway"
+        );
+
+        // And every other arm's punctuation goes with it.
+        for (status, expected) in [
+            (StatusCode::FORBIDDEN, "forbidden (403)"),
+            (
+                StatusCode::NOT_FOUND,
+                "not found (404): POST /api/v1/deployments/42/dbt-sync",
+            ),
+        ] {
+            let err = ApiError {
+                status,
+                method: Method::POST,
+                path: "/api/v1/deployments/42/dbt-sync".to_string(),
+                detail: "   ".to_string(),
+            };
+            assert_eq!(err.to_string(), expected, "{status}");
+        }
+
+        // A detail that does say something keeps its separator.
+        let err = ApiError {
+            status: StatusCode::FORBIDDEN,
+            method: Method::GET,
+            path: "/x".to_string(),
+            detail: "not your deployment".to_string(),
+        };
+        assert_eq!(err.to_string(), "forbidden (403): not your deployment");
     }
 }
