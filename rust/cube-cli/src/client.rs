@@ -7,6 +7,7 @@ use serde_json::Value;
 
 use crate::error::api_bail;
 use crate::oauth;
+use crate::util;
 
 /// The API answered, with a status that isn't a success.
 ///
@@ -110,6 +111,31 @@ struct RefreshAuth {
 }
 
 pub type Query = Vec<(String, String)>;
+
+/// The explanation to carry in an [`ApiError`], from whatever the server sent.
+///
+/// A JSON body's `message`/`error` when there is one, the whole body when there isn't —
+/// and normalised either way. The fallback is what makes that matter: a proxy or ingress
+/// answering 502 with an HTML page would otherwise put the page inside `POST /… failed
+/// with 502: <!DOCTYPE html>…`. That lands worst in the waits, where `poll` retries a 502
+/// five times printing this each time, then repeats it as `Last error:` in the timeout —
+/// so one bad gateway could bury the handful of progress lines the loop exists to produce.
+///
+/// `REASON_LIMIT` rather than the label's budget: a real API message is short and stays
+/// whole, and the cap only ever bites on the body-as-detail case. Nothing matches on this
+/// text — it exists to be read — so collapsing costs nothing.
+fn failure_detail(text: &str) -> String {
+    let detail = serde_json::from_str::<Value>(text)
+        .ok()
+        .and_then(|v| {
+            v.get("message")
+                .or_else(|| v.get("error"))
+                .map(|m| m.to_string())
+        })
+        .unwrap_or_else(|| text.to_string());
+
+    util::one_line(&detail, util::REASON_LIMIT)
+}
 
 impl Client {
     fn build(base_url: &str, token: &str, refresh: Option<RefreshAuth>) -> Result<Self> {
@@ -292,19 +318,11 @@ impl Client {
         text: String,
     ) -> Result<Value> {
         if !status.is_success() {
-            let detail = serde_json::from_str::<Value>(&text)
-                .ok()
-                .and_then(|v| {
-                    v.get("message")
-                        .or_else(|| v.get("error"))
-                        .map(|m| m.to_string())
-                })
-                .unwrap_or_else(|| text.clone());
             return Err(anyhow::Error::new(ApiError {
                 status,
                 method: method.clone(),
                 path: path.to_string(),
-                detail,
+                detail: failure_detail(&text),
             }));
         }
 
@@ -471,5 +489,29 @@ mod tests {
             serde_json::json!({"items": []})
         );
         assert_eq!(finish(StatusCode::NO_CONTENT, "").unwrap(), Value::Null);
+    }
+
+    #[test]
+    fn a_gateway_error_page_does_not_become_the_error_message() {
+        let page = "<!DOCTYPE html>\n<html>\n  <body>502 Bad Gateway</body>\n</html>";
+        let detail = failure_detail(page);
+        assert!(!detail.contains('\n'), "one line: {detail}");
+        assert!(detail.starts_with("<!DOCTYPE html> <html>"));
+
+        // The cap only bites on a body this size; `poll` prints this up to six times.
+        let long = failure_detail(&"x".repeat(5000));
+        assert!(long.ends_with('…'));
+        assert!(long.chars().count() <= util::REASON_LIMIT + 1);
+    }
+
+    #[test]
+    fn a_real_api_message_survives_whole() {
+        // The common path: short, already one line, and the part worth reading.
+        let detail = failure_detail(r#"{"message":"deployment 42 not found"}"#);
+        assert_eq!(detail, "\"deployment 42 not found\"");
+        assert_eq!(
+            failure_detail(r#"{"error":"branch is not active"}"#),
+            "\"branch is not active\""
+        );
     }
 }
