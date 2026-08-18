@@ -4,6 +4,7 @@ use anyhow::Result;
 use clap::Subcommand;
 
 use crate::client::{Client, Query};
+use crate::commands::data_model::dev_mode_command;
 use crate::wait::{self, Progress, Wait};
 use crate::{output, util, Ctx};
 
@@ -35,20 +36,6 @@ const BUILD_FAILED: &[&str] = &["failed", "cancelled"];
 /// const with nothing left to fill in.
 type Hint = fn(deployment: i64, branch: &str) -> String;
 
-/// The command that opens a branch for compilation, in one place.
-///
-/// Two messages hand it over — the `Branch is not active` verdict below, and the
-/// `none`/`stopped` backstop in [`wait_for_build`] — and their prose deliberately differs
-/// ("If the branch exists…" softens the backstop, which fires on absence rather than on a
-/// verdict). What a reader COPIES shouldn't differ, though, so only the sentences around
-/// it are written twice. Quoted because the branch is user-supplied: see
-/// [`util::shell_quote`].
-fn dev_mode_command(deployment: i64, branch: &str) -> String {
-    format!(
-        "`cube data-model dev-mode {deployment} {}`",
-        util::shell_quote(branch)
-    )
-}
 const NOT_BUILDING: &[(&str, Hint)] = &[
     ("Bad branch", |deployment, _| {
         format!(
@@ -603,16 +590,10 @@ mod tests {
     }
 
     #[test]
-    fn the_dev_mode_command_survives_a_branch_name_with_a_metacharacter() {
-        // Both the verdict hint and the `none`/`stopped` backstop hand this over, and a
-        // ref may legally carry `#` — which unquoted comments out the rest of the line,
-        // so the command runs against the wrong branch and looks like it worked.
-        assert_eq!(
-            dev_mode_command(42, "feat#1234"),
-            "`cube data-model dev-mode 42 'feat#1234'`"
-        );
-        // The backstop's wording differs from the hint's on purpose; the command a
-        // reader copies must not.
+    fn the_hint_borrows_the_shared_dev_mode_command() {
+        // The backstop's wording differs from this hint's on purpose; the command a
+        // reader copies must not — so neither spells it out. `data_model` owns what that
+        // command looks like, including the quoting.
         assert!(NOT_BUILDING
             .iter()
             .any(|(_, hint)| hint(42, "feat#1234").contains(&dev_mode_command(42, "feat#1234"))));
