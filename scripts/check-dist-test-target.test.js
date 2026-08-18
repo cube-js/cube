@@ -226,6 +226,26 @@ test('exempts a .ts-only transform when every suite is .ts', () => {
   assert.deepStrictEqual(offenders, []);
 });
 
+test('exempts a transform split per extension, which jointly covers both', () => {
+  // Jest applies the whole map, so coverage is the union across patterns: two
+  // per-extension entries between them compile everything the package has.
+  // Splitting the map this way is idiomatic — the entries usually differ in
+  // their options — and reporting it as a dist-target offender would be the
+  // false positive that gets a guard deleted rather than fixed.
+  const { offenders } = check({
+    ok: {
+      config: {
+        transform: {
+          '^.+\\.ts$': 'ts-jest',
+          '^.+\\.tsx$': 'ts-jest',
+        },
+      },
+      sources: [TS_TEST, 'src/widget.spec.tsx'],
+    },
+  });
+  assert.deepStrictEqual(offenders, []);
+});
+
 test('flags transform: {} — jest\'s idiom for no transformation at all', () => {
   const { offenders } = check({
     drifted: { config: { transform: {} }, sources: [TS_TEST] },

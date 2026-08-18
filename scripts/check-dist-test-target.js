@@ -104,16 +104,22 @@ function transformsTypeScript(config, sources = []) {
     ? [...new Set(sources.map(file => path.extname(file).slice(1)))]
     : ['ts', 'tsx'];
 
-  return Object.keys(config.transform || {}).some(pattern => {
+  const matchers = Object.keys(config.transform || {}).flatMap(pattern => {
     try {
-      const matcher = new RegExp(pattern);
-      return extensions.every(extension => matcher.test(`example.test.${extension}`));
+      return [new RegExp(pattern)];
     } catch (error) {
       // An unparseable pattern is jest's problem to report, not this check's
       // reason to exempt a package.
-      return false;
+      return [];
     }
   });
+
+  // Coverage is the union across patterns: jest applies the whole map, so two
+  // per-extension entries between them can compile everything the package has.
+  // The `every` stays over the extensions — an exemption still has to mean
+  // every suite here can run, not that one of them can.
+  return extensions.every(extension =>
+    matchers.some(matcher => matcher.test(`example.test.${extension}`)));
 }
 
 // `target` is Cargo build output — 7.5 GB of it under `cubejs-backend-native`
