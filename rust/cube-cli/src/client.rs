@@ -160,11 +160,17 @@ fn failure_detail(text: &str) -> String {
         // renders. When there is genuinely nothing, an empty detail is honest, and
         // `Display` drops its separator rather than promising a reason that never comes.
         Some(body) if says_nothing(body) => String::new(),
-        // The body verbatim, not its JSON rendering: `{"message":400}` should read as
-        // what arrived rather than as a re-serialisation of it.
-        Some(_) => text.to_string(),
-        // Not JSON at all: a gateway page, a plain-text error, or nothing.
-        None => text.to_string(),
+        // A body that IS a string is text that happened to arrive quoted, and unwrapping
+        // it is the same rule `explains` applies to a string candidate — otherwise the
+        // same content renders two ways depending on whether it came wrapped in an
+        // object. The unwrapped shape is what a proxy sends (`send(JSON.stringify("Bad
+        // gateway"))`), and proxies are what this fallback is for.
+        Some(Value::String(said)) => said.to_string(),
+        // Everything else verbatim rather than re-serialised: `serde_json`'s map is a
+        // `BTreeMap` here, so rendering an object back would sort its keys, and the CLI
+        // would print something the server never sent — a small surprise for anyone
+        // holding it next to `curl`.
+        _ => text.to_string(),
     });
 
     util::one_line(&detail, util::REASON_LIMIT)
@@ -655,6 +661,19 @@ mod tests {
         assert_eq!(failure_detail("400"), "400");
         assert_eq!(failure_detail("Bad Gateway"), "Bad Gateway");
         assert_eq!(failure_detail(r#"{"code":400}"#), r#"{"code":400}"#);
+
+        // Wrapped or not, one rendering: a quoted body is text that arrived quoted.
+        assert_eq!(failure_detail(r#""Bad gateway""#), "Bad gateway");
+        assert_eq!(
+            failure_detail(r#"{"message":"Bad gateway"}"#),
+            "Bad gateway"
+        );
+        // And an object keeps the order the server sent, which re-serialising would sort.
+        assert_eq!(
+            failure_detail(r#"{"z":1,"a":2}"#),
+            r#"{"z":1,"a":2}"#,
+            "keys in the order they arrived"
+        );
 
         let err = ApiError {
             status: StatusCode::BAD_GATEWAY,
