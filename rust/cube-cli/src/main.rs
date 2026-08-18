@@ -1,6 +1,7 @@
 mod client;
 mod commands;
 mod config;
+mod error;
 mod oauth;
 mod output;
 mod telemetry;
@@ -281,6 +282,9 @@ async fn main() {
     let command_name = command.name();
 
     let result = run(global, command).await;
+    // API failures are commonly caused by a CLI that lags the API, so they
+    // get an extra "try updating" hint below the error.
+    let api_error = result.as_ref().err().is_some_and(error::is_api_error);
 
     if !is_completion {
         let mut props = serde_json::Map::new();
@@ -295,11 +299,17 @@ async fn main() {
         }
         telemetry::flush().await;
     }
-    if let Some(check) = check {
-        update::print_notice(check).await;
-    }
+    let announced = match check {
+        Some(check) => update::print_notice(check).await,
+        None => false,
+    };
     if let Err(err) = result {
         eprintln!("error: {err:#}");
+        if api_error {
+            if let Some(hint) = update::api_error_hint(announced) {
+                eprintln!("{hint}");
+            }
+        }
         std::process::exit(1);
     }
 }

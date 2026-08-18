@@ -1,7 +1,9 @@
 use std::time::{Duration, Instant};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use serde::Deserialize;
+
+use crate::error::{api_bail, api_error};
 
 /// OAuth 2.0 Device Authorization Grant (RFC 8628).
 ///
@@ -99,13 +101,16 @@ pub async fn request_device_code(
     let status = res.status();
     let text = res.text().await.unwrap_or_default();
     if !status.is_success() {
-        bail!(
+        api_bail!(
             "device authorization request failed ({status}) at {endpoint}: {}",
             text.trim()
         );
     }
-    serde_json::from_str(&text)
-        .map_err(|e| anyhow!("could not parse device authorization response: {e}\n{text}"))
+    serde_json::from_str(&text).map_err(|e| {
+        api_error(format!(
+            "could not parse device authorization response: {e}\n{text}"
+        ))
+    })
 }
 
 /// Step 3 — poll the token endpoint until the user approves (or it fails).
@@ -144,7 +149,7 @@ pub async fn poll_for_token(
 
         if status.is_success() {
             return serde_json::from_str(&text)
-                .map_err(|e| anyhow!("could not parse token response: {e}\n{text}"));
+                .map_err(|e| api_error(format!("could not parse token response: {e}\n{text}")));
         }
 
         // RFC 8628 §3.5: pending/slow_down keep polling; anything else is fatal.
@@ -166,7 +171,7 @@ pub async fn poll_for_token(
                         .unwrap_or_default()
                 ),
             },
-            Err(_) => bail!(
+            Err(_) => api_bail!(
                 "token poll failed ({status}) at {endpoint}: {}",
                 text.trim()
             ),
@@ -196,10 +201,10 @@ pub async fn refresh(
     let status = res.status();
     let text = res.text().await.unwrap_or_default();
     if !status.is_success() {
-        bail!("token refresh failed ({status}): {}", text.trim());
+        api_bail!("token refresh failed ({status}): {}", text.trim());
     }
     serde_json::from_str(&text)
-        .map_err(|e| anyhow!("could not parse refresh response: {e}\n{text}"))
+        .map_err(|e| api_error(format!("could not parse refresh response: {e}\n{text}")))
 }
 
 /// Best-effort attempt to open a URL in the user's browser (no extra deps).

@@ -28,8 +28,13 @@ pins a specific release tag).
 
 Every run checks GitHub for a newer release in the background and prints a
 notice when one is available (set `CUBE_NO_UPDATE_CHECK=1` to disable, e.g.
-in CI; the notice only goes to interactive terminals, on stderr). Update
-in place any time with:
+in CI; the notice only goes to interactive terminals, on stderr).
+
+A command that fails on an API error also prints a hint to try updating: a
+CLI that lags the API is a common cause of API errors, so it is worth ruling
+out first. `CUBE_NO_UPDATE_CHECK=1` silences that hint too.
+
+Update in place any time with:
 
 ```bash
 cube update          # download the latest release and replace this binary

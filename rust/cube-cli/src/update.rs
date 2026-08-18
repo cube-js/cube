@@ -121,21 +121,57 @@ pub fn spawn_check() -> tokio::task::JoinHandle<Option<String>> {
     })
 }
 
-/// Print a pending update notice (best effort, never blocks long).
-pub async fn print_notice(handle: tokio::task::JoinHandle<Option<String>>) {
+/// Print a pending update notice (best effort, never blocks long). Returns
+/// whether a notice was actually printed.
+pub async fn print_notice(handle: tokio::task::JoinHandle<Option<String>>) -> bool {
     if !std::io::stderr().is_terminal() {
-        return;
+        return false;
     }
     // The check runs concurrently with the command; give a short grace
     // period in case the command finished faster than the API call.
     if let Ok(Ok(Some(notice))) = tokio::time::timeout(Duration::from_millis(1500), handle).await {
         eprintln!("{notice}");
+        return true;
+    }
+    false
+}
+
+/// Hint printed after an API error. A CLI that lags the API is a common cause
+/// of otherwise puzzling API errors, so point at `cube update` before the user
+/// starts digging. `announced` says whether the update notice above already
+/// reported a newer release, so the hint can point at it instead of repeating
+/// the advice. `None` when update checks are opted out of.
+pub fn api_error_hint(announced: bool) -> Option<String> {
+    if std::env::var_os("CUBE_NO_UPDATE_CHECK").is_some() {
+        return None;
+    }
+    Some(hint_text(announced))
+}
+
+fn hint_text(announced: bool) -> String {
+    if announced {
+        "hint: this request failed on the API side — the newer release above may already fix it"
+            .to_string()
+    } else {
+        format!(
+            "hint: this request failed on the API side, and a newer release may already fix it — \
+             run `cube update` to upgrade from {CURRENT_VERSION}, then try again"
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hint_points_at_the_update_command_or_the_notice() {
+        let hint = hint_text(false);
+        assert!(hint.contains("cube update"), "{hint}");
+        assert!(hint.contains(CURRENT_VERSION), "{hint}");
+        // Nothing to repeat when the notice above already said it.
+        assert!(!hint_text(true).contains("cube update"));
+    }
 
     #[test]
     fn newer_than_compares_numerically() {
