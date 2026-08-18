@@ -541,8 +541,9 @@ with a warning on stderr and `"refVerified": false` in the JSON document — fro
 or from a bare `--json` start, since a pipeline that follows the sync in a later step has
 no `--ref` left to check. A verified run reports `true`, and `null` means
 there was nothing to verify. The recipe above rejects an uncheckable branch name *before* syncing, because whether a
-ref can be checked depends only on the ref — paying for a sync first would leave a branch
-behind that the failed step can no longer name. Its character set mirrors the CLI's, which
+ref can be checked depends only on the ref — so paying for a sync it is going to reject
+buys nothing, and leaves a branch behind. (The assertion after the sync names that branch
+so it can still be swept, but not creating it is better.) Its character set mirrors the CLI's, which
 is the source of truth: if that set grows, the shell guard is the copy that goes stale, and
 the assertion after the sync is what still holds either way. It then still asserts `refVerified == true`
 rather than trusting it, which also fails on `null`: that recipe always passes `--ref` and
