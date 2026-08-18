@@ -205,14 +205,22 @@ pub fn nonempty_target(s: &str) -> Result<String, String> {
 /// rather than as a payload that named nothing. These messages are read out of CI logs
 /// after the fact, where the message is all the reader gets.
 pub fn branch_or_placeholder(branch: &str) -> String {
-    // `trim`, like `nonempty` above: a name of blanks leaves exactly the hole in the
-    // sentence this exists to close, and it would be the one spelling of "named nothing"
-    // that still reads as a formatting bug.
-    if branch.trim().is_empty() {
-        "<branch>".to_string()
-    } else {
+    if names_a_branch(branch) {
         branch.to_string()
+    } else {
+        "<branch>".to_string()
     }
+}
+
+/// Whether a payload actually named a branch.
+///
+/// Trim-aware, like `nonempty` above: a name of blanks is the other spelling of "named
+/// nothing", and the only one that an `is_empty` check still reads as a name. That matters
+/// most where the answer picks BETWEEN two sentences rather than filling one in — taking
+/// the wrong arm prints both a hole mid-sentence and a suggested command that can't work,
+/// which is worse than either alone.
+pub fn names_a_branch(branch: &str) -> bool {
+    !branch.trim().is_empty()
 }
 
 /// Wrap a value so it survives being pasted into a shell.
@@ -272,6 +280,18 @@ pub fn parse_duration(s: &str) -> Result<std::time::Duration, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn blanks_do_not_name_a_branch() {
+        assert!(names_a_branch("main"));
+        assert!(!names_a_branch(""));
+        // The spelling an `is_empty` guard mistakes for a name: it would print
+        // "Entered dev mode on     (forked from main)" and suggest `--branch '   '`.
+        assert!(!names_a_branch("   "));
+        assert!(!names_a_branch("\n"));
+        assert_eq!(branch_or_placeholder("   "), "<branch>");
+        assert_eq!(branch_or_placeholder("main"), "main");
+    }
+
     #[test]
     fn shell_quote_survives_what_a_ref_name_may_legally_carry() {
         // `git check-ref-format` permits all of these, and each one changes what an
