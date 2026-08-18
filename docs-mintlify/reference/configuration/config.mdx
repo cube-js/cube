@@ -448,6 +448,24 @@ in the drivers' [source code][link-github-cube-drivers].
 
 <Info>
 
+The optional `expiresAt` element states when the connection this configuration
+describes stops being usable, as epoch milliseconds (or seconds), an ISO 8601
+string, or a date. It is not passed to the driver.
+
+A driver is resolved once and then cached, and replaced when the configuration
+`driver_factory` returns changes. A connection built from a credential that
+*stops* rotating — an expired token whose refresh is failing — is the case that
+leaves behind: the factory keeps resolving an identical configuration while the
+connection is already dead. `expiresAt` states the lifetime outright, so the
+connection is replaced when it elapses whether or not anything else changed.
+
+It is deliberately excluded from the comparison, so a factory may return a
+deadline recomputed on every call without that reading as a new connection.
+
+</Info>
+
+<Info>
+
 A custom `driver_factory` takes precedence over the [`CUBEJS_PRE_AGGREGATIONS_*`
 environment variables][ref-preagg-data-source], for every data source rather than only the
 ones it handles. If both are configured, the `driver_factory` connection is used for
