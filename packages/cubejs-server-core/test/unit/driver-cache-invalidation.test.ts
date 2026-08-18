@@ -1012,6 +1012,38 @@ describe('driver cache invalidation', () => {
     expect((<FakeDriver>first).release).toHaveBeenCalled();
   });
 
+  // The other side of that boundary. An incident bounded by its duration has to
+  // be reused right up until the duration is reached, or a single dependency
+  // outage shorter than the grace window drains the pool after all.
+  test('reuses through an incident shorter than the grace window', async () => {
+    let shouldFail = false;
+    const { core, driverFactory, request } = await createCore({
+      driverFactory: (ctx: any) => {
+        if (shouldFail) {
+          throw new Error('secret store unreachable');
+        }
+
+        return <any>{ type: 'postgres', password: ctx.securityContext.token };
+      },
+    }, { token: 'token-a' });
+
+    const first = await driverFactory('default');
+
+    shouldFail = true;
+
+    // Four minutes of refusals at 1.5s — one unbroken incident, under the bound.
+    for (let i = 0; i < 160; i++) {
+      clock.advance(1500);
+      // eslint-disable-next-line no-await-in-loop
+      await request({ token: `token-${i}` }, `req-${i}`);
+      // eslint-disable-next-line no-await-in-loop
+      expect(await driverFactory('default')).toBe(first);
+    }
+
+    expect((<FakeDriver>first).release).not.toHaveBeenCalled();
+    expect(core.builtDrivers).toHaveLength(1);
+  });
+
   // Replacing a driver cannot move a deadline the factory keeps re-asserting.
   // Honouring one would find the new driver stale the moment its suppression
   // window closed, for the life of the process.

@@ -112,8 +112,10 @@ const MAX_DRIVER_REBUILD_ATTEMPTS = 3;
 const DRIVER_REBUILD_MIN_INTERVAL_MS = 30 * 1000;
 
 /**
- * Consecutive staleness checks that could not resolve a configuration before
- * the cached driver is given up rather than reused.
+ * Separate refusal incidents, spanning the grace window, before the cached
+ * driver is given up rather than reused. One of the two routes to a give-up —
+ * see `PROBE_FAILURE_GRACE_MS` for the other, and `PROBE_FAILURE_COALESCE_MS`
+ * for why the unit is incidents rather than failed checks.
  *
  * A probe failure is the factory declining to produce a connection for this
  * context. One is transient — a secret store blinking, a timeout — and reusing
@@ -123,15 +125,22 @@ const DRIVER_REBUILD_MIN_INTERVAL_MS = 30 * 1000;
  * is how an expired credential goes on serving errors from a pool nobody
  * rebuilds.
  */
-const MAX_CONSECUTIVE_PROBE_FAILURES = 3;
+const MAX_PROBE_FAILURE_INCIDENTS = 3;
 
 /**
- * How long those failures must span before the driver is given up.
+ * How long refusal has to go on before the driver is given up — both how long
+ * repeated incidents must span, and how long a single unbroken one must run.
  *
- * The count alone is not a duration: under load three concurrent probes can
- * fail inside the same blink of a dependency. Requiring both keeps a burst from
- * tearing down a working pool while still bounding how long a refusal can be
- * ignored.
+ * Those are the two routes, and each covers a traffic profile the other cannot
+ * reach. Where probes are sparse every refusal stands alone, so the count is
+ * what accumulates. Where they are dense they coalesce into one incident that
+ * never ends, and only its duration distinguishes it from a blink.
+ *
+ * Note what this means, because it is the thing to check before assuming
+ * otherwise: one continuous dependency outage *is* enough, if it lasts. That is
+ * deliberate — it is the same call this bound made when the window was widened
+ * to minutes, and the recipe tells a `driver_factory` reaching an external
+ * dependency to catch its own failures rather than propagate them.
  *
  * Minutes rather than seconds because a probe failure is not evidence about the
  * cached connection — it is evidence about whatever the factory had to reach to
@@ -1098,7 +1107,7 @@ export class CubejsServerCore {
           // faster than the coalescing window and would otherwise count once
           // however long the credential stayed dead.
           const sustainedIncident = now - failures.incidentStartedAt >= PROBE_FAILURE_GRACE_MS;
-          const repeatedIncidents = failures.count >= MAX_CONSECUTIVE_PROBE_FAILURES
+          const repeatedIncidents = failures.count >= MAX_PROBE_FAILURE_INCIDENTS
             && failingForMs >= PROBE_FAILURE_GRACE_MS;
 
           // Transient, as far as anything here can tell. Reuse, exactly as
