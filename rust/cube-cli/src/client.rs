@@ -143,6 +143,12 @@ fn failure_detail(text: &str) -> String {
                     Some(said) if !util::is_blank(said) => Some(said.to_string()),
                     Some(_) => None,
                     None if m.is_null() => None,
+                    // An EMPTY container is the same declining-to-explain, one type
+                    // wider: `{}` and `[]` render as themselves and would beat a good
+                    // `error` beside them. A number is not — `400` at least says
+                    // something — so this stays narrow rather than "anything falsy".
+                    None if m.as_object().is_some_and(|o| o.is_empty()) => None,
+                    None if m.as_array().is_some_and(|a| a.is_empty()) => None,
                     // Anything else — an object, a list of validation errors — has no
                     // plainer form, so JSON is the honest rendering.
                     None => Some(m.to_string()),
@@ -561,5 +567,17 @@ mod tests {
             failure_detail(r#"{"message":"","statusCode":400}"#),
             r#"{"message":"","statusCode":400}"#
         );
+        // The same, one type wider: an empty container says as little as a blank string.
+        assert_eq!(
+            failure_detail(r#"{"message":{},"error":"branch is not active"}"#),
+            "branch is not active"
+        );
+        assert_eq!(
+            failure_detail(r#"{"message":[],"error":"branch is not active"}"#),
+            "branch is not active"
+        );
+        // But a value that says something still wins, whatever its type — the rule is
+        // "said nothing", not "is falsy".
+        assert_eq!(failure_detail(r#"{"message":400,"error":"x"}"#), "400");
     }
 }

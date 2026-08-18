@@ -396,10 +396,17 @@ mod tests {
     }
 
     #[test]
-    fn one_line_stops_reading_once_it_has_enough() {
-        // Bounded work, not just a bounded result: these are response bodies, and a
-        // gateway can send megabytes. Both shapes have to stop early — many small tokens,
-        // and one token with no whitespace to break it up.
+    fn one_line_caps_a_body_of_any_size_or_shape() {
+        // Both shapes a response body arrives in: many small tokens, and one token with
+        // no whitespace to break it up. The second is what the per-character inner loop
+        // is for — a word-at-a-time bound would copy all five million characters.
+        //
+        // What this does NOT assert is the bound on WORK, which is why the loop is
+        // written the way it is: there's no allocation hook here, and a wall-clock
+        // assertion would be flaky, so the collapse-then-cut version this replaced would
+        // pass too — it produces the same 41 characters after allocating about ten
+        // megabytes. The size below is chosen so that version is slow enough to notice
+        // rather than to fail; the reason it isn't used lives on `one_line` itself.
         let many = "word ".repeat(500_000);
         let one = "x".repeat(5_000_000);
         for input in [many, one] {
@@ -407,10 +414,13 @@ mod tests {
             assert_eq!(cut.chars().count(), 41, "40 chars plus the ellipsis");
             assert!(cut.ends_with('…'));
         }
-        // And the boundary the flag depends on: input ending exactly at the budget was
-        // not cut, so it must not claim it was.
+        // The boundary the `cut` flag turns on, which the rewrite could plausibly get
+        // wrong: input ending exactly at the budget was not cut, so it must not say it
+        // was — an off-by-one here would put an ellipsis on every full-length message.
         assert_eq!(one_line("abcde", 5), "abcde");
         assert_eq!(one_line("abcdef", 5), "abcde…");
+        // And a separator landing exactly on the budget is the other side of it.
+        assert_eq!(one_line("ab cd", 2), "ab…");
     }
 
     #[test]
