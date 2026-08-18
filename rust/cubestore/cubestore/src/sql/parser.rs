@@ -708,7 +708,6 @@ impl<'a> CubeStoreParser<'a> {
                     key: self.parse_identifier()?,
                     value: self.parse_literal_string()?,
                     external_id,
-                    // Concurrency is a required argument, it goes after the value
                     concurrency: self.parse_integer("concurrency", false)?,
                 }
             }
@@ -1272,7 +1271,6 @@ mod tests {
 
     #[test]
     fn parse_queue_add_and_retrieve() -> Result<(), CubeError> {
-        // Concurrency is the required third positional argument
         let res = parse_stmt("QUEUE ADD_AND_RETRIEVE 'key' 'value' 4")?;
         match res {
             Statement::Queue(QueueCommand::AddAndRetrieve {
@@ -1295,7 +1293,6 @@ mod tests {
             _ => panic!("Expected QueueCommand::AddAndRetrieve"),
         }
 
-        // Options are supported and order independent
         let res = parse_stmt(
             "QUEUE ADD_AND_RETRIEVE ORPHANED 60 EXCLUSIVE PRIORITY -3 EXTERNAL_ID 'ext' 'key' 'value' 1",
         )?;
@@ -1317,7 +1314,6 @@ mod tests {
             _ => panic!("Expected QueueCommand::AddAndRetrieve"),
         }
 
-        // Concurrency is required
         let res = parse_stmt("QUEUE ADD_AND_RETRIEVE 'key' 'value'");
         assert!(res.is_err(), "expected parse error, got: {:?}", res);
 

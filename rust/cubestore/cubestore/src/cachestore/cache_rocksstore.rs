@@ -712,10 +712,8 @@ impl RocksCacheStore {
             .collect()
     }
 
-    /// Reads the concurrency budget of the prefix the path belongs to: the number of
-    /// pending items and the keys of the active ones. Shared by `QUEUE RETRIEVE` and
-    /// `QUEUE ADD_AND_RETRIEVE` so that both use the same (prefix scoped, exclusivity
-    /// and priority blind) budget.
+    /// The budget is prefix scoped, exclusivity and priority blind. Shared by
+    /// `QUEUE RETRIEVE` and `QUEUE ADD_AND_RETRIEVE` so that they cannot drift apart.
     fn queue_prefix_counters(
         queue_schema: &QueueItemRocksTable,
         path: &str,
@@ -739,10 +737,9 @@ impl RocksCacheStore {
         Ok((pending, active))
     }
 
-    /// Claims a pending queue item: moves it to the active status inside the caller's
-    /// batch and returns its payload. Shared by `QUEUE RETRIEVE` and
-    /// `QUEUE ADD_AND_RETRIEVE`, so both use identical exclusivity, heartbeat and
-    /// missing payload semantics. The concurrency budget must be checked by the caller.
+    /// Moves the item to the active status inside the caller's batch. Shared by
+    /// `QUEUE RETRIEVE` and `QUEUE ADD_AND_RETRIEVE`, so both use identical exclusivity,
+    /// heartbeat and missing payload semantics. The budget is checked by the caller.
     fn try_claim_queue_item(
         queue_schema: &QueueItemRocksTable,
         queue_payload_schema: &QueueItemPayloadRocksTable,
@@ -891,7 +888,6 @@ pub struct QueueAddAndRetrieveResponse {
 }
 
 impl QueueAddAndRetrieveResponse {
-    /// Wraps the outcome of a claim attempt on an item which already existed
     pub fn from_claim(id: u64, claim: QueueRetrieveResponse) -> Self {
         let (payload, extra, pending, active) = match claim {
             QueueRetrieveResponse::Success {
@@ -1471,7 +1467,6 @@ impl CacheStore for RocksCacheStore {
             let queue_schema = QueueItemRocksTable::new(db_ref.clone());
             let (pending, mut active) = Self::queue_prefix_counters(&queue_schema, &payload.path)?;
 
-            // The same budget as QUEUE RETRIEVE CONCURRENCY uses
             let claim = active.len() < (payload.concurrency as usize);
 
             let index_key = QueueItemIndexKey::ByPath(payload.path.clone());
@@ -2876,7 +2871,6 @@ mod tests {
             Config::test("test_queue_add_and_retrieve"),
         );
 
-        // A brand new item is claimed right away, it's inserted with the active status
         let res = cachestore
             .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path1", "v1", 1))
             .await?;
@@ -2889,7 +2883,6 @@ mod tests {
 
         assert_queue_item_status(&cachestore, "path1", QueueItemStatus::Active, true).await?;
 
-        // The concurrency budget is used up by path1, path2 stays pending
         let res = cachestore
             .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path2", "v2", 1))
             .await?;
@@ -2900,8 +2893,7 @@ mod tests {
 
         assert_queue_item_status(&cachestore, "path2", QueueItemStatus::Pending, false).await?;
 
-        // The same path is not inserted twice, but it can be claimed when there is a room.
-        // The stored value is returned, not the value of this call.
+        // The stored value is returned, not the value of this call
         let res = cachestore
             .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path2", "v2-dup", 2))
             .await?;
@@ -2915,7 +2907,6 @@ mod tests {
 
         assert_queue_item_status(&cachestore, "path2", QueueItemStatus::Active, true).await?;
 
-        // An already active item cannot be claimed again
         let res = cachestore
             .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path1", "v1", 5))
             .await?;
@@ -2924,7 +2915,6 @@ mod tests {
         assert_eq!(res.pending, 0);
         assert_eq!(res.active.len(), 2);
 
-        // A zero concurrency never claims
         let res = cachestore
             .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path3", "v3", 0))
             .await?;
@@ -2934,7 +2924,6 @@ mod tests {
 
         assert_queue_item_status(&cachestore, "path3", QueueItemStatus::Pending, false).await?;
 
-        // A plain QUEUE ADD never claims, it always inserts a pending item
         let res = cachestore
             .queue_add(QueueAddPayload {
                 path: "prefix:path4".to_string(),
@@ -2977,7 +2966,6 @@ mod tests {
         assert!(res.added);
         assert_eq!(res.payload, Some("v1".to_string()));
 
-        // No room for path2, it stays pending and exclusive for process-a
         let res = cachestore
             .queue_add_and_retrieve(QueueAddAndRetrievePayload {
                 process_id: Some("process-a".to_string()),
@@ -2988,7 +2976,6 @@ mod tests {
         assert!(res.added);
         assert_eq!(res.payload, None);
 
-        // Another process cannot claim it
         let res = cachestore
             .queue_add_and_retrieve(QueueAddAndRetrievePayload {
                 process_id: Some("process-b".to_string()),
@@ -3010,7 +2997,6 @@ mod tests {
         assert_eq!(cachestore.queue_all(None).await?.len(), 2);
         assert_queue_item_status(&cachestore, "path2", QueueItemStatus::Pending, false).await?;
 
-        // The owner claims it
         let res = cachestore
             .queue_add_and_retrieve(QueueAddAndRetrievePayload {
                 process_id: Some("process-a".to_string()),

@@ -457,7 +457,6 @@ lazy_static::lazy_static! {
         "prefilter_chunks_shared_scan",
         "planning_topk_hash_aggregate",
         "topk_hash_aggregate_trim",
-        // QUEUE ADD_AND_RETRIEVE is not supported by the older CubeStore binary
         "queue_add_and_retrieve",
     ].into_iter().map(ToOwned::to_owned).collect();
 }
@@ -12037,7 +12036,6 @@ async fn queue_retrieve_extended(service: Box<dyn SqlClient>) -> Result<(), Cube
 
 async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     {
-        // A brand new item is claimed by the insert itself
         let add_response = service
             .exec_query(r#"QUEUE ADD_AND_RETRIEVE PRIORITY 1 "STANDALONE#queue:1" "payload1" 1"#)
             .await?;
@@ -12055,7 +12053,6 @@ async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeE
     }
 
     {
-        // The concurrency budget is used up, the item is added, but not claimed
         let add_response = service
             .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:2" "payload2" 1"#)
             .await?;
@@ -12066,8 +12063,7 @@ async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeE
     }
 
     {
-        // The same path is not added twice, but it's claimed when there is a room.
-        // The stored payload is returned, not the payload of this call.
+        // The stored payload is returned, not the payload of this call
         let add_response = service
             .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:2" "payload2-dup" 2"#)
             .await?;
@@ -12084,7 +12080,6 @@ async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeE
     }
 
     {
-        // An already active item is not claimed again
         let add_response = service
             .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:1" "payload1" 5"#)
             .await?;
@@ -12095,7 +12090,6 @@ async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeE
     }
 
     {
-        // A plain QUEUE ADD keeps its original response shape
         let add_response = service
             .exec_query(r#"QUEUE ADD "STANDALONE#queue:3" "payload3""#)
             .await?;
