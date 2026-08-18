@@ -222,12 +222,13 @@ fn says_nothing(value: &Value) -> bool {
 /// built with — so if it ever arrives, three things want revisiting: this paragraph, the
 /// reason the catch-all arm of [`failure_detail`] gives for keeping the body verbatim,
 /// and the pair of assertions in
-/// `a_response_that_explains_nothing_does_not_promise_that_it_will`. The nested one flips,
-/// along with the sentence above it saying the keys come back sorted — though not the
-/// recovery note beneath that, which is the one thing there that becomes live rather than
-/// stale. The other assertion keeps passing with its own comment true word for word; what
-/// it loses is the thing it was for, since with both orders preserved it no longer
-/// contrasts with anything, so the question there is whether it still earns its place.
+/// `a_response_that_explains_nothing_does_not_promise_that_it_will`, which exists to hold
+/// this asymmetry down. With both orders preserved there is no asymmetry, so the pair
+/// stops being a pair: the nested assertion flips outright, along with the sentence above
+/// it saying the keys come back sorted, while the other goes on passing with its own
+/// comment true word for word — the question there is whether it still earns its place.
+/// The recovery note beneath the nested one is the exception to all of this: it is the
+/// only thing in either block that becomes live rather than stale.
 fn explains(value: &Value) -> Option<String> {
     if says_nothing(value) {
         return None;
@@ -704,9 +705,10 @@ mod tests {
             "keys in the order they arrived"
         );
         // A NESTED object can't: there is no raw slice for it, so it is re-rendered and
-        // the keys come back sorted. Asserted so the asymmetry with the line above is a
-        // documented fact rather than something a reader meets in a log — the content is
-        // all there, only the order is the crate's rather than the server's.
+        // the keys come back sorted. The content is all there, only the order is the
+        // crate's rather than the server's — asserted rather than left for a reader to
+        // meet in a log. `explains`' "On key order" is where this pair's reason for
+        // existing lives, so that it can stop being true in one place.
         //
         // If this ever fails with the keys IN ORDER, nothing regressed: something in the
         // graph turned on `serde_json/preserve_order`. Swap the expectation, then work
