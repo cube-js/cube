@@ -373,7 +373,7 @@ steps:
       # when `dbt sync` could not confirm it — a ref starting with `#` or `@`, say.
       jq -e '.refVerified == true' sync.json >/dev/null || {
         echo "sync not verified to have used $GITHUB_HEAD_REF"
-        echo "prune the branch it created: cube data-model delete-branch $DEPLOYMENT_ID $BRANCH"
+        echo "prune the branch it created: cube data-model delete-branch $DEPLOYMENT_ID '$BRANCH'"
         exit 1
       }
       echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
