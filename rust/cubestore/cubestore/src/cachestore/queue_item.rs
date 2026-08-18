@@ -309,6 +309,15 @@ pub enum QueueRetrieveResponse {
     },
 }
 
+/// Wire format of the `active` column, shared by all commands which report it
+pub fn active_keys_to_value(active: Vec<String>) -> TableValue {
+    if active.is_empty() {
+        TableValue::Null
+    } else {
+        TableValue::String(active.join(","))
+    }
+}
+
 impl QueueRetrieveResponse {
     pub fn into_queue_retrieve_rows(self, extended: bool) -> Vec<Row> {
         match self {
@@ -326,11 +335,7 @@ impl QueueRetrieveResponse {
                     TableValue::Null
                 },
                 TableValue::Int(pending as i64),
-                if active.len() > 0 {
-                    TableValue::String(active.join(","))
-                } else {
-                    TableValue::Null
-                },
+                active_keys_to_value(active),
                 TableValue::String(id.to_string()),
             ])],
             QueueRetrieveResponse::LockFailed { pending, active }
@@ -342,11 +347,7 @@ impl QueueRetrieveResponse {
                         TableValue::Null,
                         TableValue::Null,
                         TableValue::Int(pending as i64),
-                        if active.len() > 0 {
-                            TableValue::String(active.join(","))
-                        } else {
-                            TableValue::Null
-                        },
+                        active_keys_to_value(active),
                         TableValue::Null,
                     ])]
                 } else {

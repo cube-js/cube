@@ -316,6 +316,7 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         ),
         t("queue_latest_result_v1", queue_latest_result_v1),
         t("queue_retrieve_extended", queue_retrieve_extended),
+        t("queue_add_and_retrieve", queue_add_and_retrieve),
         t("queue_ack_then_result_v1", queue_ack_then_result_v1),
         t("queue_ack_then_result_v2", queue_ack_then_result_v2),
         t(
@@ -456,6 +457,8 @@ lazy_static::lazy_static! {
         "prefilter_chunks_shared_scan",
         "planning_topk_hash_aggregate",
         "topk_hash_aggregate_trim",
+        // QUEUE ADD_AND_RETRIEVE is not supported by the older CubeStore binary
+        "queue_add_and_retrieve",
     ].into_iter().map(ToOwned::to_owned).collect();
 }
 
@@ -11881,6 +11884,40 @@ fn assert_queue_add_columns(response: &Arc<DataFrame>) {
     );
 }
 
+fn queue_add_and_retrieve_row(
+    id: &str,
+    added: bool,
+    pending: i64,
+    active: &str,
+    payload: Option<&str>,
+) -> Row {
+    Row::new(vec![
+        TableValue::String(id.to_string()),
+        TableValue::Boolean(added),
+        TableValue::Int(pending),
+        TableValue::String(active.to_string()),
+        payload.map_or(TableValue::Null, |payload| {
+            TableValue::String(payload.to_string())
+        }),
+        // extra is always empty for a freshly added item
+        TableValue::Null,
+    ])
+}
+
+fn assert_queue_add_and_retrieve_columns(response: &Arc<DataFrame>) {
+    assert_eq!(
+        response.get_columns(),
+        &vec![
+            Column::new("id".to_string(), ColumnType::String, 0),
+            Column::new("added".to_string(), ColumnType::Boolean, 1),
+            Column::new("pending".to_string(), ColumnType::Int, 2),
+            Column::new("active".to_string(), ColumnType::String, 3),
+            Column::new("payload".to_string(), ColumnType::String, 4),
+            Column::new("extra".to_string(), ColumnType::String, 5),
+        ]
+    );
+}
+
 fn assert_queue_add_and_get_id(response: &Arc<DataFrame>) -> Result<String, CubeError> {
     assert_queue_add_columns(response);
 
@@ -11995,6 +12032,116 @@ async fn queue_retrieve_extended(service: Box<dyn SqlClient>) -> Result<(), Cube
             ]),]
         );
     }
+    Ok(())
+}
+
+async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    {
+        // A brand new item is claimed by the insert itself
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE PRIORITY 1 "STANDALONE#queue:1" "payload1" 1"#)
+            .await?;
+        assert_queue_add_and_retrieve_columns(&add_response);
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row(
+                "1",
+                true,
+                0,
+                "1",
+                Some("payload1")
+            )]
+        );
+    }
+
+    {
+        // The concurrency budget is used up, the item is added, but not claimed
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:2" "payload2" 1"#)
+            .await?;
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row("2", true, 1, "1", None)]
+        );
+    }
+
+    {
+        // The same path is not added twice, but it's claimed when there is a room.
+        // The stored payload is returned, not the payload of this call.
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:2" "payload2-dup" 2"#)
+            .await?;
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row(
+                "2",
+                false,
+                0,
+                "1,2",
+                Some("payload2")
+            )]
+        );
+    }
+
+    {
+        // An already active item is not claimed again
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:1" "payload1" 5"#)
+            .await?;
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row("1", false, 0, "1,2", None)]
+        );
+    }
+
+    {
+        // A plain QUEUE ADD keeps its original response shape
+        let add_response = service
+            .exec_query(r#"QUEUE ADD "STANDALONE#queue:3" "payload3""#)
+            .await?;
+        assert_queue_add_columns(&add_response);
+    }
+
+    {
+        let pending_response = service
+            .exec_query(r#"QUEUE PENDING "STANDALONE#queue""#)
+            .await?;
+        assert_eq!(
+            pending_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("3".to_string()),
+                TableValue::String("3".to_string()),
+                TableValue::String("pending".to_string()),
+                TableValue::Null,
+            ]),]
+        );
+
+        let active_response = service
+            .exec_query(r#"QUEUE ACTIVE "STANDALONE#queue""#)
+            .await?;
+        assert_eq!(active_response.get_rows().len(), 2);
+    }
+
+    {
+        // A claimed item can be acknowledged without an explicit QUEUE RETRIEVE
+        let ack_response = service
+            .exec_query(r#"QUEUE ACK "STANDALONE#queue:1" "result1""#)
+            .await?;
+        assert_eq!(
+            ack_response.get_rows(),
+            &vec![Row::new(vec![TableValue::Boolean(true)])]
+        );
+
+        let result_response = service
+            .exec_query(r#"QUEUE RESULT "STANDALONE#queue:1""#)
+            .await?;
+        assert_queue_result_columns(&result_response);
+        assert_eq!(
+            result_response.get_rows(),
+            &vec![queue_result_row("result1", "1", None)]
+        );
+    }
+
     Ok(())
 }
 
