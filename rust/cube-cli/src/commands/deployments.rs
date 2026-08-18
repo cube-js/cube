@@ -599,6 +599,12 @@ mod tests {
             named_branch(&serde_json::json!({"branchName": ""})),
             "<branch>"
         );
+        // Blanks are the other spelling of "named nothing", and the only one that would
+        // still read as a formatting bug.
+        assert_eq!(
+            named_branch(&serde_json::json!({"branchName": "   "})),
+            "<branch>"
+        );
         assert_eq!(
             named_branch(&serde_json::json!({"branchName": "main"})),
             "main"

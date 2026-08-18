@@ -205,7 +205,10 @@ pub fn nonempty_target(s: &str) -> Result<String, String> {
 /// rather than as a payload that named nothing. These messages are read out of CI logs
 /// after the fact, where the message is all the reader gets.
 pub fn branch_or_placeholder(branch: &str) -> String {
-    if branch.is_empty() {
+    // `trim`, like `nonempty` above: a name of blanks leaves exactly the hole in the
+    // sentence this exists to close, and it would be the one spelling of "named nothing"
+    // that still reads as a formatting bug.
+    if branch.trim().is_empty() {
         "<branch>".to_string()
     } else {
         branch.to_string()

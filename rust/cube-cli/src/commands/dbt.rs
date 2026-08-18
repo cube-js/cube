@@ -401,6 +401,11 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
 
             let sync_job_id = output::field(&started, "syncJobId");
             let branch_name = output::field(&started, "branchName");
+            // Every message below says which branch, and a payload that named none would
+            // otherwise leave a hole mid-sentence. The raw value stays for the two things
+            // that must act on it rather than print it: the ref comparison, and the
+            // `--wait` document a gate reads.
+            let shown = util::branch_or_placeholder(&branch_name);
 
             // Fail closed if the server didn't honour --ref (see `verify_ref_applied`).
             // `None` when there was nothing to verify: no --ref, or the caller named the
@@ -447,7 +452,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     }
                     output::print_json(&doc);
                 } else {
-                    output::success(&format!("Started dbt sync {sync_job_id} on {branch_name}"));
+                    output::success(&format!("Started dbt sync {sync_job_id} on {shown}"));
                     println!(
                         "Watch it with `cube dbt status {deployment} {} --wait`, \
                          or re-run sync with --wait.",
@@ -459,7 +464,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 return Ok(());
             }
 
-            eprintln!("dbt sync {sync_job_id} started on {branch_name}");
+            eprintln!("dbt sync {sync_job_id} started on {shown}");
             let status = wait_for_sync(&api, deployment, &sync_job_id, timeout, poll).await?;
 
             if output::field(&status, "status") == FAILED {
@@ -553,7 +558,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                         // committed, so a caller can read the result separately and
                         // carry on.
                         return Err(err.context(format!(
-                            "dbt sync {sync_job_id} completed on {branch_name}, but its result \
+                            "dbt sync {sync_job_id} completed on {shown}, but its result \
                              could not be read. The sync itself succeeded — read the result with \
                              `cube dbt result {deployment} {}`",
                             util::shell_quote(&sync_job_id)
@@ -571,9 +576,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     ref_verified,
                 ));
             } else {
-                output::success(&format!(
-                    "dbt sync {sync_job_id} completed on {branch_name}"
-                ));
+                output::success(&format!("dbt sync {sync_job_id} completed on {shown}"));
                 print_result(false, &result);
                 // Waiting doesn't clean up either, and this is the form the docs teach —
                 // so the interactive user who waits hears what the one who doesn't
