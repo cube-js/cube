@@ -206,8 +206,9 @@ fn verify_ref_applied(
          Stopping rather than reporting a result for a ref that may not have been used. \
          The sync is still running: cancel it with `cube dbt cancel {deployment} \
          {sync_job_id}`, and delete the branch with `cube data-model delete-branch \
-         {deployment} {branch_name}`. Pass --branch to name the branch yourself, which \
-         skips this check."
+         {deployment} {}`. Pass --branch to name the branch yourself, which \
+         skips this check.",
+        util::shell_quote(branch_name)
     )
 }
 
@@ -271,8 +272,9 @@ fn print_prune_hint(sync_created_it: bool, deployment: i64, branch_name: &str) {
     if sync_created_it {
         println!(
             "The branch is not removed automatically — prune it with \
-             `cube data-model delete-branch {deployment} {branch_name}` \
-             when you're done."
+             `cube data-model delete-branch {deployment} {}` \
+             when you're done.",
+            util::shell_quote(branch_name)
         );
     }
 }
@@ -697,7 +699,7 @@ mod tests {
         );
         assert!(
             err.to_string()
-                .contains("cube data-model delete-branch 42 dbt-sync/main-20260817-abcd1234"),
+                .contains("cube data-model delete-branch 42 'dbt-sync/main-20260817-abcd1234'"),
             "{err}"
         );
         assert!(verify_ref_applied(7, "feature/x", "dbt-sync/20260817-abcd1234", "j").is_err());

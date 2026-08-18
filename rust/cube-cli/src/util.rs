@@ -193,6 +193,21 @@ pub fn nonempty_target(s: &str) -> Result<String, String> {
     Ok(s.to_string())
 }
 
+/// Wrap a value so it survives being pasted into a shell.
+///
+/// The CLI's failure messages hand over commands to run — `delete-branch <branch>`,
+/// `dev-mode <branch>` — and they are read out of CI logs, where they get copied without
+/// being reread. A branch name is user-supplied and `git check-ref-format` permits `#`,
+/// `$`, `&`, `;` and `!`, so `feat#1234` pastes as `feat` plus a comment: a command that
+/// looks like it ran and silently addressed the wrong thing.
+///
+/// Single quotes rather than escaping each metacharacter, because inside them the shell
+/// interprets nothing — except a single quote, which is itself legal in a ref name, so it
+/// is closed, escaped and reopened the POSIX way.
+pub fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', r"'\''"))
+}
+
 /// Parse a wait duration: a bare number of seconds, or a number with a `s`/`m`/`h`
 /// suffix (`90`, `30s`, `15m`, `1h`).
 ///
@@ -229,6 +244,19 @@ pub fn parse_duration(s: &str) -> Result<std::time::Duration, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn shell_quote_survives_what_a_ref_name_may_legally_carry() {
+        // `git check-ref-format` permits all of these, and each one changes what an
+        // unquoted command does — `#` comments the rest away, `;` starts a new command,
+        // `$` expands to nothing at all.
+        assert_eq!(shell_quote("feat#1234"), "'feat#1234'");
+        assert_eq!(shell_quote("a;rm -rf b"), "'a;rm -rf b'");
+        assert_eq!(shell_quote("$HOME"), "'$HOME'");
+        // A single quote is legal too, so it can't simply be wrapped: close, escape,
+        // reopen — the only form that works inside single quotes.
+        assert_eq!(shell_quote("it's"), r"'it'\''s'");
+    }
+
     use super::*;
     use serde_json::json;
 

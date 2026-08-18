@@ -34,6 +34,21 @@ const BUILD_FAILED: &[&str] = &["failed", "cancelled"];
 /// drift apart in silence. Non-capturing closures coerce to `fn`, so the table stays a
 /// const with nothing left to fill in.
 type Hint = fn(deployment: i64, branch: &str) -> String;
+
+/// The command that opens a branch for compilation, in one place.
+///
+/// Two messages hand it over — the `Branch is not active` verdict below, and the
+/// `none`/`stopped` backstop in [`wait_for_build`] — and their prose deliberately differs
+/// ("If the branch exists…" softens the backstop, which fires on absence rather than on a
+/// verdict). What a reader COPIES shouldn't differ, though, so only the sentences around
+/// it are written twice. Quoted because the branch is user-supplied: see
+/// [`util::shell_quote`].
+fn dev_mode_command(deployment: i64, branch: &str) -> String {
+    format!(
+        "`cube data-model dev-mode {deployment} {}`",
+        util::shell_quote(branch)
+    )
+}
 const NOT_BUILDING: &[(&str, Hint)] = &[
     ("Bad branch", |deployment, _| {
         format!(
@@ -43,9 +58,9 @@ const NOT_BUILDING: &[(&str, Hint)] = &[
     }),
     ("Branch is not active", |deployment, branch| {
         format!(
-            "A branch only compiles once it is opened in dev mode — run \
-             `cube data-model dev-mode {deployment} {branch}` and wait on the dev-… \
-             branch it prints"
+            "A branch only compiles once it is opened in dev mode — run {} and wait on \
+             the dev-… branch it prints",
+            dev_mode_command(deployment, branch)
         )
     }),
 ];
@@ -179,16 +194,16 @@ async fn wait_for_build(
                 let branch = named_branch(&res);
                 anyhow::bail!(
                     "nothing is building branch {branch} (status {status}{}). If the branch \
-                     exists, it only compiles once it is opened in dev mode — run \
-                     `cube data-model dev-mode {deployment} {branch}` and wait on the \
-                     dev-… branch it prints",
+                     exists, it only compiles once it is opened in dev mode — run {} and \
+                     wait on the dev-… branch it prints",
                     // This branch bails instead of timing out, so the timeout's
                     // "(last seen: …)" never speaks for it.
                     if complaint.is_empty() {
                         String::new()
                     } else {
                         format!(": {complaint}")
-                    }
+                    },
+                    dev_mode_command(deployment, &branch)
                 );
             }
         } else {
@@ -584,7 +599,23 @@ mod tests {
         // requiring it everywhere would pin a command that doesn't take one.
         assert!(NOT_BUILDING
             .iter()
-            .any(|(_, hint)| hint(42, "release-2026").contains("dev-mode 42 release-2026")));
+            .any(|(_, hint)| hint(42, "release-2026").contains("dev-mode 42 'release-2026'")));
+    }
+
+    #[test]
+    fn the_dev_mode_command_survives_a_branch_name_with_a_metacharacter() {
+        // Both the verdict hint and the `none`/`stopped` backstop hand this over, and a
+        // ref may legally carry `#` — which unquoted comments out the rest of the line,
+        // so the command runs against the wrong branch and looks like it worked.
+        assert_eq!(
+            dev_mode_command(42, "feat#1234"),
+            "`cube data-model dev-mode 42 'feat#1234'`"
+        );
+        // The backstop's wording differs from the hint's on purpose; the command a
+        // reader copies must not.
+        assert!(NOT_BUILDING
+            .iter()
+            .any(|(_, hint)| hint(42, "feat#1234").contains(&dev_mode_command(42, "feat#1234"))));
     }
 
     #[test]
