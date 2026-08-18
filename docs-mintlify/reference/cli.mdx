@@ -351,22 +351,31 @@ env:
 
 steps:
   - name: Sync the dbt branch under review
+    shell: bash   # the `case` below is a bash range, not one inherited by luck
     run: |
       # `dbt sync` can only verify a ref whose first character it recognises, so a
       # convention it can't check would run this gate unverified. Reject it here, before
       # a sync spends minutes creating a branch this step would then abandon. LC_ALL=C
-      # keeps the range ASCII on shells that would otherwise match by collation.
+      # keeps the range ASCII: bash matches it by collation until 5.0, and the macOS
+      # runners still ship 3.2.
       export LC_ALL=C
       case "$GITHUB_HEAD_REF" in
         [A-Za-z0-9_.-]*) ;;
         *) echo "this gate needs a branch name starting with a letter, digit, _, . or -: $GITHUB_HEAD_REF"; exit 1;;
       esac
       cube dbt sync "$DEPLOYMENT_ID" --ref "$GITHUB_HEAD_REF" --wait --json > sync.json
+      # Read the branch name BEFORE the assertion below: a sync that reaches this point
+      # has already created a branch, and a failing assertion exits the step before
+      # $GITHUB_ENV is written, which skips the prune step. This message is then the only
+      # place the job says which branch to sweep.
+      BRANCH=$(jq -r .branchName sync.json)
       # The gate only means anything if the sync used the ref, so refuse to continue
       # when `dbt sync` could not confirm it — a ref starting with `#` or `@`, say.
-      jq -e '.refVerified == true' sync.json >/dev/null \
-        || { echo "sync not verified to have used $GITHUB_HEAD_REF"; exit 1; }
-      BRANCH=$(jq -r .branchName sync.json)
+      jq -e '.refVerified == true' sync.json >/dev/null || {
+        echo "sync not verified to have used $GITHUB_HEAD_REF"
+        echo "prune the branch it created: cube data-model delete-branch $DEPLOYMENT_ID $BRANCH"
+        exit 1
+      }
       echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
 
   - name: Compile and query the generated model

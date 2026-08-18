@@ -249,6 +249,37 @@ fn print_result(json: bool, result: &Value) {
     }
 }
 
+/// Each sync deliberately creates a FRESH branch which outlives the command, so a job
+/// running per pull request accumulates them — say so, and name the command that removes
+/// one, rather than let them pile up unnoticed. Printed from every path that ends well,
+/// through one function so they can't drift into saying different things.
+///
+/// `sync_created_it` is false when the caller passed `--branch`: the branch is then
+/// theirs, may be long-lived, and this sync didn't create it, so a filled-in
+/// `delete-branch` would be pointing at their own branch.
+fn print_prune_hint(sync_created_it: bool, deployment: i64, branch_name: &str) {
+    if sync_created_it {
+        println!(
+            "The branch is not removed automatically — prune it with \
+             `cube data-model delete-branch {deployment} {branch_name}` \
+             when you're done."
+        );
+    }
+}
+
+/// The verification a server reported for itself, if it reported one at all — the rule
+/// BOTH `--json` documents defer to, kept in one place so they cannot come to disagree.
+///
+/// A server that echoes the resolved ref has better evidence than this client's prefix
+/// comparison, so its answer wins. An explicit `null` is not an answer: `null` is exactly
+/// what this CLI renders for "there was nothing to verify", and the documented
+/// `jq -e '.refVerified == true'` treats it as fatal — so a server that spells "not
+/// applicable" that way must not turn a client-verified sync into a red gate.
+fn reported_ref_verified(doc: &Value) -> Option<&Value> {
+    doc.get("refVerified")
+        .filter(|reported| !reported.is_null())
+}
+
 /// The `--wait --json` document: one object carrying BOTH halves a caller needs —
 /// which branch to compile next, and how the sync ended. Waiting otherwise forced a
 /// choice between the start payload (which names the branch) and the result (which
@@ -271,12 +302,13 @@ fn wait_json(
         "status": output::field(status, "status"),
         "error": status.get("error").cloned().unwrap_or(Value::Null),
         "result": result.cloned().unwrap_or(Value::Null),
-        // Same rule as the bare-start path: a server that reports this itself has
-        // better evidence than the client's prefix comparison, so it wins. Checked on
-        // both documents because either could carry it.
-        "refVerified": started
-            .get("refVerified")
-            .or_else(|| status.get("refVerified"))
+        // Checked on both documents because either could carry it, and `started` first
+        // because the ref is resolved at POST time — that is where a server would
+        // answer; the terminal status is consulted only in case it carries the field
+        // instead. See [`reported_ref_verified`] for why the client keeps the field
+        // when the server sends an explicit `null`.
+        "refVerified": reported_ref_verified(started)
+            .or_else(|| reported_ref_verified(status))
             .cloned()
             .unwrap_or_else(|| Value::from(ref_verified)),
     })
@@ -368,16 +400,22 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     // `--ref` left to check, so this document is its only chance to learn
                     // the ref wasn't confirmed.
                     let mut doc = started.clone();
-                    // `or_insert`, not `insert`: if a future server echoes the resolved
-                    // ref and reports this itself, its answer is better evidence than
-                    // this client's prefix comparison and should win — `wait_json`
-                    // defers the same way, so both documents follow one rule. A document that
-                    // isn't an object silently goes without the field — lossy on purpose,
-                    // and safe for the documented `jq -e '.refVerified == true'`, which
-                    // fails on a missing field.
+                    // Read before the mutable borrow, so the check and the insert can
+                    // look at the same document without fighting the borrow checker.
+                    let server_answered = reported_ref_verified(&doc).is_some();
+                    // Filled in only when the server didn't answer, by the same
+                    // [`reported_ref_verified`] rule `wait_json` follows, so both
+                    // documents stay one rule rather than two that resemble each other.
+                    // `entry().or_insert_with` can't express it: it fills only a VACANT
+                    // key, so a server-sent `null` would survive and fail the documented
+                    // `jq -e '.refVerified == true'` on a sync this client verified.
+                    // A document that isn't an object silently goes without the field —
+                    // lossy on purpose, and safe for that same assertion, which fails on
+                    // a missing field.
                     if let Some(obj) = doc.as_object_mut() {
-                        obj.entry("refVerified")
-                            .or_insert_with(|| Value::from(ref_verified));
+                        if !server_answered {
+                            obj.insert("refVerified".to_string(), Value::from(ref_verified));
+                        }
                     }
                     output::print_json(&doc);
                 } else {
@@ -386,19 +424,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                         "Watch it with `cube dbt status {deployment} {sync_job_id} --wait`, \
                          or re-run sync with --wait."
                     );
-                    // Only when the server named the branch: with `--branch` it is the
-                    // caller's own, may be long-lived, and this sync didn't create it —
-                    // so a filled-in `delete-branch` would be pointing at their branch.
-                    if branch.is_none() {
-                        // Each sync deliberately creates a FRESH branch, so a job running
-                        // per pull request accumulates them — say so, and name the command
-                        // that removes one, rather than let them pile up unnoticed.
-                        println!(
-                            "The branch is not removed automatically — prune it with \
-                             `cube data-model delete-branch {deployment} {branch_name}` \
-                             when you're done."
-                        );
-                    }
+                    print_prune_hint(branch.is_none(), deployment, &branch_name);
                 }
 
                 return Ok(());
@@ -519,6 +545,11 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     "dbt sync {sync_job_id} completed on {branch_name}"
                 ));
                 print_result(false, &result);
+                // Waiting doesn't clean up either, and this is the form the docs teach —
+                // so the interactive user who waits hears what the one who doesn't
+                // already heard. Not on the FAILED path above: a branch that failed is
+                // kept deliberately, as the evidence for why.
+                print_prune_hint(branch.is_none(), deployment, &branch_name);
             }
         }
         Cmd::Status {
@@ -666,11 +697,55 @@ mod tests {
         let doc = wait_json(&started, &status, "dbt-sync/x", None, Some(false));
         assert_eq!(doc["refVerified"], json!(true));
 
+        // Either document can carry it.
+        let doc = wait_json(
+            &json!({}),
+            &json!({"status": "COMPLETED", "refVerified": true}),
+            "dbt-sync/x",
+            None,
+            Some(false),
+        );
+        assert_eq!(doc["refVerified"], json!(true));
+
         // With no server field, the client's answer is what's reported.
         let doc = wait_json(&json!({}), &status, "dbt-sync/x", None, Some(false));
         assert_eq!(doc["refVerified"], json!(false));
         let doc = wait_json(&json!({}), &status, "dbt-sync/x", None, None);
         assert_eq!(doc["refVerified"], json!(null));
+    }
+
+    #[test]
+    fn an_explicit_null_from_the_server_is_not_an_answer() {
+        // `null` is what this CLI itself renders for "nothing to verify", and the
+        // documented `jq -e '.refVerified == true'` fails on it. So a server that spells
+        // "not applicable" that way must not overwrite a sync this client DID verify —
+        // which is what `entry().or_insert_with` and a bare `.get()` both got wrong,
+        // since serde_json tells absent apart from present-and-null.
+        assert!(reported_ref_verified(&json!({"refVerified": null})).is_none());
+        assert!(reported_ref_verified(&json!({})).is_none());
+        assert_eq!(
+            reported_ref_verified(&json!({"refVerified": false})),
+            Some(&json!(false)),
+            "false IS an answer — only null is the absence of one"
+        );
+
+        let doc = wait_json(
+            &json!({"refVerified": null}),
+            &json!({"status": "COMPLETED"}),
+            "dbt-sync/x",
+            None,
+            Some(true),
+        );
+        assert_eq!(doc["refVerified"], json!(true));
+        // A null on the start document must not stop the status document being read.
+        let doc = wait_json(
+            &json!({"refVerified": null}),
+            &json!({"status": "COMPLETED", "refVerified": false}),
+            "dbt-sync/x",
+            None,
+            Some(true),
+        );
+        assert_eq!(doc["refVerified"], json!(false));
     }
 
     #[test]
