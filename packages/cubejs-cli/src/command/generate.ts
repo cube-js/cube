@@ -101,7 +101,7 @@ export function configureGenerateCommand(program: CommanderStatic) {
     .description('Generate Cube schema from DB tables schema')
     .action(
       (options) => generate(options)
-        .catch(e => displayError(e.stack || e, { dbType: options.dbType }, e))
+        .catch(e => displayError(e.stack || e, { dbType: options.dbType }))
     )
     .on('--help', () => {
       console.log('');

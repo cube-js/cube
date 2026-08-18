@@ -50,7 +50,7 @@ export async function proxyCommand(program: CommanderStatic, command: string) {
             const CommandInstance: Command = new OriginalCommandPackage.default(process.argv.slice(3));
             await CommandInstance.run();
           } catch (e: any) {
-            displayError(e.stack || e.message, {}, e);
+            displayError(e.stack || e.message);
           }
         });
 

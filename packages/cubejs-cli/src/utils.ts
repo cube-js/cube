@@ -2,7 +2,7 @@ import os from 'os';
 import { spawn } from 'cross-spawn';
 import fs from 'fs-extra';
 import chalk from 'chalk';
-import { track, BaseEvent, internalExceptions, isApiError } from '@cubejs-backend/shared';
+import { track, BaseEvent, internalExceptions } from '@cubejs-backend/shared';
 import { compare as semverCompare, parse as semverParse, SemVer } from 'semver';
 
 export const executeCommand = (command: string, args: string[]) => {
@@ -49,30 +49,7 @@ export async function event(opts: BaseEvent) {
   }
 }
 
-/**
- * API errors are often caused by an outdated CLI talking to a newer API,
- * so we detect them to suggest an update. Errors thrown by older versions of
- * packages that don't use `ApiError` yet are matched by their message.
- */
-export function isCliApiError(error: unknown): boolean {
-  if (isApiError(error)) {
-    return true;
-  }
-
-  return error instanceof Error && /HTTP error! status: \d+/.test(error.message);
-}
-
-export const displayCliUpdateSuggestion = () => {
-  const { name, version } = loadCliManifest();
-
-  console.error(
-    `${chalk.yellow('  Your CLI version is')} ${version}${chalk.yellow(
-      '. Updating it to the latest version may resolve this error:'
-    )} npm install -g ${name}@latest`
-  );
-};
-
-export const displayError = async (text: string | string[], options = {}, error?: unknown) => {
+export const displayError = async (text: string | string[], options = {}) => {
   console.error('');
   console.error(chalk.cyan('Cube Error ---------------------------------------'));
   console.error('');
@@ -93,11 +70,6 @@ export const displayError = async (text: string | string[], options = {}, error?
   });
 
   console.error('');
-
-  if (isCliApiError(error)) {
-    displayCliUpdateSuggestion();
-  }
-
   console.error(`${chalk.yellow('  Ask this question in Cube Slack:')} https://slack.cube.dev`);
   console.error(`${chalk.yellow('  Post an issue:')} https://github.com/cube-js/cube.js/issues`);
   console.error('');

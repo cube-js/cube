@@ -188,7 +188,7 @@ export function configureCreateCommand(program: CommanderStatic) {
     .description('Create new Cube app')
     .action(
       (projectName, options) => create(projectName, options)
-        .catch(e => displayError(e.stack || e, { projectName, dbType: options.dbType }, e))
+        .catch(e => displayError(e.stack || e, { projectName, dbType: options.dbType }))
     )
     .on('--help', () => {
       console.log('');

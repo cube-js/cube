@@ -38,7 +38,7 @@ export function configureValidateCommand(program: CommanderStatic) {
     .description('Validate Cube schema')
     .action(
       (options) => validate(options)
-        .catch(error => displayError(error.stack || error, {}, error))
+        .catch(error => displayError(error))
     )
     .on('--help', () => {
       console.log('');

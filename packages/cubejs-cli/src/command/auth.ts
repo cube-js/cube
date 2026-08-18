@@ -20,7 +20,7 @@ export function configureAuthCommand(program: CommanderStatic): void {
     .description('Authenticate access to Cube Cloud')
     .action(
       (currentToken) => authenticate(currentToken)
-        .catch(e => displayError(e.stack || e, {}, e))
+        .catch(e => displayError(e.stack || e))
     )
     .on('--help', () => {
       console.log('');
