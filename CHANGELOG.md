@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.72](https://github.com/cube-js/cube/compare/v1.6.71...v1.6.72) (2026-08-18)
+
+### Performance Improvements
+
+- **postgres-driver:** build user defined types map in linear time ([#11586](https://github.com/cube-js/cube/issues/11586)) ([a2a136a](https://github.com/cube-js/cube/commit/a2a136ae23e2a732711e967b31f0df25f324ee6e)), closes [#11149](https://github.com/cube-js/cube/issues/11149)
+- **postgres-driver:** Skip relation array types when loading user defined types ([#11587](https://github.com/cube-js/cube/issues/11587)) ([4a960ff](https://github.com/cube-js/cube/commit/4a960ffe4bc07f9fa6591a85a006aa8c0eec38d4)), closes [#11149](https://github.com/cube-js/cube/issues/11149)
+
 ## [1.6.71](https://github.com/cube-js/cube/compare/v1.6.70...v1.6.71) (2026-08-17)
 
 ### Bug Fixes
