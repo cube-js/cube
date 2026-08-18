@@ -931,6 +931,16 @@ async fn load_data(
                             .unwrap_or(false),
                     )
                     .await;
+
+                if let Some(used_pre_aggregations) = metadata
+                    .get("usedPreAggregations")
+                    .map(String::as_str)
+                    .and_then(parse_used_pre_aggregations)
+                {
+                    span_id
+                        .merge_used_pre_aggregations(used_pre_aggregations)
+                        .await;
+                }
             }
 
             match (options.max_records, data.num_rows()) {
@@ -1357,35 +1367,89 @@ pub fn transform_response<C: ColumnarValueObject>(
     transform_response_body!(response, schema, member_fields)
 }
 
-/// Builds a schema with `lastRefreshTime` / `external` metadata.
+/// Result metadata of a single load response, as reported by the API gateway.
+/// Grouped in one struct so every value is named at the call site instead of
+/// riding along as a positional argument.
+#[derive(Debug, Clone, Default)]
+pub struct ResultMetadata {
+    pub last_refresh_time: Option<String>,
+    /// `true` when the result was served from an external (CubeStore)
+    /// pre-aggregation.
+    pub external: bool,
+    /// `usedPreAggregations` object of the load response, passed through
+    /// verbatim.
+    pub used_pre_aggregations: Option<serde_json::Value>,
+}
+
+/// Builds a schema with `lastRefreshTime` / `external` / `usedPreAggregations`
+/// metadata.
 ///
 /// `lastRefreshTime` is passed through unchanged. The `external` marker is
 /// added when the flag is set so downstream code can tell that the result
 /// was served from an external (CubeStore) pre-aggregation — the case
 /// where cubesql's own cache-freshness decisions actually need to look at
 /// the pre-agg refresh, as internal pre-aggregations hit the source DB
-/// and rely on its own caching.
-pub fn build_response_schema(
-    schema: &SchemaRef,
-    last_refresh_time: Option<String>,
-    external: bool,
-) -> SchemaRef {
-    if last_refresh_time.is_none() && !external {
+/// and rely on its own caching. `usedPreAggregations` rides along the same
+/// way, JSON-encoded because Arrow schema metadata is a string map; it names
+/// the pre-aggregations behind the result so a client can match it to a build.
+pub fn build_response_schema(schema: &SchemaRef, result_metadata: &ResultMetadata) -> SchemaRef {
+    let used_pre_aggregations = result_metadata
+        .used_pre_aggregations
+        .as_ref()
+        .filter(|v| is_reportable_used_pre_aggregations(v))
+        .and_then(|v| serde_json::to_string(v).ok());
+
+    if result_metadata.last_refresh_time.is_none()
+        && !result_metadata.external
+        && used_pre_aggregations.is_none()
+    {
         return schema.clone();
     }
 
     let mut metadata = schema.metadata().clone();
-    if let Some(t) = last_refresh_time {
-        metadata.insert("lastRefreshTime".to_string(), t);
+    if let Some(t) = &result_metadata.last_refresh_time {
+        metadata.insert("lastRefreshTime".to_string(), t.clone());
     }
-    if external {
+    if result_metadata.external {
         metadata.insert("external".to_string(), "true".to_string());
+    }
+    if let Some(used_pre_aggregations) = used_pre_aggregations {
+        metadata.insert("usedPreAggregations".to_string(), used_pre_aggregations);
     }
 
     Arc::new(Schema::new_with_metadata(
         schema.fields().to_vec(),
         metadata,
     ))
+}
+
+/// Whether a `usedPreAggregations` value is worth passing on: a query that hit
+/// no pre-aggregation reports an empty object, and anything that is not an
+/// object at all is not something a reader can merge into a span or hand to a
+/// client. The API gateway is the only writer and always sends an object, so
+/// the type check is defensive.
+fn is_reportable_used_pre_aggregations(value: &serde_json::Value) -> bool {
+    matches!(value, serde_json::Value::Object(map) if !map.is_empty())
+}
+
+/// Reads the `usedPreAggregations` schema metadata written by
+/// `build_response_schema` back into a value, applying the same
+/// nothing-to-report normalization so that every reader of the metadata agrees
+/// on it - the writer and the readers live in different crates. A blob that
+/// does not parse is reported and dropped rather than failing the query: the
+/// metadata is reporting only, and no result depends on it.
+pub fn parse_used_pre_aggregations(encoded: &str) -> Option<serde_json::Value> {
+    match serde_json::from_str::<serde_json::Value>(encoded) {
+        Ok(value) if is_reportable_used_pre_aggregations(&value) => Some(value),
+        Ok(_) => None,
+        Err(e) => {
+            warn!(
+                "Unable to parse usedPreAggregations of a load response: {}",
+                e
+            );
+            None
+        }
+    }
 }
 
 pub fn convert_transport_response(
@@ -1401,13 +1465,20 @@ pub fn convert_transport_response(
                 data,
                 last_refresh_time,
                 external,
+                used_pre_aggregations,
                 ..
             } = result;
             let V1LoadResultDataColumnar { members, columns } = data;
 
             let mut response = JsonColumnarValueObject::try_new(members, columns)?;
-            let updated_schema =
-                build_response_schema(&schema, last_refresh_time, external.unwrap_or(false));
+            let updated_schema = build_response_schema(
+                &schema,
+                &ResultMetadata {
+                    last_refresh_time,
+                    external: external.unwrap_or(false),
+                    used_pre_aggregations,
+                },
+            );
 
             transform_response(&mut response, updated_schema, &member_fields)
         })
@@ -1448,20 +1519,26 @@ mod tests {
     #[test]
     fn build_response_schema_no_metadata_when_nothing_to_add() {
         let schema = build_schema();
-        let updated = build_response_schema(&schema, None, false);
+        let updated = build_response_schema(&schema, &ResultMetadata::default());
         assert!(updated.metadata().is_empty());
     }
 
     #[test]
     fn build_response_schema_passes_through_last_refresh_time() {
         let schema = build_schema();
-        let updated =
-            build_response_schema(&schema, Some("2024-01-01T00:00:00.000Z".to_string()), false);
+        let updated = build_response_schema(
+            &schema,
+            &ResultMetadata {
+                last_refresh_time: Some("2024-01-01T00:00:00.000Z".to_string()),
+                ..Default::default()
+            },
+        );
         assert_eq!(
             updated.metadata().get("lastRefreshTime"),
             Some(&"2024-01-01T00:00:00.000Z".to_string())
         );
         assert!(updated.metadata().get("external").is_none());
+        assert!(updated.metadata().get("usedPreAggregations").is_none());
     }
 
     #[test]
@@ -1470,7 +1547,14 @@ mod tests {
         // passed through unchanged. The marker reports the external hit.
         let schema = build_schema();
         let stale = "2000-01-01T00:00:00.000Z".to_string();
-        let updated = build_response_schema(&schema, Some(stale.clone()), true);
+        let updated = build_response_schema(
+            &schema,
+            &ResultMetadata {
+                last_refresh_time: Some(stale.clone()),
+                external: true,
+                ..Default::default()
+            },
+        );
 
         assert_eq!(updated.metadata().get("lastRefreshTime"), Some(&stale));
         assert_eq!(
@@ -1484,12 +1568,90 @@ mod tests {
         let schema = build_schema();
         // No incoming last_refresh_time, but external flag is set — emit
         // only the marker; do NOT synthesize a `lastRefreshTime`.
-        let updated = build_response_schema(&schema, None, true);
+        let updated = build_response_schema(
+            &schema,
+            &ResultMetadata {
+                external: true,
+                ..Default::default()
+            },
+        );
         assert!(updated.metadata().get("lastRefreshTime").is_none());
         assert_eq!(
             updated.metadata().get("external"),
             Some(&"true".to_string())
         );
+    }
+
+    #[test]
+    fn build_response_schema_json_encodes_used_pre_aggregations() {
+        // Arrow schema metadata is a string map, so the object travels as JSON
+        // and has to come back out of it unchanged.
+        let schema = build_schema();
+        let used_pre_aggregations = serde_json::json!({
+            "schema.orders_main20240101": {
+                "preAggregationId": "Orders.main",
+                "targetTableName": "schema.orders_main20240101_abc_def_1712",
+                "lastUpdatedAt": 1712000000000u64,
+                "type": "rollup",
+            }
+        });
+        let updated = build_response_schema(
+            &schema,
+            &ResultMetadata {
+                used_pre_aggregations: Some(used_pre_aggregations.clone()),
+                ..Default::default()
+            },
+        );
+
+        let encoded = updated.metadata().get("usedPreAggregations").unwrap();
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(encoded).unwrap(),
+            used_pre_aggregations
+        );
+    }
+
+    #[test]
+    fn parse_used_pre_aggregations_normalizes_nothing_to_report() {
+        // Same normalization as the writer applies, so a reader of the metadata
+        // never has to special-case an empty object or a null
+        assert_eq!(parse_used_pre_aggregations("null"), None);
+        assert_eq!(parse_used_pre_aggregations("{}"), None);
+        // Nothing a reader could merge or report, however well-formed
+        assert_eq!(parse_used_pre_aggregations("\"nonsense\""), None);
+        assert_eq!(parse_used_pre_aggregations("[]"), None);
+        // Not JSON at all - reported and dropped, never fatal
+        assert_eq!(parse_used_pre_aggregations("{oops"), None);
+
+        let used_pre_aggregations = serde_json::json!({
+            "schema.orders_main": { "preAggregationId": "Orders.main" }
+        });
+        assert_eq!(
+            parse_used_pre_aggregations(&used_pre_aggregations.to_string()),
+            Some(used_pre_aggregations)
+        );
+    }
+
+    #[test]
+    fn build_response_schema_skips_unreportable_used_pre_aggregations() {
+        // A query that hit no pre-aggregation reports an empty object; passing
+        // that on would make every plain SQL result carry a useless key. The
+        // same goes for a value no reader could merge.
+        let schema = build_schema();
+        for used_pre_aggregations in [
+            serde_json::json!({}),
+            serde_json::Value::Null,
+            serde_json::json!("nonsense"),
+        ] {
+            let updated = build_response_schema(
+                &schema,
+                &ResultMetadata {
+                    used_pre_aggregations: Some(used_pre_aggregations),
+                    ..Default::default()
+                },
+            );
+
+            assert!(updated.metadata().is_empty());
+        }
     }
 
     /// Collects everything a splitter produces for a single input batch: the chunk

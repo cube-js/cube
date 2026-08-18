@@ -40,7 +40,26 @@ Response
   - `type` - Data type
 - `lastRefreshTime` - An ISO 8601 timestamp indicating when the data was last refreshed.
 - `external` - A boolean indicating whether the query was served from a
-  pre-aggregation in Cube Store. Present only when the query hit a pre-aggregation.
+  pre-aggregation in Cube Store.
+- `usedPreAggregations` - The pre-aggregations this result was served from, keyed
+  by pre-aggregation table name. Each entry carries `preAggregationId` (the name in
+  the data model, e.g. `Orders.main`, stable across rebuilds), `lastUpdatedAt` and
+  `type`. Absent when the query hit no pre-aggregation.
+
+  A `rollupJoin` or `rollupLambda` pre-aggregation is reported as the rollups it
+  references, not as itself, because that is what the query actually reads. Look
+  for those rollups rather than for the joining or lambda pre-aggregation.
+
+  <Note>
+
+  These fields name your pre-aggregations and are returned to every API consumer -
+  including browsers holding a public embedding token. Fields that describe
+  storage layout or query results stay behind
+  [`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode)
+  and the Playground: `targetTableName` (the physical table of one specific build,
+  version hashes included) and `refreshKeyValues`.
+
+  </Note>
 - `total` - The total number of rows returned for the query. Useful for
   paginating results.
 
@@ -420,8 +439,12 @@ This endpoint is part of the [SQL API][ref-sql-api].
 | `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_path/v1/running-query/requestid). If not provided, a unique ID is generated automatically. | ❌ No |
 
 Response: a stream of newline-delimited JSON objects. The first object contains
-the `schema` property with column names and types, and optionally
-`lastRefreshTime` indicating when the data was last refreshed.
+the `schema` property with column names and types, optionally
+`lastRefreshTime` indicating when the data was last refreshed, and optionally
+`usedPreAggregations` naming the pre-aggregations the result was served from
+(same shape as in the [JSON query](#base_path/v1/load) response). Neither field is
+reported for queries served in [streaming mode](/reference/core-data-apis/sql-api#streaming),
+which records no result metadata.
 The following objects contain chunks of the result set under the `data` property.
 Each chunk includes one or more rows of the result set; the maximum number of rows
 per chunk is set by

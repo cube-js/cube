@@ -675,6 +675,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
           res.extensions = {
             annotation: results.annotation,
             lastRefreshTime: results.lastRefreshTime,
+            usedPreAggregations: results.usedPreAggregations,
           };
 
           return results.data.map(entry => R.toPairs(entry)

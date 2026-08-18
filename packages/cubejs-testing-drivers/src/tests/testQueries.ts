@@ -494,8 +494,9 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     //
     // `external` is the field that carries this - it is true only when a
     // pre-aggregation in the rollup store served the query. (`usedPreAggregations`
-    // would be more explicit, but the gateway only emits it in dev mode, which
-    // this suite does not enable.)
+    // names the pre-aggregations behind a result, but says nothing about which
+    // engine answered: an internal rollup, which never reaches the rollup store,
+    // shows up there too.)
     function servedByRollupStore(response: any): boolean {
       // `loadResponse` is not part of the public ResultSet type.
       const [result] = response.loadResponse?.results ?? [];
