@@ -11,6 +11,15 @@ analysis.
 In this recipe, we will show you how to export Query History data to Amazon S3, and then
 analyze it using Cube by reading the data from S3 using DuckDB.
 
+<Warning>
+
+Before you start, check that the **Monitoring Integrations Tier** of your deployment is
+set to **Medium (Up to 50 GB/mo)**. On a lower tier, [Query History
+export][ref-query-history-export] fails silently — no events reach any sink and no error
+is logged.
+
+</Warning>
+
 <iframe
   width="100%"
   height="400"
