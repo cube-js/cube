@@ -279,9 +279,12 @@ fn print_prune_hint(sync_created_it: bool, deployment: i64, branch_name: &str) {
 /// value that assertion can't read would turn a sync this client verified into a red
 /// gate, which is the whole failure this rule exists to avoid. `false` stays an answer;
 /// anything else falls back to the client's own comparison, which is at least a verdict.
-fn reported_ref_verified(doc: &Value) -> Option<&Value> {
-    doc.get("refVerified")
-        .filter(|reported| reported.is_boolean())
+///
+/// `Option<bool>` rather than `Option<&Value>` because `as_bool` IS the rule — absent and
+/// not-a-verdict both become `None` — so the next reader is told the invariant instead of
+/// reconstructing it from a filter, and both documents share one conversion back to JSON.
+fn reported_ref_verified(doc: &Value) -> Option<bool> {
+    doc.get("refVerified")?.as_bool()
 }
 
 /// The `--wait --json` document: one object carrying BOTH halves a caller needs —
@@ -310,11 +313,12 @@ fn wait_json(
         // because the ref is resolved at POST time — that is where a server would
         // answer; the terminal status is consulted only in case it carries the field
         // instead. See [`reported_ref_verified`] for why the client keeps the field
-        // when the server sends an explicit `null`.
-        "refVerified": reported_ref_verified(started)
-            .or_else(|| reported_ref_verified(status))
-            .cloned()
-            .unwrap_or_else(|| Value::from(ref_verified)),
+        // when the server's value isn't a verdict.
+        "refVerified": Value::from(
+            reported_ref_verified(started)
+                .or_else(|| reported_ref_verified(status))
+                .or(ref_verified),
+        ),
     })
 }
 
@@ -411,8 +415,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     // [`reported_ref_verified`] rule `wait_json` follows, so both
                     // documents stay one rule rather than two that resemble each other.
                     // `entry().or_insert_with` can't express it: it fills only a VACANT
-                    // key, so a server-sent `null` would survive and fail the documented
-                    // `jq -e '.refVerified == true'` on a sync this client verified.
+                    // key, so a server-sent non-verdict would survive and fail the
+                    // documented `jq -e '.refVerified == true'` on a sync this client
+                    // verified.
                     // A document that isn't an object silently goes without the field —
                     // lossy on purpose, and safe for that same assertion, which fails on
                     // a missing field.
@@ -738,8 +743,8 @@ mod tests {
         }
         assert_eq!(
             reported_ref_verified(&json!({"refVerified": false})),
-            Some(&json!(false)),
-            "false IS an answer — only null is the absence of one"
+            Some(false),
+            "false IS an answer — it is the absence of a verdict that is not"
         );
 
         let doc = wait_json(
