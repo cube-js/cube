@@ -235,7 +235,37 @@ pub fn is_blank(s: &str) -> bool {
     s.trim().is_empty()
 }
 
-/// A status field, read for comparison against the states a wait knows.
+/// How much of a server complaint to keep in a POLL LABEL. Long enough for the known
+/// verdicts and a sentence of context, short enough that one poll stays one line.
+pub const COMPLAINT_LIMIT: usize = 120;
+
+/// How much to keep when the text IS the message: a terminal failure's reason.
+///
+/// Generous where [`COMPLAINT_LIMIT`] is tight, and the difference is the point. A label
+/// is repeated every poll and is a dedupe key, so it has to be short and stable. A
+/// terminal reason is printed once, is the last thing anyone reads, and is the whole
+/// purpose of the message — a dbt compile error naming the model and the missing node
+/// runs well past 120 characters, and cutting it there would leave a gate's log saying
+/// that something failed without saying what.
+pub const REASON_LIMIT: usize = 800;
+
+/// Squash arbitrary server text into a single line.
+///
+/// Collapsing matters on its own, before any truncation: these land in `anyhow` chains
+/// that render with `{err:#}`, joining links with ": ", so a multi-line compile error
+/// turns one error into several lines with no shape. Truncation keeps the leading text,
+/// which is where these verdicts put their meaning.
+pub fn one_line(text: &str, max_chars: usize) -> String {
+    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.chars().count() <= max_chars {
+        return collapsed;
+    }
+
+    collapsed.chars().take(max_chars).collect::<String>() + "…"
+}
+
+/// A status field, read for comparison against the states a wait knows — or for the
+/// `--json` document, where the comparison is the caller's rather than ours.
 ///
 /// Trimmed for the reason every other comparison on this branch is: padding is a spelling
 /// of the same value, not a different one. It matters more here than in a message, though
@@ -304,6 +334,49 @@ pub fn parse_duration(s: &str) -> Result<std::time::Duration, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn one_line_collapses_and_truncates() {
+        assert_eq!(
+            one_line("Branch is not active", 120),
+            "Branch is not active"
+        );
+        assert_eq!(one_line("", 120), "");
+        // A multi-line error becomes one progress line, not several.
+        assert_eq!(
+            one_line("Build failed:\n  cube orders\n  line 3", 120),
+            "Build failed: cube orders line 3"
+        );
+        // Long text is cut, keeping the leading meaning.
+        let long = "x".repeat(200);
+        let cut = one_line(&long, 10);
+        assert_eq!(cut.chars().count(), 11, "10 chars plus the ellipsis");
+        assert!(cut.starts_with("xxxxxxxxxx"));
+    }
+
+    #[test]
+    fn a_terminal_reason_keeps_what_a_poll_label_would_cut() {
+        // The two limits exist to differ: a label repeats every poll and is a dedupe key,
+        // while a reason is printed once and is why the message exists. A dbt compile
+        // error naming the model and the missing node runs past the label's 120.
+        let reason = "Compilation Error in model fct_orders\n  Model \
+                      'model.x.fct_orders' depends on a node named 'stg_orders' which \
+                      was not found\n  > in macro ref (macros/ref.sql)";
+        let kept = one_line(reason, REASON_LIMIT);
+        assert!(!kept.contains('\n'), "still one line: {kept}");
+        assert!(kept.ends_with("(macros/ref.sql)"), "not truncated: {kept}");
+        assert!(
+            one_line(reason, COMPLAINT_LIMIT).ends_with('…'),
+            "the label limit would have cut it, which is why they differ"
+        );
+    }
+
+    #[test]
+    fn one_line_counts_characters_not_bytes() {
+        // Truncating on bytes would panic mid-character here.
+        let cut = one_line(&"é".repeat(50), 10);
+        assert_eq!(cut.chars().count(), 11);
+    }
+
     #[test]
     fn a_padded_status_still_names_the_state_it_reports() {
         // The consequential half of the same rule: a wait treats an unrecognised state as

@@ -497,7 +497,10 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 // the failed job actually wants — and `is_blank` rather than `is_empty`
                 // because a reason of blanks would fill the slot without answering it,
                 // on the one line somebody reads when the gate goes red.
-                let error = output::field(&status, "error");
+                // Collapsed like the build failure in `deployments`: a dbt reason is a
+                // compile or warehouse error that arrives multi-line, and this is a
+                // `bail!` whose chain `main` renders on one line with `{err:#}`.
+                let error = util::one_line(&output::field(&status, "error"), util::REASON_LIMIT);
                 bail!(
                     "dbt sync {sync_job_id} failed: {}",
                     if util::is_blank(&error) {
@@ -612,7 +615,11 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 let status = wait_for_sync(&api, deployment, &sync_job_id, timeout, poll).await?;
                 print_status(ctx.json, &status);
                 if util::status_of(&status, "status") == FAILED {
-                    let error = output::field(&status, "error");
+                    // Collapsed like the build failure in `deployments`: a dbt reason is a
+                    // compile or warehouse error that arrives multi-line, and this is a
+                    // `bail!` whose chain `main` renders on one line with `{err:#}`.
+                    let error =
+                        util::one_line(&output::field(&status, "error"), util::REASON_LIMIT);
                     bail!(
                         "dbt sync {sync_job_id} failed: {}",
                         if util::is_blank(&error) {
