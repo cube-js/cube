@@ -25,6 +25,7 @@ use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::queryplanner::metadata_cache::BasicMetadataCacheFactory;
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
+use crate::remotefs::azure_blob::AzureBlobRemoteFs;
 use crate::remotefs::cleanup::RemoteFsCleanup;
 use crate::remotefs::gcs::GCSRemoteFs;
 use crate::remotefs::minio::MINIORemoteFs;
@@ -316,6 +317,7 @@ pub fn validate_config(c: &dyn ConfigObj) -> ValidationMessages {
         "CUBESTORE_MINIO_BUCKET",
         "CUBESTORE_S3_BUCKET",
         "CUBESTORE_GCS_BUCKET",
+        "CUBESTORE_AZURE_CONTAINER",
         "CUBESTORE_REMOTE_DIR",
     ];
     remote_vars.retain(|v| env::var(v).is_ok());
@@ -347,6 +349,11 @@ pub enum FileStoreProvider {
     },
     MINIO {
         bucket_name: String,
+        sub_path: Option<String>,
+    },
+    AzureBlob {
+        account: String,
+        container: String,
         sub_path: Option<String>,
     },
 }
@@ -1679,7 +1686,15 @@ impl Config {
                     5,
                 ),
                 store_provider: {
-                    if let Ok(bucket_name) = env::var("CUBESTORE_S3_BUCKET") {
+                    if let Ok(container) = env::var("CUBESTORE_AZURE_CONTAINER") {
+                        FileStoreProvider::AzureBlob {
+                            container,
+                            account: env::var("CUBESTORE_AZURE_ACCOUNT").expect(
+                                "CUBESTORE_AZURE_ACCOUNT required when CUBESTORE_AZURE_CONTAINER is set",
+                            ),
+                            sub_path: env::var("CUBESTORE_AZURE_SUB_PATH").ok(),
+                        }
+                    } else if let Ok(bucket_name) = env::var("CUBESTORE_S3_BUCKET") {
                         FileStoreProvider::S3 {
                             bucket_name,
                             region: env::var("CUBESTORE_S3_REGION").expect(
@@ -2490,6 +2505,23 @@ impl Config {
                     .register("original_remote_fs", async move |_| {
                         let arc: Arc<dyn DIService> =
                             MINIORemoteFs::new(data_dir, bucket_name, sub_path).unwrap();
+                        arc
+                    })
+                    .await;
+            }
+            FileStoreProvider::AzureBlob {
+                account,
+                container,
+                sub_path,
+            } => {
+                let data_dir = self.config_obj.data_dir.clone();
+                let account = account.to_string();
+                let container = container.to_string();
+                let sub_path = sub_path.clone();
+                self.injector
+                    .register("original_remote_fs", async move |_| {
+                        let arc: Arc<dyn DIService> =
+                            AzureBlobRemoteFs::new(data_dir, account, container, sub_path).unwrap();
                         arc
                     })
                     .await;
