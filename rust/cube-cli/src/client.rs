@@ -200,6 +200,13 @@ fn says_nothing(value: &Value) -> bool {
 /// said 400, while the `error` one candidate along may be the sentence somebody can act
 /// on. That reasoning is why the fallback does NOT reuse this — there, nothing sits
 /// beside it, and rejecting a bare scalar would drop the only thing the server said.
+///
+/// One thing this can't match the fallback on: an object is re-rendered from the parsed
+/// value, and `serde_json`'s map is a `BTreeMap` here, so its keys come back SORTED. The
+/// fallback avoids that by keeping the raw text, which isn't available for a value nested
+/// inside it — preserving order here would mean carrying the source slice through, for a
+/// difference that reorders a validation error rather than losing any of it. Worth
+/// knowing when holding the output next to `curl`; not worth the plumbing.
 fn explains(value: &Value) -> Option<String> {
     if says_nothing(value) {
         return None;
@@ -673,6 +680,15 @@ mod tests {
             failure_detail(r#"{"z":1,"a":2}"#),
             r#"{"z":1,"a":2}"#,
             "keys in the order they arrived"
+        );
+        // A NESTED object can't: there is no raw slice for it, so it is re-rendered and
+        // `serde_json`'s `BTreeMap` sorts the keys. Asserted so the asymmetry with the
+        // line above is a documented fact rather than something a reader meets in a log —
+        // the content is all there, only the order is the crate's rather than the
+        // server's. See `explains`.
+        assert_eq!(
+            failure_detail(r#"{"error":{"z":1,"a":2}}"#),
+            r#"{"a":2,"z":1}"#
         );
 
         let err = ApiError {
