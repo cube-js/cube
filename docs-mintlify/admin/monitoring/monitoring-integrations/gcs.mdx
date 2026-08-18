@@ -18,7 +18,9 @@ To export logs to Google Cloud Storage, start by creating a bucket for Cube logs
 and a service account that can write to it.
 
 Then, put the service account key in an environment variable under **Settings →
-Environment variables**, base64-encoded:
+Environment variables**, base64-encoded. The name must start with
+`CUBE_CLOUD_MONITORING_` — only variables with that prefix are available to the
+Vector agent:
 
 ```bash
 CUBE_CLOUD_MONITORING_GCS_CREDENTIALS=eyJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIsIC4uLn0=
@@ -41,7 +43,6 @@ inputs = [
 bucket = "your-gcs-bucket-name"
 compression = "gzip"
 credentials_base64 = "$CUBE_CLOUD_MONITORING_GCS_CREDENTIALS"
-credentials_path = "/etc/credentials/gcp-cloud-storage.json"
 
 [sinks.gcp-cloud-storage.encoding]
 codec = "json"
@@ -55,21 +56,24 @@ navigate to your bucket and watch the logs coming.
 
 ### Authentication
 
-The `gcp_cloud_storage` sink reads its service account key from a file, so
-authentication takes two options that work together — one handled by Cube, one by
-Vector:
+Authenticate with the `credentials_base64` option, set to the name of the
+environment variable holding the base64-encoded service account key:
 
-| Option | Handled by | Description |
-| --- | --- | --- |
-| `credentials_base64` | Cube | The base64-encoded service account key, or a reference to an environment variable holding it (e.g. `$CUBE_CLOUD_MONITORING_GCS_CREDENTIALS`). Cube decodes it, mounts it into the Vector agent at `/etc/credentials/<sink-name>.json`, and removes the option from the configuration it passes on — which is why it does not appear in [Vector's own sink reference][vector-docs-sinks-gcs]. |
-| `credentials_path` | Vector | Where the sink reads the key from. Set it to the same `/etc/credentials/<sink-name>.json` path. |
+```toml
+credentials_base64 = "$CUBE_CLOUD_MONITORING_GCS_CREDENTIALS"
+```
+
+This is the only supported way to give the sink its credentials. `credentials_base64`
+is specific to Cube — it does not appear in [Vector's own sink
+reference][vector-docs-sinks-gcs]. Cube decodes the key and provides it to the Vector
+agent as a file named after the sink, so there is no path for you to configure.
 
 <Warning>
 
-The sink name becomes the name of a Kubernetes object, so it must be lowercase
+Because the credentials file is named after the sink, the sink name must be lowercase
 alphanumeric characters and dashes only — **no underscores**. A sink named
-`query_history_gcs` will not get a credentials file; name it
-`query-history-gcs` instead.
+`query_history_gcs` will not get a credentials file; name it `query-history-gcs`
+instead.
 
 </Warning>
 
