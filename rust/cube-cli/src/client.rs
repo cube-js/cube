@@ -223,11 +223,12 @@ fn says_nothing(value: &Value) -> bool {
 /// and the pair of assertions in
 /// `a_response_that_explains_nothing_does_not_promise_that_it_will`, which exists to hold
 /// this asymmetry down. With both orders preserved there is no asymmetry, so the pair
-/// stops being a pair: the nested assertion flips outright, along with the sentence above
-/// it saying the keys come back sorted, while the other goes on passing with its own
-/// comment true word for word — the question there is whether it still earns its place.
-/// The recovery note beneath the nested one is the exception to all of this: it is the
-/// only thing in either block that becomes live rather than stale.
+/// stops being a pair, and each part of it moves differently: the nested assertion flips,
+/// and so does the sentence above it saying the keys come back sorted; the other assertion
+/// goes on passing, its own comment still true, having lost only the thing it was for —
+/// whether it still earns its place is the judgement to make; and the recovery note
+/// beneath the nested one is the only part that becomes LIVE, since it is what a reader
+/// arrives at from the failure.
 fn explains(value: &Value) -> Option<String> {
     if says_nothing(value) {
         return None;
