@@ -315,10 +315,13 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         []
       );
 
-      this.userDefinedTypes = customTypes.rows.reduce(
-        (prev, current) => ({ [current.oid]: current.typname, ...prev }),
-        {}
-      );
+      const userDefinedTypes: Record<string, string> = {};
+
+      for (const row of customTypes.rows) {
+        userDefinedTypes[row.oid] = row.typname;
+      }
+
+      this.userDefinedTypes = userDefinedTypes;
     }
   }
 
