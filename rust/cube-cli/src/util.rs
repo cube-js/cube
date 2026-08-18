@@ -204,6 +204,14 @@ pub fn nonempty_target(s: &str) -> Result<String, String> {
 /// sentence around the command, where `branch  is not building` reads as a formatting bug
 /// rather than as a payload that named nothing. These messages are read out of CI logs
 /// after the fact, where the message is all the reader gets.
+///
+/// A name that is merely PADDED is returned as it is, not trimmed. `nonempty` accepts
+/// `--branch '  x  '` and sends it on unchanged, so such a branch can exist, and the
+/// messages carrying this name also carry a `delete-branch` for it — trimming would print
+/// a command naming a different branch than the one that exists, which is the failure
+/// every quoting commit on this branch has been closing. `shell_quote` renders it
+/// `'  x  '`, so the padding is visible rather than silently eaten; ugly and true beats
+/// tidy and wrong.
 pub fn branch_or_placeholder(branch: &str) -> String {
     if names_a_branch(branch) {
         branch.to_string()
@@ -290,6 +298,14 @@ mod tests {
         assert!(!names_a_branch("\n"));
         assert_eq!(branch_or_placeholder("   "), "<branch>");
         assert_eq!(branch_or_placeholder("main"), "main");
+        // Padded but real: returned verbatim, because the same name goes into a
+        // `delete-branch` in the same sentence and a trimmed one would address a
+        // different branch. `shell_quote` is what makes the padding visible.
+        assert_eq!(branch_or_placeholder("  main  "), "  main  ");
+        assert_eq!(
+            shell_quote(&branch_or_placeholder("  main  ")),
+            "'  main  '"
+        );
     }
 
     #[test]
