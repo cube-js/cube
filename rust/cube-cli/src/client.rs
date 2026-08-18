@@ -221,10 +221,11 @@ fn says_nothing(value: &Value) -> bool {
 /// built with — so if it ever arrives, three things want revisiting: this paragraph, the
 /// reason the catch-all arm of [`failure_detail`] gives for keeping the body verbatim,
 /// and the pair of assertions in
-/// `a_response_that_explains_nothing_does_not_promise_that_it_will`. The nested one flips.
-/// The other keeps passing with its stated reason intact — what it loses is the thing it
-/// was for: with both orders preserved the pair no longer contrasts, and documents an
-/// asymmetry that has stopped existing.
+/// `a_response_that_explains_nothing_does_not_promise_that_it_will`. The nested one flips,
+/// and the comment above it goes with it — that is where the asymmetry is written down.
+/// The other keeps passing with its own comment true word for word; what it loses is the
+/// thing it was for, since with both orders preserved it no longer contrasts with
+/// anything, so the question there is whether it still earns its place.
 fn explains(value: &Value) -> Option<String> {
     if says_nothing(value) {
         return None;
