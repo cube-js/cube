@@ -106,15 +106,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             Some(n) => output::success(&format!("Data model on {branch} is valid ({n} cubes)")),
             None => output::success(&format!("Data model on {branch} is valid")),
         }
-    } else if errors.is_empty() {
-        // A failure the API couldn't itemize. Saying "failed to compile:" here
-        // would promise a list and then print nothing; point at the runtime
-        // instead, which is where the answer actually is.
-        eprintln!(
-            "{} Data model on {branch} could not be validated.",
-            "✗".red()
-        );
-    } else {
+    } else if !errors.is_empty() {
         // Compilation errors go to stderr so `cube validate --json` stays
         // machine-readable on stdout and a human run stays readable when
         // stdout is piped.
@@ -127,6 +119,10 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
     if !valid {
         // Non-zero exit is the point of the command in CI, so it holds in
         // --json mode too, where the report above was printed as JSON.
+        //
+        // With nothing to list there is no stderr header above it: the header
+        // exists to introduce a list, and repeating the verdict on two lines
+        // says less than the one line that also says what to look at.
         if errors.is_empty() {
             bail!(
                 "data model on {branch} could not be validated \
