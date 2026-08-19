@@ -28,6 +28,7 @@ pub mod spec;
 pub mod tenant;
 pub mod update;
 pub mod users;
+pub mod validate;
 pub mod variables;
 pub mod whoami;
 pub mod workbooks;
