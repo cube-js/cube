@@ -701,7 +701,7 @@ mod tests {
             ],
             "the set of branch arguments refusing an empty value changed. Adding one is \
              `value_parser = util::nonempty` on the declaration; dropping one means \
-             `--branch \"\"` now travels as an empty `branchName`, so say why here."
+             `--branch \"\"` now travels as an empty field, so say why here."
         );
         assert_eq!(
             accepts,
@@ -721,7 +721,7 @@ mod tests {
                 "cube github connect --branch",
             ],
             "a branch argument that takes an empty value and sends it as an empty \
-             `branchName` was added, removed or renamed. A new one belongs on this list \
+             field was added, removed or renamed. A new one belongs on this list \
              only if leaving the target to the server is what you want for it."
         );
     }
