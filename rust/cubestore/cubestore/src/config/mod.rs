@@ -1322,37 +1322,39 @@ pub async fn init_test_logger() {
 /// dropped connection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TopKAggregateStrategy {
-    /// Original streaming NRA merge with per-row state (default).
+    /// Original streaming NRA merge with per-row state.
     #[serde(rename = "streaming")]
     Streaming,
     /// Same streaming NRA merge (keeps early termination, bounded router memory), but vectorized.
     #[serde(rename = "vectorized_streaming")]
     VectorizedStreaming,
-    /// ClickHouse-style full re-aggregation on the router + fetch-limited sort. Drops early
-    /// termination, so the router materializes every distinct group.
+    /// ClickHouse-style full re-aggregation on the router + fetch-limited sort (default). Drops
+    /// early termination, so the router materializes every distinct group.
     #[serde(rename = "full_merge")]
     FullMerge,
 }
 
 /// Parses [`TopKAggregateStrategy`] from an env var. Lenient: an unset or unrecognized value falls
-/// back to the default (`Streaming`) with a warning rather than panicking -- a malformed perf toggle
+/// back to the default (`FullMerge`) with a warning rather than panicking -- a malformed perf toggle
 /// must never take a node down.
 fn env_topk_strategy(name: &str) -> TopKAggregateStrategy {
     match env::var(name) {
-        Err(_) => TopKAggregateStrategy::Streaming,
+        Err(_) => TopKAggregateStrategy::FullMerge,
         Ok(v) => match v.trim().to_ascii_lowercase().as_str() {
-            "" | "streaming" | "default" | "v1" => TopKAggregateStrategy::Streaming,
+            "streaming" | "v1" => TopKAggregateStrategy::Streaming,
             "vectorized" | "vectorized_streaming" | "v2" => {
                 TopKAggregateStrategy::VectorizedStreaming
             }
-            "full_merge" | "full-merge" | "fullmerge" => TopKAggregateStrategy::FullMerge,
+            "" | "default" | "full_merge" | "full-merge" | "fullmerge" => {
+                TopKAggregateStrategy::FullMerge
+            }
             other => {
                 log::warn!(
-                    "unknown {} value '{}', using default (streaming)",
+                    "unknown {} value '{}', using default (full_merge)",
                     name,
                     other
                 );
-                TopKAggregateStrategy::Streaming
+                TopKAggregateStrategy::FullMerge
             }
         },
     }
@@ -1369,11 +1371,11 @@ fn env_bool(name: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
-/// Lenient boolean env read for opt-in toggles: only `1`/`true` enable it, anything else (including a
-/// typo) is treated as off. Unlike [`env_bool`] it never panics -- a malformed value on a
-/// performance flag must not take a node down on startup.
-fn env_flag(name: &str) -> bool {
-    env::var(name).map_or(false, |v| v == "true" || v == "1")
+/// Lenient boolean env read for toggles: only `1`/`true` enable it, anything else (including a
+/// typo) is treated as off; an unset variable falls back to `default`. Unlike [`env_bool`] it never
+/// panics -- a malformed value on a performance flag must not take a node down on startup.
+fn env_flag(name: &str, default: bool) -> bool {
+    env::var(name).map_or(default, |v| v == "true" || v == "1")
 }
 
 pub fn env_parse<T>(name: &str, default: T) -> T
@@ -1554,20 +1556,20 @@ where
 }
 
 // Unlike env_optparse, an unparseable value is not fatal: it logs a warning and falls
-// back to per_chunk, so a typo in the strategy env never takes the process down.
+// back to range, so a typo in the strategy env never takes the process down.
 fn env_repartition_strategy() -> RepartitionStrategy {
     match env::var("CUBESTORE_REPARTITION_STRATEGY") {
         Ok(v) => match v.parse::<RepartitionStrategy>() {
             Ok(s) => s,
             Err(e) => {
                 log::warn!(
-                    "Ignoring CUBESTORE_REPARTITION_STRATEGY: {}; using per_chunk",
+                    "Ignoring CUBESTORE_REPARTITION_STRATEGY: {}; using range",
                     e
                 );
-                RepartitionStrategy::PerChunk
+                RepartitionStrategy::Range
             }
         },
-        Err(_) => RepartitionStrategy::PerChunk,
+        Err(_) => RepartitionStrategy::Range,
     }
 }
 
@@ -1867,7 +1869,7 @@ impl Config {
                 .map(|v| v as u64),
                 job_runners_count: env_parse("CUBESTORE_JOB_RUNNERS", 4),
                 long_term_job_runners_count: env_parse("CUBESTORE_LONG_TERM_JOB_RUNNERS", 32),
-                csv_import_job_runners_count: env_parse("CUBESTORE_CSV_IMPORT_JOB_RUNNERS", 0),
+                csv_import_job_runners_count: env_parse("CUBESTORE_CSV_IMPORT_JOB_RUNNERS", 1),
                 connection_timeout: 60,
                 server_name: env::var("CUBESTORE_SERVER_NAME")
                     .ok()
@@ -1876,7 +1878,7 @@ impl Config {
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
                 load_aware_import_placement_enabled: env_bool(
                     "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
-                    false,
+                    true,
                 ),
                 repartition_chunks_time_budget_secs: env_parse(
                     "CUBESTORE_REPARTITION_TIME_BUDGET_SECS",
@@ -1896,7 +1898,7 @@ impl Config {
                 ),
                 repartition_concurrent_download: env_bool(
                     "CUBESTORE_REPARTITION_CONCURRENT_DOWNLOAD",
-                    false,
+                    true,
                 ),
                 repartition_strategy: env_repartition_strategy(),
                 repartition_merge_max_input_files: env_parse(
@@ -1905,15 +1907,15 @@ impl Config {
                 ),
                 repartition_merge_max_rows: env_parse(
                     "CUBESTORE_REPARTITION_MERGE_MAX_ROWS",
-                    4_000_000,
+                    400_000,
                 ),
                 repartition_check_overlapping_children: env_bool(
                     "CUBESTORE_REPARTITION_CHECK_OVERLAPPING_CHILDREN",
                     false,
                 ),
-                group_by_limit_factor: env_parse_lenient("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 0),
-                group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION"),
-                coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE"),
+                group_by_limit_factor: env_parse_lenient("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 2),
+                group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION", true),
+                coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE", false),
                 topk_aggregate_strategy: env_topk_strategy("CUBESTORE_TOPK_STRATEGY"),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
@@ -2002,7 +2004,7 @@ impl Config {
                     Some(60_000),
                     None,
                 ),
-                metastore_batch_rpc: env_parse("CUBESTORE_METASTORE_BATCH_RPC", false),
+                metastore_batch_rpc: env_parse("CUBESTORE_METASTORE_BATCH_RPC", true),
                 transport_max_message_size,
                 transport_max_frame_size: env_parse_size(
                     "CUBESTORE_TRANSPORT_MAX_FRAME_SIZE",
