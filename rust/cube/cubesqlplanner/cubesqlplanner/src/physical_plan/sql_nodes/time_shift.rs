@@ -63,8 +63,8 @@ impl SqlNode for TimeShiftSqlNode {
                                 None
                             }
                         });
-                    if let Some(shift) = shift {
-                        let shift = shift.interval.clone().unwrap().to_sql();
+                    if let Some(shift) = shift.and_then(|s| s.interval.as_ref()) {
+                        let shift = shift.to_sql();
                         let inner_visitor = visitor.with_arg_needs_paren_safe(false);
                         let input = self.input.to_sql(
                             &inner_visitor,

@@ -80,6 +80,10 @@ async fn test_multi_stage_time_shift_pre_agg_with_leaf_measure_via_view() {
     // through a view: the time dimension filter is view-qualified while the
     // accumulated time shifts are keyed by the underlying cube member. The
     // shifted leaf must still get its own widened date_range.
+    //
+    // The widened range only decides which rollup partitions are loaded, so
+    // the assertions on the usages are what guard it; the executed rows are a
+    // parity check against the cube-level query.
     let schema = MockSchema::from_yaml_file(YAML)
         .only_pre_aggregations(&["customers_lifetime_by_returns_month"]);
     let ctx = TestContext::new(schema).unwrap();
@@ -371,15 +375,21 @@ async fn test_multi_stage_time_shift_pre_agg_on_derived_time_dimension() {
 
     // The shifted leaf reads the rollup column, so the interval has to be
     // applied to that column — the derived member's own SQL is never
-    // expanded here and cannot carry the shift.
+    // expanded here and cannot carry the shift. Every occurrence must sit
+    // directly on the column: one landing on an already shifted expression
+    // would mean the interval was added twice.
+    let shifts = sql.matches("interval '1 month'").count();
+    let shifts_on_column = sql
+        .matches(r#""pa_customers__return_day_month" + interval '1 month'"#)
+        .count();
     assert!(
-        sql.contains(r#""pa_customers__return_day_month" + interval '1 month'"#),
+        shifts > 0,
         "Shifted leaf must offset the pre-aggregation column:\n{}",
         sql
     );
-    assert!(
-        !sql.contains("interval '1 month') + interval '1 month'"),
-        "Shift must be applied once:\n{}",
+    assert_eq!(
+        shifts_on_column, shifts,
+        "Every shift must be applied to the rollup column itself:\n{}",
         sql
     );
 
