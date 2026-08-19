@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.24](https://github.com/cube-js/cube/compare/v1.7.23...v1.7.24) (2026-08-19)
+
+### Bug Fixes
+
+- Validate query timezone against IANA zones ([#11575](https://github.com/cube-js/cube/issues/11575)) ([d1ba22a](https://github.com/cube-js/cube/commit/d1ba22a31cdfdeb07b50cb3fc0763be6c2c57c4a))
+
 ## [1.7.23](https://github.com/cube-js/cube/compare/v1.7.22...v1.7.23) (2026-08-18)
 
 **Note:** Version bump only for package @cubejs-backend/shared
