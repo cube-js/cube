@@ -387,6 +387,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         { stageQueryKey: queryKey, requestId, orphanedTimeout: 60 }
       );
 
+      // Cleanup is best-effort: keys come from fn's resolved value, so a failed assertion leaves
+      // its items in the queue. That is fine because the queue prefix is randomized per run
+      // (see tenantPrefix), so nothing can bleed into another run sharing the same Cube Store.
       const withConnections = async (count: number, fn: (...connections: any[]) => Promise<QueryKey[]>) => {
         const connections = await Promise.all(
           Array.from({ length: count }, () => queue.queueDriver.createConnection())
