@@ -135,26 +135,18 @@ pub fn body(map: Map<String, Value>) -> Value {
     Value::Object(map)
 }
 
-/// Reject a supplied-but-empty branch at parse time. A branch, not a ref: every caller
-/// names one, and the tree's only `--ref` carries [`nonempty_target`].
+/// Reject a supplied-but-empty branch at parse time. Not a ref — `--ref` carries
+/// [`nonempty_target`], which says where the server's behaviour was measured.
 ///
-/// Attached to a declaration as a clap `value_parser`, so it holds for that argument the
-/// moment it exists. A hand-written call in a match arm did not: this check was added
-/// three times, and each round found an argument the previous had missed — the last was
-/// `github connect --branch`, which sends its value under the key `branch` and so escaped
-/// even a grep for `branchName`.
+/// On the declaration rather than in a match arm: written by hand it was added three
+/// times, each round missing an argument — last `github connect --branch`, which sends
+/// under the key `branch` and escaped a grep for `branchName`.
 ///
-/// It is not on every branch argument any more.
-/// `only_the_listed_branch_arguments_refuse_an_empty_value` holds the current set, and is
-/// the only place it is written down. Where the server's behaviour on an empty value has
-/// actually been measured, [`nonempty_target`] says so.
-///
-/// Empty values reach the CLI from scripts, not just from typos: `jq -r` prints nothing at
-/// all for empty input, and `$GITHUB_HEAD_REF` is empty on every trigger but
-/// `pull_request`. (A missing *field* prints `null`, which travels as a literal name and
-/// gets a 404 — loud, and the right answer.) The reachable case is `data-model dev-mode ""`
-/// from a CI gate whose branch variable came out empty, which without this would enter dev
-/// mode on the deploy branch and leave every later step of the gate checking production.
+/// It no longer guards every branch argument;
+/// `only_the_listed_branch_arguments_refuse_an_empty_value` holds the set. The reachable
+/// case is a CI gate whose variable came out empty — `$GITHUB_HEAD_REF` is unset off
+/// `pull_request`, and `jq -r` prints nothing — where `dev-mode ""` would enter dev mode
+/// on the deploy branch.
 pub fn nonempty(s: &str) -> Result<String, String> {
     if s.trim().is_empty() {
         return Err(
@@ -663,29 +655,17 @@ mod tests {
         accepts.sort();
         // Both sides, not just the guarded one. A list rather than a count because the
         // answer is no longer the same for every branch argument and a number can only
-        // say that something moved, not what; and BOTH lists because each closes a
-        // direction the other cannot see. Without `refuses`, a guard silently dropped
-        // off an argument passes. Without `accepts`, a NEW unguarded `--branch` is
-        // simply not recorded and passes too — which is the hole a "does everything
-        // refuse?" walk used to cover for free, and the reason this test still earns
-        // its keep now that the answer varies.
+        // say that something moved, not what. Both lists, because `refuses` catches a
+        // guard dropped off an argument and `accepts` catches a new one declared without
+        // anyone deciding its side — the walk records parse time only.
         //
-        // Exact rather than a floor, for the reason it always was: the filter only sees
-        // ids that name a branch or a ref, so a rename out of that family (`branch` →
-        // `name`, as `create-branch <name>` already is) or an outright removal would
-        // shrink the walk, and a floor would absorb that silently.
+        // Exact, not a floor: the filter only sees ids naming a branch or ref, so a
+        // rename out of that family or a removal shrinks the walk silently.
         //
-        // The split is not derived from what a blank COSTS, which is what makes the one
-        // pair that reads as an oversight deliberate: `deploy --branch` and
-        // `deployments build-status --branch` carry the same documented fallback word for
-        // word and only the second is guarded, yet a blank `deploy` uploads the local tree
-        // and prunes what isn't in it where a blank `build-status` only misreports.
-        // `merge-to-default` merges into the deploy branch and deletes the source. Both
-        // were raised in review and deliberately left accepting, so a new write-shaped
-        // flag does not join `refuses` by being destructive.
-        //
-        // The walk sees parse time and nothing else: landing in `accepts` means the parser
-        // took the value, not that it reaches a request or what happens to it there.
+        // The split is not by what a blank costs. `deploy --branch` and `build-status
+        // --branch` share a fallback and only the second is guarded, though a blank
+        // `deploy` uploads and prunes; `merge-to-default` merges to deploy and deletes
+        // the source. Both were raised in review and left accepting.
         assert_eq!(
             refuses,
             [
