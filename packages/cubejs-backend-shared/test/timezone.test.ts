@@ -32,7 +32,6 @@ describe('canonicalTimezone', () => {
     '+05:00',
     '+05',
     '05',
-    '',
     // No trimming: API payloads must be exact.
     ' UTC',
     'UTC ',
@@ -44,7 +43,8 @@ describe('canonicalTimezone', () => {
   test.each([
     undefined,
     null,
-  ])('returns null for unset value %j', (value) => {
+    '',
+  ])('returns null for unset or empty value %j', (value) => {
     expect(canonicalTimezone(value)).toBeNull();
   });
 
