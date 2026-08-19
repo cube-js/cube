@@ -710,8 +710,10 @@ mod tests {
         // Finally, the walk sees parse time and nothing else: landing in `accepts` means
         // the parser took the value, not that it reaches a request. That it travels as an
         // empty field is a property of whatever builds each request, and that is two
-        // different places: every flag on `accepts` goes through `set`, `push` or
-        // `write_body`, which insert `Some("")` verbatim, while the five required names
+        // different places: every flag on `accepts` but one goes through `set`, `push` or
+        // `write_body`, which insert `Some("")` verbatim — `pull` builds its own
+        // `json!({ "branchName": b })`, so it is the one entry where the caveat below is
+        // already live rather than hypothetical — while the five required names
         // interpolate the value directly — `json!({ "branchName": branch })` for three of
         // them, the `delete-branch` query tuple, and `json!({ "name": name, … })` for
         // `create-branch`, whose key is `name` and so answers no `branchName` grep. That
@@ -761,9 +763,10 @@ mod tests {
             ],
             "a branch argument that takes an empty value at parse time was added, \
              removed or renamed. This list records the parser's answer alone — that a \
-             blank then travels as an empty field is held by `set`, `push` and \
-             `write_body`. A new one belongs here only if you want the parser to take a \
-             blank; check what the command then does with it."
+             blank then travels as an empty field is a property of whatever builds the \
+             request, which is usually `set`, `push` or `write_body` but not always. A \
+             new one belongs here only if you want the parser to take a blank; check \
+             what the command then does with it."
         );
     }
 
