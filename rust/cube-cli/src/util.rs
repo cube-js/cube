@@ -150,13 +150,13 @@ pub fn body(map: Map<String, Value>) -> Value {
 /// `deployments build-status`. Everywhere else an optional `--branch` now accepts a
 /// blank and sends it.
 ///
-/// The reason it is worth rejecting where it stays differs by caller, which is why the
-/// message names both: on the required names a blank is a name the caller failed to
-/// supply rather than a value left open, since clap will not let them omit it, while on
-/// the optional flags it is not dropped — it is sent as
-/// an empty field, and what an empty field means is then the server's choice rather than
-/// the caller's. Where that choice has actually been measured, `nonempty_target` says so
-/// instead.
+/// The reason it is worth rejecting differs by caller, though the message deliberately
+/// does not: it states only what holds for every one of them — a blank names no branch,
+/// and is not dropped but sent as an empty field, leaving what that means to the server
+/// rather than to the caller. What is specific to the five required names is that clap
+/// will not let you omit them, so a blank there is a name the caller failed to supply
+/// rather than a value left open; that reason lives here and not in the string. Where
+/// the server's choice has actually been measured, `nonempty_target` says so instead.
 ///
 /// Empty values reach the CLI from scripts, not just from typos: `jq -r` prints
 /// nothing at all for empty input, and `$GITHUB_HEAD_REF` is empty on every trigger
@@ -712,10 +712,14 @@ mod tests {
         // empty field is a property of whatever builds each request, and that is two
         // different places: every flag on `accepts` goes through `set`, `push` or
         // `write_body`, which insert `Some("")` verbatim, while the five required names
-        // interpolate the value directly (`json!({ "branchName": branch })` and the
-        // `delete-branch` query tuple). Either way a command that later dropped a blank
-        // while building its own body would not fail anything here — so a reader sent
-        // downstream by either message needs the half that matches their argument.
+        // interpolate the value directly — `json!({ "branchName": branch })` for three of
+        // them, the `delete-branch` query tuple, and `json!({ "name": name, … })` for
+        // `create-branch`, whose key is `name` and so answers no `branchName` grep. That
+        // fifth one is also why this paragraph counts five where the one above counts
+        // four: `create-branch <NAME>` is guarded but sits outside the walk's id filter,
+        // so it never reaches either list. Either way a command that later dropped a
+        // blank while building its own body would not fail anything here — so a reader
+        // sent downstream by either message needs the half matching their argument.
         assert_eq!(
             refuses,
             [
