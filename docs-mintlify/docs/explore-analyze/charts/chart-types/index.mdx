@@ -32,7 +32,7 @@ picker appears, and choosing a type is always your action.
 
 The recommendation reads the shape of your query and its result: how many measures, dimensions and
 time dimensions you selected, how many distinct values each dimension has, and how long the
-category labels are. Nothing is sent anywhere and nothing is saved — the suggestion lasts for the
+category labels are. It is computed in your browser and is not saved — the suggestion lasts for the
 current session only.
 
 Where a threshold is involved, it comes from
@@ -41,8 +41,8 @@ Design Knowledge as Constraints*, IEEE VIS 2018), which encodes established visu
 as rules: a category axis becomes crowded past 12 values, a color or stacking channel saturates
 past 10 series, and no axis reads past 30 values.
 
-One number is Cube's own rather than Draco's, and is tuned by us: a mean label length of **16
-characters** counts as long.
+One number is Cube's own rather than Draco's: a mean label length past **16 characters** counts as
+long.
 
 The number of rows in the result is deliberately not a condition. It follows from the granularity
 you chose rather than from the shape of the query, so counting it would recommend a different chart
@@ -50,7 +50,19 @@ for the same measure over the same time dimension simply because you switched fr
 
 ### The conditions
 
-Cube checks these in order and takes the first that matches.
+Cube first checks whether the query disqualifies every chart, and recommends the
+[table](/docs/explore-analyze/charts/chart-types/table) if it does:
+
+| Recommendation | When |
+| -- | -- |
+| **Table** | The query has no measure, two time dimensions, three or more dimensions, or a category past 30 values |
+
+A query meeting any of these has no chart encoding that reads well, so the table is the honest
+answer. [Maps](/docs/explore-analyze/charts/chart-types/map) are the exception and are still
+recommended over the table — a map has no category axis to crowd, so a large number of plotted
+places is normal rather than unreadable.
+
+Otherwise Cube checks these in order and takes the first that matches:
 
 | Recommendation | When |
 | -- | -- |
@@ -58,26 +70,25 @@ Cube checks these in order and takes the first that matches.
 | **KPI** | One measure, no dimensions, and a single row |
 | **Line** | A measure over a time dimension, optionally split by one category of up to 10 values |
 | **Scatter** | Two or more measures with no time dimension — the shape for correlating them |
-| **Stacked bar** | One measure split by two categories, the first up to 12 values and the second up to 10 |
-| **Heatmap** | One measure split by two larger categories that fill enough of the grid to be worth drawing |
-| **Bar** | One measure across a few categories with short labels |
-| **Horizontal bar** | The same, where the labels are long or the categories too many for a vertical axis |
-| **Table** | The query has no measure, two time dimensions, three or more dimensions, or a category past 30 values |
+| **Bar (stacked)** | One measure split by two categories, the first up to 12 values and the second up to 10 |
+| **Heatmap** | One measure split by two categories past those bounds, whose combinations fill at least half the grid |
+| **Bar** | One measure across up to 12 categories whose labels average 16 characters or fewer |
+| **Bar (horizontal)** | The same, where the labels are longer or the categories run past 12 |
+
+The two [bar](/docs/explore-analyze/charts/chart-types/bar) rows are variants of the same chart
+type, not separate ones.
 
 Pie is not recommended. Its shape — one measure across a few categories — is the same one Bar
 answers, and a bar chart compares those values more accurately, so Cube recommends Bar and leaves
 Pie to you. It remains available in the picker like any other chart type.
-
-Table's conditions are disqualifiers rather than a last preference: a query that meets any of them
-has no chart encoding that reads well, so the table is the honest answer. Maps are the exception —
-a map has no category axis to crowd, so a large number of plotted places is normal rather than
-unreadable.
 
 ### When nothing is recommended
 
 Cube suppresses the recommendation rather than guessing. You will see no outline when:
 
 - no rule matches the query cleanly;
+- a measure over time is split into 11 to 30 series — too many for a color channel, too few to give
+  up on;
 - a value it needs is still unknown, such as the number of distinct values in a dimension;
 - the result was truncated by a row limit, so the counts it would read are incomplete;
 - you have already picked a type by hand in the picker you are looking at.
