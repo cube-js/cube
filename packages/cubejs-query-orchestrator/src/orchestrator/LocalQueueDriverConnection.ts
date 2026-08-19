@@ -236,7 +236,6 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
   }
 
   public async addToQueue(
-    _keyScore: number,
     queryKey: QueryKey,
     _orphanedTime: number,
     queryHandler: string,

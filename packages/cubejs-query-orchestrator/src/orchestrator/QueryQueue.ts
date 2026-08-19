@@ -252,7 +252,6 @@ export class QueryQueue {
       }
 
       const time = new Date().getTime();
-      const keyScore = time + (10000 - priority) * 1E14;
 
       options.orphanedTimeout = query.orphanedTimeout;
 
@@ -260,7 +259,7 @@ export class QueryQueue {
       const orphanedTime = time + (orphanedTimeout * 1000);
 
       const [added, queueId, queueSize, addedToQueueTime] = await queueConnection.addToQueue(
-        keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
+        queryKey, orphanedTime, queryHandler, query, priority, options
       );
 
       if (added > 0) {

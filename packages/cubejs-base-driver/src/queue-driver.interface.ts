@@ -54,8 +54,6 @@ export interface QueueDriverConnectionInterface {
    * Adds specified by the queryKey query to the queue, returns tuple
    * with the operation result.
    *
-   * @param keyScore Redis specific thing, ignored by every current driver: ordering is
-   *   derived from priority and insertion time instead.
    * @param queryKey
    * @param orphanedTime Ignored by every current driver: the per item orphaned deadline is
    *   derived from options.orphanedTimeout (in seconds) instead.
@@ -64,7 +62,7 @@ export interface QueueDriverConnectionInterface {
    * @param priority
    * @param options
    */
-  addToQueue(keyScore: number, queryKey: QueryKey, orphanedTime: number, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse>;
+  addToQueue(queryKey: QueryKey, orphanedTime: number, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse>;
   // Return query keys which was sorted by priority and time
   getToProcessQueries(): Promise<QueryKeysTuple[]>;
   getActiveQueries(): Promise<QueryKeysTuple[]>;

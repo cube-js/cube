@@ -287,12 +287,11 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       try {
         const priority = 10;
         const time = new Date().getTime();
-        const keyScore = time + (10000 - priority) * 1E14;
 
         expect(await connection.getOrphanedQueries()).toEqual([]);
 
         let orphanedTimeout = 2;
-        await connection.addToQueue(keyScore, ['1', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
+        await connection.addToQueue(['1', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
           queueId: 1,
           stageQueryKey: '1',
           requestId: '1',
@@ -303,7 +302,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
         orphanedTimeout = 60;
 
-        await connection.addToQueue(keyScore, ['2', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
+        await connection.addToQueue(['2', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
           queueId: 2,
           stageQueryKey: '2',
           requestId: '2',
@@ -380,19 +379,14 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     describe('queue driver semantics', () => {
       const priority = 10;
 
-      const addQuery = (connection: any, queryKey: QueryKey, requestId: string) => {
-        const time = new Date().getTime();
-
-        return connection.addToQueue(
-          time + (10000 - priority) * 1E14,
-          queryKey,
-          time + 60 * 1000,
-          'delay',
-          <any>{ isJob: true },
-          priority,
-          { stageQueryKey: queryKey, requestId, orphanedTimeout: 60 }
-        );
-      };
+      const addQuery = (connection: any, queryKey: QueryKey, requestId: string) => connection.addToQueue(
+        queryKey,
+        new Date().getTime() + 60 * 1000,
+        'delay',
+        <any>{ isJob: true },
+        priority,
+        { stageQueryKey: queryKey, requestId, orphanedTimeout: 60 }
+      );
 
       const withConnections = async (count: number, fn: (...connections: any[]) => Promise<QueryKey[]>) => {
         const connections = await Promise.all(
@@ -498,19 +492,14 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
       // `QUEUE ADD ... ORPHANED n` takes seconds and derives the deadline itself, so the
       // only way to get an orphaned item is to wait it out
-      const addWithOrphanedTimeout = (connection: any, queryKey: QueryKey, requestId: string) => {
-        const time = new Date().getTime();
-
-        return connection.addToQueue(
-          time + (10000 - priority) * 1E14,
-          queryKey,
-          time + 1000,
-          'delay',
-          <any>{ isJob: true },
-          priority,
-          { stageQueryKey: queryKey, requestId, orphanedTimeout: 1 }
-        );
-      };
+      const addWithOrphanedTimeout = (connection: any, queryKey: QueryKey, requestId: string) => connection.addToQueue(
+        queryKey,
+        new Date().getTime() + 1000,
+        'delay',
+        <any>{ isJob: true },
+        priority,
+        { stageQueryKey: queryKey, requestId, orphanedTimeout: 1 }
+      );
 
       test('orphaned queries only cover pending items', async () => {
         await withConnections(1, async (connection) => {

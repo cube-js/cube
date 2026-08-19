@@ -67,7 +67,6 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
   }
 
   public async addToQueue(
-    _keyScore: number,
     queryKey: QueryKey,
     _orphanedTime: number,
     queryHandler: string,
