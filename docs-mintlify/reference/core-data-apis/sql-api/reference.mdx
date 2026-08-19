@@ -360,6 +360,17 @@ of the PostgreSQL documentation.
 | --- | --- | --- | --- |
 | `TO_CHAR` | Converts a timestamp to string according to the given format | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 
+### Type casts
+
+The SQL API supports casting to `regtype` and `regtype[]`, e.g., `atttypid::regtype`
+or `'{int8,numeric,bool}'::regtype[]`. This is primarily useful for BI tools that
+introspect table columns via `pg_catalog.pg_attribute`/`pg_type` queries, comparing
+`atttypid` against a `regtype[]` literal.
+
+Accepted spellings include the internal type name (`int4`), the canonical `regtype`
+name (`integer`), and common SQL aliases (`int`, `decimal`, `char`, `float`), with or
+without an explicit `pg_catalog.` qualifier.
+
 ### Date/time functions
 
 <Info>
