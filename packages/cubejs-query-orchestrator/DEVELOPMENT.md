@@ -230,17 +230,24 @@ active and returns the payload. Between those two calls another node can take th
 concurrency slot, so the enqueueing node often pays for the second round-trip and gets
 nothing back.
 
-`QUEUE ADD_AND_RETRIEVE` inserts **and** claims the item in one atomic operation when the
-prefix has a free concurrency slot, so the enqueueing request can go straight to executing:
+`QUEUE ADD_AND_RETRIEVE` inserts **and** claims the item in one atomic operation, so the
+enqueueing request can go straight to executing:
 
 ```
 QUEUE ADD_AND_RETRIEVE [EXCLUSIVE] [PRIORITY ?n] [ORPHANED ?ttl] [EXTERNAL_ID ?id]
     ?path ?payload ?concurrency
 ```
 
-`payload IS NULL` in the response means the item was not claimed — the budget was full, the
-item was already active, or it belongs to another process — and the caller falls back to
-the normal path with nothing lost, because the item is enqueued either way.
+The item is claimed when both hold for its prefix:
+
+- a concurrency slot is free — `active < concurrency`, the same budget
+  `QUEUE RETRIEVE CONCURRENCY` uses;
+- the backlog is shallow — `pending < concurrency / 2`, not counting the item itself.
+
+`payload IS NULL` in the response means the item was not claimed — one of the two
+conditions failed, the item was already active, or it belongs to another process — and the
+caller falls back to the normal path with nothing lost, because the item is enqueued either
+way.
 
 ```mermaid
 sequenceDiagram
@@ -287,10 +294,18 @@ Everything after the claim is unchanged: `MERGE_EXTRA`, `HEARTBEAT`, `ACK` and
 `RESULT_BLOCKING` behave exactly as in the normal path, and a fast-tracked item is a
 regular active item — `TO_CANCEL` will reclaim it if the heartbeat stops.
 
-The concurrency budget is the same one `QUEUE RETRIEVE CONCURRENCY` uses: prefix scoped,
-and blind to both exclusivity and priority. Being priority blind is the trade-off of the
-fast track — it claims the item being added even when a higher priority item is pending in
-the same prefix, so it should not be used for queues that rely on priority ordering.
+Priority ordering is enforced by the *selection* step, not by the claim: `QUEUE PENDING`
+returns items highest priority first (oldest first within a priority) and reconcile takes
+`toProcessLimit` off the top of that list. `QUEUE RETRIEVE <path>` itself is priority blind
+— it is safe only because the path it is given came from that sorted list.
+
+The fast track selects itself, so it is priority blind with nothing to compensate. That is
+what the `pending < concurrency / 2` condition bounds: with a shallow backlog there is
+almost nothing to jump over, and with a deep one the fast track steps aside and lets
+reconcile pick by priority. Note that a claimed item goes straight to active and never
+becomes pending, so a burst onto an idle queue still fast-tracks every query — items only
+start accumulating in pending once the concurrency budget is exhausted, which is exactly
+when the condition should stop firing.
 
 > **Status:** the `QUEUE ADD_AND_RETRIEVE` command exists in Cube Store. The driver still
 > emits `QUEUE ADD`; wiring the fast track into `CubeStoreQueueDriver.addToQueue` needs a

@@ -1467,11 +1467,23 @@ impl CacheStore for RocksCacheStore {
             let queue_schema = QueueItemRocksTable::new(db_ref.clone());
             let (pending, mut active) = Self::queue_prefix_counters(&queue_schema, &payload.path)?;
 
-            let claim = active.len() < (payload.concurrency as usize);
-
             let index_key = QueueItemIndexKey::ByPath(payload.path.clone());
             let id_row_opt = queue_schema
                 .get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)?;
+
+            // An item which is already pending is not a part of its own backlog
+            let backlog = match &id_row_opt {
+                Some(id_row) if id_row.get_row().get_status() == &QueueItemStatus::Pending => {
+                    pending.saturating_sub(1)
+                }
+                _ => pending,
+            };
+
+            // A deep backlog is left to QUEUE PENDING + reconcile, which pick by priority.
+            // Claiming the item being added ignores priority, it's acceptable only while
+            // there is almost nothing to jump over.
+            let claim = active.len() < (payload.concurrency as usize)
+                && backlog * 2 < (payload.concurrency as u64);
 
             if let Some(id_row) = id_row_opt {
                 let id = id_row.get_id();
@@ -2941,6 +2953,57 @@ mod tests {
         assert_queue_item_status(&cachestore, "path4", QueueItemStatus::Pending, false).await?;
 
         RocksCacheStore::cleanup_test_cachestore("test_queue_add_and_retrieve");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_queue_add_and_retrieve_backlog() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "test_queue_add_and_retrieve_backlog",
+            Config::test("test_queue_add_and_retrieve_backlog"),
+        );
+
+        for path in ["prefix:path1", "prefix:path2"] {
+            cachestore
+                .queue_add(QueueAddPayload {
+                    path: path.to_string(),
+                    value: "v".to_string(),
+                    priority: 0,
+                    orphaned: None,
+                    process_id: None,
+                    exclusive: false,
+                    external_id: None,
+                })
+                .await?;
+        }
+
+        // 2 pending items is not less than a half of 4, the backlog is left to reconcile
+        // even though all the concurrency slots are free
+        let res = cachestore
+            .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path3", "v3", 4))
+            .await?;
+        assert!(res.added);
+        assert_eq!(res.payload, None);
+        assert_eq!(res.active, Vec::<String>::new());
+        assert_eq!(res.pending, 3);
+
+        assert_queue_item_status(&cachestore, "path3", QueueItemStatus::Pending, false).await?;
+
+        // 3 pending items is less than a half of 7
+        let res = cachestore
+            .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path4", "v4", 7))
+            .await?;
+        assert!(res.added);
+        assert_eq!(res.payload, Some("v4".to_string()));
+        assert_eq!(res.active, vec!["path4".to_string()]);
+        assert_eq!(res.pending, 3);
+
+        assert_queue_item_status(&cachestore, "path4", QueueItemStatus::Active, true).await?;
+
+        RocksCacheStore::cleanup_test_cachestore("test_queue_add_and_retrieve_backlog");
 
         Ok(())
     }
