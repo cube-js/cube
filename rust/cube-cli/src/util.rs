@@ -683,11 +683,13 @@ mod tests {
         // shrink the walk, and a floor would absorb that silently.
         //
         // What the two sides record is NOT "required" against "optional". A clap
-        // `value_parser` never runs on an omitted flag, so `None` was always legal and
-        // every argument here was already optional; the guard only ever rejected
-        // `Some("")`. The accepting side is therefore a decision about supplied-but-empty
-        // — it means the documented default rather than an error — not a flag becoming
-        // optional that wasn't.
+        // `value_parser` never runs on an omitted flag, so `None` was always legal for
+        // every optional argument here and the guard only ever rejected `Some("")` —
+        // nothing became optional by leaving `refuses`. The four required `<BRANCH>`
+        // positionals are the exception and the only one: clap will not let you omit
+        // those, so a blank there is a name the caller failed to supply rather than a
+        // value they left open, as the list below says. The accepting side is therefore
+        // a decision about supplied-but-empty on flags that were already optional.
         //
         // Nor is the split derived from what a blank then COSTS, which is what makes the
         // one pair that looks like an oversight deliberate: `deploy --branch` and
@@ -744,9 +746,8 @@ mod tests {
                 "cube github connect --branch",
             ],
             "a branch argument that takes an empty value at parse time was added, \
-             removed or renamed. A new one belongs on this list only if letting a \
-             supplied-but-empty value mean the documented default is what you want \
-             for it."
+             removed or renamed. A new one belongs on this list only if leaving what a \
+             supplied-but-empty value means to the server is what you want for it."
         );
     }
 
