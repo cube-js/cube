@@ -20,7 +20,7 @@ export type RetrieveForProcessingResponse = [
   active: QueryKeyHash[],
   pending: number,
   def: QueryDef | null,
-] | null;
+];
 
 export interface AddToQueueQuery {
   isJob: boolean,

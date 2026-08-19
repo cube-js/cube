@@ -474,12 +474,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         await withConnections(1, async (connection) => {
           const hash = connection.redisHash(['never-added', []]);
 
-          const result = await connection.retrieveForProcessing(hash);
-          // Old Cube Store without EXTENDED support answers with null here
-          if (result) {
-            expect(result[0]).toBe(0);
-            expect(result[4]).toBe(null);
-          }
+          const [added, , , , def] = await connection.retrieveForProcessing(hash);
+          expect(added).toBe(0);
+          expect(def).toBe(null);
 
           const [active, toProcess] = await connection.getQueryStageState(true);
           expect(active).not.toContain(hash);

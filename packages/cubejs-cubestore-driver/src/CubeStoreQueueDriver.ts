@@ -322,8 +322,9 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
       }
     }
 
-    // Old Cube Store without EXTENDED support returns no rows at all on failure
-    return null;
+    // EXTENDED always yields exactly one row, so no rows means we are talking to something
+    // that isn't Cube Store
+    throw new Error('Empty response on QUEUE RETRIEVE');
   }
 
   public async getResultBlocking(hash: QueryKeyHash, queueId: QueueId): Promise<QueryDef | null> {

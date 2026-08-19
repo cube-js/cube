@@ -747,17 +747,13 @@ export class QueryQueue {
     let query;
 
     try {
-      const retrieveResult = await queueConnection.retrieveForProcessing(queryKeyHashed);
+      let retrieveQueueId;
 
-      if (retrieveResult) {
-        let retrieveQueueId;
+      [insertedCount, retrieveQueueId, activeKeys, queueSize, query] = await queueConnection.retrieveForProcessing(queryKeyHashed);
 
-        [insertedCount, retrieveQueueId, activeKeys, queueSize, query] = retrieveResult;
-
-        // Null on anything but a successful activation, and on old Cube Store always
-        if (retrieveQueueId) {
-          queueId = retrieveQueueId;
-        }
+      // Null on anything but a successful activation
+      if (retrieveQueueId) {
+        queueId = retrieveQueueId;
       }
 
       const activated = activeKeys && activeKeys.indexOf(queryKeyHashed) !== -1;
