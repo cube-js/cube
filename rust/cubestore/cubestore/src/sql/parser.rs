@@ -122,7 +122,7 @@ pub enum QueueCommand {
         external_id: Option<String>,
     },
     /// `QUEUE ADD` which also claims the item (moves it to the active status) in the
-    /// same atomic operation, when the prefix has less than `concurrency` active items.
+    /// same atomic operation, when the `concurrency` budget of the prefix allows it.
     AddAndRetrieve {
         exclusive: bool,
         priority: i64,

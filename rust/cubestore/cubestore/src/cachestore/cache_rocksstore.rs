@@ -870,8 +870,7 @@ pub struct QueueAddAndRetrievePayload {
     pub process_id: Option<String>,
     pub exclusive: bool,
     pub external_id: Option<String>,
-    /// The item is claimed only when the prefix has less than `concurrency` active
-    /// items. It's the same budget as `QUEUE RETRIEVE CONCURRENCY` uses.
+    /// The same budget as `QUEUE RETRIEVE CONCURRENCY` uses
     pub concurrency: u32,
 }
 
@@ -2980,8 +2979,7 @@ mod tests {
                 .await?;
         }
 
-        // 2 pending items is not less than a half of 4, the backlog is left to reconcile
-        // even though all the concurrency slots are free
+        // Every concurrency slot is free, only the backlog declines the claim
         let res = cachestore
             .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path3", "v3", 4))
             .await?;
@@ -2992,7 +2990,6 @@ mod tests {
 
         assert_queue_item_status(&cachestore, "path3", QueueItemStatus::Pending, false).await?;
 
-        // 3 pending items is less than a half of 7
         let res = cachestore
             .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path4", "v4", 7))
             .await?;

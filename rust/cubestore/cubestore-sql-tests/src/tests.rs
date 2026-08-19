@@ -12156,8 +12156,7 @@ async fn queue_add_and_retrieve_backlog(service: Box<dyn SqlClient>) -> Result<(
     }
 
     {
-        // 2 pending items is not less than a half of 4, the backlog is left to
-        // QUEUE PENDING + reconcile even though every concurrency slot is free
+        // Every concurrency slot is free, only the backlog declines the claim
         let add_response = service
             .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:3" "payload3" 4"#)
             .await?;
@@ -12169,7 +12168,6 @@ async fn queue_add_and_retrieve_backlog(service: Box<dyn SqlClient>) -> Result<(
     }
 
     {
-        // 3 pending items is less than a half of 7
         let add_response = service
             .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:4" "payload4" 7"#)
             .await?;
