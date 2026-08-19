@@ -52,6 +52,12 @@ impl SqlNode for TimeShiftSqlNode {
         let res = match node.as_ref() {
             MemberSymbol::Dimension(ev) => {
                 if !ev.is_reference() && ev.is_time() {
+                    // The first probe is by exact name on purpose: a dimension
+                    // that gets evaluated has its shift applied when the
+                    // recursion reaches the owned member it wraps, and matching
+                    // it here as well would add the interval twice. Only a
+                    // substituted dimension, which is never expanded, resolves
+                    // through the chain.
                     let shift = self
                         .shifts
                         .dimensions_shifts
@@ -63,8 +69,17 @@ impl SqlNode for TimeShiftSqlNode {
                                 None
                             }
                         });
-                    if let Some(shift) = shift.and_then(|s| s.interval.as_ref()) {
-                        let shift = shift.to_sql();
+                    if let Some(shift) = shift {
+                        let shift = shift
+                            .interval
+                            .as_ref()
+                            .ok_or_else(|| {
+                                CubeError::internal(format!(
+                                    "Time shift for dimension {} has no interval",
+                                    ev.full_name()
+                                ))
+                            })?
+                            .to_sql();
                         let inner_visitor = visitor.with_arg_needs_paren_safe(false);
                         let input = self.input.to_sql(
                             &inner_visitor,
