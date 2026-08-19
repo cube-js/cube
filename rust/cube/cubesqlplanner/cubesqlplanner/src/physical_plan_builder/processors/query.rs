@@ -1,9 +1,10 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::transforms as logical_transforms;
 use crate::logical_plan::{all_symbols, Query, QuerySource};
+use crate::physical_plan::symbols::column_ref_symbol::literal_reference;
 use crate::physical_plan::{
-    CalcGroupItem, CalcGroupsJoin, Expr, From, MemberExpression, ReferencesBuilder, Select,
-    SelectBuilder,
+    CalcGroupItem, CalcGroupsJoin, Expr, From, MemberExpression, ReferenceSubstitutions,
+    ReferencesBuilder, Select, SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::collectors::collect_calc_group_dims_from_nodes;
@@ -85,7 +86,10 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             ),
             QuerySource::FullKeyAggregate(_) => None,
         };
-        let mut calc_group_value_references: Vec<(String, String)> = Vec::new();
+        // Values pinned by the query rather than read from a source. Kept apart
+        // because a select over a pre-aggregation reads every other member from
+        // the rollup columns, but still renders these as literals.
+        let mut calc_group_literals = ReferenceSubstitutions::new();
         let from = if let Some(stored_dims) = calc_group_stored_dims {
             let all_symbols = all_symbols(&logical_plan.schema(), &logical_plan.filter());
             let calc_group_dims = collect_calc_group_dims_from_nodes(all_symbols.iter())?
@@ -104,9 +108,15 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 .clone()
                 .filter(|itm| itm.values.len() == 1)
             {
+                calc_group_literals.insert(
+                    item.symbol.full_name(),
+                    literal_reference(&item.symbol, item.values[0].clone()),
+                );
+                // A join condition can name a calc-group dimension too, and it
+                // is built before there is a select symbol environment to
+                // rewrite, so it resolves the value while rendering.
                 context_factory
                     .add_render_reference(item.symbol.full_name(), item.values[0].clone());
-                calc_group_value_references.push((item.symbol.full_name(), item.values[0].clone()));
             }
             let calc_groups_to_join = calc_groups_items
                 .filter(|itm| itm.values.len() > 1)
@@ -122,13 +132,15 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         };
 
         let mut schema = logical_plan.schema().clone();
+        let references_builder = ReferencesBuilder::new(from.clone());
+        let mut substitutions = calc_group_literals.clone();
 
         match logical_plan.source() {
             QuerySource::LogicalJoin(join) => {
-                let references_builder = ReferencesBuilder::new(from.clone());
-                self.builder.resolve_subquery_dimensions_references(
+                self.builder.collect_subquery_dimensions_substitutions(
                     &join.dimension_subqueries(),
                     &references_builder,
+                    &mut substitutions,
                     &mut context_factory,
                 )?;
             }
@@ -181,10 +193,6 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
 
         let is_pre_aggregation = matches!(logical_plan.source(), QuerySource::PreAggregation(_));
 
-        let references_builder = ReferencesBuilder::new(from.clone());
-
-        let mut select_builder = SelectBuilder::new(from);
-
         if !logical_plan.modifers().ungrouped {
             context_factory.set_group_by_members(
                 schema
@@ -195,31 +203,60 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         }
 
         for dimension in schema.all_dimensions() {
-            self.builder.process_query_dimension(
+            self.builder.collect_query_dimension_substitution(
                 dimension,
                 &references_builder,
-                &mut select_builder,
-                &mut context_factory,
-                &context,
+                &from,
+                &mut substitutions,
             )?;
         }
 
-        for (measure, exists) in self.builder.measures_for_query(&schema.measures, &context) {
-            if exists {
-                references_builder.resolve_references_for_member(
+        let measures_for_query = self.builder.measures_for_query(&schema.measures, &context);
+        for (measure, exists) in measures_for_query.iter() {
+            if *exists {
+                references_builder.collect_substitutions_for_member(
                     measure.clone(),
                     &None,
-                    context_factory.render_references_mut(),
+                    &mut substitutions,
                 )?;
+            }
+        }
+
+        let over_full_aggregated_source = self.is_over_full_aggregated_source(logical_plan);
+        if over_full_aggregated_source {
+            references_builder.collect_substitutions_for_filter(&having, &mut substitutions)?;
+        }
+
+        // A select over a pre-aggregation reads its members from the rollup
+        // columns, which the pre-aggregation node already resolved; only the
+        // values pinned by the query are substituted here.
+        let substitutions = if is_pre_aggregation {
+            calc_group_literals
+        } else {
+            substitutions
+        };
+
+        let schema = logical_transforms::substitute_symbols_in_schema(&schema, &substitutions)?;
+        let filter = logical_transforms::substitute_symbols_in_filter(filter, &substitutions)?;
+        let having = logical_transforms::substitute_symbols_in_filter(having, &substitutions)?;
+
+        let mut select_builder = SelectBuilder::new(from);
+
+        for dimension in schema.all_dimensions() {
+            self.builder
+                .project_query_dimension(dimension, &mut select_builder, &context)?;
+        }
+
+        for (measure, exists) in measures_for_query.iter() {
+            if *exists {
+                let measure = transforms::substitute_by_name(measure, &substitutions)?;
                 select_builder.add_projection_member(&measure, None);
             } else {
                 select_builder.add_null_projection(&measure, None);
             }
         }
 
-        if self.is_over_full_aggregated_source(logical_plan) {
-            references_builder
-                .resolve_references_for_filter(&having, context_factory.render_references_mut())?;
+        if over_full_aggregated_source {
             select_builder.set_filter(having);
         } else {
             if !logical_plan.modifers().ungrouped {
@@ -238,15 +275,6 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         select_builder.set_limit(logical_plan.modifers().limit);
         select_builder.set_offset(logical_plan.modifers().offset);
 
-        if is_pre_aggregation {
-            context_factory.clear_render_references();
-            // Calc-group values are rendered as literals, not resolved from
-            // the rollup, so they must survive the render-reference reset.
-            for (name, value) in calc_group_value_references.into_iter() {
-                context_factory.add_render_reference(name, value);
-            }
-        }
-
         // When reading from a pre-aggregation, drop ORDER BY keys on measures that
         // are not part of the selection. CubeStore cannot ORDER BY an aggregate of a
         // rollup column that isn't projected.
@@ -264,25 +292,25 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         } else {
             logical_plan.modifers().order_by.clone()
         };
-        // Items present in the schema are sorted by their stamped schema
-        // symbol; only a measure absent from the projection carries its
-        // own symbol into the ORDER BY and needs the form here.
-        let order_by = if let Some(modifier) = &measure_modifier {
-            order_by
-                .iter()
-                .map(|o| -> Result<_, CubeError> {
-                    if !schema.find_member_positions(&o.name()).is_empty() {
-                        return Ok(o.clone());
+        // Items present in the schema are sorted by their stamped and
+        // substituted schema symbol; only a measure absent from the projection
+        // carries its own symbol into the ORDER BY and needs both here.
+        let order_by = order_by
+            .iter()
+            .map(|o| -> Result<_, CubeError> {
+                if !schema.find_member_positions(&o.name()).is_empty() {
+                    return Ok(o.clone());
+                }
+                let symbol = match &measure_modifier {
+                    Some(modifier) => {
+                        transforms::measures_render_modifier(&o.member_symbol(), modifier)?
                     }
-                    Ok(OrderByItem::new(
-                        transforms::measures_render_modifier(&o.member_symbol(), modifier)?,
-                        o.desc(),
-                    ))
-                })
-                .collect::<Result<Vec<_>, _>>()?
-        } else {
-            order_by
-        };
+                    None => o.member_symbol(),
+                };
+                let symbol = transforms::substitute_by_name(&symbol, &substitutions)?;
+                Ok(OrderByItem::new(symbol, o.desc()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         select_builder.set_order_by(self.builder.make_order_by(&schema, &order_by)?);
 
         let res = Rc::new(select_builder.build(query_tools.clone(), context_factory));

@@ -78,6 +78,9 @@ impl TraversalVisitor for JoinHintsCollector {
                 }
             }
             MemberSymbol::MemberExpression(_) => {}
+            // A reference is read from a source the query already has, so it
+            // hints at no join of its own.
+            MemberSymbol::ColumnRef(_) => {}
         };
         Ok(Some(()))
     }

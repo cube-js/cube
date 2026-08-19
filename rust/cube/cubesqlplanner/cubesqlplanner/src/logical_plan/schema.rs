@@ -55,7 +55,7 @@ impl LogicalSchema {
         for (i, m) in self.time_dimensions.iter().enumerate() {
             if m.full_name() == name {
                 result.push(i + self.dimensions.len());
-            } else if let Ok(time_dimension) = m.as_time_dimension() {
+            } else if let Some(time_dimension) = m.time_dimension_behind_references() {
                 if time_dimension.base_symbol().full_name() == name {
                     result.push(i + self.dimensions.len());
                 }

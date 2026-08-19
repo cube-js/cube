@@ -9,6 +9,7 @@ impl ToSql for MemberSymbol {
             Self::TimeDimension(t) => t.to_sql(ctx),
             Self::Measure(m) => m.to_sql(ctx),
             Self::MemberExpression(e) => e.to_sql(ctx),
+            Self::ColumnRef(r) => r.to_sql(ctx),
         }
     }
 }

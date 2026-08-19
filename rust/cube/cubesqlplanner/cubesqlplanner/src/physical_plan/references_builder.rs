@@ -1,11 +1,18 @@
-use crate::physical_plan::sql_nodes::RenderReferences;
+use crate::physical_plan::symbols::column_ref_symbol::column_reference;
 use crate::physical_plan::{
     CalcGroupsJoin, From, FromSource, Join, QualifiedColumnName, SingleAliasedSource, SingleSource,
 };
 use crate::planner::filter::{Filter, FilterItem};
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
+use std::collections::HashMap;
 use std::rc::Rc;
+
+/// What one select replaces its members with: `full_name` of a member
+/// the select reads from one of its sources → the reference symbol that
+/// reads it. Applied to the select's whole symbol environment at once,
+/// so a member named here is read wherever the select mentions it.
+pub type ReferenceSubstitutions = HashMap<String, Rc<MemberSymbol>>;
 
 pub struct ReferencesBuilder {
     source: Rc<From>,
@@ -44,35 +51,75 @@ impl ReferencesBuilder {
         Ok(())
     }
 
-    pub fn resolve_references_for_member(
+    /// Records how `member` is read from this select's sources: the
+    /// member itself when a source produces it, otherwise the
+    /// dependencies of its expression that a source produces.
+    ///
+    /// The first entry for a name wins, so a caller that pins a member
+    /// itself (a value fixed by the query, an axis column of a join)
+    /// records it before the walk reaches it.
+    pub fn collect_substitutions_for_member(
         &self,
         member: Rc<MemberSymbol>,
         strict_source: &Option<String>,
-        references: &mut RenderReferences,
+        substitutions: &mut ReferenceSubstitutions,
     ) -> Result<(), CubeError> {
+        // A reference already names the column it reads. Resolving it
+        // again would look its origin up in this select's sources and
+        // point it somewhere else.
+        if matches!(member.as_ref(), MemberSymbol::ColumnRef(_)) {
+            return Ok(());
+        }
         let member_name = member.full_name();
-        if references.contains_key(&member_name) {
+        if substitutions.contains_key(&member_name) {
             return Ok(());
         }
-        if let Some(reference) = self.find_reference_for_member(&member, strict_source) {
-            references.insert(member_name.clone(), reference);
+        if let Some(column) = self.find_reference_for_member(&member, strict_source) {
+            substitutions.insert(member_name, column_reference(&member, column));
             return Ok(());
         }
 
-        let dependencies = member.get_dependencies();
-        if !dependencies.is_empty() {
-            for dep in dependencies.iter() {
-                self.resolve_references_for_member(dep.clone(), strict_source, references)?
+        for dep in member.get_dependencies().iter() {
+            self.collect_substitutions_for_member(dep.clone(), strict_source, substitutions)?;
+        }
+        Ok(())
+    }
+
+    pub fn collect_substitutions_for_filter(
+        &self,
+        filter: &Option<Filter>,
+        substitutions: &mut ReferenceSubstitutions,
+    ) -> Result<(), CubeError> {
+        if let Some(filter) = filter {
+            for itm in filter.items.iter() {
+                self.collect_substitutions_for_filter_item(itm, substitutions)?;
             }
-        } else {
-            /*             if !self.has_source_for_leaf_memeber(&member, strict_source) {
-                return Err(CubeError::internal(format!(
-                    "Planning error: member {} has no source",
-                    member_name
-                )));
-            } */
         }
+        Ok(())
+    }
 
+    fn collect_substitutions_for_filter_item(
+        &self,
+        item: &FilterItem,
+        substitutions: &mut ReferenceSubstitutions,
+    ) -> Result<(), CubeError> {
+        match item {
+            FilterItem::Item(item) => self.collect_substitutions_for_member(
+                item.member_evaluator().clone(),
+                &None,
+                substitutions,
+            )?,
+            FilterItem::Group(group) => {
+                for itm in group.items.iter() {
+                    self.collect_substitutions_for_filter_item(itm, substitutions)?
+                }
+            }
+            FilterItem::Segment(segment) => self.collect_substitutions_for_member(
+                segment.member_evaluator().clone(),
+                &None,
+                substitutions,
+            )?,
+        }
         Ok(())
     }
 
@@ -104,19 +151,6 @@ impl ReferencesBuilder {
         Ok(())
     }
 
-    pub fn resolve_references_for_filter(
-        &self,
-        filter: &Option<Filter>,
-        references: &mut RenderReferences,
-    ) -> Result<(), CubeError> {
-        if let Some(filter) = filter {
-            for itm in filter.items.iter() {
-                self.resolve_references_for_filter_item(itm, references)?;
-            }
-        }
-        Ok(())
-    }
-
     fn validate_filter_item(&self, item: &FilterItem) -> Result<(), CubeError> {
         match item {
             FilterItem::Item(item) => {
@@ -130,31 +164,6 @@ impl ReferencesBuilder {
             FilterItem::Segment(segment) => {
                 self.validate_member(segment.member_evaluator().clone(), &None)?
             }
-        }
-        Ok(())
-    }
-
-    fn resolve_references_for_filter_item(
-        &self,
-        item: &FilterItem,
-        references: &mut RenderReferences,
-    ) -> Result<(), CubeError> {
-        match item {
-            FilterItem::Item(item) => self.resolve_references_for_member(
-                item.member_evaluator().clone(),
-                &None,
-                references,
-            )?,
-            FilterItem::Group(group) => {
-                for itm in group.items.iter() {
-                    self.resolve_references_for_filter_item(itm, references)?
-                }
-            }
-            FilterItem::Segment(segment) => self.resolve_references_for_member(
-                segment.member_evaluator().clone(),
-                &None,
-                references,
-            )?,
         }
         Ok(())
     }

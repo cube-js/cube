@@ -226,6 +226,20 @@ impl SqlCall {
         }
     }
 
+    /// A call whose whole body is one member symbol, so it renders as
+    /// exactly that symbol's SQL. Used to give a member an input it
+    /// does not declare itself — a symbol standing for a value the
+    /// enclosing select already has.
+    pub fn new_direct_reference(symbol: Rc<MemberSymbol>) -> Rc<Self> {
+        Rc::new(Self::new(
+            SqlTemplate::String(SqlCallArg::dependency(0)),
+            vec![SqlDependency::Symbol(symbol)],
+            vec![],
+            vec![],
+            SecutityContextProps { values: vec![] },
+        ))
+    }
+
     /// Renders the template into a single SQL string. Errors when
     /// the template is a `StringVec` — use `eval_vec` for that case.
     pub fn eval(

@@ -1,4 +1,4 @@
-use super::SqlNode;
+use super::{EvaluateSqlNode, SqlNode};
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -9,11 +9,18 @@ use std::rc::Rc;
 
 /// Dispatches rendering to a kind-specific sub-chain based on the
 /// member's variant: dimension / time dimension / measure / other.
+///
+/// A `ColumnRef` is the exception: it renders itself and nothing may
+/// wrap it, so it goes straight to the bare evaluate node rather than
+/// through any configured chain. This is the outermost dispatch of the
+/// chain, so that rule holds for every position a reference can appear
+/// in, including the dependencies of another member's SQL.
 pub struct RootSqlNode {
     dimension_processor: Rc<dyn SqlNode>,
     time_dimesions_processor: Rc<dyn SqlNode>,
     measure_processor: Rc<dyn SqlNode>,
     default_processor: Rc<dyn SqlNode>,
+    reference_processor: Rc<dyn SqlNode>,
 }
 
 impl RootSqlNode {
@@ -28,6 +35,7 @@ impl RootSqlNode {
             time_dimesions_processor,
             measure_processor,
             default_processor,
+            reference_processor: EvaluateSqlNode::new(),
         })
     }
 
@@ -75,7 +83,14 @@ impl SqlNode for RootSqlNode {
                 node_processor.clone(),
                 templates,
             )?,
-            _ => self.default_processor.to_sql(
+            MemberSymbol::ColumnRef(_) => self.reference_processor.to_sql(
+                visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+                templates,
+            )?,
+            MemberSymbol::MemberExpression(_) => self.default_processor.to_sql(
                 visitor,
                 node,
                 query_tools.clone(),

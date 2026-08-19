@@ -56,6 +56,9 @@ impl TraversalVisitor for CubeNamesCollector {
                 }
             }
             MemberSymbol::MemberExpression(_) => {}
+            // A reference is read from a source the query already has, so it
+            // brings no cube of its own into the join.
+            MemberSymbol::ColumnRef(_) => {}
         };
         Ok(Some(()))
     }

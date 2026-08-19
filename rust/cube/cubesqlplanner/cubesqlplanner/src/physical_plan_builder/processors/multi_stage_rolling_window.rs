@@ -1,14 +1,15 @@
 use super::super::context::PushDownBuilderContext;
 use super::super::{LogicalNodeProcessor, ProcessableNode};
-use crate::logical_plan::transforms;
+use crate::logical_plan::transforms as logical_transforms;
 use crate::logical_plan::{MultiStageRollingWindow, MultiStageRollingWindowType};
-use crate::physical_plan::ReferencesBuilder;
+use crate::physical_plan::symbols::column_ref_symbol::column_reference;
 use crate::physical_plan::{
     Expr, From, JoinBuilder, JoinCondition, MemberExpression, QualifiedColumnName, QueryPlan,
-    SelectBuilder,
+    ReferenceSubstitutions, ReferencesBuilder, SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::planner::MeasureRenderModifier;
+use crate::planner::symbols::transforms;
+use crate::planner::{MeasureRenderModifier, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -83,44 +84,74 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
             on,
         );
 
-        let mut context_factory = context.make_sql_nodes_factory()?;
+        let context_factory = context.make_sql_nodes_factory()?;
         let from = From::new_from_join(join_builder.build());
         let references_builder = ReferencesBuilder::new(from.clone());
-        let mut select_builder = SelectBuilder::new(from.clone());
 
-        //We insert render reference for main time dimension (with some granularity as in time series to avoid unnecessary date_tranc)
-        context_factory.add_render_reference(
+        let mut substitutions = ReferenceSubstitutions::new();
+        let date_from = || QualifiedColumnName::new(Some(root_alias.clone()), format!("date_from"));
+        //The main time dimension is read from the time series axis at the granularity the series was built with, so it needs no date_trunc of its own
+        substitutions.insert(
             time_dimension.full_name(),
-            QualifiedColumnName::new(Some(root_alias.clone()), format!("date_from")),
+            column_reference(&time_dimension, date_from()),
         );
 
-        //We also insert render reference for the base dimension of the time dimension (i.e. without `_granularity` prefix to let other time dimensions make date_tranc)
-        context_factory.add_render_reference(
-            time_dimension
-                .as_time_dimension()?
-                .base_symbol()
-                .full_name(),
-            QualifiedColumnName::new(Some(root_alias.clone()), format!("date_from")),
+        //The base dimension of that time dimension is read from the same axis, so a time dimension at another granularity truncates the axis column
+        let base_time_dimension = time_dimension.as_time_dimension()?.base_symbol().clone();
+        substitutions.insert(
+            base_time_dimension.full_name(),
+            column_reference(&base_time_dimension, date_from()),
         );
 
         // Time dimensions are read from the rolling source input, where they
         // are already timezone-converted and truncated, so they must render
         // without the conversion.
-        let schema = transforms::mark_tz_converted_at_source_in_schema(&rolling_window.schema)?;
+        let schema =
+            logical_transforms::mark_tz_converted_at_source_in_schema(&rolling_window.schema)?;
         // An ungrouped rolling select emits row-level values: count-like
         // measures render a not-null indicator over the input column;
         // otherwise the select merges the window's partial values.
         let schema = if rolling_window.is_ungrouped {
-            transforms::measures_render_modifier_in_schema(
+            logical_transforms::measures_render_modifier_in_schema(
                 &schema,
                 &MeasureRenderModifier::UngroupedFinal,
             )?
         } else {
-            transforms::measures_render_modifier_in_schema(
+            logical_transforms::measures_render_modifier_in_schema(
                 &schema,
                 &MeasureRenderModifier::RollingMerge,
             )?
         };
+
+        for dim in schema.dimensions.iter() {
+            if dim.clone().resolve_reference_chain()
+                != time_dimension.clone().resolve_reference_chain()
+            {
+                references_builder.collect_substitutions_for_member(
+                    dim.clone(),
+                    &Some(measure_input_alias.clone()),
+                    &mut substitutions,
+                )?;
+            }
+        }
+
+        // A measure of a rolling select aggregates the row-level values the
+        // rolling source produced for it, so it reads its input from that
+        // source instead of computing it.
+        for measure in schema.measures.iter() {
+            let name_in_base_query = measure_input_schema.resolve_member_alias(measure);
+            let input = column_reference(
+                measure,
+                QualifiedColumnName::new(Some(measure_input_alias.clone()), name_in_base_query),
+            );
+            let measure_symbol = measure.as_measure()?;
+            let over_input = transforms::measure_over_reference(&measure_symbol, input);
+            substitutions.insert(measure.full_name(), MemberSymbol::new_measure(over_input));
+        }
+
+        let schema = logical_transforms::substitute_symbols_in_schema(&schema, &substitutions)?;
+
+        let mut select_builder = SelectBuilder::new(from.clone());
 
         for dim in schema.time_dimensions.iter() {
             let alias = references_builder
@@ -129,27 +160,12 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
         }
 
         for dim in schema.dimensions.iter() {
-            if dim.clone().resolve_reference_chain()
-                != time_dimension.clone().resolve_reference_chain()
-            {
-                references_builder.resolve_references_for_member(
-                    dim.clone(),
-                    &Some(measure_input_alias.clone()),
-                    context_factory.render_references_mut(),
-                )?;
-            }
             let alias = references_builder
                 .resolve_alias_for_member(&dim, &Some(measure_input_alias.clone()));
             select_builder.add_projection_member(dim, alias);
         }
 
         for measure in schema.measures.iter() {
-            let name_in_base_query = measure_input_schema.resolve_member_alias(measure);
-            context_factory.add_ungrouped_measure_reference(
-                measure.full_name(),
-                QualifiedColumnName::new(Some(measure_input_alias.clone()), name_in_base_query),
-            );
-
             select_builder.add_projection_member(&measure, None);
         }
 
