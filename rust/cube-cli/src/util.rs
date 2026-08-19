@@ -712,8 +712,9 @@ mod tests {
         // empty field is a property of whatever builds each request, and that is two
         // different places: every flag on `accepts` but one goes through `set`, `push` or
         // `write_body`, which insert `Some("")` verbatim — `pull` builds its own
-        // `json!({ "branchName": b })`, so it is the one entry where the caveat below is
-        // already live rather than hypothetical — while the five required names
+        // `json!({ "branchName": b })`, which sends the blank just the same (measured:
+        // `pull --branch ""` posts `{"branchName":""}`), but is the one entry where the
+        // caveat below has somewhere to happen — while the five required names
         // interpolate the value directly — `json!({ "branchName": branch })` for three of
         // them, the `delete-branch` query tuple, and `json!({ "name": name, … })` for
         // `create-branch`, whose key is `name` and so answers no `branchName` grep. That
