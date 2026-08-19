@@ -5,6 +5,12 @@ description: Connect MCP-aware assistants to Cube through a hosted HTTPS endpoin
 
 Cube MCP (Model Context Protocol) lets MCP-compatible AI clients connect to Cube over HTTPS using OAuth.
 
+This page covers the **Cube connector**, which gives an AI assistant direct access to Cube
+through MCP. It is not [Cube agent skills](/docs/integrations/agent-skills), which run in a
+coding agent and operate Cube through the CLI, or
+[Agent Skills in Cube](/docs/explore-analyze/skills), which are saved workflows your data
+team authors for Analytics Chat.
+
 <Note>
 
 The MCP server is available on [Premium and Enterprise plans](https://cube.dev/pricing). <br />Users need the [Viewer][ref-roles] role or higher to interact with the MCP server. Which tools a
@@ -85,53 +91,26 @@ authenticated user is allowed to see.
 
 ## Connect to Claude
 
-### Claude Code
+Cube is available in the
+[Claude Connectors Directory](https://claude.ai/customize/connectors). Connect it once
+and use it in Claude on the web, desktop, or Claude Code—there is no endpoint to paste or
+local server to configure.
 
-```bash
-claude mcp add --transport http cube-mcp-server https://cubecloud.dev/mcp
-```
+1. In Claude on the web or desktop, open **Customize → Connectors**.
+2. Click **+**, choose **Browse connectors**, and search for **Cube**.
+3. Select Cube and click **Connect**.
+4. Complete the Cube OAuth flow and choose your tenant.
 
-#### Authentication and usage flow:
+On a Team or Enterprise plan, an owner may need to enable Cube first under
+**Admin Settings → Connectors**.
 
-1. Run the command copied from **Admin → MCP Server → AI Clients → Claude Code**.
-2. Then run Claude and use `/mcp` to list available servers.
-3. Select `cube-mcp-server` and choose `Authenticate`.
-4. A browser window opens for authentication.
-5. Log into Cube and choose your tenant.
-6. Return to Claude Code and start asking questions.
+To use Cube in a chat, open the tools menu and enable the Cube connector, then ask a data
+question. In Claude Code, run `/mcp` to confirm the connector is available and authenticate
+if prompted.
 
 <Frame>
   <img src="https://lgo0ecceic.ucarecd.net/68c3e7e2-def2-4aec-84a5-8cded3473def/" />
 </Frame>
-
-### Claude (Team/Enterprise)
-
-1. Open Settings in Claude (web or desktop).
-2. Scroll to **Integrations** and click **Add more**.
-3. Use:
-   - **Integration name:** Cube MCP
-   - **Integration URL:** `https://cubecloud.dev/mcp`
-4. Complete the OAuth flow to grant access.
-5. Enable tools in any new chats.
-
-#### Use Cube in Claude chat
-
-1. Start a new chat in Claude.
-2. Open the tools menu and enable **Cube MCP** (use the tools search if you have many tools).
-3. Ask a data question. Toggle the tool off to disable it for that chat.
-
-### Claude (Desktop app)
-
-```json
-{
-  "mcpServers": {
-    "cube-mcp-server": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "--transport", "http", "https://cubecloud.dev/mcp"]
-    }
-  }
-}
-```
 
 ## Connect to Cursor
 
