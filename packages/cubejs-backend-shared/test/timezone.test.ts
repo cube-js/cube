@@ -43,9 +43,12 @@ describe('canonicalTimezone', () => {
   test.each([
     undefined,
     null,
-    '',
-  ])('returns null for unset or empty value %j', (value) => {
+  ])('returns null for unset value %j', (value) => {
     expect(canonicalTimezone(value)).toBeNull();
+  });
+
+  test('throws for an empty string', () => {
+    expect(() => canonicalTimezone('')).toThrow(TypeError);
   });
 
   // The casts are the point: real callers are plain JS, so the signature is not enforced.
