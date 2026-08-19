@@ -102,6 +102,15 @@ You cannot delete your own account. Deleting a user is irreversible.
 
 </Warning>
 
+## Effective access
+
+A user's page shows a read-only **Effective access** section listing which source
+grants each piece of access the user has — a default role, a directly assigned
+role, a directly assigned policy, or a group. This is useful for answering "why
+can this user do that?" without piecing it together from the roles, groups, and
+policies pages separately. Admins can view this for any user; users can view it
+for themselves.
+
 ## Provisioning users via SCIM
 
 If your organization uses an identity provider such as [Okta][ref-okta] or

@@ -134,9 +134,16 @@ page, or viewing a dashboard never re-runs anything on its own.
 
 ## On dashboards
 
-Python reports render their **saved output** on dashboards. Nothing re-runs on
-dashboard load, so a dashboard full of Python reports costs no compute to open —
-each widget shows whatever the last **Run** produced.
+A python widget re-runs its script under the **viewer's own security context** when
+a dashboard is opened, rather than showing the report's saved output — this keeps
+row-level security correct, since a stored result would otherwise leak whatever
+rows the person who last pressed **Run** could see. Dashboard filters and time
+grains flow into the re-run as well, on the builder, published dashboards, and
+embeds.
+
+This has a real compute cost: the first person to open a dashboard triggers a
+sandbox run per python widget. Repeat views within 5 minutes reuse a cached
+result, shared across viewers with the same filters and identity.
 
 A python widget can be opened in [Explore](/docs/explore-analyze/explore) from a
 dashboard and run from there.
