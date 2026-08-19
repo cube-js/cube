@@ -242,7 +242,7 @@ The item is claimed when both hold for its prefix:
 
 - a concurrency slot is free — `active < concurrency`, the same budget
   `QUEUE RETRIEVE CONCURRENCY` uses;
-- the backlog is shallow — `pending < concurrency / 2`, not counting the item itself.
+- the backlog is shallow — `pending * 2 < concurrency`, not counting the item itself.
 
 `payload IS NULL` in the response means the item was not claimed — one of the two
 conditions failed, the item was already active, or it belongs to another process — and the
