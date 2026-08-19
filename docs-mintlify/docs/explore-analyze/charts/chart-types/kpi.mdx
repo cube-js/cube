@@ -11,7 +11,7 @@ KPI tiles highlight important metrics and key performance indicators. Rather tha
 
 The KPI visualization starts with a **Number** block that compares the first and second rows of your result for the first numeric column.
 
-To add a new block, click the **+** button inside the visualization and choose the block type. To edit a block, click it in the visualization — the configuration panel updates to show that block's settings.
+To add a new block, click the **+** button inside the visualization and choose the block type. To edit a block, click it in the visualization — the configuration panel updates to show that block's settings, split into a **Data** tab and a **Style** tab.
 
 Reorder blocks by dragging the handle on the left side of each block. Delete a block with the trash icon in its configuration panel.
 
@@ -27,9 +27,8 @@ Displays a single value from your query result.
 |---|---|
 | **Field** | The measure or dimension to display |
 | **Row** | Which row of the result to read from |
+| **Label** | Optional custom title; defaults to the field's name |
 | **Format** | Number formatting (currency, percent, etc.) |
-| **Font size / color** | Text appearance |
-| **Alignment** | Left, center, or right |
 
 {/* TODO screenshot: Number block (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -41,10 +40,8 @@ Displays a current value alongside a previous value with a calculated difference
 |---|---|
 | **Current field / row** | The primary value |
 | **Previous field / row** | The value to compare against — can be a different column or a different row from the same column |
-| **Difference format** | Absolute, percentage, or both |
-| **Positive color / Negative color** | Colors applied based on whether the change is positive or negative |
 
-To compare to a static goal, add a column to your query that always returns the same number (e.g. a calculated field with a constant), then select it as the **Previous** field.
+To compare to a static goal, add a column to your query that always returns the same number (e.g. a calculated field with a constant), then select it as the **Previous** field. Comparison blocks don't have their own format override — values and the calculated difference render using the query's own number formatting. Colors for the positive/negative/neutral states are set on the [Style tab](#per-block-styling).
 
 {/* TODO screenshot: Comparison block showing current vs. previous with colored delta (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -55,28 +52,34 @@ Shows a value relative to a target as a progress bar or circle. Useful for goal 
 | Setting | Description |
 |---|---|
 | **Value field / row** | The current progress value |
-| **Target field / row** | The goal or maximum value |
+| **Use custom goal** | Switch the target from a query field to a fixed number you type in |
+| **Target field / row** | The goal or maximum value (hidden when a custom goal is set) |
+| **Label** | Optional custom title |
 | **Style** | Bar or circle |
-| **Color** | Fill color for the progress indicator |
-
-<Tip>
-To compare against a static number like a quarterly goal, add a calculated field that always returns that number and use it as the **Target** field.
-</Tip>
+| **Width** | Width of the bar or circle, in pixels |
+| **Show percent** | Display the progress as a percentage of the target |
+| **Show target** | Display the target value alongside the progress indicator |
+| **Format** | Number formatting for the progress value |
 
 {/* TODO screenshot: Progress bar block (bar style) and circle style (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ### Sparkline
 
-Renders a compact trend chart — either a bar or line — within the KPI tile. Use this to show the trend behind the headline number.
+Renders a compact trend line — with an optional filled area — within the KPI tile. Use this to show the trend behind the headline number.
 
 | Setting | Description |
 |---|---|
 | **Series measure** | The measure to plot |
 | **Series dimension** | The dimension to use as the X axis (typically a time dimension) |
-| **Chart type** | Bar or line |
-| **Height / Width** | Dimensions of the sparkline in the tile |
+| **Show value** | Display the headline value above the trend line |
+| **Show trend** | Show or hide the trend line/area itself |
+| **Line width** | Thickness of the trend line |
 | **Max points** | Limits the number of data points rendered |
-| **Colors** | Line/fill colors |
+| **Height / Width** | Dimensions of the sparkline in the tile |
+| **Colors** | Line and area-fill colors |
+| **Format** | Number formatting for the headline value |
+
+By default, the headline value is the series measure's own latest value; toggle **Headline uses measure** off to source it from a different column instead.
 
 {/* TODO screenshot: Sparkline block showing a trend line (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -93,6 +96,25 @@ Use text blocks for short labels and headings inside the KPI. For complex layout
 A free-form HTML block rendered inside the KPI tile. Use this for advanced custom layouts that go beyond what the other block types support.
 
 {/* TODO screenshot: HTML block with custom content (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Per-block styling
+
+Every block's Style tab has alignment controls for how its content sits within its own row:
+
+| Setting | Description |
+|---|---|
+| **Horizontal** | Left, center, or right |
+| **Vertical** | Top, middle, or bottom |
+
+Beyond alignment, the available color and font settings depend on the block type:
+
+| Block | Style options |
+|---|---|
+| **Number** | Value color, background color, and font size (in pixels) |
+| **Comparison** | Positive/negative colors for the change, plus a neutral color and background for the unchanged state |
+| **Progress bar, Sparkline, HTML** | Background color |
+
+{/* TODO screenshot: KPI block Style tab showing alignment and appearance controls */}
 
 ## Layout controls
 
