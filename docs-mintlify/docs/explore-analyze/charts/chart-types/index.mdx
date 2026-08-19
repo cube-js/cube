@@ -23,7 +23,7 @@ For configuration options that apply across chart types — axes, color, series 
 
 When your query returns a result, Cube outlines the one chart type that best fits it and labels it
 **Recommended**. It is a suggestion: every other available type stays selectable, and the outline
-disappears once you pick a type yourself.
+yields as soon as you pick a type in that picker.
 
 Cube never applies a chart type for you. The recommendation is always only outlined, wherever the
 picker appears, and choosing a type is always your action.
@@ -36,7 +36,7 @@ category labels are. It is computed in your browser and is not saved — the sug
 current session only.
 
 Where a threshold is involved, it comes from
-[Draco](https://ieeexplore.ieee.org/document/8440847) (Moritz et al., *Formalizing Visualization
+[Draco](https://idl.cs.washington.edu/papers/draco/) (Moritz et al., *Formalizing Visualization
 Design Knowledge as Constraints*, IEEE VIS 2018), which encodes established visualization research
 as rules: a category axis becomes crowded past 12 values, a color or stacking channel saturates
 past 10 series, and no axis reads past 30 values.
@@ -44,9 +44,10 @@ past 10 series, and no axis reads past 30 values.
 One number is Cube's own rather than Draco's: a mean label length past **16 characters** counts as
 long.
 
-The number of rows in the result is deliberately not a condition. It follows from the granularity
-you chose rather than from the shape of the query, so counting it would recommend a different chart
-for the same measure over the same time dimension simply because you switched from years to days.
+No threshold is applied to the number of rows. A few rules read the row count directly — a KPI
+needs exactly one row, a heatmap needs its grid at least half filled — but none of them treats "too
+many rows" as a reason to recommend a different chart, because the row count follows the
+granularity you chose rather than the shape of your query.
 
 ### The conditions
 
@@ -69,18 +70,18 @@ Otherwise Cube checks these in order and takes the first that matches:
 | **Map** | The query contains latitude and longitude |
 | **KPI** | One measure, no dimensions, and a single row |
 | **Line** | A measure over a time dimension, optionally split by one category of up to 10 values |
-| **Scatter** | Two or more measures with no time dimension — the shape for correlating them |
+| **Scatter** | Two or more measures with no time dimension, across one category or several rows — the shape for correlating them |
 | **Bar (stacked)** | One measure split by two categories, the first up to 12 values and the second up to 10 |
-| **Heatmap** | One measure split by two categories past those bounds, whose combinations fill at least half the grid |
+| **Heatmap** | One measure split by two categories, both past those bounds — the first past 12 values and the second past 10 — whose combinations fill at least half the grid |
 | **Bar** | One measure across up to 12 categories whose labels average 16 characters or fewer |
 | **Bar (horizontal)** | The same, where the labels are longer or the categories run past 12 |
 
 The two [bar](/docs/explore-analyze/charts/chart-types/bar) rows are variants of the same chart
 type, not separate ones.
 
-Pie is not recommended. Its shape — one measure across a few categories — is the same one Bar
-answers, and a bar chart compares those values more accurately, so Cube recommends Bar and leaves
-Pie to you. It remains available in the picker like any other chart type.
+Pie, area, boxplot and HTML are never recommended — pick them yourself. Pie's shape, one measure
+across a few categories, is the one Bar already answers, and a bar chart compares those values more
+accurately. All four stay available in the picker like any other chart type.
 
 ### When nothing is recommended
 
@@ -90,8 +91,8 @@ Cube suppresses the recommendation rather than guessing. You will see no outline
 - a measure over time is split into 11 to 30 series — too many for a color channel, too few to give
   up on;
 - a value it needs is still unknown, such as the number of distinct values in a dimension;
+- the result came back empty, so there is nothing to draw;
 - the result was truncated by a row limit, so the counts it would read are incomplete;
-- you have already picked a type by hand in the picker you are looking at.
-
-The chart type you have applied is not one of these cases: when the best fit is the type already on
-screen, Cube still marks it, confirming the choice rather than leaving the picker silent.
+- you have picked a type by hand in the picker you are looking at. The outline returns the next
+  time you open it — including on the type you applied, since Cube marks the best fit whether or
+  not it is already on screen.
