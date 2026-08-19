@@ -135,7 +135,11 @@ pub fn body(map: Map<String, Value>) -> Value {
     Value::Object(map)
 }
 
-/// Reject a supplied-but-empty branch or ref at parse time.
+/// Reject a supplied-but-empty branch at parse time.
+///
+/// A branch, not "a branch or ref": every caller names a branch, and the tree's only
+/// `--ref` carries [`nonempty_target`]. Declaring this one for a ref would explain an
+/// empty `--ref` as failing to name a branch.
 ///
 /// Attached to a declaration as a clap `value_parser`, so it holds for that argument
 /// the moment it exists — including through `Option<String>`, where `None` stays legal
