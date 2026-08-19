@@ -57,7 +57,9 @@ const evaluatedPatchMeasureExpression = parsedPatchMeasureExpression.keys({
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
 
-export const timezoneSchema = Joi.string().custom((value, helpers) => {
+const cacheModeSchema = Joi.valid('stale-if-slow', 'stale-while-revalidate', 'must-revalidate', 'no-cache');
+
+const timezoneSchema = Joi.string().custom((value, helpers) => {
   const name = canonicalTimezone(value);
   if (!name) {
     return helpers.message({ custom: '{{#label}} must be a valid IANA time zone, got "{{#tz}}"' }, { tz: value });
@@ -197,8 +199,8 @@ const querySchema = Joi.object().keys({
   limit: Joi.number().integer().strict().min(0),
   offset: Joi.number().integer().strict().min(0),
   total: Joi.boolean(),
-  cacheMode: Joi.valid('stale-if-slow', 'stale-while-revalidate', 'must-revalidate', 'no-cache'),
-  cache: Joi.valid('stale-if-slow', 'stale-while-revalidate', 'must-revalidate', 'no-cache'),
+  cacheMode: cacheModeSchema,
+  cache: cacheModeSchema,
   ungrouped: Joi.boolean(),
   responseFormat: Joi.valid('default', 'compact', 'columnar'),
   subqueryJoins: Joi.array().items(subqueryJoin),
@@ -207,6 +209,13 @@ const querySchema = Joi.object().keys({
     member: Joi.string().required(),
     filter: Joi.object(),
   })),
+});
+
+export const cubeSqlRequestSchema = Joi.object().keys({
+  query: Joi.string().required(),
+  timezone: timezoneSchema,
+  cache: cacheModeSchema,
+  throwContinueWait: Joi.boolean(),
 });
 
 const normalizeQueryOrder = order => {

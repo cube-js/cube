@@ -87,6 +87,7 @@ import { SubscriptionServer, WebSocketSendMessageFn } from './ws/subscription-se
 import { LocalSubscriptionStore } from './ws/local-subscription-store';
 import {
   getPivotQuery,
+  cubeSqlRequestSchema,
   getQueryGranularity,
   normalizeQuery,
   normalizeQueryCancelPreAggregations,
@@ -95,7 +96,6 @@ import {
   parseInputMemberExpression,
   preAggsJobsRequestSchema,
   remapToQueryAdapterFormat,
-  timezoneSchema,
 } from './query';
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
@@ -481,12 +481,12 @@ class ApiGateway {
         try {
           await this.assertApiScope('data', req.context?.securityContext);
 
-          const { error, value: timezone } = timezoneSchema.validate(req.body.timezone, { errors: { label: false } });
+          const { error, value: body } = cubeSqlRequestSchema.validate(req.body);
           if (error) {
-            throw new UserError(`Invalid timezone: ${error.message || error.toString()}`);
+            throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
           }
 
-          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext, req.body.cache, timezone, req.body.throwContinueWait, req.context?.requestId);
+          await this.sqlServer.execSql(body.query, res, req.context?.securityContext, body.cache, body.timezone, body.throwContinueWait, req.context?.requestId);
         } catch (e: any) {
           // Quickfix for https://github.com/cube-js/cube/issues/10450,
           // Right now, it's too complicated to fix the issue correctly, because

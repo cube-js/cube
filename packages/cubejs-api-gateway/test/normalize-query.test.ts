@@ -1,9 +1,9 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import {
+  cubeSqlRequestSchema,
   normalizeQuery,
   normalizeQueryPreAggregations,
   normalizeQueryPreAggregationPreview,
-  timezoneSchema,
 } from '../src/query';
 
 const baseQuery = {
@@ -107,33 +107,57 @@ describe('normalizeQueryPreAggregationPreview timezone handling', () => {
   });
 });
 
-// Used on its own (not as part of an object schema) to validate the /v1/cubesql
-// session timezone.
-describe('timezoneSchema as a standalone validator', () => {
-  test.each([
-    ['america/new_york', 'America/New_York'],
-    ['UTC', 'UTC'],
-    ['uTc', 'UTC'],
-  ])('normalizes %j -> %j', (tz, expected) => {
-    const { error, value } = timezoneSchema.validate(tz);
+describe('cubeSqlRequestSchema', () => {
+  const baseBody = { query: 'SELECT 1' };
+
+  test('accepts a body with only the query', () => {
+    const { error, value } = cubeSqlRequestSchema.validate(baseBody);
     expect(error).toBeUndefined();
-    expect(value).toBe(expected);
+    expect(value).toEqual(baseBody);
   });
 
-  test('accepts an absent value', () => {
-    const { error, value } = timezoneSchema.validate(undefined);
+  test('accepts every supported field', () => {
+    const { error, value } = cubeSqlRequestSchema.validate({
+      ...baseBody,
+      timezone: 'America/Los_Angeles',
+      cache: 'stale-while-revalidate',
+      throwContinueWait: true,
+    });
     expect(error).toBeUndefined();
-    expect(value).toBeUndefined();
+    expect(value.cache).toBe('stale-while-revalidate');
+    expect(value.throwContinueWait).toBe(true);
+  });
+
+  test('requires the query', () => {
+    expect(cubeSqlRequestSchema.validate({}).error?.message).toMatch(/"query" is required/);
+  });
+
+  test('rejects an unknown field', () => {
+    expect(cubeSqlRequestSchema.validate({ ...baseBody, nope: 1 }).error).toBeDefined();
+  });
+
+  test('rejects an unknown cache mode', () => {
+    expect(cubeSqlRequestSchema.validate({ ...baseBody, cache: 'sometimes' }).error).toBeDefined();
+  });
+
+  test.each([
+    ['america/new_york', 'America/New_York'],
+    ['uTc', 'UTC'],
+  ])('normalizes timezone %j -> %j', (tz, expected) => {
+    const { error, value } = cubeSqlRequestSchema.validate({ ...baseBody, timezone: tz });
+    expect(error).toBeUndefined();
+    expect(value.timezone).toBe(expected);
   });
 
   test.each([
     'Not/AZone',
     'foo/bar',
   ])('rejects invalid timezone %j', (tz) => {
-    expect(timezoneSchema.validate(tz).error?.message).toMatch(/valid IANA time zone/);
+    expect(cubeSqlRequestSchema.validate({ ...baseBody, timezone: tz }).error?.message)
+      .toMatch(/valid IANA time zone/);
   });
 
-  test.each([null, '', 123, true])('rejects %j', (tz) => {
-    expect(timezoneSchema.validate(tz).error).toBeDefined();
+  test.each([null, '', 123, true])('rejects timezone %j', (tz) => {
+    expect(cubeSqlRequestSchema.validate({ ...baseBody, timezone: tz }).error).toBeDefined();
   });
 });
