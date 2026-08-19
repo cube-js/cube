@@ -558,6 +558,12 @@ crate::plan_to_language! {
 
 // trace_macros!(false);
 
+/// Positions of `WrappedSelect` children, for the rules that reach into the node instead of
+/// matching it with a pattern. Keep in sync with the `WrappedSelect` definition above.
+pub const WRAPPED_SELECT_SELECT_TYPE: usize = 0;
+pub const WRAPPED_SELECT_FROM: usize = 6;
+pub const WRAPPED_SELECT_JOINS: usize = 7;
+
 #[macro_export]
 macro_rules! var_iter {
     ($eclass:expr, $field_variant:ident) => {{
