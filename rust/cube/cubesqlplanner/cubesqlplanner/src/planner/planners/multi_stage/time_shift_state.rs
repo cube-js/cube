@@ -34,6 +34,20 @@ impl TimeShiftState {
         self.dimensions_shifts.get(&owned.full_name())
     }
 
+    /// True when the symbol itself, or any member it is built from, is
+    /// shifted. Unlike `get_for_symbol` this answers whether a shift is
+    /// involved at all, not whether one can be attributed to the symbol.
+    pub fn has_shift_under(&self, symbol: &Rc<MemberSymbol>) -> bool {
+        let symbol = resolve_base_symbol(symbol);
+        if self.dimensions_shifts.contains_key(&symbol.full_name()) {
+            return true;
+        }
+        symbol
+            .get_dependencies()
+            .iter()
+            .any(|dep| self.has_shift_under(dep))
+    }
+
     /// Splits the accumulated shifts into two maps: regular
     /// `DimensionTimeShift`s applied at render time, and
     /// `CalendarDimensionTimeShift`s that come from a calendar

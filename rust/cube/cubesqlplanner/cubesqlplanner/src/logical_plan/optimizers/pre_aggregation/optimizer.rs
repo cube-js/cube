@@ -137,6 +137,9 @@ impl PreAggregationOptimizer {
         is_user_query: bool,
     ) -> Result<Option<Rc<Query>>, CubeError> {
         for pre_aggregation in compiled_pre_aggregations.iter() {
+            if !Self::can_carry_time_shifts(pre_aggregation, time_shifts) {
+                continue;
+            }
             let external = pre_aggregation.external.unwrap_or(false);
             let date_range =
                 Self::extract_date_range(&query.filter(), &self.query_tools, time_shifts, external);
@@ -475,6 +478,29 @@ impl PreAggregationOptimizer {
                 source.clone()
             }
         }
+    }
+
+    // A stored time dimension is shifted by offsetting its column as a whole,
+    // which only reproduces the shifted values when the shift can be
+    // attributed to that column. A column built from several members of which
+    // just some are shifted has no such offset — moving it would carry along
+    // rows the shift must leave in place — and the lookup cannot attribute a
+    // shift to it either, so the two agree: whenever a shift is involved but
+    // cannot be attributed, the pre-aggregation cannot serve the shifted leaf.
+    fn can_carry_time_shifts(
+        pre_aggregation: &CompiledPreAggregation,
+        time_shifts: &TimeShiftState,
+    ) -> bool {
+        if time_shifts.is_empty() {
+            return true;
+        }
+        pre_aggregation
+            .time_dimensions
+            .iter()
+            .all(|time_dimension| {
+                !time_shifts.has_shift_under(time_dimension)
+                    || time_shifts.get_for_symbol(time_dimension).is_some()
+            })
     }
 
     fn extract_date_range(

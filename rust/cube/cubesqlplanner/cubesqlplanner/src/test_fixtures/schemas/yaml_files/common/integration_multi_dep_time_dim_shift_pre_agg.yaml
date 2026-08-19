@@ -1,0 +1,42 @@
+cubes:
+    - name: mdd_events
+      sql: "SELECT * FROM mdd_events"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: happened_at
+            type: time
+            sql: happened_at
+          - name: recorded_at
+            type: time
+            sql: recorded_at
+
+          # Time dimension built from two owned time dimensions. The shift
+          # below covers only one of them, so the stored rollup column
+          # cannot represent the shifted values.
+          - name: effective_at
+            type: time
+            sql: "COALESCE({CUBE.happened_at}, {CUBE.recorded_at})"
+      measures:
+          - name: total
+            type: sum
+            sql: val
+
+          - name: total_prev_month
+            type: number
+            sql: "{CUBE.total}"
+            multi_stage: true
+            time_shift:
+                - interval: "1 month"
+                  type: prior
+                  timeDimension: mdd_events.happened_at
+
+      pre_aggregations:
+          - name: total_by_effective_month
+            type: rollup
+            measures:
+                - total
+            time_dimension: mdd_events.effective_at
+            granularity: month

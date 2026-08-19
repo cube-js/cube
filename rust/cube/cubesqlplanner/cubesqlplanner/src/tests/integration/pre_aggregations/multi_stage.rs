@@ -397,3 +397,44 @@ async fn test_multi_stage_time_shift_pre_agg_on_derived_time_dimension() {
         insta::assert_snapshot!(result);
     }
 }
+
+const MULTI_DEP_YAML: &str = "common/integration_multi_dep_time_dim_shift_pre_agg.yaml";
+const MULTI_DEP_SEED: &str = "integration_multi_dep_time_dim_shift_tables.sql";
+
+// A rollup stores one column for a time dimension built from two owned time
+// dimensions, while the shift covers only one of them. Offsetting the stored
+// column would move every row, including those the shift must leave in place,
+// so no offset of that column can reproduce the shifted values and the rollup
+// cannot serve the shifted leaf at all.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_time_shift_pre_agg_on_partially_shifted_time_dimension() {
+    let schema = MockSchema::from_yaml_file(MULTI_DEP_YAML)
+        .only_pre_aggregations(&["total_by_effective_month"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {r#"
+        measures:
+          - mdd_events.total
+          - mdd_events.total_prev_month
+        time_dimensions:
+          - dimension: mdd_events.effective_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: mdd_events.effective_at
+    "#};
+
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    assert!(
+        pre_aggrs.is_empty(),
+        "Rollup cannot represent the shifted leaf, so the query must fall back to base SQL; got {:?}",
+        pre_aggrs.iter().map(|u| u.name().clone()).collect_vec()
+    );
+
+    // Snapshot holds the values the same query produces from base SQL.
+    if let Some(result) = ctx.try_execute(query, MULTI_DEP_SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
