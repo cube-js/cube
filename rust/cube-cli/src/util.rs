@@ -150,10 +150,12 @@ pub fn body(map: Map<String, Value>) -> Value {
 /// `deployments build-status`. Everywhere else an optional `--branch` now accepts a
 /// blank and sends it.
 ///
-/// The reason it is worth rejecting where it stays: an empty value is not dropped, it is
-/// sent as an empty field, and what an empty field means is then the server's
-/// choice rather than the caller's. Where that choice has actually been measured,
-/// `nonempty_target` says so instead.
+/// The reason it is worth rejecting where it stays differs by caller, which is why the
+/// message names both: on the required names a blank names no branch at all and the
+/// server never gets a say, while on the optional flags it is not dropped — it is sent as
+/// an empty field, and what an empty field means is then the server's choice rather than
+/// the caller's. Where that choice has actually been measured, `nonempty_target` says so
+/// instead.
 ///
 /// Empty values reach the CLI from scripts, not just from typos: `jq -r` prints
 /// nothing at all for empty input, and `$GITHUB_HEAD_REF` is empty on every trigger
@@ -751,8 +753,8 @@ mod tests {
             "a branch argument that takes an empty value at parse time was added, \
              removed or renamed. This list records the parser's answer alone — that a \
              blank then travels as an empty field is held by `set`, `push` and \
-             `write_body`. A new one belongs here only if you want a blank both taken \
-             and sent."
+             `write_body`. A new one belongs here only if you want the parser to take a \
+             blank; check what the command then does with it."
         );
     }
 
