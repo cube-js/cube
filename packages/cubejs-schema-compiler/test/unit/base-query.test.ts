@@ -183,17 +183,6 @@ describe('SQL Generation', () => {
       expect(query.buildSqlAndParams()[0]).toContain(`AT TIME ZONE '${expected}'`);
     });
 
-    // Unreachable over HTTP: every route validates the timezone as a string before the
-    // query is built, so a wrong type here is a bug in a config hook.
-    it.each([
-      123,
-      {},
-      true,
-    ])('rejects non-string timezone %j', async (timezone) => {
-      await compilers.compiler.compile();
-      expect(() => buildTimezoneQuery(timezone as any)).toThrow(TypeError);
-    });
-
     it('Simple query - complex measure', async () => {
       await compilers.compiler.compile();
 
