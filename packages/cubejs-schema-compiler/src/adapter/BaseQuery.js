@@ -299,12 +299,15 @@ export class BaseQuery {
     this.multiStageQuery = this.options.multiStageQuery;
     this.timezone = this.options.timezone;
 
-    // Backstop guard for every dialect convertTz() sink. Deliberately does not canonicalize:
-    // rewriting this.timezone would change generated SQL and pre-agg partition keys for
-    // non-gateway callers (queryRewrite, refresh scheduler). The type is checked here so a
-    // wrong one stays a user error instead of the TypeError canonicalTimezone raises.
-    if (this.timezone && (typeof this.timezone !== 'string' || !canonicalTimezone(this.timezone))) {
-      throw new UserError(`Incorrect timezone ${this.timezone}`);
+    // Backstop for every dialect convertTz() sink: callers that bypass the API gateway
+    // (queryRewrite, refresh scheduler, SQL API sessions) reach the dialects through here.
+    if (this.timezone) {
+      const timezone = canonicalTimezone(this.timezone);
+      if (!timezone) {
+        throw new UserError(`Incorrect timezone ${this.timezone}`);
+      }
+
+      this.timezone = timezone;
     }
 
     this.rowLimit = this.options.rowLimit;
@@ -949,7 +952,7 @@ export class BaseQuery {
       dimensions: this.options.dimensions,
       segments: this.options.segments,
       timeDimensions: this.options.timeDimensions,
-      timezone: this.options.timezone,
+      timezone: this.timezone,
       joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
       securityContext: this.contextSymbols.securityContext,
@@ -1007,7 +1010,7 @@ export class BaseQuery {
       dimensions: this.options.dimensions,
       segments: this.options.segments,
       timeDimensions: this.options.timeDimensions,
-      timezone: this.options.timezone,
+      timezone: this.timezone,
       joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
       order,

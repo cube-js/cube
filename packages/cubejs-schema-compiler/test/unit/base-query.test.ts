@@ -171,19 +171,27 @@ describe('SQL Generation', () => {
       expect(() => buildTimezoneQuery('Not/AZone')).toThrow('Incorrect timezone Not/AZone');
     });
 
-    it('validates without canonicalizing the timezone', async () => {
+    // The native planner parses the zone case-sensitively, so the name reaching the
+    // dialects has to be the canonical one whichever planner runs.
+    it.each([
+      ['utc', 'UTC'],
+      ['america/new_york', 'America/New_York'],
+    ])('canonicalizes timezone %j to %j', async (timezone, expected) => {
       await compilers.compiler.compile();
-      const query = buildTimezoneQuery('utc');
-      expect(query.timezone).toBe('utc');
+      const query = buildTimezoneQuery(timezone);
+      expect(query.timezone).toBe(expected);
+      expect(query.buildSqlAndParams()[0]).toContain(`AT TIME ZONE '${expected}'`);
     });
 
+    // Unreachable over HTTP: every route validates the timezone as a string before the
+    // query is built, so a wrong type here is a bug in a config hook.
     it.each([
       123,
       {},
       true,
-    ])('rejects non-string timezone %j as a UserError', async (timezone) => {
+    ])('rejects non-string timezone %j', async (timezone) => {
       await compilers.compiler.compile();
-      expect(() => buildTimezoneQuery(timezone as any)).toThrow(UserError);
+      expect(() => buildTimezoneQuery(timezone as any)).toThrow(TypeError);
     });
 
     it('Simple query - complex measure', async () => {
