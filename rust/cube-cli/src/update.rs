@@ -133,14 +133,32 @@ pub fn spawn_check() -> tokio::task::JoinHandle<UpdateCheck> {
     })
 }
 
-/// Await the background check (best effort, never blocks long). The check runs
-/// concurrently with the command; give it a short grace period in case the
-/// command finished faster than the API call.
-pub async fn resolve(handle: tokio::task::JoinHandle<UpdateCheck>) -> UpdateCheck {
+/// Await the background check, but only when its answer will be used: the
+/// notice is interactive-only and the hint only runs on an API failure, so a
+/// piped command that succeeded must not pay for a GitHub round trip it will
+/// throw away.
+pub async fn resolve(
+    handle: Option<tokio::task::JoinHandle<UpdateCheck>>,
+    api_error: bool,
+) -> UpdateCheck {
+    let Some(handle) = handle else {
+        return UpdateCheck::Unknown;
+    };
+    if !wanted(api_error, std::io::stderr().is_terminal()) {
+        return UpdateCheck::Unknown;
+    }
+    // The check runs concurrently with the command; give it a short grace
+    // period in case the command finished faster than the API call.
     match tokio::time::timeout(Duration::from_millis(1500), handle).await {
         Ok(Ok(outcome)) => outcome,
         _ => UpdateCheck::Unknown,
     }
+}
+
+/// Whether anything will read the check's answer — [`print_notice`] on a
+/// terminal, or [`api_error_hint`] under an API failure.
+fn wanted(api_error: bool, interactive: bool) -> bool {
+    api_error || interactive
 }
 
 /// Print the "new release available" notice, if there is one to print.
@@ -216,6 +234,15 @@ mod tests {
 
     fn hint(outcome: &UpdateCheck, announced: bool) -> Option<String> {
         hint_for(outcome, announced, false)
+    }
+
+    #[test]
+    fn a_piped_command_that_succeeded_does_not_wait_on_the_check() {
+        // Neither consumer would read the answer, so there is nothing to await.
+        assert!(!wanted(false, false));
+        // A terminal gets the notice; an API failure gets the hint.
+        assert!(wanted(false, true));
+        assert!(wanted(true, false));
     }
 
     #[test]

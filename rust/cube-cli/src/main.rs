@@ -299,10 +299,7 @@ async fn main() {
         }
         telemetry::flush().await;
     }
-    let outcome = match check {
-        Some(check) => update::resolve(check).await,
-        None => update::UpdateCheck::Unknown,
-    };
+    let outcome = update::resolve(check, api_error).await;
     let announced = update::print_notice(&outcome);
     if let Err(err) = result {
         eprintln!("error: {err:#}");
