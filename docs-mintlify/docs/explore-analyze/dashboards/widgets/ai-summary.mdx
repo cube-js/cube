@@ -1,13 +1,13 @@
 ---
-title: AI summary
+title: Analysis
 description: Generate natural-language summaries of dashboard data on demand using an AI agent.
 ---
 
-AI summary widgets generate a natural-language summary of the data shown on the dashboard. Write a prompt — for example, _"Summarize the key trends and call out anything unusual"_ — and the configured [AI agent][ref-agents] produces a Markdown narrative based on the current dashboard state, including the data behind every chart and the values of any active [controls][ref-controls].
+Analysis widgets generate a natural-language summary of the data shown on the dashboard. Write a prompt — for example, _"Summarize the key trends and call out anything unusual"_ — and the configured [AI agent][ref-agents] produces a Markdown narrative based on the current dashboard state, including the data behind every chart and the values of any active [controls][ref-controls].
 
-## Adding an AI summary
+## Adding an Analysis widget
 
-In the [dashboard builder][ref-workbooks], add an AI summary from the **Add Widgets** menu in the toolbar. The widget opens with a prompt editor — write your prompt and click **Generate Summary** to produce the first response.
+In the [dashboard builder][ref-workbooks], add an Analysis widget from the **Add Widgets** menu in the toolbar. The widget opens with a prompt editor — write your prompt and click **Run** to produce the first response. A widget that hasn't been run yet shows "Analysis is not run yet" with a **Run** button.
 
 ## Use cases
 
@@ -28,11 +28,11 @@ Once generated, the summary is **cached** with the widget. Viewers loading the d
 
 The widget keeps a checksum of the dashboard state at the time of generation: the queries behind each chart, the active control values, and the chart configuration. When any of those change, the widget marks the cached summary as **stale** and shows a refresh prompt so viewers know the narrative may no longer match the data.
 
-Click the refresh icon (or open the widget menu and choose **Refresh**) to regenerate using the saved prompt against the latest state.
+On a published dashboard, a widget that has run shows a freshness indicator instead of a menu — colored by how old the data is, with a tooltip reading "Refreshed *N* ago". Open it and choose **Refresh** to regenerate using the saved prompt against the latest state. The dashboard's **Refresh all charts** control also refreshes any Analysis widget that has already run at least once.
 
 ## Choosing the agent
 
-By default, AI summaries use the agent configured at the dashboard level. You can override the agent per widget when you need a particular [agent's][ref-agents] tooling, model, or guardrails for a specific summary.
+By default, Analysis widgets use the agent configured at the dashboard level. You can override the agent per widget when you need a particular [agent's][ref-agents] tooling, model, or guardrails for a specific summary.
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-agents]: /admin/ai
