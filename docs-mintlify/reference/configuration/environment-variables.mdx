@@ -1415,6 +1415,14 @@ for][ref-config-sched-refresh-timer].
 | --------------------------------------------------------- | ---------------------- | --------------------- |
 | [A valid timezone from the tz database][wiki-tz-database] | N/A                    | N/A                   |
 
+<Warning>
+
+An invalid value fails at server startup. Only TZ Database names are accepted — fixed
+UTC offsets such as `+05:00` are rejected. Empty entries are ignored, so a trailing or
+repeated comma, e.g. `UTC,`, is not an error.
+
+</Warning>
+
 It can be also set using the [`scheduled_refresh_time_zones` configuration
 option](/reference/configuration/config#scheduled_refresh_time_zones).
 
