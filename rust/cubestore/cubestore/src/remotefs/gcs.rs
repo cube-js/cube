@@ -121,6 +121,10 @@ di_service!(GCSRemoteFs, [RemoteFs, ExtendedRemoteFs]);
 /// GCS answers 404 for an object that is already gone where S3 answers 204. Absent is the state a
 /// caller of `delete_file` asked for and none of them can act on the difference, so it is reported
 /// as done rather than as a failure they have to log.
+///
+/// A missing bucket carries the same reason, and the client crate keeps the message and the code
+/// private, so the two cannot be told apart here. A bucket that is not there fails every upload and
+/// download loudly, which is the signal to go by.
 fn is_absent_object(e: &cloud_storage::Error) -> bool {
     match e {
         cloud_storage::Error::Google(response) => {

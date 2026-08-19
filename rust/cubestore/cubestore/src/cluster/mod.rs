@@ -67,7 +67,7 @@ use opentelemetry::Context as OtelContext;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::pin::Pin;
 use std::sync::Weak;
@@ -2113,6 +2113,8 @@ impl ClusterImpl {
             if self.node_name_by_partition(&p) != self.server_name {
                 continue;
             }
+            let mut missing_partition_file = false;
+            let mut missing_chunk_ids = Vec::new();
             if let Some(file) = p.get_row().get_full_name(p.get_id()) {
                 if self.stop_token.is_cancelled() {
                     log::debug!("Startup warmup cancelled");
@@ -2122,7 +2124,7 @@ impl ClusterImpl {
                     .remote_fs
                     .download_file(file, p.get_row().file_size())
                     .await;
-                self.report_warmup_download(result, p.get_id(), None).await;
+                missing_partition_file = self.warmup_file_is_absent(result);
             }
             for c in chunks {
                 if self.stop_token.is_cancelled() {
@@ -2139,53 +2141,131 @@ impl ClusterImpl {
                         c.get_row().file_size(),
                     )
                     .await;
-                self.report_warmup_download(result, p.get_id(), Some(c.get_id()))
-                    .await;
+                if self.warmup_file_is_absent(result) {
+                    missing_chunk_ids.push(c.get_id());
+                }
+            }
+            if missing_partition_file || !missing_chunk_ids.is_empty() {
+                self.report_absent_warmup_files(
+                    p.get_id(),
+                    missing_partition_file,
+                    &missing_chunk_ids,
+                )
+                .await;
             }
         }
         log::debug!("Startup warmup finished");
         return;
     }
 
-    /// A file that is gone by the time the pass reaches it is the normal case: the walk takes as
-    /// long as it takes and compaction removes what it replaces meanwhile. One that an active row
-    /// still points at means the data is really missing, which is worth an error.
-    async fn report_warmup_download(
-        &self,
-        result: Result<String, CubeError>,
-        partition_id: u64,
-        chunk_id: Option<u64>,
-    ) {
-        let e = match result {
-            Ok(_) => return,
-            Err(e) => e,
-        };
-        if e.is_file_not_found() {
-            if self.is_warmup_file_referenced(partition_id, chunk_id).await {
-                app_metrics::WARMUP_MISSING_ACTIVE.increment();
-                log::error!("Warmup file of an active row is missing: {}", e.message);
-            } else {
-                app_metrics::WARMUP_MISSING_STALE.increment();
-                log::debug!("Skipping warmup of a replaced file: {}", e.message);
+    /// Reports everything but an absent file, which on its own says nothing: only the metastore can
+    /// tell whether the pass is simply behind or the data is gone.
+    fn warmup_file_is_absent(&self, result: Result<String, CubeError>) -> bool {
+        match result {
+            Ok(_) => false,
+            Err(e) if e.is_file_not_found() => true,
+            Err(e) => {
+                log::error!("Error: {:?}", e);
+                false
             }
-            return;
         }
-        log::error!("Error: {:?}", e);
     }
 
-    /// Whether the metastore still points at the file. A row that cannot be read counts as gone,
-    /// the same way the corrupt data deactivation path treats it.
-    async fn is_warmup_file_referenced(&self, partition_id: u64, chunk_id: Option<u64>) -> bool {
-        match chunk_id {
-            Some(chunk_id) => match self.meta_store.get_chunk(chunk_id).await {
-                Ok(c) => c.get_row().active(),
-                Err(_) => false,
-            },
-            None => match self.meta_store.get_partition(partition_id).await {
-                Ok(p) => p.get_row().has_main_table_file(),
-                Err(_) => false,
-            },
+    /// A file that is gone by the time the pass reaches it is the normal case: the walk takes as
+    /// long as it takes and compaction removes what it replaces meanwhile. A file the metastore
+    /// still names is really missing, which is worth an error of its own.
+    async fn report_absent_warmup_files(
+        &self,
+        partition_id: u64,
+        partition_file: bool,
+        chunk_ids: &[u64],
+    ) {
+        let (partition_named, named_chunks) = match self
+            .named_warmup_files(partition_id, partition_file, chunk_ids)
+            .await
+        {
+            Ok(named) => named,
+            Err(e) => {
+                // Assuming either verdict would either hide missing data or report every file of a
+                // partition as lost, so report that the check itself did not happen.
+                log::warn!(
+                    "Could not check {} absent warmup file(s) of partition {} against the metastore: {}",
+                    chunk_ids.len() + partition_file as usize,
+                    partition_id,
+                    e
+                );
+                return;
+            }
+        };
+
+        let mut active = 0;
+        let mut stale = 0;
+        if partition_file {
+            if partition_named {
+                active += 1;
+                log::error!(
+                    "Warmup file of active partition {} is missing in remote fs",
+                    partition_id
+                );
+            } else {
+                stale += 1;
+            }
         }
+        for id in chunk_ids {
+            if named_chunks.contains(id) {
+                active += 1;
+                log::error!("Warmup file of active chunk {} is missing in remote fs", id);
+            } else {
+                stale += 1;
+            }
+        }
+
+        if 0 < active {
+            app_metrics::WARMUP_MISSING_ACTIVE.add(active);
+        }
+        if 0 < stale {
+            app_metrics::WARMUP_MISSING_STALE.add(stale);
+            log::debug!(
+                "Skipping {} warmup file(s) of partition {} replaced since the snapshot",
+                stale,
+                partition_id
+            );
+        }
+    }
+
+    /// Which of the files the metastore still names, read in one batch per partition so that a node
+    /// whose snapshot compaction has long moved on does not turn the check into a request per file.
+    /// The batch reads leave out the ids they no longer hold, which is what tells a deleted row
+    /// apart from a metastore we could not reach.
+    async fn named_warmup_files(
+        &self,
+        partition_id: u64,
+        partition_file: bool,
+        chunk_ids: &[u64],
+    ) -> Result<(bool, HashSet<u64>), CubeError> {
+        let partition_named = if partition_file {
+            self.meta_store
+                .get_partitions_out_of_queue(vec![partition_id])
+                .await?
+                .first()
+                .map_or(false, |p| p.get_row().has_main_table_file())
+        } else {
+            false
+        };
+
+        let mut named_chunks = HashSet::new();
+        if !chunk_ids.is_empty() {
+            for c in self
+                .meta_store
+                .get_chunks_out_of_queue(chunk_ids.to_vec())
+                .await?
+            {
+                if c.get_row().active() {
+                    named_chunks.insert(c.get_id());
+                }
+            }
+        }
+        Ok((partition_named, named_chunks))
     }
 }
 
@@ -2392,13 +2472,12 @@ mod tests {
                     .await?[0]
                     .get_id();
 
-                assert!(
-                    cluster
-                        .is_warmup_file_referenced(partition_id, Some(chunk_id))
-                        .await
-                );
+                let (partition_named, named_chunks) = cluster
+                    .named_warmup_files(partition_id, true, &[chunk_id])
+                    .await?;
+                assert!(named_chunks.contains(&chunk_id));
                 // The partition holds no data of its own until it is compacted.
-                assert!(!cluster.is_warmup_file_referenced(partition_id, None).await);
+                assert!(!partition_named);
 
                 services
                     .injector
@@ -2416,18 +2495,15 @@ mod tests {
                     .remove(0)
                     .get_id();
                 assert_ne!(compacted_id, partition_id);
-                assert!(cluster.is_warmup_file_referenced(compacted_id, None).await);
-                assert!(!cluster.is_warmup_file_referenced(partition_id, None).await);
-                assert!(
-                    !cluster
-                        .is_warmup_file_referenced(partition_id, Some(chunk_id))
-                        .await
-                );
-                assert!(
-                    !cluster
-                        .is_warmup_file_referenced(partition_id, Some(chunk_id + 1000))
-                        .await
-                );
+                assert!(cluster.named_warmup_files(compacted_id, true, &[]).await?.0);
+
+                // An id the metastore no longer holds at all is left out of the batch read, the
+                // same as one it holds as inactive.
+                let (partition_named, named_chunks) = cluster
+                    .named_warmup_files(partition_id, true, &[chunk_id, chunk_id + 1000])
+                    .await?;
+                assert!(!partition_named);
+                assert!(named_chunks.is_empty());
 
                 Ok::<(), CubeError>(())
             })
