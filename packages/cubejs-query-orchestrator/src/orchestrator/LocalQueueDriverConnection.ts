@@ -128,7 +128,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
       return { ...item.payload, ...item.extra };
     }
 
-    return item.payload;
+    return { ...item.payload };
   }
 
   /**
