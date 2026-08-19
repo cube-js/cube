@@ -681,6 +681,29 @@ mod tests {
         // ids that name a branch or a ref, so a rename out of that family (`branch` →
         // `name`, as `create-branch <name>` already is) or an outright removal would
         // shrink the walk, and a floor would absorb that silently.
+        //
+        // What the two sides record is NOT "required" against "optional". A clap
+        // `value_parser` never runs on an omitted flag, so `None` was always legal and
+        // every argument here was already optional; the guard only ever rejected
+        // `Some("")`. The accepting side is therefore a decision about supplied-but-empty
+        // — it means the documented default rather than an error — not a flag becoming
+        // optional that wasn't.
+        //
+        // Nor is the split derived from what a blank then COSTS, which is what makes the
+        // one pair that looks like an oversight deliberate: `deploy --branch` and
+        // `deployments build-status --branch` carry the same documented fallback word for
+        // word, and only the second is guarded — yet a blank `deploy` uploads the local
+        // tree and prunes what isn't in it, where a blank `build-status` only misreports.
+        // `merge-to-default` is the same shape, merging into the deploy branch and
+        // deleting the source. Both were raised in review and deliberately left here, so
+        // consequence is not the axis and a new write-shaped flag doesn't join `refuses`
+        // by being destructive.
+        //
+        // Finally, the walk sees parse time and nothing else: landing in `accepts` means
+        // the parser took the value, not that it reaches a request. That it travels as an
+        // empty field is held by `set`, `push` and `write_body`, which insert `Some("")`
+        // verbatim — a command that later dropped a blank while building its own body
+        // would not fail anything here.
         assert_eq!(
             refuses,
             [
@@ -720,9 +743,10 @@ mod tests {
                 "cube deploy --branch",
                 "cube github connect --branch",
             ],
-            "a branch argument that takes an empty value and sends it as an empty \
-             field was added, removed or renamed. A new one belongs on this list \
-             only if leaving the target to the server is what you want for it."
+            "a branch argument that takes an empty value at parse time was added, \
+             removed or renamed. A new one belongs on this list only if letting a \
+             supplied-but-empty value mean the documented default is what you want \
+             for it."
         );
     }
 

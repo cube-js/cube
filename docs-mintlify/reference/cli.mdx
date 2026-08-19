@@ -288,17 +288,18 @@ cube data-model merge-to-default DEPLOYMENT_ID --branch my-branch -m "add orders
 
 <Warning>
 
-Check that `$DEV` is set before the two lines that use it. An interactive shell has no
+Check that `$DEV` is set before `put` and `commit` use it. An interactive shell has no
 `pipefail`, so a failed `dev-mode` leaves it empty and `jq` still exits 0 — and `put` and
 `commit` accept an empty `--branch`, sending an empty field rather than stopping. They
-would then act on whatever your dev-mode session currently points at. `delete-branch`
-two lines later does refuse it, so the sequence fails eventually, but only after `commit`
-has already pushed. In a script, `set -o pipefail` and a `[ -n "$DEV" ]` guard cover it.
+would then act on whatever your dev-mode session currently points at. `delete-branch`,
+the third line taking `$DEV`, does refuse it, so the sequence fails eventually — but only
+after `commit` has already pushed. In a script, `set -o pipefail` and a `[ -n "$DEV" ]`
+guard cover it.
 
 </Warning>
 
-That accounts for `my-branch`; the two lines before it account for what you'd otherwise
-leave behind. Dev mode is per-credential state, so while a session stays open every
+That accounts for `my-branch`; `exit-dev-mode` and `delete-branch` account for what
+you'd otherwise leave behind. Dev mode is per-credential state, so while a session stays open every
 command that omits `--branch` targets that dev branch instead of the deploy branch, and
 each pass through this workflow forks another `dev-…` branch. Releasing and pruning
 before the merge also keeps the fork's parent around until the fork is gone.
