@@ -95,6 +95,7 @@ describe('SQL Generation', () => {
           'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
+
     it('Simple query - time dimension', async () => {
       await compilers.compiler.compile();
 
@@ -122,6 +123,66 @@ describe('SQL Generation', () => {
       expect(queryAndParams[0]).toContain('GROUP BY 1, 2');
       expect(queryAndParams[0]).toContain('ORDER BY  2');
     });
+
+    const buildTimezoneQuery = (timezone: string) => new PostgresQuery(compilers, {
+      measures: ['cards.count'],
+      timeDimensions: [
+        {
+          dimension: 'cards.createdAt',
+          granularity: 'day',
+          dateRange: ['2021-01-01', '2021-01-02']
+        }
+      ],
+      timezone,
+      filters: [],
+    });
+
+    it.each([
+      'Not/AZone',
+      '+05:00',
+      '+05',
+      '05',
+      'foo/bar',
+    ])('rejects invalid timezone %j', async (timezone) => {
+      await compilers.compiler.compile();
+      expect(() => buildTimezoneQuery(timezone)).toThrow(UserError);
+    });
+
+    it.each([
+      'America/New_York',
+      'america/new_york',
+      'AMERICA/NEW_YORK',
+      'utc',
+      'uTc',
+    ])('accepts valid timezone regardless of case: %s', async (timezone) => {
+      await compilers.compiler.compile();
+      expect(() => buildTimezoneQuery(timezone)).not.toThrow();
+    });
+
+    it('renders a canonical timezone into SQL', async () => {
+      await compilers.compiler.compile();
+      const [sql] = buildTimezoneQuery('America/New_York').buildSqlAndParams();
+      expect(sql).toContain("AT TIME ZONE 'America/New_York'");
+    });
+
+    // Counterpart: query_tools.rs `format!("Incorrect timezone {}", timezone)`.
+    it('reports the invalid zone with the same message as the native planner', async () => {
+      await compilers.compiler.compile();
+      expect(() => buildTimezoneQuery('Not/AZone')).toThrow('Incorrect timezone Not/AZone');
+    });
+
+    // The native planner parses the zone case-sensitively, so the name reaching the
+    // dialects has to be the canonical one whichever planner runs.
+    it.each([
+      ['utc', 'UTC'],
+      ['america/new_york', 'America/New_York'],
+    ])('canonicalizes timezone %j to %j', async (timezone, expected) => {
+      await compilers.compiler.compile();
+      const query = buildTimezoneQuery(timezone);
+      expect(query.timezone).toBe(expected);
+      expect(query.buildSqlAndParams()[0]).toContain(`AT TIME ZONE '${expected}'`);
+    });
+
     it('Simple query - complex measure', async () => {
       await compilers.compiler.compile();
 
@@ -137,6 +198,7 @@ describe('SQL Generation', () => {
           'FROM  card_tbl  AS "cards"';
       expect(queryAndParams[0]).toEqual(expected);
     });
+
     it('Simple query - complex dimension', async () => {
       await compilers.compiler.compile();
 
@@ -157,6 +219,7 @@ describe('SQL Generation', () => {
           'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
+
     it('Simple query - CUBE dimension', async () => {
       await compilers.compiler.compile();
 
@@ -177,6 +240,7 @@ describe('SQL Generation', () => {
           'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
+
     it('Simple query - CUBE id', async () => {
       await compilers.compiler.compile();
 
@@ -197,6 +261,7 @@ describe('SQL Generation', () => {
           'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
+
     it('Simple query - simple filter', async () => {
       await compilers.compiler.compile();
 
@@ -241,6 +306,7 @@ describe('SQL Generation', () => {
       const expectedParams = ['type_value', 'not_type_value', 'type_value'];
       expect(queryAndParams[1]).toEqual(expectedParams);
     });
+
     it('Simple query - null and many equals filter', async () => {
       await compilers.compiler.compile();
 
