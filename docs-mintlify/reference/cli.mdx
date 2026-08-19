@@ -556,7 +556,10 @@ The CLI refuses an empty `--branch` or `--ref` rather than letting either mean
 "whichever branch the server would have picked", so a gate that gets this wrong
 fails instead of reporting green — but failing at the source beats failing later.
 Note that `$GITHUB_HEAD_REF` is only set on `pull_request` events; on any other
-trigger `--ref` gets an empty string, which is why the run stops there.
+trigger `--ref` gets an empty string, which is why the run stops there. The one exception
+is `data-model put --branch`, which reads an empty value as "not specified" instead: its
+fallback is your own active dev-mode branch, so an unnamed target there is neither shared
+nor production, and nothing is sent. Every flag this recipe uses refuses one.
 
 The API key needs more than the sync itself: `SchemaUpdate` to start or cancel a sync,
 enter dev mode and delete branches, `SchemaRead` to follow a sync and read the data model,

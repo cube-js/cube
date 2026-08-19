@@ -143,8 +143,16 @@ pub fn body(map: Map<String, Value>) -> Value {
 /// match arms did not hold: this check was added three times, and each round found
 /// another flag that had been missed. The last one was `github connect --branch`,
 /// which sends its value under the key `branch` and so escaped even a grep for
-/// `branchName`. `every_branch_and_ref_flag_refuses_an_empty_value` counts the flags
-/// and holds the property, so the number lives in that assertion and nowhere else.
+/// `branchName`. `only_the_named_exemption_accepts_an_empty_branch_or_ref` counts the
+/// flags and holds the property, so the number lives in that assertion and nowhere else.
+///
+/// One flag is exempt, and the test names it: `data-model put --branch`. Its fallback is
+/// the caller's OWN active dev-mode branch, so an unnamed target there is neither shared
+/// nor production, and `write_body` drops the blank instead of sending an empty
+/// `branchName` — the request becomes the one omitting the flag would have sent. What
+/// keeps the rest is not the blank itself but where their fallback lands: `deploy` and
+/// `build-status` fall back to the deploy branch, `merge-to-default` merges into it, and
+/// `dbt sync --ref` starts a job on the way to its own.
 ///
 /// The reason it is worth rejecting at all: an empty value is not dropped, it is
 /// sent as an empty field, and what an empty field means is then the server's
@@ -535,16 +543,23 @@ mod tests {
 
     /// Holds the promise the doc comment makes, which hand-written calls in match
     /// arms could not: every `--branch`/`--ref` in the whole command tree refuses an
-    /// empty value. A new branch-taking flag is a copy of a declaration, so this
-    /// fails the moment one is declared without the parser.
+    /// empty value, bar the one exemption named below. A new branch-taking flag is a
+    /// copy of a declaration, so this fails the moment one is declared without the
+    /// parser.
     ///
     /// It goes through real argument parsing rather than introspecting the parser
     /// (clap keeps `ValueParser::parse_ref` private), filling every other required
     /// argument with a placeholder so that the only thing left to object to is the
     /// empty value.
     #[test]
-    fn every_branch_and_ref_flag_refuses_an_empty_value() {
+    fn only_the_named_exemption_accepts_an_empty_branch_or_ref() {
         use clap::{CommandFactory, Parser};
+
+        /// The flags that read a blank as "not specified" instead of refusing it.
+        /// Listed, not counted, so the exemption is a line someone has to write and
+        /// justify rather than a number quietly going down by one. See [`nonempty`]
+        /// for what separates this flag from the rest.
+        const ACCEPTS_A_BLANK: &[&str] = &["cube data-model put --branch"];
 
         // On the action, not on `get_num_args()`: the derive leaves num_args
         // unresolved until `Command::build`, so an unbuilt tree reports `None` for
@@ -623,11 +638,22 @@ mod tests {
                     .err()
                     .map(|e| e.to_string())
                     .unwrap_or_default();
+                if ACCEPTS_A_BLANK.contains(&flag.as_str()) {
+                    // Asserted rather than skipped: an exemption that quietly started
+                    // refusing again would leave a list entry describing nothing, and
+                    // the count below would still add up.
+                    assert!(
+                        err.is_empty(),
+                        "{flag} is listed as accepting a blank but refuses one: {err}"
+                    );
+                    continue;
+                }
                 assert!(
                     err.contains("an empty value"),
                     "{flag} accepts an empty value — add \
-                     `value_parser = util::nonempty` to the declaration.\n\
-                     Got instead: {err}"
+                     `value_parser = util::nonempty` to the declaration, or list it in \
+                     ACCEPTS_A_BLANK if its fallback is the caller's own dev-mode \
+                     branch.\nGot instead: {err}"
                 );
                 checked.push(flag);
             }
@@ -646,7 +672,7 @@ mod tests {
         // walk, and a floor would absorb that silently.
         assert_eq!(
             checked.len(),
-            20,
+            19,
             "a branch/ref flag was added, removed or renamed — update the count and \
              check the new one carries `value_parser = util::nonempty`: {checked:#?}"
         );
