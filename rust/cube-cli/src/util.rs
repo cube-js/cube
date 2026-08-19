@@ -159,8 +159,10 @@ pub fn body(map: Map<String, Value>) -> Value {
 /// and is not dropped but sent as an empty field, leaving what that means to the server
 /// rather than to the caller. What is specific to the five required names is that clap
 /// will not let you omit them, so a blank there is a name the caller failed to supply
-/// rather than a value left open; that reason lives here and not in the string. Where
-/// the server's choice has actually been measured, `nonempty_target` says so instead.
+/// rather than a value left open — which the message does not say, carrying only the
+/// shared half. `only_the_listed_branch_arguments_refuse_an_empty_value` is where the
+/// split itself is recorded, as it is for the set above. Where the server's choice has
+/// actually been measured, `nonempty_target` says so instead.
 ///
 /// Empty values reach the CLI from scripts, not just from typos: `jq -r` prints
 /// nothing at all for empty input, and `$GITHUB_HEAD_REF` is empty on every trigger
