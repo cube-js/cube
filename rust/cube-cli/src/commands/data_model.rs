@@ -27,7 +27,7 @@ enum Cmd {
         #[arg(long)]
         content: bool,
         /// Branch to read (defaults to the deployment's default branch)
-        #[arg(long, value_parser = util::nonempty)]
+        #[arg(long)]
         branch: Option<String>,
     },
     /// Print a single file's content
@@ -37,7 +37,7 @@ enum Cmd {
         /// File path within the project, e.g. model/cubes/orders.yml
         path: String,
         /// Branch name (defaults to the deployment default branch)
-        #[arg(long, value_parser = util::nonempty)]
+        #[arg(long)]
         branch: Option<String>,
     },
     /// Create or overwrite a file (writes require a dev-mode branch)
@@ -54,7 +54,7 @@ enum Cmd {
         content: Option<String>,
         /// Dev-mode branch to write to, as returned by `dev-mode` (defaults to
         /// your active dev-mode branch)
-        #[arg(long, value_parser = util::nonempty)]
+        #[arg(long)]
         branch: Option<String>,
     },
     /// Delete files (writes require a dev-mode branch)
@@ -67,7 +67,7 @@ enum Cmd {
         paths: Vec<String>,
         /// Dev-mode branch to write to, as returned by `dev-mode` (defaults to
         /// your active dev-mode branch)
-        #[arg(long, value_parser = util::nonempty)]
+        #[arg(long)]
         branch: Option<String>,
     },
     /// Rename (move) a file (writes require a dev-mode branch)
@@ -80,7 +80,7 @@ enum Cmd {
         to: String,
         /// Dev-mode branch to write to, as returned by `dev-mode` (defaults to
         /// your active dev-mode branch)
-        #[arg(long, value_parser = util::nonempty)]
+        #[arg(long)]
         branch: Option<String>,
     },
     /// List branches
@@ -157,7 +157,7 @@ enum Cmd {
         #[arg(long, short = 'm')]
         message: Option<String>,
         /// Branch to commit (defaults to the active dev-mode branch)
-        #[arg(long, value_parser = util::nonempty)]
+        #[arg(long)]
         branch: Option<String>,
     },
     /// List server-side content hashes of data model files
@@ -165,7 +165,7 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Branch name (defaults to the deployment default branch)
-        #[arg(long, value_parser = util::nonempty)]
+        #[arg(long)]
         branch: Option<String>,
     },
     /// Sync a branch from its remote and rebuild if it moved
@@ -173,7 +173,7 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Branch name (defaults to the deployment default branch)
-        #[arg(long, value_parser = util::nonempty)]
+        #[arg(long)]
         branch: Option<String>,
     },
     /// Merge a branch into its parent branch
@@ -181,7 +181,7 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Branch to merge (defaults to the active dev-mode branch)
-        #[arg(long, value_parser = util::nonempty)]
+        #[arg(long)]
         branch: Option<String>,
         /// Squash commits into one
         #[arg(long)]
@@ -198,7 +198,7 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Branch to merge (defaults to the active dev-mode branch)
-        #[arg(long, value_parser = util::nonempty)]
+        #[arg(long)]
         branch: Option<String>,
         /// Commit message
         #[arg(long, short = 'm')]
