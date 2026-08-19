@@ -21,7 +21,7 @@ pub struct Args {
     directory: PathBuf,
     /// Branch to deploy to (defaults to the active dev-mode branch, else the
     /// deploy branch)
-    #[arg(long, value_parser = util::nonempty)]
+    #[arg(long)]
     branch: Option<String>,
     /// Keep remote files that don't exist locally (default prunes them)
     #[arg(long)]

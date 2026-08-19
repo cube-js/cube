@@ -28,7 +28,7 @@ enum Cmd {
         #[arg(long)]
         space: Option<String>,
         /// Branch name (defaults to the deployment default branch)
-        #[arg(long, value_parser = util::nonempty)]
+        #[arg(long)]
         branch: Option<String>,
     },
 }
