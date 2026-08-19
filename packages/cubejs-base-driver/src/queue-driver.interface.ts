@@ -24,7 +24,8 @@ export type RetrieveForProcessingResponse = [
 
 export interface AddToQueueQuery {
   isJob: boolean,
-  orphanedTimeout: unknown
+  // Read only by QueryQueue.executeInQueue, which copies it into AddToQueueOptions
+  orphanedTimeout?: unknown
 }
 
 export interface AddToQueueOptions {
