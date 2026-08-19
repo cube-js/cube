@@ -294,7 +294,7 @@ can change their values, switch operators, or remove them entirely.
 
 Each entry has a `member` (a dimension or measure exposed by the view), an
 `operator`, and a list of `values` — or a single `value`, which is natural for
-single-value operators. Null-check operators take no value.
+single-value operators. The null and empty checks take no value.
 
 <Info>
 
@@ -366,13 +366,23 @@ view(`orders_view`, {
 ##### Operators
 
 Operators use the same labels data consumers see in the workbook filter bar —
-what you see in the filter bar is what you type: `is`, `is not`, `after date`,
-`after or on date`, `before date`, `before or on date`, `between`, `contains`,
-`not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`,
-`is null`, `is not null`.
+what you see in the filter bar is what you type:
+
+- Any member: `is`, `is not`, `is null`, `is not null`.
+- Strings: `contains`, `not contains`, `starts with`, `not starts with`,
+  `ends with`, `not ends with`, `is empty`, `is not empty`.
+- Numbers: `greater than`, `greater than or equal`, `less than`,
+  `less than or equal`, `between`.
+- Dates and times: `after`, `after or on`, `before`, `before or on`, `between`,
+  and the period comparisons `in the month`, `not in the month`,
+  `in the quarter`, `not in the quarter`, `in the year`, `not in the year`. A
+  period comparison takes any date inside the period, so `in the year` with
+  `2026-03-14` means all of 2026.
 
 Operators are case-insensitive and whitespace-tolerant. Internal type names and
-REST API aliases (e.g. `equals`, `gte`, `inDateRange`) are also accepted.
+REST (JSON) API aliases (e.g. `equals`, `gte`, `inDateRange`) are also accepted,
+as are the older `after date` / `before or on date` spellings the filter bar used
+before the noun was dropped.
 
 On a date or time member, `is` with a relative value is an **equality** at that
 value's grain, not a range — `is yesterday` matches yesterday only (e.g.

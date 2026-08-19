@@ -34,7 +34,73 @@ ellipsis. Hover over a truncated cell to see its full value in a tooltip.
 
 ## Filtering
 
-Dimensions and measures can be added as filters to focus on specific rows of data.
+Dimensions and measures can be added as filters to focus on specific rows of
+data. Pick **Filter** in a member's menu in the left pane, or in a result
+column's menu, to add the first one. The filter bar then appears above the
+results, with a **Filter** button for adding more — you can filter on any member
+of the semantic view, whether or not the query selects it.
+
+Every filter is a chip showing its member, operator and value. Click the chip
+to edit it, or use its options menu to remove it. A filter added without a
+value yet is highlighted and left out of the query; the query runs as soon as
+the value is complete.
+
+Filtering a dimension keeps or drops rows before aggregation, as a SQL `WHERE`
+condition. Filtering a measure applies after aggregation, as a `HAVING`
+condition — so `revenue greater than 1000` keeps groups whose total exceeds
+1000, not individual orders.
+
+### Operators
+
+The operators offered depend on the member's data type, for measures as much as
+for dimensions:
+
+| Data type | Operators |
+| --- | --- |
+| String | is, is not, contains, not contains, starts with, not starts with, ends with, not ends with, is null, is not null, is empty, is not empty |
+| Number | is, is not, greater than, greater than or equal, less than, less than or equal, between, is null, is not null |
+| Time | is, is not, after, after or on, before, before or on, between, in the month, not in the month, in the quarter, not in the quarter, in the year, not in the year, is null, is not null |
+| Boolean | is, is not, is null, is not null |
+
+On a number member the comparisons appear on the chip as `=`, `≠`, `>`, `≥`,
+`<` and `≤`.
+
+### Values
+
+- **is** and **is not** accept several values, matching any of them. On a string
+  member the value picker lists the member's own values and searches them
+  server-side, so you select from what the data actually contains.
+- The **contains**, **starts with** and **ends with** family matches a
+  substring, prefix or suffix, ignoring case.
+- **between** includes both bounds.
+- **is null**, **is not null**, **is empty** and **is not empty** take no value.
+  Empty means the empty string, which is not the same as null.
+- The period operators take any date inside the period — **in the year** with
+  `2026-03-14` matches all of 2026.
+- A date value can be fixed or relative. The date editor's **Relative** tab
+  takes values like `today`, `7 days ago`, `this month` or `2 weeks from now`,
+  and resolves them every time the query runs, so the window rolls forward on
+  its own. The full list is under
+  [`default_ui_filters`][ref-default-ui-filters].
+
+### Combining filters
+
+Filters in the bar are combined with AND: every one of them must hold. For OR,
+and for anything nested, use **Add advanced filter** in the filter picker's
+footer. It creates a group, shown as its own chip, whose operator sits as a
+toggle between the filters inside it — click it to switch the whole group
+between AND and OR. Groups can contain groups, which is how an expression like
+`status is completed AND (country is US OR city contains San)` is built.
+
+A group holds either dimension filters or measure filters, never both, because
+the two apply at different stages of the query. Its **Filter** button therefore
+offers only the kind of member the group already contains.
+
+### Custom SQL filters
+
+**Add custom SQL**, also in the filter picker's footer, takes a SQL condition
+and passes it into the query as written. Use it for a condition the operators
+above cannot express.
 
 ### Default filters
 
