@@ -299,10 +299,15 @@ async fn main() {
         }
         telemetry::flush().await;
     }
+    // Print the failure before consulting the release check: only the hint
+    // needs that answer, and a slow or unreachable GitHub must not sit between
+    // the user and the error they are waiting for.
+    if let Err(err) = &result {
+        eprintln!("error: {err:#}");
+    }
     let outcome = update::resolve(check, api_error).await;
     let announced = update::print_notice(&outcome);
-    if let Err(err) = result {
-        eprintln!("error: {err:#}");
+    if result.is_err() {
         if api_error {
             if let Some(hint) = update::api_error_hint(&outcome, announced) {
                 eprintln!("{hint}");
