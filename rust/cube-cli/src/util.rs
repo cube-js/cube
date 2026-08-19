@@ -135,45 +135,26 @@ pub fn body(map: Map<String, Value>) -> Value {
     Value::Object(map)
 }
 
-/// Reject a supplied-but-empty branch at parse time.
+/// Reject a supplied-but-empty branch at parse time. A branch, not a ref: every caller
+/// names one, and the tree's only `--ref` carries [`nonempty_target`].
 ///
-/// A branch, not "a branch or ref": every caller names a branch, and the tree's only
-/// `--ref` carries [`nonempty_target`]. Declaring this one for a ref would explain an
-/// empty `--ref` as failing to name a branch.
+/// Attached to a declaration as a clap `value_parser`, so it holds for that argument the
+/// moment it exists. A hand-written call in a match arm did not: this check was added
+/// three times, and each round found an argument the previous had missed — the last was
+/// `github connect --branch`, which sends its value under the key `branch` and so escaped
+/// even a grep for `branchName`.
 ///
-/// Attached to a declaration as a clap `value_parser`, so it holds for that argument
-/// the moment it exists — including through `Option<String>`, where `None` stays legal
-/// and `Some("")` can no longer be constructed. A hand-written call in a match arm did
-/// not hold: this check was added three times, and each round found an argument the
-/// previous had missed — the last was `github connect --branch`, which sends its value
-/// under the key `branch` and so escaped even a grep for `branchName`.
+/// It is not on every branch argument any more.
+/// `only_the_listed_branch_arguments_refuse_an_empty_value` holds the current set, and is
+/// the only place it is written down. Where the server's behaviour on an empty value has
+/// actually been measured, [`nonempty_target`] says so.
 ///
-/// It is no longer on every branch argument. `only_the_listed_branch_arguments_refuse_an_empty_value`
-/// is where the current set lives, as a list rather than a doc comment that would go
-/// stale: the required names, which have no fallback at all, plus `dbt sync` and
-/// `deployments build-status`. Everywhere else an optional `--branch` now accepts a
-/// blank and sends it.
-///
-/// The reason it is worth rejecting differs by caller, though the message deliberately
-/// does not: it states only what holds for every one of them — a blank names no branch,
-/// and is not dropped but sent as an empty field, leaving what that means to the server
-/// rather than to the caller. What is specific to the five required names is that clap
-/// will not let you omit them, so a blank there is a name the caller failed to supply
-/// rather than a value left open — which the message does not say, carrying only the
-/// shared half. `only_the_listed_branch_arguments_refuse_an_empty_value` is where the
-/// split itself is recorded, as it is for the set above. Where the server's choice has
-/// actually been measured, `nonempty_target` says so instead.
-///
-/// Empty values reach the CLI from scripts, not just from typos: `jq -r` prints
-/// nothing at all for empty input, and `$GITHUB_HEAD_REF` is empty on every trigger
-/// but `pull_request`. (A missing *field* prints `null`, which travels as a literal
-/// name and gets a 404 — loud, and the right answer.) The reachable case is not a
-/// mistyped flag; it is `data-model dev-mode ""` from a CI gate whose branch
-/// variable came out empty, which without this would enter dev mode on the deploy
-/// branch and leave every later step of the gate checking production.
-///
-/// Also used for `create-branch <name>`, which the walk's id filter does not reach —
-/// that one guard is a local decision, not a property the test holds.
+/// Empty values reach the CLI from scripts, not just from typos: `jq -r` prints nothing at
+/// all for empty input, and `$GITHUB_HEAD_REF` is empty on every trigger but
+/// `pull_request`. (A missing *field* prints `null`, which travels as a literal name and
+/// gets a 404 — loud, and the right answer.) The reachable case is `data-model dev-mode ""`
+/// from a CI gate whose branch variable came out empty, which without this would enter dev
+/// mode on the deploy branch and leave every later step of the gate checking production.
 pub fn nonempty(s: &str) -> Result<String, String> {
     if s.trim().is_empty() {
         return Err(
@@ -694,41 +675,17 @@ mod tests {
         // `name`, as `create-branch <name>` already is) or an outright removal would
         // shrink the walk, and a floor would absorb that silently.
         //
-        // What the two sides record is NOT "required" against "optional". A clap
-        // `value_parser` never runs on an omitted flag, so `None` was always legal for
-        // every optional argument here and the guard only ever rejected `Some("")` —
-        // nothing became optional by leaving `refuses`. The four required `<BRANCH>`
-        // positionals are the exception and the only one: clap will not let you omit
-        // those, so a blank there is a name the caller failed to supply rather than a
-        // value they left open, as the list below says. The accepting side is therefore
-        // a decision about supplied-but-empty on flags that were already optional.
-        //
-        // Nor is the split derived from what a blank then COSTS, which is what makes the
-        // one pair that looks like an oversight deliberate: `deploy --branch` and
+        // The split is not derived from what a blank COSTS, which is what makes the one
+        // pair that reads as an oversight deliberate: `deploy --branch` and
         // `deployments build-status --branch` carry the same documented fallback word for
-        // word, and only the second is guarded — yet a blank `deploy` uploads the local
-        // tree and prunes what isn't in it, where a blank `build-status` only misreports.
-        // `merge-to-default` is the same shape, merging into the deploy branch and
-        // deleting the source. Both were raised in review and deliberately left here, so
-        // consequence is not the axis and a new write-shaped flag doesn't join `refuses`
-        // by being destructive.
+        // word and only the second is guarded, yet a blank `deploy` uploads the local tree
+        // and prunes what isn't in it where a blank `build-status` only misreports.
+        // `merge-to-default` merges into the deploy branch and deletes the source. Both
+        // were raised in review and deliberately left accepting, so a new write-shaped
+        // flag does not join `refuses` by being destructive.
         //
-        // Finally, the walk sees parse time and nothing else: landing in `accepts` means
-        // the parser took the value, not that it reaches a request. That it travels as an
-        // empty field is a property of whatever builds each request, and that is two
-        // different places: every flag on `accepts` but one goes through `set`, `push` or
-        // `write_body`, which insert `Some("")` verbatim — `pull` builds its own
-        // `json!({ "branchName": b })`, which sends the blank just the same (measured:
-        // `pull --branch ""` posts `{"branchName":""}`), but is the one entry where the
-        // caveat below has somewhere to happen — while the five required names
-        // interpolate the value directly — `json!({ "branchName": branch })` for three of
-        // them, the `delete-branch` query tuple, and `json!({ "name": name, … })` for
-        // `create-branch`, whose key is `name` and so answers no `branchName` grep. That
-        // fifth one is also why this paragraph counts five where the one above counts
-        // four: `create-branch <NAME>` is guarded but sits outside the walk's id filter,
-        // so it never reaches either list. Either way a command that later dropped a
-        // blank while building its own body would not fail anything here — so a reader
-        // sent downstream by either message needs the half matching their argument.
+        // The walk sees parse time and nothing else: landing in `accepts` means the parser
+        // took the value, not that it reaches a request or what happens to it there.
         assert_eq!(
             refuses,
             [
