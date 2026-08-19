@@ -88,6 +88,8 @@ export class RedshiftQuery extends PostgresQuery {
     // nodes, unlike NOW(), which is a leader node–only function.
     templates.functions.UTCTIMESTAMP = 'GETDATE()';
     templates.functions.DATEDIFF = 'DATEDIFF({{ date_part }}, {{ args[1] }}, {{ args[2] }})';
+    // DATEADD is being rewritten to DATE_ADD
+    templates.functions.DATE_ADD = 'DATEADD({{ date_part }}, {{ interval }}, {{ args[0] }})';
     templates.functions.STRING_AGG = 'LISTAGG({% if distinct %}DISTINCT {% endif %}{{ args_concat }})';
     templates.statements.time_series_select = 'SELECT dates.f::timestamp date_from, dates.t::timestamp date_to \n' +
     'FROM (\n' +

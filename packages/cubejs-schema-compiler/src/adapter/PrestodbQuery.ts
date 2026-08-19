@@ -163,6 +163,8 @@ export class PrestodbQuery extends BaseQuery {
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
     templates.functions.DATEDIFF = 'DATE_DIFF(\'{{ date_part }}\', {{ args[1] }}, {{ args[2] }})';
+    // DATEADD is being rewritten to DATE_ADD
+    templates.functions.DATE_ADD = 'DATE_ADD(\'{{ date_part }}\', {{ interval }}, {{ args[0] }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
     templates.functions.UTCTIMESTAMP = 'CAST(NOW() AT TIME ZONE \'UTC\' AS TIMESTAMP)';
     templates.functions.TRUNC = 'TRUNCATE({{ args_concat }})';

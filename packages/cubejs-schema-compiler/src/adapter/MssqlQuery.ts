@@ -271,6 +271,8 @@ export class MssqlQuery extends BaseQuery {
     templates.functions.UTCTIMESTAMP = 'GETUTCDATE()';
     // MSSQL ROUND requires 2 arguments: ROUND(number, length)
     templates.functions.ROUND = 'ROUND({{ args_concat }}{% if args | length < 2 %}, 0{% endif %})';
+    // DATEADD is being rewritten to DATE_ADD
+    templates.functions.DATE_ADD = 'DATEADD({{ date_part }}, {{ interval }}, {{ args[0] }})';
     // NOTE: MSSQL does not support DISTINCT clause. No workaround is available
     delete templates.functions.STRING_AGG;
     // PERCENTILE_CONT works but requires PARTITION BY
