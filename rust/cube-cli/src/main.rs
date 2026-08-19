@@ -299,14 +299,15 @@ async fn main() {
         }
         telemetry::flush().await;
     }
-    let announced = match check {
-        Some(check) => update::print_notice(check).await,
-        None => false,
+    let outcome = match check {
+        Some(check) => update::resolve(check).await,
+        None => update::UpdateCheck::Unknown,
     };
+    let announced = update::print_notice(&outcome);
     if let Err(err) = result {
         eprintln!("error: {err:#}");
         if api_error {
-            if let Some(hint) = update::api_error_hint(announced) {
+            if let Some(hint) = update::api_error_hint(&outcome, announced) {
                 eprintln!("{hint}");
             }
         }
