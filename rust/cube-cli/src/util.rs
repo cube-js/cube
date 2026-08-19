@@ -671,8 +671,8 @@ mod tests {
         assert_eq!(
             refuses,
             [
-                // Required: no fallback exists, so a blank is a name the caller failed to
-                // supply. `data-model dev-mode ""` from a CI gate whose branch variable
+                // Required, so clap won't let you omit them: a blank is a name the
+                // caller failed to supply. `dev-mode ""` from a CI gate whose variable
                 // came out empty would otherwise enter dev mode on the deploy branch.
                 "cube data-model delete-branch <BRANCH>",
                 "cube data-model dev-mode <BRANCH>",
