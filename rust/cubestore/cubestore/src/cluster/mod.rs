@@ -2126,9 +2126,9 @@ impl ClusterImpl {
                 }
                 let result = self
                     .remote_fs
-                    .download_file(file, p.get_row().file_size())
+                    .download_file(file.clone(), p.get_row().file_size())
                     .await;
-                if self.warmup_file_is_absent(result) {
+                if self.report_unless_absent(result, &file) {
                     absent.partition_ids.push(p.get_id());
                 }
             }
@@ -2140,14 +2140,12 @@ impl ClusterImpl {
                 if c.get_row().in_memory() {
                     continue;
                 }
+                let file = chunk_file_name(c.get_id(), c.get_row().suffix());
                 let result = self
                     .remote_fs
-                    .download_file(
-                        chunk_file_name(c.get_id(), c.get_row().suffix()),
-                        c.get_row().file_size(),
-                    )
+                    .download_file(file.clone(), c.get_row().file_size())
                     .await;
-                if self.warmup_file_is_absent(result) {
+                if self.report_unless_absent(result, &file) {
                     absent.chunk_ids.push(c.get_id());
                 }
             }
@@ -2156,21 +2154,23 @@ impl ClusterImpl {
                     .await;
             }
         }
-        // A cancelled pass drops what it has not looked up yet, since the next start walks the
-        // whole list again anyway and the metastore is on its way down with us.
+        // Only a pass that ran to the end gets here: the cancellation paths above leave their
+        // batch unchecked, since the next start walks the whole list again anyway and the metastore
+        // is on its way down with us.
         self.report_absent_warmup_files(absent).await;
         log::debug!("Startup warmup finished");
         return;
     }
 
-    /// Reports everything but an absent file, which on its own says nothing: only the metastore can
-    /// tell whether the pass is simply behind or the data is gone.
-    fn warmup_file_is_absent(&self, result: Result<String, CubeError>) -> bool {
+    /// Reports a failed download and returns whether the reason was the file being absent, which on
+    /// its own says nothing: only the metastore can tell whether the pass is simply behind or the
+    /// data is gone, and it is asked in batches.
+    fn report_unless_absent(&self, result: Result<String, CubeError>, remote_path: &str) -> bool {
         match result {
             Ok(_) => false,
             Err(e) if e.is_file_not_found() => true,
             Err(e) => {
-                log::error!("Error: {:?}", e);
+                log::error!("Warmup of {} failed: {:?}", remote_path, e);
                 false
             }
         }
@@ -2194,9 +2194,12 @@ impl ClusterImpl {
                 // Assuming either verdict would either hide missing data or report a batch of live
                 // files as lost, so report that the check itself did not happen.
                 log::warn!(
-                    "Could not check {} absent warmup file(s) against the metastore: {}",
+                    "Could not check {} absent warmup file(s) against the metastore: {}. \
+                     Unchecked partitions: {:?}, chunks: {:?}",
                     absent.len(),
-                    e
+                    e,
+                    absent.partition_ids,
+                    absent.chunk_ids
                 );
                 return;
             }
@@ -2519,7 +2522,7 @@ mod tests {
                 // An id the metastore no longer holds at all is left out of the batch read, the
                 // same as one it holds as inactive.
                 let (named_partitions, named_chunks) = cluster
-                    .named_warmup_files(&[partition_id, compacted_id], &[chunk_id, chunk_id + 1000])
+                    .named_warmup_files(&[partition_id, compacted_id], &[chunk_id, u64::MAX])
                     .await?;
                 assert_eq!(named_partitions, HashSet::from([compacted_id]));
                 assert!(named_chunks.is_empty());
