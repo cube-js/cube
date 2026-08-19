@@ -140,8 +140,9 @@ pub fn body(map: Map<String, Value>) -> Value {
 /// so the three cannot drift apart.
 pub const EMPTY_VALUE_REFUSED: &str = "an empty value";
 
-/// Reject a supplied-but-empty branch at parse time. Not a ref — `--ref` carries
-/// [`nonempty_target`], which says where the server's behaviour was measured.
+/// Reject a supplied-but-empty branch at parse time, where what an empty value means to
+/// the server has not been measured. [`nonempty_target`] carries the two arguments where
+/// it has — one of them a `--branch`, so the split is measured-vs-not, not branch-vs-ref.
 ///
 /// On the declaration rather than in a match arm: written by hand it was added three
 /// times, each round missing an argument — last `github connect --branch`, which sends
