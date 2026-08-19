@@ -155,7 +155,7 @@ Before a log record reaches a sink, the following fields are attached to it:
 | `deployment_name` | Name of the deployment. |
 | `hostname` | Host name of the node that the record comes from. |
 | `pod_name` | Name of the pod that the record comes from. |
-| `service` | Name of the component that the record comes from, matching the input name: `cubejs-server`, `refresh-scheduler`, `warmup-job`, or `cubestore`. |
+| `service` | Name of the component that the record comes from, matching the input name: `cubejs-server`, `refresh-scheduler`, `warmup-job`, or `cubestore`. Records from the `query-history` input use `query-history` on `datadog_logs` sinks. |
 | `level` | Severity of the record, lower-cased: `error`, `warn`, `info`, or `debug`. Records with the `trace` severity are exported as `debug`, and records that carry no severity as `info`. |
 | `status` | Duplicate of `level`, for tools that expect the severity in a `status` field, e.g. Datadog. |
 | `origin` | Always `cube_cloud`. |
@@ -171,19 +171,14 @@ uses for attribution:
 | Field | Description |
 | --- | --- |
 | `ddsource` | Name of the pod that the record comes from, or `query-history` for records from the `query-history` input. |
-| `ddtags` | Comma-separated list of tags, `$DEPLOYMENT_NAME,$HOSTNAME` by default. |
+| `ddtags` | Comma-separated list of tags. By default, the deployment name and the host name. |
 
 To send your own tags to Datadog, list them in the `ddtags` option of the sink.
 They are appended to the default ones:
 
 ```toml
 [sinks.datadog]
-type = "datadog_logs"
-inputs = [
-  "cubejs-server",
-  "refresh-scheduler"
-]
-default_api_key = "$CUBE_CLOUD_MONITORING_DATADOG_API_KEY"
+# type, inputs, default_api_key, etc.
 ddtags = [
   "env:production",
   "team:analytics"
