@@ -181,3 +181,17 @@ cubes:
           - id
           - status
           - city
+
+      # Same members as `segment_rollup`, but every reference is written as a
+      # cube-name interpolation — `(CUBE) => `${CUBE}.count``.
+      - name: interpolated_refs_rollup
+        type: rollup
+        measures:
+          - '{CUBE}.count'
+          - '{CUBE}.total_amount'
+        dimensions:
+          - '{CUBE}.status'
+        segments:
+          - '{CUBE}.high_priority'
+        time_dimension: '{CUBE}.created_at'
+        granularity: day

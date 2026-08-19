@@ -1692,3 +1692,93 @@ async fn test_ungrouped_cross_cube_view_query_matches_rollup_covering_both_prima
 
     Ok(())
 }
+
+// --- References written as a cube-name interpolation ---
+//
+// `interpolated_refs_rollup` names the same members as `segment_rollup`, but
+// through `` `${CUBE}.count` ``-style references. The two must be picked for the
+// same queries and read back the same rows. The rows themselves are pinned by
+// the snapshot, which is only compared when Postgres execution is enabled.
+
+async fn interpolated_and_symbol_refs_agree(
+    query_yaml: &str,
+    snapshot_name: &str,
+) -> Result<(), CubeError> {
+    let interpolated_ctx = TestContext::new(
+        MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+            .only_pre_aggregations(&["interpolated_refs_rollup"]),
+    )?;
+    let symbol_ctx = TestContext::new(
+        MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+            .only_pre_aggregations(&["segment_rollup"]),
+    )?;
+
+    let (_sql, interpolated_pre_aggrs) =
+        interpolated_ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
+    assert_eq!(interpolated_pre_aggrs.len(), 1);
+    assert_eq!(interpolated_pre_aggrs[0].name(), "interpolated_refs_rollup");
+
+    let (_sql, symbol_pre_aggrs) = symbol_ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
+    assert_eq!(symbol_pre_aggrs.len(), 1);
+    assert_eq!(symbol_pre_aggrs[0].name(), "segment_rollup");
+
+    let interpolated_result = interpolated_ctx
+        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .await;
+    let symbol_result = symbol_ctx
+        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .await;
+
+    assert_eq!(interpolated_result, symbol_result);
+
+    if let Some(result) = interpolated_result {
+        insta::assert_snapshot!(snapshot_name, result);
+    }
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_interpolated_refs_full_match() -> Result<(), CubeError> {
+    interpolated_and_symbol_refs_agree(
+        indoc! {"
+            measures:
+              - orders.count
+              - orders.total_amount
+            dimensions:
+              - orders.status
+            segments:
+              - orders.high_priority
+            time_dimensions:
+              - dimension: orders.created_at
+                granularity: day
+            order:
+              - id: orders.status
+              - id: orders.created_at
+        "},
+        "interpolated_refs_full_match_result",
+    )
+    .await
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_interpolated_refs_with_coarser_granularity() -> Result<(), CubeError> {
+    interpolated_and_symbol_refs_agree(
+        indoc! {"
+            measures:
+              - orders.count
+            dimensions:
+              - orders.status
+            segments:
+              - orders.high_priority
+            time_dimensions:
+              - dimension: orders.created_at
+                granularity: month
+            order:
+              - id: orders.status
+              - id: orders.created_at
+        "},
+        "interpolated_refs_with_coarser_granularity_result",
+    )
+    .await
+}

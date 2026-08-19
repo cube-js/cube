@@ -104,12 +104,63 @@ impl MockMemberSql {
         }))
     }
 
+    /// Pre-aggregation array references where an element may interpolate the
+    /// cube itself: `["{CUBE}.count", "{CUBE.status}", "city"]`. A brace-free
+    /// element is a plain member path, recorded the way
+    /// `pre_agg_array_refs` records it, so both forms can be mixed in one list.
+    pub fn pre_agg_array_templates(members: Vec<String>) -> Result<Rc<Self>, CubeError> {
+        let mut args = SqlTemplateArgs::default();
+        let mut args_names = Vec::new();
+        let mut template_elements = Vec::new();
+
+        for member in &members {
+            if member.contains('{') {
+                template_elements.push(Self::parse_template_into(
+                    member,
+                    &mut args,
+                    &mut args_names,
+                )?);
+            } else {
+                let path_parts: Vec<String> = member.split('.').map(|s| s.to_string()).collect();
+                if path_parts.iter().any(|p| p.is_empty()) {
+                    return Err(CubeError::user(format!(
+                        "Invalid path in pre-aggregation: {}",
+                        member
+                    )));
+                }
+                let arg_name = path_parts[0].clone();
+                if !args_names.contains(&arg_name) {
+                    args_names.push(arg_name);
+                }
+                let index = args.insert_symbol_path(path_parts);
+                template_elements.push(format!("{{arg:{}}}", index));
+            }
+        }
+
+        Ok(Rc::new(Self {
+            template: SqlTemplate::StringVec(template_elements),
+            args,
+            args_names,
+        }))
+    }
+
     /// Parse the template string and extract symbol paths
     /// Converts "{path.to.symbol}" to "{arg:N}" and collects paths
     fn parse_template(template: &str) -> Result<(String, SqlTemplateArgs, Vec<String>), CubeError> {
-        let mut result = String::new();
         let mut args = SqlTemplateArgs::default();
         let mut args_names = Vec::new();
+        let result = Self::parse_template_into(template, &mut args, &mut args_names)?;
+        Ok((result, args, args_names))
+    }
+
+    // Parses one template, recording its dependencies into the given args so
+    // several templates can share one dependency list.
+    fn parse_template_into(
+        template: &str,
+        args: &mut SqlTemplateArgs,
+        args_names: &mut Vec<String>,
+    ) -> Result<String, CubeError> {
+        let mut result = String::new();
 
         let mut chars = template.chars().peekable();
 
@@ -172,8 +223,7 @@ impl MockMemberSql {
                 // planner passes at render time.
                 if let Some(body) = path.strip_prefix("FILTER_PARAMS:") {
                     let (cube_name, name, column) = Self::parse_filter_params_body(body)?;
-                    let column =
-                        Self::parse_column_references(&column, &mut args, &mut args_names)?;
+                    let column = Self::parse_column_references(&column, args, args_names)?;
                     let index = args.insert_filter_params(FilterParamsItem {
                         cube_name,
                         name,
@@ -216,7 +266,7 @@ impl MockMemberSql {
             }
         }
 
-        Ok((result, args, args_names))
+        Ok(result)
     }
 
     // Splits a `<cube>.<member>:<column>` FILTER_PARAMS body.

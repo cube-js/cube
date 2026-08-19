@@ -13,8 +13,13 @@ use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGro
 use crate::planner::planners::JoinPlanner;
 use crate::planner::planners::ResolvedJoinItem;
 use crate::planner::state::State;
+use crate::planner::Compiler;
 use crate::planner::GranularityHelper;
 use crate::planner::MemberSymbol;
+use crate::planner::SqlCall;
+use crate::planner::SqlCallReference;
+use crate::planner::SymbolPath;
+use crate::planner::SymbolPathType;
 use crate::planner::TimeDimensionSymbol;
 use crate::utils::debug::DebugSql;
 use cubenativeutils::CubeError;
@@ -112,19 +117,14 @@ impl PreAggregationsCompiler {
         }
 
         let measures = if let Some(refs) = description.measure_references()? {
-            Self::symbols_from_ref(
-                self.query_tools.clone(),
-                &name.cube_name,
-                refs,
-                Self::check_is_measure,
-            )?
+            Self::symbols_from_ref(self.query_tools.clone(), name, refs, Self::check_is_measure)?
         } else {
             Vec::new()
         };
         let dimensions = if let Some(refs) = description.dimension_references()? {
             Self::symbols_from_ref(
                 self.query_tools.clone(),
-                &name.cube_name,
+                name,
                 refs,
                 Self::check_is_dimension,
             )?
@@ -192,12 +192,7 @@ impl PreAggregationsCompiler {
             Vec::new()
         };
         let segments = if let Some(refs) = description.segment_references()? {
-            Self::symbols_from_ref(
-                self.query_tools.clone(),
-                &name.cube_name,
-                refs,
-                Self::check_is_segment,
-            )?
+            Self::symbols_from_ref(self.query_tools.clone(), name, refs, Self::check_is_segment)?
         } else {
             Vec::new()
         };
@@ -553,19 +548,19 @@ impl PreAggregationsCompiler {
 
     fn symbols_from_ref<F: Fn(&MemberSymbol) -> Result<(), CubeError>>(
         query_tools: Rc<State>,
-        cube_name: &String,
+        name: &PreAggregationFullName,
         ref_func: Rc<dyn MemberSql>,
         check_type_fn: F,
     ) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
         let evaluator_compiler_cell = query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-        let sql_call = evaluator_compiler.compile_sql_call(cube_name, ref_func)?;
-        let mut res = Vec::new();
-        for symbol in sql_call.get_dependencies().iter() {
-            check_type_fn(&symbol)?;
-            res.push(symbol.clone());
+        let sql_call = evaluator_compiler.compile_sql_call(&name.cube_name, ref_func)?;
+        let symbols =
+            Self::reference_symbols(&query_tools, &mut evaluator_compiler, name, &sql_call)?;
+        for symbol in symbols.iter() {
+            check_type_fn(symbol)?;
         }
-        Ok(res)
+        Ok(symbols)
     }
 
     fn time_dimension_symbol_from_ref(
@@ -577,22 +572,65 @@ impl PreAggregationsCompiler {
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
         let sql_call = evaluator_compiler.compile_sql_call(&name.cube_name, ref_func)?;
 
-        let mut symbols = Vec::new();
-
-        for symbol in sql_call.get_dependencies().into_iter() {
-            Self::check_is_time_dimension(&symbol)?;
-            symbols.push(symbol);
+        let symbols =
+            Self::reference_symbols(&query_tools, &mut evaluator_compiler, name, &sql_call)?;
+        for symbol in symbols.iter() {
+            Self::check_is_time_dimension(symbol)?;
         }
 
         symbols.into_iter().next().ok_or_else(|| {
             let path = sql_call.debug_sql(true);
-            let member_name = path.rsplit('.').next().unwrap_or(&path);
-
-            CubeError::user(format!(
-                "'{}' not found for path '{}' in pre-aggregation '{}.{}'",
-                member_name, path, name.cube_name, name.name
-            ))
+            Self::reference_not_found_error(&path, name)
         })
+    }
+
+    /// Members a pre-aggregation reference declaration names, in declaration
+    /// order. An element that interpolated the cube instead of the member is
+    /// resolved here; an element naming no member at all is an error, so a
+    /// reference is never silently dropped.
+    fn reference_symbols(
+        query_tools: &Rc<State>,
+        evaluator_compiler: &mut Compiler,
+        name: &PreAggregationFullName,
+        sql_call: &SqlCall,
+    ) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
+        let mut result = Vec::new();
+        for item in sql_call.reference_items() {
+            let symbol = match item {
+                SqlCallReference::Symbol(symbol) => symbol,
+                SqlCallReference::Path(path) => {
+                    let full_name = path.join(".");
+                    let symbol_path =
+                        SymbolPath::parse(query_tools.cube_evaluator().clone(), &full_name)
+                            .map_err(|_| Self::reference_not_found_error(&full_name, name))?;
+                    match symbol_path.path_type() {
+                        SymbolPathType::Dimension => {
+                            evaluator_compiler.add_dimension_evaluator_by_path(symbol_path)?
+                        }
+                        SymbolPathType::Measure => {
+                            evaluator_compiler.add_measure_evaluator_by_path(symbol_path)?
+                        }
+                        SymbolPathType::Segment => {
+                            evaluator_compiler.add_segment_evaluator_by_path(symbol_path)?
+                        }
+                        _ => return Err(Self::reference_not_found_error(&full_name, name)),
+                    }
+                }
+                SqlCallReference::Unresolved(rendered) => {
+                    return Err(Self::reference_not_found_error(&rendered, name))
+                }
+            };
+            result.push(symbol);
+        }
+        Ok(result)
+    }
+
+    fn reference_not_found_error(path: &str, name: &PreAggregationFullName) -> CubeError {
+        let member_name = path.rsplit('.').next().unwrap_or(path);
+        CubeError::user(format!(
+            "'{}' not found for path '{}' in pre-aggregation '{}.{}'",
+            member_name, path, name.cube_name, name.name
+        ))
     }
 
     fn check_is_measure(symbol: &MemberSymbol) -> Result<(), CubeError> {
@@ -640,13 +678,11 @@ mod tests {
     use crate::test_fixtures::test_utils::TestContext;
     use indoc::indoc;
 
-    fn create_time_dimension_context() -> TestContext {
-        // `time_dimension: \"{CUBE}.created_at\"` models a JS reference built
-        // via string interpolation — `(CUBE) => `${CUBE}.created_at``. The JS
-        // planner resolves it (reference evaluation stringifies `${CUBE}` to
-        // the cube name), but here `{CUBE}` compiles to a cube reference and
-        // `.created_at` stays literal text, so the compiled reference has no
-        // member symbol dependencies.
+    fn create_reference_context() -> TestContext {
+        // Template syntax like `\"{CUBE}.created_at\"` models a reference built by
+        // interpolating the cube itself — `(CUBE) => `${CUBE}.created_at``, where
+        // the member name arrives as literal text next to a cube reference
+        // instead of as a member symbol.
         let schema = MockSchema::from_yaml(indoc! {"
             cubes:
               - name: orders
@@ -656,35 +692,75 @@ mod tests {
                     type: number
                     sql: id
                     primary_key: true
+                  - name: status
+                    type: string
+                    sql: status
                   - name: created_at
                     type: time
                     sql: created_at
+                  - name: city
+                    type: string
+                    sql: city
                 measures:
                   - name: count
                     type: count
+                  - name: total
+                    type: sum
+                    sql: amount
+                segments:
+                  - name: completed
+                    sql: \"{CUBE}.status = 'completed'\"
                 pre_aggregations:
-                  - name: working_rollup
+                  - name: symbol_rollup
                     type: rollup
                     measures:
                       - count
                     time_dimension: created_at
                     granularity: day
-                  - name: broken_rollup_unsupported
+                  - name: interpolated_rollup
                     type: rollup
                     measures:
-                      - count
+                      - '{CUBE}.count'
+                    dimensions:
+                      - '{CUBE}.status'
+                    segments:
+                      - '{CUBE}.completed'
                     time_dimension: '{CUBE}.created_at'
                     granularity: day
-                  - name: broken_rollup_no_granularity
+                  - name: interpolated_rollup_no_granularity
                     type: rollup
                     measures:
                       - count
                     time_dimension: '{CUBE}.created_at'
+                  - name: interpolated_rollup_mixed_list
+                    type: rollup
+                    measures:
+                      - '{CUBE}.total'
+                      - count
+                    dimensions:
+                      - status
+                      - '{CUBE}.city'
+                    time_dimension: '{CUBE}.created_at'
+                    granularity: day
                   - name: broken_rollup_granularity_suffix
                     type: rollup
                     measures:
                       - count
                     time_dimension: '{CUBE}.created_at_day'
+                    granularity: day
+                  - name: broken_rollup_unknown_measure
+                    type: rollup
+                    measures:
+                      - '{CUBE}.unknown_total'
+                    time_dimension: created_at
+                    granularity: day
+                  - name: broken_rollup_expression_dimension
+                    type: rollup
+                    measures:
+                      - count
+                    dimensions:
+                      - \"{CUBE}.status = 'completed'\"
+                    time_dimension: created_at
                     granularity: day
         "})
         .unwrap();
@@ -704,8 +780,8 @@ mod tests {
 
     #[test]
     fn test_time_dimension_resolves_to_member_symbol() {
-        let ctx = create_time_dimension_context();
-        let compiled = compile_pre_agg(&ctx, "working_rollup").unwrap();
+        let ctx = create_reference_context();
+        let compiled = compile_pre_agg(&ctx, "symbol_rollup").unwrap();
 
         assert_eq!(compiled.time_dimensions.len(), 1);
         assert_eq!(
@@ -716,37 +792,115 @@ mod tests {
     }
 
     #[test]
-    fn test_time_dimension_resolved_to_cube_ref_returns_error() {
-        let ctx = create_time_dimension_context();
-        let err = compile_pre_agg(&ctx, "broken_rollup_unsupported")
-            .expect_err("Pre-aggregation with unresolvable time dimension should fail to compile");
+    fn test_interpolated_references_resolve_to_member_symbols() {
+        let ctx = create_reference_context();
+        let compiled = compile_pre_agg(&ctx, "interpolated_rollup").unwrap();
+
         assert_eq!(
-            err.message,
-            "'created_at' not found for path 'orders.created_at' in pre-aggregation 'orders.broken_rollup_unsupported'"
+            compiled
+                .measures
+                .iter()
+                .map(|m| m.full_name())
+                .collect_vec(),
+            vec!["orders.count".to_string()]
         );
+        assert_eq!(
+            compiled
+                .dimensions
+                .iter()
+                .map(|d| d.full_name())
+                .collect_vec(),
+            vec!["orders.status".to_string()]
+        );
+        assert_eq!(
+            compiled
+                .segments
+                .iter()
+                .map(|sg| sg.full_name())
+                .collect_vec(),
+            vec!["expr:orders.completed".to_string()]
+        );
+        assert_eq!(compiled.time_dimensions.len(), 1);
+        assert_eq!(
+            compiled.time_dimensions[0].full_name(),
+            "orders.created_at_day"
+        );
+        assert_eq!(compiled.granularity, Some("day".to_string()));
     }
 
     #[test]
-    fn test_time_dimension_resolved_to_cube_ref_without_granularity_returns_error() {
-        let ctx = create_time_dimension_context();
-        let err = compile_pre_agg(&ctx, "broken_rollup_no_granularity")
-            .expect_err("Pre-aggregation with unresolvable time dimension should fail to compile");
+    fn test_interpolated_time_dimension_without_granularity_resolves() {
+        let ctx = create_reference_context();
+        let compiled = compile_pre_agg(&ctx, "interpolated_rollup_no_granularity").unwrap();
+
+        assert_eq!(compiled.time_dimensions.len(), 1);
+        assert_eq!(compiled.time_dimensions[0].full_name(), "orders.created_at");
+        assert_eq!(compiled.granularity, None);
+    }
+
+    // One list mixing both forms keeps every member it names, in declaration
+    // order — join hints and lambda member matching read the list positionally.
+    #[test]
+    fn test_interpolated_and_symbol_references_in_one_list() {
+        let ctx = create_reference_context();
+        let compiled = compile_pre_agg(&ctx, "interpolated_rollup_mixed_list").unwrap();
+
         assert_eq!(
-            err.message,
-            "'created_at' not found for path 'orders.created_at' in pre-aggregation 'orders.broken_rollup_no_granularity'"
+            compiled
+                .measures
+                .iter()
+                .map(|m| m.full_name())
+                .collect_vec(),
+            vec!["orders.total".to_string(), "orders.count".to_string()]
+        );
+        assert_eq!(
+            compiled
+                .dimensions
+                .iter()
+                .map(|d| d.full_name())
+                .collect_vec(),
+            vec!["orders.status".to_string(), "orders.city".to_string()]
+        );
+        assert_eq!(
+            compiled.time_dimensions[0].full_name(),
+            "orders.created_at_day"
         );
     }
 
-    // Interpolated reference with a granularity-suffixed member name,
-    // e.g. `(CUBE) => `${CUBE}.created_at_day``.
+    // An interpolated reference naming the granularity-suffixed member instead
+    // of the member itself, e.g. `(CUBE) => `${CUBE}.created_at_day``.
     #[test]
-    fn test_time_dimension_with_granularity_suffix_returns_error() {
-        let ctx = create_time_dimension_context();
+    fn test_interpolated_time_dimension_with_granularity_suffix_returns_error() {
+        let ctx = create_reference_context();
         let err = compile_pre_agg(&ctx, "broken_rollup_granularity_suffix")
             .expect_err("Pre-aggregation with unresolvable time dimension should fail to compile");
         assert_eq!(
             err.message,
             "'created_at_day' not found for path 'orders.created_at_day' in pre-aggregation 'orders.broken_rollup_granularity_suffix'"
+        );
+    }
+
+    #[test]
+    fn test_interpolated_measure_that_does_not_exist_returns_error() {
+        let ctx = create_reference_context();
+        let err = compile_pre_agg(&ctx, "broken_rollup_unknown_measure")
+            .expect_err("Pre-aggregation with unresolvable measure should fail to compile");
+        assert_eq!(
+            err.message,
+            "'unknown_total' not found for path 'orders.unknown_total' in pre-aggregation 'orders.broken_rollup_unknown_measure'"
+        );
+    }
+
+    // An element built as an expression rather than a member reference names no
+    // member, so it is reported instead of dropped from the reference list.
+    #[test]
+    fn test_reference_that_names_no_member_returns_error() {
+        let ctx = create_reference_context();
+        let err = compile_pre_agg(&ctx, "broken_rollup_expression_dimension")
+            .expect_err("Pre-aggregation with an expression reference should fail to compile");
+        assert_eq!(
+            err.message,
+            "'status = 'completed'' not found for path 'orders.status = 'completed'' in pre-aggregation 'orders.broken_rollup_expression_dimension'"
         );
     }
 
