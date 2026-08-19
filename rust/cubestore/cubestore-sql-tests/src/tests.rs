@@ -317,6 +317,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("queue_latest_result_v1", queue_latest_result_v1),
         t("queue_retrieve_extended", queue_retrieve_extended),
         t("queue_add_and_retrieve", queue_add_and_retrieve),
+        t(
+            "queue_add_and_retrieve_backlog",
+            queue_add_and_retrieve_backlog,
+        ),
         t("queue_ack_then_result_v1", queue_ack_then_result_v1),
         t("queue_ack_then_result_v2", queue_ack_then_result_v2),
         t(
@@ -458,6 +462,7 @@ lazy_static::lazy_static! {
         "planning_topk_hash_aggregate",
         "topk_hash_aggregate_trim",
         "queue_add_and_retrieve",
+        "queue_add_and_retrieve_backlog",
     ].into_iter().map(ToOwned::to_owned).collect();
 }
 
@@ -11887,17 +11892,18 @@ fn queue_add_and_retrieve_row(
     id: &str,
     added: bool,
     pending: i64,
-    active: &str,
+    active: Option<&str>,
     payload: Option<&str>,
 ) -> Row {
+    let to_value =
+        |v: Option<&str>| v.map_or(TableValue::Null, |v| TableValue::String(v.to_string()));
+
     Row::new(vec![
         TableValue::String(id.to_string()),
         TableValue::Boolean(added),
         TableValue::Int(pending),
-        TableValue::String(active.to_string()),
-        payload.map_or(TableValue::Null, |payload| {
-            TableValue::String(payload.to_string())
-        }),
+        to_value(active),
+        to_value(payload),
         // extra is always empty for a freshly added item
         TableValue::Null,
     ])
@@ -12046,7 +12052,7 @@ async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeE
                 "1",
                 true,
                 0,
-                "1",
+                Some("1"),
                 Some("payload1")
             )]
         );
@@ -12058,7 +12064,7 @@ async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeE
             .await?;
         assert_eq!(
             add_response.get_rows(),
-            &vec![queue_add_and_retrieve_row("2", true, 1, "1", None)]
+            &vec![queue_add_and_retrieve_row("2", true, 1, Some("1"), None)]
         );
     }
 
@@ -12073,7 +12079,7 @@ async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeE
                 "2",
                 false,
                 0,
-                "1,2",
+                Some("1,2"),
                 Some("payload2")
             )]
         );
@@ -12085,7 +12091,7 @@ async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeE
             .await?;
         assert_eq!(
             add_response.get_rows(),
-            &vec![queue_add_and_retrieve_row("1", false, 0, "1,2", None)]
+            &vec![queue_add_and_retrieve_row("1", false, 0, Some("1,2"), None)]
         );
     }
 
@@ -12133,6 +12139,69 @@ async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeE
         assert_eq!(
             result_response.get_rows(),
             &vec![queue_result_row("result1", "1", None)]
+        );
+    }
+
+    Ok(())
+}
+
+async fn queue_add_and_retrieve_backlog(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    for id in 1..=2 {
+        service
+            .exec_query(&format!(
+                r#"QUEUE ADD "STANDALONE#queue:{}" "payload{}""#,
+                id, id
+            ))
+            .await?;
+    }
+
+    {
+        // 2 pending items is not less than a half of 4, the backlog is left to
+        // QUEUE PENDING + reconcile even though every concurrency slot is free
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:3" "payload3" 4"#)
+            .await?;
+        assert_queue_add_and_retrieve_columns(&add_response);
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row("3", true, 3, None, None)]
+        );
+    }
+
+    {
+        // 3 pending items is less than a half of 7
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:4" "payload4" 7"#)
+            .await?;
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row(
+                "4",
+                true,
+                3,
+                Some("4"),
+                Some("payload4")
+            )]
+        );
+    }
+
+    {
+        let pending_response = service
+            .exec_query(r#"QUEUE PENDING "STANDALONE#queue""#)
+            .await?;
+        assert_eq!(pending_response.get_rows().len(), 3);
+
+        let active_response = service
+            .exec_query(r#"QUEUE ACTIVE "STANDALONE#queue""#)
+            .await?;
+        assert_eq!(
+            active_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("4".to_string()),
+                TableValue::String("4".to_string()),
+                TableValue::String("active".to_string()),
+                TableValue::Null,
+            ]),]
         );
     }
 
