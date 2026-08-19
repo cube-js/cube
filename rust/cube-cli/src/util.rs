@@ -151,8 +151,9 @@ pub fn body(map: Map<String, Value>) -> Value {
 /// blank and sends it.
 ///
 /// The reason it is worth rejecting where it stays differs by caller, which is why the
-/// message names both: on the required names a blank names no branch at all and the
-/// server never gets a say, while on the optional flags it is not dropped — it is sent as
+/// message names both: on the required names a blank is a name the caller failed to
+/// supply rather than a value left open, since clap will not let them omit it, while on
+/// the optional flags it is not dropped — it is sent as
 /// an empty field, and what an empty field means is then the server's choice rather than
 /// the caller's. Where that choice has actually been measured, `nonempty_target` says so
 /// instead.
@@ -708,9 +709,13 @@ mod tests {
         //
         // Finally, the walk sees parse time and nothing else: landing in `accepts` means
         // the parser took the value, not that it reaches a request. That it travels as an
-        // empty field is held by `set`, `push` and `write_body`, which insert `Some("")`
-        // verbatim — a command that later dropped a blank while building its own body
-        // would not fail anything here.
+        // empty field is a property of whatever builds each request, and that is two
+        // different places: every flag on `accepts` goes through `set`, `push` or
+        // `write_body`, which insert `Some("")` verbatim, while the five required names
+        // interpolate the value directly (`json!({ "branchName": branch })` and the
+        // `delete-branch` query tuple). Either way a command that later dropped a blank
+        // while building its own body would not fail anything here — so a reader sent
+        // downstream by either message needs the half that matches their argument.
         assert_eq!(
             refuses,
             [
