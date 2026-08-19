@@ -42,10 +42,8 @@ function patchQueueDriverConnectionForTrack(connection: QueueDriverConnectionInt
     setResultAndRemoveQuery: wrapAsyncMethod('setResultAndRemoveQuery'),
     getQueryStageState: wrapAsyncMethod('getQueryStageState'),
     getResultBlocking: wrapAsyncMethod('getResultBlocking'),
-    freeProcessingLock: wrapAsyncMethod('freeProcessingLock'),
     optimisticQueryUpdate: wrapAsyncMethod('optimisticQueryUpdate'),
     getQueryAndRemove: wrapAsyncMethod('getQueryAndRemove'),
-    getNextProcessingId: wrapAsyncMethod('getNextProcessingId'),
     release: connection.release,
   };
 }
