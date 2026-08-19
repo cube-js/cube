@@ -577,11 +577,16 @@ rather than inside `echo "BRANCH=$(jq …)"`, because `-e` fires on a failed com
 substitution in an assignment but not when it is an argument to a command that
 itself succeeds.
 
-The CLI refuses an empty `--branch` or `--ref` rather than letting either mean
-"whichever branch the server would have picked", so a gate that gets this wrong
-fails instead of reporting green — but failing at the source beats failing later.
-Note that `$GITHUB_HEAD_REF` is only set on `pull_request` events; on any other
-trigger `--ref` gets an empty string, which is why the run stops there.
+Every branch argument this recipe passes refuses an empty value rather than letting it
+mean "whichever branch the server would have picked" — `dbt sync --ref`, `data-model
+dev-mode`, and `deployments build-status --branch`. So a gate that gets this wrong fails
+instead of reporting green, and it fails at the source rather than later. Note that
+`$GITHUB_HEAD_REF` is only set on `pull_request` events; on any other trigger `--ref`
+gets an empty string, which is why the run stops there.
+
+Optional `--branch` flags outside that set take an empty value and send it as an empty
+`branchName`, which leaves the server to decide what one means. Pass such a flag only
+with a name in hand, or leave it off and take the documented default.
 
 The API key needs more than the sync itself: `SchemaUpdate` to start or cancel a sync,
 enter dev mode and delete branches, `SchemaRead` to follow a sync and read the data model,
