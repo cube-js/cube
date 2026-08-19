@@ -537,13 +537,16 @@ mod tests {
         assert!(nonempty_target("\t").is_err());
     }
 
-    /// Which `--branch`/`--ref` arguments in the whole command tree refuse an empty
-    /// value, as a list nobody can change without saying so in the diff.
+    /// Where every `--branch`/`--ref` argument in the command tree stands on an empty
+    /// value, as two lists nobody can change without saying so in the diff.
     ///
-    /// It used to assert that they all did. Most optional branch flags now accept one
-    /// and send it, so the property worth holding is no longer "everywhere" but "exactly
-    /// here" — a guard silently disappearing off one argument is the failure this still
-    /// exists to catch, and a count could only say that something moved, not what.
+    /// It used to assert they all refused one. Most optional branch flags now accept it
+    /// and send it as an empty field, so the property worth holding is no longer
+    /// "everywhere" but "exactly this partition". Both halves are asserted because each
+    /// closes a direction the other is blind to: a guard dropped off an argument, and a
+    /// new `--branch` declared without anyone deciding which side it belongs on. The
+    /// old "does everything refuse?" shape covered the second for free; a one-sided
+    /// list would not.
     ///
     /// It goes through real argument parsing rather than introspecting the parser
     /// (clap keeps `ValueParser::parse_ref` private), filling every other required
@@ -589,7 +592,12 @@ mod tests {
             [path, &opts[..], &positionals[..]].concat()
         }
 
-        fn walk(cmd: &clap::Command, path: Vec<String>, checked: &mut Vec<String>) {
+        fn walk(
+            cmd: &clap::Command,
+            path: Vec<String>,
+            refuses: &mut Vec<String>,
+            accepts: &mut Vec<String>,
+        ) {
             for arg in cmd.get_arguments() {
                 // Matched by name, not by exact id, so a flag *added* under a name I
                 // did not anticipate is caught too — `--base-branch` alongside an
@@ -631,6 +639,7 @@ mod tests {
                     .map(|e| e.to_string())
                     .unwrap_or_default();
                 if err.is_empty() {
+                    accepts.push(flag);
                     continue;
                 }
                 // Anything else means the placeholder argv failed to parse for a reason
@@ -641,27 +650,39 @@ mod tests {
                     "{flag} failed to parse for a reason other than its empty value, so \
                      this test learned nothing about it: {err}"
                 );
-                checked.push(flag);
+                refuses.push(flag);
             }
             for sub in cmd.get_subcommands() {
                 let mut path = path.clone();
                 path.push(sub.get_name().to_string());
-                walk(sub, path, checked);
+                walk(sub, path, refuses, accepts);
             }
         }
 
-        let mut checked = Vec::new();
-        walk(&crate::Cli::command(), vec!["cube".into()], &mut checked);
-        checked.sort();
-        // A list rather than a count, because the answer is no longer the same for every
-        // branch argument and a number can't say which one moved. Exact rather than a
-        // floor for the reason it always was: the filter only sees ids that name a branch
-        // or a ref, so a rename out of that family (`branch` → `name`, as
-        // `create-branch <name>` already is) or an outright removal would shrink the walk,
-        // and a floor would absorb that silently. A flag leaving this list is the
-        // interesting direction — that is a guard being dropped.
+        let (mut refuses, mut accepts) = (Vec::new(), Vec::new());
+        walk(
+            &crate::Cli::command(),
+            vec!["cube".into()],
+            &mut refuses,
+            &mut accepts,
+        );
+        refuses.sort();
+        accepts.sort();
+        // Both sides, not just the guarded one. A list rather than a count because the
+        // answer is no longer the same for every branch argument and a number can only
+        // say that something moved, not what; and BOTH lists because each closes a
+        // direction the other cannot see. Without `refuses`, a guard silently dropped
+        // off an argument passes. Without `accepts`, a NEW unguarded `--branch` is
+        // simply not recorded and passes too — which is the hole a "does everything
+        // refuse?" walk used to cover for free, and the reason this test still earns
+        // its keep now that the answer varies.
+        //
+        // Exact rather than a floor, for the reason it always was: the filter only sees
+        // ids that name a branch or a ref, so a rename out of that family (`branch` →
+        // `name`, as `create-branch <name>` already is) or an outright removal would
+        // shrink the walk, and a floor would absorb that silently.
         assert_eq!(
-            checked,
+            refuses,
             [
                 // Required: no fallback exists, so a blank is a name the caller failed to
                 // supply. `data-model dev-mode ""` from a CI gate whose branch variable
@@ -670,10 +691,10 @@ mod tests {
                 "cube data-model dev-mode <BRANCH>",
                 "cube data-model disable-branch <BRANCH>",
                 "cube data-model enable-branch <BRANCH>",
-                // Optional, and guarded anyway. The two `--ref`/`--branch` pairs whose
-                // empty-value behaviour was measured rather than assumed — see
-                // `nonempty_target` — plus `dbt sync --branch`, which names the branch a
-                // sync creates and so decides whether `verify_ref_applied` runs at all.
+                // Optional, and guarded anyway. The pair whose empty-value behaviour was
+                // measured rather than assumed — see `nonempty_target` — plus
+                // `dbt sync --branch`, which names the branch a sync creates and so
+                // decides whether `verify_ref_applied` runs at all.
                 "cube dbt sync --branch",
                 "cube dbt sync --ref",
                 "cube deployments build-status --branch",
@@ -681,6 +702,27 @@ mod tests {
             "the set of branch arguments refusing an empty value changed. Adding one is \
              `value_parser = util::nonempty` on the declaration; dropping one means \
              `--branch \"\"` now travels as an empty `branchName`, so say why here."
+        );
+        assert_eq!(
+            accepts,
+            [
+                "cube agents skills --branch",
+                "cube data-model commit --branch",
+                "cube data-model delete --branch",
+                "cube data-model file-hashes --branch",
+                "cube data-model get --branch",
+                "cube data-model list --branch",
+                "cube data-model merge --branch",
+                "cube data-model merge-to-default --branch",
+                "cube data-model pull --branch",
+                "cube data-model put --branch",
+                "cube data-model rename --branch",
+                "cube deploy --branch",
+                "cube github connect --branch",
+            ],
+            "a branch argument that takes an empty value and sends it as an empty \
+             `branchName` was added, removed or renamed. A new one belongs on this list \
+             only if leaving the target to the server is what you want for it."
         );
     }
 

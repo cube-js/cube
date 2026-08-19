@@ -261,6 +261,17 @@ cube data-model merge-to-default DEPLOYMENT_ID --branch my-branch -m "add orders
 `merge-to-default` merges that branch into the deploy branch, rebuilds production, and
 **deletes the branch it merged** — pass `--keep-branch` to keep it.
 
+<Warning>
+
+Check that `$DEV` is set before the two lines that use it. An interactive shell has no
+`pipefail`, so a failed `dev-mode` leaves it empty and `jq` still exits 0 — and `put` and
+`commit` accept an empty `--branch`, sending an empty field rather than stopping. They
+would then act on whatever your dev-mode session currently points at. `delete-branch`
+two lines later does refuse it, so the sequence fails eventually, but only after `commit`
+has already pushed. In a script, `set -o pipefail` and a `[ -n "$DEV" ]` guard cover it.
+
+</Warning>
+
 That accounts for `my-branch`; the two lines before it account for what you'd otherwise
 leave behind. Dev mode is per-credential state, so while a session stays open every
 command that omits `--branch` targets that dev branch instead of the deploy branch, and
@@ -552,16 +563,17 @@ rather than inside `echo "BRANCH=$(jq …)"`, because `-e` fires on a failed com
 substitution in an assignment but not when it is an argument to a command that
 itself succeeds.
 
-Every branch argument this recipe passes refuses an empty value rather than letting it
+All four branch arguments this recipe passes refuse an empty value rather than letting it
 mean "whichever branch the server would have picked" — `dbt sync --ref`, `data-model
-dev-mode`, and `deployments build-status --branch`. So a gate that gets this wrong fails
-instead of reporting green, and it fails at the source rather than later. Note that
-`$GITHUB_HEAD_REF` is only set on `pull_request` events; on any other trigger `--ref`
-gets an empty string, which is why the run stops there.
+dev-mode`, `data-model delete-branch`, and `deployments build-status --branch`. So a gate
+that gets this wrong fails instead of reporting green, and it fails at the source rather
+than later. Note that `$GITHUB_HEAD_REF` is only set on `pull_request` events; on any
+other trigger `--ref` gets an empty string, which is why the run stops there.
 
 Optional `--branch` flags outside that set take an empty value and send it as an empty
-`branchName`, which leaves the server to decide what one means. Pass such a flag only
-with a name in hand, or leave it off and take the documented default.
+field, which leaves the server to decide what one means. (The field is `branchName` on
+most endpoints and `branch` on `github connect`.) Pass such a flag only with a name in
+hand, or leave it off and take the documented default.
 
 The API key needs more than the sync itself: `SchemaUpdate` to start or cancel a sync,
 enter dev mode and delete branches, `SchemaRead` to follow a sync and read the data model,
