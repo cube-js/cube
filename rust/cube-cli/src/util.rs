@@ -136,8 +136,10 @@ pub fn body(map: Map<String, Value>) -> Value {
 }
 
 /// The phrase both refusal messages open with, and what
-/// `only_the_listed_branch_arguments_refuse_an_empty_value` partitions on — written once
-/// so the three cannot drift apart.
+/// `only_the_listed_branch_arguments_refuse_an_empty_value` asserts a refusal was actually
+/// about — that test partitions on whether parsing failed at all, and uses this phrase to
+/// tell a refusal of the empty value from a placeholder argv that failed for a reason of
+/// its own. Written once so the three cannot drift apart.
 const EMPTY_VALUE_REFUSED: &str = "an empty value";
 
 /// Reject a supplied-but-empty branch at parse time, where what an empty value means to
