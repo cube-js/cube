@@ -138,7 +138,7 @@ pub fn body(map: Map<String, Value>) -> Value {
 /// The phrase both refusal messages open with, and what
 /// `only_the_listed_branch_arguments_refuse_an_empty_value` partitions on — written once
 /// so the three cannot drift apart.
-pub const EMPTY_VALUE_REFUSED: &str = "an empty value";
+const EMPTY_VALUE_REFUSED: &str = "an empty value";
 
 /// Reject a supplied-but-empty branch at parse time, where what an empty value means to
 /// the server has not been measured. [`nonempty_target`] carries the two arguments where
