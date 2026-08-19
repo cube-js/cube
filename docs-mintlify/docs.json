@@ -222,7 +222,8 @@
                   "docs/integrations/semantic-layer-sync/tableau"
                 ]
               },
-              "docs/integrations/mcp-server"
+              "docs/integrations/mcp-server",
+              "docs/integrations/agent-skills"
             ]
           }
         ]
