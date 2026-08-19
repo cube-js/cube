@@ -728,8 +728,8 @@ mod tests {
                 "cube deployments build-status --branch",
             ],
             "the set of branch arguments refusing an empty value changed. Adding one is \
-             `value_parser = util::nonempty` on the declaration; dropping one means \
-             `--branch \"\"` now travels as an empty field, so say why here."
+             `value_parser = util::nonempty` on the declaration; dropping one means a \
+             blank for that argument now travels as an empty field, so say why here."
         );
         assert_eq!(
             accepts,
@@ -751,7 +751,8 @@ mod tests {
             "a branch argument that takes an empty value at parse time was added, \
              removed or renamed. This list records the parser's answer alone — that a \
              blank then travels as an empty field is held by `set`, `push` and \
-             `write_body`. A new one belongs here only if both are what you want for it."
+             `write_body`. A new one belongs here only if you want a blank both taken \
+             and sent."
         );
     }
 
