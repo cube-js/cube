@@ -92,10 +92,10 @@ import {
   normalizeQueryCancelPreAggregations,
   normalizeQueryPreAggregationPreview,
   normalizeQueryPreAggregations,
-  normalizeTimezone,
   parseInputMemberExpression,
   preAggsJobsRequestSchema,
   remapToQueryAdapterFormat,
+  timezoneSchema,
 } from './query';
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
@@ -481,7 +481,10 @@ class ApiGateway {
         try {
           await this.assertApiScope('data', req.context?.securityContext);
 
-          const timezone = normalizeTimezone(req.body.timezone);
+          const { error, value: timezone } = timezoneSchema.validate(req.body.timezone, { errors: { label: false } });
+          if (error) {
+            throw new UserError(`Invalid timezone: ${error.message || error.toString()}`);
+          }
 
           await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext, req.body.cache, timezone, req.body.throwContinueWait, req.context?.requestId);
         } catch (e: any) {

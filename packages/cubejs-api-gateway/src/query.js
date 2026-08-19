@@ -57,7 +57,7 @@ const evaluatedPatchMeasureExpression = parsedPatchMeasureExpression.keys({
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
 
-const timezoneSchema = Joi.string().custom((value, helpers) => {
+export const timezoneSchema = Joi.string().custom((value, helpers) => {
   const name = canonicalTimezone(value);
   if (!name) {
     return helpers.message({ custom: '{{#label}} must be a valid IANA time zone, got "{{#tz}}"' }, { tz: value });
@@ -65,27 +65,6 @@ const timezoneSchema = Joi.string().custom((value, helpers) => {
 
   return name;
 }, 'timezone');
-
-/**
- * @param {string|undefined} value
- * @returns {string|undefined}
- */
-export const normalizeTimezone = (value) => {
-  if (!value) {
-    return value;
-  }
-
-  if (typeof value !== 'string') {
-    throw new UserError(`timezone must be a string, got ${typeof value}`);
-  }
-
-  const name = canonicalTimezone(value);
-  if (!name) {
-    throw new UserError(`timezone must be a valid IANA time zone, got "${value}"`);
-  }
-
-  return name;
-};
 
 // It might be member name, td+granularity or member expression
 const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);

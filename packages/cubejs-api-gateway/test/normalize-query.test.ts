@@ -3,7 +3,7 @@ import {
   normalizeQuery,
   normalizeQueryPreAggregations,
   normalizeQueryPreAggregationPreview,
-  normalizeTimezone,
+  timezoneSchema,
 } from '../src/query';
 
 const baseQuery = {
@@ -107,23 +107,33 @@ describe('normalizeQueryPreAggregationPreview timezone handling', () => {
   });
 });
 
-describe('normalizeTimezone helper', () => {
+// Used on its own (not as part of an object schema) to validate the /v1/cubesql
+// session timezone.
+describe('timezoneSchema as a standalone validator', () => {
   test.each([
     ['america/new_york', 'America/New_York'],
     ['UTC', 'UTC'],
     ['uTc', 'UTC'],
   ])('normalizes %j -> %j', (tz, expected) => {
-    expect(normalizeTimezone(tz)).toBe(expected);
+    const { error, value } = timezoneSchema.validate(tz);
+    expect(error).toBeUndefined();
+    expect(value).toBe(expected);
   });
 
-  test.each([undefined, null, ''])('passes through empty value %j', (tz) => {
-    expect(normalizeTimezone(tz as any)).toBe(tz);
+  test('accepts an absent value', () => {
+    const { error, value } = timezoneSchema.validate(undefined);
+    expect(error).toBeUndefined();
+    expect(value).toBeUndefined();
   });
 
   test.each([
     'Not/AZone',
     'foo/bar',
-  ])('throws on invalid timezone %j', (tz) => {
-    expect(() => normalizeTimezone(tz)).toThrow(/valid IANA time zone/);
+  ])('rejects invalid timezone %j', (tz) => {
+    expect(timezoneSchema.validate(tz).error?.message).toMatch(/valid IANA time zone/);
+  });
+
+  test.each([null, '', 123, true])('rejects %j', (tz) => {
+    expect(timezoneSchema.validate(tz).error).toBeDefined();
   });
 });
