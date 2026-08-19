@@ -75,6 +75,10 @@ export const normalizeTimezone = (value) => {
     return value;
   }
 
+  if (typeof value !== 'string') {
+    throw new UserError(`timezone must be a string, got ${typeof value}`);
+  }
+
   const name = canonicalTimezone(value);
   if (!name) {
     throw new UserError(`timezone must be a valid IANA time zone, got "${value}"`);

@@ -29,7 +29,6 @@ describe('canonicalTimezone', () => {
     'Not/AZone',
     'Europ/Berlin',
     'foo/bar',
-    // Offsets are the SQL injection surface.
     '+05:00',
     '+05',
     '05',
@@ -42,18 +41,23 @@ describe('canonicalTimezone', () => {
     expect(canonicalTimezone(value)).toBeNull();
   });
 
-  // The casts are the point: real callers are plain JS, so the signature is not enforced and
-  // moment.tz.zone() would throw a TypeError instead of returning null.
   test.each([
     undefined,
     null,
+  ])('returns null for unset value %j', (value) => {
+    expect(canonicalTimezone(value)).toBeNull();
+  });
+
+  // The casts are the point: real callers are plain JS, so the signature is not enforced.
+  // A wrong type is a bug at the call site, not an unknown zone.
+  test.each([
     123,
     0,
     {},
     [],
     true,
-  ])('returns null without throwing for non-string %j', (value) => {
-    expect(() => canonicalTimezone(value as any)).not.toThrow();
-    expect(canonicalTimezone(value as any)).toBeNull();
+    false,
+  ])('throws for non-string %j', (value) => {
+    expect(() => canonicalTimezone(value as any)).toThrow(TypeError);
   });
 });

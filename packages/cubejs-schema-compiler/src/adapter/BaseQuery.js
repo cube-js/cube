@@ -302,7 +302,9 @@ export class BaseQuery {
     // Backstop guard for every dialect convertTz() sink. Deliberately does not canonicalize:
     // rewriting this.timezone would change generated SQL and pre-agg partition keys for
     // non-gateway callers (queryRewrite, refresh scheduler). Message matches the native planner.
-    if (this.timezone && !canonicalTimezone(this.timezone)) {
+    // The type is checked here so query options carrying a wrong type stay a user error
+    // instead of the TypeError canonicalTimezone raises for call-site bugs.
+    if (this.timezone && (typeof this.timezone !== 'string' || !canonicalTimezone(this.timezone))) {
       throw new UserError(`Incorrect timezone ${this.timezone}`);
     }
 

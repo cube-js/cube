@@ -2,13 +2,17 @@ import moment from 'moment-timezone';
 
 /**
  * Resolves `value` to a canonical tz-database zone name, matched case-insensitively,
- * or `null` when it is not a known zone.
+ * or `null` when it is unset or not a known zone.
+ *
+ * @throws {TypeError} when `value` is neither a string nor unset.
  */
-export function canonicalTimezone(value: string | null): string | null {
-  // Real callers are plain JS, so the signature is not enforced: moment.tz.zone() throws a
-  // TypeError on a non-string, which would surface as a 500 instead of a validation error.
-  if (typeof value !== 'string' || value === '') {
+export function canonicalTimezone(value?: string | null): string | null {
+  if (value === undefined || value === null) {
     return null;
+  }
+
+  if (typeof value !== 'string') {
+    throw new TypeError(`Timezone must be a string, got ${typeof value}`);
   }
 
   const zone = moment.tz.zone(value);
