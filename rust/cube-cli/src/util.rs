@@ -143,7 +143,9 @@ pub fn body(map: Map<String, Value>) -> Value {
 /// under the key `branch` and escaped a grep for `branchName`.
 ///
 /// It no longer guards every branch argument;
-/// `only_the_listed_branch_arguments_refuse_an_empty_value` holds the set. The reachable
+/// `only_the_listed_branch_arguments_refuse_an_empty_value` holds the set it can see —
+/// `create-branch <NAME>` carries this too, under the id `name`, so the filter misses it.
+/// The reachable
 /// case is a CI gate whose variable came out empty — `$GITHUB_HEAD_REF` is unset off
 /// `pull_request`, and `jq -r` prints nothing — where `dev-mode ""` would enter dev mode
 /// on the deploy branch.
