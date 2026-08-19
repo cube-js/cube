@@ -683,8 +683,9 @@ mod tests {
                 "cube data-model enable-branch <BRANCH>",
                 // Optional, and guarded anyway. The pair whose empty-value behaviour was
                 // measured rather than assumed — see `nonempty_target` — plus
-                // `dbt sync --branch`, which names the branch a sync creates and so
-                // decides whether `verify_ref_applied` runs at all.
+                // `dbt sync --branch`, which the CLI reads by presence and never by
+                // value: `Some("")` claims the caller named the branch, which skips
+                // `verify_ref_applied` and the prune hint for a name nobody chose.
                 "cube dbt sync --branch",
                 "cube dbt sync --ref",
                 "cube deployments build-status --branch",
