@@ -1,7 +1,7 @@
 import R from 'ramda';
-import moment from 'moment';
+import moment from 'moment-timezone';
 import Joi from 'joi';
-import { getEnv } from '@cubejs-backend/shared';
+import { canonicalTimezone, getEnv } from '@cubejs-backend/shared';
 
 import { UserError } from './user-error';
 import { dateParser } from './date-parser';
@@ -56,6 +56,18 @@ const evaluatedPatchMeasureExpression = parsedPatchMeasureExpression.keys({
 });
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
+
+const cacheModeSchema = Joi.valid('stale-if-slow', 'stale-while-revalidate', 'must-revalidate', 'no-cache');
+
+const timezoneSchema = Joi.string().custom((value, helpers) => {
+  const name = canonicalTimezone(value);
+  if (!name) {
+    return helpers.message({ custom: '{{#label}} must be a valid IANA time zone, got "{{#tz}}"' }, { tz: value });
+  }
+
+  return name;
+}, 'timezone');
+
 // It might be member name, td+granularity or member expression
 const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
 const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)?$/);
@@ -183,14 +195,14 @@ const querySchema = Joi.object().keys({
     Joi.array().items(Joi.array().min(2).ordered(idOrMemberExpressionName, Joi.valid('asc', 'desc')))
   ),
   segments: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
-  timezone: Joi.string(),
+  timezone: timezoneSchema,
   limit: Joi.number().integer().strict().min(0),
   offset: Joi.number().integer().strict().min(0),
   total: Joi.boolean(),
   // @deprecated
   renewQuery: Joi.boolean(),
-  cacheMode: Joi.valid('stale-if-slow', 'stale-while-revalidate', 'must-revalidate', 'no-cache'),
-  cache: Joi.valid('stale-if-slow', 'stale-while-revalidate', 'must-revalidate', 'no-cache'),
+  cacheMode: cacheModeSchema,
+  cache: cacheModeSchema,
   ungrouped: Joi.boolean(),
   responseFormat: Joi.valid('default', 'compact', 'columnar'),
   subqueryJoins: Joi.array().items(subqueryJoin),
@@ -199,6 +211,13 @@ const querySchema = Joi.object().keys({
     member: Joi.string().required(),
     filter: Joi.object(),
   })),
+});
+
+export const cubeSqlRequestSchema = Joi.object().keys({
+  query: Joi.string().required(),
+  timezone: timezoneSchema,
+  cache: cacheModeSchema,
+  throwContinueWait: Joi.boolean(),
 });
 
 const normalizeQueryOrder = order => {
@@ -222,7 +241,7 @@ export const preAggsJobsRequestSchema = Joi.object({
           securityContext: Joi.required(),
         })
       ).min(1).required(),
-      timezones: Joi.array().items(Joi.string()).min(1).required(),
+      timezones: Joi.array().items(timezoneSchema).min(1).required(),
       dataSources: Joi.array().items(Joi.string()),
       cubes: Joi.array().items(Joi.string()),
       preAggregations: Joi.array().items(Joi.string()),
@@ -425,7 +444,7 @@ function normalizeQueryCacheMode(query, cacheMode) {
 const normalizeQuery = (query, persistent, cacheMode) => {
   query = normalizeQueryCacheMode(query, cacheMode);
   query.timezone = query.timezone || getEnv('defaultTimezone');
-  const { error } = querySchema.validate(query);
+  const { error, value } = querySchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
@@ -443,7 +462,7 @@ const normalizeQuery = (query, persistent, cacheMode) => {
     dimension: d.split('.').slice(0, 2).join('.'),
     granularity: d.split('.')[2]
   }));
-  const timezone = query.timezone || 'UTC';
+  const timezone = value.timezone || 'UTC';
 
   const def = getEnv('dbQueryDefaultLimit') <= getEnv('dbQueryLimit')
     ? getEnv('dbQueryDefaultLimit')
@@ -506,8 +525,8 @@ const remapToQueryAdapterFormat = (query) => (query ? {
 const queryPreAggregationsSchema = Joi.object().keys({
   expand: Joi.array().items(Joi.string()),
   metadata: Joi.object(),
-  timezone: Joi.string(),
-  timezones: Joi.array().items(Joi.string()),
+  timezone: timezoneSchema,
+  timezones: Joi.array().items(timezoneSchema),
   preAggregations: Joi.array().items(Joi.object().keys({
     id: Joi.string().required(),
     cacheOnly: Joi.boolean(),
@@ -518,14 +537,14 @@ const queryPreAggregationsSchema = Joi.object().keys({
 });
 
 const normalizeQueryPreAggregations = (query, defaultValues) => {
-  const { error } = queryPreAggregationsSchema.validate(query);
+  const { error, value } = queryPreAggregationsSchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
 
   return {
     metadata: query.metadata,
-    timezones: query.timezones || (query.timezone && [query.timezone]) || defaultValues?.timezones || ['UTC'],
+    timezones: value.timezones || (value.timezone && [value.timezone]) || defaultValues?.timezones || ['UTC'],
     preAggregations: query.preAggregations,
     expand: query.expand
   };
@@ -533,7 +552,7 @@ const normalizeQueryPreAggregations = (query, defaultValues) => {
 
 const queryPreAggregationPreviewSchema = Joi.object().keys({
   preAggregationId: Joi.string().required(),
-  timezone: Joi.string().required(),
+  timezone: timezoneSchema.required(),
   versionEntry: Joi.object().required().keys({
     content_version: Joi.string(),
     last_updated_at: Joi.number(),
@@ -545,12 +564,12 @@ const queryPreAggregationPreviewSchema = Joi.object().keys({
 });
 
 const normalizeQueryPreAggregationPreview = (query) => {
-  const { error } = queryPreAggregationPreviewSchema.validate(query);
+  const { error, value } = queryPreAggregationPreviewSchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
 
-  return query;
+  return { ...query, timezone: value.timezone };
 };
 
 const queryCancelPreAggregationPreviewSchema = Joi.object().keys({

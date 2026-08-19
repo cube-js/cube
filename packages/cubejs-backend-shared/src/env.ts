@@ -2,6 +2,7 @@
 import { get } from 'env-var';
 import { displayCLIWarning } from './cli';
 import { isNativeSupported } from './platform';
+import { canonicalTimezone } from './timezone';
 
 export class InvalidConfiguration extends Error {
   public constructor(key: string, value: any, description: string) {
@@ -285,13 +286,25 @@ const variables: Record<string, (...args: any) => any> = {
   },
   refreshWorkerConcurrency: () => get('CUBEJS_REFRESH_WORKER_CONCURRENCY')
     .asIntPositive(),
-  // eslint-disable-next-line consistent-return
   scheduledRefreshTimezones: () => {
-    const timezones = get('CUBEJS_SCHEDULED_REFRESH_TIMEZONES').asString();
+    const timezones = get('CUBEJS_SCHEDULED_REFRESH_TIMEZONES')
+      .default('')
+      .asArray()
+      .map(timezone => timezone.trim())
+      .filter(Boolean);
 
-    if (timezones) {
-      return timezones.split(',').map(t => t.trim());
-    }
+    return timezones.map(raw => {
+      const timezone = canonicalTimezone(raw);
+      if (!timezone) {
+        throw new InvalidConfiguration(
+          'CUBEJS_SCHEDULED_REFRESH_TIMEZONES',
+          raw,
+          'Must be a comma-separated list of valid IANA time zone names, e.g. UTC,America/Los_Angeles.'
+        );
+      }
+
+      return timezone;
+    });
   },
   preAggregationsBuilder: () => get('CUBEJS_PRE_AGGREGATIONS_BUILDER').asBool(),
   gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
@@ -343,9 +356,20 @@ const variables: Record<string, (...args: any) => any> = {
   nestedFoldersDelimiter: () => get('CUBEJS_NESTED_FOLDERS_DELIMITER')
     .default('')
     .asString(),
-  defaultTimezone: () => get('CUBEJS_DEFAULT_TIMEZONE')
-    .default('UTC')
-    .asString(),
+  defaultTimezone: () => {
+    const value = (get('CUBEJS_DEFAULT_TIMEZONE').asString() || '').trim() || 'UTC';
+
+    const timezone = canonicalTimezone(value);
+    if (!timezone) {
+      throw new InvalidConfiguration(
+        'CUBEJS_DEFAULT_TIMEZONE',
+        value,
+        'Must be a valid IANA time zone name, e.g. UTC or America/Los_Angeles.'
+      );
+    }
+
+    return timezone;
+  },
   preciseDecimalInCubestore: () => get('CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE')
     .default('false')
     .asBoolStrict(),

@@ -18,6 +18,7 @@ import {
   FROM_PARTITION_RANGE,
   MAX_SOURCE_ROW_LIMIT,
   QueryAlias,
+  canonicalTimezone,
   getEnv,
   localTimestampToUtc,
   timeSeries as timeSeriesBase,
@@ -297,6 +298,18 @@ export class BaseQuery {
     this.from = this.options.from;
     this.multiStageQuery = this.options.multiStageQuery;
     this.timezone = this.options.timezone;
+
+    // Backstop for every dialect convertTz() sink: callers that bypass the API gateway
+    // (queryRewrite, refresh scheduler, SQL API sessions) reach the dialects through here.
+    if (this.timezone) {
+      const timezone = canonicalTimezone(this.timezone);
+      if (!timezone) {
+        throw new UserError(`Incorrect timezone ${this.timezone}`);
+      }
+
+      this.timezone = timezone;
+    }
+
     this.rowLimit = this.options.rowLimit;
     this.offset = this.options.offset;
     /** @type {import('./PreAggregations').PreAggregations} */
@@ -941,7 +954,7 @@ export class BaseQuery {
       dimensions: this.options.dimensions,
       segments: this.options.segments,
       timeDimensions: this.options.timeDimensions,
-      timezone: this.options.timezone,
+      timezone: this.timezone,
       joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
       securityContext: this.contextSymbols.securityContext,
@@ -999,7 +1012,7 @@ export class BaseQuery {
       dimensions: this.options.dimensions,
       segments: this.options.segments,
       timeDimensions: this.options.timeDimensions,
-      timezone: this.options.timezone,
+      timezone: this.timezone,
       joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
       order,

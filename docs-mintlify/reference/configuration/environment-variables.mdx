@@ -1132,6 +1132,13 @@ The default [time zone][ref-time-zone] for queries.
 You can set the time zone name in the [TZ Database Name][link-tzdb] format, e.g.,
 `America/Los_Angeles`.
 
+<Warning>
+
+An invalid value fails at server startup. Only TZ Database names are accepted — fixed
+UTC offsets such as `+05:00` are rejected.
+
+</Warning>
+
 ## `CUBEJS_DEFAULT_API_SCOPES`
 
 [API scopes][ref-rest-scopes] used to allow or disallow access to REST (JSON) API
@@ -1418,6 +1425,13 @@ for][ref-config-sched-refresh-timer].
 | Possible Values                                           | Default in Development | Default in Production |
 | --------------------------------------------------------- | ---------------------- | --------------------- |
 | [A valid timezone from the tz database][wiki-tz-database] | N/A                    | N/A                   |
+
+<Warning>
+
+An invalid value fails at server startup. Only TZ Database names are accepted — fixed
+UTC offsets such as `+05:00` are rejected.
+
+</Warning>
 
 It can be also set using the [`scheduled_refresh_time_zones` configuration
 option](/reference/configuration/config#scheduled_refresh_time_zones).
