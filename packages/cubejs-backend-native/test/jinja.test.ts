@@ -201,9 +201,7 @@ suite('Jinja (new api)', () => {
 
     await expect(
       jinjaEngine.renderTemplate('template_panic.jinja', { js_fn: () => 'unsupported' }, null)
-    ).rejects.toThrow(
     ).rejects.toThrow(/Unexpected panic while rendering jinja template/);
-    );
 
     // The worker must survive a panic and continue to process the next jobs
     await expect(
