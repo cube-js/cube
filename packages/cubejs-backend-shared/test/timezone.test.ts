@@ -52,7 +52,6 @@ describe('canonicalTimezone', () => {
   });
 
   // The casts are the point: real callers are plain JS, so the signature is not enforced.
-  // A wrong type is a bug at the call site, not an unknown zone.
   test.each([
     123,
     0,

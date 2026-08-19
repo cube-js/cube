@@ -185,8 +185,7 @@ describe('getEnv(defaultTimezone / scheduledRefreshTimezones)', () => {
     delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES;
   });
 
-  // env-var's .default() does not fire for a *present but blank* value, and it does not trim.
-  // Blank/padded values are common in .env and compose YAML, so they must keep booting.
+  // env-var's .default() does not fire for a present but blank value, and it does not trim.
   test('defaultTimezone - unset / blank / padded resolve to UTC', () => {
     delete process.env.CUBEJS_DEFAULT_TIMEZONE;
     expect(getEnv('defaultTimezone')).toBe('UTC');
@@ -237,8 +236,7 @@ describe('getEnv(defaultTimezone / scheduledRefreshTimezones)', () => {
     expect(getEnv('scheduledRefreshTimezones')).toEqual(['America/New_York']);
   });
 
-  // Trailing/repeated separators are common in .env files and compose YAML, so they must
-  // not be read as an empty zone.
+  // Trailing/repeated separators are common in .env files and compose YAML.
   test('scheduledRefreshTimezones - ignores empty entries', () => {
     process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = 'UTC,';
     expect(getEnv('scheduledRefreshTimezones')).toEqual(['UTC']);
