@@ -19,7 +19,7 @@ use crate::cluster::worker_services::{
     WorkerProcessing,
 };
 
-use crate::ack_error;
+use crate::app_metrics;
 use crate::cluster::message::NetworkMessage;
 use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType, TraceIndex};
 use crate::cluster::transport::{ClusterTransport, MetaStoreTransport, WorkerConnection};
@@ -2118,13 +2118,11 @@ impl ClusterImpl {
                     log::debug!("Startup warmup cancelled");
                     return;
                 }
-                // TODO: propagate 'not found' and log in debug mode. Compaction might remove files,
-                //       so they are not errors most of the time.
-                ack_error!(
-                    self.remote_fs
-                        .download_file(file, p.get_row().file_size())
-                        .await
-                );
+                let result = self
+                    .remote_fs
+                    .download_file(file, p.get_row().file_size())
+                    .await;
+                self.report_warmup_download(result, p.get_id(), None).await;
             }
             for c in chunks {
                 if self.stop_token.is_cancelled() {
@@ -2141,13 +2139,53 @@ impl ClusterImpl {
                         c.get_row().file_size(),
                     )
                     .await;
-                // TODO: propagate 'not found' and log in debug mode. Compaction might remove files,
-                //       so they are not errors most of the time.
-                ack_error!(result);
+                self.report_warmup_download(result, p.get_id(), Some(c.get_id()))
+                    .await;
             }
         }
         log::debug!("Startup warmup finished");
         return;
+    }
+
+    /// A file that is gone by the time the pass reaches it is the normal case: the walk takes as
+    /// long as it takes and compaction removes what it replaces meanwhile. One that an active row
+    /// still points at means the data is really missing, which is worth an error.
+    async fn report_warmup_download(
+        &self,
+        result: Result<String, CubeError>,
+        partition_id: u64,
+        chunk_id: Option<u64>,
+    ) {
+        let e = match result {
+            Ok(_) => return,
+            Err(e) => e,
+        };
+        if e.is_file_not_found() {
+            if self.is_warmup_file_referenced(partition_id, chunk_id).await {
+                app_metrics::WARMUP_MISSING_ACTIVE.increment();
+                log::error!("Warmup file of an active row is missing: {}", e.message);
+            } else {
+                app_metrics::WARMUP_MISSING_STALE.increment();
+                log::debug!("Skipping warmup of a replaced file: {}", e.message);
+            }
+            return;
+        }
+        log::error!("Error: {:?}", e);
+    }
+
+    /// Whether the metastore still points at the file. A row that cannot be read counts as gone,
+    /// the same way the corrupt data deactivation path treats it.
+    async fn is_warmup_file_referenced(&self, partition_id: u64, chunk_id: Option<u64>) -> bool {
+        match chunk_id {
+            Some(chunk_id) => match self.meta_store.get_chunk(chunk_id).await {
+                Ok(c) => c.get_row().active(),
+                Err(_) => false,
+            },
+            None => match self.meta_store.get_partition(partition_id).await {
+                Ok(p) => p.get_row().has_main_table_file(),
+                Err(_) => false,
+            },
+        }
     }
 }
 
@@ -2314,6 +2352,8 @@ pub fn pick_worker_by_partitions<'a>(
 mod tests {
     use super::*;
     use crate::config::Config;
+    use crate::queryplanner::trace_data_loaded::DataLoadedSize;
+    use crate::store::compaction::CompactionService;
     use std::fs;
 
     fn config_with_workers(name: &str, workers: Vec<String>) -> Arc<dyn ConfigObj> {
@@ -2323,6 +2363,75 @@ mod tests {
                 c
             })
             .config_obj()
+    }
+
+    /// Compaction replacing a chunk with a partition file is exactly the race the warmup loses when
+    /// it reaches a file hours after the snapshot that named it.
+    #[tokio::test]
+    async fn warmup_file_reference_follows_the_metastore() {
+        Config::test("warmup_file_reference")
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let meta_store = services.meta_store;
+                let cluster = services.cluster;
+
+                service.exec_query("CREATE SCHEMA test").await?;
+                service.exec_query("CREATE TABLE test.warm (a int)").await?;
+                service
+                    .exec_query("INSERT INTO test.warm (a) VALUES (1), (2)")
+                    .await?;
+
+                let partition = meta_store
+                    .get_partitions_with_chunks_created_seconds_ago(-1000)
+                    .await?
+                    .remove(0);
+                let partition_id = partition.get_id();
+                let index_id = partition.get_row().get_index_id();
+                let chunk_id = meta_store
+                    .get_chunks_by_partition(partition_id, false)
+                    .await?[0]
+                    .get_id();
+
+                assert!(
+                    cluster
+                        .is_warmup_file_referenced(partition_id, Some(chunk_id))
+                        .await
+                );
+                // The partition holds no data of its own until it is compacted.
+                assert!(!cluster.is_warmup_file_referenced(partition_id, None).await);
+
+                services
+                    .injector
+                    .get_service_typed::<dyn CompactionService>()
+                    .await
+                    .compact(partition_id, DataLoadedSize::new())
+                    .await?;
+
+                // Compaction moved the rows into a partition file of its own and left the chunk
+                // and its parent behind, which is what makes their files disappear under a pass
+                // that is still walking an older snapshot.
+                let compacted_id = meta_store
+                    .get_active_partitions_by_index_id(index_id)
+                    .await?
+                    .remove(0)
+                    .get_id();
+                assert_ne!(compacted_id, partition_id);
+                assert!(cluster.is_warmup_file_referenced(compacted_id, None).await);
+                assert!(!cluster.is_warmup_file_referenced(partition_id, None).await);
+                assert!(
+                    !cluster
+                        .is_warmup_file_referenced(partition_id, Some(chunk_id))
+                        .await
+                );
+                assert!(
+                    !cluster
+                        .is_warmup_file_referenced(partition_id, Some(chunk_id + 1000))
+                        .await
+                );
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
     }
 
     #[test]
