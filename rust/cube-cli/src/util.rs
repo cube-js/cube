@@ -137,16 +137,20 @@ pub fn body(map: Map<String, Value>) -> Value {
 
 /// Reject a supplied-but-empty branch or ref at parse time.
 ///
-/// Attached to flag declarations as a clap `value_parser`, so it holds for a flag
-/// the moment the flag exists — including through `Option<String>`, where `None`
-/// stays legal and `Some("")` can no longer be constructed. Hand-written calls in
-/// match arms did not hold: this check was added three times, and each round found
-/// another flag that had been missed. The last one was `github connect --branch`,
-/// which sends its value under the key `branch` and so escaped even a grep for
-/// `branchName`. `every_branch_and_ref_flag_refuses_an_empty_value` counts the flags
-/// and holds the property, so the number lives in that assertion and nowhere else.
+/// Attached to a declaration as a clap `value_parser`, so it holds for that argument
+/// the moment it exists — including through `Option<String>`, where `None` stays legal
+/// and `Some("")` can no longer be constructed. A hand-written call in a match arm did
+/// not hold: this check was added three times, and each round found an argument the
+/// previous had missed — the last was `github connect --branch`, which sends its value
+/// under the key `branch` and so escaped even a grep for `branchName`.
 ///
-/// The reason it is worth rejecting at all: an empty value is not dropped, it is
+/// It is no longer on every branch argument. `only_the_listed_branch_arguments_refuse_an_empty_value`
+/// is where the current set lives, as a list rather than a doc comment that would go
+/// stale: the required names, which have no fallback at all, plus `dbt sync` and
+/// `deployments build-status`. Everywhere else an optional `--branch` now accepts a
+/// blank and sends it.
+///
+/// The reason it is worth rejecting where it stays: an empty value is not dropped, it is
 /// sent as an empty field, and what an empty field means is then the server's
 /// choice rather than the caller's. Where that choice has actually been measured,
 /// `nonempty_target` says so instead.
@@ -533,17 +537,20 @@ mod tests {
         assert!(nonempty_target("\t").is_err());
     }
 
-    /// Holds the promise the doc comment makes, which hand-written calls in match
-    /// arms could not: every `--branch`/`--ref` in the whole command tree refuses an
-    /// empty value. A new branch-taking flag is a copy of a declaration, so this
-    /// fails the moment one is declared without the parser.
+    /// Which `--branch`/`--ref` arguments in the whole command tree refuse an empty
+    /// value, as a list nobody can change without saying so in the diff.
+    ///
+    /// It used to assert that they all did. Most optional branch flags now accept one
+    /// and send it, so the property worth holding is no longer "everywhere" but "exactly
+    /// here" — a guard silently disappearing off one argument is the failure this still
+    /// exists to catch, and a count could only say that something moved, not what.
     ///
     /// It goes through real argument parsing rather than introspecting the parser
     /// (clap keeps `ValueParser::parse_ref` private), filling every other required
     /// argument with a placeholder so that the only thing left to object to is the
     /// empty value.
     #[test]
-    fn every_branch_and_ref_flag_refuses_an_empty_value() {
+    fn only_the_listed_branch_arguments_refuse_an_empty_value() {
         use clap::{CommandFactory, Parser};
 
         // On the action, not on `get_num_args()`: the derive leaves num_args
@@ -623,11 +630,16 @@ mod tests {
                     .err()
                     .map(|e| e.to_string())
                     .unwrap_or_default();
+                if err.is_empty() {
+                    continue;
+                }
+                // Anything else means the placeholder argv failed to parse for a reason
+                // of its own, which would otherwise be recorded as a refusal the command
+                // never expressed.
                 assert!(
                     err.contains("an empty value"),
-                    "{flag} accepts an empty value — add \
-                     `value_parser = util::nonempty` to the declaration.\n\
-                     Got instead: {err}"
+                    "{flag} failed to parse for a reason other than its empty value, so \
+                     this test learned nothing about it: {err}"
                 );
                 checked.push(flag);
             }
@@ -640,15 +652,35 @@ mod tests {
 
         let mut checked = Vec::new();
         walk(&crate::Cli::command(), vec!["cube".into()], &mut checked);
-        // Exact, not a floor: the filter can only see ids that name a branch or a
-        // ref, so a rename out of that family (`branch` → `name`, as
-        // `create-branch <name>` already is) or an outright removal would shrink the
-        // walk, and a floor would absorb that silently.
+        checked.sort();
+        // A list rather than a count, because the answer is no longer the same for every
+        // branch argument and a number can't say which one moved. Exact rather than a
+        // floor for the reason it always was: the filter only sees ids that name a branch
+        // or a ref, so a rename out of that family (`branch` → `name`, as
+        // `create-branch <name>` already is) or an outright removal would shrink the walk,
+        // and a floor would absorb that silently. A flag leaving this list is the
+        // interesting direction — that is a guard being dropped.
         assert_eq!(
-            checked.len(),
-            20,
-            "a branch/ref flag was added, removed or renamed — update the count and \
-             check the new one carries `value_parser = util::nonempty`: {checked:#?}"
+            checked,
+            [
+                // Required: no fallback exists, so a blank is a name the caller failed to
+                // supply. `data-model dev-mode ""` from a CI gate whose branch variable
+                // came out empty would otherwise enter dev mode on the deploy branch.
+                "cube data-model delete-branch <BRANCH>",
+                "cube data-model dev-mode <BRANCH>",
+                "cube data-model disable-branch <BRANCH>",
+                "cube data-model enable-branch <BRANCH>",
+                // Optional, and guarded anyway. The two `--ref`/`--branch` pairs whose
+                // empty-value behaviour was measured rather than assumed — see
+                // `nonempty_target` — plus `dbt sync --branch`, which names the branch a
+                // sync creates and so decides whether `verify_ref_applied` runs at all.
+                "cube dbt sync --branch",
+                "cube dbt sync --ref",
+                "cube deployments build-status --branch",
+            ],
+            "the set of branch arguments refusing an empty value changed. Adding one is \
+             `value_parser = util::nonempty` on the declaration; dropping one means \
+             `--branch \"\"` now travels as an empty `branchName`, so say why here."
         );
     }
 
