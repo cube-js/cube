@@ -55,14 +55,12 @@ export interface QueueDriverConnectionInterface {
    * with the operation result.
    *
    * @param queryKey
-   * @param orphanedTime Ignored by every current driver: the per item orphaned deadline is
-   *   derived from options.orphanedTimeout (in seconds) instead.
    * @param queryHandler Our queue allows using different handlers. For example, query, cvsQuery, etc.
    * @param query
    * @param priority
-   * @param options
+   * @param options The per item orphaned deadline comes from options.orphanedTimeout, in seconds
    */
-  addToQueue(queryKey: QueryKey, orphanedTime: number, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse>;
+  addToQueue(queryKey: QueryKey, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse>;
   // Return query keys which was sorted by priority and time
   getToProcessQueries(): Promise<QueryKeysTuple[]>;
   getActiveQueries(): Promise<QueryKeysTuple[]>;

@@ -251,15 +251,12 @@ export class QueryQueue {
         if (jobExists) return null;
       }
 
-      const time = new Date().getTime();
-
+      // Undefined unless the query carries its own ttl, in which case it overrides the
+      // queue wide orphanedTimeout
       options.orphanedTimeout = query.orphanedTimeout;
 
-      const orphanedTimeout = 'orphanedTimeout' in query ? query.orphanedTimeout : this.orphanedTimeout;
-      const orphanedTime = time + (orphanedTimeout * 1000);
-
       const [added, queueId, queueSize, addedToQueueTime] = await queueConnection.addToQueue(
-        queryKey, orphanedTime, queryHandler, query, priority, options
+        queryKey, queryHandler, query, priority, options
       );
 
       if (added > 0) {

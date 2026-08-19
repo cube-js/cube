@@ -291,7 +291,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         expect(await connection.getOrphanedQueries()).toEqual([]);
 
         let orphanedTimeout = 2;
-        await connection.addToQueue(['1', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
+        await connection.addToQueue(['1', []], 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
           queueId: 1,
           stageQueryKey: '1',
           requestId: '1',
@@ -302,7 +302,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
         orphanedTimeout = 60;
 
-        await connection.addToQueue(['2', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
+        await connection.addToQueue(['2', []], 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
           queueId: 2,
           stageQueryKey: '2',
           requestId: '2',
@@ -381,7 +381,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
       const addQuery = (connection: any, queryKey: QueryKey, requestId: string) => connection.addToQueue(
         queryKey,
-        new Date().getTime() + 60 * 1000,
         'delay',
         <any>{ isJob: true },
         priority,
@@ -487,11 +486,10 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         });
       });
 
-      // `QUEUE ADD ... ORPHANED n` takes seconds and derives the deadline itself, so the
-      // only way to get an orphaned item is to wait it out
+      // orphanedTimeout is in seconds and the deadline is derived from it, so the only way to
+      // get an orphaned item is to wait it out
       const addWithOrphanedTimeout = (connection: any, queryKey: QueryKey, requestId: string) => connection.addToQueue(
         queryKey,
-        new Date().getTime() + 1000,
         'delay',
         <any>{ isJob: true },
         priority,
