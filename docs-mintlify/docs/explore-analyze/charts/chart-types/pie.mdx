@@ -28,3 +28,12 @@ Drag the **Inner radius** slider in the Style tab or enter a pixel value. Settin
 ## Color and slice ordering
 
 Slices are colored using the active [color palette](/docs/explore-analyze/charts/configuration/color-and-stacking) in palette order, matched to the sort order of your query results. To change which slice appears first, adjust the sort in the results table.
+
+## Grouping small slices
+
+Use **Slice grouping** in the Fields tab to collapse low-value categories into a single named slice instead of cluttering the chart with slivers. Choose one of two modes:
+
+- **Minimal share** — group any category below a percentage threshold you set.
+- **Top N values** — keep only the top N categories by value and group the rest.
+
+The grouped slice's name is editable (defaults to "Other"). Its value is the sum of the measure across every category it absorbed, so it isn't directly comparable to the other slices, which each show one category's exact value.

@@ -166,7 +166,8 @@ For any MCP-compatible client:
 
 An MCP client is not locked to a single deployment for the whole session. After
 connecting, it can discover the deployments and agents you can access and target a
-specific one on each request.
+specific one on each request — every tool accepts an optional `deploymentId`, validated
+on each call against the deployments you can actually access.
 
 Three tools work together:
 
@@ -183,6 +184,10 @@ Three tools work together:
     configured agent.
 - **`loadQueryResults`** — paginates through the results of a previous query on the same
   deployment context.
+
+Every other tool below — query, discovery, dashboard authoring, data model editing, and
+pre-aggregations — also accepts an optional `deploymentId` to target a deployment other
+than the session default.
 
 A typical client workflow:
 

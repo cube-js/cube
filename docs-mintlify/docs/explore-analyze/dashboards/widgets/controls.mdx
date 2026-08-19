@@ -142,6 +142,12 @@ For [time granularity switchers][ref-time-grain], the dimension picker is restri
 
 Mappings are also configurable by AI agents when they build or edit a dashboard, so an agent can wire controls across charts that use different semantic views without you needing to revisit each chart manually.
 
+#### Mapping suggestions across views
+
+When a chart's semantic view differs from the dimensions the dashboard's controls already target, the chart shows a banner — "Chart not connected to all filters" — naming how many controls could be connected to it. Click **Review** to open **Controls mapping** with name-matched dimensions on the chart's view already suggested for each control, or **Dismiss** to hide the banner for that chart.
+
+Suggestions are staged, not applied automatically — each proposed mapping is marked "Mapping suggestion. Save to apply." until you save. Saving shows a confirmation ("N controls connected") with an **Undo** action.
+
 [ref-time-grain]: #time-granularity-switcher
 
 [ref-workbooks]: /docs/explore-analyze/workbooks

@@ -18,3 +18,16 @@ Cube includes a library of built-in chart types covering the most common visuali
 - [HTML](/docs/explore-analyze/charts/chart-types/html)
 
 For configuration options that apply across chart types — axes, color, series settings, tooltips — see [Configure charts](/docs/explore-analyze/charts/configuration).
+
+## Searching for a chart type
+
+The chart type picker's search box also resolves chart concepts Cube doesn't ship as a
+dedicated type — searching "gauge," "waterfall," "sankey," "treemap," "radar," "sunburst,"
+or "choropleth" surfaces the closest built-in alternative and what it can and can't do,
+for example pointing "gauge" to a KPI's progress ring. The search also indexes existing
+settings — donut shape, map projection, small multiples, color-scale rules — so they're
+findable by name even if you don't know which chart type or tab they live under.
+
+Chart types that don't fit your current query are greyed out in the picker, with a
+tooltip naming what's missing (for example, "Needs 1 measure" or "Needs 2 time
+dimensions").
