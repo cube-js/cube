@@ -54,7 +54,7 @@ enum Cmd {
         content: Option<String>,
         /// Dev-mode branch to write to, as returned by `dev-mode` (defaults to
         /// your active dev-mode branch)
-        #[arg(long, value_parser = util::nonempty)]
+        #[arg(long)]
         branch: Option<String>,
     },
     /// Delete files (writes require a dev-mode branch)
@@ -262,11 +262,23 @@ fn tree_nodes(res: &serde_json::Value) -> Vec<serde_json::Value> {
 
 /// Write endpoints take the target branch as a `branchName` body field (with
 /// the caller's active dev-mode branch as the fallback when omitted).
+///
+/// A BLANK one is dropped rather than sent, which is what lets `put --branch` stay
+/// optional in the way its `--help` already promises: `--branch ""` then means the
+/// documented fallback, decided here, instead of an empty `branchName` whose meaning
+/// would be the server's choice rather than the caller's. `--branch "$BRANCH"` needs no
+/// conditional around it — `$GITHUB_HEAD_REF` is empty on every trigger but
+/// `pull_request`, and `jq -r` prints nothing at all for empty input.
+///
+/// The other four write commands reject a blank before reaching here (see
+/// [`util::nonempty`]), so for them this is only a backstop. `put` is the one that
+/// relies on it, and the one whose fallback is the caller's own dev-mode branch rather
+/// than anything shared.
 fn write_body(
     mut body: serde_json::Map<String, serde_json::Value>,
     branch: &Option<String>,
 ) -> serde_json::Value {
-    if let Some(b) = branch {
+    if let Some(b) = branch.as_deref().filter(|b| !util::is_blank(b)) {
         body.insert("branchName".into(), json!(b));
     }
     util::body(body)
@@ -678,6 +690,33 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_blank_branch_is_dropped_rather_than_sent_as_an_empty_field() {
+        let files = || {
+            let mut map = serde_json::Map::new();
+            map.insert("files".into(), json!([]));
+            map
+        };
+        // `put --branch ""` has to produce the request omitting the flag produces,
+        // byte for byte — that is what makes the flag optional rather than a way to
+        // hand the server an empty `branchName` and let it decide what one means.
+        let omitted = write_body(files(), &None);
+        assert_eq!(write_body(files(), &Some(String::new())), omitted);
+        assert_eq!(write_body(files(), &Some("   ".to_string())), omitted);
+        assert_eq!(omitted.get("branchName"), None);
+
+        // A padded name is a name: kept as it is, like `branch_or_placeholder`, since
+        // such a branch can exist and trimming would address a different one.
+        assert_eq!(
+            write_body(files(), &Some("  x  ".to_string()))["branchName"],
+            json!("  x  ")
+        );
+        assert_eq!(
+            write_body(files(), &Some("feat/x".to_string()))["branchName"],
+            json!("feat/x")
+        );
+    }
 
     #[test]
     fn the_dev_mode_command_survives_a_branch_name_with_a_metacharacter() {
