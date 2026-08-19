@@ -167,9 +167,12 @@ pub fn body(map: Map<String, Value>) -> Value {
 /// that one guard is a local decision, not a property the test holds.
 pub fn nonempty(s: &str) -> Result<String, String> {
     if s.trim().is_empty() {
-        return Err("an empty value is still sent, as an empty field — what it \
-                    then means is the server's choice rather than yours"
-            .to_string());
+        return Err(
+            "an empty value names no branch — and it is not dropped, but \
+                    sent as an empty field, leaving what that means to the server \
+                    rather than to you"
+                .to_string(),
+        );
     }
 
     Ok(s.to_string())
@@ -746,8 +749,9 @@ mod tests {
                 "cube github connect --branch",
             ],
             "a branch argument that takes an empty value at parse time was added, \
-             removed or renamed. A new one belongs on this list only if leaving what a \
-             supplied-but-empty value means to the server is what you want for it."
+             removed or renamed. This list records the parser's answer alone — that a \
+             blank then travels as an empty field is held by `set`, `push` and \
+             `write_body`. A new one belongs here only if both are what you want for it."
         );
     }
 
