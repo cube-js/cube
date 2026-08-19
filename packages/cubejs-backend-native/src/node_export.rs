@@ -1,8 +1,10 @@
+use cubesql::compile::datafusion::scalar::ScalarValue;
+use cubesql::compile::datafusion::variable::VarType;
 use cubesql::compile::parser::parse_sql_to_statement;
-use cubesql::compile::{convert_statement_to_cube_query, get_df_batches};
+use cubesql::compile::{convert_statement_to_cube_query, get_df_batches, DatabaseVariable};
 use cubesql::config::processing_loop::ShutdownMode;
 use cubesql::sql::dataframe::arrow_to_column_type;
-use cubesql::sql::ColumnType;
+use cubesql::sql::{ColumnType, CUBESQL_DISABLE_POST_PROCESSING_VAR};
 use cubesql::transport::{SpanId, TransportService};
 use futures::StreamExt;
 
@@ -243,6 +245,7 @@ async fn handle_sql_query(
     timezone: Option<String>,
     throw_continue_wait: bool,
     request_id: Option<String>,
+    disable_post_processing: bool,
 ) -> Result<(), CubeError> {
     let span_id = Some(Arc::new(SpanId::new(
         request_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
@@ -299,6 +302,16 @@ async fn handle_sql_query(
                 .write()
                 .expect("failed to unlock session throw_continue_wait for change");
             *cm = throw_continue_wait;
+        }
+
+        if disable_post_processing {
+            session.state.set_variables(vec![DatabaseVariable {
+                name: CUBESQL_DISABLE_POST_PROCESSING_VAR.to_string(),
+                value: ScalarValue::Boolean(Some(true)),
+                var_type: VarType::UserDefined,
+                readonly: false,
+                additional_params: None,
+            }]);
         }
 
         let session_clone = Arc::clone(&session);
@@ -601,6 +614,14 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
         Err(_) => None,
     };
 
+    let disable_post_processing: bool = match cx.argument::<JsValue>(8) {
+        Ok(val) => match val.downcast::<JsBoolean, _>(&mut cx) {
+            Ok(v) => v.value(&mut cx),
+            Err(_) => false,
+        },
+        Err(_) => false,
+    };
+
     let js_stream_on_fn = Arc::new(
         node_stream
             .get::<JsFunction, _, _>(&mut cx, "on")?
@@ -654,6 +675,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             timezone,
             throw_continue_wait,
             request_id,
+            disable_post_processing,
         )
         .await;
 

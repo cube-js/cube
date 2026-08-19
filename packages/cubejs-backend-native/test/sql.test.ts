@@ -655,4 +655,105 @@ describe('SQLInterface', () => {
       }
     }
   );
+
+  // `disablePostProcessing` on /v1/cubesql reaches the planner as a session
+  // variable, and the planner rejects a query only when the post-processing it
+  // needs would run over an intermediate result truncated to
+  // CUBEJS_DB_QUERY_LIMIT rows. A window function is never pushed down to Cube
+  // and this query puts no limit on the scan underneath it, so it is exactly
+  // that case.
+  //
+  // Truncation only happens off the streaming path - with stream mode on the
+  // scan streams every row instead - so the whole check is inert under
+  // CUBESQL_STREAM_MODE, which rust-cubesql.yml sets for this suite. Every test
+  // in this block would then assert nothing while reporting green, so skip it
+  // outright and let the CI report say so.
+  //
+  // Clearing the variable from here does not work: the deletion is visible in
+  // JS, but the native config is built from the real process environment, which
+  // jest's sandboxed `process.env` does not write through to. Coverage of this
+  // path in CI therefore rests on the Rust tests in `test_post_processing.rs`,
+  // which run without stream mode; what is lost here is the JS -> native
+  // argument wiring, which only these tests exercise.
+  const describeUnlessStreamMode =
+    process.env.CUBESQL_STREAM_MODE === 'true' ? describe.skip : describe;
+
+  describeUnlessStreamMode('disablePostProcessing', () => {
+    const UNBOUNDED_POST_PROCESSING_SQL =
+      'SELECT customer_gender, SUM(count) OVER () FROM KibanaSampleDataEcommerce GROUP BY customer_gender, count;';
+
+    async function execSqlCollectingLines(
+      sql: string,
+      disablePostProcessing?: boolean
+    ) {
+      const instance = await native.registerInterface({
+        ...interfaceMethods(),
+        canSwitchUserForSession: (_payload: any) => true,
+      });
+
+      let buf = '';
+      const lines: any[] = [];
+      const write = jest.fn((chunk, _enc, callback) => {
+        const raw = (buf + chunk.toString('utf-8')).split('\n');
+        buf = raw.pop() || '';
+        for (const l of raw) {
+          if (l.trim().length) {
+            lines.push(JSON.parse(l));
+          }
+        }
+        callback();
+      });
+
+      try {
+        await native.execSql(
+          instance,
+          sql,
+          new Writable({ write }),
+          { foo: 'bar' },
+          'stale-if-slow',
+          undefined,
+          undefined,
+          undefined,
+          disablePostProcessing
+        );
+      } finally {
+        await native.shutdownInterface(instance, 'fast');
+      }
+
+      return lines;
+    }
+
+    // The planning error is what's under test, not what the fake transport does
+    // afterwards: `interfaceMethods()` answers every non-streaming load with an
+    // error of its own, so a query that gets past planning still produces an
+    // error line - just not this one.
+    function rejectedForPostProcessing(lines: any[]) {
+      return lines.some((o) => o.error?.includes('post-processing'));
+    }
+
+    test('rejects post-processing over a truncated intermediate result', async () => {
+      const lines = await execSqlCollectingLines(
+        UNBOUNDED_POST_PROCESSING_SQL,
+        true
+      );
+
+      expect(rejectedForPostProcessing(lines)).toBe(true);
+      expect(lines.find((o) => o.schema)).toBeUndefined();
+    });
+
+    test('runs the same query when the flag is not passed', async () => {
+      const lines = await execSqlCollectingLines(UNBOUNDED_POST_PROCESSING_SQL);
+
+      expect(rejectedForPostProcessing(lines)).toBe(false);
+    });
+
+    test('leaves a fully pushed down query alone', async () => {
+      const lines = await execSqlCollectingLines(
+        'SELECT customer_gender, MEASURE(count) AS cnt FROM KibanaSampleDataEcommerce GROUP BY 1;',
+        true
+      );
+
+      expect(rejectedForPostProcessing(lines)).toBe(false);
+    });
+  });
 });

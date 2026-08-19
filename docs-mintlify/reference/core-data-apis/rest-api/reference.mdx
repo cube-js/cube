@@ -411,6 +411,21 @@ This endpoint is part of the [SQL API][ref-sql-api].
 | `query` | The SQL query to run | ✅ Yes |
 | `timezone` | The [time zone][ref-time-zone] for this query in the [TZ Database Name][link-tzdb] format, e.g., `America/Los_Angeles` | ❌ No |
 | `cache` | See [cache control][ref-cache-control]. `stale-if-slow` by default | ❌ No |
+| `disablePostProcessing` | Reject the query instead of post-processing a truncated result. `false` by default. See below | ❌ No |
+
+### Rejecting queries with truncated post-processing
+
+A query that can't be fully pushed down to the data source is completed in memory
+by Cube. When such a query also puts no limit on the data it reads, Cube fetches
+only the first
+[`CUBEJS_DB_QUERY_LIMIT`](/reference/configuration/environment-variables#cubejs_db_query_limit)
+rows and post-processes those, so the result can be wrong without any error.
+
+Set `disablePostProcessing` to `true` to get an error instead. Queries that are
+fully pushed down, and queries whose post-processing reads a result bounded by a
+smaller limit, are unaffected. The check does not apply when
+[`CUBESQL_STREAM_MODE`](/reference/configuration/environment-variables#cubesql_stream_mode)
+is enabled, because nothing is truncated in that case.
 
 ### Headers
 
