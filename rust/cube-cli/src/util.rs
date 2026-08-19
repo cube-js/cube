@@ -135,6 +135,11 @@ pub fn body(map: Map<String, Value>) -> Value {
     Value::Object(map)
 }
 
+/// The phrase both refusal messages open with, and what
+/// `only_the_listed_branch_arguments_refuse_an_empty_value` partitions on — written once
+/// so the three cannot drift apart.
+pub const EMPTY_VALUE: &str = "an empty value";
+
 /// Reject a supplied-but-empty branch at parse time. Not a ref — `--ref` carries
 /// [`nonempty_target`], which says where the server's behaviour was measured.
 ///
@@ -143,20 +148,18 @@ pub fn body(map: Map<String, Value>) -> Value {
 /// under the key `branch` and escaped a grep for `branchName`.
 ///
 /// It no longer guards every branch argument;
-/// `only_the_listed_branch_arguments_refuse_an_empty_value` holds the set it can see —
-/// `create-branch <NAME>` carries this too, under the id `name`, so the filter misses it.
-/// The reachable
-/// case is a CI gate whose variable came out empty — `$GITHUB_HEAD_REF` is unset off
-/// `pull_request`, and `jq -r` prints nothing — where `dev-mode ""` would enter dev mode
-/// on the deploy branch.
+/// `only_the_listed_branch_arguments_refuse_an_empty_value` holds the set it can see.
+/// `create-branch <NAME>` carries this too, under the id `name`, which the filter misses.
+///
+/// The reachable case is a CI gate whose variable came out empty — `$GITHUB_HEAD_REF` is
+/// unset off `pull_request`, and `jq -r` prints nothing — where `dev-mode ""` would enter
+/// dev mode on a branch the caller never named.
 pub fn nonempty(s: &str) -> Result<String, String> {
     if s.trim().is_empty() {
-        return Err(
-            "an empty value names no branch — and it is not dropped, but \
-                    sent as an empty field, leaving what that means to the server \
-                    rather than to you"
-                .to_string(),
-        );
+        return Err(format!(
+            "{EMPTY_VALUE} names no branch — and it is not dropped, but sent as an \
+             empty field, leaving what that means to the server rather than to you"
+        ));
     }
 
     Ok(s.to_string())
@@ -173,12 +176,11 @@ pub fn nonempty(s: &str) -> Result<String, String> {
 /// empty on every trigger except `pull_request`.
 pub fn nonempty_target(s: &str) -> Result<String, String> {
     if s.trim().is_empty() {
-        return Err(
-            "an empty value is read as \"not specified\" and falls back to \
-                    the branch the server would have picked anyway, so this would \
-                    run against code you did not name"
-                .to_string(),
-        );
+        return Err(format!(
+            "{EMPTY_VALUE} is read as \"not specified\" and falls back to the branch \
+             the server would have picked anyway, so this would run against code you \
+             did not name"
+        ));
     }
 
     Ok(s.to_string())
@@ -633,7 +635,7 @@ mod tests {
                 // of its own, which would otherwise be recorded as a refusal the command
                 // never expressed.
                 assert!(
-                    err.contains("an empty value"),
+                    err.contains(EMPTY_VALUE),
                     "{flag} failed to parse for a reason other than its empty value, so \
                      this test learned nothing about it: {err}"
                 );
@@ -673,7 +675,7 @@ mod tests {
             [
                 // Required, so clap won't let you omit them: a blank is a name the
                 // caller failed to supply. `dev-mode ""` from a CI gate whose variable
-                // came out empty would otherwise enter dev mode on the deploy branch.
+                // came out empty would otherwise enter dev mode on an unnamed branch.
                 "cube data-model delete-branch <BRANCH>",
                 "cube data-model dev-mode <BRANCH>",
                 "cube data-model disable-branch <BRANCH>",
