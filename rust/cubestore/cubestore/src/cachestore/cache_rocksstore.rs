@@ -1423,6 +1423,12 @@ impl CacheStore for RocksCacheStore {
         &self,
         payload: QueueAddAndRetrievePayload,
     ) -> Result<QueueAddAndRetrieveResponse, CubeError> {
+        if payload.exclusive && payload.process_id.is_none() {
+            return Err(CubeError::user(
+                "An exclusive queue item requires a process_id".to_string(),
+            ));
+        }
+
         self.write_operation_queue("queue_add_and_retrieve", move |db_ref, batch_pipe| {
             let queue_schema = QueueItemRocksTable::new(db_ref.clone());
             let (pending, mut active) = Self::queue_prefix_counters(&queue_schema, &payload.path)?;
@@ -1465,10 +1471,8 @@ impl CacheStore for RocksCacheStore {
                 return Ok(QueueAddAndRetrieveResponse::from_claim(id, claim_result));
             }
 
-            // A brand new item is inserted with the active status right away, it saves
-            // an update of the just written row (and its secondary indexes) inside the
-            // same batch. The exclusive flag can never block it: the process_id of a new
-            // item is the process_id of the caller, see sql/cachestore.rs.
+            // Inserting a claimed item as active saves an update of the just written row
+            // (and its secondary indexes) inside the same batch
             let mut item = QueueItem::new(
                 payload.path,
                 if claim {
@@ -1477,7 +1481,7 @@ impl CacheStore for RocksCacheStore {
                     QueueItem::status_default()
                 },
                 payload.priority,
-                payload.orphaned.clone(),
+                payload.orphaned,
                 payload.process_id,
                 payload.exclusive,
                 payload.external_id,
@@ -2978,8 +2982,7 @@ mod tests {
         assert_eq!(res.payload, None);
         assert_queue_item_status(&cachestore, "path2", QueueItemStatus::Pending, false).await?;
 
-        // A caller without a process_id gets an error, nothing is written.
-        // It's reachable without the EXCLUSIVE keyword, because the item is exclusive.
+        // Reachable without the EXCLUSIVE keyword, because the item itself is exclusive
         let res = cachestore
             .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path2", "v2", 5))
             .await;
@@ -2998,6 +3001,18 @@ mod tests {
         assert!(!res.added);
         assert_eq!(res.payload, Some("v2".to_string()));
         assert_queue_item_status(&cachestore, "path2", QueueItemStatus::Active, true).await?;
+
+        // An exclusive item without an owner would be inserted straight in the active
+        // status and could never be claimed back
+        let res = cachestore
+            .queue_add_and_retrieve(QueueAddAndRetrievePayload {
+                exclusive: true,
+                ..queue_add_and_retrieve_payload("prefix:path3", "v3", 5)
+            })
+            .await;
+        assert!(res.is_err(), "expected an error, actual: {:?}", res);
+        assert!(res.unwrap_err().to_string().contains("process_id"));
+        assert_eq!(cachestore.queue_all(None).await?.len(), 2);
 
         RocksCacheStore::cleanup_test_cachestore("test_queue_add_and_retrieve_excl");
 
