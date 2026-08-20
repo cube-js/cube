@@ -18,6 +18,25 @@ use crate::result::QueryResult;
 
 pub(crate) type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
+/// Mirrors cubestore's `QUEUE_ITEM_PROCESS_ID_MAX_LEN`: the server rejects a longer
+/// `x-process-id` with a 400 during the handshake. Our own id is a uuid (36 chars),
+/// so truncating is a guard rather than something we expect to hit.
+const PROCESS_ID_MAX_LEN: usize = 64;
+
+/// Bytes, matching how the server measures the header.
+fn truncate_process_id(process_id: &str) -> &str {
+    if process_id.len() <= PROCESS_ID_MAX_LEN {
+        return process_id;
+    }
+
+    let mut end = PROCESS_ID_MAX_LEN;
+    while !process_id.is_char_boundary(end) {
+        end -= 1;
+    }
+
+    &process_id[..end]
+}
+
 pub(crate) enum ActorRequest {
     Query {
         sql: String,
@@ -285,8 +304,7 @@ pub(crate) async fn connect_ws(
         builder = builder.header("Authorization", value);
     }
 
-    let truncated: String = process_id.chars().take(64).collect();
-    let value = HeaderValue::from_str(&truncated)
+    let value = HeaderValue::from_str(truncate_process_id(process_id))
         .map_err(|e| TransportError::Auth(format!("x-process-id: {e}")))?;
     builder = builder.header("x-process-id", value);
 
@@ -344,5 +362,28 @@ fn host_header(url: &url::Url) -> Option<String> {
     match url.port() {
         Some(p) => Some(format!("{host}:{p}")),
         None => Some(host.to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn truncate_process_id_to_server_limit() {
+        let uuid = "5b3f2c9e-2f1a-4a2e-9d5a-9f1b6c7d8e90";
+        assert_eq!(truncate_process_id(uuid), uuid);
+
+        let max = "x".repeat(PROCESS_ID_MAX_LEN);
+        assert_eq!(truncate_process_id(&max), max);
+
+        let long = "x".repeat(PROCESS_ID_MAX_LEN + 10);
+        assert_eq!(truncate_process_id(&long), max);
+
+        // Cut on a char boundary, so the result stays within the server's byte limit
+        let multibyte = "é".repeat(PROCESS_ID_MAX_LEN);
+        let truncated = truncate_process_id(&multibyte);
+        assert!(truncated.len() <= PROCESS_ID_MAX_LEN);
+        assert_eq!(truncated, "é".repeat(PROCESS_ID_MAX_LEN / 2));
     }
 }

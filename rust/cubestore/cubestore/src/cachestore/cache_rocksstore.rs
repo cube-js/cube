@@ -5,7 +5,6 @@ use crate::cachestore::cache_item::{
 use crate::cachestore::queue_item::{
     active_keys_to_value, QueueItem, QueueItemIndexKey, QueueItemRocksIndex, QueueItemRocksTable,
     QueueItemStatus, QueueResultAckEvent, QueueResultAckEventResult, QueueRetrieveResponse,
-    QUEUE_ITEM_PROCESS_ID_MAX_LEN,
 };
 use crate::cachestore::queue_result::{QueueResultRocksIndex, QueueResultRocksTable};
 use crate::cachestore::{compaction, QueueItemPayload, QueueResult};
@@ -1372,15 +1371,6 @@ impl CacheStore for RocksCacheStore {
     }
 
     async fn queue_add(&self, payload: QueueAddPayload) -> Result<QueueAddResponse, CubeError> {
-        if let Some(ref id) = payload.process_id {
-            if id.len() > QUEUE_ITEM_PROCESS_ID_MAX_LEN {
-                return Err(CubeError::user(format!(
-                    "process_id exceeds maximum allowed length of {} characters",
-                    QUEUE_ITEM_PROCESS_ID_MAX_LEN
-                )));
-            }
-        }
-
         self.write_operation_queue("queue_add", move |db_ref, batch_pipe| {
             let queue_schema = QueueItemRocksTable::new(db_ref.clone());
             let pending = queue_schema.count_rows_by_index(
@@ -1437,15 +1427,6 @@ impl CacheStore for RocksCacheStore {
         &self,
         payload: QueueAddAndRetrievePayload,
     ) -> Result<QueueAddAndRetrieveResponse, CubeError> {
-        if let Some(ref id) = payload.process_id {
-            if id.len() > QUEUE_ITEM_PROCESS_ID_MAX_LEN {
-                return Err(CubeError::user(format!(
-                    "process_id exceeds maximum allowed length of {} characters",
-                    QUEUE_ITEM_PROCESS_ID_MAX_LEN
-                )));
-            }
-        }
-
         self.write_operation_queue("queue_add_and_retrieve", move |db_ref, batch_pipe| {
             let queue_schema = QueueItemRocksTable::new(db_ref.clone());
             let (pending, mut active) = Self::queue_prefix_counters(&queue_schema, &payload.path)?;
@@ -2767,27 +2748,6 @@ mod tests {
                 "Second insert with None external_id should succeed"
             );
             assert!(res.unwrap().added);
-        }
-
-        // process_id exceeding max length should fail
-        {
-            let long_id = "x".repeat(QUEUE_ITEM_PROCESS_ID_MAX_LEN + 1);
-            let res = cachestore
-                .queue_add(QueueAddPayload {
-                    path: "prefix:path6".to_string(),
-                    value: "v6".to_string(),
-                    priority: 0,
-                    orphaned: None,
-                    process_id: Some(long_id),
-                    exclusive: false,
-                    external_id: None,
-                })
-                .await;
-            assert!(res.is_err(), "process_id exceeding max length should fail");
-            assert!(res
-                .unwrap_err()
-                .to_string()
-                .contains("process_id exceeds maximum allowed length"));
         }
 
         RocksCacheStore::cleanup_test_cachestore("test_queue_add_validations");

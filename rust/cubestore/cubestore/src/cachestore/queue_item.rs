@@ -13,8 +13,8 @@ use std::sync::Arc;
 use crate::cachestore::QueueKey;
 use serde::{Deserialize, Deserializer, Serialize};
 
-// We use ${uuidv4()}-span-${u32}, it's 36 + 6 + 8 = 50, let's limit to 96
-pub const QUEUE_ITEM_PROCESS_ID_MAX_LEN: usize = 96;
+// It's the x-process-id header, a uuid (36 chars), bounded on ingress in src/http
+pub const QUEUE_ITEM_PROCESS_ID_MAX_LEN: usize = 64;
 // We use ${uuidv4()}, it's 36, let's limit to 48
 pub const QUEUE_ITEM_EXTERNAL_ID_MAX_LEN: usize = 48;
 

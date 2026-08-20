@@ -22,7 +22,7 @@ pub use cache_rocksstore::{
 pub use lazy::LazyRocksCacheStore;
 pub use queue_item::{
     QueueItem, QueueItemStatus, QueueResultAckEvent, QueueRetrieveResponse,
-    QUEUE_ITEM_EXTERNAL_ID_MAX_LEN,
+    QUEUE_ITEM_EXTERNAL_ID_MAX_LEN, QUEUE_ITEM_PROCESS_ID_MAX_LEN,
 };
 pub use queue_item_payload::QueueItemPayload;
 pub use queue_result::QueueResult;
