@@ -18,24 +18,6 @@ use crate::result::QueryResult;
 
 pub(crate) type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
-/// Mirrors cubestore's `QUEUE_ITEM_PROCESS_ID_MAX_LEN`: the server rejects a longer
-/// `x-process-id` with a 400 during the handshake. Our own id is a uuid (36 chars),
-/// so this is a guard rather than something we expect to hit.
-const PROCESS_ID_MAX_LEN: usize = 64;
-
-/// Bytes, matching how the server measures the header.
-fn check_process_id(process_id: &str) -> Result<(), TransportError> {
-    if process_id.len() > PROCESS_ID_MAX_LEN {
-        return Err(TransportError::Auth(format!(
-            "x-process-id exceeds maximum allowed length of {} characters, actual: {}",
-            PROCESS_ID_MAX_LEN,
-            process_id.len()
-        )));
-    }
-
-    Ok(())
-}
-
 pub(crate) enum ActorRequest {
     Query {
         sql: String,
@@ -303,7 +285,6 @@ pub(crate) async fn connect_ws(
         builder = builder.header("Authorization", value);
     }
 
-    check_process_id(process_id)?;
     let value = HeaderValue::from_str(process_id)
         .map_err(|e| TransportError::Auth(format!("x-process-id: {e}")))?;
     builder = builder.header("x-process-id", value);
@@ -362,27 +343,5 @@ fn host_header(url: &url::Url) -> Option<String> {
     match url.port() {
         Some(p) => Some(format!("{host}:{p}")),
         None => Some(host.to_string()),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn check_process_id_against_server_limit() {
-        assert!(check_process_id("5b3f2c9e-2f1a-4a2e-9d5a-9f1b6c7d8e90").is_ok());
-        assert!(check_process_id(&"x".repeat(PROCESS_ID_MAX_LEN)).is_ok());
-
-        let err = check_process_id(&"x".repeat(PROCESS_ID_MAX_LEN + 1)).unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("x-process-id exceeds maximum allowed length"),
-            "unexpected error: {err}"
-        );
-
-        // Bytes, not chars, matching how the server measures it
-        assert!(check_process_id(&"é".repeat(PROCESS_ID_MAX_LEN / 2)).is_ok());
-        assert!(check_process_id(&"é".repeat(PROCESS_ID_MAX_LEN / 2 + 1)).is_err());
     }
 }
