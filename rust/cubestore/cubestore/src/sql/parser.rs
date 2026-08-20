@@ -1,4 +1,4 @@
-use crate::cachestore::{QueueItemStatus, QueueKey};
+use crate::cachestore::{QueueItemStatus, QueueKey, QUEUE_ITEM_EXTERNAL_ID_MAX_LEN};
 use crate::sql::{QueryParameter, QueryParameters};
 use sqlparser::ast::{
     ColumnDef, CreateIndex, CreateTable, HiveDistributionStyle, Ident, ObjectName, Query,
@@ -121,6 +121,17 @@ pub enum QueueCommand {
         value: String,
         external_id: Option<String>,
     },
+    /// `QUEUE ADD` which also claims the item (moves it to the active status) in the
+    /// same atomic operation, when the `concurrency` budget of the prefix allows it.
+    AddAndRetrieve {
+        exclusive: bool,
+        priority: i64,
+        orphaned: Option<u32>,
+        key: Ident,
+        value: String,
+        external_id: Option<String>,
+        concurrency: u32,
+    },
     Get {
         key: QueueKey,
     },
@@ -169,6 +180,7 @@ impl QueueCommand {
     pub fn as_tag_command(&self) -> &'static str {
         match self {
             QueueCommand::Add { .. } => "add",
+            QueueCommand::AddAndRetrieve { .. } => "add_and_retrieve",
             QueueCommand::Get { .. } => "get",
             QueueCommand::ToCancel { .. } => "to_cancel",
             QueueCommand::List { status_filter, .. } => match status_filter {
@@ -446,6 +458,18 @@ impl<'a> CubeStoreParser<'a> {
         }
     }
 
+    fn parse_external_id(&mut self) -> Result<String, ParserError> {
+        let external_id = self.parse_literal_string()?;
+        if external_id.len() > QUEUE_ITEM_EXTERNAL_ID_MAX_LEN {
+            return Err(ParserError::ParserError(format!(
+                "external_id exceeds maximum allowed length of {} characters",
+                QUEUE_ITEM_EXTERNAL_ID_MAX_LEN
+            )));
+        }
+
+        Ok(external_id)
+    }
+
     fn parse_identifier(&mut self) -> Result<Ident, ParserError> {
         if let Token::Placeholder(placeholder) = self.parser.peek_token().token {
             self.parser.next_token();
@@ -663,7 +687,7 @@ impl<'a> CubeStoreParser<'a> {
                     "exclusive" => { exclusive = true },
                     "priority" => { priority = self.parse_integer("priority", true)? },
                     "orphaned" => { orphaned = Some(self.parse_integer("orphaned", false)?) },
-                    "external_id" => { external_id = Some(self.parser.parse_literal_string()?) },
+                    "external_id" => { external_id = Some(self.parse_external_id()?) },
                 });
 
                 QueueCommand::Add {
@@ -673,6 +697,29 @@ impl<'a> CubeStoreParser<'a> {
                     key: self.parse_identifier()?,
                     value: self.parse_literal_string()?,
                     external_id,
+                }
+            }
+            "add_and_retrieve" => {
+                let mut exclusive = false;
+                let mut priority = 0i64;
+                let mut orphaned: Option<u32> = None;
+                let mut external_id: Option<String> = None;
+
+                parse_sql_options!(self, {
+                    "exclusive" => { exclusive = true },
+                    "priority" => { priority = self.parse_integer("priority", true)? },
+                    "orphaned" => { orphaned = Some(self.parse_integer("orphaned", false)?) },
+                    "external_id" => { external_id = Some(self.parse_external_id()?) },
+                });
+
+                QueueCommand::AddAndRetrieve {
+                    exclusive,
+                    priority,
+                    orphaned,
+                    key: self.parse_identifier()?,
+                    value: self.parse_literal_string()?,
+                    external_id,
+                    concurrency: self.parse_integer("concurrency", false)?,
                 }
             }
             "cancel" => QueueCommand::Cancel {
@@ -773,7 +820,7 @@ impl<'a> CubeStoreParser<'a> {
             }
             "result" => {
                 let external_id = if self.parse_custom_token("external_id") {
-                    Some(self.parser.parse_literal_string()?)
+                    Some(self.parse_external_id()?)
                 } else {
                     None
                 };
@@ -1234,6 +1281,156 @@ mod tests {
     }
 
     #[test]
+    fn parse_queue_add_and_retrieve() -> Result<(), CubeError> {
+        let res = parse_stmt("QUEUE ADD_AND_RETRIEVE 'key' 'value' 4")?;
+        match res {
+            Statement::Queue(QueueCommand::AddAndRetrieve {
+                exclusive,
+                priority,
+                orphaned,
+                key,
+                value,
+                external_id,
+                concurrency,
+            }) => {
+                assert!(!exclusive);
+                assert_eq!(priority, 0);
+                assert_eq!(orphaned, None);
+                assert_eq!(key.value, "key");
+                assert_eq!(value, "value");
+                assert_eq!(external_id, None);
+                assert_eq!(concurrency, 4);
+            }
+            _ => panic!("Expected QueueCommand::AddAndRetrieve"),
+        }
+
+        let res = parse_stmt(
+            "QUEUE ADD_AND_RETRIEVE ORPHANED 60 EXCLUSIVE PRIORITY -3 EXTERNAL_ID 'ext' 'key' 'value' 1",
+        )?;
+        match res {
+            Statement::Queue(QueueCommand::AddAndRetrieve {
+                exclusive,
+                priority,
+                orphaned,
+                external_id,
+                concurrency,
+                ..
+            }) => {
+                assert!(exclusive);
+                assert_eq!(priority, -3);
+                assert_eq!(orphaned, Some(60));
+                assert_eq!(external_id, Some("ext".to_string()));
+                assert_eq!(concurrency, 1);
+            }
+            _ => panic!("Expected QueueCommand::AddAndRetrieve"),
+        }
+
+        let res = parse_stmt("QUEUE ADD_AND_RETRIEVE 'key' 'value'");
+        assert!(res.is_err(), "expected parse error, got: {:?}", res);
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_queue_add_and_retrieve_placeholders() -> Result<(), CubeError> {
+        let mut parser = CubeStoreParser::new(
+            "QUEUE ADD_AND_RETRIEVE ? ? ?",
+            Some(vec![
+                QueryParameter::StringValue("key".to_string()),
+                QueryParameter::StringValue("value".to_string()),
+                QueryParameter::Int64Value(8),
+            ]),
+        )?;
+
+        match parser.parse_statement()? {
+            Statement::Queue(QueueCommand::AddAndRetrieve {
+                key,
+                value,
+                concurrency,
+                ..
+            }) => {
+                assert_eq!(key.value, "key");
+                assert_eq!(value, "value");
+                assert_eq!(concurrency, 8);
+            }
+            other => panic!("Expected QueueCommand::AddAndRetrieve, actual: {:?}", other),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_queue_external_id_max_len() -> Result<(), CubeError> {
+        let max_id = "x".repeat(QUEUE_ITEM_EXTERNAL_ID_MAX_LEN);
+        let too_long_id = "x".repeat(QUEUE_ITEM_EXTERNAL_ID_MAX_LEN + 1);
+
+        // The limit is inclusive
+        match parse_stmt(&format!("QUEUE ADD EXTERNAL_ID '{}' 'key' 'value'", max_id))? {
+            Statement::Queue(QueueCommand::Add { external_id, .. }) => {
+                assert_eq!(external_id, Some(max_id.clone()));
+            }
+            other => panic!("Expected QueueCommand::Add, actual: {:?}", other),
+        }
+
+        match parse_stmt(&format!(
+            "QUEUE ADD_AND_RETRIEVE EXTERNAL_ID '{}' 'key' 'value' 1",
+            max_id
+        ))? {
+            Statement::Queue(QueueCommand::AddAndRetrieve { external_id, .. }) => {
+                assert_eq!(external_id, Some(max_id.clone()));
+            }
+            other => panic!("Expected QueueCommand::AddAndRetrieve, actual: {:?}", other),
+        }
+
+        match parse_stmt(&format!("QUEUE RESULT EXTERNAL_ID '{}' 'key'", max_id))? {
+            Statement::Queue(QueueCommand::Result { external_id, .. }) => {
+                assert_eq!(external_id, Some(max_id.clone()));
+            }
+            other => panic!("Expected QueueCommand::Result, actual: {:?}", other),
+        }
+
+        for query in [
+            format!("QUEUE ADD EXTERNAL_ID '{}' 'key' 'value'", too_long_id),
+            format!(
+                "QUEUE ADD_AND_RETRIEVE EXTERNAL_ID '{}' 'key' 'value' 1",
+                too_long_id
+            ),
+            format!("QUEUE RESULT EXTERNAL_ID '{}' 'key'", too_long_id),
+        ] {
+            let res = parse_stmt(&query);
+            assert!(res.is_err(), "expected parse error for: {}", query);
+
+            let msg = res.unwrap_err().to_string();
+            assert!(
+                msg.contains("external_id exceeds maximum allowed length"),
+                "unexpected error for {}: {}",
+                query,
+                msg
+            );
+        }
+
+        // Values coming from parameters are validated too
+        {
+            let mut parser = CubeStoreParser::new(
+                "QUEUE ADD EXTERNAL_ID ? 'key' 'value'",
+                Some(vec![QueryParameter::StringValue(too_long_id)]),
+            )?;
+
+            let res = parser.parse_statement();
+            assert!(res.is_err(), "expected parse error, got: {:?}", res);
+
+            let msg = res.unwrap_err().to_string();
+            assert!(
+                msg.contains("external_id exceeds maximum allowed length"),
+                "unexpected error: {}",
+                msg
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn parse_queue_add_duplicate_option_error() -> Result<(), CubeError> {
         let res = parse_stmt("QUEUE ADD PRIORITY 1 PRIORITY 2 'key' 'value'");
         assert!(res.is_err());
@@ -1248,6 +1445,13 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("Duplicate option: EXCLUSIVE"));
+
+        let res = parse_stmt("QUEUE ADD_AND_RETRIEVE ORPHANED 1 ORPHANED 2 'key' 'value' 1");
+        assert!(res.is_err());
+        assert!(res
+            .unwrap_err()
+            .to_string()
+            .contains("Duplicate option: ORPHANED"));
 
         Ok(())
     }

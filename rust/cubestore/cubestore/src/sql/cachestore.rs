@@ -1,4 +1,6 @@
-use crate::cachestore::{CacheItem, CacheStore, EvictionResult, QueueAddPayload, QueueItem};
+use crate::cachestore::{
+    CacheItem, CacheStore, EvictionResult, QueueAddAndRetrievePayload, QueueAddPayload, QueueItem,
+};
 use crate::metastore::{Column, ColumnType};
 
 use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType, TraceIndex};
@@ -372,6 +374,52 @@ impl CacheStoreSqlService {
                             TableValue::Boolean(response.added),
                             TableValue::Int(response.pending as i64),
                         ])],
+                    )),
+                    Some(value_size),
+                    true,
+                )
+            }
+            QueueCommand::AddAndRetrieve {
+                key,
+                exclusive,
+                priority,
+                orphaned,
+                value,
+                external_id,
+                concurrency,
+            } => {
+                if exclusive && context.process_id.is_none() {
+                    return Err(CubeError::user(
+                        "QUEUE ADD_AND_RETRIEVE EXCLUSIVE requires a process_id in the connection context (x-process-id header)".to_string(),
+                    ));
+                }
+
+                let value_size = key.value.deep_size_of() + value.deep_size_of();
+                let response = self
+                    .cachestore
+                    .queue_add_and_retrieve(QueueAddAndRetrievePayload {
+                        path: key.value,
+                        value,
+                        priority,
+                        orphaned,
+                        process_id: context.process_id.clone(),
+                        exclusive,
+                        external_id,
+                        concurrency,
+                    })
+                    .await?;
+
+                (
+                    Arc::new(DataFrame::new(
+                        vec![
+                            Column::new("id".to_string(), ColumnType::String, 0),
+                            Column::new("added".to_string(), ColumnType::Boolean, 1),
+                            Column::new("pending".to_string(), ColumnType::Int, 2),
+                            Column::new("active".to_string(), ColumnType::String, 3),
+                            Column::new("payload".to_string(), ColumnType::String, 4),
+                            Column::new("extra".to_string(), ColumnType::String, 5),
+                        ],
+                        vec![response.into_queue_add_and_retrieve_row()],
                     )),
                     Some(value_size),
                     true,

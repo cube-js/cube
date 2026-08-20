@@ -838,6 +838,16 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock queue_add, payload: {:?}!", payload)
     }
 
+    async fn queue_add_and_retrieve(
+        &self,
+        payload: crate::cachestore::QueueAddAndRetrievePayload,
+    ) -> Result<crate::cachestore::QueueAddAndRetrieveResponse, CubeError> {
+        panic!(
+            "CacheStore mock queue_add_and_retrieve, payload: {:?}!",
+            payload
+        )
+    }
+
     async fn queue_clear(&self) -> Result<(), CubeError> {
         panic!("CacheStore mock!")
     }
