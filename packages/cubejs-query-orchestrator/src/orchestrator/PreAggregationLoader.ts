@@ -13,7 +13,7 @@ import {
   UnloadOptions
 } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
-import { PreAggTableToTempTableNames, QueryCache, QueryWithParams } from './QueryCache';
+import { assertQueryWithParams, PreAggTableToTempTableNames, QueryCache, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LargeStreamWarning } from './StreamObjectsCounter';
 import {
@@ -544,14 +544,11 @@ export class PreAggregationLoader {
     saveCancelFn: SaveCancelFn,
     invalidationKeys: InvalidationKeys
   ) {
-    const [loadSql, params] =
-      Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
+    const [loadSql, params] = assertQueryWithParams(this.preAggregation.loadSql, 'preAggregation.loadSql');
     const targetTableName = this.targetTableName(newVersionEntry);
-    const query = (
-      <string>QueryCache.replacePreAggregationTableNames(
-        loadSql,
-        this.preAggregationsTablesToTempTables,
-      )
+    const query = QueryCache.replacePreAggregationTableNamesInSql(
+      loadSql,
+      this.preAggregationsTablesToTempTables,
     ).replace(
       this.preAggregation.tableName,
       targetTableName
@@ -694,14 +691,11 @@ export class PreAggregationLoader {
     withTempTable: boolean
   ): Promise<QueryOptions> {
     if (withTempTable) {
-      const [loadSql, params] =
-        Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
+      const [loadSql, params] = assertQueryWithParams(this.preAggregation.loadSql, 'preAggregation.loadSql');
 
-      const query = (
-        <string>QueryCache.replacePreAggregationTableNames(
-          loadSql,
-          this.preAggregationsTablesToTempTables,
-        )
+      const query = QueryCache.replacePreAggregationTableNamesInSql(
+        loadSql,
+        this.preAggregationsTablesToTempTables,
       ).replace(
         this.preAggregation.tableName,
         targetTableName
@@ -721,8 +715,7 @@ export class PreAggregationLoader {
 
       return queryOptions;
     } else {
-      const [sql, params] =
-        Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
+      const [sql, params] = assertQueryWithParams(this.preAggregation.sql, 'preAggregation.sql');
       const queryOptions = this.queryOptions(invalidationKeys, sql, params, targetTableName, newVersionEntry);
       this.logExecutingSql(queryOptions);
       return queryOptions;
@@ -738,8 +731,7 @@ export class PreAggregationLoader {
     saveCancelFn: SaveCancelFn,
     invalidationKeys: InvalidationKeys
   ) {
-    const [sql, params] =
-      Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
+    const [sql, params] = assertQueryWithParams(this.preAggregation.sql, 'preAggregation.sql');
 
     const queryOptions = this.queryOptions(invalidationKeys, sql, params, this.targetTableName(newVersionEntry), newVersionEntry);
     this.logExecutingSql(queryOptions);
@@ -895,8 +887,7 @@ export class PreAggregationLoader {
    * prepares download data when temp table = false
    */
   protected async getTableDataWithoutTempTable(client: DriverInterface, table: string, saveCancelFn: SaveCancelFn, queryOptions: QueryOptions, externalDriverCapabilities: DriverCapabilities) {
-    const [sql, params] =
-      Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
+    const [sql, params] = assertQueryWithParams(this.preAggregation.sql, 'preAggregation.sql');
 
     let tableData: DownloadTableData;
 
@@ -990,7 +981,7 @@ export class PreAggregationLoader {
       };
       this.logger('Creating pre-aggregation index', queryOptions);
       const preAggTableToTempTableNames = this.preAggregationsTablesToTempTables as PreAggTableToTempTableNames[];
-      const resultingSql = QueryCache.replacePreAggregationTableNames(
+      const resultingSql = QueryCache.replacePreAggregationTableNamesInSql(
         query,
         preAggTableToTempTableNames.concat([
           [this.preAggregation.tableName, { targetTableName: this.targetTableName(newVersionEntry) }],

@@ -1,6 +1,6 @@
 import { TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
-import { QueryCache, QueryWithParams } from './QueryCache';
+import { assertQueryWithParams, QueryCache, QueryWithParams } from './QueryCache';
 import {
   PreAggregationDescription,
   PreAggregations,
@@ -191,7 +191,7 @@ export class PreAggregationLoadCache {
   }
 
   public async keyQueryResult(sqlQuery: QueryWithParams, waitForRenew: boolean, priority: number) {
-    const [query, values, queryOptions]: QueryWithParams = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery, [], {}];
+    const [query, values, queryOptions] = assertQueryWithParams(sqlQuery, 'invalidateKeyQueries entry');
 
     if (!this.queryResults[this.queryCache.queryRedisKey([query, values])]) {
       this.queryResults[this.queryCache.queryRedisKey([query, values])] = await this.queryCache.cacheQueryResult(
