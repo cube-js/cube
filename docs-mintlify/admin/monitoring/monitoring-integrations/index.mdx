@@ -145,6 +145,46 @@ refresh scheduler, use the [`CUBEJS_LOG_LEVEL`](/reference/configuration/environ
 
 </Info>
 
+### Fields in exported logs
+
+Before a log record reaches a sink, the following fields are attached to it:
+
+| Field | Description |
+| --- | --- |
+| `deployment_id` | Identifier of the [deployment][ref-deployments]. |
+| `deployment_name` | Name of the deployment. |
+| `hostname` | Host name of the node that the record comes from. |
+| `pod_name` | Name of the pod that the record comes from. |
+| `service` | Name of the component that the record comes from, matching the input name: `cubejs-server`, `refresh-scheduler`, `warmup-job`, or `cubestore`. Records from the `query-history` input use `query-history` on `datadog_logs` sinks. |
+| `level` | Severity of the record, lower-cased: `error`, `warn`, `info`, or `debug`. Records with the `trace` severity are exported as `debug`, and records that carry no severity as `info`. |
+| `status` | Duplicate of `level`, for tools that expect the severity in a `status` field, e.g. Datadog. |
+| `origin` | Always `cube_cloud`. |
+
+Records from the `query-history` input carry a different set of fields, see
+[Query History export](#query-history-export).
+
+#### Datadog attributes
+
+Sinks of the `datadog_logs` type additionally get the two fields that Datadog
+uses for attribution:
+
+| Field | Description |
+| --- | --- |
+| `ddsource` | Name of the pod that the record comes from, or `query-history` for records from the `query-history` input. |
+| `ddtags` | Comma-separated list of tags. By default, the deployment name and the host name. |
+
+To send your own tags to Datadog, list them in the `ddtags` option of the sink.
+They are appended to the default ones:
+
+```toml
+[sinks.datadog]
+# type, inputs, default_api_key, etc.
+ddtags = [
+  "env:production",
+  "team:analytics"
+]
+```
+
 ### Sinks for logs
 
 You can use a [wide range of destinations][vector-docs-sinks] for logs,
@@ -231,6 +271,25 @@ list = [
 inputs = [
   "cubejs-server"
 ]
+```
+
+### Labels on exported metrics
+
+Metrics are exported with the following Prometheus labels:
+
+| Label | Metrics | Description |
+| --- | --- | --- |
+| `pod_name` | `cube_cpu_usage_ratio`, `cube_memory_usage_ratio` | Name of the pod that the measurement was taken on. |
+| `deployment_id` | `cube_requests_*` | Identifier of the [deployment][ref-deployments]. |
+| `api_type` | `cube_requests_*` | Type of [data API][ref-apis] that served the requests (`rest`, `sql`, etc.), the same values as in [Query History][ref-query-history]. `unknown` if the API type is not known. |
+| `request_source` | `cube_requests_*` | Source of the requests: `ai-engineer` for requests coming from AI features, `other` for any other source, `unknown` if the requests carry no source. |
+
+Request metrics are reported per `api_type` and `request_source` combination, so
+you can break down request counts and latency by data API:
+
+```text
+cube_requests_total{deployment_id="12345",api_type="rest",request_source="unknown"} 42
+cube_requests_total{deployment_id="12345",api_type="sql",request_source="ai-engineer"} 7
 ```
 
 ### Sinks for metrics
@@ -338,6 +397,7 @@ Exported data includes the following fields:
 | --- | --- |
 | `trace_id` | Unique identifier of the API request. |
 | `account_name` | Name of the Cube Cloud account. |
+| `query_history_link` | Link to the request in [Query History][ref-query-history]. |
 | `deployment_id` | Identifier of the [deployment][ref-deployments]. |
 | `environment_name` | Name of the [environment][ref-environments], `NULL` for production. |
 | `api_type` | Type of [data API][ref-apis] used (`rest`, `sql`, etc.), `NULL` for errors. |
@@ -349,6 +409,11 @@ Exported data includes the following fields:
 | `end_time_unix_ms` | End time of the execution, Unix timestamp in milliseconds. |
 | `api_response_duration_ms` | Duration of the execution in milliseconds. |
 | `cache_type` | [Cache type][ref-cache-type]: `no_cache`, `pre_aggregations_in_cube_store`, etc. |
+
+Unlike other logs, Query History records don't carry the
+[fields listed above](#fields-in-exported-logs), except for `origin`. On sinks of
+the `datadog_logs` type, they also get `service` and `ddsource` set to
+`query-history`, and `ddtags`.
 
 <Note>
 
