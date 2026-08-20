@@ -20,21 +20,20 @@ pub(crate) type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 /// Mirrors cubestore's `QUEUE_ITEM_PROCESS_ID_MAX_LEN`: the server rejects a longer
 /// `x-process-id` with a 400 during the handshake. Our own id is a uuid (36 chars),
-/// so truncating is a guard rather than something we expect to hit.
+/// so this is a guard rather than something we expect to hit.
 const PROCESS_ID_MAX_LEN: usize = 64;
 
 /// Bytes, matching how the server measures the header.
-fn truncate_process_id(process_id: &str) -> &str {
-    if process_id.len() <= PROCESS_ID_MAX_LEN {
-        return process_id;
+fn check_process_id(process_id: &str) -> Result<(), TransportError> {
+    if process_id.len() > PROCESS_ID_MAX_LEN {
+        return Err(TransportError::Auth(format!(
+            "x-process-id exceeds maximum allowed length of {} characters, actual: {}",
+            PROCESS_ID_MAX_LEN,
+            process_id.len()
+        )));
     }
 
-    let mut end = PROCESS_ID_MAX_LEN;
-    while !process_id.is_char_boundary(end) {
-        end -= 1;
-    }
-
-    &process_id[..end]
+    Ok(())
 }
 
 pub(crate) enum ActorRequest {
@@ -304,7 +303,8 @@ pub(crate) async fn connect_ws(
         builder = builder.header("Authorization", value);
     }
 
-    let value = HeaderValue::from_str(truncate_process_id(process_id))
+    check_process_id(process_id)?;
+    let value = HeaderValue::from_str(process_id)
         .map_err(|e| TransportError::Auth(format!("x-process-id: {e}")))?;
     builder = builder.header("x-process-id", value);
 
@@ -370,20 +370,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn truncate_process_id_to_server_limit() {
-        let uuid = "5b3f2c9e-2f1a-4a2e-9d5a-9f1b6c7d8e90";
-        assert_eq!(truncate_process_id(uuid), uuid);
+    fn check_process_id_against_server_limit() {
+        assert!(check_process_id("5b3f2c9e-2f1a-4a2e-9d5a-9f1b6c7d8e90").is_ok());
+        assert!(check_process_id(&"x".repeat(PROCESS_ID_MAX_LEN)).is_ok());
 
-        let max = "x".repeat(PROCESS_ID_MAX_LEN);
-        assert_eq!(truncate_process_id(&max), max);
+        let err = check_process_id(&"x".repeat(PROCESS_ID_MAX_LEN + 1)).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("x-process-id exceeds maximum allowed length"),
+            "unexpected error: {err}"
+        );
 
-        let long = "x".repeat(PROCESS_ID_MAX_LEN + 10);
-        assert_eq!(truncate_process_id(&long), max);
-
-        // Cut on a char boundary, so the result stays within the server's byte limit
-        let multibyte = "é".repeat(PROCESS_ID_MAX_LEN);
-        let truncated = truncate_process_id(&multibyte);
-        assert!(truncated.len() <= PROCESS_ID_MAX_LEN);
-        assert_eq!(truncated, "é".repeat(PROCESS_ID_MAX_LEN / 2));
+        // Bytes, not chars, matching how the server measures it
+        assert!(check_process_id(&"é".repeat(PROCESS_ID_MAX_LEN / 2)).is_ok());
+        assert!(check_process_id(&"é".repeat(PROCESS_ID_MAX_LEN / 2 + 1)).is_err());
     }
 }
