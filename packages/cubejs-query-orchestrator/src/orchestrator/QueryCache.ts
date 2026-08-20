@@ -25,7 +25,12 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
-import { getCacheHash, extractRequestUUID } from './utils';
+import {
+  getCacheHash,
+  extractRequestUUID,
+  evaluateLocalRefreshKey,
+  isValidLocalRefreshKey,
+} from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
 
 export type CacheQueryResultOptions = {
@@ -52,12 +57,28 @@ export type CacheQueryResultOptions = {
 export type RefreshKeyCacheOptions =
   Pick<CacheQueryResultOptions, 'priority' | 'requestId' | 'waitForRenew' | 'dataSource'>;
 
+/**
+ * Everything needed to evaluate an `every` based refreshKey without touching a
+ * database: `FLOOR((utcOffset + unixTimestamp - dayOffset) / interval)`.
+ *
+ * `utcOffset` is frozen at compile time, exactly as it already is when baked into
+ * the emitted SQL string — the orchestrator must never recompute it, or the local
+ * and SQL paths would stop agreeing across a DST transition.
+ */
+export type LocalRefreshKeyDescriptor = {
+  interval: number;
+  utcOffset: number;
+  dayOffset: number;
+  cron?: boolean;
+};
+
 type QueryOptions = {
   external?: boolean;
   renewalThreshold?: number;
   updateWindowSeconds?: number;
   renewalThresholdOutsideUpdateWindow?: number;
   incremental?: boolean;
+  localRefreshKey?: LocalRefreshKeyDescriptor;
 };
 
 export type QueryWithParams = [
@@ -182,6 +203,10 @@ export class QueryCache {
 
   protected static readonly IN_MEMORY_CACHE_DISABLE_PERIOD = 5 * 60 * 1000;
 
+  protected readonly localRefreshKeyEnabled: boolean;
+
+  protected localRefreshKeyLogged: boolean = false;
+
   public constructor(
     protected readonly cachePrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
@@ -208,6 +233,49 @@ export class QueryCache {
     this.memoryCache = new LRUCache<string, CacheEntry>({
       max: options.maxInMemoryCacheEntries || 10000
     });
+
+    // Read from the environment rather than an option: the emitting half in the schema
+    // compiler is wired straight from the same variable, and an option here could be set
+    // on its own, turning the feature into a no-op where no descriptor is ever emitted.
+    this.localRefreshKeyEnabled = getEnv('refreshKeyLocalTime');
+  }
+
+  public localRefreshKeyResult(queryOptions?: QueryOptions): [{ refresh_key: number }] | null {
+    if (!this.localRefreshKeyEnabled || !isValidLocalRefreshKey(queryOptions?.localRefreshKey)) {
+      return null;
+    }
+
+    // `refreshKeyRenewalThreshold` throttles how often the SQL result is re-read, and that is
+    // also what bounds how often the key advances: a value cached for a day advances daily,
+    // whatever `every` says. A locally evaluated key has no cache entry to age out, so the only
+    // way to keep honouring the override is to leave these keys on the SQL path.
+    if (this.options.refreshKeyRenewalThreshold) {
+      this.logLocalRefreshKeyOnce('Local refresh key evaluation skipped', {
+        warning: 'refreshKeyRenewalThreshold is set, which throttles refresh key advancement. ' +
+          'Interval based refresh keys keep running as queries. Unset it to evaluate them locally.',
+        refreshKeyRenewalThreshold: this.options.refreshKeyRenewalThreshold,
+      });
+
+      return null;
+    }
+
+    this.logLocalRefreshKeyOnce('Local refresh key evaluation enabled', {
+      warning: 'Interval based refresh keys are evaluated from this instance clock. ' +
+        'Clocks must be in sync across all API instances and refresh workers.',
+    });
+
+    return evaluateLocalRefreshKey(<LocalRefreshKeyDescriptor>queryOptions?.localRefreshKey);
+  }
+
+  // Logged on first use rather than from the constructor, where subclass field
+  // initialization has not run yet and `this.logger` may not be usable.
+  private logLocalRefreshKeyOnce(message: string, meta: Record<string, unknown>) {
+    if (this.localRefreshKeyLogged) {
+      return;
+    }
+
+    this.localRefreshKeyLogged = true;
+    this.logger(message, meta);
   }
 
   public getCacheDriver(): CacheDriverInterface {
@@ -462,6 +530,15 @@ export class QueryCache {
     options: RefreshKeyCacheOptions,
   ) {
     const [query, values, queryOptions] = sqlQuery;
+
+    // A locally evaluated key is free: nothing to cache, no queue to wait on. Short-circuiting
+    // here rather than in each caller leaves the identity work below as the single owner of the
+    // cache key, and keeps `PreAggregationLoadCache`'s per-request memo wrapping this call.
+    const local = this.localRefreshKeyResult(queryOptions);
+    if (local) {
+      return local;
+    }
+
     const cacheKey = QueryCache.refreshKeyIdentity(sqlQuery, options.dataSource);
 
     return this.cacheQueryResult(query, values, cacheKey, expiration, {

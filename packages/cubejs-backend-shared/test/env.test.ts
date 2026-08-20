@@ -107,6 +107,25 @@ describe('getEnv', () => {
     ).toBe(10);
   });
 
+  test('refreshKeyLocalTime', () => {
+    delete process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME;
+    expect(getEnv('refreshKeyLocalTime')).toBe(false);
+
+    process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME = 'true';
+    expect(getEnv('refreshKeyLocalTime')).toBe(true);
+
+    process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME = 'false';
+    expect(getEnv('refreshKeyLocalTime')).toBe(false);
+  });
+
+  test('refreshKeyLocalTime(exception)', () => {
+    process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME = 'yes';
+
+    expect(() => getEnv('refreshKeyLocalTime')).toThrowError();
+
+    delete process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME;
+  });
+
   test('livePreview', () => {
     expect(getEnv('livePreview')).toBe(true);
 

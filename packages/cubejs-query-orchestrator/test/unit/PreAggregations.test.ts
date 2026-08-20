@@ -467,6 +467,129 @@ describe('PreAggregations', () => {
     });
   });
 
+  describe('local refresh key', () => {
+    const REFRESH_KEY_SQL = 'SELECT FLOOR((UNIX_TIMESTAMP()) / 600) as refresh_key';
+    const descriptor = { interval: 600, utcOffset: 0, dayOffset: 0, cron: false };
+
+    // The flag is read from the environment in the constructor, so it has to be toggled
+    // around construction rather than passed in as an option.
+    const newQueryCache = (localRefreshKey?: boolean) => {
+      const previous = process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME;
+      if (localRefreshKey === undefined) {
+        delete process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME;
+      } else {
+        process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME = String(localRefreshKey);
+      }
+
+      try {
+        return new QueryCache(
+          'TEST',
+          mockDriverFactory as any,
+          // eslint-disable-next-line @typescript-eslint/no-empty-function
+          () => {},
+          {
+            cacheAndQueueDriver: 'memory',
+            queueOptions: async () => ({ executionTimeout: 1, concurrency: 2 }),
+          },
+        );
+      } finally {
+        if (previous === undefined) {
+          delete process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME;
+        } else {
+          process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME = previous;
+        }
+      }
+    };
+
+    const newLoadCache = (localRefreshKey?: boolean) => {
+      const cache = newQueryCache(localRefreshKey);
+      (cache.getCacheDriver() as LocalCacheDriver).reset();
+
+      const preAggregations = new PreAggregations(
+        'TEST',
+        mockDriverFactory as any,
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
+        cache,
+        { queueOptions: async () => ({ executionTimeout: 1, concurrency: 2 }) },
+      );
+
+      return new PreAggregationLoadCache(
+        mockDriverFactory as any,
+        cache,
+        preAggregations,
+        { dataSource: 'default' },
+      );
+    };
+
+    test('keyQueryResult evaluates locally without querying the datasource', async () => {
+      const loadCache = newLoadCache(true);
+
+      const result = await loadCache.keyQueryResult(
+        [REFRESH_KEY_SQL, [], { external: true, renewalThreshold: 60, localRefreshKey: descriptor }],
+        false,
+        10,
+      );
+
+      expect(result).toEqual([{ refresh_key: Math.floor(Date.now() / 1000 / descriptor.interval) }]);
+      expect(mockDriver!.executedQueries).toEqual([]);
+    });
+
+    test('keyQueryResult still queries when the flag is off', async () => {
+      const loadCache = newLoadCache(false);
+
+      await loadCache.keyQueryResult(
+        [REFRESH_KEY_SQL, [], { external: false, renewalThreshold: 60, localRefreshKey: descriptor }],
+        false,
+        10,
+      );
+
+      expect(mockDriver!.executedQueries).toEqual([REFRESH_KEY_SQL]);
+    });
+
+    test('keyQueryResult still queries an incremental key that carries no descriptor', async () => {
+      const loadCache = newLoadCache(true);
+      const incrementalSql = 'SELECT CASE WHEN NOW() < $1 THEN FLOOR((UNIX_TIMESTAMP()) / 3600) END as refresh_key';
+
+      await loadCache.keyQueryResult(
+        [incrementalSql, [], {
+          external: false,
+          renewalThreshold: 300,
+          incremental: true,
+          renewalThresholdOutsideUpdateWindow: 86400,
+        }],
+        false,
+        10,
+      );
+
+      expect(mockDriver!.executedQueries).toEqual([incrementalSql]);
+    });
+
+    // The per-request memo must pin the value for the life of one load. A single
+    // load reads the invalidation keys several times (contentVersion, the returned
+    // refreshKeyValues, the refresh queue key); if the clock were re-read, a load
+    // crossing an interval boundary would look a table up under one content version
+    // and enqueue it under another.
+    test('keyQueryResult is stable across an interval boundary within one load cache', async () => {
+      const loadCache = newLoadCache(true);
+      const key: [string, any[], Record<string, any>] =
+        [REFRESH_KEY_SQL, [], { external: true, renewalThreshold: 60, localRefreshKey: descriptor }];
+
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(600_000);
+      try {
+        const first = await loadCache.keyQueryResult(key, false, 10);
+        expect(first).toEqual([{ refresh_key: 1 }]);
+
+        nowSpy.mockReturnValue(1_200_000);
+        const second = await loadCache.keyQueryResult(key, false, 10);
+
+        expect(second).toEqual(first);
+      } finally {
+        nowSpy.mockRestore();
+      }
+    });
+  });
+
   describe('loadAllPreAggregationsIfNeeded', () => {
     let preAggregations: PreAggregations | null = null;
 

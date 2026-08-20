@@ -2,7 +2,7 @@ import R from 'ramda';
 import pLimit from 'p-limit';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
-import { Required } from '@cubejs-backend/shared';
+import { getEnv, Required } from '@cubejs-backend/shared';
 import {
   PreAggregationDescription,
   PreAggregationPartitionRangeLoader,
@@ -343,11 +343,21 @@ export class RefreshScheduler {
     const compilers = await compilerApi.getCompilers();
     const queryForEvaluation = await compilerApi.createQueryByDataSource(compilers, {});
 
+    const localRefreshKey = getEnv('refreshKeyLocalTime');
+
     await Promise.all(queryForEvaluation.cubeEvaluator.cubeNames().map(async cube => {
       const cubeFromPath = queryForEvaluation.cubeEvaluator.cubeFromPath(cube);
       const measuresCount = Object.keys(cubeFromPath.measures || {}).length;
       const dimensionsCount = Object.keys(cubeFromPath.dimensions || {}).length;
       if (measuresCount === 0 && dimensionsCount === 0) {
+        return;
+      }
+      // This method exists only to warm the shared refresh key cache. An interval based key is
+      // evaluated from the local clock instead, so there is nothing to warm and the getSql plus
+      // executeQuery per timezone would be spent on a result that is thrown away. A `sql` key
+      // still runs against the data source, so those cubes keep being warmed.
+      const sqlRefreshKey = !!cubeFromPath.refreshKey && 'sql' in cubeFromPath.refreshKey;
+      if (localRefreshKey && !sqlRefreshKey) {
         return;
       }
       await Promise.all(queryingOptions.timezones.map(async timezone => {
