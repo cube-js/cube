@@ -774,12 +774,8 @@ impl RocksCacheStore {
                             active,
                         });
                     }
-
-                    // OK, caller matches the exclusive item owner
                 }
-                (None, None) => {
-                    // No process_id on item and no caller — allow retrieval
-                }
+                (None, None) => {}
             }
         }
 

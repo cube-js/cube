@@ -1841,7 +1841,6 @@ mod tests {
             request
         }
 
-        // The handshake is where the header is bounded, so an over-long one never gets a socket
         let err = connect_async(connect_request(
             &"x".repeat(QUEUE_ITEM_PROCESS_ID_MAX_LEN + 1),
         ))
