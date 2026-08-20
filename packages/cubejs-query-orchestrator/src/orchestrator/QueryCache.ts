@@ -871,7 +871,9 @@ export class QueryCache {
       expireSecs,
       {
         renewalThreshold: this.options.refreshKeyRenewalThreshold || queryOptions?.renewalThreshold || 2 * 60,
-        renewalKey: q,
+        // Must match what PreAggregationLoadCache.keyQueryResult stores: the same refresh key can
+        // be resolved through either path and both write to the same cache entry.
+        renewalKey: [query, values],
         waitForRenew: !options.skipRefreshKeyWaitForRenew,
         requestId: options.requestId,
         dataSource: options.dataSource,

@@ -215,8 +215,11 @@ export class PreAggregationLoadCache {
     return this.queryResults[this.queryCache.queryRedisKey([query, values])];
   }
 
-  public hasKeyQueryResult(keyQuery) {
-    return !!this.queryResults[this.queryCache.queryRedisKey(keyQuery)];
+  public hasKeyQueryResult(keyQuery: QueryWithParams) {
+    // `options` is excluded because `replacePartitionSqlAndParams` recomputes `renewalThreshold`
+    // from `new Date()` for incremental refresh keys, so a key covering it would never be stable.
+    const [query, values] = keyQuery;
+    return !!this.queryResults[this.queryCache.queryRedisKey([query, values])];
   }
 
   public async getQueryStage(stageQueryKey) {
