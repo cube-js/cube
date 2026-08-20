@@ -908,9 +908,6 @@ export class QueryCache {
     callback: () => MaybeCancelablePromise<T>,
   ) => this.cacheDriver.withLock(`lock:${key}`, callback, ttl, true);
 
-  // `query` may be a whole QueryWithParams tuple: metadata operations
-  // (`METADATA:*`, see QueryOrchestrator.createMetadataQuery) are dispatched by
-  // the driver on `query[0]` rather than executed as SQL.
   public async cacheQueryResult(
     query: string | QueryWithParams,
     values: string[],
