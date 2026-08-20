@@ -139,6 +139,7 @@ Every endpoint of the Console Server public API is covered:
 |---|---|
 | `deployments` | list, get, create (`--bootstrap` scaffolds + builds a serving deployment), update (`--release-channel`, `--release-channel-version`), settings, versions, delete, token, advance-step, reset-step |
 | `regions` | list available deployment regions |
+| `validate` | compile a deployment's data model and report the compiler's errors; exits non-zero so it gates CI. `--branch` picks a branch, `--dev-mode` your active dev-mode working copy; neither validates the deploy branch |
 | `logs` | tail deployment pod logs (`--pod`, `-c/--container`; defaults to the Cube API container) |
 | `github` (`gh`) | status, installations, repos, branches, connect (import a repo into a deployment + first build) |
 | `data-model` (`dm`) | list, get, put, delete, rename files; branches, create-branch, enable-branch, disable-branch, dev-mode, exit-dev-mode, commit, pull. File writes only land on a **dev-mode branch**: `dev-mode <branch>` forks a personal `dev-…` branch and prints its name — pass that via `--branch` (or omit `--branch` to use your active dev-mode branch); puts to any other branch are rejected by the API. `enable-branch` / `disable-branch` toggle whether a shared branch's staging environment stays always active (vs. only while viewed in the UI); `branches` reports it as `ENABLED` and `environments list --type staging` lists the enabled ones |

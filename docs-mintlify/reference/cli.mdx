@@ -139,6 +139,30 @@ cube github connect DEPLOYMENT_ID REPO --installation INSTALLATION_ID --branch m
 Connecting clones the repository into the deployment and triggers the first
 build.
 
+## Validate the data model
+
+`cube validate` compiles a deployment's data model and reports the compiler's
+errors, exiting non-zero when there are any — so it works as a CI gate:
+
+```bash
+cube validate DEPLOYMENT_ID                      # the deploy branch (production)
+cube validate DEPLOYMENT_ID --branch my-branch   # a specific branch
+cube validate DEPLOYMENT_ID --dev-mode           # your active dev-mode branch
+```
+
+The compile runs where the model runs: the command asks the branch's own Cube
+API for its metadata, the same call the Cube Cloud UI makes. So the model is
+checked against that environment's real variables and drivers, and a branch is
+validated by the environment serving it — with `--dev-mode`, against your
+uncommitted working copy, before you commit it.
+
+```
+✓ Data model on master is valid (12 cubes)
+```
+
+Pass `--json` for a machine-readable report (`valid`, `errors[]` with the file
+each was reported against, `cubesCount`); the exit code is the same either way.
+
 ## Command reference
 
 Run `cube <command> --help` for the full options of any command.
@@ -148,6 +172,7 @@ Run `cube <command> --help` for the full options of any command.
 | `login`, `logout`, `whoami`, `context` | Authentication and saved contexts |
 | `deployments` | List, get, create, update, delete deployments; `settings`, `versions`, `token`, `build-status`, `advance-step`, `reset-step` |
 | `deploy` | Upload a local project directory and build it |
+| `validate` | Compile a deployment's data model and report compilation errors (`--branch`, `--dev-mode`) |
 | `logs` | Tail deployment pod logs (`--pod`, `-c/--container`, `--source production\|dev`) |
 | `regions` | List available deployment regions |
 | `github` (`gh`) | GitHub integration: `status`, `installations`, `repos`, `branches`, `connect` |

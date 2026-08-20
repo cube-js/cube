@@ -125,6 +125,8 @@ enum Command {
     Regions(commands::regions::Args),
     /// Upload a local project directory to a deployment and build it
     Deploy(commands::deploy::Args),
+    /// Compile a deployment's data model and report compilation errors
+    Validate(commands::validate::Args),
     /// Tail a deployment's pod logs
     Logs(commands::logs::Args),
     /// GitHub integration: link status, installations, repos, and connect
@@ -219,6 +221,7 @@ impl Command {
             Deployments(_) => "deployments",
             Regions(_) => "regions",
             Deploy(_) => "deploy",
+            Validate(_) => "validate",
             Logs(_) => "logs",
             Github(_) => "github",
             DataModel(_) => "data-model",
@@ -328,6 +331,7 @@ async fn run(global: GlobalArgs, command: Command) -> Result<()> {
         Deployments(args) => commands::deployments::command(args, &ctx).await,
         Regions(args) => commands::regions::command(args, &ctx).await,
         Deploy(args) => commands::deploy::command(args, &ctx).await,
+        Validate(args) => commands::validate::command(args, &ctx).await,
         Logs(args) => commands::logs::command(args, &ctx).await,
         Github(args) => commands::github::command(args, &ctx).await,
         DataModel(args) => commands::data_model::command(args, &ctx).await,
