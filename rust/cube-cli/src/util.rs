@@ -688,6 +688,18 @@ mod tests {
                 "cube dbt sync --branch",
                 "cube dbt sync --ref",
                 "cube deployments build-status --branch",
+                // `validate` is a gate: its exit code IS the product, so a blank must not
+                // be allowed to make it answer about a branch nobody named. Unguarded,
+                // the blank travels as `branchName=` (`push` sends it rather than
+                // dropping it), and if the server reads that as "not specified" — what
+                // the flag's own help documents as the default — a CI gate whose variable
+                // came out empty finds the deploy branch compiles and exits 0: a pass for
+                // code it never read. A wrong verdict rather than an unintended action,
+                // which is what separates this from `deploy --branch` below.
+                //
+                // `nonempty`, not `nonempty_target`: that reading is documented but was
+                // never measured here, and measured-vs-not is the whole of the split.
+                "cube validate --branch",
             ],
             "the set of branch arguments refusing an empty value changed. Adding one is \
              `value_parser = util::nonempty` on the declaration; dropping one means a \
@@ -709,7 +721,6 @@ mod tests {
                 "cube data-model rename --branch",
                 "cube deploy --branch",
                 "cube github connect --branch",
-                "cube validate --branch",
             ],
             "a branch argument that takes an empty value at parse time was added, \
              removed or renamed. This list records the parser's answer alone — that a \
