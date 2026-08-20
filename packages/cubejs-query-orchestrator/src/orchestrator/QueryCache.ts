@@ -183,9 +183,6 @@ export class QueryCache {
     });
   }
 
-  /**
-   * Returns cache driver instance.
-   */
   public getCacheDriver(): CacheDriverInterface {
     return this.cacheDriver;
   }
@@ -402,14 +399,6 @@ export class QueryCache {
 
   public static extractRequestUUID(requestId: string): string {
     return extractRequestUUID(requestId);
-  }
-
-  protected static replaceAll(replaceThis, withThis, inThis) {
-    withThis = withThis.replace(/\$/g, '$$$$');
-    return inThis.replace(
-      new RegExp(replaceThis.replace(/([/,!\\^${}[\]().*+?|<>\-&])/g, '\\$&'), 'g'),
-      withThis
-    );
   }
 
   public static replacePreAggregationTableNamesInSql(
