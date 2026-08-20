@@ -102,8 +102,8 @@ const INTRO_START =
 const INTRO_END = '{/* AUTOGEN:platform-endpoints END */}';
 const INTRO_TABLE_HEAD = '| Entity | Resource | Version |\n| --- | --- | --- |';
 const INTRO_SCIM_ROWS = [
-  '| [Users (SCIM)](/api-reference/scim-users/list-users) | `/scim/v2/Users` | SCIM 2.0 |',
-  '| [Groups (SCIM)](/api-reference/scim-groups/list-groups) | `/scim/v2/Groups` | SCIM 2.0 |',
+  '| [Users (SCIM)](/api-reference/scim-users/list-users) | `/api/scim/v2/Users` | SCIM 2.0 |',
+  '| [Groups (SCIM)](/api-reference/scim-groups/list-groups) | `/api/scim/v2/Groups` | SCIM 2.0 |',
 ].join('\n');
 
 // Written-file tracker: writes on a normal run, records drift under --check.
