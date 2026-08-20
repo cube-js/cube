@@ -4,6 +4,7 @@ use anyhow::{anyhow, bail, Result};
 use reqwest::{Method, StatusCode};
 use serde_json::Value;
 
+use crate::error::api_bail;
 use crate::oauth;
 
 /// Thin HTTP client over the Cube Cloud public REST API.
@@ -196,12 +197,12 @@ impl Client {
                 })
                 .unwrap_or_else(|| text.clone());
             match status {
-                StatusCode::UNAUTHORIZED => bail!(
+                StatusCode::UNAUTHORIZED => api_bail!(
                     "unauthorized (401): session expired — run `cube login` (or set CUBE_API_KEY). {detail}"
                 ),
-                StatusCode::FORBIDDEN => bail!("forbidden (403): {detail}"),
-                StatusCode::NOT_FOUND => bail!("not found (404): {method} {path}. {detail}"),
-                _ => bail!("{method} {path} failed with {status}: {detail}"),
+                StatusCode::FORBIDDEN => api_bail!("forbidden (403): {detail}"),
+                StatusCode::NOT_FOUND => api_bail!("not found (404): {method} {path}. {detail}"),
+                _ => api_bail!("{method} {path} failed with {status}: {detail}"),
             }
         }
 
@@ -215,7 +216,7 @@ impl Client {
         let looks_like_html =
             trimmed.len() >= 2 && trimmed.starts_with('<') && !trimmed.starts_with("<?xml");
         if looks_like_html {
-            bail!(
+            api_bail!(
                 "{method} {path} returned the Cube Cloud web app instead of JSON — \
                  this endpoint is not available on this tenant (the server may be \
                  running an older version)"
@@ -287,5 +288,59 @@ fn persist(context_name: &str, access_token: &str, refresh_token: Option<&str>) 
             ctx.refresh_token = Some(rt.to_string());
         }
         let _ = config.save();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::is_api_error;
+
+    fn client() -> Client {
+        Client::new("https://example.cubecloud.dev", "sk-test").unwrap()
+    }
+
+    fn finish(status: StatusCode, body: &str) -> Result<Value> {
+        client().finish_response(
+            &Method::GET,
+            "/api/v1/deployments",
+            status,
+            body.to_string(),
+        )
+    }
+
+    #[test]
+    fn unsuccessful_status_is_an_api_error() {
+        let err = finish(StatusCode::BAD_REQUEST, r#"{"message":"unknown field"}"#).unwrap_err();
+        assert!(is_api_error(&err));
+        assert!(err.to_string().contains("unknown field"), "{err}");
+    }
+
+    #[test]
+    fn every_mapped_status_is_an_api_error() {
+        for status in [
+            StatusCode::UNAUTHORIZED,
+            StatusCode::FORBIDDEN,
+            StatusCode::NOT_FOUND,
+            StatusCode::INTERNAL_SERVER_ERROR,
+        ] {
+            let err = finish(status, "").unwrap_err();
+            assert!(is_api_error(&err), "{status} should be an API error");
+        }
+    }
+
+    #[test]
+    fn web_app_html_instead_of_json_is_an_api_error() {
+        let err = finish(StatusCode::OK, "<!doctype html><html></html>").unwrap_err();
+        assert!(is_api_error(&err));
+    }
+
+    #[test]
+    fn successful_responses_still_parse() {
+        assert_eq!(
+            finish(StatusCode::OK, r#"{"items":[]}"#).unwrap(),
+            serde_json::json!({"items": []})
+        );
+        assert_eq!(finish(StatusCode::NO_CONTENT, "").unwrap(), Value::Null);
     }
 }

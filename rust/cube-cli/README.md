@@ -28,8 +28,17 @@ pins a specific release tag).
 
 Every run checks GitHub for a newer release in the background and prints a
 notice when one is available (set `CUBE_NO_UPDATE_CHECK=1` to disable, e.g.
-in CI; the notice only goes to interactive terminals, on stderr). Update
-in place any time with:
+in CI; the notice only goes to interactive terminals, on stderr).
+
+The same check feeds a hint under API errors: when a request fails on the API
+side *and* this binary is behind, the error is followed by a line suggesting
+`cube update`, since a CLI that lags the API is a common cause of otherwise
+puzzling failures. A CLI already on the latest release is never told to
+update, and `CUBE_NO_UPDATE_CHECK=1` silences the hint along with the notice.
+Unlike the notice, the hint is not limited to interactive terminals — it is
+attached to a failure, and a stale pinned CLI in CI is where it pays off.
+
+Update in place any time with:
 
 ```bash
 cube update          # download the latest release and replace this binary
