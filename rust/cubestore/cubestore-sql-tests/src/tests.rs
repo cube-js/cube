@@ -467,7 +467,6 @@ lazy_static::lazy_static! {
         "planning_topk_hash_aggregate",
         "topk_hash_aggregate_trim",
         "queue_add_and_retrieve",
-        "queue_add_and_retrieve",
         "queue_add_and_retrieve_backlog",
         "queue_add_external_id_max_len",
     ].into_iter().map(ToOwned::to_owned).collect();
@@ -12807,7 +12806,6 @@ async fn queue_add_external_id_max_len(service: Box<dyn SqlClient>) -> Result<()
         .exec_query(r#"QUEUE PENDING "STANDALONE#queue""#)
         .await?;
     assert_eq!(pending.get_rows().len(), 1);
-    assert_eq!(pending.get_rows().len(), 0);
 
     Ok(())
 }
