@@ -709,6 +709,7 @@ mod tests {
                 "cube data-model rename --branch",
                 "cube deploy --branch",
                 "cube github connect --branch",
+                "cube validate --branch",
             ],
             "a branch argument that takes an empty value at parse time was added, \
              removed or renamed. This list records the parser's answer alone — that a \
