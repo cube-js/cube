@@ -42,9 +42,25 @@ pub(crate) use api_bail;
 /// failure", so both belong here; the hint in `main` is the only reader and it
 /// does not care which of the two shapes carried it.
 ///
-/// `client::TransportError` deliberately does NOT count: a request that never
-/// got an answer says nothing about API skew, so an update hint under it would
-/// be advice about the wrong thing.
+/// The line is whether an HTTP answer arrived at all — not whose fault it was.
+/// `client::TransportError` is out because nothing answered: DNS, TLS, a dropped
+/// connection, so there is no API verdict to form a hypothesis about. A 502 or
+/// 503 is IN, even though a wobbling proxy says as little about versions as a
+/// dead socket does. Keeping it is a decision, not an oversight: the status
+/// alone cannot separate a gateway's 502 from one the application itself
+/// produced, nor a load-shedding 503 from a deploy in progress, and the CLI
+/// knows nothing of the topology that could. What keeps the wide set from
+/// becoming noise is that the hint is a hypothesis rather than a diagnosis: no
+/// arm of `update::api_error_hint` claims an update will fix anything — two say
+/// "may already fix it", the third only reports that a newer release exists and
+/// invites a retry — and it says nothing at all once the check confirms this
+/// binary is already current.
+///
+/// Deliberately NOT `client::is_transient`, which nearly coincides with the
+/// narrower line one might draw here: that one answers "could retrying work",
+/// and answers yes for a 500 — the status most worth hinting on of any, since a
+/// 500 is often the server choking on a shape this CLI sent. Retryable and
+/// version-suspect are different questions about the same status.
 pub fn is_api_error(err: &anyhow::Error) -> bool {
     err.chain()
         .any(|e| e.is::<ApiError>() || e.is::<crate::client::ApiError>())
@@ -81,6 +97,29 @@ mod tests {
         });
         assert!(is_api_error(&err));
         assert!(is_api_error(&err.context("while listing deployments")));
+    }
+
+    #[test]
+    fn an_answer_the_api_may_not_have_authored_is_still_an_answer() {
+        // The gateway statuses are deliberately IN. Pinned because the reason is
+        // an argument rather than an obvious truth — see `is_api_error` — and a
+        // reader who thinks the line should be `client::is_transient` would
+        // otherwise narrow it and lose the 500 along with them.
+        for status in [
+            reqwest::StatusCode::BAD_GATEWAY,
+            reqwest::StatusCode::SERVICE_UNAVAILABLE,
+            reqwest::StatusCode::GATEWAY_TIMEOUT,
+            reqwest::StatusCode::TOO_MANY_REQUESTS,
+            reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+        ] {
+            let err = anyhow::Error::new(crate::client::ApiError {
+                status,
+                method: reqwest::Method::GET,
+                path: "/api/v1/deployments".to_string(),
+                detail: String::new(),
+            });
+            assert!(is_api_error(&err), "{status} should be an API error");
+        }
     }
 
     #[test]
