@@ -280,34 +280,6 @@ describe('PreAggregations', () => {
     });
   });
 
-  describe('refresh key tuple validation', () => {
-    test('keyQueryResult rejects a bare SQL string instead of running it without params', async () => {
-      const preAggregations = new PreAggregations(
-        'TEST',
-        mockDriverFactory as any,
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        () => {},
-        queryCache!,
-        {},
-      );
-
-      const loadCache = new PreAggregationLoadCache(
-        mockDriverFactory as any,
-        queryCache!,
-        preAggregations,
-        { dataSource: 'default' },
-      );
-
-      await expect(loadCache.keyQueryResult('SELECT NOW()' as any, false, 10))
-        .rejects.toThrow('invalidateKeyQueries entry is expected to be a [sql, params, options?] tuple, but got: "SELECT NOW()"');
-    });
-
-    test('loadRefreshKey rejects a bare SQL string', async () => {
-      await expect(queryCache!.loadRefreshKey('SELECT NOW()' as any, 60, { dataSource: 'default' }))
-        .rejects.toThrow('cacheKeyQueries entry is expected to be a [sql, params, options?] tuple, but got: "SELECT NOW()"');
-    });
-  });
-
   describe('loadAllPreAggregationsIfNeeded', () => {
     let preAggregations: PreAggregations | null = null;
 

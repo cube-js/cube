@@ -58,11 +58,6 @@ export type QueryWithParams = [
   options?: QueryOptions
 ];
 
-/**
- * Every producer of pre-aggregation SQL emits a `[sql, params, options?]` tuple.
- * A bare SQL string used to be silently widened to `[sql, [], {}]`, which hid
- * malformed descriptions until they surfaced as a query missing its params.
- */
 export function assertQueryWithParams(value: unknown, field: string): QueryWithParams {
   if (!Array.isArray(value)) {
     throw new Error(
