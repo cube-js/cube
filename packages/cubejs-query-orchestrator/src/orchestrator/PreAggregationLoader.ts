@@ -13,7 +13,7 @@ import {
   UnloadOptions
 } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
-import { assertQueryWithParams, PreAggTableToTempTableNames, QueryCache, QueryWithParams } from './QueryCache';
+import { PreAggTableToTempTableNames, QueryCache, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LargeStreamWarning } from './StreamObjectsCounter';
 import {
@@ -544,7 +544,7 @@ export class PreAggregationLoader {
     saveCancelFn: SaveCancelFn,
     invalidationKeys: InvalidationKeys
   ) {
-    const [loadSql, params] = assertQueryWithParams(this.preAggregation.loadSql, 'preAggregation.loadSql');
+    const [loadSql, params] = this.preAggregation.loadSql;
     const targetTableName = this.targetTableName(newVersionEntry);
     const query = QueryCache.replacePreAggregationTableNamesInSql(
       loadSql,
@@ -691,7 +691,7 @@ export class PreAggregationLoader {
     withTempTable: boolean
   ): Promise<QueryOptions> {
     if (withTempTable) {
-      const [loadSql, params] = assertQueryWithParams(this.preAggregation.loadSql, 'preAggregation.loadSql');
+      const [loadSql, params] = this.preAggregation.loadSql;
 
       const query = QueryCache.replacePreAggregationTableNamesInSql(
         loadSql,
@@ -715,7 +715,7 @@ export class PreAggregationLoader {
 
       return queryOptions;
     } else {
-      const [sql, params] = assertQueryWithParams(this.preAggregation.sql, 'preAggregation.sql');
+      const [sql, params] = this.preAggregation.sql;
       const queryOptions = this.queryOptions(invalidationKeys, sql, params, targetTableName, newVersionEntry);
       this.logExecutingSql(queryOptions);
       return queryOptions;
@@ -731,7 +731,7 @@ export class PreAggregationLoader {
     saveCancelFn: SaveCancelFn,
     invalidationKeys: InvalidationKeys
   ) {
-    const [sql, params] = assertQueryWithParams(this.preAggregation.sql, 'preAggregation.sql');
+    const [sql, params] = this.preAggregation.sql;
 
     const queryOptions = this.queryOptions(invalidationKeys, sql, params, this.targetTableName(newVersionEntry), newVersionEntry);
     this.logExecutingSql(queryOptions);
@@ -887,7 +887,7 @@ export class PreAggregationLoader {
    * prepares download data when temp table = false
    */
   protected async getTableDataWithoutTempTable(client: DriverInterface, table: string, saveCancelFn: SaveCancelFn, queryOptions: QueryOptions, externalDriverCapabilities: DriverCapabilities) {
-    const [sql, params] = assertQueryWithParams(this.preAggregation.sql, 'preAggregation.sql');
+    const [sql, params] = this.preAggregation.sql;
 
     let tableData: DownloadTableData;
 

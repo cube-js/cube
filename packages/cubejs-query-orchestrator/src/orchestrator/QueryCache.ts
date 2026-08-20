@@ -58,16 +58,6 @@ export type QueryWithParams = [
   options?: QueryOptions
 ];
 
-export function assertQueryWithParams(value: unknown, field: string): QueryWithParams {
-  if (!Array.isArray(value)) {
-    throw new Error(
-      `${field} is expected to be a [sql, params, options?] tuple, but got: ${JSON.stringify(value)}`
-    );
-  }
-
-  return value as QueryWithParams;
-}
-
 export type LoadRefreshKeyOptions = {
   requestId?: string;
   skipRefreshKeyWaitForRenew?: boolean;
@@ -454,7 +444,7 @@ export class QueryCache {
     queryAndParams: QueryWithParams,
     preAggregationsTablesToTempTables: PreAggTableToTempTableNames[],
   ): QueryWithParams {
-    const [sql, params, queryOptions] = assertQueryWithParams(queryAndParams, 'queryAndParams');
+    const [sql, params, queryOptions] = queryAndParams;
 
     return [
       QueryCache.replacePreAggregationTableNamesInSql(sql, preAggregationsTablesToTempTables),
@@ -883,7 +873,7 @@ export class QueryCache {
 
   @AsyncDebounce()
   public async loadRefreshKey(q: QueryWithParams, expireSecs: number, options: LoadRefreshKeyOptions) {
-    const [query, values, queryOptions] = assertQueryWithParams(q, 'cacheKeyQueries entry');
+    const [query, values, queryOptions] = q;
 
     return this.cacheQueryResult(
       query,

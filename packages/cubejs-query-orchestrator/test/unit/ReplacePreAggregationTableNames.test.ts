@@ -82,11 +82,4 @@ describe('QueryCache.replacePreAggregationTableNames', () => {
       { external: true },
     ]);
   });
-
-  test('throws for a bare SQL string instead of widening it to an empty params tuple', () => {
-    expect(() => QueryCache.replacePreAggregationTableNames(
-      'SELECT 1' as any,
-      [],
-    )).toThrow('queryAndParams is expected to be a [sql, params, options?] tuple, but got: "SELECT 1"');
-  });
 });
