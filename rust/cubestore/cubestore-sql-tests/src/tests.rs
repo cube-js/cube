@@ -2,6 +2,7 @@ use crate::files::write_tmp_file;
 use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
+use cubestore::cachestore::QUEUE_ITEM_EXTERNAL_ID_MAX_LEN;
 use cubestore::metastore::{Column, ColumnType};
 use cubestore::queryplanner::physical_plan_flags::PhysicalPlanFlags;
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
@@ -313,6 +314,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t(
             "queue_full_workflow_v2_with_external_id",
             queue_full_workflow_v2_with_external_id,
+        ),
+        t(
+            "queue_add_external_id_max_len",
+            queue_add_external_id_max_len,
         ),
         t("queue_latest_result_v1", queue_latest_result_v1),
         t("queue_retrieve_extended", queue_retrieve_extended),
@@ -12755,6 +12760,51 @@ async fn queue_full_workflow_v2_with_external_id(
         .exec_query(r#"QUEUE RESULT EXTERNAL_ID "unknown-ext" "STANDALONE#queue:ext_v2""#)
         .await?;
     assert_eq!(result.get_rows().len(), 0);
+
+    Ok(())
+}
+
+async fn queue_add_external_id_max_len(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    let max_id = "x".repeat(QUEUE_ITEM_EXTERNAL_ID_MAX_LEN);
+    let too_long_id = "x".repeat(QUEUE_ITEM_EXTERNAL_ID_MAX_LEN + 1);
+
+    let add_response = service
+        .exec_query(&format!(
+            r#"QUEUE ADD EXTERNAL_ID '{}' "STANDALONE#queue:ext_max_len" "payload_max_len""#,
+            max_id
+        ))
+        .await?;
+    assert_queue_add_and_get_id(&add_response)?;
+
+    for query in [
+        format!(
+            r#"QUEUE ADD EXTERNAL_ID '{}' "STANDALONE#queue:ext_too_long" "payload_too_long""#,
+            too_long_id
+        ),
+        format!(
+            r#"QUEUE ADD_AND_RETRIEVE EXTERNAL_ID '{}' "STANDALONE#queue:ext_too_long" "payload_too_long" 1"#,
+            too_long_id
+        ),
+        format!(
+            r#"QUEUE RESULT EXTERNAL_ID '{}' "STANDALONE#queue:ext_too_long""#,
+            too_long_id
+        ),
+    ] {
+        let err = service.exec_query(&query).await.unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("external_id exceeds maximum allowed length"),
+            "unexpected error for {}: {}",
+            query,
+            err
+        );
+    }
+
+    // The rejected item was never written
+    let pending = service
+        .exec_query(r#"QUEUE PENDING "STANDALONE#queue:ext_too_long""#)
+        .await?;
+    assert_eq!(pending.get_rows().len(), 0);
 
     Ok(())
 }

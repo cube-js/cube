@@ -5,7 +5,7 @@ use crate::cachestore::cache_item::{
 use crate::cachestore::queue_item::{
     active_keys_to_value, QueueItem, QueueItemIndexKey, QueueItemRocksIndex, QueueItemRocksTable,
     QueueItemStatus, QueueResultAckEvent, QueueResultAckEventResult, QueueRetrieveResponse,
-    QUEUE_ITEM_EXTERNAL_ID_MAX_LEN, QUEUE_ITEM_PROCESS_ID_MAX_LEN,
+    QUEUE_ITEM_PROCESS_ID_MAX_LEN,
 };
 use crate::cachestore::queue_result::{QueueResultRocksIndex, QueueResultRocksTable};
 use crate::cachestore::{compaction, QueueItemPayload, QueueResult};
@@ -1380,14 +1380,6 @@ impl CacheStore for RocksCacheStore {
                 )));
             }
         }
-        if let Some(ref id) = payload.external_id {
-            if id.len() > QUEUE_ITEM_EXTERNAL_ID_MAX_LEN {
-                return Err(CubeError::user(format!(
-                    "external_id exceeds maximum allowed length of {} characters",
-                    QUEUE_ITEM_EXTERNAL_ID_MAX_LEN
-                )));
-            }
-        }
 
         self.write_operation_queue("queue_add", move |db_ref, batch_pipe| {
             let queue_schema = QueueItemRocksTable::new(db_ref.clone());
@@ -1450,14 +1442,6 @@ impl CacheStore for RocksCacheStore {
                 return Err(CubeError::user(format!(
                     "process_id exceeds maximum allowed length of {} characters",
                     QUEUE_ITEM_PROCESS_ID_MAX_LEN
-                )));
-            }
-        }
-        if let Some(ref id) = payload.external_id {
-            if id.len() > QUEUE_ITEM_EXTERNAL_ID_MAX_LEN {
-                return Err(CubeError::user(format!(
-                    "external_id exceeds maximum allowed length of {} characters",
-                    QUEUE_ITEM_EXTERNAL_ID_MAX_LEN
                 )));
             }
         }
@@ -2783,27 +2767,6 @@ mod tests {
                 "Second insert with None external_id should succeed"
             );
             assert!(res.unwrap().added);
-        }
-
-        // external_id exceeding max length should fail
-        {
-            let long_id = "x".repeat(QUEUE_ITEM_EXTERNAL_ID_MAX_LEN + 1);
-            let res = cachestore
-                .queue_add(QueueAddPayload {
-                    path: "prefix:path5".to_string(),
-                    value: "v5".to_string(),
-                    priority: 0,
-                    orphaned: None,
-                    process_id: None,
-                    exclusive: false,
-                    external_id: Some(long_id),
-                })
-                .await;
-            assert!(res.is_err(), "external_id exceeding max length should fail");
-            assert!(res
-                .unwrap_err()
-                .to_string()
-                .contains("external_id exceeds maximum allowed length"));
         }
 
         // process_id exceeding max length should fail
