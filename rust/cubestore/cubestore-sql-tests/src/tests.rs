@@ -12049,7 +12049,7 @@ async fn queue_retrieve_extended(service: Box<dyn SqlClient>) -> Result<(), Cube
 async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     {
         let add_response = service
-            .exec_query(r#"QUEUE ADD_AND_RETRIEVE PRIORITY 1 "STANDALONE#queue:1" "payload1" 1"#)
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE PRIORITY 1 "STANDALONE#queue:key1" "payload1" 1"#)
             .await?;
         assert_queue_add_and_retrieve_columns(&add_response);
         assert_eq!(
@@ -12058,7 +12058,7 @@ async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeE
                 "1",
                 true,
                 0,
-                Some("1"),
+                Some("key1"),
                 Some("payload1")
             )]
         );
@@ -12066,26 +12066,27 @@ async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeE
 
     {
         let add_response = service
-            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:2" "payload2" 1"#)
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:key2" "payload2" 1"#)
             .await?;
         assert_eq!(
             add_response.get_rows(),
-            &vec![queue_add_and_retrieve_row("2", true, 1, Some("1"), None)]
+            &vec![queue_add_and_retrieve_row("2", true, 1, Some("key1"), None)]
         );
     }
 
     {
         // The stored payload is returned, not the payload of this call
         let add_response = service
-            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:2" "payload2-dup" 2"#)
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:key2" "payload2-dup" 2"#)
             .await?;
+        assert_queue_add_and_retrieve_columns(&add_response);
         assert_eq!(
             add_response.get_rows(),
             &vec![queue_add_and_retrieve_row(
                 "2",
                 false,
                 0,
-                Some("1,2"),
+                Some("key1,key2"),
                 Some("payload2")
             )]
         );
@@ -12093,17 +12094,23 @@ async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeE
 
     {
         let add_response = service
-            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:1" "payload1" 5"#)
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:key1" "payload1" 5"#)
             .await?;
         assert_eq!(
             add_response.get_rows(),
-            &vec![queue_add_and_retrieve_row("1", false, 0, Some("1,2"), None)]
+            &vec![queue_add_and_retrieve_row(
+                "1",
+                false,
+                0,
+                Some("key1,key2"),
+                None
+            )]
         );
     }
 
     {
         let add_response = service
-            .exec_query(r#"QUEUE ADD "STANDALONE#queue:3" "payload3""#)
+            .exec_query(r#"QUEUE ADD "STANDALONE#queue:key3" "payload3""#)
             .await?;
         assert_queue_add_columns(&add_response);
     }
@@ -12115,7 +12122,7 @@ async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeE
         assert_eq!(
             pending_response.get_rows(),
             &vec![Row::new(vec![
-                TableValue::String("3".to_string()),
+                TableValue::String("key3".to_string()),
                 TableValue::String("3".to_string()),
                 TableValue::String("pending".to_string()),
                 TableValue::Null,
@@ -12131,7 +12138,7 @@ async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeE
     {
         // A claimed item can be acknowledged without an explicit QUEUE RETRIEVE
         let ack_response = service
-            .exec_query(r#"QUEUE ACK "STANDALONE#queue:1" "result1""#)
+            .exec_query(r#"QUEUE ACK "STANDALONE#queue:key1" "result1""#)
             .await?;
         assert_eq!(
             ack_response.get_rows(),
@@ -12139,7 +12146,7 @@ async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeE
         );
 
         let result_response = service
-            .exec_query(r#"QUEUE RESULT "STANDALONE#queue:1""#)
+            .exec_query(r#"QUEUE RESULT "STANDALONE#queue:key1""#)
             .await?;
         assert_queue_result_columns(&result_response);
         assert_eq!(
