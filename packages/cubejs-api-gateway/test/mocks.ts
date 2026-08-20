@@ -80,6 +80,14 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
     return { query, denied: false };
   },
 
+  async getGranularities(_options: any = {}) {
+    return [
+      { type: 'built-in', name: 'year', title: 'Year', format: '%Y', interval: '1 year' },
+      { type: 'built-in', name: 'month', title: 'Month', format: '%b %Y', interval: '1 month' },
+      { type: 'custom', name: 'fiscal_year', title: 'Fiscal Year', interval: '1 year', origin: '2024-02-01' },
+    ];
+  },
+
   async metaConfig(_ctx, options: any = {}) {
     const cubes = [
       {
@@ -106,6 +114,7 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
             },
             {
               name: 'Foo.timeGranularities',
+              type: 'time',
               isVisible: true,
               granularities: [
                 {
@@ -114,7 +123,18 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
                   interval: '6 months',
                   offset: '3 months'
                 }
-              ]
+              ],
+              // As attached by CompilerApi (baked or variant-selected) before meta reaches the gateway.
+              effectiveGranularities: [
+                { name: 'year', type: 'built-in', title: 'Year', interval: '1 year', format: '%Y' },
+                {
+                  name: 'half_year_by_1st_april',
+                  type: 'custom',
+                  title: 'Half Year By1 St April',
+                  interval: '6 months',
+                  offset: '3 months',
+                },
+              ],
             },
           ],
           segments: [

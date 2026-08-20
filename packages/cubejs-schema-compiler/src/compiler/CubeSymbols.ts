@@ -5,6 +5,16 @@ import { camelize } from 'inflection';
 import { UserError } from './UserError';
 import { DynamicReference } from './DynamicReference';
 import { camelizeCube } from './utils';
+import {
+  normalizeGranularitiesBlock,
+  NormalizedGranularitiesBlock,
+  resolveDimensionGranularities,
+} from './GranularityResolver';
+import {
+  buildBuiltInsCatalog,
+  DEFAULT_GRANULARITIES_CONFIG,
+  GlobalGranularitiesConfig,
+} from './GlobalGranularitiesConfig';
 
 import type { ErrorReporter } from './ErrorReporter';
 import { TranspilerSymbolResolver } from './transpilers';
@@ -16,6 +26,8 @@ export type GranularityDefinition = {
   sql?: (...args: any[]) => string;
   name?: string;
   title?: string;
+  /** d3-time-format string used by the client to display bucketed timestamps. */
+  format?: string;
   interval?: string;
   offset?: string;
   origin?: string;
@@ -33,6 +45,7 @@ export type CubeSymbolDefinition = {
   sql?: (...args: any[]) => string;
   primaryKey?: boolean;
   granularities?: Record<string, GranularityDefinition>;
+  granularitiesBlock?: NormalizedGranularitiesBlock;
   timeShift?: TimeshiftDefinition[];
   format?: string;
   currency?: string;
@@ -293,13 +306,30 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
 
   private resolveSymbolsCallContext: any;
 
-  public constructor(evaluateViews = false) {
+  // Resolves the global granularities config; shared across the compilers of one prepareCompiler so
+  // a `config.granularities` function runs once per compile.
+  private readonly granularitiesResolver?: () => Promise<GlobalGranularitiesConfig>;
+
+  // Global granularities resolved at the start of compile(); the default catalog until then.
+  private globalGranularities: GlobalGranularitiesConfig = DEFAULT_GRANULARITIES_CONFIG;
+
+  public constructor(
+    evaluateViews = false,
+    granularitiesResolver?: () => Promise<GlobalGranularitiesConfig>,
+  ) {
     this.symbols = {};
     this.builtCubes = {};
     this.cubeDefinitions = {};
     this.funcArgumentsValues = {};
     this.cubeList = [];
     this.evaluateViews = evaluateViews;
+    this.granularitiesResolver = granularitiesResolver;
+  }
+
+  // The resolved global config for this compile. Read by CubeToMetaTransformer (for
+  // `effectiveGranularities`) and by the /v1/granularities catalog.
+  public get globalGranularitiesConfig(): GlobalGranularitiesConfig {
+    return this.globalGranularities;
   }
 
   public free() {
@@ -311,7 +341,14 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     this.resolveSymbolsCallContext = undefined;
   }
 
-  public compile(cubes: CubeDefinition[], errorReporter: ErrorReporter) {
+  public async compile(cubes: CubeDefinition[], errorReporter: ErrorReporter) {
+    // Resolve the global granularities config before any cube is transformed: the merge below writes
+    // global customs onto time dimensions, and the SQL layer resolves them from that same map.
+    // The phase driver chains each compile() through `.then()`, so awaiting here is safe.
+    if (this.granularitiesResolver) {
+      this.globalGranularities = await this.granularitiesResolver();
+    }
+
     this.cubeDefinitions = Object.fromEntries(
       cubes.map((c): [string, CubeDefinition] => [c.name, c])
     );
@@ -581,6 +618,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     this.camelCaseTypes(cube.preAggregations);
     this.camelCaseTypes(cube.accessPolicy);
 
+    this.normalizeDimensionGranularities(cube.dimensions);
+
     if (cube.preAggregations) {
       this.transformPreAggregations(cube.preAggregations);
     }
@@ -601,6 +640,75 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       ...cube.segments || {},
       ...cube.preAggregations || {}
     } as CubeSymbolsDefinition;
+  }
+
+  // Stores the canonical `granularitiesBlock` on each time dimension, rewrites `granularities` to
+  // the locally-defined customs — preserving the legacy shape that BaseQuery, prepare-annotation
+  // and CubeToMetaTransformer read — then layers the effective global customs on top so they are
+  // resolvable in SQL and visible to pre-aggregation matching.
+  private normalizeDimensionGranularities(dimensions: Record<string, any> | undefined) {
+    if (!dimensions) {
+      return;
+    }
+
+    // Every time dimension participates: global customs apply even to one that declares no
+    // `granularities` of its own.
+    for (const dim of Object.values(dimensions)) {
+      if (dim && dim.type === 'time') {
+        // A view's included dimension already carries a propagated granularitiesBlock (with the
+        // source dimension's includes/excludes) alongside the custom-only `granularities` map.
+        // Re-normalizing the custom-only map here would reset includes to '*' and drop the source's
+        // includes/excludes, so only normalize dimensions that haven't been normalized yet. A
+        // dimension declaring no `granularities` needs no block — it takes the global config as-is,
+        // and attaching one would leak an empty block into the compiled model.
+        if (!dim.granularitiesBlock && 'granularities' in dim) {
+          // Keep the raw user value for the validator (it runs after this and would otherwise only
+          // see the extracted customs, never the includes/excludes/custom dict).
+          dim.rawGranularities = dim.granularities;
+          const block: NormalizedGranularitiesBlock = normalizeGranularitiesBlock(dim.granularities);
+          dim.granularitiesBlock = block;
+          dim.granularities = block.custom;
+        }
+
+        this.mergeGlobalCustomsIntoDimension(dim);
+      }
+    }
+  }
+
+  // Layer the dimension's effective global customs onto its `granularities` map (locals win on a
+  // name collision). Reassigns rather than mutating, so a view dimension sharing its source's map
+  // by reference isn't contaminated.
+  private mergeGlobalCustomsIntoDimension(dim: any) {
+    const globalCustom = this.globalGranularities.customGranularities;
+    if (Object.keys(globalCustom).length === 0) {
+      return;
+    }
+
+    // `granularitiesBlock.custom` is the model's own customs, unaffected by the merge below.
+    const locals: Record<string, GranularityDefinition> = dim.granularitiesBlock?.custom ?? {};
+    const resolved = resolveDimensionGranularities(
+      dim.granularitiesBlock ?? normalizeGranularitiesBlock(undefined),
+      this.globalGranularities.enabledBuiltIns,
+      globalCustom,
+      buildBuiltInsCatalog(this.globalGranularities),
+    );
+
+    // Only genuine global customs are baked in: built-ins resolve by name without a definition, and
+    // a local of the same name already wins.
+    const merged: Record<string, GranularityDefinition> = {};
+    for (const [name, def] of Object.entries(resolved)) {
+      if (def.type === 'custom' &&
+        Object.prototype.hasOwnProperty.call(globalCustom, name) &&
+        !Object.prototype.hasOwnProperty.call(locals, name)
+      ) {
+        merged[name] = { ...def };
+        delete (merged[name] as any).type;
+      }
+    }
+
+    if (Object.keys(merged).length > 0) {
+      dim.granularities = { ...merged, ...locals };
+    }
   }
 
   private camelCaseTypes(obj: Object | Array<any> | undefined) {
@@ -1138,6 +1246,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           format: memberRef.override?.format || resolvedMember.format,
           ...(propagatedCurrency ? { currency: propagatedCurrency } : {}),
           ...(resolvedMember.granularities ? { granularities: resolvedMember.granularities } : {}),
+          ...(resolvedMember.granularitiesBlock ? { granularitiesBlock: resolvedMember.granularitiesBlock } : {}),
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
           ...(resolvedMember.keyReference && this.processKeyReferenceForView(resolvedMember.keyReference, targetCube.name, viewAllMembers, memberRef.member)),
           ...(resolvedMember.mask !== undefined ? { mask: resolvedMember.mask } : {}),
@@ -1496,7 +1605,10 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         }
         if (refProperty &&
           cube[refProperty].type === 'time' &&
-          self.resolveGranularity([cubeName, refProperty, 'granularities', propertyName], cube)
+          self.resolveGranularity(
+            [cubeName, refProperty, 'granularities', propertyName],
+            cube
+          )
         ) {
           return {
             toString: () => this.withSymbolsCallContext(
@@ -1527,7 +1639,10 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
    * @param {string|string[]} path
    * @param [refCube] Optional cube object to operate on
    */
-  public resolveGranularity(path: string | string[], refCube?: any) {
+  public resolveGranularity(
+    path: string | string[],
+    refCube?: any,
+  ) {
     const [cubeName, dimName, gr, granName] = Array.isArray(path) ? path : path.split('.');
     const cube = refCube || this.symbols[cubeName];
 
@@ -1545,7 +1660,11 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       return { interval: `1 ${granName}` };
     }
 
-    return cube?.[dimName]?.[gr]?.[granName];
+    // A local custom wins; otherwise fall back to a global custom from the resolved config.
+    return cube?.[dimName]?.[gr]?.[granName] ??
+      (Object.prototype.hasOwnProperty.call(this.globalGranularities.customGranularities, granName)
+        ? this.globalGranularities.customGranularities[granName]
+        : undefined);
   }
 
   protected cubeDependenciesProxy(parentIndex, cubeName) {

@@ -7,6 +7,7 @@
 
 import R from 'ramda';
 import { isPredefinedGranularity } from '@cubejs-backend/shared';
+import { BUILT_IN_GRANULARITIES } from '@cubejs-backend/schema-compiler';
 import { MetaConfig, MetaConfigMap, toConfigMap } from './to-config-map';
 import { MemberType } from '../types/strings';
 import { MemberType as MemberTypeEnum } from '../types/enums';
@@ -14,7 +15,10 @@ import { MemberExpression } from '../types/query';
 
 type GranularityMeta = {
   name: string;
+  type?: 'built-in' | 'custom';
   title: string;
+  /** d3-time-format string for displaying bucketed timestamps. */
+  format?: string;
   interval: string;
   offset?: string;
   origin?: string;
@@ -36,6 +40,38 @@ type ConfigItem = {
   drillMembersGrouped?: any;
   granularities?: GranularityMeta[];
 };
+
+// Effective granularity meta for one queried time dimension, read from the enriched meta config.
+// A queried granularity outside the effective set still annotates: disabled built-ins are
+// synthesized from defaults; unknown customs yield undefined (never the deprecated legacy array).
+function resolveGranularityMeta(
+  configMap: MetaConfigMap,
+  dimension: string,
+  granularity: string,
+): GranularityMeta | undefined {
+  const cubeName = dimension.split('.')[0];
+  const dimConfig: any = configMap[cubeName]?.[MemberTypeEnum.DIMENSIONS]
+    ?.find((m: any) => m.name === dimension);
+
+  const resolved = dimConfig?.effectiveGranularities
+    ?.find((g: GranularityMeta) => g.name === granularity);
+  if (resolved) {
+    return resolved;
+  }
+
+  if (isPredefinedGranularity(granularity)) {
+    const defaults = BUILT_IN_GRANULARITIES[granularity];
+    return {
+      name: granularity,
+      type: 'built-in',
+      title: defaults?.title || granularity,
+      interval: `1 ${granularity}`,
+      ...(defaults?.format ? { format: defaults.format } : {}),
+    };
+  }
+
+  return undefined;
+}
 
 type AnnotatedConfigItem = Omit<ConfigItem, 'granularities'> & {
   granularity?: GranularityMeta;
@@ -113,18 +149,7 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
               let dimAnnotation: [string, AnnotatedConfigItem] | undefined;
 
               if (an) {
-                let granularityMeta: GranularityMeta | undefined;
-                if (isPredefinedGranularity(td.granularity)) {
-                  granularityMeta = {
-                    name: td.granularity,
-                    title: td.granularity,
-                    interval: `1 ${td.granularity}`,
-                  };
-                } else if (an[1].granularities) {
-                  // No need to send all the granularities defined, only those make sense for this query
-                  granularityMeta = an[1].granularities.find(g => g.name === td.granularity);
-                }
-
+                const granularityMeta = resolveGranularityMeta(configMap, td.dimension, td.granularity);
                 const { granularities: _, ...rest } = an[1];
                 dimAnnotation = [an[0], { ...rest, granularity: granularityMeta }];
               }

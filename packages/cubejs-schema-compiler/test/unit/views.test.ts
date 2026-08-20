@@ -589,4 +589,50 @@ describe('Views YAML', () => {
 
     await expect(compiler.compile()).rejects.toThrow('test_view cube: Member \'unknown\'');
   });
+
+  // Regression: a time dimension restricted via the dict form (includes/excludes) must keep that
+  // restriction when included in a view. The view dimension carries a propagated granularitiesBlock;
+  // re-normalizing the custom-only map used to reset includes to '*' and expose every built-in.
+  it('preserves a source time dimension includes/excludes when included in a view', async () => {
+    const { compiler, cubeEvaluator, metaTransformer } = prepareYamlCompiler(`
+      cubes:
+        - name: orders
+          sql_table: orders
+          measures:
+            - name: count
+              type: count
+          dimensions:
+            - name: id
+              sql: id
+              type: number
+              primary_key: true
+            - name: created_at
+              sql: created_at
+              type: time
+              granularities:
+                includes:
+                  - year
+                  - month
+
+      views:
+        - name: orders_view
+          cubes:
+            - join_path: orders
+              includes:
+                - count
+                - created_at
+    `);
+
+    await compiler.compile();
+
+    // The compiled view dimension keeps the source's includes, not the reset '*'.
+    const viewDim = cubeEvaluator.getCubeDefinition('orders_view').dimensions!.created_at;
+    expect(viewDim.granularitiesBlock).toBeDefined();
+    expect(viewDim.granularitiesBlock!.includes).toEqual(['year', 'month']);
+
+    // And the meta reflects only year + month (no other built-ins leak through the view).
+    const viewMeta = metaTransformer.cubes.map((d) => d.config).find((d) => d.name === 'orders_view');
+    const metaDim: any = viewMeta!.dimensions.find((d: any) => d.name === 'orders_view.created_at');
+    expect(metaDim.effectiveGranularities.map((g: any) => g.name)).toEqual(['year', 'month']);
+  });
 });
