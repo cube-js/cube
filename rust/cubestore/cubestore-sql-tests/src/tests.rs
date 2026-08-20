@@ -12155,16 +12155,17 @@ async fn queue_add_and_retrieve_backlog(service: Box<dyn SqlClient>) -> Result<(
     for id in 1..=2 {
         service
             .exec_query(&format!(
-                r#"QUEUE ADD "STANDALONE#queue:{}" "payload{}""#,
+                r#"QUEUE ADD "STANDALONE#queue:key{}" "payload{}""#,
                 id, id
             ))
             .await?;
     }
 
     {
-        // Every concurrency slot is free, only the backlog declines the claim
+        // Every concurrency slot is free, but claiming would leave the 2 pending items
+        // a single slot to share, so the item takes its place in the backlog instead
         let add_response = service
-            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:3" "payload3" 4"#)
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:key3" "payload3" 2"#)
             .await?;
         assert_queue_add_and_retrieve_columns(&add_response);
         assert_eq!(
@@ -12174,18 +12175,31 @@ async fn queue_add_and_retrieve_backlog(service: Box<dyn SqlClient>) -> Result<(
     }
 
     {
+        // A slot is left over for every one of the 3 pending items, nothing is jumped over
         let add_response = service
-            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:4" "payload4" 7"#)
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:key4" "payload4" 4"#)
             .await?;
+        assert_queue_add_and_retrieve_columns(&add_response);
         assert_eq!(
             add_response.get_rows(),
             &vec![queue_add_and_retrieve_row(
                 "4",
                 true,
                 3,
-                Some("4"),
+                Some("key4"),
                 Some("payload4")
             )]
+        );
+    }
+
+    {
+        // The very same budget declines the next claim, the slot it took is now busy
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:key5" "payload5" 4"#)
+            .await?;
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row("5", true, 4, Some("key4"), None)]
         );
     }
 
@@ -12193,7 +12207,7 @@ async fn queue_add_and_retrieve_backlog(service: Box<dyn SqlClient>) -> Result<(
         let pending_response = service
             .exec_query(r#"QUEUE PENDING "STANDALONE#queue""#)
             .await?;
-        assert_eq!(pending_response.get_rows().len(), 3);
+        assert_eq!(pending_response.get_rows().len(), 4);
 
         let active_response = service
             .exec_query(r#"QUEUE ACTIVE "STANDALONE#queue""#)
@@ -12201,7 +12215,7 @@ async fn queue_add_and_retrieve_backlog(service: Box<dyn SqlClient>) -> Result<(
         assert_eq!(
             active_response.get_rows(),
             &vec![Row::new(vec![
-                TableValue::String("4".to_string()),
+                TableValue::String("key4".to_string()),
                 TableValue::String("4".to_string()),
                 TableValue::String("active".to_string()),
                 TableValue::Null,

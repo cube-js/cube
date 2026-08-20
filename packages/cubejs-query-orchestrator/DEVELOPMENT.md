@@ -238,16 +238,13 @@ QUEUE ADD_AND_RETRIEVE [EXCLUSIVE] [PRIORITY ?n] [ORPHANED ?ttl] [EXTERNAL_ID ?i
     ?path ?payload ?concurrency
 ```
 
-The item is claimed when both hold for its prefix:
+The item is claimed when the prefix has a concurrency slot for it *and* for everything
+already queued — `active + pending < concurrency`, where `concurrency` is the same budget
+`QUEUE RETRIEVE CONCURRENCY` uses and `pending` does not count the item itself.
 
-- a concurrency slot is free — `active < concurrency`, the same budget
-  `QUEUE RETRIEVE CONCURRENCY` uses;
-- the backlog is shallow — `pending * 2 < concurrency`, not counting the item itself.
-
-`payload IS NULL` in the response means the item was not claimed — one of the two
-conditions failed, the item was already active, or it belongs to another process — and the
-caller falls back to the normal path with nothing lost, because the item is enqueued either
-way.
+`payload IS NULL` in the response means the item was not claimed — the condition failed,
+the item was already active, or it belongs to another process — and the caller falls back
+to the normal path with nothing lost, because the item is enqueued either way.
 
 ```mermaid
 sequenceDiagram
@@ -263,7 +260,7 @@ sequenceDiagram
     QueryQueue->>QueueDriver: addToQueue
 
     QueueDriver->>CubeStore: QUEUE ADD_AND_RETRIEVE PRIORITY ?n ?path ?payload ?concurrency
-    Note over CubeStore: One atomic batch:<br/>insert, then claim if active < concurrency
+    Note over CubeStore: One atomic batch:<br/>insert, then claim if the prefix allows it
     CubeStore-->>QueueDriver: AddAndRetrieveResponse
     QueueDriver-->>QueryQueue: [added, queueId, queueSize, addedToQueueTime, def?]
 
@@ -300,12 +297,12 @@ returns items highest priority first (oldest first within a priority) and reconc
 — it is safe only because the path it is given came from that sorted list.
 
 The fast track selects itself, so it is priority blind with nothing to compensate. That is
-what the `pending < concurrency / 2` condition bounds: with a shallow backlog there is
-almost nothing to jump over, and with a deep one the fast track steps aside and lets
-reconcile pick by priority. Note that a claimed item goes straight to active and never
-becomes pending, so a burst onto an idle queue still fast-tracks every query — items only
-start accumulating in pending once the concurrency budget is exhausted, which is exactly
-when the condition should stop firing.
+what the `active + pending < concurrency` condition rules out: claiming leaves a free slot
+for every item already pending, so no item is jumped over, and once the budget gets tight
+the fast track steps aside and lets reconcile pick by priority. Note that a claimed item
+goes straight to active and never becomes pending, so a burst onto an idle queue still
+fast-tracks every query — items only start accumulating in pending once the concurrency
+budget is exhausted, which is exactly when the condition should stop firing.
 
 > **Status:** the `QUEUE ADD_AND_RETRIEVE` command exists in Cube Store. The driver still
 > emits `QUEUE ADD`; wiring the fast track into `CubeStoreQueueDriver.addToQueue` needs a

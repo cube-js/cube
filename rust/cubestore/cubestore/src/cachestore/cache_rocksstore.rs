@@ -1439,11 +1439,10 @@ impl CacheStore for RocksCacheStore {
                 _ => pending,
             };
 
-            // A deep backlog is left to QUEUE PENDING + reconcile, which pick by priority.
-            // Claiming the item being added ignores priority, it's acceptable only while
-            // there is almost nothing to jump over.
-            let claim = active.len() < (payload.concurrency as usize)
-                && backlog * 2 < (payload.concurrency as u64);
+            // Claiming the item being added ignores priority, it's harmless exactly while a
+            // slot is left over for every pending item too, so nothing can be jumped over.
+            // A deeper backlog is left to QUEUE PENDING + reconcile, which pick by priority.
+            let claim = (active.len() as u64) + backlog < (payload.concurrency as u64);
 
             if let Some(id_row) = id_row_opt {
                 let id = id_row.get_id();
@@ -2898,9 +2897,10 @@ mod tests {
                 .await?;
         }
 
-        // Every concurrency slot is free, only the backlog declines the claim
+        // Every concurrency slot is free, but claiming would leave the 2 pending items
+        // a single slot to share, so the item takes its place in the backlog instead
         let res = cachestore
-            .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path3", "v3", 4))
+            .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path3", "v3", 2))
             .await?;
         assert!(res.added);
         assert_eq!(res.payload, None);
@@ -2909,8 +2909,9 @@ mod tests {
 
         assert_queue_item_status(&cachestore, "path3", QueueItemStatus::Pending, false).await?;
 
+        // A slot is left over for every one of the 3 pending items, nothing is jumped over
         let res = cachestore
-            .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path4", "v4", 7))
+            .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path4", "v4", 4))
             .await?;
         assert!(res.added);
         assert_eq!(res.payload, Some("v4".to_string()));
@@ -2918,6 +2919,17 @@ mod tests {
         assert_eq!(res.pending, 3);
 
         assert_queue_item_status(&cachestore, "path4", QueueItemStatus::Active, true).await?;
+
+        // The very same budget declines the next claim, the slot it took is now busy
+        let res = cachestore
+            .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path5", "v5", 4))
+            .await?;
+        assert!(res.added);
+        assert_eq!(res.payload, None);
+        assert_eq!(res.active, vec!["path4".to_string()]);
+        assert_eq!(res.pending, 4);
+
+        assert_queue_item_status(&cachestore, "path5", QueueItemStatus::Pending, false).await?;
 
         RocksCacheStore::cleanup_test_cachestore("test_queue_add_and_retrieve_backlog");
 
