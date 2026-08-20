@@ -45,6 +45,14 @@ export type CacheQueryResultOptions = {
   renewCycle?: boolean,
 };
 
+/**
+ * What a caller of `cacheRefreshKeyResult` is allowed to decide. Everything identifying the entry —
+ * the cache key, the renewal key, the renewal threshold — is derived from the query tuple instead,
+ * so no caller can store one under a key it will later look up by a different one.
+ */
+export type RefreshKeyCacheOptions =
+  Pick<CacheQueryResultOptions, 'priority' | 'requestId' | 'waitForRenew' | 'dataSource'>;
+
 type QueryOptions = {
   external?: boolean;
   renewalThreshold?: number;
@@ -114,7 +122,7 @@ export type PreAggTableToTempTable = [
 
 export type PreAggTableToTempTableNames = [string, { targetTableName: string; }];
 
-export type CacheKeyItem = string | string[] | QueryWithParams | QueryWithParams[] | undefined;
+export type CacheKeyItem = string | string[] | boolean | QueryWithParams | QueryWithParams[] | undefined;
 
 export type CacheKey =
   [CacheKeyItem, CacheKeyItem] |
@@ -417,6 +425,44 @@ export class QueryCache {
     // @ts-ignore
     key.persistent = queryBody.persistent;
     return key;
+  }
+
+  /**
+   * Identity of a refresh key query: the SQL, its params, and the engine it runs against. The rest
+   * of the options element is policy applied to the result rather than part of it, and
+   * `replacePartitionSqlAndParams` recomputes `renewalThreshold` from `new Date()` for incremental
+   * keys, so covering it would make the key drift within a single request.
+   */
+  public static refreshKeyIdentity(sqlQuery: QueryWithParams): [string, string[], boolean] {
+    const [query, values, options] = sqlQuery;
+    // Producers spell "runs against the source database" as both `false` and an absent option, and
+    // JSON.stringify renders the latter as null — they have to collapse to one key.
+    return [query, values, !!options?.external];
+  }
+
+  /**
+   * Cache the result of a refresh key query, identified by the query tuple itself.
+   */
+  public async cacheRefreshKeyResult(
+    sqlQuery: QueryWithParams,
+    expiration: number,
+    options: RefreshKeyCacheOptions,
+  ) {
+    const [query, values, queryOptions] = sqlQuery;
+    const cacheKey = QueryCache.refreshKeyIdentity(sqlQuery);
+
+    return this.cacheQueryResult(query, values, cacheKey, expiration, {
+      ...options,
+      renewalThreshold: this.options.refreshKeyRenewalThreshold
+        || queryOptions?.renewalThreshold || 2 * 60,
+      renewalKey: cacheKey,
+      useInMemory: true,
+      external: queryOptions?.external,
+    });
+  }
+
+  public refreshKeyCacheKey(sqlQuery: QueryWithParams): string {
+    return this.queryRedisKey(QueryCache.refreshKeyIdentity(sqlQuery));
   }
 
   public static extractRequestUUID(requestId: string): string {
@@ -884,21 +930,13 @@ export class QueryCache {
 
   @AsyncDebounce()
   public async loadRefreshKey(q: QueryWithParams, expireSecs: number, options: LoadRefreshKeyOptions) {
-    const [query, values, queryOptions] = q;
-
-    return this.cacheQueryResult(
-      query,
-      values,
-      [query, values],
+    return this.cacheRefreshKeyResult(
+      q,
       expireSecs,
       {
-        renewalThreshold: this.options.refreshKeyRenewalThreshold || queryOptions?.renewalThreshold || 2 * 60,
-        renewalKey: q,
         waitForRenew: !options.skipRefreshKeyWaitForRenew,
         requestId: options.requestId,
         dataSource: options.dataSource,
-        useInMemory: true,
-        external: queryOptions?.external,
       },
     );
   }

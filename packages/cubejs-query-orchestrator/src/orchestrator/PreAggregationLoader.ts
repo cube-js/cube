@@ -132,14 +132,14 @@ export class PreAggregationLoader {
   public async loadPreAggregation(
     throwOnMissingPartition: boolean,
   ): Promise<null | LoadPreAggregationResult> {
-    const notLoadedKey = (this.preAggregation.invalidateKeyQueries || [])
-      .find(keyQuery => !this.loadCache.hasKeyQueryResult(keyQuery));
+    const invalidationKeysLoaded = (this.preAggregation.invalidateKeyQueries || [])
+      .every(keyQuery => this.loadCache.hasKeyQueryResult(keyQuery));
 
-    if (this.isJob || !(notLoadedKey && !this.waitForRenew)) {
-      // Case 1: pre-agg build job processing.
-      // Case 2: either we have no data cached for this rollup or waitForRenew
-      // is true, either way, synchronously renew what data is needed so that
-      // the most current data will be returned fo the current request.
+    // `externalRefresh` must stay on the Case 3 path below: it owns the "partition is not built
+    // yet" handling and must never enqueue a build on this instance.
+    if (this.isJob || this.waitForRenew || (invalidationKeysLoaded && !this.externalRefresh)) {
+      // Renew synchronously so the current request returns the most current data, unlike Case 3
+      // below which serves what already exists and refreshes in the background.
       const result = await this.loadPreAggregationWithKeys();
       const refreshKeyValues = await this.getInvalidationKeyValues();
       return {

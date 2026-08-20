@@ -1,6 +1,7 @@
 /* globals jest, describe, beforeEach, afterEach, test, expect */
 import { Readable } from 'stream';
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
+import { QueryCache } from '../../src/orchestrator/QueryCache';
 
 class MockDriver {
   constructor({ csvImport, schemaData } = {}) {
@@ -839,17 +840,17 @@ describe('QueryOrchestrator', () => {
     await queryOrchestrator.fetchQuery(query);
     expect(
       queryOrchestrator.queryCache.memoryCache.has(
-        queryOrchestrator.queryCache.queryRedisKey(query.cacheKeyQueries.queries[0].slice(0, 2))
+        queryOrchestrator.queryCache.queryRedisKey(QueryCache.refreshKeyIdentity(query.cacheKeyQueries.queries[0]))
       )
     ).toBe(true);
     expect(
       queryOrchestrator.queryCache.memoryCache.has(
-        queryOrchestrator.queryCache.queryRedisKey(query.cacheKeyQueries.queries[1].slice(0, 2))
+        queryOrchestrator.queryCache.queryRedisKey(QueryCache.refreshKeyIdentity(query.cacheKeyQueries.queries[1]))
       )
     ).toBe(false);
     expect(
       queryOrchestrator.queryCache.memoryCache.has(
-        queryOrchestrator.queryCache.queryRedisKey(query.preAggregations[0].invalidateKeyQueries[0].slice(0, 2))
+        queryOrchestrator.queryCache.queryRedisKey(QueryCache.refreshKeyIdentity(query.preAggregations[0].invalidateKeyQueries[0]))
       )
     ).toBe(true);
   });
@@ -1517,6 +1518,7 @@ describe('QueryOrchestrator', () => {
         queryKey: [
           'SELECT refreshKey in source database',
           [],
+          false,
         ],
         query: 'SELECT refreshKey in source database',
         values: [],
@@ -1534,6 +1536,7 @@ describe('QueryOrchestrator', () => {
         queryKey: [
           'SELECT refreshKey in external database',
           [],
+          true,
         ],
         query: 'SELECT refreshKey in external database',
         values: [],

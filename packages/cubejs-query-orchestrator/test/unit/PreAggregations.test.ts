@@ -176,6 +176,8 @@ describe('PreAggregations', () => {
           executionTimeout: 1,
           concurrency: 2,
         }),
+        // Lazily used: only a query carrying `external: true` reaches the external queue.
+        externalDriverFactory: mockExternalDriverFactory as any,
       },
     );
 
@@ -309,6 +311,126 @@ describe('PreAggregations', () => {
           'job-token',
         )
       ).resolves.toEqual([true, 'done']);
+    });
+  });
+
+  describe('refresh key memoization', () => {
+    let preAggregations: PreAggregations;
+
+    const preAggregation = {
+      preAggregationsSchema: 'stb_pre_aggregations',
+      tableName: 'stb_pre_aggregations.orders_memo',
+      dataSource: 'default',
+      external: false,
+      loadSql: ['CREATE TABLE stb_pre_aggregations.orders_memo AS SELECT 1', []],
+      invalidateKeyQueries: [defaultCacheKeyQuery],
+    };
+
+    const createLoadCache = () => new PreAggregationLoadCache(
+      mockDriverFactory as any,
+      queryCache!,
+      preAggregations,
+      { dataSource: 'default' },
+    );
+
+    const createPreAggLoader = (loadCache: PreAggregationLoadCache, options: Record<string, any> = {}) => new PreAggregationLoader(
+      mockDriverFactory as any,
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      () => {},
+      queryCache!,
+      preAggregations,
+      preAggregation,
+      [],
+      loadCache,
+      { requestId: 'refresh-key-memo', ...options },
+    );
+
+    beforeEach(() => {
+      preAggregations = new PreAggregations(
+        'TEST',
+        mockDriverFactory as any,
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
+        queryCache!,
+        {
+          queueOptions: async () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
+        },
+      );
+    });
+
+    test('refresh key identity covers sql, params and engine, but not policy', async () => {
+      const loadCache = createLoadCache();
+      const [sql] = defaultCacheKeyQuery;
+
+      expect(loadCache.hasKeyQueryResult(defaultCacheKeyQuery)).toBe(false);
+      await loadCache.keyQueryResult(defaultCacheKeyQuery, false, 10);
+
+      expect(loadCache.hasKeyQueryResult(defaultCacheKeyQuery)).toBe(true);
+      // Policy is not identity: callers legitimately hold differing options objects, because
+      // replacePartitionSqlAndParams rebuilds that element on every call with a clock-dependent
+      // renewalThreshold for incremental keys.
+      expect(loadCache.hasKeyQueryResult([sql, [], { renewalThreshold: 1, external: false }])).toBe(true);
+      // An absent `external` means the same thing as `external: false` and has to collapse to it.
+      expect(loadCache.hasKeyQueryResult(defaultCacheKeyQuery.slice(0, 2) as any)).toBe(true);
+      expect(loadCache.hasKeyQueryResult([sql, [], { renewalThreshold: 1 }])).toBe(true);
+      // The engine does change identity — same SQL run against Cube Store is a different query.
+      expect(loadCache.hasKeyQueryResult([sql, [], { external: true }])).toBe(false);
+      expect(loadCache.hasKeyQueryResult(['SELECT NOW() as unrelated', [], {}])).toBe(false);
+    });
+
+    test('a refresh key resolved against each engine gets its own cache entry', async () => {
+      const [sql] = defaultCacheKeyQuery;
+      const loadCache = createLoadCache();
+
+      await loadCache.keyQueryResult([sql, [], { external: false }], false, 10);
+      await loadCache.keyQueryResult([sql, [], { external: true }], false, 10);
+
+      // Same SQL, different engine: conflating them would serve one engine's result for the other.
+      expect(mockDriver!.executedQueries.filter(q => q === sql).length).toEqual(1);
+      expect(mockExternalDriver!.executedQueries.filter(q => q === sql).length).toEqual(1);
+    });
+
+    test('both refresh key paths store the same renewal key', async () => {
+      const cacheKey = queryCache!.refreshKeyCacheKey(defaultCacheKeyQuery);
+      const storedRenewalKey = async () => (await queryCache!.getCacheDriver().get(cacheKey)).renewalKey;
+
+      await queryCache!.loadRefreshKey(defaultCacheKeyQuery, 3600, { dataSource: 'default', requestId: 'loadRefreshKey' });
+      const throughLoadRefreshKey = await storedRenewalKey();
+
+      // Each path has to write the entry itself, otherwise the second one just reads what the
+      // first stored and any disagreement stays invisible.
+      (queryCache!.getCacheDriver() as LocalCacheDriver).reset();
+      await createLoadCache().keyQueryResult(defaultCacheKeyQuery, false, 10);
+      const throughKeyQueryResult = await storedRenewalKey();
+
+      // A cube level cacheKeyQuery and a pre-aggregation invalidateKeyQuery can be the same SQL and
+      // then share this entry. Differing renewal keys make each path look stale to the other, so
+      // they re-fetch on every touch.
+      expect(throughLoadRefreshKey).toEqual(throughKeyQueryResult);
+    });
+
+    test('warm invalidation keys are confirmed synchronously', async () => {
+      const loadCache = createLoadCache();
+      await loadCache.keyQueryResult(defaultCacheKeyQuery, false, 10);
+
+      const result = await createPreAggLoader(loadCache, { waitForRenew: false }).loadPreAggregation(true);
+
+      // A populated refreshKeyValues is the marker of the inline path; the deferred one reports [].
+      expect(result!.refreshKeyValues.length).toEqual(1);
+    });
+
+    test('warm invalidation keys do not let externalRefresh build a pre-aggregation', async () => {
+      const loadCache = createLoadCache();
+      await loadCache.keyQueryResult(defaultCacheKeyQuery, false, 10);
+
+      // externalRefresh owns the "partition is not built yet" handling, so it must stay on the
+      // deferred path even when nothing has to be queried to confirm the refresh keys.
+      await expect(createPreAggLoader(loadCache, { externalRefresh: true }).loadPreAggregation(true))
+        .rejects.toThrowError(/No pre-aggregation partitions were built yet/);
+      expect(mockDriver!.tables).toEqual([]);
     });
   });
 
