@@ -192,9 +192,17 @@ export class PreAggregationLoadCache {
 
   public async keyQueryResult(sqlQuery: QueryWithParams, waitForRenew: boolean, priority: number) {
     const [query, values, queryOptions]: QueryWithParams = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery, [], {}];
+    const redisKey = this.queryCache.queryRedisKey([query, values]);
 
-    if (!this.queryResults[this.queryCache.queryRedisKey([query, values])]) {
-      this.queryResults[this.queryCache.queryRedisKey([query, values])] = await this.queryCache.cacheQueryResult(
+    if (!this.queryResults[redisKey]) {
+      // A locally evaluated key needs no cache driver or queue, but it must still go
+      // through this per-request memo. One load reads the invalidation keys several
+      // times (contentVersion, the returned refreshKeyValues, the refresh queue key);
+      // re-reading the clock could straddle an interval boundary and have the load
+      // look a table up under one content version and enqueue it under another.
+      const local = this.queryCache.localRefreshKeyResult(queryOptions);
+
+      this.queryResults[redisKey] = local ?? await this.queryCache.cacheQueryResult(
         query,
         values,
         [query, values],
@@ -212,9 +220,15 @@ export class PreAggregationLoadCache {
         }
       );
     }
-    return this.queryResults[this.queryCache.queryRedisKey([query, values])];
+    return this.queryResults[redisKey];
   }
 
+  // TODO hashes the whole [query, values, options] tuple, while keyQueryResult stores
+  // under [query, values]. Every compiler-produced invalidateKeyQueries entry carries an
+  // options object, so this always returns false, which pins PreAggregationLoader to the
+  // background-refresh branch whenever waitForRenew is false. Aligning the keys would
+  // change sync-vs-background refresh semantics for every pre-aggregation, so it needs to
+  // land on its own rather than riding along with an unrelated change.
   public hasKeyQueryResult(keyQuery) {
     return !!this.queryResults[this.queryCache.queryRedisKey(keyQuery)];
   }
