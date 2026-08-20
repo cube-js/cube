@@ -5,7 +5,7 @@ use anyhow::{anyhow, bail, Result};
 use reqwest::{Method, StatusCode};
 use serde_json::Value;
 
-use crate::error::api_bail;
+use crate::error::{api_bail, api_error};
 use crate::oauth;
 use crate::util;
 
@@ -88,8 +88,10 @@ fn is_not_found(err: &anyhow::Error) -> bool {
 /// function never sees the inside of: a wait closure that has decided something is
 /// wrong — an unknown sync id, a branch nothing is building — raises a plain error,
 /// and treating THAT as transient would retry a settled verdict until the timeout.
-/// Note one failure this cannot see: a 200 whose body isn't JSON is an untyped error
-/// from `finish_response`, treated as permanent on purpose — see the comment there.
+/// Note one failure this cannot see: a 200 whose body isn't JSON is an
+/// `error::ApiError` from `finish_response` — typed, so the update hint finds it, but
+/// not one of the two types below, so it stays permanent on purpose. The comment there
+/// carries the reason.
 pub fn is_transient(err: &anyhow::Error) -> bool {
     if let Some(api) = err.downcast_ref::<ApiError>() {
         return api.status.is_server_error()
@@ -447,20 +449,25 @@ impl Client {
                  running an older version)"
             );
         }
-        // Deliberately NOT one of the typed errors `is_transient` inspects: a body that
-        // arrived in full and still isn't JSON is a server that answers this route with
-        // something else (a gateway page, a plain-text error), which retrying cannot
-        // fix. Bodies lost mid-transfer surface as `TransportError` from `res.text()`
-        // instead, and those ARE retried.
+        // An `error::ApiError`, so the update hint finds it: a route answering 200 with
+        // something that isn't JSON is the same signal as the HTML arm above, whose
+        // message already offers that very hypothesis.
+        //
+        // Deliberately NOT one of the typed errors `is_transient` inspects, though —
+        // that one downcasts `ApiError` and `TransportError` from THIS module, so this
+        // stays permanent, which is right: a body that arrived in full and still isn't
+        // JSON is a server that answers this route with something else (a gateway page,
+        // a plain-text error), which retrying cannot fix. Bodies lost mid-transfer
+        // surface as `TransportError` from `res.text()` instead, and those ARE retried.
         serde_json::from_str(&text).map_err(|e| {
-            anyhow!(
+            api_error(format!(
                 // The same rule as `failure_detail`, which this predated: `replace('\n',
                 // …)` collapses newlines only, so an indented gateway page kept its
                 // indentation runs, and a hand-rolled `take` cut without saying it had.
                 // Same producer as the 502 case, on a status the branch above lets by.
                 "{method} {path} returned a body that is not JSON ({e}): {}",
                 util::one_line(&text, util::REASON_LIMIT)
-            )
+            ))
         })
     }
 
@@ -588,6 +595,17 @@ mod tests {
     fn web_app_html_instead_of_json_is_an_api_error() {
         let err = finish(StatusCode::OK, "<!doctype html><html></html>").unwrap_err();
         assert!(is_api_error(&err));
+    }
+
+    #[test]
+    fn a_body_that_is_not_json_is_an_api_error_too() {
+        // The HTML arm's signal in different clothes: a route answering 200 with
+        // a plain-text error is one this CLI cannot speak to, which is exactly
+        // the hypothesis the hint offers. Permanence stays separate — being an
+        // API error must not make it retryable.
+        let err = finish(StatusCode::OK, "Bad gateway").unwrap_err();
+        assert!(is_api_error(&err));
+        assert!(!is_transient(&err), "retrying cannot fix a non-JSON route");
     }
 
     #[test]
