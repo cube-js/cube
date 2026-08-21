@@ -384,6 +384,24 @@ describe('PostgresQuery', () => {
     expect(sql).toMatch(/WHERE/i);
   });
 
+  it('pushes down rowLimit: 0 as LIMIT 0', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.count'
+      ],
+      dimensions: [
+        'visitors.name'
+      ],
+      timezone: 'UTC',
+      rowLimit: 0,
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    expect(queryAndParams[0]).toContain('LIMIT 0');
+  });
+
   it('uses AS keyword in subquery aliases (regression test)', async () => {
     await compiler.compile();
 

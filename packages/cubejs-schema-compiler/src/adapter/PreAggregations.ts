@@ -1624,8 +1624,10 @@ export class PreAggregations {
 
     return this.query.evaluateSymbolSqlWithContext(
       () => {
+        // zeroRowLimitTopClause() is empty for every dialect that can express a zero row
+        // limit as a trailing clause; T-SQL can not, and this statement has no topLimit()
         // eslint-disable-next-line prefer-template
-        const query = `SELECT ${this.query.selectAllDimensionsAndMeasures(measures)} FROM ${from} ${this.query.baseWhere(replacedFilters)}` +
+        const query = `SELECT${this.query.zeroRowLimitTopClause()} ${this.query.selectAllDimensionsAndMeasures(measures)} FROM ${from} ${this.query.baseWhere(replacedFilters)}` +
           this.query.groupByClause();
         return isFullSimpleQuery ?
           this.query.baseHaving(query, this.query.measureFilters) +

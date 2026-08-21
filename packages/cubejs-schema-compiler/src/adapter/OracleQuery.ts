@@ -36,7 +36,11 @@ export class OracleQuery extends BaseQuery {
    * TODO replace with limitOffsetClause override
    */
   public groupByDimensionLimit() {
-    const limitClause = this.rowLimit === null ? '' : ` FETCH NEXT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000} ROWS ONLY`;
+    // `rowLimit: 0` is a valid limit that returns no rows, so it must not fall back to the
+    // default below the way a truthy check would. Same null policy as MssqlQuery#topLimit:
+    // an explicit `rowLimit: null` means "no limit", an absent one keeps the 10000 default
+    const rowLimit = this.parsedRowLimit() ?? 10000;
+    const limitClause = this.rowLimit === null ? '' : ` FETCH NEXT ${rowLimit} ROWS ONLY`;
     const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)} ROWS` : '';
     return `${offsetClause}${limitClause}`;
   }
