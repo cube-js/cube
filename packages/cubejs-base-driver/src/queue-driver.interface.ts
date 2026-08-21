@@ -35,9 +35,7 @@ export type AddToQueueResponse = [
   queueId: QueueId | null,
   queueSize: number,
   addedToQueueTime: number,
-  // `null` when the item was not claimed - the concurrency budget was full, the item is
-  // already active, or the driver does not claim on insert at all. A claim is an ownership
-  // transfer: the caller owns an active item and must execute and acknowledge it, otherwise
+  // `null` when the item was not claimed
   // the query stalls until the stalled/orphaned reclaim picks it up.
   claim: RetrieveForProcessingSuccess | null,
 ];
