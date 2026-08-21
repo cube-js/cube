@@ -73,6 +73,8 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
   private concurrency: number;
 
+  private orphanedTimeout: number;
+
   private driver: LocalQueueDriver;
 
   private state: LocalQueueDriverConnectionState;
@@ -82,6 +84,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     this.continueWaitTimeout = options.continueWaitTimeout;
     this.heartBeatTimeout = options.heartBeatTimeout;
     this.concurrency = options.concurrency;
+    this.orphanedTimeout = options.orphanedTimeout;
     this.driver = driver;
     this.state = state;
   }
@@ -162,7 +165,8 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     )(queueObj);
   }
 
-  public async addToQueue(keyScore: number, queryKey: QueryKey, orphanedTime: number, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse> {
+  public async addToQueue(queryKey: QueryKey, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse> {
+    const time = new Date().getTime();
     const queryQueueObj: QueryDefObject = {
       queueId: options.queueId,
       queryHandler,
@@ -171,7 +175,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
       stageQueryKey: options.stageQueryKey,
       priority,
       requestId: options.requestId,
-      addedToQueueTime: new Date().getTime()
+      addedToQueueTime: time
     };
 
     const key = this.redisHash(queryKey);
@@ -184,7 +188,8 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
     if (!this.state.toProcess[key] && !this.state.active[key]) {
       this.state.toProcess[key] = {
-        order: keyScore,
+        // Highest priority first, oldest first within a priority
+        order: time + (10000 - priority) * 1E14,
         queueId: options.queueId,
         key
       };
@@ -193,7 +198,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     }
 
     this.state.recent[key] = {
-      order: orphanedTime,
+      order: time + ((options.orphanedTimeout ?? this.orphanedTimeout) * 1000),
       key,
       queueId: options.queueId,
     };
@@ -209,9 +214,9 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
   /**
    * There is no round-trip to save in memory, the item is always left for reconcile to pick up.
    */
-  public async addAndRetrieve(keyScore: number, queryKey: QueryKey, orphanedTime: number, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddAndRetrieveResponse> {
+  public async addAndRetrieve(queryKey: QueryKey, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddAndRetrieveResponse> {
     const [added, queueId, queueSize, addedToQueueTime] = await this.addToQueue(
-      keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
+      queryKey, queryHandler, query, priority, options
     );
 
     return [added, queueId, queueSize, addedToQueueTime, null];

@@ -267,28 +267,11 @@ export class QueryQueue {
         if (jobExists) return null;
       }
 
-      const time = new Date().getTime();
-      const keyScore = time + (10000 - priority) * 1E14;
-
       options.orphanedTimeout = query.orphanedTimeout;
 
-      const orphanedTimeout = 'orphanedTimeout' in query ? query.orphanedTimeout : this.orphanedTimeout;
-      const orphanedTime = time + (orphanedTimeout * 1000);
-
-      const addArgs = [keyScore, queryKey, orphanedTime, queryHandler, query, priority, options] as const;
-
-      let added: number;
-      let queueId: QueueId | null;
-      let queueSize: number;
-      let addedToQueueTime: number;
-      let claim: RetrieveForProcessingSuccess | null = null;
-
-      // The env is read per call on purpose, a queue outlives changes of it
-      if (getEnv('queueFastTrack')) {
-        [added, queueId, queueSize, addedToQueueTime, claim] = await queueConnection.addAndRetrieve(...addArgs);
-      } else {
-        [added, queueId, queueSize, addedToQueueTime] = await queueConnection.addToQueue(...addArgs);
-      }
+      const [added, queueId, queueSize, addedToQueueTime, claim] = await queueConnection.addAndRetrieve(
+        queryKey, queryHandler, query, priority, options
+      );
 
       if (added > 0) {
         waitingContext = {
@@ -326,7 +309,7 @@ export class QueryQueue {
       }
 
       if (claim) {
-        // The item is active and owned by us already, there is nothing for reconcile to pick up
+        // The item is active already, there is nothing for reconcile to pick up
         await this.sendProcessMessageFn(this.claimedQuery(queryKeyHash, queueId, claim));
       } else {
         await this.reconcileQueue();
@@ -391,8 +374,7 @@ export class QueryQueue {
    */
   protected claimedQuery(queryKeyHash: QueryKeyHash, queueId: QueueId | null, claim: RetrieveForProcessingSuccess): ClaimedQuery {
     const [, claimQueueId, , queueSize, query] = claim;
-    // A driver which claims an item reports the id of it, which is what identifies the
-    // processing lock for every command downstream
+    // The id identifies the processing lock for every command downstream
     const claimedQueueId = claimQueueId ?? queueId;
 
     if (claimedQueueId === null) {
@@ -409,9 +391,7 @@ export class QueryQueue {
   }
 
   /**
-   * Subscribes to the stream of the specified query, the returned promise resolves with the
-   * stream or with `null` on a timeout. `dispose` releases the listener and the timer, it's
-   * a no-op once the promise has been resolved.
+   * `dispose` releases the listener and the timer, it's a no-op once the promise resolved.
    */
   protected waitForQueryStream(queryKeyHash: QueryKeyHash): QueryStreamWait {
     let timeoutTimerId: ReturnType<typeof setTimeout> | null = null;

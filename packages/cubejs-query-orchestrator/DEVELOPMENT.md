@@ -346,12 +346,12 @@ budget is exhausted, which is exactly when the condition should stop firing.
 
 ### Enabling it
 
-`CUBEJS_QUEUE_FAST_TRACK=true` makes `QueryQueue` call `addAndRetrieve` instead of
-`addToQueue`, it is off by default. Claiming is up to the driver from there: the Cube Store
-one negotiates the `queueAddAndRetrieve` capability the same way `queueExclusive` and
-`queueExternalId` are negotiated and falls back to `QUEUE ADD`, and the memory one never
-claims at all. Either way an unclaimed response carries a `null` claim and the caller
-continues through reconcile with nothing lost.
+`QueryQueue` always calls `addAndRetrieve` and whether anything is claimed is up to the
+driver. The Cube Store one claims when `CUBEJS_QUEUE_FAST_TRACK=true` (off by default) and
+the `queueAddAndRetrieve` capability negotiates the same way `queueExclusive` and
+`queueExternalId` do, otherwise it falls back to `QUEUE ADD`. The memory one never claims.
+Either way an unclaimed response carries a `null` claim and the caller continues through
+reconcile with nothing lost.
 
 A claim is an ownership transfer: from the moment `addAndRetrieve` returns one, the calling
 process owns an active queue item and **must** execute and acknowledge it. `executeInQueue`

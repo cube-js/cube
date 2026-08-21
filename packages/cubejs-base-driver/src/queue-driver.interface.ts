@@ -75,23 +75,19 @@ export interface QueueDriverConnectionInterface {
    * Adds specified by the queryKey query to the queue, returns tuple
    * with the operation result.
    *
-   * @param keyScore Redis specific thing
    * @param queryKey
-   * @param orphanedTime
    * @param queryHandler Our queue allows using different handlers. For example, query, cvsQuery, etc.
    * @param query
    * @param priority
    * @param options
    */
-  addToQueue(keyScore: number, queryKey: QueryKey, orphanedTime: number, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse>;
+  addToQueue(queryKey: QueryKey, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse>;
   /**
    * Same as {@link addToQueue}, but the driver also tries to claim the item for processing
    * in the same operation, which saves the caller a retrieval round-trip. A driver which
    * cannot claim returns a `null` claim and the caller falls back to the normal flow.
-   *
-   * @see AddAndRetrieveResponse for what owning a claim means.
    */
-  addAndRetrieve(keyScore: number, queryKey: QueryKey, orphanedTime: number, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddAndRetrieveResponse>;
+  addAndRetrieve(queryKey: QueryKey, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddAndRetrieveResponse>;
   // Return query keys which was sorted by priority and time
   getToProcessQueries(): Promise<QueryKeysTuple[]>;
   getActiveQueries(): Promise<QueryKeysTuple[]>;

@@ -296,12 +296,11 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       try {
         const priority = 10;
         const time = new Date().getTime();
-        const keyScore = time + (10000 - priority) * 1E14;
 
         expect(await connection.getOrphanedQueries()).toEqual([]);
 
         let orphanedTimeout = 2;
-        await connection.addToQueue(keyScore, ['1', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
+        await connection.addToQueue(['1', []], 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
           queueId: 1,
           stageQueryKey: '1',
           requestId: '1',
@@ -312,7 +311,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
         orphanedTimeout = 60;
 
-        await connection.addToQueue(keyScore, ['2', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
+        await connection.addToQueue(['2', []], 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
           queueId: 2,
           stageQueryKey: '2',
           requestId: '2',
@@ -408,21 +407,16 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       const query: QueryKey = ['select * from add_and_retrieve', []];
 
       try {
-        const priority = 10;
-        const time = new Date().getTime();
         const [added, , , , claim] = await connection.addAndRetrieve(
-          time + (10000 - priority) * 1E14,
           query,
-          time + 2000,
           'delay',
           { isJob: true, orphanedTimeout: undefined },
-          priority,
+          10,
           { queueId: 1, stageQueryKey: '1', requestId: '1' }
         );
 
         expect(added).toBe(1);
         expect(claim).toBeNull();
-        // Nothing was claimed, so the item is left for reconcile to pick up
         expect(await connection.getToProcessQueries()).toStrictEqual([
           [connection.redisHash(query), expect.any(Number)]
         ]);
@@ -437,17 +431,15 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       const connection: any = await queue.queueDriver.createConnection();
       const connection2: any = await queue.queueDriver.createConnection();
       const priority = 10;
-      const time = new Date().getTime();
-      const keyScore = time + (10000 - priority) * 1E14;
 
       await queue.reconcileQueue();
 
       await connection.addToQueue(
-        keyScore, 'race', time, 'handler', ['select'], priority, { stageQueryKey: 'race' }
+        'race', 'handler', ['select'], priority, { stageQueryKey: 'race' }
       );
 
       await connection.addToQueue(
-        keyScore + 100, 'race2', time + 100, 'handler2', ['select2'], priority, { stageQueryKey: 'race2' }
+        'race2', 'handler2', ['select2'], priority, { stageQueryKey: 'race2' }
       );
 
       const processingId1 = await connection.getNextProcessingId();
@@ -474,17 +466,15 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       const connection = await queue.queueDriver.createConnection();
       const connection2 = await queue.queueDriver.createConnection();
       const priority = 10;
-      const time = new Date().getTime();
-      const keyScore = time + (10000 - priority) * 1E14;
 
       await queue.reconcileQueue();
 
       await connection.addToQueue(
-        keyScore, 'activated1', time, 'handler', <any>['select'], priority, { stageQueryKey: 'race', requestId: '1' }
+        'activated1', 'handler', <any>['select'], priority, { stageQueryKey: 'race', requestId: '1' }
       );
 
       await connection.addToQueue(
-        keyScore + 100, 'activated2', time + 100, 'handler2', <any>['select2'], priority, { stageQueryKey: 'race2', requestId: '1' }
+        'activated2', 'handler2', <any>['select2'], priority, { stageQueryKey: 'race2', requestId: '1' }
       );
 
       const processingId1 = await connection.getNextProcessingId();
@@ -647,8 +637,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
           expect(result).toBe('select * from fast_track bar');
           expect(driverQuery.mock.calls.some(([sql]) => sql.startsWith('QUEUE ADD_AND_RETRIEVE'))).toBe(true);
-          // The claim came with the response of QUEUE ADD_AND_RETRIEVE, so there was
-          // nothing left to retrieve
+          // The claim came with the insert, there was nothing left to retrieve
           expect(retrieveForProcessing).not.toHaveBeenCalled();
           // The claim carries the processing identity, the acknowledgement must be accepted
           expect(logger.mock.calls.map(([message]) => message)).not.toContain('Orphaned execution result');
@@ -672,20 +661,13 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         const connection = await queue.queueDriver.createConnection();
         const first: QueryKey = ['select * from budget_1', []];
         const second: QueryKey = ['select * from budget_2', []];
-        const addAndRetrieve = (queryKey: QueryKey, queueId: number) => {
-          const priority = 10;
-          const time = new Date().getTime();
-
-          return connection.addAndRetrieve(
-            time + (10000 - priority) * 1E14,
-            queryKey,
-            time + 2000,
-            'delay',
-            { isJob: true, orphanedTimeout: undefined },
-            priority,
-            { queueId, stageQueryKey: `${queueId}`, requestId: `${queueId}` }
-          );
-        };
+        const addAndRetrieve = (queryKey: QueryKey, queueId: number) => connection.addAndRetrieve(
+          queryKey,
+          'delay',
+          { isJob: true, orphanedTimeout: undefined },
+          10,
+          { queueId, stageQueryKey: `${queueId}`, requestId: `${queueId}` }
+        );
 
         try {
           // concurrency is 1, the first query takes the only slot
