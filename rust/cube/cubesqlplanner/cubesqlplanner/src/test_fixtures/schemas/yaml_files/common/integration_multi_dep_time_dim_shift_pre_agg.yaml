@@ -12,6 +12,9 @@ cubes:
           - name: recorded_at
             type: time
             sql: recorded_at
+          - name: batch_at
+            type: time
+            sql: batch_at
 
           # Time dimension built from two owned time dimensions. The shift
           # below covers only one of them, so the stored rollup column
@@ -19,6 +22,12 @@ cubes:
           - name: effective_at
             type: time
             sql: "COALESCE({CUBE.happened_at}, {CUBE.recorded_at})"
+      segments:
+          # Built from the partially shifted dimension, so a stored copy of it
+          # is computed from unshifted values just like a stored dimension.
+          - name: recent_effective
+            sql: "{CUBE.effective_at} >= '2024-02-01'"
+
       measures:
           - name: total
             type: sum
@@ -34,6 +43,27 @@ cubes:
                   timeDimension: mdd_events.happened_at
 
       pre_aggregations:
+          # Stores the partially shifted dimension under `dimensions:` rather
+          # than as its time dimension, so it is substituted by column just the
+          # same while the time dimension itself is unshifted.
+          - name: total_by_batch_month_with_effective
+            type: rollup
+            measures:
+                - total
+            dimensions:
+                - effective_at
+            time_dimension: mdd_events.batch_at
+            granularity: month
+
+          - name: total_by_batch_month_with_segment
+            type: rollup
+            measures:
+                - total
+            segments:
+                - recent_effective
+            time_dimension: mdd_events.batch_at
+            granularity: month
+
           - name: total_by_effective_month
             type: rollup
             measures:

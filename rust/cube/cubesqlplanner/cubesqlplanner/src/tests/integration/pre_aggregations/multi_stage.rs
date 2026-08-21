@@ -438,3 +438,81 @@ async fn test_multi_stage_time_shift_pre_agg_on_partially_shifted_time_dimension
         insta::assert_snapshot!(result);
     }
 }
+
+// Same partially shifted dimension, but stored under the rollup's `dimensions:`
+// while its time dimension carries no shift. A stored dimension is substituted
+// by column exactly like a stored time dimension, so reading it unshifted is
+// just as wrong and the rollup must be rejected here too.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_time_shift_pre_agg_on_partially_shifted_stored_dimension() {
+    let schema = MockSchema::from_yaml_file(MULTI_DEP_YAML)
+        .only_pre_aggregations(&["total_by_batch_month_with_effective"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {r#"
+        measures:
+          - mdd_events.total
+          - mdd_events.total_prev_month
+        dimensions:
+          - mdd_events.effective_at
+        time_dimensions:
+          - dimension: mdd_events.batch_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: mdd_events.batch_at
+          - id: mdd_events.effective_at
+    "#};
+
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    assert!(
+        pre_aggrs.is_empty(),
+        "Rollup stores the partially shifted dimension as a column, so it cannot serve the shifted leaf; got {:?}",
+        pre_aggrs.iter().map(|u| u.name().clone()).collect_vec()
+    );
+
+    // Base SQL keeps the row with no happened_at where it is while shifting
+    // the rest, which is what no offset of a stored column can reproduce.
+    if let Some(result) = ctx.try_execute(query, MULTI_DEP_SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// The partially shifted dimension reaches the rollup through a segment this
+// time. A stored segment is substituted by column as well, so the same
+// rejection applies.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_time_shift_pre_agg_on_partially_shifted_stored_segment() {
+    let schema = MockSchema::from_yaml_file(MULTI_DEP_YAML)
+        .only_pre_aggregations(&["total_by_batch_month_with_segment"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {r#"
+        measures:
+          - mdd_events.total
+          - mdd_events.total_prev_month
+        segments:
+          - mdd_events.recent_effective
+        time_dimensions:
+          - dimension: mdd_events.batch_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: mdd_events.batch_at
+    "#};
+
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    assert!(
+        pre_aggrs.is_empty(),
+        "Rollup stores a segment built from the partially shifted dimension; got {:?}",
+        pre_aggrs.iter().map(|u| u.name().clone()).collect_vec()
+    );
+
+    if let Some(result) = ctx.try_execute(query, MULTI_DEP_SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
