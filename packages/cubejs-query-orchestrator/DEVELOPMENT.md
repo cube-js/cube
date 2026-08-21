@@ -343,19 +343,3 @@ the fast track steps aside and lets reconcile pick by priority. Note that a clai
 goes straight to active and never becomes pending, so a burst onto an idle queue still
 fast-tracks every query — items only start accumulating in pending once the concurrency
 budget is exhausted, which is exactly when the condition should stop firing.
-
-### Enabling it
-
-There is one `addToQueue` and whether anything is claimed is up to the driver. The Cube
-Store one claims when `CUBEJS_QUEUE_FAST_TRACK=true` (off by default) and the
-`queueAddAndRetrieve` capability negotiates the same way `queueExclusive` and
-`queueExternalId` do — that is what picks `QUEUE ADD_AND_RETRIEVE` over `QUEUE ADD`. The
-memory one never claims. Either way an unclaimed response carries a `null` claim and the
-caller continues through reconcile with nothing lost.
-
-A claim is an ownership transfer: from the moment `addToQueue` returns one, the calling
-process owns an active queue item and **must** execute and acknowledge it. `executeInQueue`
-turns it into the same `ClaimedQuery` that `claimQueryForProcessing` produces and hands it
-to `sendProcessMessageFn`, so a custom implementation needs no changes — but a receiver
-which drops the hand-off leaves the item active with nobody running it, and the query
-stalls until `TO_CANCEL` reclaims it. That is why the flag is opt-in.
