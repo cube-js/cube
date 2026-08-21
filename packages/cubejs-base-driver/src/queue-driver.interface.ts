@@ -10,7 +10,6 @@ export type QueryKeyHash = string & { __type: 'QueryKeyHash' };
 
 export type QueryKeysTuple = [keyHash: QueryKeyHash, queueId: QueueId | null /** Supported by new Cube Store and Memory */];
 export type GetActiveAndToProcessResponse = [active: QueryKeysTuple[], toProcess: QueryKeysTuple[]];
-export type AddToQueueResponse = [added: number, queueId: QueueId | null, queueSize: number, addedToQueueTime: number];
 export type QueryStageStateResponse = [active: string[], toProcess: string[]] | [active: string[], toProcess: string[], defs: Record<string, QueryDef>];
 export type RetrieveForProcessingSuccess = [
   added: unknown,
@@ -31,6 +30,15 @@ export type RetrieveForProcessingFail = [
   lockAquired: false
 ];
 export type RetrieveForProcessingResponse = RetrieveForProcessingSuccess | RetrieveForProcessingFail | null;
+export type AddToQueueResponse = [
+  added: number,
+  queueId: QueueId | null,
+  queueSize: number,
+  addedToQueueTime: number,
+  // `null` when the item was not claimed
+  // the query stalls until the stalled/orphaned reclaim picks it up.
+  claim: RetrieveForProcessingSuccess | null,
+];
 
 export interface AddToQueueQuery {
   isJob: boolean,
@@ -62,17 +70,16 @@ export interface QueueDriverConnectionInterface {
   getResult(queryKey: QueryKey, externalId?: string): Promise<any>;
   /**
    * Adds specified by the queryKey query to the queue, returns tuple
-   * with the operation result.
+   * with the operation result. A driver may also claim the item for processing in the same
+   * operation, which saves the caller a retrieval round-trip.
    *
-   * @param keyScore Redis specific thing
    * @param queryKey
-   * @param orphanedTime
    * @param queryHandler Our queue allows using different handlers. For example, query, cvsQuery, etc.
    * @param query
    * @param priority
    * @param options
    */
-  addToQueue(keyScore: number, queryKey: QueryKey, orphanedTime: number, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse>;
+  addToQueue(queryKey: QueryKey, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse>;
   // Return query keys which was sorted by priority and time
   getToProcessQueries(): Promise<QueryKeysTuple[]>;
   getActiveQueries(): Promise<QueryKeysTuple[]>;

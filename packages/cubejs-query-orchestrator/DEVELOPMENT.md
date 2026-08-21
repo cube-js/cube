@@ -289,7 +289,7 @@ sequenceDiagram
     QueueDriver->>CubeStore: QUEUE ADD_AND_RETRIEVE PRIORITY ?n ?path ?payload ?concurrency
     Note over CubeStore: One atomic batch:<br/>insert, then claim if the prefix allows it
     CubeStore-->>QueueDriver: AddAndRetrieveResponse
-    QueueDriver-->>QueryQueue: [added, queueId, queueSize, addedToQueueTime, def?]
+    QueueDriver-->>QueryQueue: [added, queueId, queueSize, addedToQueueTime, claim]
 
     alt fast track: payload is not NULL, we own the item
         QueryQueue-)Background: sendProcessMessageFn(ClaimedQuery)
@@ -310,13 +310,26 @@ What the fast track saves per query, when the slot is free:
 | Step | Normal | Fast track |
 |---|---|---|
 | `QUEUE ADD` | 1 round-trip | folded into one command |
-| `QUEUE ACTIVE` + `QUEUE PENDING` (reconcile) | 2 round-trips | skipped |
+| `QUEUE TO_CANCEL` + `QUEUE LIST` (reconcile) | 2 round-trips | skipped |
 | `QUEUE RETRIEVE` | 1 round-trip | folded into one command |
+| `QUEUE LIST` (the `Waiting for query` event) | 1 round-trip | skipped, the claim carries the state |
 | Window for another node to steal the slot | between ADD and RETRIEVE | none |
 
 Everything after the claim is unchanged: `MERGE_EXTRA`, `HEARTBEAT`, `ACK` and
 `RESULT_BLOCKING` behave exactly as in the normal path, and a fast-tracked item is a
 regular active item — `TO_CANCEL` will reclaim it if the heartbeat stops.
+
+Two side effects are worth knowing about:
+
+- `QUEUE ADD` reports the queue depth *including* the item it just made pending, while a
+  claimed item never becomes pending, so the `queueSize` of the `Added to queue` and
+  `Waiting for query` log events drops by one on the fast track. The events carry
+  `fastTrack` so the two can be told apart.
+- `reconcileQueue` is the only caller of `QUEUE TO_CANCEL`, and the fast track skips it, so
+  orphaned and stalled items are no longer collected at submission time. They still are
+  after every completed query (`executeQuery` reconciles once it acknowledges the result),
+  and a submission only skips reconcile while the concurrency budget is free — which is
+  exactly when there is no budget to reclaim.
 
 Priority ordering is enforced by the *selection* step, not by the claim: `QUEUE PENDING`
 returns items highest priority first (oldest first within a priority) and reconcile takes
@@ -330,9 +343,3 @@ the fast track steps aside and lets reconcile pick by priority. Note that a clai
 goes straight to active and never becomes pending, so a burst onto an idle queue still
 fast-tracks every query — items only start accumulating in pending once the concurrency
 budget is exhausted, which is exactly when the condition should stop firing.
-
-> **Status:** the `QUEUE ADD_AND_RETRIEVE` command exists in Cube Store. The driver still
-> emits `QUEUE ADD`; wiring the fast track into `CubeStoreQueueDriver.addToQueue` needs a
-> capability gate (the same version negotiation as `queueExclusive` / `queueExternalId`).
-> The `QueryQueue` side is in place: `executeInQueue` can build a `ClaimedQuery` out of the
-> response and hand it to `sendProcessMessageFn` without going through reconcile.

@@ -8,7 +8,8 @@ import {
   QueryDef,
   QueryStageStateResponse,
   AddToQueueOptions,
-  ProcessingId
+  ProcessingId,
+  RetrieveForProcessingSuccess
 } from '@cubejs-backend/base-driver';
 import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 
@@ -37,6 +38,11 @@ export type SendCancelMessageFn = (query: QueryDef, queueId: QueueId | null) => 
 
 export type ExecuteInQueueOptions = Omit<AddToQueueOptions, 'queueId'> & {
   spanId?: string
+};
+
+export type QueryStreamWait = {
+  promise: Promise<QueryStream | null>,
+  dispose: () => void,
 };
 
 export type QueryQueueOptions = {
@@ -236,6 +242,7 @@ export class QueryQueue {
 
     const queueConnection = await this.queueDriver.createConnection();
     let waitingContext;
+    let streamWait: QueryStreamWait | null = null;
     try {
       if (priority == null) {
         priority = 0;
@@ -260,16 +267,10 @@ export class QueryQueue {
         if (jobExists) return null;
       }
 
-      const time = new Date().getTime();
-      const keyScore = time + (10000 - priority) * 1E14;
-
       options.orphanedTimeout = query.orphanedTimeout;
 
-      const orphanedTimeout = 'orphanedTimeout' in query ? query.orphanedTimeout : this.orphanedTimeout;
-      const orphanedTime = time + (orphanedTimeout * 1000);
-
-      const [added, queueId, queueSize, addedToQueueTime] = await queueConnection.addToQueue(
-        keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
+      const [added, queueId, queueSize, addedToQueueTime, claim] = await queueConnection.addToQueue(
+        queryKey, queryHandler, query, priority, options
       );
 
       if (added > 0) {
@@ -297,13 +298,25 @@ export class QueryQueue {
           preAggregation: query.preAggregation,
           addedToQueueTime,
           persistent: !!queryKey.persistent,
+          fastTrack: !!claim,
         });
       }
 
-      await this.reconcileQueue();
+      // Subscribing after the dispatch would lose the `streamStarted` event of a handler
+      // which starts fast
+      if (queryHandler === 'stream') {
+        streamWait = this.waitForQueryStream(queryKeyHash);
+      }
+
+      if (claim) {
+        // The item is active already, there is nothing for reconcile to pick up
+        await this.sendProcessMessageFn(this.claimedQuery(queryKeyHash, queueId, claim));
+      } else {
+        await this.reconcileQueue();
+      }
 
       if (!added) {
-        const queryDef = await queueConnection.getQueryDef(queryKeyHash, queueId);
+        const queryDef = claim ? claim[4] : await queueConnection.getQueryDef(queryKeyHash, queueId);
         if (queryDef) {
           waitingContext = {
             queueId,
@@ -316,7 +329,9 @@ export class QueryQueue {
         }
       }
 
-      const [active, toProcess] = await queueConnection.getQueryStageState(true);
+      // A claim carries the active keys of its prefix, and a claimed query is never pending,
+      // so it has no place in the queue to report
+      const [active, toProcess] = claim ? [claim[2], undefined] : await queueConnection.getQueryStageState(true);
 
       this.logger('Waiting for query', {
         ...waitingContext,
@@ -324,44 +339,12 @@ export class QueryQueue {
         activeQueryKeys: active,
         toProcessQueryKeys: toProcess,
         active: active.indexOf(queryKeyHash) !== -1,
-        queueIndex: toProcess.indexOf(queryKeyHash),
+        queueIndex: toProcess ? toProcess.indexOf(queryKeyHash) : -1,
+        fastTrack: !!claim,
       });
 
-      // Stream processing goes here under assumption there's no way of a stream close just after it was added to the `streams` map.
-      // Otherwise `streamStarted` event listener should go before the `reconcileQueue` call.
-      // TODO: Fix an issue with a fast execution of stream handler which caused by removal of QueryStream from streams,
-      // while EventListener doesnt start to listen for started stream event
-      if (queryHandler === 'stream') {
-        const self = this;
-        result = await new Promise((resolve) => {
-          let timeoutTimerId = null;
-
-          const onStreamStarted = (streamStartedHash) => {
-            if (streamStartedHash === queryKeyHash) {
-              if (timeoutTimerId) {
-                clearTimeout(timeoutTimerId);
-              }
-
-              resolve(self.getQueryStream(queryKeyHash));
-            }
-          };
-
-          self.streamEvents.addListener('streamStarted', onStreamStarted);
-
-          const stream = this.getQueryStream(queryKeyHash);
-          if (stream) {
-            self.streamEvents.removeListener('streamStarted', onStreamStarted);
-            resolve(stream);
-          } else {
-            timeoutTimerId = setTimeout(
-              () => {
-                self.streamEvents.removeListener('streamStarted', onStreamStarted);
-                resolve(null);
-              },
-              this.continueWaitTimeout * 10000
-            );
-          }
-        });
+      if (streamWait) {
+        result = await streamWait.promise;
       } else {
         // Result here won't be fetched for a jobed build query (initialized by
         // the /cubejs-system/v1/pre-aggregations/jobs endpoint).
@@ -380,8 +363,81 @@ export class QueryQueue {
       }
       throw error;
     } finally {
+      streamWait?.dispose();
       this.queueDriver.release(queueConnection);
     }
+  }
+
+  /**
+   * A claim from the queue driver is the same thing `claimQueryForProcessing` produces, it just
+   * came back with the insert instead of a separate retrieval.
+   */
+  protected claimedQuery(queryKeyHash: QueryKeyHash, queueId: QueueId | null, claim: RetrieveForProcessingSuccess): ClaimedQuery {
+    const [, claimQueueId, , queueSize, query] = claim;
+    // The id identifies the processing lock for every command downstream
+    const claimedQueueId = claimQueueId ?? queueId;
+
+    if (claimedQueueId === null) {
+      throw new Error('Queue driver claimed a query without reporting its queue id');
+    }
+
+    return {
+      queryKeyHash,
+      queueId: claimedQueueId,
+      processingId: claimedQueueId,
+      queueSize,
+      query,
+    };
+  }
+
+  /**
+   * `dispose` releases the listener and the timer, it's a no-op once the promise resolved.
+   */
+  protected waitForQueryStream(queryKeyHash: QueryKeyHash): QueryStreamWait {
+    let timeoutTimerId: ReturnType<typeof setTimeout> | null = null;
+    let onStreamStarted: ((streamStartedHash: QueryKeyHash) => void) | null = null;
+
+    const dispose = () => {
+      if (timeoutTimerId) {
+        clearTimeout(timeoutTimerId);
+        timeoutTimerId = null;
+      }
+
+      if (onStreamStarted) {
+        this.streamEvents.removeListener('streamStarted', onStreamStarted);
+        onStreamStarted = null;
+      }
+    };
+
+    const promise = new Promise<QueryStream | null>((resolve) => {
+      onStreamStarted = (streamStartedHash) => {
+        if (streamStartedHash === queryKeyHash) {
+          dispose();
+
+          resolve(this.getQueryStream(queryKeyHash) ?? null);
+        }
+      };
+
+      this.streamEvents.addListener('streamStarted', onStreamStarted);
+
+      const stream = this.getQueryStream(queryKeyHash);
+      if (stream) {
+        dispose();
+
+        resolve(stream);
+      } else {
+        timeoutTimerId = setTimeout(
+          () => {
+            dispose();
+
+            resolve(null);
+          },
+          this.continueWaitTimeout * 10000
+        );
+      }
+    });
+
+    return { promise, dispose };
   }
 
   /**
