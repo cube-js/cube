@@ -34,11 +34,11 @@ enum Cmd {
         /// Wait for the sync to finish, then print its result
         #[arg(long)]
         wait: bool,
-        /// Give up waiting after this long (30s, 15m, 1h)
-        #[arg(long, default_value = "30m", value_parser = util::parse_duration)]
+        /// Give up waiting for the sync after this long; reading its result may take 30s more
+        #[arg(long, default_value = "30m", value_parser = util::parse_duration, requires = "wait")]
         timeout: Duration,
         /// How often to poll while waiting
-        #[arg(long, default_value = "5s", value_parser = util::parse_duration)]
+        #[arg(long, default_value = "5s", value_parser = util::parse_duration, requires = "wait")]
         poll: Duration,
     },
     /// Show the status of a dbt sync
@@ -51,10 +51,10 @@ enum Cmd {
         #[arg(long)]
         wait: bool,
         /// Give up waiting after this long (30s, 15m, 1h)
-        #[arg(long, default_value = "30m", value_parser = util::parse_duration)]
+        #[arg(long, default_value = "30m", value_parser = util::parse_duration, requires = "wait")]
         timeout: Duration,
         /// How often to poll while waiting
-        #[arg(long, default_value = "5s", value_parser = util::parse_duration)]
+        #[arg(long, default_value = "5s", value_parser = util::parse_duration, requires = "wait")]
         poll: Duration,
     },
     /// Show what a completed dbt sync generated

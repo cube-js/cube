@@ -336,10 +336,9 @@ impl Client {
             })
         })?;
         let status = res.status();
-        let text = res.text().await.map_err(|e| TransportError {
-            url: url.clone(),
-            source: e.to_string(),
-        })?;
+        // Preserve the status even if the response body drops mid-read: callers use it
+        // for 404 handling, transient retries, and one-shot refresh after a 401.
+        let text = res.text().await.unwrap_or_default();
         Ok((status, text))
     }
 

@@ -424,8 +424,10 @@ steps:
 
   - name: Prune the branches the gate created
     run: |
-      cube data-model delete-branch "$DEPLOYMENT_ID" "$DEV_BRANCH"
-      cube data-model delete-branch "$DEPLOYMENT_ID" "$BRANCH"
+      rc=0
+      cube data-model delete-branch "$DEPLOYMENT_ID" "$DEV_BRANCH" || rc=$?
+      cube data-model delete-branch "$DEPLOYMENT_ID" "$BRANCH" || rc=$?
+      exit $rc
 ```
 
 With `--wait --json`, the sync returns the generated branch and terminal result in one

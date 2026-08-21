@@ -299,10 +299,10 @@ enum Cmd {
         #[arg(long)]
         wait: bool,
         /// Give up waiting after this long (30s, 15m, 1h)
-        #[arg(long, default_value = "15m", value_parser = util::parse_duration)]
+        #[arg(long, default_value = "15m", value_parser = util::parse_duration, requires = "wait")]
         timeout: std::time::Duration,
         /// How often to poll while waiting
-        #[arg(long, default_value = "5s", value_parser = util::parse_duration)]
+        #[arg(long, default_value = "5s", value_parser = util::parse_duration, requires = "wait")]
         poll: std::time::Duration,
     },
     /// Advance onboarding to a target creation step

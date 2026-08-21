@@ -527,6 +527,37 @@ mod tests {
         assert!(nonempty_ref("\t").is_err());
     }
 
+    #[test]
+    fn explicit_wait_options_require_wait() {
+        use clap::Parser;
+
+        for args in [
+            vec!["cube", "dbt", "sync", "1", "--timeout", "1h"],
+            vec!["cube", "dbt", "status", "1", "job", "--poll", "1s"],
+            vec![
+                "cube",
+                "deployments",
+                "build-status",
+                "1",
+                "--timeout",
+                "1h",
+            ],
+        ] {
+            let err = crate::Cli::try_parse_from(args)
+                .err()
+                .expect("--wait must be required");
+            assert!(err.to_string().contains("--wait"), "{err}");
+        }
+
+        for args in [
+            vec!["cube", "dbt", "sync", "1"],
+            vec!["cube", "dbt", "status", "1", "job"],
+            vec!["cube", "deployments", "build-status", "1"],
+        ] {
+            assert!(crate::Cli::try_parse_from(args).is_ok());
+        }
+    }
+
     /// Where every `--branch`/`--ref` argument in the command tree stands on an empty
     /// value, as two lists nobody can change without saying so in the diff.
     ///
