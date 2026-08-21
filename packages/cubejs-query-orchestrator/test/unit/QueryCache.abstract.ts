@@ -141,15 +141,24 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           renewCycle?: boolean;
         }
       ) => {
-        // cacheQueryResult hashes options.renewalKey via queryRedisKey(),
-        // and fetchNew() stores that hash in the entry. Replicate that for seeding.
-        const seededEntry = {
-          ...cacheEntry,
-          renewalKey: cacheEntry.renewalKey
-            ? cache.queryRedisKey(cacheEntry.renewalKey)
-            : cacheEntry.renewalKey,
-        };
-        await seedCache(cacheKey, seededEntry);
+        // No entry means "start from a cold cache", so fetchNew() runs and
+        // writes a real one — used to round-trip the queryHash write path.
+        if (cacheEntry) {
+          // cacheQueryResult hashes options.renewalKey via queryRedisKey(),
+          // and fetchNew() stores that hash in the entry. Replicate that for
+          // seeding — unless the caller passes an entry fetchNew() already
+          // wrote, whose renewalKey must not be hashed a second time.
+          const { renewalKeyHashed, ...entry } = cacheEntry;
+          const seededEntry = {
+            ...entry,
+            renewalKey: entry.renewalKey && !renewalKeyHashed
+              ? cache.queryRedisKey(entry.renewalKey)
+              : entry.renewalKey,
+          };
+          await seedCache(cacheKey, seededEntry);
+        } else {
+          await cache.getCacheDriver().remove(cache.queryRedisKey(cacheKey));
+        }
 
         const fetchNewCalled = { value: false, blocked: false };
 
@@ -330,6 +339,73 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(blocked).toBe(true);
         expect(result).toBe('new-result');
         expect(cache.logger.mock.calls.map(c => c[0])).toContain('Waiting for renew');
+      });
+
+      it('same request + different query: must block on fetchNew (not return the other query\'s cache)', async () => {
+        const cacheKey = QueryCache.queryCacheKey({ query: 'same-req-other-query', values: [] });
+        const entry = {
+          time: Date.now() - 700 * 1000,
+          result: 'other-query-data',
+          renewalKey: renewalKeyOld,
+          requestId: 'abc-123-span-1',
+          // The cache key omits indexesSql and the matched time-dimension range,
+          // so one request flow can hit this entry with a different resolved
+          // query. The harness runs 'SELECT 1', so this hash cannot match.
+          queryHash: crypto.createHash('md5').update(JSON.stringify(['SELECT 2', []])).digest('hex'),
+        };
+
+        const { result, fetchNewCalled, blocked } = await callCacheQueryResult(cacheKey, entry, {
+          renewalThreshold: 600,
+          renewalKey: renewalKeyNew,
+          waitForRenew: true,
+          requestId: 'abc-123-span-2',
+        });
+
+        expect(blocked).toBe(true);
+        expect(result).toBe('new-result');
+        expect(fetchNewCalled).toBe(true);
+        expect(cache.logger.mock.calls.map(c => c[0])).not.toContain('Same request cache hit (background refresh)');
+      });
+
+      it('same request + same query: takes the short-circuit on a round-tripped hash', async () => {
+        // Every other `same request` test hand-constructs an entry with no
+        // queryHash, so they all pass via the legacy-acceptance clause. This one
+        // covers the path all real traffic takes once this ships, and gets its
+        // hash from fetchNew() rather than restating the shape — so if the write
+        // and read sides ever diverge, #10489's background refresh does not
+        // silently stop working behind a green suite.
+        const cacheKey = QueryCache.queryCacheKey({ query: 'same-req-same-query', values: [] });
+
+        // First pass: nothing cached, so fetchNew() runs and writes the entry
+        // (including its queryHash) through the real code path.
+        await callCacheQueryResult(cacheKey, undefined, {
+          renewalThreshold: 600,
+          renewalKey: renewalKeyOld,
+          waitForRenew: true,
+          requestId: 'round-trip-span-1',
+        });
+
+        const written = await cache.getCacheDriver().get(cache.queryRedisKey(cacheKey));
+        expect(written.queryHash).toBeDefined();
+
+        // Second pass: same request flow, same query, entry now stale.
+        const { result, fetchNewCalled, blocked } = await callCacheQueryResult(
+          cacheKey,
+          // `renewalKeyHashed`: the written entry's renewalKey is already a
+          // hash, so the harness must not hash it a second time.
+          { ...written, time: Date.now() - 700 * 1000, result: 'cached-data', renewalKeyHashed: true },
+          {
+            renewalThreshold: 600,
+            renewalKey: renewalKeyNew,
+            waitForRenew: true,
+            requestId: 'round-trip-span-2',
+          }
+        );
+
+        expect(result).toBe('cached-data');
+        expect(fetchNewCalled).toBe(true);
+        expect(blocked).toBe(false);
+        expect(cache.logger.mock.calls.map(c => c[0])).toContain('Same request cache hit (background refresh)');
       });
 
       it('same request + renewCycle + expired: must block on fetchNew', async () => {

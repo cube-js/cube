@@ -84,7 +84,13 @@ The pre-aggregation system includes:
 - `QueryCache.test.ts`: Query caching functionality
 - `QueryQueue.test.ts`: Queue management and processing
 - `QueryOrchestrator.test.js`: Main orchestrator logic
-- `PreAggregations.test.js`: Pre-aggregation management
+- `PreAggregations.test.ts`: Pre-aggregation management
+- `ReplacePreAggregationTableNames.test.ts`: Pre-aggregation table name substitution
+- `TestCollection.test.ts`: Asserts every test file on disk is matched by `testMatch`
+
+Note `QueryOrchestrator.test.js` is the only `.js` suite here, so the package's
+`jest.config.js` widens the ts-jest base's `.ts`-only `testMatch` and transforms
+`.js` too. `TestCollection.test.ts` guards that: drop either and it fails.
 
 ### Integration Tests (`test/integration/`)
 - `cubestore/`: CubeStore-specific integration tests

@@ -4,9 +4,11 @@ const base = require('../../jest.base-ts.config');
 module.exports = {
   ...base,
   rootDir: '.',
+  // The ts-jest base matches *.test.ts only; this package also has a .js suite.
+  testMatch: ['<rootDir>/test/**/*.test.ts', '<rootDir>/test/**/*.test.js'],
   transform: {
-    '^.+\\.ts$': ['ts-jest', {
-      tsconfig: '<rootDir>/tsconfig.jest.json'
+    '^.+\\.[tj]s$': ['ts-jest', {
+      tsconfig: '<rootDir>/tsconfig.jest.json',
     }],
   },
 };
