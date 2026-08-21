@@ -137,6 +137,9 @@ impl PreAggregationOptimizer {
         is_user_query: bool,
     ) -> Result<Option<Rc<Query>>, CubeError> {
         for pre_aggregation in compiled_pre_aggregations.iter() {
+            if !Self::can_carry_time_shifts(pre_aggregation, time_shifts) {
+                continue;
+            }
             let external = pre_aggregation.external.unwrap_or(false);
             let date_range =
                 Self::extract_date_range(&query.filter(), &self.query_tools, time_shifts, external);
@@ -477,6 +480,34 @@ impl PreAggregationOptimizer {
         }
     }
 
+    // A stored member is shifted by offsetting its column as a whole, which
+    // only reproduces the shifted values when the shift can be attributed to
+    // that column. A column built from several members of which just some are
+    // shifted has no such offset — moving it would carry along rows the shift
+    // must leave in place — and the lookup cannot attribute a shift to it
+    // either, so the two agree: whenever a shift is involved but cannot be
+    // attributed, the pre-aggregation cannot serve the shifted leaf.
+    //
+    // Every member the pre-aggregation stores is checked, not just its time
+    // dimensions: dimensions and segments are substituted by column too, and
+    // one computed from a shifted member is just as wrong when read unshifted.
+    fn can_carry_time_shifts(
+        pre_aggregation: &CompiledPreAggregation,
+        time_shifts: &TimeShiftState,
+    ) -> bool {
+        if time_shifts.is_empty() {
+            return true;
+        }
+        pre_aggregation
+            .time_dimensions
+            .iter()
+            .chain(pre_aggregation.dimensions.iter())
+            .chain(pre_aggregation.segments.iter())
+            .all(|member| {
+                !time_shifts.has_shift_under(member) || time_shifts.get_for_symbol(member).is_some()
+            })
+    }
+
     fn extract_date_range(
         filter: &LogicalFilter,
         query_tools: &Rc<State>,
@@ -496,8 +527,7 @@ impl PreAggregationOptimizer {
                         // Apply time shift for this dimension if present.
                         // SQL renders `column + interval`, so actual data range is `date - interval`.
                         if let Some(interval) = time_shifts
-                            .dimensions_shifts
-                            .get(&base_filter.member_name())
+                            .get_for_symbol(base_filter.raw_member_evaluator_ref())
                             .and_then(|s| s.interval.as_ref())
                         {
                             let tz = query_tools.timezone();

@@ -287,7 +287,11 @@ impl SqlNodesFactory {
         };
 
         let input = if !self.time_shifts.is_empty() {
-            TimeShiftSqlNode::new(self.time_shifts.clone(), input)
+            TimeShiftSqlNode::new(
+                self.time_shifts.clone(),
+                self.pre_aggregation_dimensions_references.clone(),
+                input,
+            )
         } else {
             input
         };
