@@ -276,7 +276,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       expect(cancelledQuery).toBe('123');
 
       // every client gave up on ContinueWaitError long before this point
-      await Promise.all(pending);
+      const outcomes = await Promise.all(pending);
+      outcomes.forEach((e) => expect(e).toBeInstanceOf(ContinueWaitError));
       await awaitProcessing();
 
       // 123 was cancelled before the worker could pick it up
