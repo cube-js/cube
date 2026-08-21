@@ -14,6 +14,8 @@ A funnel needs exactly two fields, picked on the Fields tab:
 - **Stage** — a dimension (a time dimension works too, bucketed by its grain). Each distinct value becomes one stage.
 - **Value** — a measure. It is rolled up per stage, so a result with extra columns still draws one bar per stage.
 
+{/* Screenshot: Fields tab with the Stage and Value selectors bound. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
 Stages keep the order your query returned them in. To reorder stages, adjust the sort in the results table — a stage that grows partway down is real data (re-entry, late-arriving events), so the chart never sorts it away for you.
 
 A stage whose value is zero still draws, as a thin line in its stage color, so a gap in the data reads as a zero rather than as a missing stage.
@@ -27,6 +29,8 @@ The connectors between stages carry the funnel's percentages. Two independent to
 
 Turning both on stacks the two lines on each connector; turning both off leaves the connectors unlabeled. Whichever you select also appears in the tooltip, alongside the stage and value.
 
+{/* Screenshot: Style tab Data labels section with the First and Prev toggles. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
 ## Data labels
 
 Each bar carries its stage name and value, both on by default and toggled in the **Data labels** section of the Style tab. The value's number format has its own picker, and one font size governs every label the funnel draws — the bar labels and the connector percentages alike.
@@ -35,4 +39,10 @@ Labels always sit at the bar's center. When a bar is too narrow to hold its labe
 
 ## Color
 
-Each stage takes its own color from the palette selected in the **Palette** dropdown on the Style tab, in palette order.
+Each stage takes its own color from the palette selected in the **Palette** dropdown on the Style tab, in palette order. See [Palettes](/docs/explore-analyze/charts/configuration/color-and-stacking#palettes) for the built-in palettes and how to define a custom one.
+
+{/* Screenshot: Style tab with the Palette dropdown open, showing the built-in discrete palettes. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Legend
+
+A legend naming each stage in its palette color is available in the **Legend** section of the Style tab, along with its placement.
