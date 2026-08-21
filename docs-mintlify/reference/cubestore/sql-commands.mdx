@@ -232,6 +232,7 @@ Synopsis:
 
 ```sql
 QUEUE ADD [EXCLUSIVE] [PRIORITY priority] [ORPHANED timeout] [EXTERNAL_ID 'id'] key 'value';
+QUEUE ADD_AND_RETRIEVE [EXCLUSIVE] [PRIORITY priority] [ORPHANED timeout] [EXTERNAL_ID 'id'] key 'value' concurrency;
 QUEUE GET key;
 QUEUE LIST [WITH_PAYLOAD] prefix;
 QUEUE PENDING [WITH_PAYLOAD] prefix;
@@ -257,6 +258,11 @@ add, claim, acknowledge, and cancel individual jobs.
 `QUEUE ADD`'s options may be given in any order. For `GET`, `ACK`, `CANCEL`,
 `HEARTBEAT`, `RESULT`, `RESULT_BLOCKING`, and `MERGE_EXTRA`, `key` is either the
 job's path or its numeric queue id.
+
+`QUEUE ADD_AND_RETRIEVE` adds an item and, in the same atomic operation, claims
+it — moving it straight to the active status — if the prefix's `concurrency`
+budget allows. It combines what otherwise takes a separate `QUEUE ADD`
+followed by `QUEUE RETRIEVE`.
 
 `QUEUE CLEAR` empties the queue by iterating over its entries, the same way
 `CACHE CLEAR` does.

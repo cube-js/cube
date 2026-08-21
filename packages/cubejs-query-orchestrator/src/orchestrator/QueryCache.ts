@@ -234,9 +234,6 @@ export class QueryCache {
     return evaluateLocalRefreshKey(<LocalRefreshKeyDescriptor>queryOptions?.localRefreshKey);
   }
 
-  /**
-   * Returns cache driver instance.
-   */
   public getCacheDriver(): CacheDriverInterface {
     return this.cacheDriver;
   }
@@ -257,15 +254,10 @@ export class QueryCache {
     queryBody: QueryBody,
     preAggregationsTablesToTempTables: PreAggTableToTempTable[],
   ) {
-    const replacePreAggregationTableNames =
-      (queryAndParams: string | QueryWithParams) => (
-        QueryCache.replacePreAggregationTableNames(
-          queryAndParams,
-          preAggregationsTablesToTempTables,
-        )
-      );
-
-    const query = replacePreAggregationTableNames(queryBody.query);
+    const query = QueryCache.replacePreAggregationTableNamesInSql(
+      queryBody.query,
+      preAggregationsTablesToTempTables,
+    );
 
     const inlineTables = preAggregationsTablesToTempTables.flatMap(
       ([_, preAggregation]) => (
@@ -285,7 +277,10 @@ export class QueryCache {
 
     const cacheKeyQueries = this
       .cacheKeyQueriesFrom(queryBody)
-      .map(replacePreAggregationTableNames);
+      .map((queryAndParams) => QueryCache.replacePreAggregationTableNames(
+        queryAndParams,
+        preAggregationsTablesToTempTables,
+      ));
 
     const renewalThreshold = queryBody.cacheKeyQueries?.renewalThreshold;
 
@@ -457,27 +452,21 @@ export class QueryCache {
     return extractRequestUUID(requestId);
   }
 
-  protected static replaceAll(replaceThis, withThis, inThis) {
-    withThis = withThis.replace(/\$/g, '$$$$');
-    return inThis.replace(
-      new RegExp(replaceThis.replace(/([/,!\\^${}[\]().*+?|<>\-&])/g, '\\$&'), 'g'),
-      withThis
-    );
-  }
-
-  public static replacePreAggregationTableNames(
-    queryAndParams: string | QueryWithParams,
+  public static replacePreAggregationTableNamesInSql(
+    sql: string,
     preAggregationsTablesToTempTables: PreAggTableToTempTableNames[],
-  ): string | QueryWithParams {
-    const [keyQuery, params, queryOptions] = Array.isArray(queryAndParams)
-      ? queryAndParams
-      : [queryAndParams, []];
+  ): string {
     // Single-pass replacement with longest-first alternation: sequential
     // per-name replacement would corrupt names that are prefixes of other
     // names (e.g. `name1` vs `name10`) and rescan already inserted target
     // names, which contain the source name as a prefix
     const sorted = [...preAggregationsTablesToTempTables]
       .sort(([a], [b]) => b.length - a.length);
+
+    if (!sorted.length) {
+      return sql;
+    }
+
     const replacements = new Map(
       sorted.map(([tableName, { targetTableName }]) => [tableName, targetTableName])
     );
@@ -487,12 +476,21 @@ export class QueryCache {
         .join('|'),
       'g'
     );
-    const replacedKeyQuery: string = sorted.length
-      ? keyQuery.replace(replaceRegex, (match) => replacements.get(match) as string)
-      : keyQuery;
-    return Array.isArray(queryAndParams)
-      ? [replacedKeyQuery, params, queryOptions]
-      : replacedKeyQuery;
+
+    return sql.replace(replaceRegex, (match) => replacements.get(match) as string);
+  }
+
+  public static replacePreAggregationTableNames(
+    queryAndParams: QueryWithParams,
+    preAggregationsTablesToTempTables: PreAggTableToTempTableNames[],
+  ): QueryWithParams {
+    const [sql, params, queryOptions] = queryAndParams;
+
+    return [
+      QueryCache.replacePreAggregationTableNamesInSql(sql, preAggregationsTablesToTempTables),
+      params,
+      queryOptions,
+    ];
   }
 
   /**
@@ -796,9 +794,9 @@ export class QueryCache {
   }
 
   public startRenewCycle(
-    query: string | QueryWithParams,
+    query: string,
     values: string[],
-    cacheKeyQueries: (string | QueryWithParams)[],
+    cacheKeyQueries: QueryWithParams[],
     expireSecs: number,
     cacheKey: CacheKey,
     renewalThreshold: any,
@@ -831,9 +829,9 @@ export class QueryCache {
   }
 
   public renewQuery(
-    query: string | QueryWithParams,
+    query: string,
     values: string[],
-    cacheKeyQueries: (string | QueryWithParams)[],
+    cacheKeyQueries: QueryWithParams[],
     expireSecs: number,
     cacheKey: CacheKey,
     renewalThreshold: any,
@@ -851,7 +849,7 @@ export class QueryCache {
   ) {
     options = options || { dataSource: 'default' };
     return Promise.all(
-      this.loadRefreshKeys(<QueryWithParams[]>cacheKeyQueries, expireSecs, options),
+      this.loadRefreshKeys(cacheKeyQueries, expireSecs, options),
     )
       .catch(e => {
         if (e instanceof ContinueWaitError) {
@@ -915,7 +913,7 @@ export class QueryCache {
 
   @AsyncDebounce()
   public async loadRefreshKey(q: QueryWithParams, expireSecs: number, options: LoadRefreshKeyOptions) {
-    const [query, values, queryOptions]: QueryWithParams = Array.isArray(q) ? q : [q, [], {}];
+    const [query, values, queryOptions] = q;
 
     // A locally evaluated key is free, so there is nothing to cache and no queue to
     // wait on. The value is quantized to the interval, so repeated calls agree

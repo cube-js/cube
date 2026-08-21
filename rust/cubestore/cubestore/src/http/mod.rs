@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use warp::{Filter, Rejection, Reply};
 
+use crate::cachestore::QUEUE_ITEM_PROCESS_ID_MAX_LEN;
 use crate::metastore::{Column, ColumnType, ImportFormat};
 use crate::mysql::SqlAuthService;
 use crate::sql::{
@@ -63,6 +64,7 @@ crate::di_service!(HttpServer, []);
 #[derive(Debug)]
 pub enum CubeRejection {
     NotAuthorized,
+    BadRequest(String),
     Internal(String),
 }
 
@@ -76,6 +78,21 @@ impl From<CubeError> for warp::reject::Rejection {
 /// so they shouldn't pollute the error log.
 fn is_rate_limit_error(e: &CubeError) -> bool {
     e.message.to_ascii_lowercase().contains("rate limit")
+}
+
+/// `process_id` is connection scoped and reaches the cachestore as `QueueItem.process_id`,
+/// so it's bounded here, on its only ingress.
+fn check_process_id_header(process_id: &Option<String>) -> Result<(), CubeRejection> {
+    if let Some(id) = process_id {
+        if id.len() > QUEUE_ITEM_PROCESS_ID_MAX_LEN {
+            return Err(CubeRejection::BadRequest(format!(
+                "x-process-id header exceeds maximum allowed length of {} characters",
+                QUEUE_ITEM_PROCESS_ID_MAX_LEN
+            )));
+        }
+    }
+
+    Ok(())
 }
 
 #[derive(Deserialize)]
@@ -124,13 +141,8 @@ impl HttpServer {
                 move |auth_header: Option<String>, process_id: Option<String>| {
                     let auth_service = auth_service.clone();
                     async move {
-                        if let Some(ref id) = process_id {
-                            if id.len() > 64 {
-                                return Err(warp::reject::custom(CubeRejection::Internal(
-                                    "x-process-id header exceeds 64 characters".to_string(),
-                                )));
-                            }
-                        }
+                        check_process_id_header(&process_id).map_err(warp::reject::custom)?;
+
                         let res = HttpServer::authorize(auth_service, auth_header).await;
                         match res {
                             Ok(user) => Ok(SqlQueryContext {
@@ -533,6 +545,13 @@ impl HttpServer {
                             Ok(warp::reply::with_status(
                                 warp::reply::json(&obj),
                                 StatusCode::FORBIDDEN,
+                            ))
+                        }
+                        CubeRejection::BadRequest(e) => {
+                            obj.insert("error".to_string(), e.to_string());
+                            Ok(warp::reply::with_status(
+                                warp::reply::json(&obj),
+                                StatusCode::BAD_REQUEST,
                             ))
                         }
                         CubeRejection::Internal(e) => {
@@ -1101,7 +1120,10 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
     use tokio::net::TcpStream;
-    use tokio_tungstenite::tungstenite::Message;
+    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+    use tokio_tungstenite::tungstenite::handshake::client::Request;
+    use tokio_tungstenite::tungstenite::http::HeaderValue;
+    use tokio_tungstenite::tungstenite::{Error as WsError, Message};
     use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
     use url::Url;
 
@@ -1758,6 +1780,83 @@ mod tests {
 
         let mut socket2 = connect_and_send(3, Some("foo2".to_string())).await;
         assert_message(&mut socket2, "10").await;
+
+        http_server.stop_processing().await;
+        Ok(())
+    }
+
+    #[test]
+    fn check_process_id_header_bounds() {
+        assert!(check_process_id_header(&None).is_ok());
+        assert!(check_process_id_header(&Some("".to_string())).is_ok());
+        assert!(
+            check_process_id_header(&Some("x".repeat(QUEUE_ITEM_PROCESS_ID_MAX_LEN))).is_ok(),
+            "the limit is inclusive"
+        );
+
+        let res = check_process_id_header(&Some("x".repeat(QUEUE_ITEM_PROCESS_ID_MAX_LEN + 1)));
+        match res {
+            Err(CubeRejection::BadRequest(msg)) => assert!(
+                msg.contains("x-process-id header exceeds maximum allowed length"),
+                "unexpected message: {}",
+                msg
+            ),
+            other => panic!("Expected CubeRejection::BadRequest, actual: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn ws_process_id_header_test() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let mut auth = MockSqlAuthService::new();
+        auth.expect_authenticate().return_const(Ok(None));
+
+        let config = Config::test("ws_process_id_header_test").config_obj();
+
+        let http_server = Arc::new(HttpServer::new(
+            "127.0.0.1:53032".to_string(),
+            Arc::new(auth),
+            Arc::new(SqlServiceMock {
+                message_counter: AtomicU64::new(0),
+            }),
+            Duration::from_millis(100),
+            Duration::from_millis(10000),
+            Duration::from_millis(1000),
+            config.transport_max_message_size(),
+            config.transport_max_frame_size(),
+        ));
+        {
+            let http_server = http_server.clone();
+            cube_ext::spawn(async move { http_server.run_server().await });
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        fn connect_request(process_id: &str) -> Request {
+            let mut request = "ws://127.0.0.1:53032/ws".into_client_request().unwrap();
+            request
+                .headers_mut()
+                .insert("x-process-id", HeaderValue::from_str(process_id).unwrap());
+            request
+        }
+
+        let err = connect_async(connect_request(
+            &"x".repeat(QUEUE_ITEM_PROCESS_ID_MAX_LEN + 1),
+        ))
+        .await
+        .err()
+        .expect("expected the handshake to be rejected");
+        match err {
+            WsError::Http(response) => assert_eq!(response.status().as_u16(), 400),
+            other => panic!("Expected an http error, actual: {:?}", other),
+        }
+
+        let (socket, _) =
+            connect_async(connect_request(&"x".repeat(QUEUE_ITEM_PROCESS_ID_MAX_LEN)))
+                .await
+                .expect("a header at the limit should be accepted");
+        drop(socket);
 
         http_server.stop_processing().await;
         Ok(())

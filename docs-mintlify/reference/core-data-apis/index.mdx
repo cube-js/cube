@@ -42,15 +42,22 @@ tools][ref-viz-tools]. Some of the features with partial support are listed belo
 
 ## Personal Core Data API Token
 
-Cube users can generate a personal token to authenticate SQL API connections from
-external tools like BI dashboards, notebooks, and SQL clients. Navigate to
-**Preferences → Personal Core Data API Token** and click
-**Generate Token**.
+Cube users can generate a personal token to authenticate SQL API and
+[REST (JSON) API][ref-rest-api] connections from external tools like BI
+dashboards, notebooks, and SQL clients. Navigate to **Preferences → Personal
+Core Data API Token** and click **Generate Token**.
 
 The token authenticates as that user, so all [groups][ref-groups],
 [user attributes][ref-user-attributes], and [data access policies][ref-dap]
 are applied to queries made with this token. The page also provides connection
-instructions including host, port, and database name for your deployment.
+instructions for your deployment: host, port, and database name for the SQL
+API, and a sample `curl` request using the token as a bearer token for the
+REST (JSON) API:
+
+```bash
+curl <deployment-url>/cubejs-api/v1/meta \
+  -H "Authorization: Bearer YOUR-CORE-DATA-API-TOKEN"
+```
 
 ## Authentication methods
 
@@ -63,6 +70,7 @@ tools][ref-viz-tools]:
 | Kerberos and NTLM | [MDX API][ref-mdx-api] |
 | [Identity provider][ref-auth-idp] | [Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets] |
 | [JSON Web Token][ref-auth-jwt] | [REST (JSON) API][ref-rest-api]<br/>[GraphQL API][ref-graphql-api] |
+| [Personal Core Data API Token](#personal-core-data-api-token) | [SQL API][ref-sql-api]<br/>[REST (JSON) API][ref-rest-api] |
 
 [cube-issbi]: https://cube.dev/use-cases/semantic-layer
 [cube-ea]: https://cube.dev/use-cases/embedded-analytics

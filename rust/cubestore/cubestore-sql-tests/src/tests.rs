@@ -2,6 +2,7 @@ use crate::files::write_tmp_file;
 use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
+use cubestore::cachestore::QUEUE_ITEM_EXTERNAL_ID_MAX_LEN;
 use cubestore::metastore::{Column, ColumnType};
 use cubestore::queryplanner::physical_plan_flags::PhysicalPlanFlags;
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
@@ -314,8 +315,17 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             "queue_full_workflow_v2_with_external_id",
             queue_full_workflow_v2_with_external_id,
         ),
+        t(
+            "queue_add_external_id_max_len",
+            queue_add_external_id_max_len,
+        ),
         t("queue_latest_result_v1", queue_latest_result_v1),
         t("queue_retrieve_extended", queue_retrieve_extended),
+        t("queue_add_and_retrieve", queue_add_and_retrieve),
+        t(
+            "queue_add_and_retrieve_backlog",
+            queue_add_and_retrieve_backlog,
+        ),
         t("queue_ack_then_result_v1", queue_ack_then_result_v1),
         t("queue_ack_then_result_v2", queue_ack_then_result_v2),
         t(
@@ -456,6 +466,9 @@ lazy_static::lazy_static! {
         "prefilter_chunks_shared_scan",
         "planning_topk_hash_aggregate",
         "topk_hash_aggregate_trim",
+        "queue_add_and_retrieve",
+        "queue_add_and_retrieve_backlog",
+        "queue_add_external_id_max_len",
     ].into_iter().map(ToOwned::to_owned).collect();
 }
 
@@ -11881,6 +11894,41 @@ fn assert_queue_add_columns(response: &Arc<DataFrame>) {
     );
 }
 
+fn queue_add_and_retrieve_row(
+    id: &str,
+    added: bool,
+    pending: i64,
+    active: Option<&str>,
+    payload: Option<&str>,
+) -> Row {
+    let to_value =
+        |v: Option<&str>| v.map_or(TableValue::Null, |v| TableValue::String(v.to_string()));
+
+    Row::new(vec![
+        TableValue::String(id.to_string()),
+        TableValue::Boolean(added),
+        TableValue::Int(pending),
+        to_value(active),
+        to_value(payload),
+        // extra is always empty for a freshly added item
+        TableValue::Null,
+    ])
+}
+
+fn assert_queue_add_and_retrieve_columns(response: &Arc<DataFrame>) {
+    assert_eq!(
+        response.get_columns(),
+        &vec![
+            Column::new("id".to_string(), ColumnType::String, 0),
+            Column::new("added".to_string(), ColumnType::Boolean, 1),
+            Column::new("pending".to_string(), ColumnType::Int, 2),
+            Column::new("active".to_string(), ColumnType::String, 3),
+            Column::new("payload".to_string(), ColumnType::String, 4),
+            Column::new("extra".to_string(), ColumnType::String, 5),
+        ]
+    );
+}
+
 fn assert_queue_add_and_get_id(response: &Arc<DataFrame>) -> Result<String, CubeError> {
     assert_queue_add_columns(response);
 
@@ -11995,6 +12043,193 @@ async fn queue_retrieve_extended(service: Box<dyn SqlClient>) -> Result<(), Cube
             ]),]
         );
     }
+    Ok(())
+}
+
+async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    {
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE PRIORITY 1 "STANDALONE#queue:key1" "payload1" 1"#)
+            .await?;
+        assert_queue_add_and_retrieve_columns(&add_response);
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row(
+                "1",
+                true,
+                0,
+                Some("key1"),
+                Some("payload1")
+            )]
+        );
+    }
+
+    {
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:key2" "payload2" 1"#)
+            .await?;
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row("2", true, 1, Some("key1"), None)]
+        );
+    }
+
+    {
+        // The stored payload is returned, not the payload of this call
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:key2" "payload2-dup" 2"#)
+            .await?;
+        assert_queue_add_and_retrieve_columns(&add_response);
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row(
+                "2",
+                false,
+                0,
+                Some("key1,key2"),
+                Some("payload2")
+            )]
+        );
+    }
+
+    {
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:key1" "payload1" 5"#)
+            .await?;
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row(
+                "1",
+                false,
+                0,
+                Some("key1,key2"),
+                None
+            )]
+        );
+    }
+
+    {
+        let add_response = service
+            .exec_query(r#"QUEUE ADD "STANDALONE#queue:key3" "payload3""#)
+            .await?;
+        assert_queue_add_columns(&add_response);
+    }
+
+    {
+        let pending_response = service
+            .exec_query(r#"QUEUE PENDING "STANDALONE#queue""#)
+            .await?;
+        assert_eq!(
+            pending_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("key3".to_string()),
+                TableValue::String("3".to_string()),
+                TableValue::String("pending".to_string()),
+                TableValue::Null,
+            ]),]
+        );
+
+        let active_response = service
+            .exec_query(r#"QUEUE ACTIVE "STANDALONE#queue""#)
+            .await?;
+        assert_eq!(active_response.get_rows().len(), 2);
+    }
+
+    {
+        // A claimed item can be acknowledged without an explicit QUEUE RETRIEVE
+        let ack_response = service
+            .exec_query(r#"QUEUE ACK "STANDALONE#queue:key1" "result1""#)
+            .await?;
+        assert_eq!(
+            ack_response.get_rows(),
+            &vec![Row::new(vec![TableValue::Boolean(true)])]
+        );
+
+        let result_response = service
+            .exec_query(r#"QUEUE RESULT "STANDALONE#queue:key1""#)
+            .await?;
+        assert_queue_result_columns(&result_response);
+        assert_eq!(
+            result_response.get_rows(),
+            &vec![queue_result_row("result1", "1", None)]
+        );
+    }
+
+    Ok(())
+}
+
+async fn queue_add_and_retrieve_backlog(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    for id in 1..=2 {
+        service
+            .exec_query(&format!(
+                r#"QUEUE ADD "STANDALONE#queue:key{}" "payload{}""#,
+                id, id
+            ))
+            .await?;
+    }
+
+    {
+        // Every concurrency slot is free, but claiming would leave the 2 pending items
+        // a single slot to share, so the item takes its place in the backlog instead
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:key3" "payload3" 2"#)
+            .await?;
+        assert_queue_add_and_retrieve_columns(&add_response);
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row("3", true, 3, None, None)]
+        );
+    }
+
+    {
+        // A slot is left over for every one of the 3 pending items, nothing is jumped over
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:key4" "payload4" 4"#)
+            .await?;
+        assert_queue_add_and_retrieve_columns(&add_response);
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row(
+                "4",
+                true,
+                3,
+                Some("key4"),
+                Some("payload4")
+            )]
+        );
+    }
+
+    {
+        // The very same budget declines the next claim, the slot it took is now busy
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:key5" "payload5" 4"#)
+            .await?;
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row("5", true, 4, Some("key4"), None)]
+        );
+    }
+
+    {
+        let pending_response = service
+            .exec_query(r#"QUEUE PENDING "STANDALONE#queue""#)
+            .await?;
+        assert_eq!(pending_response.get_rows().len(), 4);
+
+        let active_response = service
+            .exec_query(r#"QUEUE ACTIVE "STANDALONE#queue""#)
+            .await?;
+        assert_eq!(
+            active_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("key4".to_string()),
+                TableValue::String("4".to_string()),
+                TableValue::String("active".to_string()),
+                TableValue::Null,
+            ]),]
+        );
+    }
+
     Ok(())
 }
 
@@ -12547,6 +12782,51 @@ async fn queue_full_workflow_v2_with_external_id(
         .exec_query(r#"QUEUE RESULT EXTERNAL_ID "unknown-ext" "STANDALONE#queue:ext_v2""#)
         .await?;
     assert_eq!(result.get_rows().len(), 0);
+
+    Ok(())
+}
+
+async fn queue_add_external_id_max_len(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    let max_id = "x".repeat(QUEUE_ITEM_EXTERNAL_ID_MAX_LEN);
+    let too_long_id = "x".repeat(QUEUE_ITEM_EXTERNAL_ID_MAX_LEN + 1);
+
+    let add_response = service
+        .exec_query(&format!(
+            r#"QUEUE ADD EXTERNAL_ID '{}' "STANDALONE#queue:ext_max_len" "payload_max_len""#,
+            max_id
+        ))
+        .await?;
+    assert_queue_add_and_get_id(&add_response)?;
+
+    for query in [
+        format!(
+            r#"QUEUE ADD EXTERNAL_ID '{}' "STANDALONE#queue:ext_too_long" "payload_too_long""#,
+            too_long_id
+        ),
+        format!(
+            r#"QUEUE ADD_AND_RETRIEVE EXTERNAL_ID '{}' "STANDALONE#queue:ext_too_long" "payload_too_long" 1"#,
+            too_long_id
+        ),
+        format!(
+            r#"QUEUE RESULT EXTERNAL_ID '{}' "STANDALONE#queue:ext_too_long""#,
+            too_long_id
+        ),
+    ] {
+        let err = service.exec_query(&query).await.unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("external_id exceeds maximum allowed length"),
+            "unexpected error for {}: {}",
+            query,
+            err
+        );
+    }
+
+    // The rejected items were never written, only the max-length one
+    let pending = service
+        .exec_query(r#"QUEUE PENDING "STANDALONE#queue""#)
+        .await?;
+    assert_eq!(pending.get_rows().len(), 1);
 
     Ok(())
 }

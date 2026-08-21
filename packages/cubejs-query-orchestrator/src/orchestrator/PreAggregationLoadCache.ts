@@ -191,7 +191,7 @@ export class PreAggregationLoadCache {
   }
 
   public async keyQueryResult(sqlQuery: QueryWithParams, waitForRenew: boolean, priority: number) {
-    const [query, values, queryOptions]: QueryWithParams = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery, [], {}];
+    const [query, values, queryOptions] = sqlQuery;
     const redisKey = this.queryCache.queryRedisKey([query, values]);
 
     if (!this.queryResults[redisKey]) {
