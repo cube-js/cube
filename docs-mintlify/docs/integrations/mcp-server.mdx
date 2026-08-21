@@ -166,23 +166,29 @@ For any MCP-compatible client:
 
 An MCP client is not locked to a single deployment for the whole session. After
 connecting, it can discover the deployments and agents you can access and target a
-specific one on each request.
-
-Three tools work together:
+specific one on each request — every tool except `listDeployments` accepts an optional
+**`deploymentId`**, and falls back to the deployment resolved at connect time when it's
+omitted.
 
 - **`listDeployments`** — discovery. Returns every deployment you can access via MCP
   (already filtered by the admin's deployment-access settings and your permissions) and
-  each deployment's agents. Use it to find valid `deploymentId` and `agentId` values
-  before calling `chat`. Every deployment offers an **Auto** agent (`agentId: null`) in
-  addition to any configured agents.
+  each deployment's agents. Use it to find valid `deploymentId` and `agentId` values.
+  Every deployment offers an **Auto** agent (`agentId: null`) in addition to any
+  configured agents.
 - **`chat`** — accepts two optional selection parameters:
   - **`deploymentId`** — the deployment to use for this request. When omitted, the chat
     uses the deployment from the current session (the default resolved at connect time).
   - **`agentId`** — the agent to use for this request. When omitted or `null`, the
     deployment's **Auto** agent is used. Pass a specific `agentId` to route to a
     configured agent.
-- **`loadQueryResults`** — paginates through the results of a previous query on the same
-  deployment context.
+- **Every other tool** — dashboard authoring, data model editing, query and discovery,
+  and pre-aggregation tools all accept the same optional `deploymentId`, resolved and
+  permission-checked the same way as for `chat`.
+
+**Resuming a conversation.** `loadQueryResults` and `visualize`, and `chat` when it's
+passed an existing `chatId`, act on a thread that already belongs to one deployment —
+they derive `deploymentId` from that thread instead of accepting an arbitrary one, and
+reject a `deploymentId` that conflicts with it.
 
 A typical client workflow:
 

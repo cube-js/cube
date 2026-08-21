@@ -38,6 +38,12 @@ Sharing permissions are organized into three levels:
 
 The creator of a piece of content automatically receives **Full access**.
 
+For an exploration, **Can view** opens it in a read-only view: charts and data are
+visible, but saving, converting to a workbook, running Python, and the security
+context control are hidden, and any SQL is read-only. The time zone control stays
+visible so viewers can see how data is bucketed, but it can't be changed without
+**Can edit** or higher.
+
 <Info>
 
 When sharing is set at the [folder level][ref-folders], content inside
