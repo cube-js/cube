@@ -255,9 +255,9 @@ The queue coordinates pre-aggregation builds. `QUEUE LIST`, `QUEUE PENDING`, and
 TO_CANCEL` list jobs that have stopped making progress. The remaining commands
 add, claim, acknowledge, and cancel individual jobs.
 
-`QUEUE ADD`'s options may be given in any order. For `GET`, `ACK`, `CANCEL`,
-`HEARTBEAT`, `RESULT`, `RESULT_BLOCKING`, and `MERGE_EXTRA`, `key` is either the
-job's path or its numeric queue id.
+`QUEUE ADD` and `QUEUE ADD_AND_RETRIEVE`'s options may be given in any order. For
+`GET`, `ACK`, `CANCEL`, `HEARTBEAT`, `RESULT`, `RESULT_BLOCKING`, and `MERGE_EXTRA`,
+`key` is either the job's path or its numeric queue id.
 
 `QUEUE ADD_AND_RETRIEVE` adds an item and, in the same atomic operation, claims
 it — moving it straight to the active status — if the prefix's `concurrency`
