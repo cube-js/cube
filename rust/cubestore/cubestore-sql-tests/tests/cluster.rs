@@ -22,13 +22,16 @@ fn main() {
     respawn::init(); // TODO: logs in worker processes.
 
     // We run only 1 test in parallel to avoid using the ports concurrently.
-    // We skip `planning_inplace_aggregate2` as planning results differ on cluster with 2 nodes.
+    // We skip `planning_inplace_aggregate2` and `planning_topk_having` as planning results differ
+    // on cluster with 2 nodes.
     run_sql_tests(
         "cluster",
         vec![
             "--test-threads=1".to_string(),
             "--skip".to_string(),
             "planning_inplace_aggregate2".to_string(),
+            "--skip".to_string(),
+            "planning_topk_having".to_string(),
         ],
         |test_name, test_fn| {
             // Add a suffix to avoid clashes with other configurations run concurrently.

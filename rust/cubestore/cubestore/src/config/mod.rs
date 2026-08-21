@@ -534,9 +534,9 @@ pub trait ConfigObj: DIService {
 
     fn enable_topk(&self) -> bool;
 
-    /// When enabled, a TableImportCSV job is placed on the worker with the fewest in-flight
-    /// CSV imports (load-aware), instead of by stateless hash of (table_id, location). Off by
-    /// default (hash placement); kept as a flag for rollout/rollback.
+    /// When enabled (default), a TableImportCSV job is placed on the worker with the fewest
+    /// in-flight CSV imports (load-aware). When disabled, placement is the stateless hash of
+    /// (table_id, location), which ignores in-flight load.
     fn load_aware_import_placement_enabled(&self) -> bool;
 
     /// Time budget for a single batch repartition job. The job yields its runner
@@ -561,14 +561,14 @@ pub trait ConfigObj: DIService {
     /// Off by default; when disabled, chunks are sent whole and filtered only in the subprocess.
     fn prefilter_in_memory_chunks_enabled(&self) -> bool;
 
-    /// When enabled, a merge group's chunk parquets (PerPartition / Range strategies) are
-    /// downloaded concurrently before building the merge inputs, instead of one at a time.
+    /// When enabled (default), a merge group's chunk parquets (PerPartition / Range strategies)
+    /// are downloaded concurrently before building the merge inputs, instead of one at a time.
     /// The group is already bounded by repartition_merge_max_input_files and the download
-    /// pool by download_concurrency, so no extra budget is needed. Off by default.
+    /// pool by download_concurrency, so no extra budget is needed.
     fn repartition_concurrent_download(&self) -> bool;
 
     /// Which repartition strategy to use for an inactive parent's persisted chunks.
-    /// Defaults to PerChunk.
+    /// Defaults to Range.
     fn repartition_strategy(&self) -> RepartitionStrategy;
 
     /// Cap on the number of chunks merged together in one Merge group / RepartitionRange.
@@ -586,15 +586,15 @@ pub trait ConfigObj: DIService {
     fn repartition_check_overlapping_children(&self) -> bool;
     /// Factor `f` controlling when the worker-side partial hash aggregate trims its output to the
     /// top-k groups. Trimming happens only when the number of local groups exceeds `f * k`, where
-    /// `k = limit + offset`. `0` disables the optimization. Whether the trim runs decides the shape
-    /// of both halves of a split plan, so it rides in [`PlanningFlags`]; a worker uses its own value
-    /// only when the sender sent no flags.
+    /// `k = limit + offset`. `0` disables the optimization; the default is `2`. Whether the trim
+    /// runs decides the shape of both halves of a split plan, so it rides in [`PlanningFlags`]; a
+    /// worker uses its own value only when the sender sent no flags.
     fn group_by_limit_factor(&self) -> usize;
 
     /// When the worker group-by-limit hash trim is active, controls where the worker's hash table
-    /// lives: `false` (default) coalesces the partial aggregate's input to one partition (one hash
-    /// table per worker, "over merge"); `true` keeps the raw multi-partition input so it runs per
-    /// partition ("under merge").
+    /// lives: `true` (default) keeps the raw multi-partition input so the aggregate runs per
+    /// partition ("under merge"); `false` coalesces the partial aggregate's input to one partition
+    /// (one hash table per worker, "over merge").
     ///
     /// Unlike [`ConfigObj::group_by_limit_factor`], this one stays node-local and is not part of
     /// [`PlanningFlags`]: it only moves a partition coalesce below the partial aggregate, leaving
@@ -605,8 +605,8 @@ pub trait ConfigObj: DIService {
     /// partition coalesce (the hash aggregate ignores input order, so the per-row merge is wasted).
     fn coalesce_under_hash_aggregate(&self) -> bool;
 
-    /// Router-side merge strategy for distributed value-ordered top-k. The router's value governs
-    /// the whole query; see [`TopKAggregateStrategy`].
+    /// Router-side merge strategy for distributed value-ordered top-k. Defaults to FullMerge; the
+    /// router's value governs the whole query, see [`TopKAggregateStrategy`].
     fn topk_aggregate_strategy(&self) -> TopKAggregateStrategy;
 
     fn allow_decimal128(&self) -> bool;
@@ -2162,22 +2162,22 @@ impl Config {
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
                 enable_topk: true,
-                load_aware_import_placement_enabled: false,
+                load_aware_import_placement_enabled: true,
                 repartition_chunks_time_budget_secs: 60,
                 push_partial_aggregate_below_merge_enabled: true,
                 compaction_split_by_total_file_size_enabled: false,
                 // Production default is off; kept on in tests so prefilter_chunks_shared_scan
                 // and the rest of the suite keep exercising the worker-side trim path.
                 prefilter_in_memory_chunks_enabled: true,
-                repartition_concurrent_download: false,
-                repartition_strategy: RepartitionStrategy::PerChunk,
+                repartition_concurrent_download: true,
+                repartition_strategy: RepartitionStrategy::Range,
                 repartition_merge_max_input_files: 50,
-                repartition_merge_max_rows: 4_000_000,
+                repartition_merge_max_rows: 400_000,
                 repartition_check_overlapping_children: false,
                 group_by_limit_factor: 2,
-                group_by_limit_per_partition: false,
+                group_by_limit_per_partition: true,
                 coalesce_under_hash_aggregate: false,
-                topk_aggregate_strategy: TopKAggregateStrategy::Streaming,
+                topk_aggregate_strategy: TopKAggregateStrategy::FullMerge,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,
@@ -2206,7 +2206,7 @@ impl Config {
                 max_disk_space_per_worker: 0,
                 disk_space_cache_duration_secs: 0,
                 disk_space_compute_lock_timeout_ms: 1000,
-                metastore_batch_rpc: false,
+                metastore_batch_rpc: true,
                 transport_max_message_size: 64 << 20,
                 transport_max_frame_size: 16 << 20,
                 local_files_cleanup_interval_secs: 600,
