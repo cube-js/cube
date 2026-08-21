@@ -34,6 +34,13 @@ schema). The [export bucket](#export-bucket) strategy writes to the bucket, not 
   mapped service user.
 - Optionally, the warehouse name, the user role, and the database name.
 
+## Query cancellation
+
+Cancelling a query via the [`{base_path}/v1/running-query/{requestId}`][ref-rest-api-cancel]
+endpoint aborts the statement on the Snowflake warehouse itself, not just
+Cube's wait for it — so a cancelled query stops consuming warehouse compute
+instead of continuing to run in the background.
+
 ## Setup
 
 <Warning>
@@ -393,6 +400,7 @@ connections are made over HTTPS.
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
 [ref-oidc-overview]: /admin/deployment/oidc
 [ref-driver-factory]: /reference/configuration/config#driver_factory
+[ref-rest-api-cancel]: /reference/core-data-apis/rest-api/reference#base_path/v1/running-query/requestid
 [self-preaggs-batching]: #batching
 [snowflake]: https://www.snowflake.com/
 [snowflake-docs-account-id]:

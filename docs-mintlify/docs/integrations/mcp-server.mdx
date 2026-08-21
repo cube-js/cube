@@ -168,21 +168,20 @@ An MCP client is not locked to a single deployment for the whole session. After
 connecting, it can discover the deployments and agents you can access and target a
 specific one on each request.
 
-Three tools work together:
-
 - **`listDeployments`** — discovery. Returns every deployment you can access via MCP
   (already filtered by the admin's deployment-access settings and your permissions) and
-  each deployment's agents. Use it to find valid `deploymentId` and `agentId` values
-  before calling `chat`. Every deployment offers an **Auto** agent (`agentId: null`) in
-  addition to any configured agents.
-- **`chat`** — accepts two optional selection parameters:
-  - **`deploymentId`** — the deployment to use for this request. When omitted, the chat
-    uses the deployment from the current session (the default resolved at connect time).
-  - **`agentId`** — the agent to use for this request. When omitted or `null`, the
-    deployment's **Auto** agent is used. Pass a specific `agentId` to route to a
-    configured agent.
-- **`loadQueryResults`** — paginates through the results of a previous query on the same
-  deployment context.
+  each deployment's agents. Use it to find valid `deploymentId` and `agentId` values.
+  Every deployment offers an **Auto** agent (`agentId: null`) in addition to any
+  configured agents.
+- **Every other tool** accepts an optional **`deploymentId`** parameter to target a
+  deployment other than the session default (the one resolved at connect time). `chat`
+  additionally accepts an optional **`agentId`** — when omitted or `null`, the target
+  deployment's **Auto** agent is used.
+- **`loadQueryResults`** does not take a `deploymentId` — it always resumes a previous
+  query on the deployment that query already ran on.
+- Resuming an existing chat (passing `chatId` to `chat` or `visualize`) always continues
+  on the deployment that conversation started on; passing a different `deploymentId` for
+  the same `chatId` is rejected rather than silently ignored.
 
 A typical client workflow:
 
@@ -204,7 +203,7 @@ A typical client workflow:
 Requests are always validated against the admin's deployment-access settings. A deployment
 that is outside the allow-list — or that you don't have permission to see — is rejected
 with a **403 Forbidden** (`Deployment <id> is not available via MCP for this account`), so
-neither `listDeployments` nor the `chat` selection can reach an excluded deployment.
+no tool's `deploymentId` selection can reach an excluded deployment.
 
 ## Available actions
 
