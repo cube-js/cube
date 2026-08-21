@@ -391,12 +391,12 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       expect(result).toBe('select * from bar');
     });
 
-    onlyLocalTest('addAndRetrieve never claims in memory', async () => {
+    onlyLocalTest('addToQueue never claims in memory', async () => {
       const connection = await queue.queueDriver.createConnection();
       const query: QueryKey = ['select * from add_and_retrieve', []];
 
       try {
-        const [added, , , , claim] = await connection.addAndRetrieve(
+        const [added, , , , claim] = await connection.addToQueue(
           query,
           'delay',
           { isJob: true, orphanedTimeout: undefined },
@@ -650,7 +650,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         const connection = await queue.queueDriver.createConnection();
         const first: QueryKey = ['select * from budget_1', []];
         const second: QueryKey = ['select * from budget_2', []];
-        const addAndRetrieve = (queryKey: QueryKey, queueId: number) => connection.addAndRetrieve(
+        const addToQueue = (queryKey: QueryKey, queueId: number) => connection.addToQueue(
           queryKey,
           'delay',
           { isJob: true, orphanedTimeout: undefined },
@@ -660,17 +660,17 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
         try {
           // concurrency is 1, the first query takes the only slot
-          const [added1, , , , claim1] = await addAndRetrieve(first, 1);
+          const [added1, , , , claim1] = await addToQueue(first, 1);
           expect(added1).toBe(1);
           expect(claim1?.[5]).toBe(true);
           expect(claim1?.[4].queryKey).toStrictEqual(first);
 
           // an active item is never claimed twice
-          const [added1again, , , , claim1again] = await addAndRetrieve(first, 1);
+          const [added1again, , , , claim1again] = await addToQueue(first, 1);
           expect(added1again).toBe(0);
           expect(claim1again).toBeNull();
 
-          const [added2, , , , claim2] = await addAndRetrieve(second, 2);
+          const [added2, , , , claim2] = await addToQueue(second, 2);
           expect(added2).toBe(1);
           expect(claim2).toBeNull();
 

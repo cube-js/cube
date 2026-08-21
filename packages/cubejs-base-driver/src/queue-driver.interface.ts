@@ -30,16 +30,15 @@ export type RetrieveForProcessingFail = [
   lockAquired: false
 ];
 export type RetrieveForProcessingResponse = RetrieveForProcessingSuccess | RetrieveForProcessingFail | null;
-export type AddToQueueResponse = [added: number, queueId: QueueId | null, queueSize: number, addedToQueueTime: number];
-export type AddAndRetrieveResponse = [
+export type AddToQueueResponse = [
   added: number,
   queueId: QueueId | null,
   queueSize: number,
   addedToQueueTime: number,
   // `null` when the item was not claimed - the concurrency budget was full, the item is
-  // already active, or the driver has no fast track at all. A claim is an ownership transfer:
-  // the caller owns an active item and must execute and acknowledge it, otherwise the query
-  // stalls until the stalled/orphaned reclaim picks it up.
+  // already active, or the driver does not claim on insert at all. A claim is an ownership
+  // transfer: the caller owns an active item and must execute and acknowledge it, otherwise
+  // the query stalls until the stalled/orphaned reclaim picks it up.
   claim: RetrieveForProcessingSuccess | null,
 ];
 
@@ -73,7 +72,8 @@ export interface QueueDriverConnectionInterface {
   getResult(queryKey: QueryKey, externalId?: string): Promise<any>;
   /**
    * Adds specified by the queryKey query to the queue, returns tuple
-   * with the operation result.
+   * with the operation result. A driver may also claim the item for processing in the same
+   * operation, which saves the caller a retrieval round-trip.
    *
    * @param queryKey
    * @param queryHandler Our queue allows using different handlers. For example, query, cvsQuery, etc.
@@ -82,12 +82,6 @@ export interface QueueDriverConnectionInterface {
    * @param options
    */
   addToQueue(queryKey: QueryKey, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse>;
-  /**
-   * Same as {@link addToQueue}, but the driver also tries to claim the item for processing
-   * in the same operation, which saves the caller a retrieval round-trip. A driver which
-   * cannot claim returns a `null` claim and the caller falls back to the normal flow.
-   */
-  addAndRetrieve(queryKey: QueryKey, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddAndRetrieveResponse>;
   // Return query keys which was sorted by priority and time
   getToProcessQueries(): Promise<QueryKeysTuple[]>;
   getActiveQueries(): Promise<QueryKeysTuple[]>;

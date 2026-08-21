@@ -269,7 +269,7 @@ export class QueryQueue {
 
       options.orphanedTimeout = query.orphanedTimeout;
 
-      const [added, queueId, queueSize, addedToQueueTime, claim] = await queueConnection.addAndRetrieve(
+      const [added, queueId, queueSize, addedToQueueTime, claim] = await queueConnection.addToQueue(
         queryKey, queryHandler, query, priority, options
       );
 

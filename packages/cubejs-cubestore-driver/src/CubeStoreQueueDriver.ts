@@ -10,7 +10,6 @@ import {
   AddToQueueQuery,
   AddToQueueOptions,
   AddToQueueResponse,
-  AddAndRetrieveResponse,
   QueryKey,
   QueryKeyHash,
   ProcessingId,
@@ -140,38 +139,13 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
   ): Promise<AddToQueueResponse> {
     const { modifiers, values, addedToQueueTime } = await this.buildAddCommand(queryKey, queryHandler, query, priority, options);
 
-    const rows = await this.driver.query<{ id: string, added: string, pending: string }>(`QUEUE ADD${modifiers}`, values);
-    if (rows && rows.length) {
-      return [
-        rows[0].added === 'true' ? 1 : 0,
-        rows[0].id ? parseInt(rows[0].id, 10) : null,
-        parseInt(rows[0].pending, 10),
-        addedToQueueTime
-      ];
+    const fastTrack = await this.useFastTrack();
+    if (fastTrack) {
+      values.push(this.options.concurrency);
     }
 
-    throw new Error('Empty response on QUEUE ADD');
-  }
-
-  public async addAndRetrieve(
-    queryKey: QueryKey,
-    queryHandler: string,
-    query: AddToQueueQuery,
-    priority: number,
-    options: AddToQueueOptions
-  ): Promise<AddAndRetrieveResponse> {
-    if (!await this.useFastTrack()) {
-      const [added, queueId, queueSize, addedToQueueTime] = await this.addToQueue(
-        queryKey, queryHandler, query, priority, options
-      );
-
-      return [added, queueId, queueSize, addedToQueueTime, null];
-    }
-
-    const { modifiers, values, addedToQueueTime } = await this.buildAddCommand(queryKey, queryHandler, query, priority, options);
-    values.push(this.options.concurrency);
-
-    const rows = await this.driver.query<CubeStoreClaimResponse & { added: string }>(`QUEUE ADD_AND_RETRIEVE${modifiers} ?`, values);
+    const command = fastTrack ? 'ADD_AND_RETRIEVE' : 'ADD';
+    const rows = await this.driver.query<CubeStoreClaimResponse & { added: string }>(`QUEUE ${command}${modifiers}${fastTrack ? ' ?' : ''}`, values);
     if (rows && rows.length) {
       return [
         rows[0].added === 'true' ? 1 : 0,
@@ -179,11 +153,11 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
         parseInt(rows[0].pending, 10),
         addedToQueueTime,
         // An item which already existed is never added twice, but it still can be claimed
-        this.decodeClaimFromRow(rows[0], 'addAndRetrieve'),
+        fastTrack ? this.decodeClaimFromRow(rows[0], 'addToQueue') : null,
       ];
     }
 
-    throw new Error('Empty response on QUEUE ADD_AND_RETRIEVE');
+    throw new Error(`Empty response on QUEUE ${command}`);
   }
 
   public async getQueryAndRemove(hash: QueryKeyHash, queueId: QueueId | null): Promise<[QueryDef]> {
