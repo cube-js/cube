@@ -21,6 +21,7 @@ import {
   ResultWrapper,
   rowsToColumnar,
 } from '@cubejs-backend/native';
+import type { SqlFilterItem, SqlFiltersResponse } from '@cubejs-backend/native';
 import type {
   Application as ExpressApplication,
   ErrorRequestHandler,
@@ -118,6 +119,14 @@ type HandleErrorOptions = {
     query?: any,
     requestStarted?: Date
 };
+
+/**
+ * Upper bound on the number of filters a single SQL filters request may carry,
+ * counting the leaves of filter groups. A batch costs one rewrite of the query
+ * regardless of its size, so the bound is about how large a predicate the
+ * rewrite engine is asked to saturate over.
+ */
+const MAX_SQL_FILTERS = 500;
 
 function userAsyncHandler(handler: (req: Request & { context: ExtendedRequestContext }, res: ExpressResponse) => Promise<void>) {
   return (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
@@ -417,6 +426,26 @@ class ApiGateway {
 
       await this.sql({
         query: req.body.query,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
+
+    app.get(`${this.basePath}/v1/sql-filters`, userMiddlewares, userAsyncHandler(async (req: any, res) => {
+      await this.getSqlFilters({
+        query: req.query.query,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
+
+    app.post(`${this.basePath}/v1/sql-filters`, jsonParser, userMiddlewares, userAsyncHandler(async (req, res) => {
+      await this.modifySqlFilters({
+        query: req.body.query,
+        add: req.body.add,
+        set: req.body.set,
+        delete: req.body.delete,
+        replace: req.body.replace,
         context: req.context,
         res: this.resToResultFn(res)
       });
@@ -1476,6 +1505,154 @@ class ApiGateway {
       const result = await this.sqlServer.sql4sql(query, disablePostProcessing, context.securityContext);
 
       await res({ sql: result });
+    } catch (e: any) {
+      this.handleError({
+        e,
+        context,
+        query,
+        res,
+      });
+    }
+  }
+
+  /**
+   * Responds with the result of a SQL filters operation. Planning and
+   * rewriting failures are reported by the native layer in-band as
+   * `{ status: 'error', error }`, so they are mapped onto a 4xx to keep
+   * the endpoint's failures visible to status-code-based clients.
+   */
+  protected async resSqlFilters(result: SqlFiltersResponse, res: ResponseResultFn) {
+    if (result.status === 'error') {
+      await res(result, { status: 400 });
+      return;
+    }
+
+    await res(result);
+  }
+
+  /**
+   * Returns the list of Cube filters of a SQL query in Cube query format,
+   * extracted from the logical plan of the query.
+   */
+  protected async getSqlFilters({
+    query,
+    context,
+    res,
+  }: { query: string } & BaseRequest) {
+    try {
+      await this.assertApiScope('sql', context.securityContext);
+
+      if (typeof query !== 'string' || !query.trim()) {
+        throw new UserError('query parameter must be a non-empty string');
+      }
+
+      const result = await this.sqlServer.getSqlFilters(query, context.securityContext);
+
+      await this.resSqlFilters(result, res);
+    } catch (e: any) {
+      this.handleError({
+        e,
+        context,
+        query,
+        res,
+      });
+    }
+  }
+
+  /**
+   * Modifies the Cube filters of a SQL query. Exactly one of `add`, `set`,
+   * `delete` or `replace` must be provided. `add` adds the requested filters,
+   * `set` replaces all outermost filters with the specified set, `delete`
+   * attempts to delete the requested filters (all occurrences of equal
+   * filters are deleted), and `replace` replaces one exact set of filters
+   * with another (all occurrences of equal filters are replaced). Filters
+   * may be `and`/`or` filter groups; existing filters must match perfectly
+   * to be deleted or replaced. Only the outermost SELECT is modified, and
+   * only dimensions/measures available in the outermost SELECT can be
+   * filtered.
+   */
+  protected async modifySqlFilters({
+    query,
+    add,
+    set,
+    delete: deleteFilters,
+    replace,
+    context,
+    res,
+  }: { query: string, add?: unknown, set?: unknown, delete?: unknown, replace?: unknown } & BaseRequest) {
+    try {
+      await this.assertApiScope('sql', context.securityContext);
+
+      if (typeof query !== 'string' || !query.trim()) {
+        throw new UserError('query parameter must be a non-empty string');
+      }
+
+      const requestedOps = [add, set, deleteFilters, replace].filter((op) => op !== undefined);
+      if (requestedOps.length !== 1) {
+        throw new UserError('Exactly one of add, set, delete or replace parameters is required');
+      }
+
+      // The size of the predicate the rewrite engine ends up with is what
+      // costs, and a filter group nests any number of leaves inside a single
+      // array entry, so the leaves are what is bounded
+      const countFilters = (filters: unknown[]): number => filters.reduce<number>(
+        (total, filter: any) => {
+          // A group is whichever of the two fields holds an array - the other
+          // may be present and not an array, which is for the native layer to
+          // reject rather than something to recurse into
+          const group = Array.isArray(filter?.and) ? filter.and : filter?.or;
+
+          return total + (Array.isArray(group) ? Math.max(countFilters(group), 1) : 1);
+        },
+        0,
+      );
+
+      const assertFilterArray = (filters: unknown, name: string): SqlFilterItem[] => {
+        if (!Array.isArray(filters)) {
+          throw new UserError(`${name} parameter must be an array of filters`);
+        }
+
+        if (countFilters(filters) > MAX_SQL_FILTERS) {
+          throw new UserError(`${name} parameter must contain at most ${MAX_SQL_FILTERS} filters`);
+        }
+
+        return filters;
+      };
+
+      if (add !== undefined) {
+        const result = await this.sqlServer.addSqlFilters(query, assertFilterArray(add, 'add'), context.securityContext);
+
+        await this.resSqlFilters(result, res);
+        return;
+      }
+
+      if (set !== undefined) {
+        const result = await this.sqlServer.setSqlFilters(query, assertFilterArray(set, 'set'), context.securityContext);
+
+        await this.resSqlFilters(result, res);
+        return;
+      }
+
+      if (deleteFilters !== undefined) {
+        const result = await this.sqlServer.deleteSqlFilters(query, assertFilterArray(deleteFilters, 'delete'), context.securityContext);
+
+        await this.resSqlFilters(result, res);
+        return;
+      }
+
+      if (typeof replace !== 'object' || replace === null || Array.isArray(replace)) {
+        throw new UserError('replace parameter must be an object with old and new filter arrays');
+      }
+
+      const { old: oldFilters, new: newFilters } = replace as Record<string, unknown>;
+      const result = await this.sqlServer.replaceSqlFilters(
+        query,
+        assertFilterArray(oldFilters, 'replace.old'),
+        assertFilterArray(newFilters, 'replace.new'),
+        context.securityContext,
+      );
+
+      await this.resSqlFilters(result, res);
     } catch (e: any) {
       this.handleError({
         e,
