@@ -1822,6 +1822,70 @@ The ARN of the AWS IAM role to assume when using
 | ----------------- | ---------------------- | --------------------- |
 | A valid IAM role ARN | N/A                 | N/A                   |
 
+## `CUBESTORE_AZURE_ACCESS_KEY`
+
+The access key for the Azure Storage account. Optional when using Azure Blob
+Storage. If not set, Cube Store falls back to `CUBESTORE_AZURE_SAS_TOKEN` and
+then to workload identity or managed identity (see
+[`CUBESTORE_AZURE_CONTAINER`](#cubestore_azure_container)).
+
+| Possible Values                   | Default in Development | Default in Production |
+| --------------------------------- | ---------------------- | --------------------- |
+| A valid Azure Storage account key | N/A                    | N/A                   |
+
+## `CUBESTORE_AZURE_ACCOUNT`
+
+The name of the Azure Storage account. Required when
+`CUBESTORE_AZURE_CONTAINER` is set.
+
+| Possible Values                    | Default in Development | Default in Production |
+| ---------------------------------- | ---------------------- | --------------------- |
+| A valid Azure Storage account name | N/A                    | N/A                   |
+
+## `CUBESTORE_AZURE_CONTAINER`
+
+The name of the Azure Blob Storage container. Required when using Azure Blob
+Storage as persistent storage; setting it selects the Azure backend.
+
+When neither `CUBESTORE_AZURE_ACCESS_KEY` nor `CUBESTORE_AZURE_SAS_TOKEN` is
+set, Cube Store authenticates with workload identity using the standard
+`AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_FEDERATED_TOKEN_FILE`
+environment variables, or with the managed identity of the host (IMDS) if
+those are not present either.
+
+| Possible Values             | Default in Development | Default in Production |
+| --------------------------- | ---------------------- | --------------------- |
+| A valid blob container name | N/A                    | N/A                   |
+
+## `CUBESTORE_AZURE_ENDPOINT`
+
+A custom endpoint URL for Azure Blob Storage. Optional. Use this for local
+development with [Azurite](https://learn.microsoft.com/en-us/azure/storage/common/storage-use-azurite)
+or for sovereign cloud endpoints.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid URL     | N/A                    | N/A                   |
+
+## `CUBESTORE_AZURE_SAS_TOKEN`
+
+A shared access signature (SAS) token for Azure Blob Storage. Optional. Used
+when `CUBESTORE_AZURE_ACCESS_KEY` is not set. If neither the access key nor
+the SAS token is set, workload identity or managed identity is used.
+
+| Possible Values   | Default in Development | Default in Production |
+| ----------------- | ---------------------- | --------------------- |
+| A valid SAS token | N/A                    | N/A                   |
+
+## `CUBESTORE_AZURE_SUB_PATH`
+
+The path prefix within the Azure Blob Storage container to store
+pre-aggregations. Optional.
+
+| Possible Values     | Default in Development | Default in Production |
+| ------------------- | ---------------------- | --------------------- |
+| A valid path prefix | N/A                    | N/A                   |
+
 ## `CUBESTORE_BIND_ADDR`
 
 The address/port pair for Cube Store's MySQL-compatible interface.
