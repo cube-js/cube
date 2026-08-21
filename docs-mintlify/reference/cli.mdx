@@ -151,7 +151,7 @@ cube validate DEPLOYMENT_ID --dev-mode           # your active dev-mode branch
 ```
 
 The compile runs where the model runs: the command asks the branch's own Cube
-API for its metadata, the same call the Cube Cloud UI makes. So the model is
+API for its metadata, the same call the Cube UI makes. So the model is
 checked against that environment's real variables and drivers, and a branch is
 validated by the environment serving it — with `--dev-mode`, against your
 uncommitted working copy, before you commit it.
@@ -388,31 +388,10 @@ env:
 
 steps:
   - name: Sync the dbt branch under review
-    shell: bash   # the `case` below is a bash range, not one inherited by luck
+    shell: bash
     run: |
-      # `dbt sync` can only verify a ref whose first character it recognises, so a
-      # convention it can't check would run this gate unverified. Reject it here, before
-      # a sync spends minutes creating a branch this step would then abandon. LC_ALL=C
-      # keeps the range ASCII: bash matches it by collation until 5.0, and the macOS
-      # runners still ship 3.2.
-      export LC_ALL=C
-      case "$GITHUB_HEAD_REF" in
-        [A-Za-z0-9_.-]*) ;;
-        *) echo "this gate needs a branch name starting with a letter, digit, _, . or -: $GITHUB_HEAD_REF"; exit 1;;
-      esac
       cube dbt sync "$DEPLOYMENT_ID" --ref "$GITHUB_HEAD_REF" --wait --json > sync.json
-      # Read the branch name BEFORE the assertion below: a sync that reaches this point
-      # has already created a branch, and a failing assertion exits the step before
-      # $GITHUB_ENV is written, which skips the prune step. This message is then the only
-      # place the job says which branch to sweep.
-      BRANCH=$(jq -r .branchName sync.json)
-      # The gate only means anything if the sync used the ref, so refuse to continue
-      # when `dbt sync` could not confirm it — a ref starting with `#` or `@`, say.
-      jq -e '.refVerified == true' sync.json >/dev/null || {
-        echo "sync not verified to have used $GITHUB_HEAD_REF"
-        echo "prune the branch it created: cube data-model delete-branch $DEPLOYMENT_ID '$BRANCH'"
-        exit 1
-      }
+      BRANCH=$(jq -er '.branchName | select(length > 0)' sync.json)
       echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
 
   - name: Compile and query the generated model
@@ -449,193 +428,48 @@ steps:
       cube data-model delete-branch "$DEPLOYMENT_ID" "$BRANCH"
 ```
 
-With `--wait --json`, the sync writes one document carrying both the branch to
-compile and how the sync ended, which is why the branch name is available to the
-next step. Compile and query share a step because the dev-mode branch name is
-only known at runtime.
-
-The query goes to the **deployment's own host** (`deploymentUrl`), not to
-`CUBE_API_URL` — that one is the Cube Cloud API, and it answers this path with `200`
-and an HTML page, which `curl -sf` accepts happily. Asserting on the body is what turns
-"some 200 came back" into "the model answered a query".
-
-The loop exists because not every `200` is an answer: a query that takes longer than the
-`continueWaitTimeout` [orchestrator option][ref-conf-orchestrator-opts] returns [`Continue
-wait`][ref-rest-api-continue-wait]
-with status 200, and clients are expected to retry until a result appears. A first query
-against a cold dev-mode environment and an uncached warehouse is exactly when that
-happens, so failing on it would fail the gate on a model that is fine.
-
-What it retries is decided by **who wrote the body**, not by the status code, because
-the status doesn't separate the two cases: an unknown member comes back as `500` with
-Cube's own `{"error": …}`, the same class of status an overloaded ingress returns with no
-JSON at all. So a body carrying `error` is Cube answering, and Cube's errors are treated
-as permanent — the gate fails immediately and prints it, which for a mistyped measure
-means *"Cube 'nope' not found for path 'nope.count'"* in one second rather than after
-minutes of retries. `Continue wait` is the one exception the loop knows about. Note the
-trade: orchestrator and warehouse failures arrive in the same shape (as a `400`), so a
-genuinely transient data-path failure fails the gate rather than being retried — re-run
-the job if the message points at the warehouse rather than at the model. Narrowing this
-by matching error strings would be worse than re-running.
-
-Anything else — a reset, a DNS failure, an ingress error page — is retried, and `-sS`
-keeps curl's message visible instead of leaving a blank line where the reason should be.
-Exhausting the retries fails too, so a query that never answers can't pass quietly.
-
-The step's own budget is `--max-time 95` per attempt, 20 attempts, 5s apart: about half an
-hour at worst. The per-attempt cap matters because without one a host that accepts the
-connection and never answers would hang until the *job* timeout — six hours by default —
-and a gate that never returns is worse than one that fails.
-
-95 is deliberate: `continueWaitTimeout` — the only part of a request Cube bounds — is
-capped at 90 where Cube validates it, so no accepted value can make the long poll itself
-outlast a single attempt, and the two numbers never need keeping in sync. That cap applies
-to an `orchestrator_options` **object**: the function form used for multi-tenancy is
-validated as a function, so the options it returns are never checked and nothing clamps
-them downstream. If yours returns something larger, `--max-time` has to clear it.
-
-Shorten `--max-time` below that ceiling and you reintroduce the coupling — curl would
-abort each long poll before Cube could answer, and the loop would report a network failure
-for what is really two timeouts disagreeing. Raising it instead multiplies the budget by the
-attempt count, which is why the attempts came down from 30 as the cap went up. With the
-default `continueWaitTimeout` of 10s, a query that keeps long-polling gets about five
-minutes before the loop gives up.
-
-The compile and SQL generation ahead of the long poll are unbounded and add to it, so on a
-cold first query the two can still cross 95s even at an accepted value. The next attempt
-finds the compile already done, so in a log that shows up as a first attempt aborting at
-`--max-time` on a gate that then passes — not a network fault. That is why the loop keeps
-curl's exit status rather than flattening every failure to one code: an abort logs
-`no answer from the API (curl-28)`, a name-resolution failure `(curl-6)`, a reset
-`(curl-56)`, so the line itself tells you which you are looking at. (`-sS` also leaves
-curl's own message on stderr, but stderr interleaving in CI logs is not something to rely
-on.)
-
-The body is deleted before each attempt because curl leaves the previous file in place when
-it fails before the transfer starts (`--remove-on-error` does not change that), and
-without the `rm` a later transport failure would re-read an earlier body — making a stale
-`Continue wait` look like work still in progress.
-
-Name a measure the sync generated, not one that already existed, or the step passes
-without testing the new model at all.
+With `--wait --json`, the sync returns the generated branch and terminal result in one
+document. The query must use the deployment's `deploymentUrl`, and the loop must retry
+[`Continue wait`][ref-rest-api-continue-wait] responses until data arrives. Replace
+`dbt_fct_orders.count` with a measure generated by the sync.
 
 <Warning>
 
-**Give the gate its own API key, and always release the session.** Dev mode is
-per-credential state — one active branch per credential — so a gate that shares a
-key with anything else will re-point that session, and two pull requests running
-at once will re-point each other's. The step above releases it even when the
-compile or query fails, and `continue-on-error` keeps a failed release visible
-without blaming it for the job — releasing may legitimately do nothing if the gate
-never got as far as entering dev mode.
-
-The prune step is a second line of defence for the same thing: deleting a `dev-…`
-branch works while its session is still active, and ends that session — the
-deployment falls back to its production build. So a release that failed doesn't
-strand the session, and the prune doesn't need the release to have succeeded.
+Give the gate its own API key. Dev mode is per credential, so concurrent runs sharing a
+key can re-point each other's session. The concurrency group serializes them, and the
+release step runs even after a failure.
 
 </Warning>
 
 <Warning>
 
-**`--ref` is verified, not assumed.** A deployment that predates `ref` support drops the
-field silently and syncs the branch saved on the dbt integration, which would compile the
-wrong code and still pass. The response doesn't say which ref was used, so `dbt sync`
-checks the branch the server created: the requested ref appears in it (`--ref main` gives
-`dbt-sync/main-…`), and a sync that ignored the ref doesn't mention it. When it doesn't
-match, the command fails instead of reporting a result for code it can't confirm was
-compiled, and names the sync so you can cancel it. Passing `--branch` skips the check,
-because then the branch name is yours and carries no ref to look for.
-
-A few legal ref names can't be checked this way — `#1234-fix` and `@release` begin with
-characters whose treatment isn't known, so there's nothing to compare. Those syncs run,
-with a warning on stderr and `"refVerified": false` in the JSON document — from `--wait`
-or from a bare `--json` start, since a pipeline that follows the sync in a later step has
-no `--ref` left to check. A verified run reports `true`, and `null` means
-there was nothing to verify. The recipe above rejects an uncheckable branch name *before* syncing, because whether a
-ref can be checked depends only on the ref — so paying for a sync it is going to reject
-buys nothing, and leaves a branch behind. (The assertion after the sync names that branch
-so it can still be swept, but not creating it is better.) Its character set mirrors the CLI's, which
-is the source of truth: if that set grows, the shell guard is the copy that goes stale, and
-the assertion after the sync is what still holds either way. It then still asserts `refVerified == true`
-rather than trusting it, which also fails on `null`: that recipe always passes `--ref` and
-never `--branch`, so `null` would mean something changed underneath it. If you're choosing a
-branch convention for a gate, one starting with a letter or digit is the one that gets
-checked.
+Compile the personal `dev-…` branch returned by `data-model dev-mode`, not the shared
+branch created by the sync. The shared branch has no active runtime by default.
 
 </Warning>
 
-<Warning>
+Keep `shell: bash` on the piped step so a failed `cube` command cannot be hidden by a
+successful `jq` process.
 
-The compile step has to run against the **dev-mode branch**, not the branch the
-sync created. A sync lands on a shared branch, and a shared branch has nothing
-compiling it until someone opens it in dev mode — unless its [staging
-environment](/admin/deployment/environments#staging-environments) has been kept
-active with `enable-branch`, which needs a recent enough server, so this recipe
-uses dev mode. `cube data-model dev-mode` forks a personal `dev-…` branch and
-prints the name to wait on.
+New dbt inputs such as `dbt sync --ref` reject an empty value, as do required branch
+arguments such as `data-model dev-mode` and `delete-branch`. Existing optional flags keep
+their previous behavior: `deployments build-status --branch ''` is still accepted for a
+one-shot status request, but is rejected with the new `--wait` gate. Note that
+`$GITHUB_HEAD_REF` is only set on `pull_request` events; on any other trigger `--ref`
+gets an empty string, which is why the run stops there.
 
-Waiting on the wrong branch fails quickly rather than hanging: `build-status`
-reports such a branch as `building` with an error of `Branch is not active` (or
-`Bad branch` if it doesn't exist), and `--wait` stops and says so.
+Other existing optional `--branch` flags may accept an empty value for compatibility;
+omit them when you want the documented default.
 
-</Warning>
-
-Two details in there are load-bearing, both about a step going green with an empty
-branch variable. `shell: bash` gets `pipefail`, which Actions' default `bash -e`
-lacks — otherwise `cube … | jq -r .branchName` takes `jq`'s exit status and a failed
-`cube` call passes silently. And each `jq` result is captured in a bare assignment
-rather than inside `echo "BRANCH=$(jq …)"`, because `-e` fires on a failed command
-substitution in an assignment but not when it is an argument to a command that
-itself succeeds.
-
-All four branch arguments this recipe passes refuse an empty value rather than letting it
-mean "whichever branch the server would have picked" — `dbt sync --ref`, `data-model
-dev-mode`, `data-model delete-branch`, and `deployments build-status --branch`. So a gate
-that gets this wrong fails instead of reporting green, and it fails at the source rather
-than later. Note that `$GITHUB_HEAD_REF` is only set on `pull_request` events; on any
-other trigger `--ref` gets an empty string, which is why the run stops there.
-
-Optional `--branch` flags outside that set take an empty value and send it as an empty
-field, which leaves the server to decide what one means. (The field is `branchName` on
-most endpoints and `branch` on `github connect`.) Pass such a flag only with a name in
-hand, or leave it off and take the documented default.
-
-The API key needs more than the sync itself: `SchemaUpdate` to start or cancel a sync,
-enter dev mode and delete branches, `SchemaRead` to follow a sync and read the data model,
-and `DeploymentRead` to read build status, resolve the deployment's URL and mint a Core
-Data APIs token. `SchemaUpdateDevBranches` exists as a separate action for dev-branch
-edits, and the gate's middle steps are dev-branch operations — whether `SchemaUpdate`
-subsumes it isn't something this page has verified, so include it if your role separates
-the two. `All` avoids the question at the cost of granting everything else. Its
-scope must include this deployment — see [API keys][ref-api-keys] and [custom
-roles][ref-custom-roles]. Any failure — a failed sync, a failed compile, a
-timeout — exits non-zero, so the job fails without extra scripting.
+The API key needs `SchemaUpdate`, `SchemaRead`, `SchemaUpdateDevBranches`, and
+`DeploymentRead` for this deployment. See [API keys][ref-api-keys] and [custom
+roles][ref-custom-roles].
 
 <Info>
 
-A gate run creates **two** branches — the sync's own, and the personal `dev-…` fork
-that entering dev mode makes. The fork is not reused between runs: it is looked up
-by parent branch, and the parent is a new sync branch every time. So both are pruned,
-the fork first, since deleting a parent only re-parents its children rather than
-removing them.
-
-The step deliberately has no `if: always()`: on a **failure** those branches are the
-evidence — they hold the generated cubes that broke the build, and the failed build
-belongs to the fork — so they are left for someone to open. On success they have
-served their purpose.
-
-That holds for a failure the branches can explain. A gate that failed on a transient
-warehouse error — the trade described above, where an orchestrator failure arrives in
-Cube's error shape and isn't retried — leaves both branches behind carrying nothing, and
-the remedy for it is to re-run, which mints another pair. `cube data-model branches
-DEPLOYMENT_ID` lists them for a manual sweep; the names don't survive into the next run's
-`GITHUB_ENV`, so no later run can clean them up for you.
-
-For a deployment connected to a git provider, add `--remove-on-upstream` to delete
-the pushed ref as well; without it the branch is removed from Cube only. Deleting
-the deploy branch is refused, and an unknown branch is a 404 — so a re-run of a
-gate that already pruned fails loudly rather than silently.
+A successful gate prunes both branches it creates: the sync branch and its personal
+`dev-…` fork. Failed runs keep them for inspection. Add `--remove-on-upstream` to the
+cleanup commands if the connected Git provider branch should also be deleted.
 
 </Info>
 
@@ -661,7 +495,6 @@ or explicitly with `CUBE_NO_TELEMETRY=1` (or the legacy `CUBEJS_TELEMETRY=false`
 
 [ref-api-keys]: /admin/account-billing/api-keys
 [ref-custom-roles]: /admin/users-and-permissions/custom-roles
-[ref-conf-orchestrator-opts]: /reference/configuration/config#orchestrator_options
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-rest-api-continue-wait]: /reference/core-data-apis/rest-api#continue-wait
 [ref-staging-env]: /admin/deployment/environments#staging-environments

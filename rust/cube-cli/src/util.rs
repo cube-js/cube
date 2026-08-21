@@ -140,9 +140,7 @@ pub fn body(map: Map<String, Value>) -> Value {
 /// so the three cannot drift apart.
 const EMPTY_VALUE_REFUSED: &str = "an empty value";
 
-/// Reject a supplied-but-empty branch at parse time, where what an empty value means to
-/// the server has not been measured. [`nonempty_target`] carries the two arguments where
-/// it has — one of them a `--branch`, so the split is measured-vs-not, not branch-vs-ref.
+/// Reject a supplied-but-empty branch at parse time.
 ///
 /// On the declaration rather than in a match arm: written by hand it was added three
 /// times, each round missing an argument — last `github connect --branch`, which sends
@@ -166,16 +164,9 @@ pub fn nonempty(s: &str) -> Result<String, String> {
     Ok(s.to_string())
 }
 
-/// `nonempty` for the two flags whose empty-value behaviour was measured against a
-/// live tenant: `--branch` on `deployments build-status` and `--ref` on `dbt sync`.
-///
-/// Both are read as "not specified" and fall back to something that already exists —
-/// the deployment's active or deploy branch, and the dbt integration's tracked
-/// branch. Neither errors: the empty-ref sync ran to COMPLETED with four cubes and
-/// exit 0. That is what makes an empty value dangerous rather than untidy in a CI
-/// gate, and it is reachable without anything failing, since `$GITHUB_HEAD_REF` is
-/// empty on every trigger except `pull_request`.
-pub fn nonempty_target(s: &str) -> Result<String, String> {
+/// `nonempty` with a message specific to `dbt sync --ref`, where an empty value is read
+/// as "not specified" and falls back to the integration's tracked branch.
+pub fn nonempty_ref(s: &str) -> Result<String, String> {
     if s.trim().is_empty() {
         return Err(format!(
             "{EMPTY_VALUE_REFUSED} is read as \"not specified\" and falls back to the branch \
@@ -305,8 +296,8 @@ pub fn status_of(res: &serde_json::Value, path: &str) -> String {
 /// looks like it ran and silently addressed the wrong thing.
 ///
 /// Single quotes rather than escaping each metacharacter, because inside them the shell
-/// interprets nothing — except a single quote, which is itself legal in a ref name, so it
-/// is closed, escaped and reopened the POSIX way.
+/// interprets nothing. A quote inside the value is escaped for the current platform:
+/// close/escape/reopen on POSIX, and doubled for PowerShell on Windows.
 ///
 /// The convention is every user-supplied value inside a suggested command, not only the
 /// ones whose character set is known to be dangerous. Sync ids are opaque hex in practice
@@ -314,7 +305,14 @@ pub fn status_of(res: &serde_json::Value, path: &str) -> String {
 /// were "usually fine" too, until a ref called `#1234-fix` turned up, and a rule with an
 /// exemption list is one somebody has to re-derive at each new call site.
 pub fn shell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', r"'\''"))
+    #[cfg(windows)]
+    {
+        format!("'{}'", value.replace('\'', "''"))
+    }
+    #[cfg(not(windows))]
+    {
+        format!("'{}'", value.replace('\'', r"'\''"))
+    }
 }
 
 /// Parse a wait duration: a bare number of seconds, or a number with a `s`/`m`/`h`
@@ -466,9 +464,11 @@ mod tests {
         // An empty value stays visible rather than vanishing into the command line —
         // `deployments::named_branch`'s fallback reasons from this.
         assert_eq!(shell_quote(""), "''");
-        // A single quote is legal too, so it can't simply be wrapped: close, escape,
-        // reopen — the only form that works inside single quotes.
+        // A single quote is legal too, so it must be escaped for the current shell.
+        #[cfg(not(windows))]
         assert_eq!(shell_quote("it's"), r"'it'\''s'");
+        #[cfg(windows)]
+        assert_eq!(shell_quote("it's"), "'it''s'");
     }
 
     use super::*;
@@ -522,9 +522,9 @@ mod tests {
         assert!(nonempty("dbt-sync/x").is_ok());
         assert!(nonempty("").is_err());
         assert!(nonempty("   ").is_err());
-        assert!(nonempty_target("main").is_ok());
-        assert!(nonempty_target("").is_err());
-        assert!(nonempty_target("\t").is_err());
+        assert!(nonempty_ref("main").is_ok());
+        assert!(nonempty_ref("").is_err());
+        assert!(nonempty_ref("\t").is_err());
     }
 
     /// Where every `--branch`/`--ref` argument in the command tree stands on an empty
@@ -681,25 +681,10 @@ mod tests {
                 "cube data-model dev-mode <BRANCH>",
                 "cube data-model disable-branch <BRANCH>",
                 "cube data-model enable-branch <BRANCH>",
-                // Optional, and guarded anyway. The pair whose empty-value behaviour was
-                // measured rather than assumed — see `nonempty_target` — plus
-                // `dbt sync --branch`, which names the branch a sync creates and so
-                // decides whether `verify_ref_applied` runs at all.
+                // New dbt arguments are strict: no previous CLI behaviour depends on
+                // accepting an explicit empty value for them.
                 "cube dbt sync --branch",
                 "cube dbt sync --ref",
-                "cube deployments build-status --branch",
-                // `validate` is a gate: its exit code IS the product, so a blank must not
-                // be allowed to make it answer about a branch nobody named. Unguarded,
-                // the blank travels as `branchName=` (`push` sends it rather than
-                // dropping it), and if the server reads that as "not specified" — what
-                // the flag's own help documents as the default — a CI gate whose variable
-                // came out empty finds the deploy branch compiles and exits 0: a pass for
-                // code it never read. A wrong verdict rather than an unintended action,
-                // which is what separates this from `deploy --branch` below.
-                //
-                // `nonempty`, not `nonempty_target`: that reading is documented but was
-                // never measured here, and measured-vs-not is the whole of the split.
-                "cube validate --branch",
             ],
             "the set of branch arguments refusing an empty value changed. Adding one is \
              `value_parser = util::nonempty` on the declaration; dropping one means a \
@@ -720,7 +705,12 @@ mod tests {
                 "cube data-model put --branch",
                 "cube data-model rename --branch",
                 "cube deploy --branch",
+                // Existing flags retain their parse-time behaviour. `build-status`
+                // validates a blank only for its new `--wait` mode, where it is a gate;
+                // legacy one-shot calls and `validate` continue to pass it through.
+                "cube deployments build-status --branch",
                 "cube github connect --branch",
+                "cube validate --branch",
             ],
             "a branch argument that takes an empty value at parse time was added, \
              removed or renamed. This list records the parser's answer alone — that a \

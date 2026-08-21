@@ -25,7 +25,7 @@ enum Cmd {
         /// Git ref in the dbt repository to sync — a branch or tag, not a commit
         /// SHA. Overrides the branch saved on the dbt integration for this sync
         /// only, so CI can test the ref under review.
-        #[arg(long, value_parser = util::nonempty_target)]
+        #[arg(long, value_parser = util::nonempty_ref)]
         r#ref: Option<String>,
         /// Name for the Cube branch the generated cubes land on (defaults to a
         /// generated `dbt-sync/…` name)
@@ -98,123 +98,7 @@ const MISSING_GRACE: Duration = Duration::from_secs(60);
 /// Short on purpose: nothing is being waited for here, it only buys enough room to
 /// ride out a transient failure on the gate's final request.
 const RESULT_FETCH_TIMEOUT: Duration = Duration::from_secs(30);
-
-/// How much of a ref to expect in a branch name.
-///
-/// Measured against a live deployment rather than inferred, because the first version of
-/// this check guessed and rejected two of three legitimate refs. What the server does
-/// with `--ref X`, in `dbt-sync/<X>-<timestamp>-<hash>`:
-///
-/// | requested                                          | branch segment                             |
-/// |----------------------------------------------------|--------------------------------------------|
-/// | `main`                                             | `main`                                     |
-/// | `refs/heads/main`                                  | `refs-heads-main`                          |
-/// | `release/2026.08`                                  | `release-2026.08`  (dot kept)              |
-/// | `feat_x_orders`                                    | `feat_x_orders`    (underscore kept)       |
-/// | `UPPER_lower`                                      | `UPPER_lower`      (case kept)             |
-/// | `feat x orders`                                    | `feat-x-orders`    (space replaced)        |
-/// | `feat~x`                                           | `feat-x`           (tilde replaced)        |
-/// | `feature/CUB-1234-add-orders-fact-table-and-more`  | `feature-CUB-1234-add-orders-fact-table-a` |
-///
-/// (`git check-ref-format` rejects a space, so that row measures the server rather than
-/// anything `--ref` can carry; `~` earns its place — `main~1` is a legal revision.)
-///
-/// One observation deliberately *not* encoded: `#1-fix` produced `1-fix`, so a leading `#`
-/// is dropped rather than replaced. One probe of one character is how the first two
-/// versions of this check went wrong, so `#` stays in the unmeasured set and reports the
-/// sync unverified instead. Extending the mapping wants the same treatment the table got:
-/// measure the class, then encode it.
-///
-/// So alphanumerics, `_`, `.` and `-` survive with their case; `/`, space and `~` become
-/// `-`; and the segment is cut at 40 characters. Comparing whole refs therefore fails
-/// healthy syncs — a prefix is what survives every shape, and it keeps the property that
-/// matters, since a sync that ignored the ref contains *nothing* from it.
-const REF_PREFIX: usize = 12;
-
-/// The leading part of a ref as it should appear in a server-generated branch name.
-fn ref_fingerprint(value: &str) -> String {
-    value
-        .chars()
-        .map(|ch| match ch {
-            // Measured as replaced by the server.
-            '/' | ' ' | '~' => '-',
-            // Measured as kept; compared case-insensitively.
-            ch => ch.to_ascii_lowercase(),
-        })
-        // Stop at the first character nobody measured — `:`, `#`, `^` and friends could
-        // be replaced or kept, and guessing either way risks failing a healthy sync. A
-        // shorter fingerprint is the safe direction: it can only under-check.
-        .take_while(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'))
-        .take(REF_PREFIX)
-        .collect()
-}
-
-/// Fail if the branch the server created shows no sign of the ref we asked for.
-///
-/// A deployment that predates `ref` support drops the field silently and syncs the
-/// integration's tracked branch instead — the sync succeeds, the gate passes, and the
-/// pull request's dbt models were never compiled. Nothing in the response says which ref
-/// was used, so the branch name is the only evidence available (see [`REF_PREFIX`]).
-///
-/// Only checked when the caller let the server name the branch: with `--branch` the name
-/// is the caller's own and carries no ref to look for.
-///
-/// `Ok(true)` when the branch name confirms the ref, `Ok(false)` when the ref left nothing
-/// comparable — the caller warns and reports it as `refVerified: false` — and `Err` when
-/// the name contradicts the ref.
-///
-/// `deployment` is carried for the error message alone: it bails on a running sync that
-/// has already made a branch, so both recovery commands have to be runnable exactly as
-/// printed — this lands in a CI log, not a shell with someone in front of it.
-fn verify_ref_applied(
-    deployment: i64,
-    requested: &str,
-    branch_name: &str,
-    sync_job_id: &str,
-) -> Result<bool> {
-    let fingerprint = ref_fingerprint(requested);
-    // A ref beginning with a character nobody measured leaves nothing to compare. That's
-    // a legal ref (`#1234-fix`, `@release`), and a silent Ok would mean the gate ran
-    // unverified with no way to tell.
-    if fingerprint.is_empty() {
-        return Ok(false);
-    }
-
-    let lowered = branch_name.to_ascii_lowercase();
-    let matched = match lowered.split_once("dbt-sync/") {
-        // Anchored on the marker rather than the start of the name, so a nested
-        // `myorg/dbt-sync/…` still gets the strict check: the ref segment begins right
-        // after it, and requiring `starts_with` there is what stops a short fingerprint
-        // matching the trailing timestamp-hash.
-        Some((_, segment)) => segment.starts_with(&fingerprint),
-        // No marker to anchor on — a renamed prefix. Weaker on purpose, and knowingly:
-        // the trailing `-<timestamp>-<hash>` outlives any rename, so a short fingerprint
-        // (`1`, `2026`, a hex character) can still be satisfied by it. Preferred over
-        // failing every healthy sync after the POST, which is what anchoring on a
-        // literal did.
-        None => lowered.contains(&fingerprint),
-    };
-    if matched {
-        return Ok(true);
-    }
-
-    // The one site an unnamed branch genuinely reaches: this bails BECAUSE the comparison
-    // failed, and an empty name fails it. Only the message is affected — the `--wait`
-    // document keeps whatever the server sent (see `wait_json`).
-    let branch_name = &util::branch_or_placeholder(branch_name);
-    anyhow::bail!(
-        "the sync started on {branch_name}, which doesn't begin with the ref you asked \
-         for ({requested}). Either this deployment predates `ref` support — in which case \
-         it is syncing the branch saved on the dbt integration, compiling the wrong code \
-         and still passing — or it names branches differently than this check expects. \
-         Stopping rather than reporting a result for a ref that may not have been used. \
-         The sync is still running: cancel it with `cube dbt cancel {deployment} {}`, \
-         and delete the branch with `cube data-model delete-branch {deployment} {}`. \
-         Pass --branch to name the branch yourself, which skips this check.",
-        util::shell_quote(sync_job_id),
-        util::shell_quote(branch_name)
-    )
-}
+const RESULT_FETCH_POLL_MAX: Duration = Duration::from_secs(5);
 
 /// One line summarising a status payload, for progress output.
 ///
@@ -311,40 +195,17 @@ fn print_prune_hint(sync_created_it: bool, deployment: i64, branch_name: &str) {
     }
 }
 
-/// The verification a server reported for itself, if it reported one at all — the rule
-/// BOTH `--json` documents defer to, kept in one place so they cannot come to disagree.
-///
-/// A server that echoes the resolved ref has better evidence than this client's prefix
-/// comparison, so its answer wins. But only a BOOLEAN counts as one, because only a
-/// boolean is something the documented `jq -e '.refVerified == true'` can act on: it
-/// fails on `null`, and equally on `"true"`, `1` or an object. An unspecified future
-/// contract is the reason to be strict about this rather than lenient — deferring to a
-/// value that assertion can't read would turn a sync this client verified into a red
-/// gate, which is the whole failure this rule exists to avoid. `false` stays an answer;
-/// anything else falls back to the client's own comparison, which is at least a verdict.
-///
-/// `Option<bool>` rather than `Option<&Value>` because `as_bool` IS the rule — absent and
-/// not-a-verdict both become `None` — so the next reader is told the invariant instead of
-/// reconstructing it from a filter, and both documents share one conversion back to JSON.
-fn reported_ref_verified(doc: &Value) -> Option<bool> {
-    doc.get("refVerified")?.as_bool()
+/// A result is available only when it is a non-empty object. Some deployments return
+/// `200 null` or `{}` while the completed workflow is still publishing its result.
+fn available_result(result: Option<Value>) -> Option<Value> {
+    result.filter(|value| value.as_object().is_some_and(|object| !object.is_empty()))
 }
 
 /// The `--wait --json` document: one object carrying BOTH halves a caller needs —
 /// which branch to compile next, and how the sync ended. Waiting otherwise forced a
 /// choice between the start payload (which names the branch) and the result (which
 /// does not), and a CI job needs both.
-/// `ref_verified` is false when `--ref` was given but nothing in it could be checked
-/// against the branch name (see [`verify_ref_applied`]) — a warning on stderr is
-/// invisible to the `jq` consumer this document exists for, which would otherwise read
-/// identically to a verified run. `null` when no `--ref` was given.
-fn wait_json(
-    started: &Value,
-    status: &Value,
-    branch_name: &str,
-    result: Option<&Value>,
-    ref_verified: Option<bool>,
-) -> Value {
+fn wait_json(started: &Value, status: &Value, branch_name: &str, result: Option<&Value>) -> Value {
     serde_json::json!({
         "syncJobId": output::field(started, "syncJobId"),
         "workflowId": output::field(started, "workflowId"),
@@ -359,16 +220,6 @@ fn wait_json(
         "status": util::status_of(status, "status"),
         "error": status.get("error").cloned().unwrap_or(Value::Null),
         "result": result.cloned().unwrap_or(Value::Null),
-        // Checked on both documents because either could carry it, and `started` first
-        // because the ref is resolved at POST time — that is where a server would
-        // answer; the terminal status is consulted only in case it carries the field
-        // instead. See [`reported_ref_verified`] for why the client keeps the field
-        // when the server's value isn't a verdict.
-        "refVerified": Value::from(
-            reported_ref_verified(started)
-                .or_else(|| reported_ref_verified(status))
-                .or(ref_verified),
-        ),
     })
 }
 
@@ -439,51 +290,12 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             // `--wait` document a gate reads.
             let shown = util::branch_or_placeholder(&branch_name);
 
-            // Fail closed if the server didn't honour --ref (see `verify_ref_applied`).
-            // `None` when there was nothing to verify: no --ref, or the caller named the
-            // branch themselves.
-            let ref_verified = match (&r#ref, &branch) {
-                (Some(requested), None) => {
-                    let verified =
-                        verify_ref_applied(deployment, requested, &branch_name, &sync_job_id)?;
-                    if !verified {
-                        eprintln!(
-                            "warning: no part of `{requested}` can be checked against the \
-                             branch name, so this sync is not verified to have used it"
-                        );
-                    }
-                    Some(verified)
-                }
-                _ => None,
-            };
-
             if !wait {
                 if ctx.json {
-                    // The same reason `wait_json` carries it: a pipeline that starts a
-                    // sync here and follows it with `dbt status --wait` elsewhere has no
-                    // `--ref` left to check, so this document is its only chance to learn
-                    // the ref wasn't confirmed.
-                    let mut doc = started.clone();
-                    // Read before the mutable borrow, so the check and the insert can
-                    // look at the same document without fighting the borrow checker.
-                    let server_answered = reported_ref_verified(&doc).is_some();
-                    // Filled in only when the server didn't answer, by the same
-                    // [`reported_ref_verified`] rule `wait_json` follows, so both
-                    // documents stay one rule rather than two that resemble each other.
-                    // `entry().or_insert_with` can't express it: it fills only a VACANT
-                    // key, so a server-sent non-verdict would survive and fail the
-                    // documented `jq -e '.refVerified == true'` on a sync this client
-                    // verified.
-                    // A document that isn't an object silently goes without the field —
-                    // lossy on purpose, and safe for that same assertion, which fails on
-                    // a missing field.
-                    if let Some(obj) = doc.as_object_mut() {
-                        if !server_answered {
-                            obj.insert("refVerified".to_string(), Value::from(ref_verified));
-                        }
-                    }
-                    output::print_json(&doc);
-                } else {
+                    output::print_json(&started);
+                }
+
+                if !ctx.json {
                     output::success(&format!("Started dbt sync {sync_job_id} on {shown}"));
                     println!(
                         "Watch it with `cube dbt status {deployment} {} --wait`, \
@@ -501,13 +313,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
 
             if util::status_of(&status, "status") == FAILED {
                 if ctx.json {
-                    output::print_json(&wait_json(
-                        &started,
-                        &status,
-                        &branch_name,
-                        None,
-                        ref_verified,
-                    ));
+                    output::print_json(&wait_json(&started, &status, &branch_name, None));
                 }
 
                 // The only signal a CI gate needs is the non-zero exit. The message
@@ -557,18 +363,15 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 // the timeout branch doesn't print it twice (`main` renders the chain
                 // with `{err:#}`, joining links with ": ").
                 let fetched = wait::poll(
-                    Wait::new("dbt sync result", RESULT_FETCH_TIMEOUT, poll).advising_nothing(),
+                    Wait::new(
+                        "dbt sync result",
+                        RESULT_FETCH_TIMEOUT,
+                        poll.min(RESULT_FETCH_POLL_MAX),
+                    )
+                    .advising_nothing(),
                     || async {
-                        match api.get_optional(&path, &Vec::new()).await? {
-                            // Only an object is a result. A 200 carrying `null` — or
-                            // an empty object — is the workflow saying "nothing yet",
-                            // and treating it as done reported success with
-                            // `result: null` in the document.
-                            Some(result)
-                                if result.as_object().is_some_and(|map| !map.is_empty()) =>
-                            {
-                                Ok(Progress::Done(result))
-                            }
+                        match available_result(api.get_optional(&path, &Vec::new()).await?) {
+                            Some(result) => Ok(Progress::Done(result)),
                             _ => Ok(Progress::Waiting("result not available yet".to_string())),
                         }
                     },
@@ -581,13 +384,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                         // Still emit the document: the sync itself succeeded, and the
                         // branch name in it is what a caller needs to carry on with.
                         if ctx.json {
-                            output::print_json(&wait_json(
-                                &started,
-                                &status,
-                                &branch_name,
-                                None,
-                                ref_verified,
-                            ));
+                            output::print_json(&wait_json(&started, &status, &branch_name, None));
                         }
 
                         // Carries the recovery for EVERY way the read can fail, not
@@ -605,13 +402,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             };
 
             if ctx.json {
-                output::print_json(&wait_json(
-                    &started,
-                    &status,
-                    &branch_name,
-                    Some(&result),
-                    ref_verified,
-                ));
+                output::print_json(&wait_json(&started, &status, &branch_name, Some(&result)));
             } else {
                 output::success(&format!("dbt sync {sync_job_id} completed on {shown}"));
                 print_result(false, &result);
@@ -666,10 +457,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             sync_job_id,
         } => {
             let path = format!("{}/{sync_job_id}/result", base(deployment));
-            match api.get_optional(&path, &Vec::new()).await? {
+            match available_result(api.get_optional(&path, &Vec::new()).await?) {
                 Some(result) => print_result(ctx.json, &result),
-                // A running sync has no result yet, which is not the same as a
-                // sync that does not exist — point at the status either way.
+                // A running sync, `200 null`, and `{}` all mean "not available yet".
                 None => bail!(
                     "no result for dbt sync {sync_job_id} yet — check \
                      `cube dbt status {deployment} {}`",
@@ -700,147 +490,16 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    /// Every row is a branch name a live deployment actually returned.
     #[test]
-    fn verify_ref_applied_accepts_what_the_server_really_produces() {
-        for (requested, branch) in [
-            ("main", "dbt-sync/main-20260817140209-9351635f"),
-            (
-                "refs/heads/main",
-                "dbt-sync/refs-heads-main-20260817141045-ca062f89",
-            ),
-            (
-                "release/2026.08",
-                "dbt-sync/release-2026.08-20260817141042-5800f094",
-            ),
-            (
-                "feature/CUB-1234-add-orders-fact-table-and-more",
-                "dbt-sync/feature-CUB-1234-add-orders-fact-table-a-20260817141039-facd2053",
-            ),
-            (
-                "feat_x_orders",
-                "dbt-sync/feat_x_orders-20260817142925-8e26c377",
-            ),
-            (
-                "feat x orders",
-                "dbt-sync/feat-x-orders-20260817142930-1ca54ad4",
-            ),
-            ("feat~x", "dbt-sync/feat-x-20260817142936-a4e47002"),
-            (
-                "UPPER_lower",
-                "dbt-sync/UPPER_lower-20260817142942-eb6730ca",
-            ),
-        ] {
-            assert!(
-                verify_ref_applied(7, requested, branch, "job").unwrap_or(false),
-                "rejected or failed to verify a healthy sync: {requested} → {branch}"
-            );
-        }
-    }
-
-    #[test]
-    fn verify_ref_applied_rejects_a_branch_that_ignored_it() {
-        // What an older deployment produces: the tracked branch, or no ref segment.
-        let err = verify_ref_applied(42, "feature/x", "dbt-sync/main-20260817-abcd1234", "job-1")
-            .expect_err("a branch naming a different ref must not pass");
-        assert!(err.to_string().contains("predates `ref` support"), "{err}");
-        assert!(err.to_string().contains("job-1"), "{err}");
-        // Both recovery commands must be runnable as printed: this lands in a CI log,
-        // where nobody is around to substitute a placeholder for the deployment.
-        assert!(
-            err.to_string().contains("cube dbt cancel 42 'job-1'"),
-            "{err}"
-        );
-        assert!(
-            err.to_string()
-                .contains("cube data-model delete-branch 42 'dbt-sync/main-20260817-abcd1234'"),
-            "{err}"
-        );
-        assert!(verify_ref_applied(7, "feature/x", "dbt-sync/20260817-abcd1234", "j").is_err());
-    }
-
-    #[test]
-    fn ref_fingerprint_matches_the_server_convention() {
-        assert_eq!(ref_fingerprint("main"), "main");
-        assert_eq!(ref_fingerprint("release/2026.08"), "release-2026");
+    fn only_nonempty_objects_are_results() {
+        assert!(available_result(None).is_none());
+        assert!(available_result(Some(Value::Null)).is_none());
+        assert!(available_result(Some(json!({}))).is_none());
+        assert!(available_result(Some(json!([]))).is_none());
         assert_eq!(
-            ref_fingerprint("feature/CUB-1234-add-orders"),
-            "feature-cub-"
+            available_result(Some(json!({"generatedFiles": []}))),
+            Some(json!({"generatedFiles": []}))
         );
-        assert_eq!(ref_fingerprint("feat_x_orders"), "feat_x_order");
-        assert_eq!(ref_fingerprint("feat x orders"), "feat-x-order");
-        assert_eq!(ref_fingerprint("UPPER_lower"), "upper_lower");
-        // Unmeasured characters cut the fingerprint short rather than guessing.
-        assert_eq!(ref_fingerprint("feat:x"), "feat");
-        assert_eq!(ref_fingerprint("#1"), "");
-    }
-
-    #[test]
-    fn wait_json_prefers_a_server_reported_verification() {
-        let started = json!({"syncJobId": "j", "refVerified": true});
-        let status = json!({"status": "COMPLETED"});
-        // Client says it couldn't verify; the server says it did. The server wins.
-        let doc = wait_json(&started, &status, "dbt-sync/x", None, Some(false));
-        assert_eq!(doc["refVerified"], json!(true));
-
-        // Either document can carry it.
-        let doc = wait_json(
-            &json!({}),
-            &json!({"status": "COMPLETED", "refVerified": true}),
-            "dbt-sync/x",
-            None,
-            Some(false),
-        );
-        assert_eq!(doc["refVerified"], json!(true));
-
-        // With no server field, the client's answer is what's reported.
-        let doc = wait_json(&json!({}), &status, "dbt-sync/x", None, Some(false));
-        assert_eq!(doc["refVerified"], json!(false));
-        let doc = wait_json(&json!({}), &status, "dbt-sync/x", None, None);
-        assert_eq!(doc["refVerified"], json!(null));
-    }
-
-    #[test]
-    fn only_a_boolean_from_the_server_is_an_answer() {
-        // `null` is what this CLI itself renders for "nothing to verify", and the
-        // documented `jq -e '.refVerified == true'` fails on it. So a server that spells
-        // "not applicable" that way must not overwrite a sync this client DID verify —
-        // which is what `entry().or_insert_with` and a bare `.get()` both got wrong,
-        // since serde_json tells absent apart from present-and-null.
-        assert!(reported_ref_verified(&json!({"refVerified": null})).is_none());
-        assert!(reported_ref_verified(&json!({})).is_none());
-        // And every other non-boolean fails that same assertion for the same reason, so
-        // the rule is "a verdict", not "not null" — a distinction worth pinning, since
-        // filtering nulls alone reads as if it were complete.
-        for spelling in [json!("true"), json!(1), json!({"ok": true}), json!([])] {
-            assert!(
-                reported_ref_verified(&json!({"refVerified": spelling})).is_none(),
-                "a non-boolean is not a verdict the documented jq assertion can act on"
-            );
-        }
-        assert_eq!(
-            reported_ref_verified(&json!({"refVerified": false})),
-            Some(false),
-            "false IS an answer — it is the absence of a verdict that is not"
-        );
-
-        let doc = wait_json(
-            &json!({"refVerified": null}),
-            &json!({"status": "COMPLETED"}),
-            "dbt-sync/x",
-            None,
-            Some(true),
-        );
-        assert_eq!(doc["refVerified"], json!(true));
-        // A null on the start document must not stop the status document being read.
-        let doc = wait_json(
-            &json!({"refVerified": null}),
-            &json!({"status": "COMPLETED", "refVerified": false}),
-            "dbt-sync/x",
-            None,
-            Some(true),
-        );
-        assert_eq!(doc["refVerified"], json!(false));
     }
 
     #[test]
@@ -906,62 +565,9 @@ mod tests {
             &json!({"status": " COMPLETED\n", "branchName": "  x  "}),
             "  x  ",
             None,
-            None,
         );
         assert_eq!(doc["status"], json!("COMPLETED"));
         assert_eq!(doc["branchName"], json!("  x  "));
-    }
-
-    #[test]
-    fn an_unnamed_branch_is_named_as_such_rather_than_left_blank() {
-        // Reachable: this bails because the comparison failed, and an empty name fails
-        // it. The sentence would otherwise read "the sync started on , which doesn't…".
-        let err = verify_ref_applied(42, "feature/x", "", "job-1")
-            .expect_err("an empty branch name cannot confirm a ref");
-        assert!(err.to_string().contains("started on <branch>"), "{err}");
-        assert!(
-            err.to_string()
-                .contains("cube data-model delete-branch 42 '<branch>'"),
-            "{err}"
-        );
-    }
-
-    #[test]
-    fn an_uncheckable_ref_passes_but_says_so() {
-        // `#1` fingerprints to nothing, so the sync is allowed but reported unverified —
-        // asserting `is_ok()` alone would pass against the silent version this replaced.
-        assert!(
-            !verify_ref_applied(7, "#1", "dbt-sync/main-20260817-abcd1234", "job").unwrap(),
-            "an uncheckable ref must be reported as unverified, not as verified"
-        );
-    }
-
-    #[test]
-    fn an_unrecognised_branch_shape_falls_back_to_a_contains_check() {
-        // If the server ever renames or nests the prefix, a healthy sync must not fail.
-        // A nested prefix still contains the marker, so it keeps the STRICT check — which
-        // is what stops a short ref matching the trailing timestamp-hash.
-        assert!(
-            verify_ref_applied(7, "main", "myorg/dbt-sync/main-20260817-abcd1234", "j").unwrap()
-        );
-        assert!(verify_ref_applied(7, "1", "myorg/dbt-sync/main-20260817-abcd1234", "j").is_err());
-        // A renamed prefix has no marker: permissive, and knowingly weaker.
-        assert!(verify_ref_applied(7, "main", "sync-main-20260817-abcd1234", "j").unwrap());
-        // And it still catches a name with no trace of the ref at all.
-        assert!(verify_ref_applied(7, "feature/x", "some-other-shape-2026", "j").is_err());
-    }
-
-    /// A short ref must still be checked: searching the whole branch name matched the
-    /// constant `dbt-sync/` prefix or the trailing hash, so these used to pass against a
-    /// sync that ignored the ref entirely.
-    #[test]
-    fn a_short_ref_is_not_satisfied_by_the_branch_name_boilerplate() {
-        for requested in ["sync", "dbt", "b", "1", "2026", "f"] {
-            assert!(
-                verify_ref_applied(7, requested, "dbt-sync/main-20260817-abcd1234", "job").is_err(),
-                "{requested} was satisfied by the boilerplate around the ref segment"
-            );
-        }
     }
 
     #[test]

@@ -126,7 +126,9 @@ where
             )
         };
 
-    let deadline = tokio::time::Instant::now() + timeout;
+    let deadline = tokio::time::Instant::now()
+        .checked_add(timeout)
+        .ok_or_else(|| anyhow::anyhow!("wait timeout is too large"))?;
 
     loop {
         let failures = streak.as_ref().map_or(0, |(count, _)| *count);
@@ -279,6 +281,18 @@ mod tests {
         .unwrap();
 
         assert_eq!(value, 7);
+    }
+
+    #[tokio::test]
+    async fn rejects_a_timeout_that_cannot_fit_in_an_instant() {
+        let err = poll(
+            Wait::new("thing", Duration::MAX, Duration::from_secs(1)),
+            || std::future::ready(done(7)),
+        )
+        .await
+        .unwrap_err();
+
+        assert!(err.to_string().contains("timeout is too large"), "{err}");
     }
 
     #[tokio::test]

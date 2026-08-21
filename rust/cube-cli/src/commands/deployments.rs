@@ -292,7 +292,7 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Branch (defaults to the active dev-mode branch, else the deploy branch)
-        #[arg(long, value_parser = util::nonempty_target)]
+        #[arg(long)]
         branch: Option<String>,
         /// Wait for the build (or dev-mode worker) to finish, exiting non-zero if
         /// it fails
@@ -319,7 +319,17 @@ enum Cmd {
     },
 }
 
+fn validate_build_status_args(cmd: &Cmd) -> Result<()> {
+    if let Cmd::BuildStatus { branch, wait, .. } = cmd {
+        if *wait && branch.as_deref().is_some_and(util::is_blank) {
+            anyhow::bail!("--branch cannot be empty when used with --wait");
+        }
+    }
+    Ok(())
+}
+
 pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
+    validate_build_status_args(&args.cmd)?;
     let api = ctx.api()?;
     match args.cmd {
         Cmd::List {
@@ -552,6 +562,22 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn build_status_preserves_legacy_empty_branch_without_wait() {
+        let command = |branch, wait| Cmd::BuildStatus {
+            deployment: 1,
+            branch,
+            wait,
+            timeout: Duration::from_secs(1),
+            poll: Duration::from_secs(1),
+        };
+
+        assert!(validate_build_status_args(&command(Some(String::new()), false)).is_ok());
+        assert!(validate_build_status_args(&command(None, true)).is_ok());
+        assert!(validate_build_status_args(&command(Some("main".into()), true)).is_ok());
+        assert!(validate_build_status_args(&command(Some("  ".into()), true)).is_err());
+    }
 
     #[test]
     fn every_hint_is_runnable_as_printed() {

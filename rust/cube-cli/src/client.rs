@@ -1,5 +1,4 @@
 use std::sync::Mutex;
-use std::time::Duration;
 
 use anyhow::{anyhow, bail, Result};
 use reqwest::{Method, StatusCode};
@@ -253,23 +252,6 @@ impl Client {
         Ok(Self {
             http: reqwest::Client::builder()
                 .user_agent(concat!("cube-cli/", env!("CUBE_CLI_VERSION")))
-                // Three deadlines, because one number can't do this job.
-                //
-                // `read_timeout` is the working one: it resets after each read, so a
-                // server that accepts the connection and then says nothing fails in two
-                // minutes, while a transfer making progress is never cut off.
-                //
-                // The total is a backstop for what `read_timeout` cannot see — a
-                // response trickling a byte every 119s, and a server that never reads
-                // the request body at all (no read has been attempted, so no read
-                // deadline applies). Deliberately far above anything legitimate:
-                // `deploy` posts one file per request rather than a whole project, so
-                // the sizing case is a single large file plus `upload/finish`
-                // committing the manifest, not a project's total size. Waits bound their
-                // own attempts at the caller's `--timeout` on top of all of this.
-                .connect_timeout(Duration::from_secs(30))
-                .read_timeout(Duration::from_secs(120))
-                .timeout(Duration::from_secs(1800))
                 .build()?,
             base_url,
             token: Mutex::new(token.to_string()),
