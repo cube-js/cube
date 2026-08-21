@@ -5,10 +5,12 @@ import {
   QueryStageStateResponse,
   QueryDef,
   RetrieveForProcessingResponse,
+  RetrieveForProcessingSuccess,
   QueueDriverOptions,
   AddToQueueQuery,
   AddToQueueOptions,
   AddToQueueResponse,
+  AddAndRetrieveResponse,
   QueryKey,
   QueryKeyHash,
   ProcessingId,
@@ -36,6 +38,15 @@ type CubeStoreListResponse = {
   // eslint-disable-next-line camelcase
   queue_id?: string
   status: string
+};
+
+// cube store convert int64 to string
+type CubeStoreClaimResponse = {
+  id: string,
+  active: string | null,
+  pending: string,
+  payload: string | null,
+  extra: string | null,
 };
 
 export class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
@@ -67,15 +78,17 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     return `${this.options.redisQueuePrefix}:${queryKey}`;
   }
 
-  public async addToQueue(
-    _keyScore: number,
+  /**
+   * Builds everything `QUEUE ADD` and `QUEUE ADD_AND_RETRIEVE` have in common, they accept
+   * the same modifiers and the same trailing path and payload.
+   */
+  protected async buildAddCommand(
     queryKey: QueryKey,
-    _orphanedTime: number,
     queryHandler: string,
     query: AddToQueueQuery,
     priority: number,
     options: AddToQueueOptions
-  ): Promise<AddToQueueResponse> {
+  ) {
     const data = {
       queryHandler,
       query,
@@ -103,17 +116,71 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     values.push(JSON.stringify(data));
 
     const exclusive = queryKey.persistent && await this.driver.hasCapability('queueExclusive');
-    const rows = await this.driver.query(`QUEUE ADD${exclusive ? ' EXCLUSIVE' : ''} PRIORITY ?${options.orphanedTimeout ? ' ORPHANED ?' : ''}${useExternalId ? ' EXTERNAL_ID ?' : ''} ? ?`, values);
+
+    return {
+      addedToQueueTime: data.addedToQueueTime,
+      values,
+      modifiers: `${exclusive ? ' EXCLUSIVE' : ''} PRIORITY ?${options.orphanedTimeout ? ' ORPHANED ?' : ''}${useExternalId ? ' EXTERNAL_ID ?' : ''} ? ?`,
+    };
+  }
+
+  public async addToQueue(
+    _keyScore: number,
+    queryKey: QueryKey,
+    _orphanedTime: number,
+    queryHandler: string,
+    query: AddToQueueQuery,
+    priority: number,
+    options: AddToQueueOptions
+  ): Promise<AddToQueueResponse> {
+    const { modifiers, values, addedToQueueTime } = await this.buildAddCommand(queryKey, queryHandler, query, priority, options);
+
+    const rows = await this.driver.query<{ id: string, added: string, pending: string }>(`QUEUE ADD${modifiers}`, values);
     if (rows && rows.length) {
       return [
         rows[0].added === 'true' ? 1 : 0,
         rows[0].id ? parseInt(rows[0].id, 10) : null,
         parseInt(rows[0].pending, 10),
-        data.addedToQueueTime
+        addedToQueueTime
       ];
     }
 
     throw new Error('Empty response on QUEUE ADD');
+  }
+
+  public async addAndRetrieve(
+    keyScore: number,
+    queryKey: QueryKey,
+    orphanedTime: number,
+    queryHandler: string,
+    query: AddToQueueQuery,
+    priority: number,
+    options: AddToQueueOptions
+  ): Promise<AddAndRetrieveResponse> {
+    if (!await this.driver.hasCapability('queueAddAndRetrieve')) {
+      const [added, queueId, queueSize, addedToQueueTime] = await this.addToQueue(
+        keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
+      );
+
+      return [added, queueId, queueSize, addedToQueueTime, null];
+    }
+
+    const { modifiers, values, addedToQueueTime } = await this.buildAddCommand(queryKey, queryHandler, query, priority, options);
+    values.push(this.options.concurrency);
+
+    const rows = await this.driver.query<CubeStoreClaimResponse & { added: string }>(`QUEUE ADD_AND_RETRIEVE${modifiers} ?`, values);
+    if (rows && rows.length) {
+      return [
+        rows[0].added === 'true' ? 1 : 0,
+        rows[0].id ? parseInt(rows[0].id, 10) : null,
+        parseInt(rows[0].pending, 10),
+        addedToQueueTime,
+        // An item which already existed is never added twice, but it still can be claimed
+        this.decodeClaimFromRow(rows[0], 'addAndRetrieve'),
+      ];
+    }
+
+    throw new Error('Empty response on QUEUE ADD_AND_RETRIEVE');
   }
 
   public async getQueryAndRemove(hash: QueryKeyHash, queueId: QueueId | null): Promise<[QueryDef]> {
@@ -311,31 +378,43 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     // nothing to release
   }
 
+  protected decodeActiveKeysFromRow(active: string | null): QueryKeyHash[] {
+    return active ? active.split(',') as unknown as QueryKeyHash[] : [];
+  }
+
+  /**
+   * An empty payload means the item was not claimed by this call. Shared by
+   * `QUEUE RETRIEVE` and `QUEUE ADD_AND_RETRIEVE` so that they cannot drift apart.
+   */
+  protected decodeClaimFromRow(row: CubeStoreClaimResponse, method: string): RetrieveForProcessingSuccess | null {
+    if (!row.payload) {
+      return null;
+    }
+
+    return [
+      1,
+      row.id ? parseInt(row.id, 10) : null,
+      this.decodeActiveKeysFromRow(row.active),
+      parseInt(row.pending, 10),
+      this.decodeQueryDefFromRow(row as { payload: string, extra?: string | null }, method),
+      true
+    ];
+  }
+
   public async retrieveForProcessing(hash: QueryKeyHash, _processingId: string): Promise<RetrieveForProcessingResponse> {
-    const rows = await this.driver.query<{ id: string /* cube store convert int64 to string */, active: string | null, pending: string, payload: string, extra: string | null }>('QUEUE RETRIEVE EXTENDED CONCURRENCY ? ?', [
+    const rows = await this.driver.query<CubeStoreClaimResponse>('QUEUE RETRIEVE EXTENDED CONCURRENCY ? ?', [
       this.options.concurrency,
       this.prefixKey(hash),
     ]);
     if (rows && rows.length) {
-      const active = rows[0].active ? (rows[0].active).split(',') as unknown as QueryKeyHash[] : [];
-      const pending = parseInt(rows[0].pending, 10);
-
-      if (rows[0].payload) {
-        const def = this.decodeQueryDefFromRow(rows[0], 'retrieveForProcessing');
-
-        return [
-          1,
-          rows[0].id ? parseInt(rows[0].id, 10) : null,
-          active,
-          pending,
-          def,
-          true
-        ];
-      } else {
-        return [
-          0, null, active, pending, null, false
-        ];
-      }
+      return this.decodeClaimFromRow(rows[0], 'retrieveForProcessing') || [
+        0,
+        null,
+        this.decodeActiveKeysFromRow(rows[0].active),
+        parseInt(rows[0].pending, 10),
+        null,
+        false
+      ];
     }
 
     return null;

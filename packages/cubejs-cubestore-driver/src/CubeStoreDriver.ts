@@ -30,6 +30,7 @@ import { QueryResultFormat } from '../codegen';
 const CubeStoreCapabilityMinVersion = {
   queueExclusive: '1.6.22',
   queueExternalId: '1.6.26',
+  queueAddAndRetrieve: '1.7.25',
   sendableParameters: '1.6.38',
   arrowFormat: '1.6.66',
 } satisfies Record<string, string>;
