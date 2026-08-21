@@ -12,6 +12,8 @@ import {
   BaseDriver,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
+  StreamOptions,
+  StreamTableDataWithTypes,
   TableQueryResult, TableStructure,
 } from '@cubejs-backend/base-driver';
 import { DruidClient, DruidClientBaseConfiguration, DruidClientConfiguration } from './DruidClient';
@@ -142,7 +144,46 @@ export class DruidDriver extends BaseDriver {
     ]);
   }
 
-  public async downloadQueryResults(query: string, values: unknown[], _options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
+  public async stream(
+    query: string,
+    values: unknown[],
+    { highWaterMark }: StreamOptions,
+  ): Promise<StreamTableDataWithTypes> {
+    const { rowStream, columns, release } = await this.client.stream(
+      query,
+      this.normalizeQueryValues(values),
+      highWaterMark,
+    );
+
+    if (!columns) {
+      await release();
+
+      throw new Error(
+        'You are using an old version of Druid. Unable to detect column types in readOnly mode.'
+      );
+    }
+
+    const types: TableStructure = [];
+
+    for (const [name, meta] of Object.entries(columns)) {
+      types.push({
+        name,
+        type: this.toGenericType(meta.sqlType.toLowerCase()),
+      });
+    }
+
+    return {
+      rowStream,
+      types,
+      release,
+    };
+  }
+
+  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
+    if (options.streamImport) {
+      return this.stream(query, values, options);
+    }
+
     const { rows, columns } = await this.client.query<any>(query, this.normalizeQueryValues(values));
     if (!columns) {
       throw new Error(

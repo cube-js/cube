@@ -1,4 +1,13 @@
 import Axios, { AxiosRequestConfig } from 'axios';
+import { streamToArray } from '@cubejs-backend/shared';
+import readline from 'node:readline';
+import { Readable } from 'node:stream';
+
+export type DruidClientStreamResult = {
+  rowStream: Readable,
+  columns: Record<string, { sqlType: string }> | null,
+  release: () => Promise<void>,
+};
 
 export type DruidClientBaseConfiguration = {
   user?: string,
@@ -99,5 +108,102 @@ export class DruidClient {
 
     promise.cancel = () => cancelObj.cancel();
     return promise;
+  }
+
+  public async stream(
+    query: string,
+    parameters: { type: string, value: unknown }[],
+    highWaterMark: number,
+  ): Promise<DruidClientStreamResult> {
+    let response;
+
+    try {
+      response = await this.getClient().request({
+        url: '/druid/v2/sql/',
+        method: 'POST',
+        responseType: 'stream',
+        data: {
+          query,
+          parameters,
+          header: true,
+          sqlTypesHeader: true,
+          resultFormat: 'objectLines',
+        },
+      });
+    } catch (e: any) {
+      // In stream mode Druid returns the error as a streamed JSON body,
+      // so we need to drain it to surface the original errorMessage.
+      if (e.response && e.response.data instanceof Readable) {
+        const body = (await streamToArray<Buffer>(e.response.data))
+          .map((chunk) => chunk.toString('utf-8'))
+          .join('');
+
+        let errorMessage: string | undefined;
+        try {
+          errorMessage = JSON.parse(body)?.errorMessage;
+        } catch {
+          // Body wasn't valid JSON, fall back to the original error below.
+        }
+
+        if (errorMessage) {
+          throw new Error(errorMessage);
+        }
+      }
+
+      throw e;
+    }
+
+    const httpStream: Readable = response.data;
+    const rl = readline.createInterface({ input: httpStream, crlfDelay: Infinity });
+    const lineIterator = rl[Symbol.asyncIterator]();
+
+    const release = async () => {
+      rl.close();
+      httpStream.destroy();
+    };
+
+    try {
+      // The first non-empty line is the header (column name -> { sqlType }),
+      // matching the non-streaming `object` result format. It's present only
+      // when Druid acknowledges it via this response header.
+      let columns: Record<string, { sqlType: string }> | null = null;
+
+      if (response.headers['x-druid-sql-header-included']) {
+        for (;;) {
+          const line = await lineIterator.next();
+          if (line.done) {
+            break;
+          }
+          if (line.value !== '') {
+            columns = JSON.parse(line.value);
+            break;
+          }
+        }
+      }
+
+      // `objectLines` is newline-delimited JSON and ends with a trailing
+      // empty line, so we skip empty lines while parsing the data rows.
+      const rowsIterator = (async function* rowsIterator() {
+        for (;;) {
+          const line = await lineIterator.next();
+          if (line.done) {
+            break;
+          }
+          if (line.value !== '') {
+            yield JSON.parse(line.value);
+          }
+        }
+      }());
+
+      return {
+        rowStream: Readable.from(rowsIterator, { highWaterMark }),
+        columns,
+        release,
+      };
+    } catch (e) {
+      await release();
+
+      throw e;
+    }
   }
 }
