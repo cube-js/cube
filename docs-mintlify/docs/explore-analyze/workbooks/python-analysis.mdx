@@ -127,16 +127,18 @@ restores the starter template.
 - **A failed run keeps the previous chart.** The error surfaces alongside the last
   successful result, which stays rendered.
 
-**Run is the only way the saved result changes.** Opening the report, reloading the
-page, or viewing a dashboard never re-runs anything on its own.
+**In a workbook tab, Run is the only way the result changes.** Opening the report or
+reloading the page never re-runs anything on its own. On dashboards, behavior is
+different — see [On dashboards](#on-dashboards) below.
 
 {/* TODO: screenshot — the code panel showing the Outdated tag */}
 
 ## On dashboards
 
-Python reports render their **saved output** on dashboards. Nothing re-runs on
-dashboard load, so a dashboard full of Python reports costs no compute to open —
-each widget shows whatever the last **Run** produced.
+A Python widget on a dashboard (in the dashboard builder, and on published or
+embedded dashboards) runs live for each viewer, the same way a SQL widget does —
+it's no longer just replaying the last saved **Run**. The result is cached per
+viewer identity and isn't persisted back to the report.
 
 A python widget can be opened in [Explore](/docs/explore-analyze/explore) from a
 dashboard and run from there.
@@ -157,6 +159,10 @@ is narrower.
 
 Take this into account when deciding who can run and publish Python reports, the
 same way you would for any other saved result shared through a workbook.
+
+On dashboards, this changes: each viewer's live run applies row-level security for
+**their own** identity, the same as a SQL widget — it isn't the Run author's access
+persisted for everyone who views the dashboard.
 
 ## Limits
 
