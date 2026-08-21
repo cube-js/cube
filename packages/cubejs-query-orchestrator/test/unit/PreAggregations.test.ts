@@ -948,6 +948,43 @@ describe('PreAggregations', () => {
     });
   });
 
+  describe('isPartitionExist', () => {
+    let preAggregations: PreAggregations | null = null;
+
+    beforeEach(() => {
+      preAggregations = new PreAggregations(
+        'TEST',
+        mockDriverFactory as any,
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
+        queryCache!,
+        {
+          queueOptions: async () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
+        },
+      );
+    });
+
+    // Reproduces https://github.com/cube-js/cube/issues/11615: a replica that
+    // never ran getQueue()/getQueueState() for this dataSource (e.g. it polled
+    // job status after the job already left the shared queue) crashes with
+    // "Cannot read properties of undefined (reading 'getQueueDriver')" instead
+    // of lazily creating the queue client.
+    test('does not throw when the local queue for the dataSource was never created', async () => {
+      await expect(preAggregations!.isPartitionExist(
+        'req-1',
+        false,
+        'named_data_source',
+        'stb_pre_aggregations',
+        'stb_pre_aggregations.orders_main',
+        'some-cache-key',
+        'token-1',
+      )).resolves.toEqual([true, 'missing_partition']);
+    });
+  });
+
   describe('version function', () => {
     test('should return a valid version string for simple input', () => {
       const result = version(['test']);
