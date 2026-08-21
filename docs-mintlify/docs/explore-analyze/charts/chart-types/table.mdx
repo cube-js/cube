@@ -32,6 +32,32 @@ Pivot behavior:
 - Pivot columns can also be sorted by row values — click a row number to sort by that row, including the totals row.
 - Pivoted columns can be hidden, but hiding is indexed to the specific value (e.g. hiding `status: returned`), not position.
 
+## Row grouping
+
+Group rows by their leading dimensions into collapsible headers, so each grouped
+dimension's value is shown once for the whole group instead of repeated on every row.
+
+Turn it on with the **Group rows** toggle in the **Values** section of the **Style**
+tab. The toggle is disabled — with a tooltip explaining why — unless the table has at
+least two row dimensions and no column pivot. You can also ask [Analytics
+Chat](/docs/explore-analyze/analytics-chat) to group the table's rows.
+
+With grouping on, every row dimension except the innermost becomes a group level: rows
+nest one header per level, kept contiguous by that dimension's first-appearance order,
+with the header showing the dimension's value once instead of on every row underneath.
+
+Turning it on also adds a **Row grouping** section to the **Style** tab, with:
+
+- **Expand all groups** / **Collapse all groups** — set every group's expand state at once.
+- Text color, background color, and text formatting for the group header rows.
+
+Each group-level column's card in the **Columns** section gets a **Default state**
+control (**Expanded** or **Collapsed**) that sets whether new groups on that level start
+open or closed. It only sets the default — a viewer's own expand/collapse of an
+individual group isn't affected by changing it afterwards.
+
+{/* TODO screenshot: table with collapsed row groups and the Style tab's Row grouping section */}
+
 ## Column field options
 
 Configure individual columns in the **Columns** section of the **Style** tab (or via the dropdown arrow on a field in the **Fields** section):
