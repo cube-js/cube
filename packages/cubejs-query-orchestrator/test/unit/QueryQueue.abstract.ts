@@ -66,8 +66,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           readable.pipe(stream);
         });
       },
-      sendProcessMessageFn: async (queryKeyHashed, queueId) => {
-        processMessagePromises.push(queue.processQuery.bind(queue)(queryKeyHashed, queueId));
+      sendProcessMessageFn: async (claimed) => {
+        processMessagePromises.push(queue.executeQuery(claimed));
       },
       sendCancelMessageFn: async (query) => {
         processCancelPromises.push(queue.processCancel.bind(queue)(query));

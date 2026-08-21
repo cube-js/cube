@@ -10,8 +10,12 @@ Two participants matter when reading the diagrams:
 
 - **QueryQueue** — the request side. It enqueues and then waits for a result.
 - **BackgroundQueryQueue** — the same `QueryQueue` object, but the code paths reached
-  through `processQuery`, which run detached from the request (in cluster mode they can
+  through `executeQuery`, which run detached from the request (in cluster mode they can
   even run on another node).
+
+Claiming and executing are two separate steps: `processQuery` claims an item and then hands
+the claim to `sendProcessMessageFn`, which executes it through `executeQuery`. See
+"Background execution" below.
 
 ## Cube Store responses as TS types
 
@@ -169,29 +173,52 @@ sequenceDiagram
         Note over QueryQueue: toProcessLimit = active >= concurrency<br/>? 1 : concurrency - active<br/>Persistent queries: only own processUid
 
         loop for every query within toProcessLimit
-            QueryQueue-)Background: processQuery
-            Note over QueryQueue,Background: Detached call, reconcile does not<br/>wait for the query to finish
+            QueryQueue->>QueryQueue: processQuery
+            Note over QueryQueue,Background: Awaits the claim only, not the execution
         end
     end
 ```
 
-## Background execution: `processQuery`
+## Background execution: `processQuery` → `executeQuery`
+
+`processQuery` claims the item and nothing else. What it hands to `sendProcessMessageFn` is a
+`ClaimedQuery` — `{ queryKeyHash, queueId, processingId, queueSize, query }`, plain data on
+purpose, so a custom implementation can serialize it and let another process run
+`executeQuery`. The default implementation calls `executeQuery` in-process.
+
+`sendProcessMessageFn` must resolve once the hand-off is done, **not** once the query is
+executed: reconcile awaits it, and `executeQuery` ends with `reconcileQueue`, which is
+single-flight — awaiting the execution from inside reconcile deadlocks.
+
+Two consequences of claiming before the hand-off:
+
+- Stream queries have to be executed by the process that claimed them, their streams live in
+  the in-process `QueryQueue.streams` map. Reconcile only picks up persistent keys whose
+  `@<processUid>` suffix matches, so `sendProcessMessageFn` is always called on the owning
+  process for them — it just must not route them elsewhere.
+- A claimed item is already active. If a custom hand-off loses the message, the item is only
+  recovered by the stalled-heartbeat / `TO_CANCEL` path; `freeProcessingLock` is a no-op on
+  Cube Store, so the claim cannot be cheaply undone.
 
 ```mermaid
 sequenceDiagram
     autonumber
+    participant QueryQueue
     participant BackgroundQueryQueue as Background
     participant QueueDriverInterface as QueueDriver
     participant CubeStore
     participant QueryOrchestrator
 
-    Background->>QueueDriver: retrieveForProcessing
+    QueryQueue->>QueueDriver: retrieveForProcessing
     QueueDriver->>CubeStore: QUEUE RETRIEVE EXTENDED CONCURRENCY ?n ?path
     CubeStore-->>QueueDriver: RetrieveResponse
-    QueueDriver-->>Background: [added, queueId, activeKeys, queueSize, def, lockAcquired]
+    QueueDriver-->>QueryQueue: [added, queueId, activeKeys, queueSize, def, lockAcquired]
     Note over QueueDriver,CubeStore: The claim is atomic in Cube Store:<br/>only one node moves the item to active
 
     alt def && added && activeKeys includes our key && lockAcquired
+        QueryQueue-)Background: sendProcessMessageFn(ClaimedQuery)
+        Note over QueryQueue,Background: Detached from here on: the hand-off returns,<br/>the execution keeps running
+
         Background->>QueueDriver: optimisticQueryUpdate
         QueueDriver->>CubeStore: QUEUE MERGE_EXTRA ?queueId {"startQueryTime"}
 
@@ -217,8 +244,8 @@ sequenceDiagram
         Background->>Background: reconcileQueue
         Note over Background: The freed concurrency slot is<br/>immediately given to the next query
     else the claim did not succeed
-        Background->>QueueDriver: freeProcessingLock
-        Note over Background,QueueDriver: Another node is running it, or the<br/>concurrency budget is full. No-op for Cube Store
+        QueryQueue->>QueueDriver: freeProcessingLock
+        Note over QueryQueue,QueueDriver: Another node is running it, or the<br/>concurrency budget is full. No-op for Cube Store
     end
 ```
 
@@ -265,7 +292,7 @@ sequenceDiagram
     QueueDriver-->>QueryQueue: [added, queueId, queueSize, addedToQueueTime, def?]
 
     alt fast track: payload is not NULL, we own the item
-        QueryQueue-)Background: processQuery, already claimed
+        QueryQueue-)Background: sendProcessMessageFn(ClaimedQuery)
         Note over QueryQueue,Background: No reconcile, no QUEUE RETRIEVE.<br/>The payload from the response is the QueryDef
         Background->>QueryOrchestrator: execute
     else payload IS NULL, the item stays pending
@@ -306,5 +333,6 @@ budget is exhausted, which is exactly when the condition should stop firing.
 
 > **Status:** the `QUEUE ADD_AND_RETRIEVE` command exists in Cube Store. The driver still
 > emits `QUEUE ADD`; wiring the fast track into `CubeStoreQueueDriver.addToQueue` needs a
-> capability gate (the same version negotiation as `queueExclusive` / `queueExternalId`)
-> plus the `QueryQueue` change that hands the claimed `QueryDef` straight to `processQuery`.
+> capability gate (the same version negotiation as `queueExclusive` / `queueExternalId`).
+> The `QueryQueue` side is in place: `executeInQueue` can build a `ClaimedQuery` out of the
+> response and hand it to `sendProcessMessageFn` without going through reconcile.
