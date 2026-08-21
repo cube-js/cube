@@ -23,6 +23,7 @@ use crate::planner::SymbolPathType;
 use crate::planner::TimeDimensionSymbol;
 use crate::utils::debug::DebugSql;
 use cubenativeutils::CubeError;
+use cubenativeutils::CubeErrorCauseType;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -602,7 +603,15 @@ impl PreAggregationsCompiler {
                     let full_name = path.join(".");
                     let symbol_path =
                         SymbolPath::parse(query_tools.cube_evaluator().clone(), &full_name)
-                            .map_err(|_| Self::reference_not_found_error(&full_name, name))?;
+                            // A path the data model doesn't know is reported with the
+                            // pre-aggregation it came from; anything else (a failure
+                            // reaching the model at all) is passed through as it is.
+                            .map_err(|e| match e.cause {
+                                CubeErrorCauseType::User => {
+                                    Self::reference_not_found_error(&full_name, name)
+                                }
+                                _ => e,
+                            })?;
                     match symbol_path.path_type() {
                         SymbolPathType::Dimension => {
                             evaluator_compiler.add_dimension_evaluator_by_path(symbol_path)?
@@ -754,6 +763,18 @@ mod tests {
                       - '{CUBE}.unknown_total'
                     time_dimension: created_at
                     granularity: day
+                  - name: interpolated_rollup_granularity_segment
+                    type: rollup
+                    measures:
+                      - count
+                    time_dimension: '{CUBE}.created_at.day'
+                    granularity: day
+                  - name: symbol_rollup_granularity_segment
+                    type: rollup
+                    measures:
+                      - count
+                    time_dimension: created_at.day
+                    granularity: day
                   - name: broken_rollup_expression_dimension
                     type: rollup
                     measures:
@@ -877,6 +898,24 @@ mod tests {
         assert_eq!(
             err.message,
             "'created_at_day' not found for path 'orders.created_at_day' in pre-aggregation 'orders.broken_rollup_granularity_suffix'"
+        );
+    }
+
+    // Naming the granularity inside the reference, `${CUBE}.created_at.day`,
+    // instead of through `granularity:`. Rejected — and rejected the same way as
+    // the equivalent symbol reference `CUBE.created_at.day`.
+    #[test]
+    fn test_granularity_inside_the_reference_is_rejected_like_the_symbol_form() {
+        let ctx = create_reference_context();
+        let interpolated = compile_pre_agg(&ctx, "interpolated_rollup_granularity_segment")
+            .expect_err("Granularity inside a time dimension reference should fail to compile");
+        let symbol = compile_pre_agg(&ctx, "symbol_rollup_granularity_segment")
+            .expect_err("Granularity inside a time dimension reference should fail to compile");
+
+        assert_eq!(interpolated.message, symbol.message);
+        assert_eq!(
+            interpolated.message,
+            "Pre-aggregation time dimension must be a dimension"
         );
     }
 

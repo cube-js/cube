@@ -1731,6 +1731,14 @@ async fn interpolated_and_symbol_refs_agree(
 
     assert_eq!(interpolated_result, symbol_result);
 
+    // Without Postgres execution there are no rows to compare, so make it
+    // explicit that the row assertions below do run when it is enabled.
+    #[cfg(feature = "integration-postgres")]
+    assert!(
+        interpolated_result.is_some(),
+        "Postgres execution is enabled but returned no result"
+    );
+
     if let Some(result) = interpolated_result {
         insta::assert_snapshot!(snapshot_name, result);
     }

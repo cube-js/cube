@@ -578,6 +578,10 @@ impl SqlCall {
     /// yields the path to resolve: the cube reference's path followed by the
     /// literal segments. Anything else names no member and is reported as
     /// unresolved, rendered for diagnostics.
+    ///
+    /// An element wrapping a member reference in an expression still yields that
+    /// member, since the member is a dependency of its own — only the cube-name
+    /// form has nothing to fall back on.
     pub fn reference_items(&self) -> Vec<SqlCallReference> {
         let elements = match &self.template {
             SqlTemplate::String(s) => std::slice::from_ref(s),
@@ -592,13 +596,16 @@ impl SqlCall {
                 .any(|index| self.deps.get(*index).is_some_and(|dep| dep.is_symbol()));
             if names_symbol {
                 for index in arg_indices {
+                    // An index the recorded dependencies don't cover names
+                    // nothing; the rest of the element is still read.
+                    let Some(symbol) = self.deps.get(index).and_then(|dep| dep.as_symbol()) else {
+                        continue;
+                    };
                     if taken[index] {
                         continue;
                     }
-                    if let Some(symbol) = self.deps[index].as_symbol() {
-                        taken[index] = true;
-                        result.push(SqlCallReference::Symbol(symbol.clone()));
-                    }
+                    taken[index] = true;
+                    result.push(SqlCallReference::Symbol(symbol.clone()));
                 }
                 continue;
             }
@@ -641,10 +648,11 @@ impl SqlCall {
 
     // `{arg:N}` indices in the order they appear in the element.
     fn template_arg_indices(element: &str) -> Vec<usize> {
+        let needle = format!("{{{}:", SqlCallArg::ARG_PREFIX);
         let mut result = Vec::new();
         let mut rest = element;
-        while let Some(start) = rest.find(&format!("{{{}:", SqlCallArg::ARG_PREFIX)) {
-            rest = &rest[start + SqlCallArg::ARG_PREFIX.len() + 2..];
+        while let Some(start) = rest.find(&needle) {
+            rest = &rest[start + needle.len()..];
             let Some(end) = rest.find('}') else {
                 break;
             };
@@ -1011,6 +1019,16 @@ mod tests {
         );
 
         assert_eq!(described(&sql_call), vec!["unresolved:orders.created_at"]);
+    }
+
+    // An index the recorded dependencies don't cover must not be read as one.
+    #[test]
+    fn test_placeholder_out_of_bounds_next_to_a_member_is_skipped() {
+        let ctx = test_context();
+        let symbol = ctx.create_dimension("orders.status").unwrap();
+        let sql_call = single("{arg:0} || {arg:7}", vec![SqlDependency::Symbol(symbol)]);
+
+        assert_eq!(described(&sql_call), vec!["symbol:orders.status"]);
     }
 
     #[test]
