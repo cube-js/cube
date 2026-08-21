@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.25](https://github.com/cube-js/cube/compare/v1.7.24...v1.7.25) (2026-08-21)
+
+### Bug Fixes
+
+- **cubesql:** Support `DATE_ADD` SQL pushdown ([#11539](https://github.com/cube-js/cube/issues/11539)) ([3051ccd](https://github.com/cube-js/cube/commit/3051ccd8c634941dce80235a0e6e823fa8586355))
+
+### Features
+
+- **cube-cli:** reintroduce `cube validate` as a Cloud data-model check ([#11595](https://github.com/cube-js/cube/issues/11595)) ([efeaee3](https://github.com/cube-js/cube/commit/efeaee324c2bd3958682bf502750c9a29bad675e))
+- **cube-cli:** suggest updating the CLI when a request fails on the API ([#11592](https://github.com/cube-js/cube/issues/11592)) ([96eaca5](https://github.com/cube-js/cube/commit/96eaca552d1f24d962c6e0d88b4d2de50403fd6c))
+- **cubestore:** Support QUEUE ADD_AND_RETRIEVE command ([#11590](https://github.com/cube-js/cube/issues/11590)) ([73ec070](https://github.com/cube-js/cube/commit/73ec070d55edf2c2fa4d70bbce1f37d735ce40cd))
+
 ## [1.7.24](https://github.com/cube-js/cube/compare/v1.7.23...v1.7.24) (2026-08-19)
 
 ### Bug Fixes
