@@ -1,7 +1,188 @@
+use std::time::Duration;
+
 use anyhow::Result;
 use clap::Subcommand;
 
+use crate::client::{Client, Query};
+use crate::commands::data_model::dev_mode_command;
+use crate::wait::{self, Progress, Wait};
 use crate::{output, util, Ctx};
+
+/// The states this endpoint reports, split by what a wait should do with them.
+///
+/// The API normalises its internal build-job and dev-worker states into one set:
+/// `built` (a finished build, or a running dev worker), `building` (queued, in
+/// progress, or a worker spinning up), `warmup`, `failed`, `cancelled`, `stopped`,
+/// and `none`. Only the first group ends a wait happily and only the second ends it
+/// unhappily; everything else is progress or absence, handled below. An unknown
+/// value counts as progress on purpose — a new state server-side should slow a wait
+/// down, never make an older CLI call a build finished.
+const BUILD_DONE: &[&str] = &["built"];
+const BUILD_FAILED: &[&str] = &["failed", "cancelled"];
+
+/// The `errorText` verdicts that mean this branch will never build, each paired
+/// with what to actually do about it.
+///
+/// Both were measured against a live deployment. They need different advice, which
+/// is why they aren't one message: "not active" is fixed by opening the branch in
+/// dev mode, while "Bad branch" means there is no such branch — and telling someone
+/// who mistyped a name to open it in dev mode sends them somewhere that cannot help.
+///
+/// The advice is a formatter rather than a string because these commands are read in a
+/// CI log — `build-status --wait` is half the documented gate — where nobody is left to
+/// substitute a placeholder. A `&'static str` can't interpolate, and a template plus a
+/// `replace` at the bail would put the placeholder's spelling in two places, free to
+/// drift apart in silence. Non-capturing closures coerce to `fn`, so the table stays a
+/// const with nothing left to fill in.
+type Hint = fn(deployment: i64, branch: &str) -> String;
+
+const NOT_BUILDING: &[(&str, Hint)] = &[
+    ("Bad branch", |deployment, _| {
+        format!(
+            "There is no such branch — check the name with \
+             `cube data-model branches {deployment}`"
+        )
+    }),
+    ("Branch is not active", |deployment, branch| {
+        format!(
+            "A branch only compiles once it is opened in dev mode — run {} and wait on \
+             the dev-… branch it prints",
+            dev_mode_command(deployment, branch)
+        )
+    }),
+];
+
+/// How long to tolerate an explicit `none`/`stopped` before giving up.
+///
+/// The backstop, not the main defence: against a live deployment the cases that
+/// never finish — an unknown branch, a shared branch with no dev worker — report
+/// `building` with an `errorText`, which the loop catches directly and in seconds.
+/// This covers a worker that reports itself stopped instead, and gives a starting
+/// one a moment before concluding anything.
+///
+/// Measured in TIME, not polls, so `--poll 1s` doesn't silently cut the window to
+/// six seconds and turn a slow worker start into the wrong diagnosis.
+const IDLE_GRACE: Duration = Duration::from_secs(60);
+
+/// The branch a failure should name, for both the prose and the command it suggests.
+/// See [`util::branch_or_placeholder`] for why an unnamed one gets a placeholder.
+fn named_branch(res: &serde_json::Value) -> String {
+    util::branch_or_placeholder(&output::field(res, "branchName"))
+}
+
+/// Poll build-status until the build (or dev-mode worker) reaches a terminal state.
+/// Returns the terminal payload; whether that state is a failure is the caller's
+/// call, since only it knows what the exit should be.
+async fn wait_for_build(
+    api: &Client,
+    deployment: i64,
+    path: &str,
+    query: &Query,
+    timeout: Duration,
+    interval: Duration,
+) -> Result<serde_json::Value> {
+    let idle_since = std::cell::Cell::new(None::<std::time::Instant>);
+
+    wait::poll(Wait::new("build", timeout, interval), || async {
+        let res = api.get(path, query).await?;
+        let status = util::status_of(&res, "status");
+
+        if BUILD_DONE.contains(&status.as_str()) || BUILD_FAILED.contains(&status.as_str()) {
+            return Ok(Progress::Done(res));
+        }
+
+        // A non-terminal status carrying one of the known verdicts is the endpoint
+        // saying "this will never finish", and it is the only way to hear it: both
+        // look exactly like a worker spinning up if you read the status alone, so
+        // waiting on either sat out the whole timeout in silence.
+        //
+        // Matched against known verdicts rather than "any errorText", because a
+        // healthy in-progress build is NOT guaranteed to carry an empty one. The
+        // field is the dev worker's own status proxied through, so whether it can
+        // still hold a PREVIOUS failure while a new build runs isn't knowable from
+        // this side — and if it can, aborting on any error would fail a rebuild after
+        // a red build, on its first poll. That is a worse failure than the wait it
+        // replaces, and it would land exactly when CI retries. An unrecognised
+        // verdict is therefore waited through, carried in the progress label below.
+        // Two forms of the same field, and the split is deliberate. Matching reads the
+        // RAW text, since the match is `contains` and truncating first could cut off a
+        // verdict that arrives after some prefix — losing the fatal case. Everything
+        // that a human reads uses the normalised one: the label is a dedupe key and
+        // this is arbitrary text from a worker, so anything volatile in it — a counter,
+        // a rotating address — would make every poll a "change" and turn a 15-minute
+        // wait into a line per poll, which is exactly the promise `poll` makes.
+        // Collapsing whitespace also keeps a multi-line error from becoming several
+        // progress lines, or landing whole inside `(last seen: …)` or a failure.
+        let error = output::field(&res, "errorText");
+        let complaint = util::one_line(&error, util::COMPLAINT_LIMIT);
+
+        if let Some((verdict, hint)) = NOT_BUILDING
+            .iter()
+            .find(|(verdict, _)| error.contains(verdict))
+        {
+            // Name the verdict, not just the text: matching reads raw while printing
+            // is truncated, so in the very case raw matching exists for — a verdict
+            // after a long prefix — the printed complaint need not contain it, and a
+            // message whose quoted cause doesn't support its own advice is what makes
+            // someone doubt the tool. The fuller text is appended only when it says
+            // something the verdict doesn't, which today it usually doesn't.
+            //
+            // Exact equality, not `contains`, and that asymmetry with the match above
+            // is deliberate: a decorated verdict ("Error: Bad branch") therefore
+            // prints twice, which is untidy, while `contains` would swallow a
+            // decoration that carries the detail ("Bad branch: refs/heads/typo not
+            // found" would print as the bare verdict). Between repeating a few words
+            // and dropping the one line that says WHICH ref was wrong, the repetition
+            // is the cheaper mistake. Neither shape is live: both known verdicts
+            // arrive bare.
+            let branch = named_branch(&res);
+            anyhow::bail!(
+                "branch {branch} is not building ({verdict}){}. {}",
+                if complaint == *verdict {
+                    String::new()
+                } else {
+                    format!(": {complaint}")
+                },
+                hint(deployment, &branch)
+            );
+        }
+
+        if status == "none" || status == "stopped" {
+            let since = idle_since.get().unwrap_or_else(std::time::Instant::now);
+            idle_since.set(Some(since));
+            if since.elapsed() > IDLE_GRACE {
+                let branch = named_branch(&res);
+                anyhow::bail!(
+                    "nothing is building branch {branch} (status {status}{}). If the branch \
+                     exists, it only compiles once it is opened in dev mode — run {} and \
+                     wait on the dev-… branch it prints",
+                    // This branch bails instead of timing out, so the timeout's
+                    // "(last seen: …)" never speaks for it.
+                    if util::is_blank(&complaint) {
+                        String::new()
+                    } else {
+                        format!(": {complaint}")
+                    },
+                    dev_mode_command(deployment, &branch)
+                );
+            }
+        } else {
+            idle_since.set(None);
+        }
+
+        // An unrecognised complaint rides along in the label rather than being
+        // announced once and forgotten: the loop reports labels when they CHANGE, so
+        // this surfaces a new complaint, stays quiet while it persists, and — since
+        // the timeout names the last label — leaves the eventual failure explaining
+        // itself instead of pointing at a line printed fifteen minutes earlier.
+        Ok(Progress::Waiting(if util::is_blank(&complaint) {
+            status
+        } else {
+            format!("{status} ({complaint})")
+        }))
+    })
+    .await
+}
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -113,6 +294,16 @@ enum Cmd {
         /// Branch (defaults to the active dev-mode branch, else the deploy branch)
         #[arg(long)]
         branch: Option<String>,
+        /// Wait for the build (or dev-mode worker) to finish, exiting non-zero if
+        /// it fails
+        #[arg(long)]
+        wait: bool,
+        /// Give up waiting after this long (30s, 15m, 1h)
+        #[arg(long, default_value = "15m", value_parser = util::parse_duration, requires = "wait")]
+        timeout: std::time::Duration,
+        /// How often to poll while waiting
+        #[arg(long, default_value = "5s", value_parser = util::parse_duration, requires = "wait")]
+        poll: std::time::Duration,
     },
     /// Advance onboarding to a target creation step
     AdvanceStep {
@@ -128,7 +319,17 @@ enum Cmd {
     },
 }
 
+fn validate_build_status_args(cmd: &Cmd) -> Result<()> {
+    if let Cmd::BuildStatus { branch, wait, .. } = cmd {
+        if *wait && branch.as_deref().is_some_and(util::is_blank) {
+            anyhow::bail!("--branch cannot be empty when used with --wait");
+        }
+    }
+    Ok(())
+}
+
 pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
+    validate_build_status_args(&args.cmd)?;
     let api = ctx.api()?;
     match args.cmd {
         Cmd::List {
@@ -278,16 +479,53 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 output::success(&format!("Deleted deployment {deployment}"));
             }
         }
-        Cmd::BuildStatus { deployment, branch } => {
+        Cmd::BuildStatus {
+            deployment,
+            branch,
+            wait,
+            timeout,
+            poll,
+        } => {
             let mut query = Vec::new();
             util::push(&mut query, "branchName", &branch);
-            let res = api
-                .get(
-                    &format!("/api/v1/deployments/{deployment}/build-status"),
-                    &query,
-                )
-                .await?;
+            let path = format!("/api/v1/deployments/{deployment}/build-status");
+
+            if !wait {
+                let res = api.get(&path, &query).await?;
+                output::print_json(&res);
+
+                return Ok(());
+            }
+
+            let res = wait_for_build(&api, deployment, &path, &query, timeout, poll).await?;
             output::print_json(&res);
+
+            let status = util::status_of(&res, "status");
+            if BUILD_FAILED.contains(&status.as_str()) {
+                // Normalised like the two sites in `wait_for_build`, and this is the one
+                // that needs it most: those quote a short worker verdict, while this is a
+                // FAILED BUILD, so the text is a compile error that can arrive long and
+                // multi-line. Nothing matches against it here — the status already said
+                // what happened — so the raw/normalised split those sites keep for
+                // `contains` doesn't apply.
+                // `REASON_LIMIT`, not `COMPLAINT_LIMIT`: the poll labels above are
+                // repeated and deduped, so they must stay short — this is printed once
+                // and is the whole point of the message.
+                let error = util::one_line(&output::field(&res, "errorText"), util::REASON_LIMIT);
+                anyhow::bail!(
+                    "build {status} for branch {}{}",
+                    named_branch(&res),
+                    // Still `is_blank` rather than `is_empty`, though `one_line` has
+                    // already collapsed blanks to nothing: one rule at every site that
+                    // picks an arm is cheaper to keep true than one with an exception
+                    // whose safety depends on a call two lines up.
+                    if util::is_blank(&error) {
+                        String::new()
+                    } else {
+                        format!(": {error}")
+                    }
+                );
+            }
         }
         Cmd::AdvanceStep { deployment, step } => {
             let res = api
@@ -319,4 +557,78 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn build_status_preserves_legacy_empty_branch_without_wait() {
+        let command = |branch, wait| Cmd::BuildStatus {
+            deployment: 1,
+            branch,
+            wait,
+            timeout: Duration::from_secs(1),
+            poll: Duration::from_secs(1),
+        };
+
+        assert!(validate_build_status_args(&command(Some(String::new()), false)).is_ok());
+        assert!(validate_build_status_args(&command(None, true)).is_ok());
+        assert!(validate_build_status_args(&command(Some("main".into()), true)).is_ok());
+        assert!(validate_build_status_args(&command(Some("  ".into()), true)).is_err());
+    }
+
+    #[test]
+    fn every_hint_is_runnable_as_printed() {
+        // These are read out of a CI job log, where nobody is left to substitute a
+        // placeholder — so the table must not carry one, whichever verdict fires.
+        for (verdict, hint) in NOT_BUILDING {
+            let advice = hint(42, "release-2026");
+            assert!(
+                !advice.contains('<') && !advice.contains('>'),
+                "{verdict}'s advice still has a placeholder: {advice}"
+            );
+            assert!(
+                advice.contains("42"),
+                "{verdict}'s advice drops the deployment"
+            );
+        }
+        // Only the dev-mode advice needs the branch; `branches` lists them all, so
+        // requiring it everywhere would pin a command that doesn't take one.
+        assert!(NOT_BUILDING
+            .iter()
+            .any(|(_, hint)| hint(42, "release-2026").contains("dev-mode 42 'release-2026'")));
+    }
+
+    #[test]
+    fn the_hint_borrows_the_shared_dev_mode_command() {
+        // The backstop's wording differs from this hint's on purpose; the command a
+        // reader copies must not — so neither spells it out. `data_model` owns what that
+        // command looks like, including the quoting.
+        assert!(NOT_BUILDING
+            .iter()
+            .any(|(_, hint)| hint(42, "feat#1234").contains(&dev_mode_command(42, "feat#1234"))));
+    }
+
+    #[test]
+    fn a_payload_with_no_branch_says_so_rather_than_dropping_the_argument() {
+        // The command half is covered by quoting; this is the prose half, which it
+        // can't reach — see `util::branch_or_placeholder`.
+        assert_eq!(named_branch(&serde_json::json!({})), "<branch>");
+        assert_eq!(
+            named_branch(&serde_json::json!({"branchName": ""})),
+            "<branch>"
+        );
+        // Blanks are the other spelling of "named nothing", and the only one that would
+        // still read as a formatting bug.
+        assert_eq!(
+            named_branch(&serde_json::json!({"branchName": "   "})),
+            "<branch>"
+        );
+        assert_eq!(
+            named_branch(&serde_json::json!({"branchName": "main"})),
+            "main"
+        );
+    }
 }

@@ -4,6 +4,8 @@ use anyhow::{Context as _, Result};
 use clap::Subcommand;
 use serde_json::json;
 
+use reqwest::Method;
+
 use crate::client::{Client, Query};
 use crate::{output, util, Ctx};
 
@@ -97,8 +99,10 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Name
+        #[arg(value_parser = util::nonempty)]
         name: String,
-        /// Enter dev mode on the new branch
+        /// Point your dev-mode session at the new branch (file writes still need
+        /// the `dev-…` name that `dev-mode` returns)
         #[arg(long)]
         dev_mode: bool,
     },
@@ -107,7 +111,20 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Branch to enable (a shared branch — not a personal dev branch)
+        #[arg(value_parser = util::nonempty)]
         branch: String,
+    },
+    /// Delete a branch and its Cube-side git ref
+    DeleteBranch {
+        /// Deployment id
+        deployment: i64,
+        /// Branch to delete
+        #[arg(value_parser = util::nonempty)]
+        branch: String,
+        /// Also delete the branch on the connected git provider (GitHub/GitLab).
+        /// Off by default, so your own remote is left alone unless you say so.
+        #[arg(long)]
+        remove_on_upstream: bool,
     },
     /// Disable a branch: its staging environment is active only while the
     /// branch is viewed in the Cube UI
@@ -115,6 +132,7 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Branch to disable
+        #[arg(value_parser = util::nonempty)]
         branch: String,
     },
     /// Enter dev mode on a branch (prints the personal dev-mode branch that
@@ -123,6 +141,7 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
         /// Branch to base dev mode on (required by the API)
+        #[arg(value_parser = util::nonempty)]
         branch: String,
     },
     /// Exit dev mode
@@ -208,10 +227,16 @@ fn flatten(nodes: &[serde_json::Value], out: &mut Vec<serde_json::Value>) {
 
 /// Printed after entering dev mode, so the user knows which branch the write
 /// commands accept.
+///
+/// Quoted like every other value this CLI hands back inside a command (see
+/// [`util::shell_quote`]). A `dev-…` name is server-generated and so far always safe,
+/// which is exactly the "usually fine" the convention exists to stop relying on: the
+/// exemption isn't written anywhere, so the next reader has to re-derive it.
 fn dev_branch_hint(dev_branch: &str) -> String {
     format!(
-        "Data-model writes target it: pass --branch {dev_branch} \
-         (or omit --branch to use your active dev-mode branch)."
+        "Data-model writes target it: pass --branch {} \
+         (or omit --branch to use your active dev-mode branch).",
+        util::shell_quote(dev_branch)
     )
 }
 
@@ -295,6 +320,24 @@ fn read_content(file: Option<String>, content: Option<String>) -> Result<String>
         Some(c) => Ok(c.to_string()),
         None => anyhow::bail!("provide --file <path> or --content <text>"),
     }
+}
+
+/// The command that opens a branch for compilation, rendered in one place.
+///
+/// Three messages hand it over — the `Branch is not active` verdict and the
+/// `none`/`stopped` backstop in [`crate::commands::deployments`], and `create-branch
+/// --dev-mode` below — and their prose deliberately differs: one answers a verdict, one
+/// answers absence, one follows a branch that was just created. What a reader COPIES
+/// shouldn't differ, so only the sentences around it are written three times. It lives
+/// here because this module owns the subcommand it names.
+///
+/// The branch is user-supplied and goes into a command meant to be pasted, so it is
+/// quoted — see [`util::shell_quote`] for what a legal ref name can do unquoted.
+pub fn dev_mode_command(deployment: i64, branch: &str) -> String {
+    format!(
+        "`cube data-model dev-mode {deployment} {}`",
+        util::shell_quote(branch)
+    )
 }
 
 pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
@@ -439,14 +482,38 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             if ctx.json {
                 output::print_json(&res);
             } else {
-                // With --dev-mode the server forks a personal dev-mode branch off
-                // the new branch; that's the branch file writes must target.
+                // The server points the session at the new branch rather than
+                // forking a personal dev branch off it, so `branchName` comes back
+                // equal to `name` and this hint stays silent — measured against a
+                // live tenant, where writes to that name are then rejected with
+                // "is not a dev-mode branch". Kept for the case where a server does
+                // fork, since the forked name is what writes would have to target.
                 let dev_branch = output::field(&res, "branchName");
-                if dev_mode && !dev_branch.is_empty() && dev_branch != name {
+                // Both halves decide on trimmed text, or the condition would hold two
+                // ideas of what a name IS: `nonempty` passes `--branch 'x '` through
+                // unchanged, so a server that trims before echoing makes an equal pair
+                // look different — and this arm would announce a fork that didn't happen.
+                // The printed value stays raw; only the decision trims.
+                if dev_mode && !util::is_blank(&dev_branch) && dev_branch.trim() != name.trim() {
                     output::success(&format!(
                         "Created branch {name}; entered dev mode on {dev_branch}"
                     ));
                     println!("{}", dev_branch_hint(&dev_branch));
+                } else if dev_mode {
+                    // Say what happened: this re-points per-credential state, and
+                    // silence here reads exactly like a plain `create-branch`. Worded
+                    // as the request, not the outcome, because this arm fires on the
+                    // flag we sent — the response's `active` is false here whether or
+                    // not `--dev-mode` was passed, so it can't confirm the session
+                    // moved, and asserting it would invent the state the message
+                    // exists to stop hiding.
+                    output::success(&format!(
+                        "Created branch {name} and asked to enter dev mode on it"
+                    ));
+                    println!(
+                        "File writes still need a dev-… branch: run {}.",
+                        dev_mode_command(deployment, &name)
+                    );
                 } else {
                     output::success(&format!("Created branch {name}"));
                 }
@@ -454,6 +521,37 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         }
         Cmd::EnableBranch { deployment, branch } => {
             set_branch_enabled(&api, ctx, deployment, &branch, true).await?;
+        }
+        Cmd::DeleteBranch {
+            deployment,
+            branch,
+            remove_on_upstream,
+        } => {
+            // `branchName` travels as a query parameter, not a path segment: branch
+            // names contain slashes (`dbt-sync/main-…`). `Client::delete` takes no
+            // query, so this goes through `request` directly.
+            //
+            let mut query: Query = vec![("branchName".to_string(), branch.clone())];
+            if remove_on_upstream {
+                query.push(("removeOnUpstream".to_string(), "true".to_string()));
+            }
+            let res = api
+                .request(
+                    Method::DELETE,
+                    &format!("/build/api/v1/deployments/{deployment}/branches"),
+                    &query,
+                    None,
+                )
+                .await?;
+            if ctx.json {
+                output::print_json(&res);
+            } else if remove_on_upstream {
+                output::success(&format!(
+                    "Deleted branch {branch}, including its ref on the git provider"
+                ));
+            } else {
+                output::success(&format!("Deleted branch {branch}"));
+            }
         }
         Cmd::DisableBranch { deployment, branch } => {
             set_branch_enabled(&api, ctx, deployment, &branch, false).await?;
@@ -472,7 +570,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 // Dev mode runs on a personal `dev-…` branch forked from the
                 // requested one — expose it, since file writes only accept it.
                 let dev_branch = output::field(&res, "branchName");
-                if dev_branch.is_empty() || dev_branch == branch {
+                // Trimmed on both sides, for the reason given at the `create-branch`
+                // arm above: an equal pair must not read as a fork.
+                if util::is_blank(&dev_branch) || dev_branch.trim() == branch.trim() {
                     output::success(&format!("Entered dev mode on {branch}"));
                 } else {
                     output::success(&format!(
@@ -573,4 +673,20 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_dev_mode_command_survives_a_branch_name_with_a_metacharacter() {
+        // Three messages hand this over, and a ref may legally carry `#` — which
+        // unquoted comments out the rest of the line, so the command runs against the
+        // wrong branch and looks to the reader like it worked.
+        assert_eq!(
+            dev_mode_command(42, "feat#1234"),
+            "`cube data-model dev-mode 42 'feat#1234'`"
+        );
+    }
 }
