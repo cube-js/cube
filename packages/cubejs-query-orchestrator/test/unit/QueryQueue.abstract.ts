@@ -250,29 +250,40 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     const onlyLocalTest = options.cacheAndQueueDriver !== 'cubestore' ? test : xtest;
 
     test('orphaned', async () => {
-      // recover if previous test broken something
-      for (let i = 1; i <= 4; i++) {
-        await queue.executeInQueue('delay', `11${i}`, { delay: 50, result: `${i}` }, 0);
+      cancelledQuery = null;
+
+      // Two queries hold the single worker slot. orphanedTimeout keeps them out of the
+      // orphaned set themselves: the memory driver reports active queries as orphaned once
+      // their timeout passes, Cube Store does not.
+      const pending = [
+        queue.executeInQueue('delay', '121', { delay: 1200, result: '1', orphanedTimeout: 60 }, 0).catch(e => e),
+      ];
+      await delayFn(null, 50);
+      pending.push(queue.executeInQueue('delay', '122', { delay: 1200, result: '2', orphanedTimeout: 60 }, 0).catch(e => e));
+      await delayFn(null, 50);
+      // 121 and 122 keep the worker busy for ~2.4s, so this one is still queued when its
+      // 1s orphaned timeout expires
+      pending.push(queue.executeInQueue('delay', '123', { delay: 50, result: '3', orphanedTimeout: 1 }, 0).catch(e => e));
+
+      // Reconciliation is what cancels orphaned queries and nothing else triggers it while
+      // the worker is busy.
+      const deadline = Date.now() + 2000;
+      while (cancelledQuery !== '123' && Date.now() < deadline) {
+        await queue.reconcileQueue();
+        await delayFn(null, 100);
       }
 
-      cancelledQuery = null;
-      delayCount = 0;
+      expect(cancelledQuery).toBe('123');
 
-      let result = queue.executeInQueue('delay', '111', { delay: 800, result: '1' }, 0);
-      delayFn(null, 50).then(() => queue.executeInQueue('delay', '112', { delay: 800, result: '2' }, 0)).catch(e => e);
-      delayFn(null, 75).then(() => queue.executeInQueue('delay', '113', { delay: 800, result: '3' }, 0)).catch(e => e);
-      // orphaned timeout should be applied
-      delayFn(null, 100).then(() => queue.executeInQueue('delay', '114', { delay: 900, result: '4' }, 0)).catch(e => e);
+      // every client gave up on ContinueWaitError long before this point
+      const outcomes = await Promise.all(pending);
+      outcomes.forEach((e) => expect(e).toBeInstanceOf(ContinueWaitError));
+      await awaitProcessing();
 
-      expect(await result).toBe('10');
-      await queue.executeInQueue('delay', '112', { delay: 800, result: '2' }, 0);
-
-      result = await queue.executeInQueue('delay', '113', { delay: 900, result: '3' }, 0);
-      expect(result).toBe('32');
-
-      await delayFn(null, 500);
-      expect(cancelledQuery).toBe('114');
-      await queue.executeInQueue('delay', '114', { delay: 50, result: '4' }, 0);
+      // 123 was cancelled before the worker could pick it up
+      expect(delayCount).toBe(2);
+      // cancellation removed it from the queue, so the same key can be queued again
+      expect(await queue.executeInQueue('delay', '123', { delay: 50, result: '3' }, 0)).toBe('32');
     });
 
     test('orphaned with custom ttl', async () => {
