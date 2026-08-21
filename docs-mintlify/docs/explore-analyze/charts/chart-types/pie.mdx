@@ -27,6 +27,18 @@ Drag the **Inner radius** slider in the Style tab or enter a pixel value. Settin
 
 {/* Screenshot: Style tab with the Inner radius control highlighted. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
+## Rings
+
+A pie's **Fields** tab is its own panel, not the X/Y/Color channels the other chart types use. It has three controls:
+
+| Control | What it sets |
+|---|---|
+| **Rings** | The dimensions the circle is divided by, innermost first. With one dimension you get a plain pie; add more and each becomes an outer ring, subdividing the ring inside it. Drag to reorder |
+| **Measure** | The measure whose values set each slice's arc length |
+| **Tooltips** | The fields shown on hover — see [tooltips](/docs/explore-analyze/charts/configuration/tooltips) |
+
+The innermost ring doubles as the color dimension, so reordering the rings also changes what the slices are colored by.
+
 ## Color and slice ordering
 
 Slices are colored using the active [color palette](/docs/explore-analyze/charts/configuration/color-and-stacking) in palette order, matched to the sort order of your query results. To change which slice appears first, adjust the sort in the results table.

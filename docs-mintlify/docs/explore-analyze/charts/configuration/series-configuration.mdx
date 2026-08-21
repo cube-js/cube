@@ -1,9 +1,11 @@
 ---
 title: Series configuration
-description: Configure individual series — mark type, color, and display options — independently from the global chart settings.
+description: Configure Y-axis layers — mark type, axis assignment, stacking, and data labels — independently from the global chart settings.
 ---
 
-Series configuration lets you override chart settings on a per-series basis. Access it from the **Fields** tab by expanding an individual series in the Y-axis section.
+Series configuration applies to a chart built from **Y-axis layers**. Below the Y channel on the **Fields** tab there is a **+ Y Axis** button; each press adds a layer with its own fields, mark type, and axis assignment. It is not a channel dropdown, and it is offered only when the X axis is categorical or time-based and the chart is neither a heatmap, a boxplot, nor [split into small multiples](/docs/explore-analyze/charts/configuration/small-multiples).
+
+A chart can also carry several series without layers, when the query itself returns more than one measure. That is [multi-series mode](/docs/explore-analyze/charts/configuration/series-mapping), and its measures are listed in a **Series** section whose rows carry no settings of their own — so the settings on this page are never per-measure. With no layers there is nothing to override: data labels, stacking, and color come from the global [data labels](/docs/explore-analyze/charts/configuration/data-labels) and [color & stacking](/docs/explore-analyze/charts/configuration/color-and-stacking) settings, and mark type and axis assignment do not apply at all — every series is drawn with the chart's own mark, on its one Y axis. Add a layer and it gets its own mark type, Y axis assignment, data labels, and stacking. **Which one you are in is visible on the Fields tab**: a layer is a repeat of the whole set of Fields controls, with its own mark type and axis assignment, while multi-series is a **Series** list inside one such set. The two can coexist, so a layer can itself be in multi-series mode.
 
 {/* TODO screenshot: series configuration panel expanded for one series (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -18,18 +20,16 @@ Available mark types per series:
 - **Scatter** (point)
 
 To create a bar + line chart:
-1. Add two measures to the Y axis.
-2. Expand the second series in the Fields tab.
+1. Click **+ Y Axis** on the Fields tab to add a second layer.
+2. Pick the measure it should plot.
 3. Set its mark type to **Line**.
 4. Optionally assign it to the **Right Y axis** in the same panel (see [Axes](/docs/explore-analyze/charts/configuration/axes)).
 
 {/* TODO screenshot: second series with mark type set to Line (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
-## Series color
+## Color
 
-When no **Color** channel is assigned (single-color charts with no color-by dimension), each series has an individual color picker. Click the color swatch to open the picker and set a custom color for that series.
-
-This setting has no effect when a Color channel is active — in that case, colors are managed by the palette in [Color & stacking](/docs/explore-analyze/charts/configuration/color-and-stacking).
+Color is not set per layer. It is a chart-level control on the **Style** tab, and only when no Color channel is assigned — see [mark color](/docs/explore-analyze/charts/configuration/color-and-stacking).
 
 ## Y axis assignment
 
