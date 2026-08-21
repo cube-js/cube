@@ -52,6 +52,8 @@ type CubeStoreClaimResponse = {
 export class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   protected readonly externalIdEnabled: boolean;
 
+  protected readonly fastTrackEnabled: boolean;
+
   protected readonly sendParameters: boolean;
 
   public constructor(
@@ -59,7 +61,16 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     protected readonly options: QueueDriverOptions,
   ) {
     this.externalIdEnabled = getEnv('queueExternalId');
+    this.fastTrackEnabled = getEnv('queueFastTrack');
     this.sendParameters = getEnv('cubestoreSendableParameters');
+  }
+
+  public async useFastTrack(): Promise<boolean> {
+    if (this.fastTrackEnabled) {
+      return this.driver.hasCapability('queueAddAndRetrieve');
+    }
+
+    return false;
   }
 
   public async useExternalId(): Promise<boolean> {
@@ -78,10 +89,6 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     return `${this.options.redisQueuePrefix}:${queryKey}`;
   }
 
-  /**
-   * Builds everything `QUEUE ADD` and `QUEUE ADD_AND_RETRIEVE` have in common, they accept
-   * the same modifiers and the same trailing path and payload.
-   */
   protected async buildAddCommand(
     queryKey: QueryKey,
     queryHandler: string,
@@ -125,9 +132,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
   }
 
   public async addToQueue(
-    _keyScore: number,
     queryKey: QueryKey,
-    _orphanedTime: number,
     queryHandler: string,
     query: AddToQueueQuery,
     priority: number,
@@ -149,17 +154,15 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
   }
 
   public async addAndRetrieve(
-    keyScore: number,
     queryKey: QueryKey,
-    orphanedTime: number,
     queryHandler: string,
     query: AddToQueueQuery,
     priority: number,
     options: AddToQueueOptions
   ): Promise<AddAndRetrieveResponse> {
-    if (!await this.driver.hasCapability('queueAddAndRetrieve')) {
+    if (!await this.useFastTrack()) {
       const [added, queueId, queueSize, addedToQueueTime] = await this.addToQueue(
-        keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
+        queryKey, queryHandler, query, priority, options
       );
 
       return [added, queueId, queueSize, addedToQueueTime, null];
@@ -383,8 +386,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
   }
 
   /**
-   * An empty payload means the item was not claimed by this call. Shared by
-   * `QUEUE RETRIEVE` and `QUEUE ADD_AND_RETRIEVE` so that they cannot drift apart.
+   * Shared by `QUEUE RETRIEVE` and `QUEUE ADD_AND_RETRIEVE` so that they cannot drift apart.
    */
   protected decodeClaimFromRow(row: CubeStoreClaimResponse, method: string): RetrieveForProcessingSuccess | null {
     if (!row.payload) {
