@@ -318,11 +318,11 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
     };
 
     await createBenchmark({
-      currency: 50,
-      totalQueries: 1_000,
+      currency: parseInt(process.env.BENCH_CONCURRENCY || '50', 10),
+      totalQueries: parseInt(process.env.BENCH_TOTAL_QUERIES || '1000', 10),
       // eslint-disable-next-line no-bitwise
-      queueResponseSize: 5 << 20,
-      queuePayloadSize: 256 * 1024,
+      queueResponseSize: parseInt(process.env.BENCH_RESPONSE_SIZE || `${5 << 20}`, 10),
+      queuePayloadSize: parseInt(process.env.BENCH_PAYLOAD_SIZE || `${256 * 1024}`, 10),
     });
 
     if (options.afterAll) {
