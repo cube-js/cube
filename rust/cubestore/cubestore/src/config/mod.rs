@@ -1304,6 +1304,13 @@ pub async fn init_test_logger() {
 
 /// Router-side merge strategy for distributed value-ordered top-k (`SELECT ... GROUP BY x ORDER BY
 /// agg(...) LIMIT k`). Selected by `CUBESTORE_TOPK_STRATEGY`.
+///
+/// The strategy shapes both the worker subtree and the router node combining it, and each node
+/// plans its own half from its own configuration, so `CUBESTORE_TOPK_STRATEGY` (and
+/// `CUBESTORE_GROUP_BY_LIMIT_FACTOR`, which decides whether the worker emits sorted or hash-trimmed
+/// groups) must hold the same value on the router and on every select worker. A cluster running a
+/// mix -- a rolling upgrade that changes either default, say -- returns wrong top-k rows instead of
+/// failing: the router combines a worker stream whose ordering guarantee it does not have.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TopKAggregateStrategy {
     /// Original streaming NRA merge with per-row state.
