@@ -3,7 +3,7 @@ import crypto from 'crypto';
 
 import type { QueryKey, QueueDriverInterface } from '@cubejs-backend/base-driver';
 import { pausePromise } from '@cubejs-backend/shared';
-import { CubestoreQueueDriverConnection } from '@cubejs-backend/cubestore-driver';
+import { CubeStoreDriver, CubestoreQueueDriverConnection } from '@cubejs-backend/cubestore-driver';
 
 import { QueryQueue, QueryQueueOptions } from '../../src';
 import { ContinueWaitError } from '../../src/orchestrator/ContinueWaitError';
@@ -35,6 +35,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
     let delayCount = 0;
     let streamCount = 0;
+    // A cushion which keeps the order of the log calls deterministic for the tests which
+    // assert on it, a handler without it completes while executeInQueue is still logging
+    let streamHandlerDelay = 250;
     const processMessagePromises: Promise<any>[] = [];
     const processCancelPromises: Promise<any>[] = [];
     let cancelledQuery;
@@ -54,9 +57,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       streamHandler: async (query, stream) => {
         streamCount++;
 
-        // TODO: Fix an issue with a fast execution of stream handler which caused by removal of QueryStream from streams,
-        // while EventListener doesnt start to listen for started stream event
-        await pausePromise(250);
+        if (streamHandlerDelay) {
+          await pausePromise(streamHandlerDelay);
+        }
 
         return new Promise((resolve, reject) => {
           const readable = Readable.from([]);
@@ -103,6 +106,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       logger.mockClear();
       delayCount = 0;
       streamCount = 0;
+      streamHandlerDelay = 250;
     });
 
     afterAll(async () => {
@@ -361,12 +365,61 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       expect(logger.mock.calls[logger.mock.calls.length - 1][0]).toEqual('Performing query completed');
     });
 
+    test('stream handler which starts immediately', async () => {
+      streamHandlerDelay = 0;
+
+      const key: QueryKey = ['select * from table_no_delay', []];
+      key.persistent = true;
+      const stream = await queue.executeInQueue('stream', key, { aliasNameToMember: {} }, 0);
+      await awaitProcessing();
+
+      // The handler can emit `streamStarted` and finish before executeInQueue awaits for
+      // it, which is safe only because the listener is subscribed before the dispatch
+      expect(stream).toBeDefined();
+
+      for await (const chunk of stream) {
+        console.log('streaming chunk: ', chunk);
+      }
+
+      expect(streamCount).toEqual(1);
+    });
+
     test('removed before reconciled', async () => {
       const query: QueryKey = ['select * from', []];
       const key = queue.redisHash(query);
       await queue.processQuery(key, null);
       const result = await queue.executeInQueue('foo', key, query);
       expect(result).toBe('select * from bar');
+    });
+
+    onlyLocalTest('addAndRetrieve never claims in memory', async () => {
+      const connection = await queue.queueDriver.createConnection();
+      const query: QueryKey = ['select * from add_and_retrieve', []];
+
+      try {
+        const priority = 10;
+        const time = new Date().getTime();
+        const [added, , , , claim] = await connection.addAndRetrieve(
+          time + (10000 - priority) * 1E14,
+          query,
+          time + 2000,
+          'delay',
+          { isJob: true, orphanedTimeout: undefined },
+          priority,
+          { queueId: 1, stageQueryKey: '1', requestId: '1' }
+        );
+
+        expect(added).toBe(1);
+        expect(claim).toBeNull();
+        // Nothing was claimed, so the item is left for reconcile to pick up
+        expect(await connection.getToProcessQueries()).toStrictEqual([
+          [connection.redisHash(query), expect.any(Number)]
+        ]);
+      } finally {
+        await connection.getQueryAndRemove(connection.redisHash(query), null);
+
+        queue.queueDriver.release(connection);
+      }
     });
 
     onlyLocalTest('queue driver lock obtain race condition', async () => {
@@ -559,6 +612,101 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           expect(delayCount).toBe(1);
         }
       }, 30000);
+    });
+
+    // eslint-disable-next-line no-unused-expressions
+    options.cacheAndQueueDriver === 'cubestore' && describe('with CUBEJS_QUEUE_FAST_TRACK enabled', () => {
+      jest.setTimeout(10 * 1000);
+
+      beforeAll(() => {
+        process.env.CUBEJS_QUEUE_FAST_TRACK = 'true';
+      });
+
+      afterAll(() => {
+        delete process.env.CUBEJS_QUEUE_FAST_TRACK;
+      });
+
+      test('an idle queue claims the query on add', async () => {
+        const retrieveForProcessing = jest.spyOn(CubestoreQueueDriverConnection.prototype, 'retrieveForProcessing');
+        const driverQuery = jest.spyOn(CubeStoreDriver.prototype, 'query');
+
+        try {
+          const query: QueryKey = ['select * from fast_track', []];
+          const result = await queue.executeInQueue('foo', query, query);
+
+          expect(result).toBe('select * from fast_track bar');
+          expect(driverQuery.mock.calls.some(([sql]) => sql.startsWith('QUEUE ADD_AND_RETRIEVE'))).toBe(true);
+          // The claim came with the response of QUEUE ADD_AND_RETRIEVE, so there was
+          // nothing left to retrieve
+          expect(retrieveForProcessing).not.toHaveBeenCalled();
+          // The claim carries the processing identity, the acknowledgement must be accepted
+          expect(logger.mock.calls.map(([message]) => message)).not.toContain('Orphaned execution result');
+        } finally {
+          retrieveForProcessing.mockRestore();
+          driverQuery.mockRestore();
+        }
+      });
+
+      test('concurrent clients execute the query once', async () => {
+        const results = await Promise.all([
+          queue.executeInQueue('delay', 'fast_track_concurrent', { delay: 400, result: '2' }),
+          queue.executeInQueue('delay', 'fast_track_concurrent', { delay: 400, result: '2' })
+        ]);
+
+        expect(results).toStrictEqual(['20', '20']);
+        expect(delayCount).toBe(1);
+      });
+
+      test('a claim is not given out while the concurrency budget is taken', async () => {
+        const connection = await queue.queueDriver.createConnection();
+        const first: QueryKey = ['select * from budget_1', []];
+        const second: QueryKey = ['select * from budget_2', []];
+        const addAndRetrieve = (queryKey: QueryKey, queueId: number) => {
+          const priority = 10;
+          const time = new Date().getTime();
+
+          return connection.addAndRetrieve(
+            time + (10000 - priority) * 1E14,
+            queryKey,
+            time + 2000,
+            'delay',
+            { isJob: true, orphanedTimeout: undefined },
+            priority,
+            { queueId, stageQueryKey: `${queueId}`, requestId: `${queueId}` }
+          );
+        };
+
+        try {
+          // concurrency is 1, the first query takes the only slot
+          const [added1, , , , claim1] = await addAndRetrieve(first, 1);
+          expect(added1).toBe(1);
+          expect(claim1?.[5]).toBe(true);
+          expect(claim1?.[4].queryKey).toStrictEqual(first);
+
+          // an active item is never claimed twice
+          const [added1again, , , , claim1again] = await addAndRetrieve(first, 1);
+          expect(added1again).toBe(0);
+          expect(claim1again).toBeNull();
+
+          const [added2, , , , claim2] = await addAndRetrieve(second, 2);
+          expect(added2).toBe(1);
+          expect(claim2).toBeNull();
+
+          // A claimed item goes straight to active and never becomes pending, the one
+          // which was not claimed is left for reconcile to pick up by priority
+          expect(await connection.getActiveQueries()).toStrictEqual([
+            [connection.redisHash(first), expect.any(Number)]
+          ]);
+          expect(await connection.getToProcessQueries()).toStrictEqual([
+            [connection.redisHash(second), expect.any(Number)]
+          ]);
+        } finally {
+          await connection.getQueryAndRemove(connection.redisHash(first), null);
+          await connection.getQueryAndRemove(connection.redisHash(second), null);
+
+          queue.queueDriver.release(connection);
+        }
+      });
     });
   });
 };

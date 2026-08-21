@@ -10,7 +10,6 @@ export type QueryKeyHash = string & { __type: 'QueryKeyHash' };
 
 export type QueryKeysTuple = [keyHash: QueryKeyHash, queueId: QueueId | null /** Supported by new Cube Store and Memory */];
 export type GetActiveAndToProcessResponse = [active: QueryKeysTuple[], toProcess: QueryKeysTuple[]];
-export type AddToQueueResponse = [added: number, queueId: QueueId | null, queueSize: number, addedToQueueTime: number];
 export type QueryStageStateResponse = [active: string[], toProcess: string[]] | [active: string[], toProcess: string[], defs: Record<string, QueryDef>];
 export type RetrieveForProcessingSuccess = [
   added: unknown,
@@ -31,6 +30,18 @@ export type RetrieveForProcessingFail = [
   lockAquired: false
 ];
 export type RetrieveForProcessingResponse = RetrieveForProcessingSuccess | RetrieveForProcessingFail | null;
+export type AddToQueueResponse = [added: number, queueId: QueueId | null, queueSize: number, addedToQueueTime: number];
+export type AddAndRetrieveResponse = [
+  added: number,
+  queueId: QueueId | null,
+  queueSize: number,
+  addedToQueueTime: number,
+  // `null` when the item was not claimed - the concurrency budget was full, the item is
+  // already active, or the driver has no fast track at all. A claim is an ownership transfer:
+  // the caller owns an active item and must execute and acknowledge it, otherwise the query
+  // stalls until the stalled/orphaned reclaim picks it up.
+  claim: RetrieveForProcessingSuccess | null,
+];
 
 export interface AddToQueueQuery {
   isJob: boolean,
@@ -73,6 +84,14 @@ export interface QueueDriverConnectionInterface {
    * @param options
    */
   addToQueue(keyScore: number, queryKey: QueryKey, orphanedTime: number, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse>;
+  /**
+   * Same as {@link addToQueue}, but the driver also tries to claim the item for processing
+   * in the same operation, which saves the caller a retrieval round-trip. A driver which
+   * cannot claim returns a `null` claim and the caller falls back to the normal flow.
+   *
+   * @see AddAndRetrieveResponse for what owning a claim means.
+   */
+  addAndRetrieve(keyScore: number, queryKey: QueryKey, orphanedTime: number, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddAndRetrieveResponse>;
   // Return query keys which was sorted by priority and time
   getToProcessQueries(): Promise<QueryKeysTuple[]>;
   getActiveQueries(): Promise<QueryKeysTuple[]>;

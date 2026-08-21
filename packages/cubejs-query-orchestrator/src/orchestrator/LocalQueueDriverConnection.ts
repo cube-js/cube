@@ -9,6 +9,7 @@ import {
   AddToQueueQuery,
   AddToQueueOptions,
   AddToQueueResponse,
+  AddAndRetrieveResponse,
   QueryKeysTuple,
   GetActiveAndToProcessResponse,
   QueryStageStateResponse,
@@ -203,6 +204,17 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
       Object.keys(this.state.toProcess).length,
       queryQueueObj.addedToQueueTime
     ];
+  }
+
+  /**
+   * There is no round-trip to save in memory, the item is always left for reconcile to pick up.
+   */
+  public async addAndRetrieve(keyScore: number, queryKey: QueryKey, orphanedTime: number, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddAndRetrieveResponse> {
+    const [added, queueId, queueSize, addedToQueueTime] = await this.addToQueue(
+      keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
+    );
+
+    return [added, queueId, queueSize, addedToQueueTime, null];
   }
 
   public async getToProcessQueries(): Promise<QueryKeysTuple[]> {
