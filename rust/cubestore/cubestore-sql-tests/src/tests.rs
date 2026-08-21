@@ -3600,28 +3600,32 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) -> Result<(), 
     verbose.show_sort_by = true;
     assert_eq!(
         pp_phys_plan_ext(p.router.as_ref(), &verbose),
-        "Projection, [url, sum(Data.hits)@1:hits]\
-           \n  AggregateTopK, limit: 10, sortBy: [2 desc nulls last]\
-           \n    ClusterSend, partitions: [[1, 2]], sort_order: [1]"
+        "Projection, [url, sum(Data.hits)@1:hits], sort_order: [1]\
+           \n  Sort, by: [sum(Data.hits)@1 desc nulls last], fetch: 10, sort_order: [1]\
+           \n    LinearSingleAggregate\
+           \n      CoalescePartitions\
+           \n        ClusterSend, partitions: [[1, 2]]"
     );
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &verbose),
-        "Projection, [url, sum(Data.hits)@1:hits]\
-           \n  AggregateTopK, limit: 10, sortBy: [2 desc nulls last]\
-           \n    Worker, sort_order: [1]\
-           \n      Sort, by: [sum(Data.hits)@1 desc nulls last], sort_order: [1]\
-           \n        LinearSingleAggregate\
+        "Projection, [url, sum(Data.hits)@1:hits], sort_order: [1]\
+           \n  Sort, by: [sum(Data.hits)@1 desc nulls last], fetch: 10, sort_order: [1]\
+           \n    LinearSingleAggregate\
+           \n      CoalescePartitions\
+           \n        Worker\
            \n          CoalescePartitions\
-           \n            Union\
-           \n              Filter\
-           \n                Scan, index: default:1:[1]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2, 3, 4]\
-           \n                  Sort, by: [allowed@0, site_id@1, url@2, day@3, hits@4], sort_order: [0, 1, 2, 3, 4]\
-           \n                    Empty\
+           \n            LinearSingleAggregate\
            \n              CoalescePartitions\
-           \n                Filter\
-           \n                  Scan, index: default:2:[2]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2, 3, 4]\
-           \n                    Sort, by: [allowed@0, site_id@1, url@2, day@3, hits@4], sort_order: [0, 1, 2, 3, 4]\
-           \n                      Empty"
+           \n                Union\
+           \n                  Filter\
+           \n                    Scan, index: default:1:[1]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n                      Sort, by: [allowed@0, site_id@1, url@2, day@3, hits@4], sort_order: [0, 1, 2, 3, 4]\
+           \n                        Empty\
+           \n                  CoalescePartitions\
+           \n                    Filter\
+           \n                      Scan, index: default:2:[2]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n                        Sort, by: [allowed@0, site_id@1, url@2, day@3, hits@4], sort_order: [0, 1, 2, 3, 4]\
+           \n                          Empty"
     );
     Ok(())
 }
@@ -4494,18 +4498,20 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) -> Result<(), CubeErr
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
         "Projection, [url, sum(Data.hits)@1:hits]\
-        \n  AggregateTopK, limit: 3, having: sum(Data.hits)@1 > 10\
-        \n    Worker\
-        \n      Sort\
-        \n        SortedSingleAggregate\
-        \n          MergeSort\
-        \n            Union\
-        \n              Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
-        \n                Sort\
-        \n                  Empty\
-        \n              Scan, index: default:2:[2]:sort_on[url], fields: [url, hits]\
-        \n                Sort\
-        \n                  Empty"
+        \n  Sort, fetch: 3\
+        \n    Filter, predicate: sum(Data.hits)@1 > 10\
+        \n      SortedSingleAggregate\
+        \n        CoalescePartitions\
+        \n          Worker\
+        \n            SortedSingleAggregate\
+        \n              MergeSort\
+        \n                Union\
+        \n                  Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
+        \n                    Sort\
+        \n                      Empty\
+        \n                  Scan, index: default:2:[2]:sort_on[url], fields: [url, hits]\
+        \n                    Sort\
+        \n                      Empty"
     );
 
     let query = "SELECT `url` `url`, SUM(`hits`) `hits`, CARDINALITY(MERGE(`uhits`)) `uhits` \

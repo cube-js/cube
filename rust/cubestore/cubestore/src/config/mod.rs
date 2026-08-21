@@ -533,9 +533,9 @@ pub trait ConfigObj: DIService {
 
     fn enable_topk(&self) -> bool;
 
-    /// When enabled, a TableImportCSV job is placed on the worker with the fewest in-flight
-    /// CSV imports (load-aware), instead of by stateless hash of (table_id, location). Off by
-    /// default (hash placement); kept as a flag for rollout/rollback.
+    /// When enabled (default), a TableImportCSV job is placed on the worker with the fewest
+    /// in-flight CSV imports (load-aware). When disabled, placement is the stateless hash of
+    /// (table_id, location), which ignores in-flight load.
     fn load_aware_import_placement_enabled(&self) -> bool;
 
     /// Time budget for a single batch repartition job. The job yields its runner
@@ -560,14 +560,14 @@ pub trait ConfigObj: DIService {
     /// Off by default; when disabled, chunks are sent whole and filtered only in the subprocess.
     fn prefilter_in_memory_chunks_enabled(&self) -> bool;
 
-    /// When enabled, a merge group's chunk parquets (PerPartition / Range strategies) are
-    /// downloaded concurrently before building the merge inputs, instead of one at a time.
+    /// When enabled (default), a merge group's chunk parquets (PerPartition / Range strategies)
+    /// are downloaded concurrently before building the merge inputs, instead of one at a time.
     /// The group is already bounded by repartition_merge_max_input_files and the download
-    /// pool by download_concurrency, so no extra budget is needed. Off by default.
+    /// pool by download_concurrency, so no extra budget is needed.
     fn repartition_concurrent_download(&self) -> bool;
 
     /// Which repartition strategy to use for an inactive parent's persisted chunks.
-    /// Defaults to PerChunk.
+    /// Defaults to Range.
     fn repartition_strategy(&self) -> RepartitionStrategy;
 
     /// Cap on the number of chunks merged together in one Merge group / RepartitionRange.
@@ -585,20 +585,20 @@ pub trait ConfigObj: DIService {
     fn repartition_check_overlapping_children(&self) -> bool;
     /// Factor `f` controlling when the worker-side partial hash aggregate trims its output to the
     /// top-k groups. Trimming happens only when the number of local groups exceeds `f * k`, where
-    /// `k = limit + offset`. `0` disables the optimization.
+    /// `k = limit + offset`. `0` disables the optimization; the default is `2`.
     fn group_by_limit_factor(&self) -> usize;
 
     /// When the worker group-by-limit hash trim is active, controls where the worker's hash table
-    /// lives: `false` (default) coalesces the partial aggregate's input to one partition (one hash
-    /// table per worker, "over merge"); `true` keeps the raw multi-partition input so it runs per
-    /// partition ("under merge").
+    /// lives: `true` (default) keeps the raw multi-partition input so the aggregate runs per
+    /// partition ("under merge"); `false` coalesces the partial aggregate's input to one partition
+    /// (one hash table per worker, "over merge").
     fn group_by_limit_per_partition(&self) -> bool;
 
     /// Replace the sort-preserving merge feeding a grouped Linear (hash) aggregate with a plain
     /// partition coalesce (the hash aggregate ignores input order, so the per-row merge is wasted).
     fn coalesce_under_hash_aggregate(&self) -> bool;
 
-    /// Router-side merge strategy for distributed value-ordered top-k.
+    /// Router-side merge strategy for distributed value-ordered top-k. Defaults to FullMerge.
     fn topk_aggregate_strategy(&self) -> TopKAggregateStrategy;
 
     fn allow_decimal128(&self) -> bool;
@@ -1304,36 +1304,45 @@ pub async fn init_test_logger() {
 
 /// Router-side merge strategy for distributed value-ordered top-k (`SELECT ... GROUP BY x ORDER BY
 /// agg(...) LIMIT k`). Selected by `CUBESTORE_TOPK_STRATEGY`.
+///
+/// The strategy shapes both the worker subtree and the router node combining it, and each node
+/// plans its own half from its own configuration, so `CUBESTORE_TOPK_STRATEGY` (and
+/// `CUBESTORE_GROUP_BY_LIMIT_FACTOR`, which decides whether the worker emits sorted or hash-trimmed
+/// groups) must hold the same value on the router and on every select worker. A cluster running a
+/// mix -- a rolling upgrade that changes either default, say -- returns wrong top-k rows instead of
+/// failing: the router combines a worker stream whose ordering guarantee it does not have.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TopKAggregateStrategy {
-    /// Original streaming NRA merge with per-row state (default).
+    /// Original streaming NRA merge with per-row state.
     Streaming,
     /// Same streaming NRA merge (keeps early termination, bounded router memory), but vectorized.
     VectorizedStreaming,
-    /// ClickHouse-style full re-aggregation on the router + fetch-limited sort. Drops early
-    /// termination, so the router materializes every distinct group.
+    /// ClickHouse-style full re-aggregation on the router + fetch-limited sort (default). Drops
+    /// early termination, so the router materializes every distinct group.
     FullMerge,
 }
 
 /// Parses [`TopKAggregateStrategy`] from an env var. Lenient: an unset or unrecognized value falls
-/// back to the default (`Streaming`) with a warning rather than panicking -- a malformed perf toggle
+/// back to the default (`FullMerge`) with a warning rather than panicking -- a malformed perf toggle
 /// must never take a node down.
 fn env_topk_strategy(name: &str) -> TopKAggregateStrategy {
     match env::var(name) {
-        Err(_) => TopKAggregateStrategy::Streaming,
+        Err(_) => TopKAggregateStrategy::FullMerge,
         Ok(v) => match v.trim().to_ascii_lowercase().as_str() {
-            "" | "streaming" | "default" | "v1" => TopKAggregateStrategy::Streaming,
+            "streaming" | "v1" => TopKAggregateStrategy::Streaming,
             "vectorized" | "vectorized_streaming" | "v2" => {
                 TopKAggregateStrategy::VectorizedStreaming
             }
-            "full_merge" | "full-merge" | "fullmerge" => TopKAggregateStrategy::FullMerge,
+            "" | "default" | "full_merge" | "full-merge" | "fullmerge" => {
+                TopKAggregateStrategy::FullMerge
+            }
             other => {
                 log::warn!(
-                    "unknown {} value '{}', using default (streaming)",
+                    "unknown {} value '{}', using default (full_merge)",
                     name,
                     other
                 );
-                TopKAggregateStrategy::Streaming
+                TopKAggregateStrategy::FullMerge
             }
         },
     }
@@ -1350,11 +1359,11 @@ fn env_bool(name: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
-/// Lenient boolean env read for opt-in toggles: only `1`/`true` enable it, anything else (including a
-/// typo) is treated as off. Unlike [`env_bool`] it never panics -- a malformed value on a
-/// performance flag must not take a node down on startup.
-fn env_flag(name: &str) -> bool {
-    env::var(name).map_or(false, |v| v == "true" || v == "1")
+/// Lenient boolean env read for toggles: only `1`/`true` enable it, anything else (including a
+/// typo) is treated as off; an unset variable falls back to `default`. Unlike [`env_bool`] it never
+/// panics -- a malformed value on a performance flag must not take a node down on startup.
+fn env_flag(name: &str, default: bool) -> bool {
+    env::var(name).map_or(default, |v| v == "true" || v == "1")
 }
 
 pub fn env_parse<T>(name: &str, default: T) -> T
@@ -1535,20 +1544,20 @@ where
 }
 
 // Unlike env_optparse, an unparseable value is not fatal: it logs a warning and falls
-// back to per_chunk, so a typo in the strategy env never takes the process down.
+// back to range, so a typo in the strategy env never takes the process down.
 fn env_repartition_strategy() -> RepartitionStrategy {
     match env::var("CUBESTORE_REPARTITION_STRATEGY") {
         Ok(v) => match v.parse::<RepartitionStrategy>() {
             Ok(s) => s,
             Err(e) => {
                 log::warn!(
-                    "Ignoring CUBESTORE_REPARTITION_STRATEGY: {}; using per_chunk",
+                    "Ignoring CUBESTORE_REPARTITION_STRATEGY: {}; using range",
                     e
                 );
-                RepartitionStrategy::PerChunk
+                RepartitionStrategy::Range
             }
         },
-        Err(_) => RepartitionStrategy::PerChunk,
+        Err(_) => RepartitionStrategy::Range,
     }
 }
 
@@ -1848,7 +1857,7 @@ impl Config {
                 .map(|v| v as u64),
                 job_runners_count: env_parse("CUBESTORE_JOB_RUNNERS", 4),
                 long_term_job_runners_count: env_parse("CUBESTORE_LONG_TERM_JOB_RUNNERS", 32),
-                csv_import_job_runners_count: env_parse("CUBESTORE_CSV_IMPORT_JOB_RUNNERS", 0),
+                csv_import_job_runners_count: env_parse("CUBESTORE_CSV_IMPORT_JOB_RUNNERS", 1),
                 connection_timeout: 60,
                 server_name: env::var("CUBESTORE_SERVER_NAME")
                     .ok()
@@ -1857,7 +1866,7 @@ impl Config {
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
                 load_aware_import_placement_enabled: env_bool(
                     "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
-                    false,
+                    true,
                 ),
                 repartition_chunks_time_budget_secs: env_parse(
                     "CUBESTORE_REPARTITION_TIME_BUDGET_SECS",
@@ -1877,7 +1886,7 @@ impl Config {
                 ),
                 repartition_concurrent_download: env_bool(
                     "CUBESTORE_REPARTITION_CONCURRENT_DOWNLOAD",
-                    false,
+                    true,
                 ),
                 repartition_strategy: env_repartition_strategy(),
                 repartition_merge_max_input_files: env_parse(
@@ -1886,15 +1895,15 @@ impl Config {
                 ),
                 repartition_merge_max_rows: env_parse(
                     "CUBESTORE_REPARTITION_MERGE_MAX_ROWS",
-                    4_000_000,
+                    400_000,
                 ),
                 repartition_check_overlapping_children: env_bool(
                     "CUBESTORE_REPARTITION_CHECK_OVERLAPPING_CHILDREN",
                     false,
                 ),
-                group_by_limit_factor: env_parse_lenient("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 0),
-                group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION"),
-                coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE"),
+                group_by_limit_factor: env_parse_lenient("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 2),
+                group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION", true),
+                coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE", false),
                 topk_aggregate_strategy: env_topk_strategy("CUBESTORE_TOPK_STRATEGY"),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
@@ -1983,7 +1992,7 @@ impl Config {
                     Some(60_000),
                     None,
                 ),
-                metastore_batch_rpc: env_parse("CUBESTORE_METASTORE_BATCH_RPC", false),
+                metastore_batch_rpc: env_parse("CUBESTORE_METASTORE_BATCH_RPC", true),
                 transport_max_message_size,
                 transport_max_frame_size: env_parse_size(
                     "CUBESTORE_TRANSPORT_MAX_FRAME_SIZE",
@@ -2141,22 +2150,22 @@ impl Config {
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
                 enable_topk: true,
-                load_aware_import_placement_enabled: false,
+                load_aware_import_placement_enabled: true,
                 repartition_chunks_time_budget_secs: 60,
                 push_partial_aggregate_below_merge_enabled: true,
                 compaction_split_by_total_file_size_enabled: false,
                 // Production default is off; kept on in tests so prefilter_chunks_shared_scan
                 // and the rest of the suite keep exercising the worker-side trim path.
                 prefilter_in_memory_chunks_enabled: true,
-                repartition_concurrent_download: false,
-                repartition_strategy: RepartitionStrategy::PerChunk,
+                repartition_concurrent_download: true,
+                repartition_strategy: RepartitionStrategy::Range,
                 repartition_merge_max_input_files: 50,
-                repartition_merge_max_rows: 4_000_000,
+                repartition_merge_max_rows: 400_000,
                 repartition_check_overlapping_children: false,
                 group_by_limit_factor: 2,
-                group_by_limit_per_partition: false,
+                group_by_limit_per_partition: true,
                 coalesce_under_hash_aggregate: false,
-                topk_aggregate_strategy: TopKAggregateStrategy::Streaming,
+                topk_aggregate_strategy: TopKAggregateStrategy::FullMerge,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,
@@ -2185,7 +2194,7 @@ impl Config {
                 max_disk_space_per_worker: 0,
                 disk_space_cache_duration_secs: 0,
                 disk_space_compute_lock_timeout_ms: 1000,
-                metastore_batch_rpc: false,
+                metastore_batch_rpc: true,
                 transport_max_message_size: 64 << 20,
                 transport_max_frame_size: 16 << 20,
                 local_files_cleanup_interval_secs: 600,
