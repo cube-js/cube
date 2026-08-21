@@ -71,6 +71,7 @@
                       "docs/explore-analyze/charts/chart-types/area",
                       "docs/explore-analyze/charts/chart-types/scatter",
                       "docs/explore-analyze/charts/chart-types/pie",
+                      "docs/explore-analyze/charts/chart-types/funnel",
                       "docs/explore-analyze/charts/chart-types/sankey",
                       "docs/explore-analyze/charts/chart-types/heatmap",
                       "docs/explore-analyze/charts/chart-types/boxplot",
