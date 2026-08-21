@@ -1,0 +1,38 @@
+---
+title: Funnel
+description: Show how a value narrows from stage to stage, such as signup → activation → purchase.
+---
+
+Funnel charts draw one bar per stage, centered on a shared midline, with a connector between each adjacent pair of stages. Each bar's width is proportional to its stage's value, so the figure narrows wherever values drop. Best for stage-to-stage conversion: how many users, orders, or events survive each step of a process.
+
+{/* Screenshot: funnel chart — order counts across four statuses, with stage names and values on the bars and conversion percentages on the connectors. Place directly below this paragraph, full width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Fields
+
+A funnel needs exactly two fields, picked on the Fields tab:
+
+- **Stage** — a dimension (a time dimension works too, bucketed by its grain). Each distinct value becomes one stage.
+- **Value** — a measure. It is rolled up per stage, so a result with extra columns still draws one bar per stage.
+
+Stages keep the order your query returned them in. To reorder stages, adjust the sort in the results table — a stage that grows partway down is real data (re-entry, late-arriving events), so the chart never sorts it away for you.
+
+A stage whose value is zero still draws, as a thin line in its stage color, so a gap in the data reads as a zero rather than as a missing stage.
+
+## Conversion percentages
+
+The connectors between stages carry the funnel's percentages. Two independent toggles in the **Data labels** section of the Style tab control them:
+
+- **First** — each stage as a share of the first stage, drawn as `36% of first`. On by default.
+- **Prev** — each stage as a share of the stage before it, drawn as `20% of previous`.
+
+Turning both on stacks the two lines on each connector; turning both off leaves the connectors unlabeled. Whichever you select also appears in the tooltip, alongside the stage and value.
+
+## Data labels
+
+Each bar carries its stage name and value, both on by default and toggled in the **Data labels** section of the Style tab. The value's number format has its own picker, and one font size governs every label the funnel draws — the bar labels and the connector percentages alike.
+
+Labels always sit at the bar's center. When a bar is too narrow to hold its label, the text switches from white to a dark color so it stays readable against the page background.
+
+## Color
+
+Each stage takes its own color from the palette selected in the **Palette** dropdown on the Style tab, in palette order.
