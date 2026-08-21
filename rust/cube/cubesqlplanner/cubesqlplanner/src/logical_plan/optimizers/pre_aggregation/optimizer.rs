@@ -495,9 +495,22 @@ impl PreAggregationOptimizer {
                     if let Ok((from, to)) = date_range_op.formatted_date_range(precision) {
                         // Apply time shift for this dimension if present.
                         // SQL renders `column + interval`, so actual data range is `date - interval`.
+                        //
+                        // `dimensions_shifts` is keyed by reference-chain-resolved names —
+                        // `all_time_members` resolves every symbol before it becomes a key —
+                        // while `member_name()` only peels the `TimeDimension` wrapper. A view
+                        // member is a reference to the underlying cube member, so its unresolved
+                        // name never equals the key, the lookup misses and the range is left
+                        // unwidened. Retry with the resolved name so view-qualified queries
+                        // widen the same way cube-qualified ones do.
+                        let resolved_member_name = base_filter
+                            .member_evaluator()
+                            .resolve_reference_chain()
+                            .full_name();
                         if let Some(interval) = time_shifts
                             .dimensions_shifts
                             .get(&base_filter.member_name())
+                            .or_else(|| time_shifts.dimensions_shifts.get(&resolved_member_name))
                             .and_then(|s| s.interval.as_ref())
                         {
                             let tz = query_tools.timezone();
