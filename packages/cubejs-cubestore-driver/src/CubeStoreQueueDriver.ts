@@ -11,7 +11,6 @@ import {
   AddToQueueResponse,
   QueryKey,
   QueryKeyHash,
-  ProcessingId,
   QueueId,
   GetActiveAndToProcessResponse,
   QueryKeysTuple,
@@ -68,9 +67,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
   }
 
   public async addToQueue(
-    _keyScore: number,
     queryKey: QueryKey,
-    _orphanedTime: number,
     queryHandler: string,
     query: AddToQueueQuery,
     priority: number,
@@ -132,10 +129,6 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     return null;
   }
 
-  public async freeProcessingLock(_hash: QueryKeyHash, _processingId: string, _activated: unknown): Promise<void> {
-    // nothing to do
-  }
-
   public async getActiveQueries(): Promise<QueryKeysTuple[]> {
     const rows = await this.driver.query<CubeStoreListResponse>('QUEUE ACTIVE ?', [
       this.options.redisQueuePrefix
@@ -183,17 +176,6 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
       active,
       toProcess,
     ];
-  }
-
-  public async getNextProcessingId(): Promise<number | string> {
-    const rows = await this.driver.query('CACHE INCR ?', [
-      `${this.options.redisQueuePrefix}:PROCESSING_COUNTER`
-    ]);
-    if (rows && rows.length) {
-      return rows[0].value;
-    }
-
-    throw new Error('Unable to get next processing id');
   }
 
   public async getQueryStageState(onlyKeys: boolean): Promise<QueryStageStateResponse> {
@@ -297,7 +279,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     return null;
   }
 
-  public async optimisticQueryUpdate(hash: QueryKeyHash, toUpdate: unknown, _processingId: ProcessingId, queueId: QueueId): Promise<boolean> {
+  public async optimisticQueryUpdate(hash: QueryKeyHash, toUpdate: unknown, queueId: QueueId): Promise<boolean> {
     await this.driver.query('QUEUE MERGE_EXTRA ? ?', [
       // queryKeyHash as compatibility fallback
       queueId || this.prefixKey(hash),
@@ -311,7 +293,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     // nothing to release
   }
 
-  public async retrieveForProcessing(hash: QueryKeyHash, _processingId: string): Promise<RetrieveForProcessingResponse> {
+  public async retrieveForProcessing(hash: QueryKeyHash): Promise<RetrieveForProcessingResponse> {
     const rows = await this.driver.query<{ id: string /* cube store convert int64 to string */, active: string | null, pending: string, payload: string, extra: string | null }>('QUEUE RETRIEVE EXTENDED CONCURRENCY ? ?', [
       this.options.concurrency,
       this.prefixKey(hash),
@@ -329,16 +311,19 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
           active,
           pending,
           def,
-          true
         ];
       } else {
+        // NotEnoughConcurrency, NotFound, LockFailed or ExclusiveAccessFailed. Cube Store
+        // returns all of them as an empty EXTENDED row and mutates nothing.
         return [
-          0, null, active, pending, null, false
+          0, null, active, pending, null
         ];
       }
     }
 
-    return null;
+    // EXTENDED always yields exactly one row, so no rows means we are talking to something
+    // that isn't Cube Store
+    throw new Error('Empty response on QUEUE RETRIEVE');
   }
 
   public async getResultBlocking(hash: QueryKeyHash, queueId: QueueId): Promise<QueryDef | null> {
@@ -354,7 +339,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     return null;
   }
 
-  public async setResultAndRemoveQuery(hash: QueryKeyHash, executionResult: unknown, _processingId: ProcessingId, queueId: QueueId): Promise<boolean> {
+  public async setResultAndRemoveQuery(hash: QueryKeyHash, executionResult: unknown, queueId: QueueId): Promise<boolean> {
     const rows = await this.driver.query('QUEUE ACK ? ?', [
       // queryKeyHash as compatibility fallback
       queueId || this.prefixKey(hash),

@@ -251,16 +251,12 @@ export class QueryQueue {
         if (jobExists) return null;
       }
 
-      const time = new Date().getTime();
-      const keyScore = time + (10000 - priority) * 1E14;
-
+      // Undefined unless the query carries its own ttl, in which case it overrides the
+      // queue wide orphanedTimeout
       options.orphanedTimeout = query.orphanedTimeout;
 
-      const orphanedTimeout = 'orphanedTimeout' in query ? query.orphanedTimeout : this.orphanedTimeout;
-      const orphanedTime = time + (orphanedTimeout * 1000);
-
       const [added, queueId, queueSize, addedToQueueTime] = await queueConnection.addToQueue(
-        keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
+        queryKey, queryHandler, query, priority, options
       );
 
       if (added > 0) {
@@ -746,21 +742,15 @@ export class QueryQueue {
     let activeKeys;
     let queueSize;
     let query;
-    let processingLockAcquired;
 
     try {
-      const processingId = queueId || /** for Redis only */ await queueConnection.getNextProcessingId();
-      const retrieveResult = await queueConnection.retrieveForProcessing(queryKeyHashed, processingId);
+      let retrieveQueueId;
 
-      if (retrieveResult) {
-        let retrieveQueueId;
+      [insertedCount, retrieveQueueId, activeKeys, queueSize, query] = await queueConnection.retrieveForProcessing(queryKeyHashed);
 
-        [insertedCount, retrieveQueueId, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
-
-        // Backward compatibility for old Cube Store, Redis and Memory
-        if (retrieveQueueId) {
-          queueId = retrieveQueueId;
-        }
+      // Null on anything but a successful activation
+      if (retrieveQueueId) {
+        queueId = retrieveQueueId;
       }
 
       const activated = activeKeys && activeKeys.indexOf(queryKeyHashed) !== -1;
@@ -768,7 +758,7 @@ export class QueryQueue {
         query = await queueConnection.getQueryDef(queryKeyHashed, null);
       }
 
-      if (query && insertedCount && activated && processingLockAcquired) {
+      if (query && insertedCount && activated) {
         let executionResult;
         let queryExecutionFinished = false;
         // Set by the query handler's setCancelHandler callback once execution begins.
@@ -778,7 +768,6 @@ export class QueryQueue {
         const timeInQueue = (new Date()).getTime() - query.addedToQueueTime;
         this.logger('Performing query', {
           queueId,
-          processingId,
           queueSize,
           queryKey: query.queryKey,
           queuePrefix: this.redisQueuePrefix,
@@ -790,7 +779,7 @@ export class QueryQueue {
           preAggregation: query.query?.preAggregation,
           addedToQueueTime: query.addedToQueueTime,
         });
-        await queueConnection.optimisticQueryUpdate(queryKeyHashed, { startQueryTime }, processingId, queueId);
+        await queueConnection.optimisticQueryUpdate(queryKeyHashed, { startQueryTime }, queueId);
 
         let queryProcessHeartbeat = Date.now();
         const heartBeatTimer = setInterval(
@@ -874,7 +863,7 @@ export class QueryQueue {
                     async (cancelHandler) => {
                       localCancelHandler = cancelHandler;
                       try {
-                        await queueConnection.optimisticQueryUpdate(queryKeyHashed, { cancelHandler }, processingId, queueId);
+                        await queueConnection.optimisticQueryUpdate(queryKeyHashed, { cancelHandler }, queueId);
                       } catch (e: any) {
                         this.logger('Error while query update', {
                           queueId,
@@ -898,7 +887,6 @@ export class QueryQueue {
 
           this.logger('Performing query completed', {
             queueId,
-            processingId,
             queueSize,
             duration: ((new Date()).getTime() - startQueryTime),
             queryKey: query.queryKey,
@@ -917,7 +905,6 @@ export class QueryQueue {
           };
           this.logger('Error while querying', {
             queueId,
-            processingId,
             queueSize,
             duration: ((new Date()).getTime() - startQueryTime),
             queryKey: query.queryKey,
@@ -936,7 +923,6 @@ export class QueryQueue {
             if (queryWithCancelHandle) {
               this.logger('Cancelling query due to timeout', {
                 queueId,
-                processingId,
                 queryKey: queryWithCancelHandle.queryKey,
                 queuePrefix: this.redisQueuePrefix,
                 requestId: queryWithCancelHandle.requestId,
@@ -955,11 +941,10 @@ export class QueryQueue {
           clearInterval(heartBeatTimer);
         }
 
-        if (!(await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, processingId, queueId))) {
+        if (!(await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, queueId))) {
           this.logger('Orphaned execution result', {
             queueId,
-            processingId,
-            warn: 'Result for query was not set due to processing lock wasn\'t acquired',
+            warn: 'Result for query was not set, queue item was already removed (cancelled or orphaned)',
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
@@ -982,20 +967,19 @@ export class QueryQueue {
         //   }
         // }
 
+        // Nothing to clean up here: retrieveForProcessing only reports a failure when it left
+        // the queue untouched, so the item is either missing, still pending or active elsewhere.
         this.logger('Skip processing', {
           queueId,
-          processingId,
           queryKey: query && query.queryKey || queryKeyHashed,
           requestId: query && query.requestId,
           queuePrefix: this.redisQueuePrefix,
-          processingLockAcquired,
           query,
           insertedCount,
           activeKeys,
           activated,
           queryExists: !!query
         });
-        await queueConnection.freeProcessingLock(queryKeyHashed, processingId, activated);
       }
     } catch (e: any) {
       this.logger('Queue storage error', {

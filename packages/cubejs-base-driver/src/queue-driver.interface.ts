@@ -1,8 +1,6 @@
 export type QueryDef = any;
 // Primary key of Queue item
 export type QueueId = string | number | bigint;
-// This was used as a lock for Redis, deprecated.
-export type ProcessingId = string | number | bigint;
 export type QueryKey = (string | [string, any[]]) & {
   persistent?: true,
 };
@@ -12,29 +10,22 @@ export type QueryKeysTuple = [keyHash: QueryKeyHash, queueId: QueueId | null /**
 export type GetActiveAndToProcessResponse = [active: QueryKeysTuple[], toProcess: QueryKeysTuple[]];
 export type AddToQueueResponse = [added: number, queueId: QueueId | null, queueSize: number, addedToQueueTime: number];
 export type QueryStageStateResponse = [active: string[], toProcess: string[]] | [active: string[], toProcess: string[], defs: Record<string, QueryDef>];
-export type RetrieveForProcessingSuccess = [
-  added: unknown,
+/**
+ * `added` is `1` when the queue item was moved from pending to active by this call, `0` otherwise.
+ */
+export type RetrieveForProcessingResponse = [
+  added: number,
   // QueueId is required for Cube Store, other providers don't support it
   queueId: QueueId | null,
   active: QueryKeyHash[],
   pending: number,
-  def: QueryDef,
-  lockAquired: true
+  def: QueryDef | null,
 ];
-export type RetrieveForProcessingFail = [
-  added: unknown,
-  // QueueId is required for Cube Store, other providers don't support it
-  queueId: QueueId | null,
-  active: QueryKeyHash[],
-  pending: number,
-  def: null,
-  lockAquired: false
-];
-export type RetrieveForProcessingResponse = RetrieveForProcessingSuccess | RetrieveForProcessingFail | null;
 
 export interface AddToQueueQuery {
   isJob: boolean,
-  orphanedTimeout: unknown
+  // Read only by QueryQueue.executeInQueue, which copies it into AddToQueueOptions
+  orphanedTimeout?: unknown
 }
 
 export interface AddToQueueOptions {
@@ -64,15 +55,13 @@ export interface QueueDriverConnectionInterface {
    * Adds specified by the queryKey query to the queue, returns tuple
    * with the operation result.
    *
-   * @param keyScore Redis specific thing
    * @param queryKey
-   * @param orphanedTime
    * @param queryHandler Our queue allows using different handlers. For example, query, cvsQuery, etc.
    * @param query
    * @param priority
-   * @param options
+   * @param options The per item orphaned deadline comes from options.orphanedTimeout, in seconds
    */
-  addToQueue(keyScore: number, queryKey: QueryKey, orphanedTime: number, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse>;
+  addToQueue(queryKey: QueryKey, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse>;
   // Return query keys which was sorted by priority and time
   getToProcessQueries(): Promise<QueryKeysTuple[]>;
   getActiveQueries(): Promise<QueryKeysTuple[]>;
@@ -83,17 +72,18 @@ export interface QueueDriverConnectionInterface {
   getStalledQueries(): Promise<QueryKeysTuple[]>;
   getQueryStageState(onlyKeys: boolean): Promise<QueryStageStateResponse>;
   updateHeartBeat(hash: QueryKeyHash, queueId: QueueId | null): Promise<void>;
-  getNextProcessingId(): Promise<ProcessingId>;
-  // Trying to acquire a lock for processing a queue item, this method can return null when
-  // multiple nodes tries to process the same query
-  retrieveForProcessing(hash: QueryKeyHash, processingId: ProcessingId): Promise<RetrieveForProcessingResponse>;
-  freeProcessingLock(hash: QueryKeyHash, processingId: ProcessingId, activated: unknown): Promise<void>;
-  optimisticQueryUpdate(hash: QueryKeyHash, toUpdate: unknown, processingId: ProcessingId, queueId: QueueId | null): Promise<boolean>;
+  // Atomically moves a pending queue item to active, which is what stops multiple nodes
+  // from processing the same query. Returns `added: 0` when the item is missing, already
+  // active, or the queue is at its concurrency limit - in all of those cases nothing is
+  // mutated, so there is nothing for the caller to roll back.
+  retrieveForProcessing(hash: QueryKeyHash): Promise<RetrieveForProcessingResponse>;
+  optimisticQueryUpdate(hash: QueryKeyHash, toUpdate: unknown, queueId: QueueId | null): Promise<boolean>;
   cancelQuery(queryKey: QueryKey, queueId: QueueId | null): Promise<QueryDef | null>;
   getQueryAndRemove(hash: QueryKeyHash, queueId: QueueId | null): Promise<[QueryDef]>;
-  setResultAndRemoveQuery(hash: QueryKeyHash, executionResult: any, processingId: ProcessingId, queueId: QueueId | null): Promise<unknown>;
+  // Returns false when the queue item is gone (cancelled or orphaned while it was executing),
+  // which means the result was dropped.
+  setResultAndRemoveQuery(hash: QueryKeyHash, executionResult: any, queueId: QueueId | null): Promise<unknown>;
   release(): void;
-  //
   getQueriesToCancel(): Promise<QueryKeysTuple[]>
   // @deprecated
   getActiveAndToProcess(): Promise<GetActiveAndToProcessResponse>;
