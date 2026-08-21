@@ -159,6 +159,23 @@ export type DriverOptions = {
 
 export type DriverConfig = {
   type: DatabaseType,
+  /**
+   * When the connection this configuration describes stops being usable, as
+   * epoch milliseconds (or seconds), an ISO 8601 string, or a `Date`.
+   *
+   * A driver is resolved once and then cached, so a connection built from a
+   * rotating credential is replaced only when that credential *changes*. One
+   * that stops rotating — an expired token whose refresh is failing upstream —
+   * resolves to an identical configuration indefinitely while the connection
+   * built from it is already dead, and no comparison can see that. Setting this
+   * states the lifetime outright, so the driver is replaced when it elapses
+   * whether or not anything about the configuration changed.
+   *
+   * Optional, and deliberately not part of the configuration's identity: a
+   * factory may return a fresh deadline on every call without that reading as a
+   * changed connection.
+   */
+  expiresAt?: number | string | Date,
 } & DriverOptions;
 
 export type DriverFactoryFn = (context: DriverContext) =>
