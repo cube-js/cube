@@ -238,6 +238,33 @@ Example:
 SET cube_cache = 'must-revalidate';
 ```
 
+## Limitations
+
+### Timestamp range
+
+The SQL API represents timestamps with nanosecond precision, so it can only return
+values between `1677-09-21 00:12:43.145224192` and `2262-04-11 23:47:16.854775807`.
+Selecting a time dimension whose value falls outside that range fails with
+`Timestamp out of range for column '<name>'`.
+
+Values outside the range are legal in most data sources and easy to acquire
+accidentally: a `9999-12-31` end-of-time sentinel in a slowly changing dimension table,
+a bad ETL default, or a mis-parsed date. To query such a column, either read it as a
+date, which has a far wider range:
+
+```sql
+SELECT MIN(valid_to::date) FROM customers;
+```
+
+or clamp the sentinel value in the [data model][ref-data-model-concepts].
+
+<Info>
+
+Earlier versions returned an out-of-range value as `NULL` rather than raising an error,
+which made the wrong answer indistinguishable from a genuine `NULL`.
+
+</Info>
+
 ## Troubleshooting
 
 ### `Can't find rewrite`
