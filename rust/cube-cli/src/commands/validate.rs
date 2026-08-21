@@ -17,7 +17,7 @@ pub struct Args {
     /// Deployment id
     deployment: i64,
     /// Branch to validate (defaults to the deployment's deploy branch)
-    #[arg(long, conflicts_with = "dev_mode")]
+    #[arg(long, value_parser = util::nonempty, conflicts_with = "dev_mode")]
     branch: Option<String>,
     /// Validate your active dev-mode branch — the uncommitted working copy
     /// `cube data-model dev-mode` put you on
