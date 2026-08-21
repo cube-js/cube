@@ -284,7 +284,7 @@ sequenceDiagram
     participant QueryOrchestrator
 
     Caller->>QueryQueue: executeInQueue
-    QueryQueue->>QueueDriver: addAndRetrieve
+    QueryQueue->>QueueDriver: addToQueue
 
     QueueDriver->>CubeStore: QUEUE ADD_AND_RETRIEVE PRIORITY ?n ?path ?payload ?concurrency
     Note over CubeStore: One atomic batch:<br/>insert, then claim if the prefix allows it
@@ -346,14 +346,14 @@ budget is exhausted, which is exactly when the condition should stop firing.
 
 ### Enabling it
 
-`QueryQueue` always calls `addAndRetrieve` and whether anything is claimed is up to the
-driver. The Cube Store one claims when `CUBEJS_QUEUE_FAST_TRACK=true` (off by default) and
-the `queueAddAndRetrieve` capability negotiates the same way `queueExclusive` and
-`queueExternalId` do, otherwise it falls back to `QUEUE ADD`. The memory one never claims.
-Either way an unclaimed response carries a `null` claim and the caller continues through
-reconcile with nothing lost.
+There is one `addToQueue` and whether anything is claimed is up to the driver. The Cube
+Store one claims when `CUBEJS_QUEUE_FAST_TRACK=true` (off by default) and the
+`queueAddAndRetrieve` capability negotiates the same way `queueExclusive` and
+`queueExternalId` do — that is what picks `QUEUE ADD_AND_RETRIEVE` over `QUEUE ADD`. The
+memory one never claims. Either way an unclaimed response carries a `null` claim and the
+caller continues through reconcile with nothing lost.
 
-A claim is an ownership transfer: from the moment `addAndRetrieve` returns one, the calling
+A claim is an ownership transfer: from the moment `addToQueue` returns one, the calling
 process owns an active queue item and **must** execute and acknowledge it. `executeInQueue`
 turns it into the same `ClaimedQuery` that `claimQueryForProcessing` produces and hands it
 to `sendProcessMessageFn`, so a custom implementation needs no changes — but a receiver
