@@ -53,7 +53,16 @@ const SnowflakeToGenericType: Record<string, GenericDataBaseType> = {
   // For some reason, snowflake SDK returns `fixed` type for DWH types like NUMBER(38, 15)
   // @see https://docs.snowflake.com/en/sql-reference/data-types-numeric for more info on types
   fixed: 'decimal',
-  timestamp_ntz: 'timestamp'
+  // All three TIMESTAMP variants map to the same generic timestamp. TIMESTAMP_LTZ and
+  // TIMESTAMP_TZ both store a UTC instant, and initConnection() pins the session to
+  // TIMEZONE = 'UTC', so every variant is rendered/hydrated as UTC. Leaving TZ/LTZ
+  // unmapped made BaseDriver.toGenericType() fall through to its `|| columnType`
+  // default and hand Cube Store the literal type name, which it rejects with
+  // "Custom type 'timestamp_tz' is not supported" when building a pre-aggregation.
+  // @see https://docs.snowflake.com/en/sql-reference/data-types-datetime
+  timestamp_ntz: 'timestamp',
+  timestamp_ltz: 'timestamp',
+  timestamp_tz: 'timestamp'
 };
 
 // User can create own stage to pass permission restrictions.

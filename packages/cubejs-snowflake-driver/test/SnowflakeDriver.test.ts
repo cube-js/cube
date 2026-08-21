@@ -12,12 +12,18 @@ const QUERY_TO_TEST_HYDRATION = `
     CAST(1265.88 AS NUMBER(10,2))                  AS "n",
     CAST('2026-04-28 13:07:42.123' AS TIMESTAMP_NTZ)         AS "ts_ntz",
     CAST('2026-04-28 13:07:42.123 +0000' AS TIMESTAMP_TZ)    AS "ts_tz",
+    -- A non-UTC offset must hydrate to the UTC instant, not the wall clock:
+    -- 13:07:42.123 -07:00 == 20:07:42.123 UTC.
+    CAST('2026-04-28 13:07:42.123 -0700' AS TIMESTAMP_TZ)    AS "ts_tz_offset",
+    CAST('2026-04-28 13:07:42.123 -0700' AS TIMESTAMP_LTZ)   AS "ts_ltz",
     CAST('2026-04-28' AS DATE)                               AS "d"
   UNION ALL
   SELECT
     CAST(0.10 AS NUMBER(10,2)),
     CAST('2000-02-29 00:00:00.007' AS TIMESTAMP_NTZ),
     CAST('2000-02-29 00:00:00.007 +0000' AS TIMESTAMP_TZ),
+    CAST('2000-02-29 00:00:00.007 -0700' AS TIMESTAMP_TZ),
+    CAST('2000-02-29 00:00:00.007 -0700' AS TIMESTAMP_LTZ),
     CAST('2000-02-29' AS DATE);
 `;
 
@@ -27,12 +33,16 @@ function assertHydrationResults(rows: any[]) {
       n: '1265.88',
       ts_ntz: '2026-04-28T13:07:42.123',
       ts_tz: '2026-04-28T13:07:42.123',
+      ts_tz_offset: '2026-04-28T20:07:42.123',
+      ts_ltz: '2026-04-28T20:07:42.123',
       d: '2026-04-28T00:00:00.000',
     },
     {
       n: '0.10',
       ts_ntz: '2000-02-29T00:00:00.007',
       ts_tz: '2000-02-29T00:00:00.007',
+      ts_tz_offset: '2000-02-29T07:00:00.007',
+      ts_ltz: '2000-02-29T07:00:00.007',
       d: '2000-02-29T00:00:00.000',
     },
   ]);
