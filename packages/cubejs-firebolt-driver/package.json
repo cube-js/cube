@@ -42,12 +42,6 @@
   "publishConfig": {
     "access": "public"
   },
-  "jest": {
-    "testEnvironment": "node",
-    "setupFiles": [
-      "./test/test-env.js"
-    ]
-  },
   "eslintConfig": {
     "extends": "../cubejs-linter"
   }
