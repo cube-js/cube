@@ -24,6 +24,9 @@ import {
   DatabaseStructure,
   DriverCapabilities,
   DriverInterface,
+  prependSqlPreamble,
+  resolveSqlPreamble,
+  trySplitSqlPreamble,
   QueryColumnsResult,
   QueryOptions,
   QuerySchemasResult,
@@ -96,6 +99,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
        * Whether this driver is used for pre-aggregations.
        */
       preAggregations?: boolean,
+      preAggregationsSqlPreamble?: boolean,
 
       /**
        * Max pool size value for the [cube]<-->[db] pool.
@@ -107,16 +111,27 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
        * request before determining it as not valid. Default - 10000 ms.
        */
       testConnectionTimeout?: number,
+
+      /**
+       * SQL prepended to every query on this connection.
+       */
+      sqlPreamble?: string,
     } = {}
   ) {
-    super({
-      testConnectionTimeout: config.testConnectionTimeout,
-    });
-
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
     const preAggregations = config.preAggregations || false;
+    // Pre-aggregation builds resolve the preamble from the pre-aggregation
+    // namespace even when their credentials do not, since the preamble is not a
+    // connection target. Falls back to `preAggregations` for a driver
+    // constructed directly rather than through the server's driver factory.
+    const preAggregationsSqlPreamble = config.preAggregationsSqlPreamble ?? preAggregations;
+
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+      sqlPreamble: resolveSqlPreamble(config, getEnv('dbSqlPreamble', { dataSource, preAggregations: preAggregationsSqlPreamble })),
+    });
 
     this.options = {
       scopes: [
@@ -184,6 +199,15 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     // listing user-defined functions in a dataset.
     // @see https://cloud.google.com/bigquery/pricing#free
     await this.bigquery.getDatasets();
+  }
+
+  /**
+   * This driver applies `sql_preamble`.
+   *
+   * Prepended into the query text, since BigQuery is stateless.
+   */
+  public override supportsSqlPreamble(): boolean {
+    return true;
   }
 
   public readOnly() {
@@ -337,8 +361,9 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     options?: StreamOptions
   ): Promise<StreamTableData> {
     const labels = this.buildQueryLabels(options);
+    // Streaming does not go through runQueryJob, so it needs the preamble too.
     const stream = await this.bigquery.createQueryStream({
-      query,
+      query: prependSqlPreamble(query, this.sqlPreamble()),
       params: values,
       parameterMode: 'positional',
       useLegacySql: false,
@@ -444,15 +469,106 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return { cube_request_id: value };
   }
 
+  /**
+   * BigQuery is stateless — there is no session to carry a preamble — so the
+   * preamble is prepended into the query text and travels in the same job.
+   * That is the only placement under which a `CREATE TEMP FUNCTION` is visible
+   * to the query, since a temporary UDF lives for exactly one query.
+   *
+   * Sessions would be the alternative and are unusable here: BigQuery forbids
+   * concurrent queries within a session, which a BI backend serving concurrent
+   * users cannot accept.
+   *
+   * One caveat is enforced rather than documented. A multi-statement request is
+   * a *script*, and a script job ignores `destinationTable` — so prepending onto
+   * a pre-aggregation load would let the build report success while writing
+   * nothing. BigQuery exempts one shape: statements that are all
+   * `CREATE TEMP FUNCTION` followed by a single query. A preamble outside that
+   * shape is therefore refused on destination jobs instead of silently
+   * discarding the result.
+   */
+  protected withSqlPreamble(bigQueryQuery: Query): Query {
+    const preamble = this.sqlPreamble();
+
+    if (!preamble || typeof bigQueryQuery.query !== 'string') {
+      return bigQueryQuery;
+    }
+
+    if (bigQueryQuery.destination && !BigQueryDriver.isScriptSafePreamble(preamble)) {
+      throw new Error(
+        'CUBEJS_DB_SQL_PREAMBLE cannot be applied to a pre-aggregation build on BigQuery unless it ' +
+        'contains only CREATE TEMP FUNCTION statements whose boundaries are unambiguous. BigQuery ' +
+        'runs any other multi-statement request as a script, and a script job ignores the ' +
+        'destination table, so the build would write no rows. Restrict the preamble to CREATE TEMP ' +
+        'FUNCTION — avoiding nested block comments and unterminated literals, which make the ' +
+        'statement boundaries undecidable — or set a pre-aggregation specific preamble that does.'
+      );
+    }
+
+    return { ...bigQueryQuery, query: prependSqlPreamble(bigQueryQuery.query, preamble) };
+  }
+
+  /**
+   * True when every statement is a `CREATE TEMP FUNCTION`, the one multi-statement
+   * shape BigQuery still runs as a normal query rather than a script.
+   *
+   * Fails closed on an ambiguous blob. The splitter hands back the whole blob as
+   * one entry when it cannot find the boundaries confidently, and that entry may
+   * still contain several statements — judging it script-safe because it *starts*
+   * with `CREATE TEMP FUNCTION` would let a script onto a destination job, which
+   * is the silent-empty-table case this guard exists to prevent.
+   */
+  protected static isScriptSafePreamble(preamble: string): boolean {
+    const { statements, ambiguous } = trySplitSqlPreamble(preamble);
+
+    if (ambiguous) {
+      return false;
+    }
+
+    return statements.length > 0 && statements.every(
+      statement => /^create\s+(or\s+replace\s+)?temp(orary)?\s+function\b/i
+        .test(BigQueryDriver.withoutLeadingComments(statement))
+    );
+  }
+
+  /**
+   * Drops leading comments so a documented UDF definition is still recognized as
+   * the script-exempt shape. Comments are kept in the statement text, and a
+   * commented `CREATE TEMP FUNCTION` would otherwise be refused on a
+   * pre-aggregation build with a message telling the user to do what they did.
+   */
+  private static withoutLeadingComments(statement: string): string {
+    let rest = statement.trimStart();
+
+    for (;;) {
+      if (rest.startsWith('--') || rest.startsWith('#')) {
+        const lineEnd = rest.indexOf('\n');
+        if (lineEnd === -1) {
+          return '';
+        }
+        rest = rest.slice(lineEnd + 1).trimStart();
+      } else if (rest.startsWith('/*')) {
+        const blockEnd = rest.indexOf('*/');
+        if (blockEnd === -1) {
+          return '';
+        }
+        rest = rest.slice(blockEnd + 2).trimStart();
+      } else {
+        return rest;
+      }
+    }
+  }
+
   protected async runQueryJob<T = QueryRowsResponse>(
     bigQueryQuery: Query,
     options: any,
     withResults: boolean = true
   ): Promise<T> {
     const labels = this.buildQueryLabels(options);
+    const withPreamble = this.withSqlPreamble(bigQueryQuery);
     const jobRequest: Query = labels
-      ? { ...bigQueryQuery, labels: { ...bigQueryQuery.labels, ...labels } }
-      : bigQueryQuery;
+      ? { ...withPreamble, labels: { ...withPreamble.labels, ...labels } }
+      : withPreamble;
     const [job] = await this.bigquery.createQueryJob(jobRequest);
 
     return <any> this.waitForJobResult(job, options, withResults);

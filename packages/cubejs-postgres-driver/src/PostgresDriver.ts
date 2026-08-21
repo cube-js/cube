@@ -13,6 +13,7 @@ import {
   DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
   GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions,
   StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities, TableColumn, createPoolName,
+  applySqlPreambleStatements, resolveSqlPreamble,
 } from '@cubejs-backend/base-driver';
 import { QueryStream } from './QueryStream';
 import { PgClient, PgClientConfig } from './PgClient';
@@ -93,6 +94,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
        * Whether this driver is used for pre-aggregations.
        */
       preAggregations?: boolean,
+      preAggregationsSqlPreamble?: boolean,
 
       /**
        * Max pool size value for the [cube]<-->[db] pool.
@@ -109,16 +111,31 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
        * request before determining it as not valid. Default - 10000 ms.
        */
       testConnectionTimeout?: number,
+
+      /**
+       * SQL executed on every acquired connection before the query.
+       */
+      sqlPreamble?: string,
     } = {}
   ) {
-    super({
-      testConnectionTimeout: config.testConnectionTimeout,
-    });
-
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
     const preAggregations = config.preAggregations || false;
+    // Pre-aggregation builds resolve the preamble from the pre-aggregation
+    // namespace even when their credentials do not, since the preamble is not a
+    // connection target. Falls back to `preAggregations` for a driver
+    // constructed directly rather than through the server's driver factory.
+    const preAggregationsSqlPreamble = config.preAggregationsSqlPreamble ?? preAggregations;
+
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+      sqlPreamble: resolveSqlPreamble(config, getEnv('dbSqlPreamble', { dataSource, preAggregations: preAggregationsSqlPreamble })),
+    });
+
+    // The preamble is applied per connection in prepareConnection, so it is not
+    // part of the pg client config spread below.
+    const { sqlPreamble: _sqlPreamble, ...clientConfig } = config;
 
     const poolConfig: PgClientConfig = {
       host: getEnv('dbHost', { dataSource, preAggregations }),
@@ -127,7 +144,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       user: getEnv('dbUser', { dataSource, preAggregations }),
       password: getEnv('dbPass', { dataSource, preAggregations }),
       ssl: this.getSslOptions(dataSource, preAggregations),
-      ...config
+      ...clientConfig
     };
 
     const poolName = createPoolName('postgres', dataSource, preAggregations);
@@ -347,7 +364,25 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     await conn.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
     await conn.query(`SET statement_timeout TO ${options.executionTimeout}`);
 
+    await this.applySqlPreamble(conn);
+
     await this.loadUserDefinedTypes(conn);
+  }
+
+  /**
+   * Runs the preamble on an acquired connection.
+   *
+   * A pooled connection is not guaranteed to be one the preamble has already run
+   * on, so this runs per acquire — which the query and stream paths both go
+   * through. Because the pool reuses connections, re-execution is normal and
+   * statements already applied here are skipped.
+   *
+   * Its own method so subclasses that replace `prepareConnection` (CrateDB and
+   * Materialize both do, to skip session settings they don't support) still
+   * apply the preamble.
+   */
+  protected async applySqlPreamble(conn: PgClient) {
+    await applySqlPreambleStatements(this.sqlPreamble(), statement => conn.query(statement));
   }
 
   protected mapFields(fields: FieldDef[]) {
@@ -473,6 +508,16 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
   protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): GenericDataBaseType {
     return PostgresToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType, precision, scale);
+  }
+
+  /**
+   * This driver applies `sql_preamble`.
+   *
+   * Inherited by RedshiftDriver, CrateDriver and MaterializeDriver, which all
+   * reuse the `prepareConnection` hook that applies the preamble.
+   */
+  public override supportsSqlPreamble(): boolean {
+    return true;
   }
 
   public readOnly() {
