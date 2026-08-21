@@ -25,6 +25,14 @@ cubes:
           - name: fiscal_year
             interval: "1 year"
             offset: "1 month"
+          # Trivial interval with an off-boundary origin: must render through DATE_BIN,
+          # not DATE_TRUNC, or the origin is silently discarded.
+          - name: fiscal_year_by_1st_april
+            interval: "1 year"
+            origin: "2024-04-01"
+          - name: calendar_year_by_origin
+            interval: "1 year"
+            origin: "2024-01-01"
 
       - name: fiscal_year_alias
         type: time
@@ -39,3 +47,11 @@ cubes:
       - name: total_amount
         type: sum
         sql: amount
+      - name: total_amount_prior_year
+        type: number
+        sql: "{CUBE.total_amount}"
+        multi_stage: true
+        time_shift:
+          - time_dimension: created_at
+            interval: "1 year"
+            type: prior
