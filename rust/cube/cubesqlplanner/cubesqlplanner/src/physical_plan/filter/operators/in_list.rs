@@ -9,11 +9,14 @@ impl FilterOperationSql for InListOp {
         let allocated = ctx.allocate_and_cast_values(&self.values, &self.member_type)?;
 
         if self.negated {
-            ctx.plan_templates
-                .not_in_where(ctx.member_sql.to_string(), allocated, need_null_check)
+            ctx.plan_templates.not_in_where(
+                ctx.member_sql().to_string(),
+                allocated,
+                need_null_check,
+            )
         } else {
             ctx.plan_templates
-                .in_where(ctx.member_sql.to_string(), allocated, need_null_check)
+                .in_where(ctx.member_sql().to_string(), allocated, need_null_check)
         }
     }
 }

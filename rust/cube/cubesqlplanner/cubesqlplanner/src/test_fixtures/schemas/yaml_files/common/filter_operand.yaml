@@ -1,0 +1,64 @@
+cubes:
+    - name: orders
+      sql: "SELECT * FROM orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: amount
+            type: number
+            sql: amount
+          - name: flag
+            type: boolean
+            sql: flag
+          - name: note
+            type: string
+            sql: note
+          - name: created_at
+            type: time
+            sql: created_at
+
+          # Top-level AND/OR — bind weaker than every filter operator.
+          - name: big_and_flag
+            type: boolean
+            sql: "{CUBE}.amount > 50 AND {CUBE}.flag"
+          - name: big_or_flag
+            type: boolean
+            sql: "{CUBE}.amount > 50 OR {CUBE}.flag"
+
+          # Top-level comparison — a second one next to it is a syntax error on
+          # Postgres and Trino alike.
+          - name: big
+            type: boolean
+            sql: "{CUBE}.amount > 50"
+
+          - name: amount_plus
+            type: number
+            sql: "{CUBE}.amount + 1"
+          - name: note_tagged
+            type: string
+            sql: "{CUBE}.note || '-tag'"
+          - name: shifted_at
+            type: time
+            sql: "{CUBE}.created_at + INTERVAL '1 day'"
+
+          # Atomic, but a trailing line comment still swallows whatever the
+          # template appends on that line.
+          - name: amount_commented
+            type: number
+            sql: "{CUBE}.amount -- as is"
+
+      measures:
+          - name: count
+            type: count
+          - name: total
+            type: sum
+            sql: amount
+          # The reported model's shape: a calculated boolean over a plain measure.
+          - name: total_is_set
+            type: boolean
+            sql: "{total} IS NOT NULL"
+          - name: total_over_150
+            type: boolean
+            sql: "{total} > 150"
