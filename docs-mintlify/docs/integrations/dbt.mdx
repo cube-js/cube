@@ -405,6 +405,20 @@ deployment is shown in the dbt settings card, ready to drop into a CI step.
   />
 </Frame>
 
+The trigger call accepts an optional `ref` — a branch or tag in your dbt repository —
+to sync from for that call only, without changing the branch saved on the
+integration. Use it in a pull request pipeline to test the ref under review before it
+merges.
+
+The response includes a `syncJobId`, which a pipeline can use to wait on the sync
+instead of firing the trigger and moving on blind:
+
+| Call | What it does |
+| --- | --- |
+| `GET .../dbt-sync/{syncJobId}` | Returns the sync's current `status`. Poll it until `status` reaches `COMPLETED` or `FAILED`. |
+| `GET .../dbt-sync/{syncJobId}/result` | Once `status` is `COMPLETED`, returns the generated cube files and cube count. |
+| `DELETE .../dbt-sync/{syncJobId}` | Cancels a sync that's still running — for example, when a newer push supersedes it. |
+
 ### Trigger on every push
 
 Register a webhook on your dbt repository so Cube syncs automatically whenever the

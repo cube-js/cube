@@ -108,6 +108,8 @@ Set the visibility from the **Visibility** dropdown when editing the control. **
 
 When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] whose query already uses the same dimension. Charts that don't reference that dimension are left alone, so a dashboard can mix scoped and unscoped views by default. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different dimension.
 
+The reverse case — adding a chart from a different semantic view than the dashboard's existing controls (a **cross-view** chart) — isn't wired up automatically, since a same-named dimension on another view isn't necessarily the same dimension. Instead, Cube prompts you to review it: a banner names how many controls could apply, and **Review…** opens [Controls mapping](#controls-mapping) with a suggested dimension already picked for each match. Save to connect them, or **Dismiss** the banner to leave the chart unconnected. A confirmation after saving lets you **Undo** the connection.
+
 ### Incompatible controls
 
 If controls of a certain type are incompatible with a particular chart's query, the chart skips all controls of that type and renders the data without them. Controls of the other type still apply — for example, if filters fail but a time granularity switcher works, the chart shows the granularity-adjusted data without filtering, and vice versa.
@@ -130,12 +132,13 @@ Open **Controls mapping** from a chart's settings menu to inspect or override th
 - **Toggle the control on or off** for the chart, even when a mapping exists
 - **Pick a different dimension** from the chart's semantic view to remap the control to
 
-Three states show up in the mapping sidebar:
+Four states show up in the mapping sidebar:
 
 | Status | What it means |
 |---|---|
 | **Mapped automatically** | The control's dimension exists on the chart's semantic view, so it's wired up without configuration. |
 | **Manually mapped** | You (or an AI agent) picked a specific dimension for this chart. **Reset** restores the automatic mapping. |
+| **Suggested mapping** | Cube found a matching dimension on a cross-view chart but hasn't applied it yet — save to apply it, or pick a different dimension. |
 | **Can't map automatically** | The control targets a dimension that doesn't exist on the chart's semantic view. The chart is unaffected by the control until you map it manually. |
 
 For [time granularity switchers][ref-time-grain], the dimension picker is restricted to time-typed dimensions on the chart's semantic view, since other dimension types can't be resolved by the time granularity pipeline.
