@@ -1385,6 +1385,31 @@ this variable.
 | ------------------------- | ---------------------- | --------------------- |
 | A valid number in seconds | `600`                  | `600`                 |
 
+## `CUBEJS_REFRESH_KEY_LOCAL_TIME`
+
+If `true`, interval and cron based [`refresh_key`](/reference/data-modeling/cube#refresh_key)
+values are computed from the Cube instance's own clock instead of being fetched with a
+`SELECT FLOOR(...) as refresh_key` query. This removes a database round trip per refresh
+key check, which for the default 10 second refresh key means one fewer query on nearly
+every request.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
+Only `every`-based refresh keys are affected. Refresh keys defined with `sql`, and those
+using [`incremental`](/reference/data-modeling/pre-aggregations#incremental), still run
+against the database because their values cannot be derived from a time interval alone.
+
+<Warning>
+
+Set this variable to the same value on **every** API instance and refresh worker, and keep
+their clocks synchronized (for example with NTP). Instances whose clocks straddle an
+interval boundary compute different refresh keys, which can cause the same
+pre-aggregation to be built more than once.
+
+</Warning>
+
 ## `CUBEJS_REFRESH_WORKER`
 
 If `true`, this instance of Cube will **only** refresh pre-aggregations.

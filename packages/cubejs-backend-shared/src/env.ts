@@ -368,6 +368,15 @@ const variables: Record<string, (...args: any) => any> = {
   preciseDecimalInCubestore: () => get('CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE')
     .default('false')
     .asBoolStrict(),
+  /**
+   * Evaluates interval and cron based `refreshKey` values from the API instance
+   * clock instead of issuing `SELECT FLOOR(...) as refresh_key`. Requires clocks
+   * to be in sync across all API instances and refresh workers, otherwise nodes
+   * straddling an interval boundary disagree and rebuild pre-aggregations twice.
+   */
+  refreshKeyLocalTime: () => get('CUBEJS_REFRESH_KEY_LOCAL_TIME')
+    .default('false')
+    .asBoolStrict(),
 
   /** ****************************************************************
    * Common db options                                               *

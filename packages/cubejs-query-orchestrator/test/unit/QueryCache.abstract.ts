@@ -377,6 +377,82 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       });
     });
 
+    describe('local refresh key', () => {
+      const REFRESH_KEY_SQL = 'SELECT FLOOR((UNIX_TIMESTAMP()) / 600) as refresh_key';
+      const descriptor = { interval: 600, utcOffset: 0, dayOffset: 0, cron: false };
+
+      const newCache = (localRefreshKey?: boolean) => new QueryCacheOpened(
+        crypto.randomBytes(16).toString('hex'),
+        () => {
+          throw new Error('driverFactory is not implemented, mock should be used...');
+        },
+        jest.fn(),
+        { ...options, localRefreshKey },
+      );
+
+      const loadRefreshKey = async (localRefreshKey: boolean | undefined, queryOptions: any) => {
+        const localCache = newCache(localRefreshKey);
+        const spy = jest.spyOn(localCache, 'queryWithRetryAndRelease')
+          .mockImplementation(async () => [{ refresh_key: 12345 }]);
+
+        try {
+          const [result] = await Promise.all(
+            localCache.loadRefreshKeys(
+              [[REFRESH_KEY_SQL, [], queryOptions]],
+              60,
+              { dataSource: 'default' },
+            )
+          );
+
+          return { result, executed: spy.mock.calls.length };
+        } finally {
+          spy.mockRestore();
+          await localCache.cleanup();
+        }
+      };
+
+      it('evaluates locally without touching the driver', async () => {
+        const { result, executed } = await loadRefreshKey(true, {
+          external: true,
+          renewalThreshold: 60,
+          localRefreshKey: descriptor,
+        });
+
+        expect(executed).toBe(0);
+        expect(result).toEqual([{ refresh_key: Math.floor(Date.now() / 1000 / 600) }]);
+      });
+
+      it('runs the query when the flag is off', async () => {
+        const { result, executed } = await loadRefreshKey(false, {
+          external: true,
+          renewalThreshold: 60,
+          localRefreshKey: descriptor,
+        });
+
+        expect(executed).toBe(1);
+        expect(result).toEqual([{ refresh_key: 12345 }]);
+      });
+
+      it('runs the query when there is no descriptor', async () => {
+        const { executed } = await loadRefreshKey(true, {
+          external: false,
+          renewalThreshold: 10,
+        });
+
+        expect(executed).toBe(1);
+      });
+
+      it('runs the query when the descriptor is malformed', async () => {
+        const { executed } = await loadRefreshKey(true, {
+          external: true,
+          renewalThreshold: 60,
+          localRefreshKey: { ...descriptor, interval: 0 },
+        });
+
+        expect(executed).toBe(1);
+      });
+    });
+
     it('queryCacheKey format', () => {
       const key1 = QueryCache.queryCacheKey({
         query: 'select data',

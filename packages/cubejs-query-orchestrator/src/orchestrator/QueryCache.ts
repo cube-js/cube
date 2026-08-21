@@ -24,7 +24,12 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
-import { getCacheHash, extractRequestUUID } from './utils';
+import {
+  getCacheHash,
+  extractRequestUUID,
+  evaluateLocalRefreshKey,
+  isValidLocalRefreshKey,
+} from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
 
 export type CacheQueryResultOptions = {
@@ -44,12 +49,28 @@ export type CacheQueryResultOptions = {
   renewCycle?: boolean,
 };
 
+/**
+ * Everything needed to evaluate an `every` based refreshKey without touching a
+ * database: `FLOOR((utcOffset + unixTimestamp - dayOffset) / interval)`.
+ *
+ * `utcOffset` is frozen at compile time, exactly as it already is when baked into
+ * the emitted SQL string — the orchestrator must never recompute it, or the local
+ * and SQL paths would stop agreeing across a DST transition.
+ */
+export type LocalRefreshKeyDescriptor = {
+  interval: number;
+  utcOffset: number;
+  dayOffset: number;
+  cron?: boolean;
+};
+
 type QueryOptions = {
   external?: boolean;
   renewalThreshold?: number;
   updateWindowSeconds?: number;
   renewalThresholdOutsideUpdateWindow?: number;
   incremental?: boolean;
+  localRefreshKey?: LocalRefreshKeyDescriptor;
 };
 
 export type QueryWithParams = [
@@ -144,6 +165,7 @@ export interface QueryCacheOptions {
   cacheAndQueueDriver: CacheAndQueryDriverType;
   maxInMemoryCacheEntries?: number;
   skipExternalCacheAndQueue?: boolean;
+  localRefreshKey?: boolean;
 }
 
 export class QueryCache {
@@ -154,6 +176,10 @@ export class QueryCache {
   protected externalQueue: QueryQueue | null = null;
 
   protected memoryCache: LRUCache<string, CacheEntry>;
+
+  protected readonly localRefreshKeyEnabled: boolean;
+
+  protected localRefreshKeyLogged: boolean = false;
 
   public constructor(
     protected readonly cachePrefix: string,
@@ -181,6 +207,31 @@ export class QueryCache {
     this.memoryCache = new LRUCache<string, CacheEntry>({
       max: options.maxInMemoryCacheEntries || 10000
     });
+
+    this.localRefreshKeyEnabled = options.localRefreshKey ?? getEnv('refreshKeyLocalTime');
+  }
+
+  /**
+   * Evaluates an interval based refresh key locally, or returns null when the SQL
+   * path must be used: the feature is off, the key is one we cannot reproduce
+   * (`refreshKey.sql`, incremental), or the descriptor is malformed.
+   */
+  public localRefreshKeyResult(queryOptions?: QueryOptions): [{ refresh_key: number }] | null {
+    if (!this.localRefreshKeyEnabled || !isValidLocalRefreshKey(queryOptions?.localRefreshKey)) {
+      return null;
+    }
+
+    // Logged on first use rather than from the constructor, where subclass field
+    // initialization has not run yet and `this.logger` may not be usable.
+    if (!this.localRefreshKeyLogged) {
+      this.localRefreshKeyLogged = true;
+      this.logger('Local refresh key evaluation enabled', {
+        warning: 'Interval based refresh keys are evaluated from this instance clock. ' +
+          'Clocks must be in sync across all API instances and refresh workers.',
+      });
+    }
+
+    return evaluateLocalRefreshKey(<LocalRefreshKeyDescriptor>queryOptions?.localRefreshKey);
   }
 
   public getCacheDriver(): CacheDriverInterface {
@@ -863,6 +914,14 @@ export class QueryCache {
   @AsyncDebounce()
   public async loadRefreshKey(q: QueryWithParams, expireSecs: number, options: LoadRefreshKeyOptions) {
     const [query, values, queryOptions] = q;
+
+    // A locally evaluated key is free, so there is nothing to cache and no queue to
+    // wait on. The value is quantized to the interval, so repeated calls agree
+    // except across a boundary — the same window the cached SQL result had.
+    const local = this.localRefreshKeyResult(queryOptions);
+    if (local) {
+      return local;
+    }
 
     return this.cacheQueryResult(
       query,
