@@ -1232,4 +1232,74 @@ describe('Refresh Scheduler', () => {
     // backoffDataStillActive exists, which means backoff is still in place
     // (nextTimestamp may be close to current time due to test execution delays)
   });
+
+  test('getRefreshKeysLimiter returns a shared limiter per orchestrator id', async () => {
+    const { serverCore } = setupScheduler({
+      repository: repositoryWithoutPreAggregations,
+      skipAssertSecurityContext: true,
+    });
+
+    const ctx = { authInfo: null, securityContext: {}, requestId: 'XXX' };
+
+    const first = await serverCore.getRefreshKeysLimiter(ctx, 2);
+    const second = await serverCore.getRefreshKeysLimiter(ctx, 2);
+    // Same orchestrator id and concurrency should reuse the limiter
+    expect(second).toBe(first);
+
+    // Changing the concurrency rebuilds the limiter
+    const third = await serverCore.getRefreshKeysLimiter(ctx, 3);
+    expect(third).not.toBe(first);
+  });
+
+  test('Refresh key dispatch is bounded by concurrency', async () => {
+    process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
+
+    const { refreshScheduler, serverCore } = setupScheduler({
+      repository: repositoryWithPreAggregations,
+    });
+
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
+    const concurrency = 2;
+
+    let inFlight = 0;
+    let maxInFlight = 0;
+
+    // Wrap the orchestrator's executeQuery once to track how many refresh-key
+    // dispatches are running concurrently.
+    const orchestratorApi = await serverCore.getOrchestratorApi(ctx);
+    const realExecuteQuery = orchestratorApi.executeQuery.bind(orchestratorApi);
+    orchestratorApi.executeQuery = async (query: any) => {
+      if (query.loadRefreshKeysOnly) {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        try {
+          // Hold the slot briefly so concurrent dispatches can build up.
+          await new Promise(resolve => setTimeout(resolve, 25));
+          return await realExecuteQuery(query);
+        } finally {
+          inFlight -= 1;
+        }
+      }
+      return realExecuteQuery(query);
+    };
+    jest.spyOn(serverCore, 'getOrchestratorApi').mockResolvedValue(orchestratorApi);
+
+    // Two cubes (Foo, Bar) x two timezones => four refresh-key dispatches.
+    // Without the limiter all four would run at once; with it no more than
+    // `concurrency` should overlap.
+    for (let i = 0; i < 1000; i++) {
+      const refreshResult = await refreshScheduler.runScheduledRefresh(ctx, {
+        concurrency,
+        workerIndices: [0],
+        timezones: ['UTC', 'America/Los_Angeles'],
+      });
+      if (refreshResult.finished) {
+        break;
+      }
+    }
+
+    expect(maxInFlight).toBeGreaterThan(0);
+    expect(maxInFlight).toBeLessThanOrEqual(concurrency);
+  });
 });
