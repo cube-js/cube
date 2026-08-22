@@ -280,6 +280,38 @@ describe('PreAggregations', () => {
     });
   });
 
+  describe('isPartitionExist', () => {
+    test('initializes a missing data source queue before checking the job result', async () => {
+      const preAggregations = new PreAggregations(
+        'TEST',
+        mockDriverFactory as any,
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
+        queryCache!,
+        {
+          cacheAndQueueDriver: 'memory',
+          queueOptions: async () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
+        },
+      );
+      mockDriver!.tables.push('stb_pre_aggregations.orders_main');
+
+      await expect(
+        preAggregations.isPartitionExist(
+          'request-id',
+          false,
+          'named_data_source',
+          'stb_pre_aggregations',
+          'stb_pre_aggregations.orders_main',
+          ['job-key'],
+          'job-token',
+        )
+      ).resolves.toEqual([true, 'done']);
+    });
+  });
+
   describe('loadAllPreAggregationsIfNeeded', () => {
     let preAggregations: PreAggregations | null = null;
 
