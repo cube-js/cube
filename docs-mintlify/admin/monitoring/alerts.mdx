@@ -1,0 +1,43 @@
+---
+title: Alerts
+description: Get email notifications about API outages, database timeouts, and pre-aggregation build failures across your deployments.
+---
+
+Alerts send email notifications when a deployment has an API outage, a database
+response timeout, or a pre-aggregation build fails or completes. Manage them from
+**Alerts** in the account-level Admin panel.
+
+<Note>
+
+Available on the [Starter plan and above](https://cube.dev/pricing).
+
+</Note>
+
+## Configuration
+
+Click **New alert** and choose:
+
+- **Event type** — one of the [event types](#event-types) below, or **All** to
+  match every type.
+- **For deployments** — **All** deployments on the account, or specific ones.
+- **Send alerts to** — **All users on this account** or **Specific users**; you
+  can also add **Custom email** addresses that aren't Cube Cloud users.
+
+Existing alerts are listed in a table with their event type, deployments, and
+recipients, and can be edited or deleted (individually or in bulk).
+
+## Event types
+
+| Event type | Triggered when |
+| --- | --- |
+| API outages | A deployment's API becomes unreachable. |
+| Database response timeouts | A query to the connected data source times out. |
+| Pre-aggregation build failures | A [pre-aggregation build](/admin/monitoring/pre-aggregations) fails. |
+| Build completed | A deployment build finishes. |
+
+A pre-aggregation build failure notification links back to the pre-aggregation
+and suggests [partitioning it][ref-partition-granularity] or configuring an
+[export bucket][ref-export-bucket] if it's large.
+
+[ref-partition-granularity]: /reference/data-modeling/pre-aggregations#partition_granularity
+[ref-export-bucket]: /docs/pre-aggregations/using-pre-aggregations#export-bucket
