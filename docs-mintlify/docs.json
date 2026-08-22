@@ -115,7 +115,8 @@
                       "docs/explore-analyze/dashboards/widgets/text",
                       "docs/explore-analyze/dashboards/widgets/controls",
                       "docs/explore-analyze/dashboards/widgets/ai-summary",
-                      "docs/explore-analyze/dashboards/widgets/layout"
+                      "docs/explore-analyze/dashboards/widgets/layout",
+                      "docs/explore-analyze/dashboards/widgets/container"
                     ]
                   },
                   "docs/explore-analyze/dashboards/styling",
