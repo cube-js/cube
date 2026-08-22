@@ -839,6 +839,71 @@ cubes:
   });
 
   describe('Access policy: ', () => {
+    it('supports equality and inequality operators in conditions', async () => {
+      const compilers = prepareYamlCompiler(
+        `
+        cubes:
+        - name: Orders
+          sql: "select * from tbl"
+          measures:
+            - name: count
+              type: count
+          accessPolicy:
+            - role: admin
+              conditions:
+                - if: "{ securityContext.region == 'EMEA' }"
+                - if: "{ securityContext.department != 'Sales' }"
+        `
+      );
+
+      await compilers.compiler.compile();
+
+      const conditions = compilers.cubeEvaluator.cubeFromPath('Orders').accessPolicy![0].conditions!;
+      expect(conditions[0].if.toString()).toContain('securityContext.region === "EMEA"');
+      expect(conditions[1].if.toString()).toContain('securityContext.department !== "Sales"');
+      expect(conditions[0].if({ region: 'EMEA' })).toBe(true);
+      expect(conditions[1].if({ department: 'Sales' })).toBe(false);
+      expect(conditions[1].if({ department: 'Marketing' })).toBe(true);
+    });
+
+    it('does not support chained comparisons in conditions', async () => {
+      const { compiler } = prepareYamlCompiler(
+        `
+        cubes:
+        - name: Orders
+          sql: "select * from tbl"
+          measures:
+            - name: count
+              type: count
+          accessPolicy:
+            - role: admin
+              conditions:
+                - if: "{ securityContext.region == securityContext.department == 'Sales' }"
+        `
+      );
+
+      await expect(compiler.compile()).rejects.toThrow('Chained Python comparisons are not supported');
+    });
+
+    it.each(['===', '!=='])('does not support JavaScript operator %s in conditions', async (operator) => {
+      const { compiler } = prepareYamlCompiler(
+        `
+        cubes:
+        - name: Orders
+          sql: "select * from tbl"
+          measures:
+            - name: count
+              type: count
+          accessPolicy:
+            - role: admin
+              conditions:
+                - if: "{ securityContext.region ${operator} 'EMEA' }"
+        `
+      );
+
+      await expect(compiler.compile()).rejects.toThrow('Failed to parse Python expression');
+    });
+
     it('defines a correct accessPolicy', async () => {
       const { compiler } = prepareYamlCompiler(
         `

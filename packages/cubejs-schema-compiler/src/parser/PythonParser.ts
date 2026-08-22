@@ -24,6 +24,9 @@ import Python3Parser, {
   And_testContext,
   // eslint-disable-next-line camelcase
   Or_testContext,
+  ComparisonContext,
+  // eslint-disable-next-line camelcase
+  Comp_opContext,
 } from './Python3Parser';
 import { UserError } from '../compiler/UserError';
 import Python3ParserVisitor from './Python3ParserVisitor';
@@ -244,6 +247,21 @@ export class PythonParser {
             return children[0];
           }
           return children.reduce((left, right) => t.logicalExpression('||', left, right));
+        } else if (node instanceof Comp_opContext) {
+          if (node.EQUALS()) {
+            return '===';
+          } else if (node.NOT_EQ_2()) {
+            return '!==';
+          }
+          throw new UserError(`Unsupported Python comparison operator: ${node.getText()}`);
+        } else if (node instanceof ComparisonContext) {
+          if (children.length === 1) {
+            return children[0];
+          }
+          if (children.length !== 3) {
+            throw new UserError('Chained Python comparisons are not supported');
+          }
+          return t.binaryExpression(children[1], children[0], children[2]);
         } else if (node instanceof ArglistContext) {
           return children;
         } else {
