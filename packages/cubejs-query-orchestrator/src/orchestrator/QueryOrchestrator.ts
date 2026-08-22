@@ -232,6 +232,8 @@ export class QueryOrchestrator {
         targetTableName: pa.targetTableName,
         refreshKeyValues: pa.refreshKeyValues,
         lastUpdatedAt: pa.lastUpdatedAt,
+        preAggregationId: pa.preAggregationId,
+        type: pa.type,
       })),
     )(preAggregationsTablesToTempTables);
 

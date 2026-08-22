@@ -576,11 +576,12 @@ describe('SQLInterface', () => {
   // header used to come back without them while the same base measures queried
   // plainly did carry them.
   //
-  // Both queries carry an explicit LIMIT to pin them to the buffered path.
+  // Both queries carry a small explicit LIMIT to pin them to the buffered path.
   // `CubeScanExecutionPlan::execute` switches to `load_stream` when stream mode
-  // is on and the request has no limit, and that branch never runs `load_data`,
-  // so no freshness metadata is recorded at all — a known gap, and this suite
-  // runs under CUBESQL_STREAM_MODE=true in CI.
+  // is on and the request either has no limit or one above
+  // `CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`, and that branch never runs
+  // `load_data`, so no result metadata is recorded at all — a known gap, and
+  // this suite runs under CUBESQL_STREAM_MODE=true in CI.
   test.each([
     [
       'plain measure projection',
@@ -591,7 +592,7 @@ describe('SQLInterface', () => {
       'SELECT customer_gender, ROUND(MEASURE(maxPrice) / MEASURE(count), 2) AS avg_value, MEASURE(count) AS cnt FROM KibanaSampleDataEcommerce GROUP BY 1 ORDER BY 3 DESC LIMIT 10;',
     ],
   ])(
-    'lastRefreshTime and external survive in /cubesql JSONL header for a %s',
+    'lastRefreshTime, external and usedPreAggregations survive in /cubesql JSONL header for a %s',
     async (_name, sql) => {
       const methods = {
         ...interfaceMethods(),
@@ -618,6 +619,13 @@ describe('SQLInterface', () => {
                 },
                 lastRefreshTime: '2024-01-01T00:00:00.000Z',
                 external: true,
+                usedPreAggregations: {
+                  'schema.kibana_main': {
+                    preAggregationId: 'KibanaSampleDataEcommerce.main',
+                    lastUpdatedAt: 1712000000000,
+                    type: 'rollup',
+                  },
+                },
               },
             ],
           };
@@ -650,6 +658,99 @@ describe('SQLInterface', () => {
         expect(schemaLine).toBeDefined();
         expect(schemaLine.lastRefreshTime).toBe('2024-01-01T00:00:00.000Z');
         expect(schemaLine.external).toBe(true);
+        expect(schemaLine.usedPreAggregations['schema.kibana_main'].preAggregationId)
+          .toBe('KibanaSampleDataEcommerce.main');
+      } finally {
+        await native.shutdownInterface(instance, 'fast');
+      }
+    }
+  );
+
+  // Identity of the pre-aggregations behind the result, so a client can join a
+  // chart to the build it is watching. Arrow schema metadata is a string map,
+  // so the object round-trips through JSON on the way here.
+  test.each([
+    [
+      'surfaced when reported',
+      {
+        'schema.kibana_main': {
+          preAggregationId: 'KibanaSampleDataEcommerce.main',
+          lastUpdatedAt: 1712000000000,
+          type: 'rollup',
+        },
+      },
+      {
+        'schema.kibana_main': {
+          preAggregationId: 'KibanaSampleDataEcommerce.main',
+          lastUpdatedAt: 1712000000000,
+          type: 'rollup',
+        },
+      },
+    ],
+    // A query that hit no pre-aggregation must not leave an empty key behind.
+    ['absent when the object is empty', {}, undefined],
+    ['absent when not reported', undefined, undefined],
+  ])(
+    'usedPreAggregations is %s in /cubesql JSONL schema header',
+    async (_name, usedPreAggregations, expected) => {
+      const methods = {
+        ...interfaceMethods(),
+        sqlApiLoad: jest.fn(async ({ streaming, query }: any) => {
+          if (streaming) {
+            return { stream: new FakeRowStream(query) };
+          }
+          return {
+            results: [
+              {
+                annotation: {
+                  measures: {},
+                  dimensions: {},
+                  segments: {},
+                  timeDimensions: {},
+                },
+                data: {
+                  members: ['KibanaSampleDataEcommerce.order_date'],
+                  columns: [['2024-01-01T00:00:00.000']],
+                },
+                lastRefreshTime: '2024-01-01T00:00:00.000Z',
+                external: true,
+                usedPreAggregations,
+              },
+            ],
+          };
+        }),
+      };
+
+      const instance = await native.registerInterface({
+        ...methods,
+        canSwitchUserForSession: (_payload: any) => true,
+      });
+
+      let buf = '';
+      const lines: any[] = [];
+      const write = jest.fn((chunk, _enc, callback) => {
+        const raw = (buf + chunk.toString('utf-8')).split('\n');
+        buf = raw.pop() || '';
+        for (const l of raw) {
+          if (l.trim().length) {
+            lines.push(JSON.parse(l));
+          }
+        }
+        callback();
+      });
+      const cubeSqlStream = new Writable({ write });
+
+      try {
+        await native.execSql(
+          instance,
+          'SELECT order_date FROM KibanaSampleDataEcommerce LIMIT 1;',
+          cubeSqlStream
+        );
+
+        const schemaLine = lines.find((o) => o.schema);
+        expect(schemaLine).toBeDefined();
+        expect(schemaLine.usedPreAggregations).toEqual(expected);
+        expect(schemaLine.lastRefreshTime).toBe('2024-01-01T00:00:00.000Z');
       } finally {
         await native.shutdownInterface(instance, 'fast');
       }
