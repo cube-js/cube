@@ -77,20 +77,24 @@ This works on both regular and published (embedded) dashboards. The filter is
 only applied if a matching filter widget for that dimension already exists on the
 dashboard.
 
-## Allow CSV export
+## Allow chart export
 
 By default, embedded dashboards do not expose a download action on individual
-widgets. To let viewers download a chart widget's data as a CSV file, add the
+widgets. To let viewers download a chart widget's data, add the
 `allowExport=true` query parameter to the embed URL:
 
 ```text
 https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&allowExport=true
 ```
 
-When enabled, each chart widget's ⋮ menu shows a **Download as CSV** action. The
-CSV is generated client-side from the data already loaded into the widget, so no
-additional query is issued. The parameter is opt-in — omit it (the default) to
-keep the download action hidden.
+When enabled, each chart widget's ⋮ menu shows **Download as PNG**, **Download
+as PDF**, and **Download as CSV** actions. CSV is generated client-side from
+the data already loaded into the widget, so no additional query is issued. PNG
+and PDF are server-rendered snapshots, the same mechanism used for
+[dashboard export](/docs/explore-analyze/dashboards#download-as-png-or-pdf) in
+the main app, and only one export can run at a time per dashboard. The
+parameter is opt-in — omit it (the default) to keep the download action
+hidden.
 
 ## Show or hide the AI chat
 
