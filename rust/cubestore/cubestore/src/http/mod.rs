@@ -1916,7 +1916,7 @@ mod tests {
         auth.expect_authenticate().return_const(Ok(None));
 
         let http_server = Arc::new(HttpServer::new(
-            "127.0.0.1:53032".to_string(),
+            "127.0.0.1:53033".to_string(),
             Arc::new(auth),
             Arc::new(SqlServiceMock {
                 message_counter: AtomicU64::new(0),
@@ -1934,7 +1934,7 @@ mod tests {
 
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-        let (mut socket, _) = connect_async(Url::parse("ws://127.0.0.1:53032/ws").unwrap())
+        let (mut socket, _) = connect_async(Url::parse("ws://127.0.0.1:53033/ws").unwrap())
             .await
             .unwrap();
 
