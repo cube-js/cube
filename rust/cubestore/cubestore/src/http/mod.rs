@@ -51,7 +51,7 @@ use warp::reject::Reject;
 /// process because it is too large (RFC 6455 section 7.4.1, "Message Too Big").
 const MESSAGE_TOO_BIG_CLOSE_CODE: u16 = 1009;
 
-/// How much room the transport is given above the configured message size.
+/// How much room the transport is given above the configured sizes.
 ///
 /// The size limit is enforced here rather than by the transport, so that an
 /// over-limit request can be answered with an error naming the message it
@@ -63,6 +63,19 @@ const MESSAGE_TOO_BIG_CLOSE_CODE: u16 = 1009;
 /// enforces it as a backstop against a peer that would otherwise make the
 /// server buffer without bound. A message in between is what gets the readable
 /// error; past the backstop there is nothing to answer with but a close frame.
+///
+/// The frame limit is given the same headroom, and has to be: a client sends a
+/// query as a single frame, so an exact frame limit would refuse an over-limit
+/// message at the transport before the handler ever saw it, and at the default
+/// configuration — where `CUBESTORE_TRANSPORT_MAX_FRAME_SIZE` and
+/// `CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE` are both `64 << 20` — that is every
+/// over-limit message, leaving the readable error unreachable.
+///
+/// Frame size is not re-checked in the handler, because reassembly happens
+/// below `warp` and individual frames are never visible up here. So with the
+/// two knobs configured apart, `CUBESTORE_TRANSPORT_MAX_FRAME_SIZE` bounds a
+/// single allocation at the headroom multiple of its configured value, and the
+/// message limit is what actually enforces the policy.
 const TRANSPORT_SIZE_HEADROOM: usize = 2;
 
 /// Recognizes the error raised when an incoming message exceeds
@@ -270,7 +283,7 @@ impl HttpServer {
                                             // on it. See TRANSPORT_SIZE_HEADROOM.
                                             if message_buffer.len() > max_message_size {
                                                 let error = format!(
-                                                    "Request of {} bytes exceeds the maximum message size of {} bytes. Reduce the size of the query, e.g. by sending fewer or smaller inline tables, or raise CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE",
+                                                    "Request of {} bytes exceeds the maximum message size of {} bytes. Reduce the size of the query, e.g. by sending fewer or smaller inline tables, or raise CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE.",
                                                     message_buffer.len(), max_message_size
                                                 );
                                                 error!("Websocket message too large: {}", error);
@@ -1937,6 +1950,7 @@ mod tests {
         http_server.stop_processing().await;
         Ok(())
     }
+
     /// An incoming message past the transport backstop is answered with the
     /// WebSocket "message too big" close code instead of the connection being
     /// dropped without a word, which the client can only read as a bare
