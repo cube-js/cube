@@ -270,6 +270,34 @@ fn pick(value: &Value, keys: &[&str]) -> String {
         .unwrap_or_default()
 }
 
+/// Server text as a terminal may safely show it: every control character except the
+/// line breaks and tabs the timeline keeps on purpose is dropped.
+///
+/// This is text the CLI did not write — dbt compile output, warehouse messages, model
+/// names — and an ESC sequence in it can retitle a window, move the cursor, or overwrite
+/// the lines above it in a CI log. `one_line` is not the guard it looks like: it drops
+/// control characters that are WHITESPACE as a side effect of splitting on it, and ESC
+/// is not whitespace. Printing raw would be safe only under `--json`, where `serde_json`
+/// escapes them.
+fn printable(text: &str) -> String {
+    text.chars()
+        .filter(|c| !c.is_control() || *c == '\n' || *c == '\t')
+        .collect()
+}
+
+/// How much of one server-supplied value a table cell or a line prefix keeps. Long
+/// enough for a branch name, a timestamp or a trigger with room to spare, short enough
+/// that one row stays one row: a table is laid out to its widest cell, so an unbounded
+/// one would push every other column off the screen.
+const CELL_LIMIT: usize = 120;
+
+/// One bounded, printable line of server text — what a table cell and a timeline
+/// prefix both need, and where trimming comes from: `one_line` splits on whitespace, so
+/// padding and interior newlines go the same way.
+fn one_cell(text: &str) -> String {
+    util::one_line(&printable(text), CELL_LIMIT)
+}
+
 /// A `durationMs` rendered as time, because a sync runs for minutes and `912345` is
 /// not a thing anyone reads off a table.
 ///
@@ -282,8 +310,14 @@ fn human_duration_ms(raw: &str) -> String {
         Ok(ms) => ms,
         // A whole number of milliseconds that arrived as a float (`912345.0`) is still
         // a duration; a negative or non-numeric one is not, and falls through.
+        //
+        // Bounded, not merely non-negative: an `as` cast SATURATES, so `1e30` would
+        // otherwise render as a confident five-billion-hour duration instead of passing
+        // through as the nonsense it is.
         Err(_) => match raw.parse::<f64>() {
-            Ok(value) if value.is_finite() && value >= 0.0 => value.round() as u64,
+            Ok(value) if value.is_finite() && value >= 0.0 && value < u64::MAX as f64 => {
+                value.round() as u64
+            }
             _ => return raw.to_string(),
         },
     };
@@ -311,23 +345,35 @@ const HISTORY_COLUMNS: [&str; 6] = [
     "BRANCH",
 ];
 
+/// The column a row has to fill to be usable at all: without an id, nothing in it can
+/// be passed to `logs` or `result`.
+const ID_COLUMN: usize = 0;
+
 /// One run as a table row.
 fn history_row(run: &Value) -> Vec<String> {
+    // Every cell read the same way, and through `one_cell` rather than `pick` alone:
+    // these are server strings landing in a laid-out table, where an interior newline
+    // breaks the row and an unbounded value pushes the other columns off the screen.
+    // Padding goes with them, so a `COMPLETED ` cannot sit beside a `COMPLETED` and
+    // read as two outcomes.
+    let cell = |keys: &[&str]| one_cell(&pick(run, keys));
+
     vec![
-        pick(run, &["syncJobId", "id"]),
-        // Trimmed like every other status this file reads: padding is a spelling of the
-        // same value, and a table that shows `COMPLETED ` next to `COMPLETED` reads as
-        // two outcomes.
-        util::status_of(run, "status"),
-        pick(run, &["trigger", "triggeredBy"]),
-        pick(run, &["startedAt", "createdAt"]),
+        cell(&["syncJobId", "id"]),
+        // One key, unlike its neighbours, and not an oversight: `status` is the field the
+        // sync endpoints already publish and whose two terminal values this file acts on,
+        // so a second spelling here would be an invention rather than the other name for
+        // a thing already named.
+        cell(&["status"]),
+        cell(&["trigger", "triggeredBy"]),
+        cell(&["startedAt", "createdAt"]),
         // `durationMs` ONLY — never `completedAt` minus `startedAt`. Those two stamps
         // are written by different processes, so their difference can disagree with the
         // server's own figure and, for a run that fails moments after starting, be
         // negative. A run that reports no `durationMs` gets an empty cell, which is the
         // honest answer; a computed one would be a plausible wrong number.
-        human_duration_ms(&pick(run, &["durationMs"])),
-        pick(run, &["branchName", "branch"]),
+        human_duration_ms(&cell(&["durationMs"])),
+        cell(&["branchName", "branch"]),
     ]
 }
 
@@ -352,17 +398,64 @@ struct LogEntry {
 fn log_entry(value: &Value) -> LogEntry {
     let level = pick(value, &["level", "severity"]);
     LogEntry {
-        time: pick(value, &["timestamp", "createdAt"]),
-        stage: pick(value, &["stage", "phase"]),
-        // Only the trailing end is trimmed, unlike the poll label's `one_line`: this is
-        // the failure text itself, printed once, and a dbt compile error means its line
-        // breaks. Collapsing them would be the label's rule applied where it does harm.
-        message: pick(value, &["message", "text"]).trim_end().to_string(),
+        time: one_cell(&pick(value, &["timestamp", "createdAt"])),
+        stage: one_cell(&pick(value, &["stage", "phase"])),
+        // Kept whole, unlike the prefix beside it and the poll label's `one_line`: this
+        // is the failure text itself, printed once, and a dbt compile error means its
+        // line breaks. Collapsing them would apply the label's rule where it does harm —
+        // so the control characters `one_line` would have taken with the newlines are
+        // dropped deliberately instead.
+        message: printable(pick(value, &["message", "text"]).trim_end()),
         error: matches!(
             level.trim().to_ascii_uppercase().as_str(),
             "ERROR" | "FATAL" | "CRITICAL"
         ),
     }
+}
+
+/// A failure's text is red wherever it lands, the raw-entry fallback below included:
+/// the entry this build understood least is the last place to drop the signal that it
+/// is a failure.
+fn paint_failure(text: String, error: bool) -> String {
+    if error {
+        text.red().to_string()
+    } else {
+        text
+    }
+}
+
+/// One rendered line of the timeline.
+///
+/// The colour lives here rather than at the call site, next to the choice of what to
+/// show: the fallback below has to drop a prefix as well as swap the text, and those
+/// are one decision rather than two.
+fn log_line(value: &Value) -> String {
+    let LogEntry {
+        time,
+        stage,
+        message,
+        error,
+    } = log_entry(value);
+
+    // The text is why somebody ran this command, so an entry this build cannot find it
+    // in is shown as it arrived rather than dropped — and on its own: the raw JSON
+    // already carries the timestamp and the stage that would otherwise prefix it, and
+    // `serde_json` escapes the control characters `printable` exists to drop.
+    if util::is_blank(&message) {
+        return paint_failure(value.to_string(), error);
+    }
+
+    let mut parts = Vec::new();
+    if !util::is_blank(&time) {
+        parts.push(time.dimmed().to_string());
+    }
+    // A blank stage adds no empty brackets, for the reason `status_label` prints none.
+    if !util::is_blank(&stage) {
+        parts.push(format!("[{stage}]").cyan().to_string());
+    }
+    parts.push(paint_failure(message, error));
+
+    parts.join(" ")
 }
 
 /// A result is available only when it is a non-empty object. Some deployments return
@@ -645,30 +738,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             }
 
             for entry in entries {
-                let LogEntry {
-                    time,
-                    stage,
-                    message,
-                    error,
-                } = log_entry(&entry);
-                let mut line = Vec::new();
-                if !util::is_blank(&time) {
-                    line.push(time.dimmed().to_string());
-                }
-                if !util::is_blank(&stage) {
-                    line.push(format!("[{stage}]").cyan().to_string());
-                }
-                // An entry whose text this build cannot find is printed as it arrived
-                // rather than dropped: the timeline is why somebody ran this command, and
-                // a silently emptied line would read as a phase that said nothing.
-                if util::is_blank(&message) {
-                    line.push(entry.to_string());
-                } else if error {
-                    line.push(message.red().to_string());
-                } else {
-                    line.push(message);
-                }
-                println!("{}", line.join(" "));
+                println!("{}", log_line(&entry));
             }
         }
         Cmd::History {
@@ -694,13 +764,20 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             }
 
             let rows: Vec<Vec<String>> = output::items(&res).iter().map(history_row).collect();
-            // A page this build recognised nothing in would print as rows of blanks, which
-            // reads as "these syncs are empty" rather than "this CLI did not understand
-            // them" — and `--json` answers regardless of what the columns can name.
-            if !rows.is_empty() && rows.iter().flatten().all(|cell| util::is_blank(cell)) {
+            // A page whose rows name no sync at all is one this build could not read:
+            // every run has an id, and a row without one cannot be passed on to `logs` or
+            // `result` either. Printed as blanks it would read as "these syncs are empty"
+            // rather than "this CLI did not understand them", so say so and point at
+            // `--json`, which answers whatever the columns cannot name.
+            //
+            // Keyed on the id rather than on every cell being blank, which a single
+            // filled column was enough to defeat. It still does not claim to catch ONE
+            // renamed field: a column of blanks beside filled ones is visible on its own,
+            // and a warning per column would fire on every legitimately empty one.
+            if !rows.is_empty() && rows.iter().all(|row| util::is_blank(&row[ID_COLUMN])) {
                 eprintln!(
-                    "warning: these sync rows carry no field this CLI knows — re-run with \
-                     --json, or update the CLI with `cube update`"
+                    "warning: these sync rows name no sync job id — re-run with --json, \
+                     or update the CLI with `cube update`"
                 );
             }
             output::table(&HISTORY_COLUMNS, rows);
@@ -746,6 +823,8 @@ mod tests {
         let row = history_row(&json!({}));
         assert_eq!(row.len(), HISTORY_COLUMNS.len());
         assert!(row.iter().all(|value| value.is_empty()));
+        // And the column `history`'s warning reads is the one it means.
+        assert_eq!(HISTORY_COLUMNS[ID_COLUMN], "SYNC JOB ID");
     }
 
     #[test]
@@ -818,6 +897,10 @@ mod tests {
         assert_eq!(human_duration_ms("  "), "");
         assert_eq!(human_duration_ms("-1"), "-1");
         assert_eq!(human_duration_ms("PT15M"), "PT15M");
+        // An `as` cast saturates, so this has to be rejected before it becomes a
+        // confident five-billion-hour duration.
+        assert_eq!(human_duration_ms("1e30"), "1e30");
+        assert_eq!(human_duration_ms("inf"), "inf");
     }
 
     #[test]
@@ -872,6 +955,62 @@ mod tests {
         for level in ["warn", "WARNING", "info", "", "  "] {
             assert!(!log_entry(&json!({"level": level})).error, "{level}");
         }
+    }
+
+    #[test]
+    fn a_log_line_carries_the_prefix_its_entry_answered_for() {
+        let line = log_line(&json!({
+            "timestamp": "2026-08-24T10:00:01Z",
+            "stage": "COMPILING_DBT",
+            "message": "Parsing dbt project"
+        }));
+        assert!(line.contains("2026-08-24T10:00:01Z"), "{line}");
+        assert!(line.contains("[COMPILING_DBT]"), "{line}");
+        // Uncoloured, so the text arrives verbatim rather than wrapped.
+        assert!(line.ends_with("Parsing dbt project"), "{line}");
+        // A blank stage adds no empty brackets.
+        assert!(!log_line(&json!({"stage": " ", "message": "x"})).contains('['));
+    }
+
+    #[test]
+    fn an_entry_whose_text_this_build_cannot_find_is_shown_as_it_arrived() {
+        // Exactly the entry, once: the JSON already carries whatever a prefix would
+        // repeat, so it is printed alone rather than after a timestamp and a stage.
+        let unknown = json!({"ts": "2026-08-24T10:00:01Z", "detail": "a newer shape"});
+        assert_eq!(log_line(&unknown), unknown.to_string());
+        // A failure keeps its colour even here — the entry this build understood least is
+        // the last place to drop the signal that it is one.
+        let failed = json!({"level": "error", "detail": "no message field"});
+        let line = log_line(&failed);
+        assert!(line.contains(&failed.to_string()), "{line}");
+        assert_ne!(line, failed.to_string(), "still coloured: {line}");
+    }
+
+    #[test]
+    fn server_text_cannot_drive_the_terminal() {
+        // dbt output and warehouse errors are text this CLI did not write, and an ESC
+        // sequence in one can retitle a window, move the cursor, or overwrite the lines
+        // above it in a CI log. The line breaks a compile error means are kept; the rest
+        // of the control characters are not.
+        let entry = log_entry(&json!({
+            "stage": "COMPILING_DBT\u{1b}[2J",
+            "message": "Compilation Error\n\u{1b}]0;retitled\u{7}  in model fct_orders\tx"
+        }));
+        assert_eq!(entry.stage, "COMPILING_DBT[2J");
+        assert_eq!(
+            entry.message,
+            "Compilation Error\n]0;retitled  in model fct_orders\tx"
+        );
+        // The same for a cell, which is one line as well: a newline in a value would
+        // otherwise break the row it sits in, and an unbounded one the whole layout.
+        let row = history_row(&json!({
+            "branchName": "dbt-sync/a\u{1b}[2J\nb",
+            "trigger": "T".repeat(500)
+        }));
+        assert_eq!(cell(&row, "BRANCH"), "dbt-sync/a[2J b");
+        let trigger = cell(&row, "TRIGGER");
+        assert!(trigger.ends_with('…'), "bounded: {trigger}");
+        assert_eq!(trigger.chars().count(), CELL_LIMIT + 1);
     }
 
     #[test]
