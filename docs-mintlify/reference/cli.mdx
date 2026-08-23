@@ -177,7 +177,7 @@ Run `cube <command> --help` for the full options of any command.
 | `regions` | List available deployment regions |
 | `github` (`gh`) | GitHub integration: `status`, `installations`, `repos`, `branches`, `connect` |
 | `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `delete-branch`, `enable-branch`/`disable-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
-| `dbt` | dbt sync: `sync` (`--ref`, `--wait`), `status`, `result`, `cancel` |
+| `dbt` | dbt sync: `sync` (`--ref`, `--wait`), `status`, `result`, `logs`, `history`, `cancel` |
 | `environments` | Deployment environments and environment tokens |
 | `variables` | Deployment environment variables |
 | `folders`, `workbooks`, `reports`, `workspace` | Workspace content management |
@@ -367,6 +367,35 @@ provisions a sandbox and parses the project — so prefer one per push over one 
 commit.
 
 </Note>
+
+### Sync history and logs
+
+`history` lists a deployment's recent syncs — how each one was triggered, how it
+ended, and how long it took — and `logs` prints one sync's phase timeline,
+including the text a failed phase produced:
+
+```bash
+cube dbt history DEPLOYMENT_ID
+cube dbt logs DEPLOYMENT_ID SYNC_JOB_ID
+```
+
+Both page with `--first`/`--after`, taking the cursor from `pageInfo.endCursor` in
+`--json` output, and need only `SchemaRead`. Durations are the server's own
+single-clock figure, so they never disagree with the run they describe.
+
+`logs` is what turns a red CI step into something self-explaining: a failed
+`--wait` reports the reason, and the timeline says which phase produced it.
+
+```bash
+cube dbt sync "$DEPLOYMENT_ID" --ref "$GITHUB_HEAD_REF" --wait --json > sync.json || {
+  SYNC_JOB_ID=$(jq -r '.syncJobId // empty' sync.json)
+  [ -n "$SYNC_JOB_ID" ] && cube dbt logs "$DEPLOYMENT_ID" "$SYNC_JOB_ID"
+  exit 1
+}
+```
+
+A failed `--wait --json` still writes its document before exiting non-zero, which
+is what leaves the `syncJobId` there to follow up on.
 
 ### dbt sync as a CI test gate
 
