@@ -51,6 +51,20 @@ use warp::reject::Reject;
 /// process because it is too large (RFC 6455 section 7.4.1, "Message Too Big").
 const MESSAGE_TOO_BIG_CLOSE_CODE: u16 = 1009;
 
+/// How much room the transport is given above the configured message size.
+///
+/// The size limit is enforced here rather than by the transport, so that an
+/// over-limit request can be answered with an error naming the message it
+/// belongs to, on a connection that stays up for everything else multiplexed
+/// over it. That needs the message to arrive whole: `tungstenite` raises its
+/// capacity error as soon as the frame header is parsed, before the payload is
+/// read, which leaves the frame stream desynchronized and the message id
+/// unread. So the transport is configured a factor above the limit, and only
+/// enforces it as a backstop against a peer that would otherwise make the
+/// server buffer without bound. A message in between is what gets the readable
+/// error; past the backstop there is nothing to answer with but a close frame.
+const TRANSPORT_SIZE_HEADROOM: usize = 2;
+
 /// Recognizes the error raised when an incoming message exceeds
 /// `CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE` or `CUBESTORE_TRANSPORT_MAX_FRAME_SIZE`,
 /// and renders it as a close reason. `warp` boxes the underlying `tungstenite`
@@ -193,7 +207,7 @@ impl HttpServer {
             .and_then(move |tx: mpsc::Sender<(mpsc::Sender<Arc<HttpMessage>>, SqlQueryContext, HttpMessage)>, sql_query_context: SqlQueryContext, ws: Ws| async move {
                 let tx_to_move = tx.clone();
                 let sql_query_context = sql_query_context.clone();
-                let reply = ws.max_frame_size(max_frame_size).max_message_size(max_message_size).on_upgrade(async move |mut web_socket| {
+                let reply = ws.max_frame_size(max_frame_size.saturating_mul(TRANSPORT_SIZE_HEADROOM)).max_message_size(max_message_size.saturating_mul(TRANSPORT_SIZE_HEADROOM)).on_upgrade(async move |mut web_socket| {
                     let process_id = sql_query_context.process_id.as_deref().unwrap_or("None");
                     trace!("WebSocket connection established (process_id: {})", process_id);
                     let (response_tx, mut response_rx) = mpsc::channel::<Arc<HttpMessage>>(10000);
@@ -213,14 +227,15 @@ impl HttpServer {
                             Some(msg) = web_socket.next() => {
                                 match msg {
                                     Err(e) => {
-                                        // An over-limit message is reported before its payload is
-                                        // read, so the frame stream is left desynchronized and the
-                                        // message id is never seen: the connection can't be reused
-                                        // and an application level error can't be attributed to the
-                                        // query that caused it. Answer with the close code reserved
-                                        // for this instead of dropping the connection silently, so
-                                        // the client can report the size rather than a bare
-                                        // disconnect it would otherwise retry.
+                                        // Past the transport backstop the payload is refused
+                                        // before it is read, so the frame stream is left
+                                        // desynchronized and the message id is never seen: the
+                                        // connection can't be reused and the error can't be
+                                        // attributed to a query the way an over-limit request
+                                        // under the backstop is. Answer with the close code
+                                        // reserved for this instead of dropping the connection
+                                        // silently, so the client can report the size rather than
+                                        // a bare disconnect it would otherwise retry.
                                         match message_too_large_reason(&e) {
                                             Some(reason) => {
                                                 error!("Websocket message too large: {}", reason);
@@ -248,6 +263,25 @@ impl HttpServer {
 
                                             let message_id = http_message.message_id();
                                             let connection_id = http_message.connection_id().map(|s| s.to_string());
+
+                                            // Refused here rather than by the transport so the
+                                            // answer can name the message it belongs to and the
+                                            // connection survives for everything else in flight
+                                            // on it. See TRANSPORT_SIZE_HEADROOM.
+                                            if message_buffer.len() > max_message_size {
+                                                let error = format!(
+                                                    "Request of {} bytes exceeds the maximum message size of {} bytes. Reduce the size of the query, e.g. by sending fewer or smaller inline tables, or raise CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE",
+                                                    message_buffer.len(), max_message_size
+                                                );
+                                                error!("Websocket message too large: {}", error);
+                                                let send_res = web_socket.send(
+                                                    Message::binary(HttpMessage { message_id, connection_id, command: HttpCommand::Error { error } }.bytes())
+                                                ).await;
+                                                if let Err(e) = send_res {
+                                                    error!("Websocket message send error: {:?}", e)
+                                                }
+                                                continue;
+                                            }
 
                                             match HttpMessage::read(http_message).await {
                                                 Err(e) => {
@@ -1903,7 +1937,7 @@ mod tests {
         http_server.stop_processing().await;
         Ok(())
     }
-    /// An incoming message over the transport size limit is answered with the
+    /// An incoming message past the transport backstop is answered with the
     /// WebSocket "message too big" close code instead of the connection being
     /// dropped without a word, which the client can only read as a bare
     /// disconnect and retry.
@@ -1938,14 +1972,14 @@ mod tests {
             .await
             .unwrap();
 
-        // A query too long to fit, so that the server refuses the frame before
-        // it can read the message id back out of it.
+        // Clear of the headroom the graceful path is given, so that the server
+        // refuses the frame before it can read the message id back out of it.
         socket
             .send(Message::binary(
                 HttpMessage {
                     message_id: 1,
                     command: HttpCommand::Query {
-                        query: "s".repeat(max_message_size * 2),
+                        query: "s".repeat(max_message_size * TRANSPORT_SIZE_HEADROOM * 2),
                         inline_tables: vec![],
                         trace_obj: None,
                         parameters: None,
@@ -1969,6 +2003,114 @@ mod tests {
                 );
             }
             msg => panic!("Close frame expected, got: {:?}", msg),
+        }
+
+        http_server.stop_processing().await;
+        Ok(())
+    }
+
+    /// An over-limit request that still fits within the transport headroom is
+    /// answered with an error naming the message it belongs to, and the
+    /// connection carries on serving the queries multiplexed over it.
+    #[tokio::test]
+    async fn ws_message_too_large_reports_the_message_test() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let max_message_size = 4 * 1024;
+        let mut auth = MockSqlAuthService::new();
+        auth.expect_authenticate().return_const(Ok(None));
+
+        let http_server = Arc::new(HttpServer::new(
+            "127.0.0.1:53034".to_string(),
+            Arc::new(auth),
+            Arc::new(SqlServiceMock {
+                message_counter: AtomicU64::new(0),
+            }),
+            Duration::from_millis(100),
+            Duration::from_millis(10000),
+            Duration::from_millis(1000),
+            max_message_size,
+            max_message_size,
+        ));
+        {
+            let http_server = http_server.clone();
+            cube_ext::spawn(async move { http_server.run_server().await });
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let (mut socket, _) = connect_async(Url::parse("ws://127.0.0.1:53034/ws").unwrap())
+            .await
+            .unwrap();
+
+        // Over the limit, but inside the headroom the transport is given, so it
+        // arrives whole and can be attributed to message 7.
+        socket
+            .send(Message::binary(
+                HttpMessage {
+                    message_id: 7,
+                    command: HttpCommand::Query {
+                        query: "s".repeat(max_message_size + max_message_size / 2),
+                        inline_tables: vec![],
+                        trace_obj: None,
+                        parameters: None,
+                        response_format: QueryResultFormat::Legacy,
+                    },
+                    connection_id: Some("foo".to_string()),
+                }
+                .bytes(),
+            ))
+            .await
+            .unwrap();
+
+        // Read off the flatbuffer directly: `HttpMessage::read` only decodes the
+        // commands a client sends, and an error is not one of them.
+        let msg = socket.next().await.unwrap().unwrap();
+        let data = msg.into_data();
+        let message = root_as_http_message(&data).unwrap();
+        assert_eq!(message.message_id(), 7);
+        let error = message
+            .command_as_http_error()
+            .expect("an error was expected")
+            .error()
+            .unwrap_or_default();
+        assert!(
+            error.contains("exceeds the maximum message size"),
+            "unexpected error: {}",
+            error
+        );
+
+        // The point of answering instead of closing: the connection is still
+        // usable for everything that wasn't oversized.
+        socket
+            .send(Message::binary(
+                HttpMessage {
+                    message_id: 8,
+                    command: HttpCommand::Query {
+                        query: "foo".to_string(),
+                        inline_tables: vec![],
+                        trace_obj: None,
+                        parameters: None,
+                        response_format: QueryResultFormat::Legacy,
+                    },
+                    connection_id: Some("foo".to_string()),
+                }
+                .bytes(),
+            ))
+            .await
+            .unwrap();
+
+        let msg = socket.next().await.unwrap().unwrap();
+        let message = HttpMessage::read(root_as_http_message(&msg.into_data()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(message.message_id, 8);
+        match message.command {
+            HttpCommand::ResultSet { data_frame } => assert_eq!(
+                data_frame.get_rows()[0].values()[0],
+                TableValue::String("0".to_string())
+            ),
+            command => panic!("Result set expected, got: {:?}", command),
         }
 
         http_server.stop_processing().await;
