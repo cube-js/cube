@@ -6832,6 +6832,109 @@ mod tests {
             .await;
         Ok(())
     }
+    /// A grouped aggregate over an index whose sort key does not start with the filtered
+    /// columns: every group column is pinned to a single value by the filter, which makes the
+    /// aggregate sorted and hands it to the streaming implementation. Its output partitioning
+    /// must follow the scan's, otherwise only the first partition is read and the rows living
+    /// in the others are silently dropped.
+    #[tokio::test]
+    async fn single_value_equals_scans_every_partition() -> Result<(), CubeError> {
+        Config::test("single_value_equals_scans_every_partition")
+            .update_config(|mut c| {
+                c.compaction_chunks_count_threshold = 0;
+                c.partition_split_threshold = 400;
+                c.max_partition_split_threshold = 400;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                service.exec_query("CREATE SCHEMA pa").await?.collect().await?;
+                // The time dimension leads the sort key, so the equality-filtered columns are
+                // not an index prefix -- the shape of a partitioned rollup.
+                service
+                    .exec_query(
+                        "CREATE TABLE pa.rollup (date_code timestamp, equipment_type text, \
+                         month_code text, site_id text, hours int)",
+                    )
+                    .await?
+                    .collect()
+                    .await?;
+
+                let mut rows = Vec::new();
+                for month in 1..=12 {
+                    for day in 1..=8 {
+                        for equipment_type in &["QC", "RTG", "STS"] {
+                            for site_id in &["ABC", "PSE", "XYZ"] {
+                                rows.push(format!(
+                                    "('2026-{:02}-{:02}T00:00:00.000', '{}', '2026{:02}', '{}', {})",
+                                    month, day, equipment_type, month, site_id, 10
+                                ));
+                            }
+                        }
+                    }
+                }
+                for chunk in rows.chunks(300) {
+                    service
+                        .exec_query(&format!(
+                            "INSERT INTO pa.rollup (date_code, equipment_type, month_code, \
+                             site_id, hours) VALUES {}",
+                            chunk.join(", ")
+                        ))
+                        .await?
+                        .collect()
+                        .await?;
+                }
+                // Rows reachable only through the first of several scanned partitions is what
+                // the regression is about, so wait for the data to be split across partitions
+                // and fail loudly rather than silently testing a single-partition scan.
+                let mut scanned_partitions = TableValue::Int(0);
+                for _ in 0..1200 {
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                    let partitions = service
+                        .exec_query(
+                            "SELECT count(*) FROM system.partitions \
+                             WHERE active = true AND main_table_row_count > 0",
+                        )
+                        .await?
+                        .collect()
+                        .await?;
+                    scanned_partitions = partitions.get_rows()[0].values()[0].clone();
+                    if scanned_partitions > TableValue::Int(1) {
+                        break;
+                    }
+                }
+                assert!(
+                    scanned_partitions > TableValue::Int(1),
+                    "the scan must span several partitions, got {:?}",
+                    scanned_partitions
+                );
+
+                // The last month of the range, so the matching rows sit in the last partition
+                // the scan visits and never in the first one -- reading only the first partition
+                // has to show up as a missing row rather than by chance returning the right one.
+                let single_value = service
+                    .exec_query(
+                        "SELECT site_id, CAST(month_code AS INT) mc, sum(hours) v FROM pa.rollup \
+                         WHERE (equipment_type = 'QC') AND (CAST(month_code AS INT) = '202612') \
+                         AND (site_id = 'PSE') GROUP BY 1, 2",
+                    )
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    single_value.get_rows(),
+                    &vec![Row::new(vec![
+                        TableValue::String("PSE".to_string()),
+                        TableValue::Int(202612),
+                        TableValue::Int(80)
+                    ])]
+                );
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
 }
 
 impl SqlServiceImpl {

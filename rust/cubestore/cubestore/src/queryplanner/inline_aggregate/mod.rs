@@ -9,7 +9,7 @@ pub use sorted_group_values_rows::SortedGroupValuesRows;
 use datafusion::arrow::datatypes::{DataType, SchemaRef};
 use datafusion::common::stats::Precision;
 use datafusion::common::Statistics;
-use datafusion::error::Result as DFResult;
+use datafusion::error::{DataFusionError, Result as DFResult};
 use datafusion::execution::TaskContext;
 use datafusion::physical_expr::aggregate::AggregateFunctionExpr;
 use datafusion::physical_expr::{Distribution, LexRequirement};
@@ -22,7 +22,7 @@ use datafusion::physical_plan::{
     SendableRecordBatchStream,
 };
 use std::any::Any;
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -31,7 +31,7 @@ pub enum InlineAggregateMode {
     Final,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct InlineAggregateExec {
     mode: InlineAggregateMode,
     /// Group by expressions
@@ -55,6 +55,29 @@ pub struct InlineAggregateExec {
     pub input_schema: SchemaRef,
     cache: PlanProperties,
     required_input_ordering: Vec<Option<LexRequirement>>,
+    /// The aggregate this node replaced. Kept so that swapping the input can be delegated to it:
+    /// DataFusion recomputes the plan properties there and preserves the output schema, which it
+    /// derives from aggregate expression names that its own rules are free to rewrite.
+    source: Arc<AggregateExec>,
+}
+
+/// Skips [InlineAggregateExec::source]: it carries a copy of the same input subtree the node
+/// already prints, so deriving would double the output of every nested aggregate.
+impl Debug for InlineAggregateExec {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InlineAggregateExec")
+            .field("mode", &self.mode)
+            .field("group_by", &self.group_by)
+            .field("aggr_expr", &self.aggr_expr)
+            .field("filter_expr", &self.filter_expr)
+            .field("limit", &self.limit)
+            .field("input", &self.input)
+            .field("schema", &self.schema)
+            .field("input_schema", &self.input_schema)
+            .field("cache", &self.cache)
+            .field("required_input_ordering", &self.required_input_ordering)
+            .finish_non_exhaustive()
+    }
 }
 
 impl InlineAggregateExec {
@@ -101,6 +124,7 @@ impl InlineAggregateExec {
             input_schema,
             cache,
             required_input_ordering,
+            source: Arc::new(aggregate.clone()),
         })
     }
 
@@ -192,19 +216,37 @@ impl ExecutionPlan for InlineAggregateExec {
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        let result = Self {
-            mode: self.mode,
-            group_by: self.group_by.clone(),
-            aggr_expr: self.aggr_expr.clone(),
-            filter_expr: self.filter_expr.clone(),
-            limit: self.limit.clone(),
-            input: children[0].clone(),
-            schema: self.schema.clone(),
-            input_schema: self.input_schema.clone(),
-            cache: self.cache.clone(),
-            required_input_ordering: self.required_input_ordering.clone(),
+        // Swapping the input is delegated to the aggregate this node was built from, so that
+        // DataFusion recomputes the plan properties -- output partitioning above all. Carrying
+        // them over leaves a stale partition count, and the parent then executes only that many
+        // of the input's partitions and silently drops the rows of the rest.
+        let rebuilt = Arc::clone(&self.source).with_new_children(children)?;
+        let Some(aggregate) = rebuilt.as_any().downcast_ref::<AggregateExec>() else {
+            return Err(DataFusionError::Internal(format!(
+                "AggregateExec::with_new_children returned {}",
+                rebuilt.name()
+            )));
         };
-        Ok(Arc::new(result))
+
+        // The streaming implementation is only valid while the new input stays sorted on the
+        // group keys; if it no longer is, keep the plain hash aggregate. The limit stays behind
+        // with it: here it counts complete groups off a sorted input, while a hash aggregate
+        // reads it as a cap on distinct groups and would stop mid-way through arbitrary ones.
+        // Dropping it only costs the early exit.
+        Ok(match Self::try_new_from_aggregate(aggregate) {
+            Some(inline) => Arc::new(inline.with_limit(self.limit)),
+            None => {
+                // No pass in the pipeline is known to de-sort an inline aggregate's input, and a
+                // parent merge built around the old ordering would not notice the switch, so say
+                // it out loud rather than degrade quietly.
+                log::warn!(
+                    "Input of an inline {:?} aggregate is no longer sorted on the group keys, \
+                     falling back to a hash aggregate",
+                    self.mode
+                );
+                Arc::new(aggregate.clone().with_limit(None))
+            }
+        })
     }
 
     fn execute(
