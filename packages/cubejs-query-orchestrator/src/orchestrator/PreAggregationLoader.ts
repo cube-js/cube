@@ -20,6 +20,7 @@ import {
   getStructureVersion,
   InvalidationKeys,
   LoadPreAggregationResult,
+  PreAggregationBuildStatus,
   PreAggregations,
   PreAggregationTableToTempTable,
   tablesToVersionEntries,
@@ -131,6 +132,11 @@ export class PreAggregationLoader {
   public async loadPreAggregation(
     throwOnMissingPartition: boolean,
   ): Promise<null | LoadPreAggregationResult> {
+    if (this.isJob && this.externalRefresh) {
+      // eslint-disable-next-line no-use-before-define
+      throw new Error(PreAggregations.buildJobsNotAllowedMessage());
+    }
+
     const notLoadedKey = (this.preAggregation.invalidateKeyQueries || [])
       .find(keyQuery => !this.loadCache.hasKeyQueryResult(keyQuery));
 
@@ -486,14 +492,26 @@ export class PreAggregationLoader {
 
     return cancelCombinator(
       async saveCancelFn => {
+        await this.reportBuildStatus(targetTableName, {
+          status: 'building',
+          startedAt: new Date().getTime(),
+        });
+
         try {
-          return await refreshStrategy.bind(this)(
+          const result = await refreshStrategy.bind(this)(
             client,
             newVersionEntry,
             saveCancelFn,
             invalidationKeys
           );
-        } catch (e) {
+          await this.reportBuildStatus(targetTableName, { status: 'done' });
+          return result;
+        } catch (e: any) {
+          await this.reportBuildStatus(targetTableName, {
+            status: 'failure',
+            error: (e.message || e).toString(),
+          });
+
           // It's required to remove touch keys, because they are unique per run/table, and it causes
           // a large number of touch keys in the cache store
           try {
@@ -518,6 +536,26 @@ export class PreAggregationLoader {
         }
       }
     );
+  }
+
+  /**
+   * Persists the build outcome so the jobs API can tell a finished build from a
+   * versioned table that merely exists. Only build jobs are tracked: nothing
+   * else reads these records and every build would otherwise write to the cache
+   * store on every refresh.
+   */
+  private async reportBuildStatus(targetTableName: string, status: PreAggregationBuildStatus): Promise<void> {
+    if (!this.isJob) {
+      return;
+    }
+
+    try {
+      await this.preAggregations.setPreAggregationBuildStatus(targetTableName, status);
+    } catch (e: any) {
+      this.logger('Error on saving pre-aggregation build status', {
+        error: (e.stack || e), preAggregation: this.preAggregation, requestId: this.requestId,
+      });
+    }
   }
 
   protected logExecutingSql(payload) {
@@ -941,6 +979,9 @@ export class PreAggregationLoader {
   ) {
     const externalDriver: DriverInterface = await this.externalDriverFactory();
     const table = this.targetTableName(newVersionEntry);
+    // A table that is already there was built by someone else, so a failure
+    // here says nothing about it and it must be left alone
+    const preExistingTable = await this.externalTableExists(externalDriver, table);
 
     this.logger('Uploading external pre-aggregation', queryOptions);
     await saveCancelFn(
@@ -957,17 +998,45 @@ export class PreAggregationLoader {
           sealAt: this.preAggregation.sealAt
         }
       )
-    ).catch((error: any) => {
+    ).catch(async (error: any) => {
       this.logger('Uploading external pre-aggregation error', {
         ...queryOptions,
         error: error?.stack || error?.message
       });
+      // A half-built table is the newest version of the partition, so it shadows
+      // the previous correct one and orphaned tables cleanup always keeps it.
+      if (!preExistingTable) {
+        await this.dropPartiallyBuiltTable(externalDriver, table, queryOptions);
+      }
       throw error;
     });
     this.logger('Uploading external pre-aggregation completed', queryOptions);
 
     await this.loadCache.fetchTables(this.preAggregation);
     await this.dropOrphanedTables(externalDriver, table, saveCancelFn, true, queryOptions);
+  }
+
+  private async externalTableExists(driver: DriverInterface, table: string): Promise<boolean> {
+    const actualTables = await driver.getTablesQuery(this.preAggregation.preAggregationsSchema);
+
+    return actualTables
+      .map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`)
+      .includes(table);
+  }
+
+  private async dropPartiallyBuiltTable(driver: DriverInterface, table: string, queryOptions: QueryOptions) {
+    this.logger('Dropping partially built external pre-aggregation', queryOptions);
+
+    try {
+      // Dropped without looking it up first: a table listing can be stale, and
+      // losing the drop is much worse than dropping a table that was never created
+      await driver.dropTable(table);
+    } catch (e: any) {
+      this.logger('Dropping partially built external pre-aggregation error', {
+        ...queryOptions,
+        error: e?.stack || e?.message
+      });
+    }
   }
 
   protected async createIndexes(driver: DriverInterface, newVersionEntry: VersionEntry, saveCancelFn: SaveCancelFn, queryOptions: QueryOptions) {

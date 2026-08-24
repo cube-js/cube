@@ -139,6 +139,26 @@ type PreAggJob = {
   dataSource: string,
 };
 
+/**
+ * Outcome of a build for a particular versioned partition table. Tracked
+ * separately from the table itself: the versioned table becomes visible to
+ * `getTablesQuery` as soon as it is created, which is long before the rows
+ * are imported into it.
+ */
+export type PreAggregationBuildStatus = {
+  status: 'building' | 'done' | 'failure',
+  error?: string,
+  startedAt?: number,
+};
+
+const PRE_AGG_BUILD_STATUS_PERSIST_TIME = 86400;
+
+/**
+ * How much longer than the queue execution timeout a build is still believed
+ * to be running. The slack covers the queue writing the timeout failure down.
+ */
+const ABANDONED_BUILD_TIMEOUT_FACTOR = 2;
+
 export type LoadPreAggregationResult = {
   targetTableName: string;
   refreshKeyValues: any[];
@@ -338,6 +358,39 @@ export class PreAggregations {
     return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_REFRESH_END_REACHED', '');
   }
 
+  protected preAggBuildStatusRedisKey(tableName: string): string {
+    // TODO add dataSource?
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_BUILD_STATUS', tableName);
+  }
+
+  public async setPreAggregationBuildStatus(tableName: string, status: PreAggregationBuildStatus): Promise<void> {
+    await this.queryCache.getCacheDriver().set(
+      this.preAggBuildStatusRedisKey(tableName),
+      status,
+      PRE_AGG_BUILD_STATUS_PERSIST_TIME
+    );
+  }
+
+  public async getPreAggregationBuildStatus(tableName: string): Promise<PreAggregationBuildStatus | null> {
+    return await this.queryCache.getCacheDriver().get(this.preAggBuildStatusRedisKey(tableName)) || null;
+  }
+
+  /**
+   * The queue times a build out on its own and records the failure, so a build
+   * that is still marked as running long past that timeout is one whose process
+   * is gone and will never report an outcome.
+   */
+  private async isBuildAbandoned(dataSource: string, buildStatus: PreAggregationBuildStatus): Promise<boolean> {
+    if (!buildStatus.startedAt) {
+      return false;
+    }
+
+    const { executionTimeout } = await this.options.queueOptions(dataSource);
+    const limit = (executionTimeout || getEnv('dbQueryTimeout')) * 1000 * ABANDONED_BUILD_TIMEOUT_FACTOR;
+
+    return new Date().getTime() - buildStatus.startedAt > limit;
+  }
+
   public async addTableUsed(tableName: string): Promise<void> {
     if (this.usedCache.has(tableName)) {
       return;
@@ -472,23 +525,38 @@ export class PreAggregations {
     const result = await conn.getResult(key);
     this.queue[dataSource].getQueueDriver().release(conn);
 
-    // calculating status
+    // fetching the build outcome. The queue result is readable only once, so
+    // the persisted build status is the durable source of truth here.
+    const buildStatus = await this.getPreAggregationBuildStatus(table);
+
+    // calculating status. A build that is known to be running or to have failed
+    // wins over the existence of the versioned table: the table is created
+    // before the rows are imported into it and it is left behind when the
+    // import fails or is killed. Without such a record the table is all we
+    // have, which is also the only thing to go by when the partition was
+    // already up to date and no build was run for it at all.
     let status: string;
-    if (tables.length === 1) {
+    if (buildStatus?.status === 'failure') {
+      status = `failure: ${buildStatus.error}`;
+    } else if (result?.error) {
+      status = `failure: ${result.error}`;
+    } else if (buildStatus?.status === 'building') {
+      status = await this.isBuildAbandoned(dataSource, buildStatus)
+        ? 'failure: the build has not completed'
+        : 'processing';
+    } else if (tables.length === 1) {
       status = 'done';
     } else {
-      status = result?.error
-        ? `failure: ${result.error}`
-        : 'missing_partition';
+      status = 'missing_partition';
     }
 
     // updating jobs cache if needed
-    if (result) {
-      const preAggJob: PreAggJob = await this
-        .queryCache
-        .getCacheDriver()
-        .get(`PRE_AGG_JOB_${token}`);
+    const preAggJob: PreAggJob = await this
+      .queryCache
+      .getCacheDriver()
+      .get(`PRE_AGG_JOB_${token}`);
 
+    if (preAggJob) {
       await this
         .queryCache
         .getCacheDriver()
@@ -706,7 +774,7 @@ export class PreAggregations {
           () => this.driverFactory(dataSource, true),
           (client, q) => {
             const {
-              preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId, invalidationKeys, buildRangeEnd
+              preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId, invalidationKeys, buildRangeEnd, isJob
             } = q;
             const loader = new PreAggregationLoader(
               () => this.driverFactory(dataSource, true),
@@ -724,7 +792,7 @@ export class PreAggregations {
                   dataSource,
                 },
               ),
-              { requestId, externalRefresh: this.externalRefresh, buildRangeEnd }
+              { requestId, externalRefresh: this.externalRefresh, buildRangeEnd, isJob }
             );
             return loader.refresh(newVersionEntry, invalidationKeys, client);
           },
@@ -809,6 +877,12 @@ export class PreAggregations {
       'Please make sure your refresh worker is configured correctly, running, pre-aggregation tables are built and ' +
       'all pre-aggregation refresh settings like timezone match. ' +
       `Expected table name patterns: ${expectedTableNames.join(', ')}`;
+  }
+
+  public static buildJobsNotAllowedMessage(): string {
+    return 'This instance isn\'t set up to build pre-aggregations, so it can\'t run a pre-aggregation build job. ' +
+      'Please post build jobs to an instance running a refresh worker, or set ' +
+      'CUBEJS_PRE_AGGREGATIONS_BUILDER=true for this instance.';
   }
 
   public static structureVersion(preAggregation) {
