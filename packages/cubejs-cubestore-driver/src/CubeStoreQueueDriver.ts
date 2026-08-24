@@ -35,8 +35,9 @@ function hashQueryKey(queryKey: QueryKey, processUid?: string): QueryKeyHash {
 
 type CubeStoreListResponse = {
   id: unknown,
+  // Returned by every LIST-shaped queue command since Cube Store v0.34.11
   // eslint-disable-next-line camelcase
-  queue_id?: string
+  queue_id: string
   status: string
 };
 
@@ -191,7 +192,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     ]);
     return rows.map((row) => [
       row.id as QueryKeyHash,
-      row.queue_id ? parseInt(row.queue_id, 10) : null,
+      parseInt(row.queue_id, 10),
     ]);
   }
 
@@ -201,7 +202,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     ]);
     return rows.map((row) => [
       row.id as QueryKeyHash,
-      row.queue_id ? parseInt(row.queue_id, 10) : null,
+      parseInt(row.queue_id, 10),
     ]);
   }
 
@@ -217,12 +218,12 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
         if (row.status === 'active') {
           active.push([
             row.id as QueryKeyHash,
-            row.queue_id ? parseInt(row.queue_id, 10) : null,
+            parseInt(row.queue_id, 10),
           ]);
         } else {
           toProcess.push([
             row.id as QueryKeyHash,
-            row.queue_id ? parseInt(row.queue_id, 10) : null,
+            parseInt(row.queue_id, 10),
           ]);
         }
       }
@@ -232,17 +233,6 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
       active,
       toProcess,
     ];
-  }
-
-  public async getNextProcessingId(): Promise<number | string> {
-    const rows = await this.driver.query('CACHE INCR ?', [
-      `${this.options.redisQueuePrefix}:PROCESSING_COUNTER`
-    ]);
-    if (rows && rows.length) {
-      return rows[0].value;
-    }
-
-    throw new Error('Unable to get next processing id');
   }
 
   public async getQueryStageState(onlyKeys: boolean): Promise<QueryStageStateResponse> {
@@ -294,7 +284,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     ]);
     return rows.map((row) => [
       row.id as QueryKeyHash,
-      row.queue_id ? parseInt(row.queue_id, 10) : null,
+      parseInt(row.queue_id, 10),
     ]);
   }
 
@@ -305,7 +295,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     ]);
     return rows.map((row) => [
       row.id as QueryKeyHash,
-      row.queue_id ? parseInt(row.queue_id, 10) : null,
+      parseInt(row.queue_id, 10),
     ]);
   }
 
@@ -317,7 +307,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     ]);
     return rows.map((row) => [
       row.id as QueryKeyHash,
-      row.queue_id ? parseInt(row.queue_id, 10) : null,
+      parseInt(row.queue_id, 10),
     ]);
   }
 

@@ -1,14 +1,14 @@
 export type QueryDef = any;
 // Primary key of Queue item
 export type QueueId = string | number | bigint;
-// This was used as a lock for Redis, deprecated.
+// The lock token of a retrieval, always the item's queueId. Only the memory driver compares it.
 export type ProcessingId = string | number | bigint;
 export type QueryKey = (string | [string, any[]]) & {
   persistent?: true,
 };
 export type QueryKeyHash = string & { __type: 'QueryKeyHash' };
 
-export type QueryKeysTuple = [keyHash: QueryKeyHash, queueId: QueueId | null /** Supported by new Cube Store and Memory */];
+export type QueryKeysTuple = [keyHash: QueryKeyHash, queueId: QueueId];
 export type GetActiveAndToProcessResponse = [active: QueryKeysTuple[], toProcess: QueryKeysTuple[]];
 export type QueryStageStateResponse = [active: string[], toProcess: string[]] | [active: string[], toProcess: string[], defs: Record<string, QueryDef>];
 export type RetrieveForProcessingSuccess = [
@@ -106,7 +106,6 @@ export interface QueueDriverConnectionInterface {
   getStalledQueries(): Promise<QueryKeysTuple[]>;
   getQueryStageState(onlyKeys: boolean): Promise<QueryStageStateResponse>;
   updateHeartBeat(hash: QueryKeyHash, queueId: QueueId | null): Promise<void>;
-  getNextProcessingId(): Promise<ProcessingId>;
   // Trying to acquire a lock for processing a queue item, this method can return null when
   // multiple nodes tries to process the same query
   retrieveForProcessing(hash: QueryKeyHash, processingId: ProcessingId): Promise<RetrieveForProcessingResponse>;

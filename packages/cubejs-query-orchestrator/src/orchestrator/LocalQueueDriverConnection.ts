@@ -42,10 +42,6 @@ export interface PromiseWithResolve<T = any> extends Promise<T> {
   resolved?: boolean;
 }
 
-export interface ProcessingCounter {
-  counter: number;
-}
-
 export class LocalQueueDriverConnectionState {
   public resultPromises: Record<QueryKeyHash, PromiseWithResolve> = {};
 
@@ -58,8 +54,6 @@ export class LocalQueueDriverConnectionState {
   public active: Record<QueryKeyHash, QueueItem> = {};
 
   public heartBeat: Record<QueryKeyHash, QueueItem> = {};
-
-  public processingCounter: ProcessingCounter = { counter: 1 };
 
   public processingLocks: Record<QueryKeyHash, any> = {};
 }
@@ -261,11 +255,6 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     return true;
   }
 
-  public async getNextProcessingId(): Promise<ProcessingId> {
-    this.state.processingCounter.counter += 1;
-    return this.state.processingCounter.counter;
-  }
-
   public async getOrphanedQueries(): Promise<QueryKeysTuple[]> {
     return this.queueArrayAsTuple(this.state.recent, new Date().getTime());
   }
@@ -301,17 +290,17 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     let added = 0;
 
     if (Object.keys(this.state.active).length < this.concurrency && !this.state.active[queryKeyHash]) {
-      this.state.active[queryKeyHash] = { key: queryKeyHash, order: Number(processingId), queueId: Number(processingId) };
+      this.state.active[queryKeyHash] = { key: queryKeyHash, order: Number(processingId), queueId: processingId };
       delete this.state.toProcess[queryKeyHash];
 
       added = 1;
     }
 
-    this.state.heartBeat[queryKeyHash] = { key: queryKeyHash, order: new Date().getTime(), queueId: Number(processingId) };
+    this.state.heartBeat[queryKeyHash] = { key: queryKeyHash, order: new Date().getTime(), queueId: processingId };
 
     return [
       added,
-      this.state.queryDef[queryKeyHash]?.queueId || null,
+      this.state.queryDef[queryKeyHash]?.queueId ?? null,
       this.queueArray(this.state.active) as QueryKeyHash[],
       Object.keys(this.state.toProcess).length,
       this.state.queryDef[queryKeyHash],

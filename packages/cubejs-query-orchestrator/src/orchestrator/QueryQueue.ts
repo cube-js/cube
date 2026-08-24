@@ -185,7 +185,8 @@ export class QueryQueue {
     return stream;
   }
 
-  protected counter = 0;
+  // Zero is falsy, and a queueId is still checked for truthiness in a few places
+  protected counter = 1;
 
   public generateQueueId() {
     return this.counter++;
@@ -602,7 +603,7 @@ export class QueryQueue {
         const [queryDef] = await queueConnection.getQueryAndRemove(queryKey, queueId);
         if (queryDef) {
           this.logger('Removing orphaned query', {
-            queueId: queueId || queryDef.queueId /** Special handling for Redis */,
+            queueId,
             queryKey: queryDef.queryKey,
             queuePrefix: this.redisQueuePrefix,
             requestId: queryDef.requestId,
@@ -792,7 +793,7 @@ export class QueryQueue {
   /**
    * Retrieves the query specified by the `queryKeyHashed` and hands it over for execution.
    */
-  protected async processQuery(queryKeyHashed: QueryKeyHash, queueId: QueueId | null): Promise<void> {
+  protected async processQuery(queryKeyHashed: QueryKeyHash, queueId: QueueId): Promise<void> {
     const retrieved = await this.retrieveQueryForProcessing(queryKeyHashed, queueId);
     if (!retrieved) {
       return;
@@ -820,7 +821,7 @@ export class QueryQueue {
    * the active set. Returns `null` when the retrieval didn't succeed, which means another node is
    * already running the query or the concurrency budget is full.
    */
-  protected async retrieveQueryForProcessing(queryKeyHashed: QueryKeyHash, queueId: QueueId | null): Promise<RetrievedQuery | null> {
+  protected async retrieveQueryForProcessing(queryKeyHashed: QueryKeyHash, queueId: QueueId): Promise<RetrievedQuery | null> {
     const queueConnection = await this.queueDriver.createConnection();
 
     let insertedCount;
@@ -830,7 +831,9 @@ export class QueryQueue {
     let processingLockAcquired;
 
     try {
-      const processingId = queueId || /** for Redis only */ await queueConnection.getNextProcessingId();
+      // The lock token, taken before the retrieval can replace queueId below. Every call that
+      // releases the lock has to be handed the same value retrieveForProcessing got.
+      const processingId = queueId;
       const retrieveResult = await queueConnection.retrieveForProcessing(queryKeyHashed, processingId);
 
       if (retrieveResult) {
