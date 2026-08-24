@@ -1371,27 +1371,32 @@ fn env_bool(name: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
-/// Lenient boolean env read for toggles: recognizes the usual spellings in either case and falls
-/// back to `default` with a warning on anything else. Unlike [`env_bool`] it never panics -- a
-/// malformed value on a performance flag must not take a node down on startup, and for a flag that
-/// is on by default the value an operator writes to turn it off is the one path that must work.
+/// Recognizes the usual boolean spellings in either case; `None` for anything else, including an
+/// empty value.
+fn parse_flag(value: &str) -> Option<bool> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Some(true),
+        "0" | "false" | "no" | "off" => Some(false),
+        _ => None,
+    }
+}
+
+/// Lenient boolean env read for toggles: falls back to `default` with a warning on a value
+/// [`parse_flag`] does not recognize. Unlike [`env_bool`] it never panics -- a malformed value on a
+/// performance flag must not take a node down on startup, and for a flag that is on by default the
+/// value an operator writes to turn it off is the one path that must work.
 fn env_flag(name: &str, default: bool) -> bool {
     match env::var(name) {
         Err(_) => default,
-        Ok(v) => match v.trim().to_ascii_lowercase().as_str() {
-            "" => default,
-            "1" | "true" | "yes" | "on" => true,
-            "0" | "false" | "no" | "off" => false,
-            other => {
-                log::warn!(
-                    "Ignoring {} value '{}', using default ({})",
-                    name,
-                    other,
-                    default
-                );
+        Ok(v) => parse_flag(&v).unwrap_or_else(|| {
+            log::warn!(
+                "Ignoring {} value '{}', using default ({})",
+                name,
+                v,
                 default
-            }
-        },
+            );
+            default
+        }),
     }
 }
 
@@ -3079,5 +3084,20 @@ mod tests {
             RepartitionStrategy::Range
         );
         assert!("nonsense".parse::<RepartitionStrategy>().is_err());
+    }
+
+    #[test]
+    fn parse_flag_spellings() {
+        for on in ["1", "true", "TRUE", "True", "yes", "on", " on "] {
+            assert_eq!(parse_flag(on), Some(true), "{}", on);
+        }
+        for off in ["0", "false", "FALSE", "no", "off", " off "] {
+            assert_eq!(parse_flag(off), Some(false), "{}", off);
+        }
+        // Unrecognized values leave the caller on its default rather than silently reading as off,
+        // which for an on-by-default toggle would turn it off behind the operator's back.
+        for unknown in ["", "  ", "enabled", "2", "-1", "nonsense"] {
+            assert_eq!(parse_flag(unknown), None, "{}", unknown);
+        }
     }
 }

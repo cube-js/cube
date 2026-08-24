@@ -580,9 +580,12 @@ impl QueryExecutorImpl {
         data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<Arc<SessionContext>, CubeError> {
         // A sender that does not send the flags planned from its own configuration, and this
-        // node's configuration reproduces it as long as the value is unset (both binaries default
-        // to the same one) or set on every node. A value set on the router alone is the one case
-        // it cannot reproduce, so keep such a value set cluster-wide until every node sends flags.
+        // node's configuration reproduces it when the value is set on every node, or when it is
+        // unset and both binaries default to the same one. The defaults changed once since the
+        // flags were introduced, so an upgrade that reaches this binary from one older than the
+        // flags -- skipping the release that introduced them -- must pin CUBESTORE_TOPK_STRATEGY
+        // and CUBESTORE_GROUP_BY_LIMIT_FACTOR cluster-wide for the duration, or the two halves of
+        // a split plan get planned from different values and the query returns wrong rows.
         let planning_flags = worker_planning_params
             .flags
             .unwrap_or_else(|| PlanningFlags::from_config(self.config.as_ref()));

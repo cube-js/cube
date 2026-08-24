@@ -3469,15 +3469,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn topk_full_merge() -> Result<(), CubeError> {
-        // The full-merge strategy replaces the streaming top-k node with a router-side
-        // re-aggregation + fetch-limited sort. Exercise it end-to-end (UNION -> multi-partition
-        // ClusterSend, which is what required the explicit CoalescePartitions fan-in) and check it
-        // returns the same top-k as the default streaming merge across Sum/Min/Max, both directions,
-        // and HAVING.
-        Config::test("topk_full_merge")
+    async fn topk_streaming_merge() -> Result<(), CubeError> {
+        // The streaming strategy keeps the per-row top-k node instead of the default router-side
+        // re-aggregation + fetch-limited sort, and is what an operator falls back to. Exercise it
+        // end-to-end (UNION -> multi-partition ClusterSend, which is what required the explicit
+        // CoalescePartitions fan-in) and check it returns the same top-k as the default full merge
+        // across Sum/Min/Max, both directions, and HAVING.
+        Config::test("topk_streaming_merge")
             .update_config(|mut c| {
-                c.topk_aggregate_strategy = crate::config::TopKAggregateStrategy::FullMerge;
+                c.topk_aggregate_strategy = crate::config::TopKAggregateStrategy::Streaming;
                 c
             })
             .start_test(async move |services| {
@@ -4040,16 +4040,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn repartition_concurrent_download_keeps_data_consistent() -> Result<(), CubeError> {
-        // PerPartition merge with concurrent chunk download enabled must drain and keep
-        // data consistent end-to-end (real concurrent downloads in the merge group build).
-        Config::test("repartition_concurrent_download_keeps_data_consistent")
+    async fn repartition_sequential_download_keeps_data_consistent() -> Result<(), CubeError> {
+        // Concurrent chunk download is the default, so this covers the fallback: a PerPartition
+        // merge downloading its group one chunk at a time must drain and keep data consistent
+        // end-to-end.
+        Config::test("repartition_sequential_download_keeps_data_consistent")
             .update_config(|mut c| {
                 c.partition_split_threshold = 20;
                 c.compaction_chunks_count_threshold = 10;
                 c.repartition_strategy = crate::config::RepartitionStrategy::PerPartition;
                 c.repartition_merge_max_input_files = 4;
-                c.repartition_concurrent_download = true;
+                c.repartition_concurrent_download = false;
                 c
             })
             .start_test(async move |services| {
@@ -6615,6 +6616,10 @@ mod tests {
 
     #[tokio::test]
     async fn worker_sort_and_limit_cluster() -> Result<(), CubeError> {
+        // The workers run the group-by-limit trim with `group_by_limit_per_partition` off, the
+        // non-default "over merge" shape: one hash table per worker over the coalesced input.
+        // Both shapes must return the same rows, and the default one is what the rest of the
+        // suite runs.
         Config::test("worker_sort_limit_router")
             .update_config(|mut config| {
                 config.select_workers = vec![
@@ -6623,6 +6628,7 @@ mod tests {
                 ];
                 config.metastore_bind_address = Some("127.0.0.1:25106".to_string());
                 config.compaction_chunks_count_threshold = 0;
+                config.group_by_limit_per_partition = false;
                 config
             })
             .start_test(async move |services| {
@@ -6642,6 +6648,7 @@ mod tests {
                             ),
                         };
                         config.compaction_chunks_count_threshold = 0;
+                        config.group_by_limit_per_partition = false;
                         config
                     })
                     .start_test_worker(async move |_| {
@@ -6660,6 +6667,7 @@ mod tests {
                                     ),
                                 };
                                 config.compaction_chunks_count_threshold = 0;
+                                config.group_by_limit_per_partition = false;
                                 config
                             })
                             .start_test_worker(async move |_| {
