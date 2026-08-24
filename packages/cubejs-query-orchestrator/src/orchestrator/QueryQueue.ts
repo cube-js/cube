@@ -831,20 +831,13 @@ export class QueryQueue {
     let processingLockAcquired;
 
     try {
-      // The lock token, taken before the retrieval can replace queueId below. Every call that
-      // releases the lock has to be handed the same value retrieveForProcessing got.
+      // The lock token is the queueId, every call which releases the lock has to be handed
+      // the same value retrieveForProcessing got
       const processingId = queueId;
+
       const retrieveResult = await queueConnection.retrieveForProcessing(queryKeyHashed, processingId);
-
       if (retrieveResult) {
-        let retrieveQueueId;
-
-        [insertedCount, retrieveQueueId, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
-
-        // Backward compatibility for old Cube Store, Redis and Memory
-        if (retrieveQueueId) {
-          queueId = retrieveQueueId;
-        }
+        [insertedCount, , activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
       }
 
       const activated = activeKeys && activeKeys.indexOf(queryKeyHashed) !== -1;
