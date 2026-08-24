@@ -4,7 +4,7 @@ use datafusion::arrow::compute::SortOptions;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::stats::Precision;
 use datafusion::common::Statistics;
-use datafusion::error::Result as DFResult;
+use datafusion::error::{DataFusionError, Result as DFResult};
 use datafusion::execution::TaskContext;
 use datafusion::physical_expr::aggregate::AggregateFunctionExpr;
 use datafusion::physical_expr::{Distribution, LexRequirement};
@@ -16,7 +16,7 @@ use datafusion::physical_plan::{
     PlanProperties, SendableRecordBatchStream,
 };
 use std::any::Any;
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 /// Worker-side partial hash aggregate that trims its output to the top-k groups by a total order,
@@ -32,7 +32,7 @@ use std::sync::Arc;
 /// columns), expressed as `(partial-output column index, sort options)`. A total order is required
 /// for correctness: the same group key can live on multiple workers, and a consistent cut across
 /// workers guarantees every partial state the router selects reaches it.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct GroupByLimitAggregateExec {
     group_by: PhysicalGroupBy,
     aggr_expr: Vec<Arc<AggregateFunctionExpr>>,
@@ -48,6 +48,28 @@ pub struct GroupByLimitAggregateExec {
     factor: usize,
     /// Total order over the partial output columns.
     order: Vec<(usize, SortOptions)>,
+    /// The aggregate this node replaced. Kept so that swapping the input can be delegated to it:
+    /// DataFusion recomputes the plan properties there and preserves the output schema.
+    source: Arc<AggregateExec>,
+}
+
+/// Skips [GroupByLimitAggregateExec::source]: it carries a copy of the same input subtree the node
+/// already prints, so deriving would double the output of every nested aggregate.
+impl Debug for GroupByLimitAggregateExec {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GroupByLimitAggregateExec")
+            .field("group_by", &self.group_by)
+            .field("aggr_expr", &self.aggr_expr)
+            .field("filter_expr", &self.filter_expr)
+            .field("input", &self.input)
+            .field("schema", &self.schema)
+            .field("input_schema", &self.input_schema)
+            .field("cache", &self.cache)
+            .field("k", &self.k)
+            .field("factor", &self.factor)
+            .field("order", &self.order)
+            .finish_non_exhaustive()
+    }
 }
 
 impl GroupByLimitAggregateExec {
@@ -97,6 +119,7 @@ impl GroupByLimitAggregateExec {
             k,
             factor,
             order,
+            source: Arc::new(aggregate.clone()),
         })
     }
 
@@ -177,24 +200,23 @@ impl ExecutionPlan for GroupByLimitAggregateExec {
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        let input = children[0].clone();
-        // Track the (possibly changed) input's partitioning; a partial aggregate preserves it.
-        let cache = self
-            .cache
-            .clone()
-            .with_partitioning(input.output_partitioning().clone());
-        Ok(Arc::new(Self {
-            group_by: self.group_by.clone(),
-            aggr_expr: self.aggr_expr.clone(),
-            filter_expr: self.filter_expr.clone(),
-            input,
-            schema: self.schema.clone(),
-            input_schema: self.input_schema.clone(),
-            cache,
-            k: self.k,
-            factor: self.factor,
-            order: self.order.clone(),
-        }))
+        // Swapping the input is delegated to the aggregate this node was built from, so that
+        // DataFusion recomputes the whole of the plan properties -- output partitioning above all,
+        // a stale count there makes the parent read only some of the input's partitions and
+        // silently drop the rest -- and preserves the output schema.
+        let rebuilt = Arc::clone(&self.source).with_new_children(children)?;
+        let Some(aggregate) = rebuilt.as_any().downcast_ref::<AggregateExec>() else {
+            return Err(DataFusionError::Internal(format!(
+                "AggregateExec::with_new_children returned {}",
+                rebuilt.name()
+            )));
+        };
+        Ok(
+            match Self::try_new_from_partial(aggregate, self.k, self.factor, self.order.clone()) {
+                Some(trimmed) => Arc::new(trimmed),
+                None => rebuilt,
+            },
+        )
     }
 
     fn execute(
