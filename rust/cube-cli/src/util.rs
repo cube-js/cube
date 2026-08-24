@@ -186,6 +186,16 @@ pub fn nonempty_ref(s: &str) -> Result<String, String> {
 /// The reachable case is the same one the two above were written for: a CI script whose
 /// `$STATUS` did not expand, where the run this refuses would otherwise have listed
 /// whatever the server made of an empty field.
+///
+/// Padding is TRIMMED here, where the two above deliberately keep it — see
+/// `branch_or_placeholder` for why they must. The difference is what the value is: a
+/// branch name is the caller's own, `--branch '  x  '` can name a branch that really
+/// exists, and only the caller knows. A filter is one word out of a vocabulary the
+/// server publishes, and no member of it has a space in it — so padding cannot be
+/// meaningful, and passing it on lands in the very failure this argument's help text
+/// was written to prevent: an empty table that reads as an answer rather than as a
+/// value nothing could match. `$(jq -r …)` and a value read out of a file are the
+/// ordinary ways to acquire it.
 pub fn nonempty_filter(s: &str) -> Result<String, String> {
     if s.trim().is_empty() {
         return Err(format!(
@@ -194,7 +204,7 @@ pub fn nonempty_filter(s: &str) -> Result<String, String> {
         ));
     }
 
-    Ok(s.to_string())
+    Ok(s.trim().to_string())
 }
 
 /// A branch name to PRINT, when the payload might not have carried one.
@@ -544,9 +554,16 @@ mod tests {
         assert!(nonempty_ref("main").is_ok());
         assert!(nonempty_ref("").is_err());
         assert!(nonempty_ref("\t").is_err());
-        assert!(nonempty_filter("FAILED").is_ok());
+        assert_eq!(nonempty_filter("FAILED").unwrap(), "FAILED");
         assert!(nonempty_filter("").is_err());
         assert!(nonempty_filter("  ").is_err());
+        // A filter is trimmed and a branch name is not, and the divergence is the point:
+        // no value in the server's filter vocabulary has a space in it, so ` FAILED`
+        // could only ever match nothing — while `--branch '  x  '` can name a branch that
+        // exists, and the messages carrying that name also carry a command addressing it.
+        assert_eq!(nonempty_filter(" FAILED\n").unwrap(), "FAILED");
+        assert_eq!(nonempty("  main  ").unwrap(), "  main  ");
+        assert_eq!(nonempty_ref("  main  ").unwrap(), "  main  ");
         // All three open with the phrase the command-tree walk partitions on, so a guard
         // that ends up on a branch argument is recognised as one wherever it came from.
         for refusal in [nonempty(""), nonempty_ref(""), nonempty_filter("")] {

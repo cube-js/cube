@@ -382,9 +382,10 @@ cube dbt logs DEPLOYMENT_ID SYNC_JOB_ID
 `history` narrows with `--status` (`RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED`,
 `UNKNOWN`) and `--trigger` (`manual`, `api`, `webhook`, `agent`, `unknown`) — both
 case-sensitive as spelled here — and pages with `--first`/`--after`, taking the cursor
-from `pageInfo.endCursor` in `--json` output. A page holds at most 100 runs, so a larger `--first` returns 100 with
-`pageInfo.hasNextPage` set. `logs` takes no paging flags — one sync's timeline is one
-page, and each line carries the phase it belongs to and how long that phase took.
+from `pageInfo.endCursor` in `--json` output. A page holds at most 100 runs, so a
+larger `--first` returns 100 with `pageInfo.hasNextPage` set. `logs` takes no paging
+flags — one sync's timeline is one page, and each line carries the phase it belongs
+to and how long that phase took.
 
 Both need only `SchemaRead`. Durations are the server's own single-clock figure, so
 they never disagree with the run they describe. `--json` carries the rest of each
