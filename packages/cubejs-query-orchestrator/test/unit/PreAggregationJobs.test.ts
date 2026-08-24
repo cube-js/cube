@@ -227,10 +227,10 @@ describe('pre-aggregation build jobs', () => {
     return status;
   };
 
-  // An instance that is configured to never build pre-aggregations must not run
-  // jobs-API builds in-process either.
-  test('jobs-API build honours the externalRefresh guard', async () => {
-    // Sanity check: a regular query on an externalRefresh instance refuses to build.
+  // `externalRefresh` stops a query from building a pre-aggregation as a side
+  // effect. A build job is an explicit request to build, so it runs anyway —
+  // posting jobs to an instance that serves queries only is a supported setup.
+  test('jobs-API build runs on an externalRefresh instance', async () => {
     await expect(
       orchestratorExternalRefresh.fetchQuery({
         query: 'SELECT * FROM stb_pre_aggregations.orders_month',
@@ -244,14 +244,9 @@ describe('pre-aggregation build jobs', () => {
 
     expect(externalMockDriver.tables.length).toEqual(0);
 
-    // The very same instance must refuse a jobs-API build as well.
-    await expect(
-      orchestratorExternalRefresh.fetchQuery(jobQuery('externalRefresh job query') as any)
-    ).rejects.toThrow(/build pre-aggregations/);
+    await orchestratorExternalRefresh.fetchQuery(jobQuery('externalRefresh job query') as any);
 
-    await delay(500);
-
-    expect(externalMockDriver.tables.length).toEqual(0);
+    await waitFor(() => externalMockDriver.indexes.length > 0);
   });
 
   test('completed jobs-API build is reported as done', async () => {
@@ -271,6 +266,37 @@ describe('pre-aggregation build jobs', () => {
     );
 
     expect(status).toEqual('done');
+  });
+
+  // The queue de-duplicates on the query key, so a job regularly ends up
+  // waiting on a build some other request enqueued. That build has to record
+  // its outcome as well, or the job falls back to the bare table again.
+  test('build started by a regular query records its outcome', async () => {
+    externalMockDriver.importBehavior = 'hang';
+
+    orchestrator.fetchQuery({
+      query: 'SELECT * FROM stb_pre_aggregations.orders_month',
+      values: [],
+      cacheKeyQueries: { queries: [] },
+      preAggregations: [PRE_AGGREGATION],
+      requestId: 'regular query build',
+      external: true,
+    } as any).catch(() => undefined);
+
+    await externalMockDriver.importStarted;
+    const [targetTableName] = externalMockDriver.tables;
+
+    const [, status] = await orchestrator.isPartitionExist(
+      'regular query build',
+      true,
+      'default',
+      'stb_pre_aggregations',
+      targetTableName,
+      ['some key'],
+      'test-token',
+    );
+
+    expect(status).toEqual('processing');
   });
 
   // A build that is still importing rows must not be reported as `done` just

@@ -385,7 +385,7 @@ export class PreAggregations {
       return false;
     }
 
-    const { executionTimeout } = await this.options.queueOptions(dataSource);
+    const { executionTimeout } = await this.options.queueOptions?.(dataSource) || {};
     const limit = (executionTimeout || getEnv('dbQueryTimeout')) * 1000 * ABANDONED_BUILD_TIMEOUT_FACTOR;
 
     return new Date().getTime() - buildStatus.startedAt > limit;
@@ -538,14 +538,14 @@ export class PreAggregations {
     let status: string;
     if (buildStatus?.status === 'failure') {
       status = `failure: ${buildStatus.error}`;
-    } else if (result?.error) {
-      status = `failure: ${result.error}`;
     } else if (buildStatus?.status === 'building') {
       status = await this.isBuildAbandoned(dataSource, buildStatus)
         ? 'failure: the build has not completed'
         : 'processing';
     } else if (tables.length === 1) {
       status = 'done';
+    } else if (result?.error) {
+      status = `failure: ${result.error}`;
     } else {
       status = 'missing_partition';
     }
@@ -556,7 +556,9 @@ export class PreAggregations {
       .getCacheDriver()
       .get(`PRE_AGG_JOB_${token}`);
 
-    if (preAggJob) {
+    // clients poll in a loop, so rewriting an unchanged status would both add a
+    // write per token per poll and keep pushing the record's expiry forward
+    if (preAggJob && preAggJob.status !== status) {
       await this
         .queryCache
         .getCacheDriver()
@@ -774,7 +776,7 @@ export class PreAggregations {
           () => this.driverFactory(dataSource, true),
           (client, q) => {
             const {
-              preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId, invalidationKeys, buildRangeEnd, isJob
+              preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId, invalidationKeys, buildRangeEnd
             } = q;
             const loader = new PreAggregationLoader(
               () => this.driverFactory(dataSource, true),
@@ -792,7 +794,7 @@ export class PreAggregations {
                   dataSource,
                 },
               ),
-              { requestId, externalRefresh: this.externalRefresh, buildRangeEnd, isJob }
+              { requestId, externalRefresh: this.externalRefresh, buildRangeEnd }
             );
             return loader.refresh(newVersionEntry, invalidationKeys, client);
           },
@@ -877,12 +879,6 @@ export class PreAggregations {
       'Please make sure your refresh worker is configured correctly, running, pre-aggregation tables are built and ' +
       'all pre-aggregation refresh settings like timezone match. ' +
       `Expected table name patterns: ${expectedTableNames.join(', ')}`;
-  }
-
-  public static buildJobsNotAllowedMessage(): string {
-    return 'This instance isn\'t set up to build pre-aggregations, so it can\'t run a pre-aggregation build job. ' +
-      'Please post build jobs to an instance running a refresh worker, or set ' +
-      'CUBEJS_PRE_AGGREGATIONS_BUILDER=true for this instance.';
   }
 
   public static structureVersion(preAggregation) {

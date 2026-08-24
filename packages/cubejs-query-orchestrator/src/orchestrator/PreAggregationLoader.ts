@@ -132,11 +132,6 @@ export class PreAggregationLoader {
   public async loadPreAggregation(
     throwOnMissingPartition: boolean,
   ): Promise<null | LoadPreAggregationResult> {
-    if (this.isJob && this.externalRefresh) {
-      // eslint-disable-next-line no-use-before-define
-      throw new Error(PreAggregations.buildJobsNotAllowedMessage());
-    }
-
     const notLoadedKey = (this.preAggregation.invalidateKeyQueries || [])
       .find(keyQuery => !this.loadCache.hasKeyQueryResult(keyQuery));
 
@@ -540,15 +535,11 @@ export class PreAggregationLoader {
 
   /**
    * Persists the build outcome so the jobs API can tell a finished build from a
-   * versioned table that merely exists. Only build jobs are tracked: nothing
-   * else reads these records and every build would otherwise write to the cache
-   * store on every refresh.
+   * versioned table that merely exists. Recorded for every build, not just for
+   * the ones a job started: the queue de-duplicates on the query key, so a job
+   * regularly ends up waiting on a build some other request enqueued.
    */
   private async reportBuildStatus(targetTableName: string, status: PreAggregationBuildStatus): Promise<void> {
-    if (!this.isJob) {
-      return;
-    }
-
     try {
       await this.preAggregations.setPreAggregationBuildStatus(targetTableName, status);
     } catch (e: any) {
@@ -979,9 +970,6 @@ export class PreAggregationLoader {
   ) {
     const externalDriver: DriverInterface = await this.externalDriverFactory();
     const table = this.targetTableName(newVersionEntry);
-    // A table that is already there was built by someone else, so a failure
-    // here says nothing about it and it must be left alone
-    const preExistingTable = await this.externalTableExists(externalDriver, table);
 
     this.logger('Uploading external pre-aggregation', queryOptions);
     await saveCancelFn(
@@ -1005,9 +993,7 @@ export class PreAggregationLoader {
       });
       // A half-built table is the newest version of the partition, so it shadows
       // the previous correct one and orphaned tables cleanup always keeps it.
-      if (!preExistingTable) {
-        await this.dropPartiallyBuiltTable(externalDriver, table, queryOptions);
-      }
+      await this.dropPartiallyBuiltTable(externalDriver, table, queryOptions);
       throw error;
     });
     this.logger('Uploading external pre-aggregation completed', queryOptions);
@@ -1016,20 +1002,13 @@ export class PreAggregationLoader {
     await this.dropOrphanedTables(externalDriver, table, saveCancelFn, true, queryOptions);
   }
 
-  private async externalTableExists(driver: DriverInterface, table: string): Promise<boolean> {
-    const actualTables = await driver.getTablesQuery(this.preAggregation.preAggregationsSchema);
-
-    return actualTables
-      .map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`)
-      .includes(table);
-  }
-
   private async dropPartiallyBuiltTable(driver: DriverInterface, table: string, queryOptions: QueryOptions) {
     this.logger('Dropping partially built external pre-aggregation', queryOptions);
 
     try {
-      // Dropped without looking it up first: a table listing can be stale, and
-      // losing the drop is much worse than dropping a table that was never created
+      // Dropped without checking that it is there: `CREATE TABLE` carries no
+      // `IF NOT EXISTS`, so a leftover table fails every later attempt at this
+      // version until it is gone
       await driver.dropTable(table);
     } catch (e: any) {
       this.logger('Dropping partially built external pre-aggregation error', {

@@ -544,14 +544,14 @@ To trigger pre-aggregation builds, send a `POST` request with a payload
 including `post` as the `action` and `selector` properties. The response will
 contain an array of `tokens` (identifiers) of triggered jobs.
 
-<Warning>
+<Note>
 
-Jobs run on the instance that receives the request. If that instance isn't set
-up to build pre-aggregations, the request fails. Send jobs to an instance that
-runs a [refresh worker][ref-refresh-worker], or set
-[`CUBEJS_PRE_AGGREGATIONS_BUILDER`][ref-preaggs-builder] to `true` for it.
+Builds run in the process that receives the request, even on an instance that
+never builds pre-aggregations while serving queries. Restarting that instance
+interrupts any build it is running; such a build is reported as `failure`, so
+re-trigger the job for those partitions.
 
-</Warning>
+</Note>
 
 Example request triggering builds of all pre-aggregations defined in all cubes
 using an empty security context and a `UTC` timezone:
@@ -659,9 +659,9 @@ In the `status` property of the payload, you can get the following statuses:
 | `scheduled` | The job hasn't run yet |
 | `processing` | The job is currently running |
 | `done` | The build has completed and its data has landed in the pre-aggregation storage |
-| `failure: <error>` | The build has failed; the error message is appended to the status |
-| `missing_partition` | No build outcome is known for this partition. Either the job was never picked up, or its record has expired (job records are kept for 24 hours). Trigger the job again |
-| `not_found` | The token is unknown or has expired |
+| `failure: <error>` | The build has failed; the error message is appended to the status. `failure: the build has not completed` means the instance running the build stopped before it finished, for example because it was restarted mid-build |
+| `missing_partition` | No table exists for this partition and no build outcome is recorded for it. Trigger the job again |
+| `not_found` | The token is unknown, or the job record has expired. Job records are kept for 24 hours |
 | `pre_agg_not_found` | The pre-aggregation the job was triggered for is no longer defined in the data model |
 
 <Note>
@@ -1199,6 +1199,4 @@ Keep-Alive: timeout=5
 [ref-time-zone]: /reference/core-data-apis/queries#time-zone
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
 [ref-control-plane-api]: /reference/control-plane-api
-[ref-refresh-worker]: /reference/configuration/environment-variables#cubejs_refresh_worker
-[ref-preaggs-builder]: /reference/configuration/environment-variables#cubejs_pre_aggregations_builder
 [self-metadata-api]: #metadata-api
