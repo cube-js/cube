@@ -41,7 +41,7 @@ type CubeStoreListResponse = {
 };
 
 // cube store convert int64 to string
-type CubeStoreClaimResponse = {
+type CubeStoreRetrieveResponse = {
   id: string,
   active: string | null,
   pending: string,
@@ -67,7 +67,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
 
   /**
    * Below `Interactive` nothing is blocked on the query, and that is the regime where the
-   * queue runs at its concurrency ceiling for minutes, so the claim never succeeds anyway
+   * queue runs at its concurrency ceiling for minutes, so the retrieval never succeeds anyway
    */
   public async useFastTrack(priority: QueuePriority): Promise<boolean> {
     if (this.fastTrackEnabled && priority >= QueuePriority.Interactive) {
@@ -150,15 +150,15 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     }
 
     const command = fastTrack ? 'ADD_AND_RETRIEVE' : 'ADD';
-    const rows = await this.driver.query<CubeStoreClaimResponse & { added: string }>(`QUEUE ${command}${modifiers}${fastTrack ? ' ?' : ''}`, values);
+    const rows = await this.driver.query<CubeStoreRetrieveResponse & { added: string }>(`QUEUE ${command}${modifiers}${fastTrack ? ' ?' : ''}`, values);
     if (rows && rows.length) {
       return [
         rows[0].added === 'true' ? 1 : 0,
         rows[0].id ? parseInt(rows[0].id, 10) : null,
         parseInt(rows[0].pending, 10),
         addedToQueueTime,
-        // An item which already existed is never added twice, but it still can be claimed
-        fastTrack ? this.decodeClaimFromRow(rows[0], 'addToQueue') : null,
+        // An item which already existed is never added twice, but it still can be retrieved
+        fastTrack ? this.decodeRetrievedFromRow(rows[0], 'addToQueue') : null,
       ];
     }
 
@@ -367,7 +367,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
   /**
    * Shared by `QUEUE RETRIEVE` and `QUEUE ADD_AND_RETRIEVE` so that they cannot drift apart.
    */
-  protected decodeClaimFromRow(row: CubeStoreClaimResponse, method: string): RetrieveForProcessingSuccess | null {
+  protected decodeRetrievedFromRow(row: CubeStoreRetrieveResponse, method: string): RetrieveForProcessingSuccess | null {
     if (!row.payload) {
       return null;
     }
@@ -383,12 +383,12 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
   }
 
   public async retrieveForProcessing(hash: QueryKeyHash, _processingId: string): Promise<RetrieveForProcessingResponse> {
-    const rows = await this.driver.query<CubeStoreClaimResponse>('QUEUE RETRIEVE EXTENDED CONCURRENCY ? ?', [
+    const rows = await this.driver.query<CubeStoreRetrieveResponse>('QUEUE RETRIEVE EXTENDED CONCURRENCY ? ?', [
       this.options.concurrency,
       this.prefixKey(hash),
     ]);
     if (rows && rows.length) {
-      return this.decodeClaimFromRow(rows[0], 'retrieveForProcessing') || [
+      return this.decodeRetrievedFromRow(rows[0], 'retrieveForProcessing') || [
         0,
         null,
         this.decodeActiveKeysFromRow(rows[0].active),

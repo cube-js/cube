@@ -70,8 +70,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           readable.pipe(stream);
         });
       },
-      sendProcessMessageFn: async (claimed) => {
-        processMessagePromises.push(queue.executeQuery(claimed));
+      sendProcessMessageFn: async (retrieved) => {
+        processMessagePromises.push(queue.executeQuery(retrieved));
       },
       sendCancelMessageFn: async (query) => {
         processCancelPromises.push(queue.processCancel.bind(queue)(query));
@@ -405,12 +405,12 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       expect(result).toBe('select * from bar');
     });
 
-    onlyLocalTest('addToQueue never claims in memory', async () => {
+    onlyLocalTest('addToQueue never retrieves in memory', async () => {
       const connection = await queue.queueDriver.createConnection();
       const query: QueryKey = ['select * from add_and_retrieve', []];
 
       try {
-        const [added, , , , claim] = await connection.addToQueue(
+        const [added, , , , retrieved] = await connection.addToQueue(
           query,
           'delay',
           { isJob: true, orphanedTimeout: undefined },
@@ -419,7 +419,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         );
 
         expect(added).toBe(1);
-        expect(claim).toBeNull();
+        expect(retrieved).toBeNull();
         expect(await connection.getToProcessQueries()).toStrictEqual([
           [connection.redisHash(query), expect.any(Number)]
         ]);
@@ -630,7 +630,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         delete process.env.CUBEJS_QUEUE_FAST_TRACK;
       });
 
-      test('an idle queue claims the query on add', async () => {
+      test('an idle queue retrieves the query on add', async () => {
         const retrieveForProcessing = jest.spyOn(CubestoreQueueDriverConnection.prototype, 'retrieveForProcessing');
         const driverQuery = jest.spyOn(CubeStoreDriver.prototype, 'query');
 
@@ -640,9 +640,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
           expect(result).toBe('select * from fast_track bar');
           expect(driverQuery.mock.calls.some(([sql]) => sql.startsWith('QUEUE ADD_AND_RETRIEVE'))).toBe(true);
-          // The claim came with the insert, there was nothing left to retrieve
+          // The retrieval came with the insert, there was nothing left to retrieve
           expect(retrieveForProcessing).not.toHaveBeenCalled();
-          // The claim carries the processing identity, the acknowledgement must be accepted
+          // The retrieval carries the processing identity, the acknowledgement must be accepted
           expect(logger.mock.calls.map(([message]) => message)).not.toContain('Orphaned execution result');
         } finally {
           retrieveForProcessing.mockRestore();
@@ -675,7 +675,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         }
       });
 
-      test('a claim is not given out while the concurrency budget is taken', async () => {
+      test('a query is not retrieved while the concurrency budget is taken', async () => {
         const connection = await queue.queueDriver.createConnection();
         const first: QueryKey = ['select * from budget_1', []];
         const second: QueryKey = ['select * from budget_2', []];
@@ -689,22 +689,22 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
         try {
           // concurrency is 1, the first query takes the only slot
-          const [added1, , , , claim1] = await addToQueue(first, 1);
+          const [added1, , , , retrieved1] = await addToQueue(first, 1);
           expect(added1).toBe(1);
-          expect(claim1?.[5]).toBe(true);
-          expect(claim1?.[4].queryKey).toStrictEqual(first);
+          expect(retrieved1?.[5]).toBe(true);
+          expect(retrieved1?.[4].queryKey).toStrictEqual(first);
 
-          // an active item is never claimed twice
-          const [added1again, , , , claim1again] = await addToQueue(first, 1);
+          // an active item is never retrieved twice
+          const [added1again, , , , retrieved1again] = await addToQueue(first, 1);
           expect(added1again).toBe(0);
-          expect(claim1again).toBeNull();
+          expect(retrieved1again).toBeNull();
 
-          const [added2, , , , claim2] = await addToQueue(second, 2);
+          const [added2, , , , retrieved2] = await addToQueue(second, 2);
           expect(added2).toBe(1);
-          expect(claim2).toBeNull();
+          expect(retrieved2).toBeNull();
 
-          // A claimed item goes straight to active and never becomes pending, the one
-          // which was not claimed is left for reconcile to pick up by priority
+          // A retrieved item goes straight to active and never becomes pending, the one
+          // which was not retrieved is left for reconcile to pick up by priority
           expect(await connection.getActiveQueries()).toStrictEqual([
             [connection.redisHash(first), expect.any(Number)]
           ]);

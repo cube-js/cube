@@ -13,8 +13,8 @@ Two participants matter when reading the diagrams:
   through `executeQuery`, which run detached from the request (in cluster mode they can
   even run on another node).
 
-Claiming and executing are two separate steps: `processQuery` claims an item and then hands
-the claim to `sendProcessMessageFn`, which executes it through `executeQuery`. See
+Retrieving and executing are two separate steps: `processQuery` retrieves an item and then hands
+the retrieval to `sendProcessMessageFn`, which executes it through `executeQuery`. See
 "Background execution" below.
 
 ## Cube Store responses as TS types
@@ -32,7 +32,7 @@ type AddToQueueResponse = {
 // QUEUE ADD_AND_RETRIEVE, extends AddToQueueResponse (see "Fast track" below)
 type AddAndRetrieveResponse = AddToQueueResponse & {
     active: string | null,  // comma separated keys, NULL when empty
-    payload: string | null, // NULL means "the item was not claimed"
+    payload: string | null, // NULL means "the item was not retrieved"
     extra: string | null,
 }
 // QUEUE RETRIEVE [EXTENDED] CONCURRENCY
@@ -77,7 +77,7 @@ enum ResultStatus {
 }
 ```
 
-`EXTENDED` on `QUEUE RETRIEVE` changes only the failure shape: without it a failed claim
+`EXTENDED` on `QUEUE RETRIEVE` changes only the failure shape: without it a failed retrieval
 returns zero rows, with it a single row where `payload` and `id` are `NULL` but `pending`
 and `active` are filled. The driver always sends `EXTENDED`.
 
@@ -174,15 +174,15 @@ sequenceDiagram
 
         loop for every query within toProcessLimit
             QueryQueue->>QueryQueue: processQuery
-            Note over QueryQueue,Background: Awaits the claim only, not the execution
+            Note over QueryQueue,Background: Awaits the retrieval only, not the execution
         end
     end
 ```
 
 ## Background execution: `processQuery` → `executeQuery`
 
-`processQuery` claims the item and nothing else. What it hands to `sendProcessMessageFn` is a
-`ClaimedQuery` — `{ queryKeyHash, queueId, processingId, queueSize, query }`, plain data on
+`processQuery` retrieves the item and nothing else. What it hands to `sendProcessMessageFn` is a
+`RetrievedQuery` — `{ queryKeyHash, queueId, processingId, queueSize, query }`, plain data on
 purpose, so a custom implementation can serialize it and let another process run
 `executeQuery`. The default implementation calls `executeQuery` in-process.
 
@@ -190,15 +190,15 @@ purpose, so a custom implementation can serialize it and let another process run
 executed: reconcile awaits it, and `executeQuery` ends with `reconcileQueue`, which is
 single-flight — awaiting the execution from inside reconcile deadlocks.
 
-Two consequences of claiming before the hand-off:
+Two consequences of retrieving before the hand-off:
 
-- Stream queries have to be executed by the process that claimed them, their streams live in
+- Stream queries have to be executed by the process that retrieved them, their streams live in
   the in-process `QueryQueue.streams` map. Reconcile only picks up persistent keys whose
   `@<processUid>` suffix matches, so `sendProcessMessageFn` is always called on the owning
   process for them — it just must not route them elsewhere.
-- A claimed item is already active. If a custom hand-off loses the message, the item is only
+- A retrieved item is already active. If a custom hand-off loses the message, the item is only
   recovered by the stalled-heartbeat / `TO_CANCEL` path; `freeProcessingLock` is a no-op on
-  Cube Store, so the claim cannot be cheaply undone.
+  Cube Store, so the retrieval cannot be cheaply undone.
 
 ```mermaid
 sequenceDiagram
@@ -213,10 +213,10 @@ sequenceDiagram
     QueueDriver->>CubeStore: QUEUE RETRIEVE EXTENDED CONCURRENCY ?n ?path
     CubeStore-->>QueueDriver: RetrieveResponse
     QueueDriver-->>QueryQueue: [added, queueId, activeKeys, queueSize, def, lockAcquired]
-    Note over QueueDriver,CubeStore: The claim is atomic in Cube Store:<br/>only one node moves the item to active
+    Note over QueueDriver,CubeStore: The retrieval is atomic in Cube Store:<br/>only one node moves the item to active
 
     alt def && added && activeKeys includes our key && lockAcquired
-        QueryQueue-)Background: sendProcessMessageFn(ClaimedQuery)
+        QueryQueue-)Background: sendProcessMessageFn(RetrievedQuery)
         Note over QueryQueue,Background: Detached from here on: the hand-off returns,<br/>the execution keeps running
 
         Background->>QueueDriver: optimisticQueryUpdate
@@ -243,7 +243,7 @@ sequenceDiagram
 
         Background->>Background: reconcileQueue
         Note over Background: The freed concurrency slot is<br/>immediately given to the next query
-    else the claim did not succeed
+    else the retrieval did not succeed
         QueryQueue->>QueueDriver: freeProcessingLock
         Note over QueryQueue,QueueDriver: Another node is running it, or the<br/>concurrency budget is full. No-op for Cube Store
     end
@@ -257,7 +257,7 @@ active and returns the payload. Between those two calls another node can take th
 concurrency slot, so the enqueueing node often pays for the second round-trip and gets
 nothing back.
 
-`QUEUE ADD_AND_RETRIEVE` inserts **and** claims the item in one atomic operation, so the
+`QUEUE ADD_AND_RETRIEVE` inserts **and** retrieves the item in one atomic operation, so the
 enqueueing request can go straight to executing:
 
 ```
@@ -265,7 +265,7 @@ QUEUE ADD_AND_RETRIEVE [EXCLUSIVE] [PRIORITY ?n] [ORPHANED ?ttl] [EXTERNAL_ID ?i
     ?path ?payload ?concurrency
 ```
 
-The item is claimed when the prefix has a concurrency slot for it *and* for everything
+The item is retrieved when the prefix has a concurrency slot for it *and* for everything
 already queued — `active + pending < concurrency`, where `concurrency` is the same budget
 `QUEUE RETRIEVE CONCURRENCY` uses and `pending` does not count the item itself.
 
@@ -273,10 +273,10 @@ The driver only emits the command for queries at **priority 10 or above**. That 
 the latency-sensitive work sits — `QueryCache` submits a user query at 10, and
 `PreAggregationLoader` uses 10 for a build a request is waiting on — while background
 refresh comes in below it. A background sweep runs the queue at its concurrency ceiling for
-minutes, which is the one regime where the claim never succeeds and the extra `concurrency`
+minutes, which is the one regime where the retrieval never succeeds and the extra `concurrency`
 parameter is pure overhead.
 
-`payload IS NULL` in the response means the item was not claimed — the condition failed,
+`payload IS NULL` in the response means the item was not retrieved — the condition failed,
 the item was already active, or it belongs to another process — and the caller falls back
 to the normal path with nothing lost, because the item is enqueued either way.
 
@@ -294,12 +294,12 @@ sequenceDiagram
     QueryQueue->>QueueDriver: addToQueue
 
     QueueDriver->>CubeStore: QUEUE ADD_AND_RETRIEVE PRIORITY ?n ?path ?payload ?concurrency
-    Note over CubeStore: One atomic batch:<br/>insert, then claim if the prefix allows it
+    Note over CubeStore: One atomic batch:<br/>insert, then retrieve if the prefix allows it
     CubeStore-->>QueueDriver: AddAndRetrieveResponse
-    QueueDriver-->>QueryQueue: [added, queueId, queueSize, addedToQueueTime, claim]
+    QueueDriver-->>QueryQueue: [added, queueId, queueSize, addedToQueueTime, retrieved]
 
     alt fast track: payload is not NULL, we own the item
-        QueryQueue-)Background: sendProcessMessageFn(ClaimedQuery)
+        QueryQueue-)Background: sendProcessMessageFn(RetrievedQuery)
         Note over QueryQueue,Background: No reconcile, no QUEUE RETRIEVE.<br/>The payload from the response is the QueryDef
         Background->>QueryOrchestrator: execute
     else payload IS NULL, the item stays pending
@@ -319,17 +319,17 @@ What the fast track saves per query, when the slot is free:
 | `QUEUE ADD` | 1 round-trip | folded into one command |
 | `QUEUE TO_CANCEL` + `QUEUE LIST` (reconcile) | 2 round-trips | skipped |
 | `QUEUE RETRIEVE` | 1 round-trip | folded into one command |
-| `QUEUE LIST` (the `Waiting for query` event) | 1 round-trip | skipped, the claim carries the state |
+| `QUEUE LIST` (the `Waiting for query` event) | 1 round-trip | skipped, the retrieval carries the state |
 | Window for another node to steal the slot | between ADD and RETRIEVE | none |
 
-Everything after the claim is unchanged: `MERGE_EXTRA`, `HEARTBEAT`, `ACK` and
+Everything after the retrieval is unchanged: `MERGE_EXTRA`, `HEARTBEAT`, `ACK` and
 `RESULT_BLOCKING` behave exactly as in the normal path, and a fast-tracked item is a
 regular active item — `TO_CANCEL` will reclaim it if the heartbeat stops.
 
 Two side effects are worth knowing about:
 
 - `QUEUE ADD` reports the queue depth *including* the item it just made pending, while a
-  claimed item never becomes pending, so the `queueSize` of the `Added to queue` and
+  retrieved item never becomes pending, so the `queueSize` of the `Added to queue` and
   `Waiting for query` log events drops by one on the fast track. The events carry
   `fastTrack` so the two can be told apart.
 - `reconcileQueue` is the only caller of `QUEUE TO_CANCEL`, and the fast track skips it, so
@@ -338,15 +338,15 @@ Two side effects are worth knowing about:
   and a submission only skips reconcile while the concurrency budget is free — which is
   exactly when there is no budget to reclaim.
 
-Priority ordering is enforced by the *selection* step, not by the claim: `QUEUE PENDING`
+Priority ordering is enforced by the *selection* step, not by the retrieval: `QUEUE PENDING`
 returns items highest priority first (oldest first within a priority) and reconcile takes
 `toProcessLimit` off the top of that list. `QUEUE RETRIEVE <path>` itself is priority blind
 — it is safe only because the path it is given came from that sorted list.
 
 The fast track selects itself, so it is priority blind with nothing to compensate. That is
-what the `active + pending < concurrency` condition rules out: claiming leaves a free slot
+what the `active + pending < concurrency` condition rules out: retrieving leaves a free slot
 for every item already pending, so no item is jumped over, and once the budget gets tight
-the fast track steps aside and lets reconcile pick by priority. Note that a claimed item
+the fast track steps aside and lets reconcile pick by priority. Note that a retrieved item
 goes straight to active and never becomes pending, so a burst onto an idle queue still
 fast-tracks every query — items only start accumulating in pending once the concurrency
 budget is exhausted, which is exactly when the condition should stop firing.

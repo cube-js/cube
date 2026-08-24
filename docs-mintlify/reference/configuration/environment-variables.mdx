@@ -194,7 +194,7 @@ and we don't recommend enabling it in production yet.
 </Warning>
 
 Enables the preview fast-track path for Cube Store query queues. When enabled,
-Cube can atomically enqueue and claim a query when queue concurrency is
+Cube can atomically enqueue and retrieve a query when queue concurrency is
 available, reducing queue coordination round trips. It applies to queries at
 queue priority 10 and above, which is where user-facing queries and the
 pre-aggregation builds a request waits on are submitted; background refresh runs

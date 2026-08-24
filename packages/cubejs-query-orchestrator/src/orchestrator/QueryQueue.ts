@@ -26,7 +26,7 @@ export type QueryHandlerFn = (query: QueryDef, cancelHandler: CancelHandlerFn) =
 export type StreamHandlerFn = (query: QueryDef, stream: QueryStream) => Promise<unknown>;
 export type QueryHandlersMap = Record<string, QueryHandlerFn>;
 
-export type ClaimedQuery = {
+export type RetrievedQuery = {
   queryKeyHash: QueryKeyHash;
   queueId: QueueId | null;
   processingId: ProcessingId;
@@ -34,7 +34,7 @@ export type ClaimedQuery = {
   query: QueryDef;
 };
 
-export type SendProcessMessageFn = (claimed: ClaimedQuery) => Promise<void> | void;
+export type SendProcessMessageFn = (retrieved: RetrievedQuery) => Promise<void> | void;
 export type SendCancelMessageFn = (query: QueryDef, queueId: QueueId | null) => Promise<void> | void;
 
 export type ExecuteInQueueOptions = Omit<AddToQueueOptions, 'queueId'> & {
@@ -133,7 +133,7 @@ export class QueryQueue {
     this.orphanedTimeout = options.orphanedTimeout || 120;
     this.heartBeatInterval = options.heartBeatInterval || 30;
 
-    this.sendProcessMessageFn = options.sendProcessMessageFn || ((claimed) => { this.executeQuery(claimed); });
+    this.sendProcessMessageFn = options.sendProcessMessageFn || ((retrieved) => { this.executeQuery(retrieved); });
     this.sendCancelMessageFn = options.sendCancelMessageFn || ((query, queueId) => { this.processCancel(query, queueId); });
     this.queryHandlers = options.queryHandlers;
     this.streamHandler = options.streamHandler;
@@ -267,7 +267,7 @@ export class QueryQueue {
 
       options.orphanedTimeout = query.orphanedTimeout;
 
-      const [added, queueId, queueSize, addedToQueueTime, claim] = await queueConnection.addToQueue(
+      const [added, queueId, queueSize, addedToQueueTime, retrieved] = await queueConnection.addToQueue(
         queryKey, queryHandler, query, priority, options
       );
 
@@ -296,7 +296,7 @@ export class QueryQueue {
           preAggregation: query.preAggregation,
           addedToQueueTime,
           persistent: !!queryKey.persistent,
-          fastTrack: !!claim,
+          fastTrack: !!retrieved,
         });
       }
 
@@ -306,15 +306,15 @@ export class QueryQueue {
         streamWait = this.waitForQueryStream(queryKeyHash);
       }
 
-      if (claim) {
+      if (retrieved) {
         // The item is active already, there is nothing for reconcile to pick up
-        await this.sendProcessMessageFn(this.claimedQuery(queryKeyHash, queueId, claim));
+        await this.sendProcessMessageFn(this.retrievedQuery(queryKeyHash, queueId, retrieved));
       } else {
         await this.reconcileQueue();
       }
 
       if (!added) {
-        const queryDef = claim ? claim[4] : await queueConnection.getQueryDef(queryKeyHash, queueId);
+        const queryDef = retrieved ? retrieved[4] : await queueConnection.getQueryDef(queryKeyHash, queueId);
         if (queryDef) {
           waitingContext = {
             queueId,
@@ -327,9 +327,9 @@ export class QueryQueue {
         }
       }
 
-      // A claim carries the active keys of its prefix, and a claimed query is never pending,
+      // A retrieval carries the active keys of its prefix, and a retrieved query is never pending,
       // so it has no place in the queue to report
-      const [active, toProcess] = claim ? [claim[2], undefined] : await queueConnection.getQueryStageState(true);
+      const [active, toProcess] = retrieved ? [retrieved[2], undefined] : await queueConnection.getQueryStageState(true);
 
       this.logger('Waiting for query', {
         ...waitingContext,
@@ -338,7 +338,7 @@ export class QueryQueue {
         toProcessQueryKeys: toProcess,
         active: active.indexOf(queryKeyHash) !== -1,
         queueIndex: toProcess ? toProcess.indexOf(queryKeyHash) : -1,
-        fastTrack: !!claim,
+        fastTrack: !!retrieved,
       });
 
       if (streamWait) {
@@ -367,22 +367,22 @@ export class QueryQueue {
   }
 
   /**
-   * A claim from the queue driver is the same thing `claimQueryForProcessing` produces, it just
-   * came back with the insert instead of a separate retrieval.
+   * A retrieval from the queue driver is the same thing `retrieveQueryForProcessing` produces, it
+   * just came back with the insert instead of a separate retrieval.
    */
-  protected claimedQuery(queryKeyHash: QueryKeyHash, queueId: QueueId | null, claim: RetrieveForProcessingSuccess): ClaimedQuery {
-    const [, claimQueueId, , queueSize, query] = claim;
+  protected retrievedQuery(queryKeyHash: QueryKeyHash, queueId: QueueId | null, retrieved: RetrieveForProcessingSuccess): RetrievedQuery {
+    const [, retrievedQueueId, , queueSize, query] = retrieved;
     // The id identifies the processing lock for every command downstream
-    const claimedQueueId = claimQueueId ?? queueId;
+    const processingQueueId = retrievedQueueId ?? queueId;
 
-    if (claimedQueueId === null) {
-      throw new Error('Queue driver claimed a query without reporting its queue id');
+    if (processingQueueId === null) {
+      throw new Error('Queue driver retrieved a query without reporting its queue id');
     }
 
     return {
       queryKeyHash,
-      queueId: claimedQueueId,
-      processingId: claimedQueueId,
+      queueId: processingQueueId,
+      processingId: processingQueueId,
       queueSize,
       query,
     };
@@ -655,7 +655,7 @@ export class QueryQueue {
         .slice(0, toProcessLimit)
         .map(([queryKey, queueId]) => this.processQuery(queryKey, queueId));
 
-      // Awaits the claim of every picked query, not their execution.
+      // Awaits the retrieval of every picked query, not their execution.
       await Promise.all(tasks);
     } finally {
       this.queueDriver.release(queueConnection);
@@ -800,21 +800,21 @@ export class QueryQueue {
   }
 
   /**
-   * Claims the query specified by the `queryKeyHashed` and hands it over for execution.
+   * Retrieves the query specified by the `queryKeyHashed` and hands it over for execution.
    */
   protected async processQuery(queryKeyHashed: QueryKeyHash, queueId: QueueId | null): Promise<void> {
-    const claimed = await this.claimQueryForProcessing(queryKeyHashed, queueId);
-    if (!claimed) {
+    const retrieved = await this.retrieveQueryForProcessing(queryKeyHashed, queueId);
+    if (!retrieved) {
       return;
     }
 
     try {
-      await this.sendProcessMessageFn(claimed);
+      await this.sendProcessMessageFn(retrieved);
     } catch (e: any) {
       this.logger('Error while sending process message', {
-        queueId: claimed.queueId,
-        queryKey: claimed.query.queryKey,
-        requestId: claimed.query.requestId,
+        queueId: retrieved.queueId,
+        queryKey: retrieved.query.queryKey,
+        requestId: retrieved.query.requestId,
         error: (e.stack || e).toString(),
         queuePrefix: this.redisQueuePrefix
       });
@@ -823,10 +823,10 @@ export class QueryQueue {
 
   /**
    * Acquires the processing lock for the query specified by the `queryKeyHashed` and moves it to
-   * the active set. Returns `null` when the claim didn't succeed, which means another node is
+   * the active set. Returns `null` when the retrieval didn't succeed, which means another node is
    * already running the query or the concurrency budget is full.
    */
-  protected async claimQueryForProcessing(queryKeyHashed: QueryKeyHash, queueId: QueueId | null): Promise<ClaimedQuery | null> {
+  protected async retrieveQueryForProcessing(queryKeyHashed: QueryKeyHash, queueId: QueueId | null): Promise<RetrievedQuery | null> {
     const queueConnection = await this.queueDriver.createConnection();
 
     let insertedCount;
@@ -906,12 +906,12 @@ export class QueryQueue {
   }
 
   /**
-   * Executes a claimed query: runs its handler while keeping the queue heartbeat alive, then acks
+   * Executes a retrieved query: runs its handler while keeping the queue heartbeat alive, then acks
    * the result. It's the counterpart of `sendProcessMessageFn` and the entry point for a custom
    * implementation which hands the query over to another process.
    */
-  public async executeQuery(claimed: ClaimedQuery): Promise<void> {
-    const { queryKeyHash: queryKeyHashed, queueId, processingId, queueSize, query } = claimed;
+  public async executeQuery(retrieved: RetrievedQuery): Promise<void> {
+    const { queryKeyHash: queryKeyHashed, queueId, processingId, queueSize, query } = retrieved;
 
     const queueConnection = await this.queueDriver.createConnection();
 

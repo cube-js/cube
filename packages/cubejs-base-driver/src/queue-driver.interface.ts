@@ -35,9 +35,9 @@ export type AddToQueueResponse = [
   queueId: QueueId | null,
   queueSize: number,
   addedToQueueTime: number,
-  // `null` when the item was not claimed
+  // `null` when the item was not retrieved
   // the query stalls until the stalled/orphaned reclaim picks it up.
-  claim: RetrieveForProcessingSuccess | null,
+  retrieved: RetrieveForProcessingSuccess | null,
 ];
 
 /**
@@ -86,7 +86,7 @@ export interface QueueDriverConnectionInterface {
   getResult(queryKey: QueryKey, externalId?: string): Promise<any>;
   /**
    * Adds specified by the queryKey query to the queue, returns tuple
-   * with the operation result. A driver may also claim the item for processing in the same
+   * with the operation result. A driver may also retrieve the item for processing in the same
    * operation, which saves the caller a retrieval round-trip.
    *
    * @param queryKey
