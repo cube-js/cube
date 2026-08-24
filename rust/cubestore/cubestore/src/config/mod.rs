@@ -1371,11 +1371,28 @@ fn env_bool(name: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
-/// Lenient boolean env read for toggles: only `1`/`true` enable it, anything else (including a
-/// typo) is treated as off; an unset variable falls back to `default`. Unlike [`env_bool`] it never
-/// panics -- a malformed value on a performance flag must not take a node down on startup.
+/// Lenient boolean env read for toggles: recognizes the usual spellings in either case and falls
+/// back to `default` with a warning on anything else. Unlike [`env_bool`] it never panics -- a
+/// malformed value on a performance flag must not take a node down on startup, and for a flag that
+/// is on by default the value an operator writes to turn it off is the one path that must work.
 fn env_flag(name: &str, default: bool) -> bool {
-    env::var(name).map_or(default, |v| v == "true" || v == "1")
+    match env::var(name) {
+        Err(_) => default,
+        Ok(v) => match v.trim().to_ascii_lowercase().as_str() {
+            "" => default,
+            "1" | "true" | "yes" | "on" => true,
+            "0" | "false" | "no" | "off" => false,
+            other => {
+                log::warn!(
+                    "Ignoring {} value '{}', using default ({})",
+                    name,
+                    other,
+                    default
+                );
+                default
+            }
+        },
+    }
 }
 
 pub fn env_parse<T>(name: &str, default: T) -> T
@@ -1876,7 +1893,7 @@ impl Config {
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
-                load_aware_import_placement_enabled: env_bool(
+                load_aware_import_placement_enabled: env_flag(
                     "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
                     true,
                 ),
@@ -1896,7 +1913,7 @@ impl Config {
                     "CUBESTORE_PREFILTER_IN_MEMORY_CHUNKS",
                     false,
                 ),
-                repartition_concurrent_download: env_bool(
+                repartition_concurrent_download: env_flag(
                     "CUBESTORE_REPARTITION_CONCURRENT_DOWNLOAD",
                     true,
                 ),
@@ -2004,7 +2021,7 @@ impl Config {
                     Some(60_000),
                     None,
                 ),
-                metastore_batch_rpc: env_parse("CUBESTORE_METASTORE_BATCH_RPC", true),
+                metastore_batch_rpc: env_flag("CUBESTORE_METASTORE_BATCH_RPC", true),
                 transport_max_message_size,
                 transport_max_frame_size: env_parse_size(
                     "CUBESTORE_TRANSPORT_MAX_FRAME_SIZE",

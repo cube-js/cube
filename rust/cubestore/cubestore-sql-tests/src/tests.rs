@@ -4495,8 +4495,28 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) -> Result<(), CubeErr
         .await?;
     let mut show_hints = PPOptions::default();
     show_hints.show_filters = true;
-    assert_eq!(
-        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+    // The full-merge top-k re-aggregates on the router over a coalesce of the worker streams. On a
+    // multi-node cluster that coalesce fans in one stream per worker, so the plan carries an extra
+    // merge -- the shape worth pinning, since it is where the router must not claim an ordering the
+    // fan-in does not preserve.
+    let expected_worker_plan = if service.prefix() == "cluster" {
+        "Projection, [url, sum(Data.hits)@1:hits]\
+        \n  Sort, fetch: 3\
+        \n    Filter, predicate: sum(Data.hits)@1 > 10\
+        \n      SortedSingleAggregate\
+        \n        CoalescePartitions\
+        \n          MergeSort\
+        \n            Worker\
+        \n              SortedSingleAggregate\
+        \n                MergeSort\
+        \n                  Union\
+        \n                    Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
+        \n                      Sort\
+        \n                        Empty\
+        \n                    Scan, index: default:2:[2]:sort_on[url], fields: [url, hits]\
+        \n                      Sort\
+        \n                        Empty"
+    } else {
         "Projection, [url, sum(Data.hits)@1:hits]\
         \n  Sort, fetch: 3\
         \n    Filter, predicate: sum(Data.hits)@1 > 10\
@@ -4512,6 +4532,10 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) -> Result<(), CubeErr
         \n                  Scan, index: default:2:[2]:sort_on[url], fields: [url, hits]\
         \n                    Sort\
         \n                      Empty"
+    };
+    assert_eq!(
+        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+        expected_worker_plan
     );
 
     let query = "SELECT `url` `url`, SUM(`hits`) `hits`, CARDINALITY(MERGE(`uhits`)) `uhits` \
