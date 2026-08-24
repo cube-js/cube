@@ -426,7 +426,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         // only the call order pins it down
         expect(streamCallOrder).toContain('subscribe');
         expect(streamCallOrder).toContain('dispatch');
-        expect(streamCallOrder.indexOf('subscribe')).toBeLessThan(streamCallOrder.indexOf('dispatch'));
+        expect(streamCallOrder).toEqual(['subscribe', 'dispatch']);
       } finally {
         spy.mockRestore();
       }
