@@ -27,8 +27,7 @@ impl ToSql for BaseFilter {
             {
                 let time_shift = visitor
                     .time_shifts()
-                    .dimensions_shifts
-                    .get(&symbol_to_match.full_name())
+                    .get_for_symbol(&symbol_to_match)
                     .and_then(|shift| shift.interval.as_ref());
                 return self.typed_filter().to_sql_for_filter_params(
                     filter_params_item,
