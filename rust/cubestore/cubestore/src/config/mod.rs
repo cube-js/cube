@@ -586,10 +586,9 @@ pub trait ConfigObj: DIService {
     fn repartition_check_overlapping_children(&self) -> bool;
     /// Factor `f` controlling when the worker-side partial hash aggregate trims its output to the
     /// top-k groups. Trimming happens only when the number of local groups exceeds `f * k`, where
-    /// `k = limit + offset`. `0` disables the optimization. Whether the trim runs at all decides
-    /// the shape of both halves of a split plan, so the router's value governs the whole query: it
-    /// travels in [`PlanningFlags`] and a select worker reads its own value only for a query whose
-    /// sender did not send any flags.
+    /// `k = limit + offset`. `0` disables the optimization. Whether the trim runs decides the shape
+    /// of both halves of a split plan, so it rides in [`PlanningFlags`]; a worker uses its own value
+    /// only when the sender sent no flags.
     fn group_by_limit_factor(&self) -> usize;
 
     /// When the worker group-by-limit hash trim is active, controls where the worker's hash table
@@ -1314,21 +1313,13 @@ pub async fn init_test_logger() {
 /// Router-side merge strategy for distributed value-ordered top-k (`SELECT ... GROUP BY x ORDER BY
 /// agg(...) LIMIT k`). Selected by `CUBESTORE_TOPK_STRATEGY`.
 ///
-/// The strategy shapes both the worker subtree and the router node that combines it, and the two
-/// only fit together when both halves were planned from the same value -- otherwise the router
-/// combines a worker stream whose ordering guarantee it does not have and returns wrong rows
-/// instead of failing. So the router's value travels with the query in [`PlanningFlags`] and the
-/// worker plans from that rather than from its own configuration; setting `CUBESTORE_TOPK_STRATEGY`
-/// on a select worker alone has no effect.
+/// Both halves of a split plan must be planned from the same value, or the router combines a worker
+/// stream whose ordering it does not have and returns wrong rows instead of failing. So it rides in
+/// [`PlanningFlags`], and a worker uses its own value only when the sender sent no flags.
 ///
-/// A worker reads its own value only for a query whose sender did not send any flags, i.e. one
-/// from a node that predates them and therefore planned from its own configuration.
-///
-/// Serialized as part of those flags under the same names `CUBESTORE_TOPK_STRATEGY` accepts, which
-/// are therefore part of the cross-node contract: renaming a variant must not change them.
-/// Deliberately without a catch-all variant: a strategy this binary does not know about must fail
-/// the query rather than fall back to a value the sender did not plan with. The receiving node fails to deserialize the message and drops the connection, so
-/// the reason is in its own log while the sender reports a connection error.
+/// The wire names are the env names and must survive a variant rename. No catch-all variant: an
+/// unknown strategy fails the message deserialize, which the receiver logs and the sender sees as a
+/// dropped connection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TopKAggregateStrategy {
     /// Original streaming NRA merge with per-row state (default).
