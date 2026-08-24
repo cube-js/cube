@@ -186,6 +186,9 @@ sequenceDiagram
 purpose, so a custom implementation can serialize it and let another process run
 `executeQuery`. The default implementation calls `executeQuery` in-process.
 
+`processingId` is the lock token of the retrieval and always carries the `queueId`. Only the
+memory driver compares it, Cube Store ignores it and keys every command off the `queueId`.
+
 `sendProcessMessageFn` must resolve once the hand-off is done, **not** once the query is
 executed: reconcile awaits it, and `executeQuery` ends with `reconcileQueue`, which is
 single-flight — awaiting the execution from inside reconcile deadlocks.

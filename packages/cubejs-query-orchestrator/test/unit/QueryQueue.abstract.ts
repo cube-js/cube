@@ -435,7 +435,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     test('removed before reconciled', async () => {
       const query: QueryKey = ['select * from', []];
       const key = queue.redisHash(query);
-      await queue.processQuery(key, null);
+      await queue.processQuery(key, queue.generateQueueId());
       const result = await queue.executeInQueue('foo', key, query);
       expect(result).toBe('select * from bar');
     });
@@ -472,24 +472,21 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
       await queue.reconcileQueue();
 
-      await connection.addToQueue(
-        'race', 'handler', ['select'], priority, { stageQueryKey: 'race' }
+      const [, raceQueueId] = await connection.addToQueue(
+        'race', 'handler', ['select'], priority, { queueId: queue.generateQueueId(), stageQueryKey: 'race' }
       );
 
-      await connection.addToQueue(
-        'race2', 'handler2', ['select2'], priority, { stageQueryKey: 'race2' }
+      const [, race2QueueId] = await connection.addToQueue(
+        'race2', 'handler2', ['select2'], priority, { queueId: queue.generateQueueId(), stageQueryKey: 'race2' }
       );
 
-      const processingId1 = await connection.getNextProcessingId();
-      const processingId4 = await connection.getNextProcessingId();
+      // Neither is locked yet, so both releases are no-ops
+      await connection.freeProcessingLock('race', raceQueueId, true);
+      await connection.freeProcessingLock('race2', race2QueueId, true);
 
-      await connection.freeProcessingLock('race', processingId1, true);
-      await connection.freeProcessingLock('race2', processingId4, true);
+      await connection2.retrieveForProcessing('race2', race2QueueId);
 
-      await connection2.retrieveForProcessing('race2', await connection.getNextProcessingId());
-
-      const processingId = await connection.getNextProcessingId();
-      const retrieve6 = await connection.retrieveForProcessing('race', processingId);
+      const retrieve6 = await connection.retrieveForProcessing('race', raceQueueId);
       console.log(retrieve6);
       expect(!!retrieve6[5]).toBe(true);
 
@@ -507,30 +504,28 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
       await queue.reconcileQueue();
 
-      await connection.addToQueue(
-        'activated1', 'handler', <any>['select'], priority, { stageQueryKey: 'race', requestId: '1' }
+      const [, activated1QueueId] = await connection.addToQueue(
+        'activated1', 'handler', <any>['select'], priority, { queueId: queue.generateQueueId(), stageQueryKey: 'race', requestId: '1' }
       );
 
-      await connection.addToQueue(
-        'activated2', 'handler2', <any>['select2'], priority, { stageQueryKey: 'race2', requestId: '1' }
+      const [, activated2QueueId] = await connection.addToQueue(
+        'activated2', 'handler2', <any>['select2'], priority, { queueId: queue.generateQueueId(), stageQueryKey: 'race2', requestId: '1' }
       );
 
-      const processingId1 = await connection.getNextProcessingId();
-      const processingId2 = await connection.getNextProcessingId();
-      const processingId3 = await connection.getNextProcessingId();
-
-      const retrieve1 = await connection.retrieveForProcessing('activated1' as any, processingId1);
+      const retrieve1 = await connection.retrieveForProcessing('activated1' as any, activated1QueueId);
       console.log(retrieve1);
-      const retrieve2 = await connection2.retrieveForProcessing('activated2' as any, processingId2);
+      const retrieve2 = await connection2.retrieveForProcessing('activated2' as any, activated2QueueId);
       console.log(retrieve2);
-      console.log(await connection.freeProcessingLock('activated1' as any, processingId1, retrieve1 && retrieve1[2].indexOf('activated1' as any) !== -1));
-      const retrieve3 = await connection.retrieveForProcessing('activated2' as any, processingId3);
-      console.log(retrieve3);
-      console.log(await connection.freeProcessingLock('activated2' as any, processingId3, retrieve3 && retrieve3[2].indexOf('activated2' as any) !== -1));
-      console.log(retrieve2[2].indexOf('activated2' as any) !== -1);
-      console.log(await connection2.freeProcessingLock('activated2' as any, processingId2, retrieve2 && retrieve2[2].indexOf('activated2' as any) !== -1));
+      console.log(await connection.freeProcessingLock('activated1' as any, activated1QueueId, retrieve1 && retrieve1[2].indexOf('activated1' as any) !== -1));
 
-      const retrieve4 = await connection.retrieveForProcessing('activated2' as any, await connection.getNextProcessingId());
+      // Another node reaches the same item, so it comes with the same lock token and loses
+      const retrieve3 = await connection.retrieveForProcessing('activated2' as any, activated2QueueId);
+      expect(retrieve3).toBeNull();
+
+      console.log(retrieve2[2].indexOf('activated2' as any) !== -1);
+      console.log(await connection2.freeProcessingLock('activated2' as any, activated2QueueId, retrieve2 && retrieve2[2].indexOf('activated2' as any) !== -1));
+
+      const retrieve4 = await connection.retrieveForProcessing('activated2' as any, activated2QueueId);
       console.log(retrieve4);
       expect(retrieve4[0]).toBe(1);
       expect(!!retrieve4[5]).toBe(true);
