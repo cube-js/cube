@@ -13,7 +13,8 @@ import {
   GetActiveAndToProcessResponse,
   QueryStageStateResponse,
   RetrieveForProcessingResponse,
-  QueueDriverOptions
+  QueueDriverOptions,
+  QueuePriority
 } from '@cubejs-backend/base-driver';
 import {
   LocalQueueDriver
@@ -164,7 +165,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     )(queueObj);
   }
 
-  public async addToQueue(queryKey: QueryKey, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse> {
+  public async addToQueue(queryKey: QueryKey, queryHandler: string, query: AddToQueueQuery, priority: QueuePriority, options: AddToQueueOptions): Promise<AddToQueueResponse> {
     const time = new Date().getTime();
     const queryQueueObj: QueryDefObject = {
       queueId: options.queueId,

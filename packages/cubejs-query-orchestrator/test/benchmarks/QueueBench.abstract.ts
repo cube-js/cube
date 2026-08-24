@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { ChildProcess, fork } from 'child_process';
 import { createPromiseLock, MethodName, pausePromise } from '@cubejs-backend/shared';
-import { QueueDriverConnectionInterface, QueueDriverInterface, } from '@cubejs-backend/base-driver';
+import { QueueDriverConnectionInterface, QueueDriverInterface, QueuePriority } from '@cubejs-backend/base-driver';
 import { LocalQueueDriver, QueryQueue, QueryQueueOptions } from '../../src';
 
 export type QueryQueueTestOptions = Pick<QueryQueueOptions, 'cacheAndQueueDriver' | 'cubeStoreDriverFactory'> & {
@@ -73,7 +73,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
       await options.beforeAll();
     }
 
-    const createBenchmark = async (benchSettings: { totalQueries: number, queueResponseSize: number, queuePayloadSize: number, currency: number, pushIntervalMs: number, priority: number }) => {
+    const createBenchmark = async (benchSettings: { totalQueries: number, queueResponseSize: number, queuePayloadSize: number, currency: number, pushIntervalMs: number, priority: QueuePriority }) => {
       const counters = {
         connections: 0,
         methods: {},
@@ -326,8 +326,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
       currency: parseInt(process.env.BENCH_CONCURRENCY || '50', 10),
       totalQueries,
       pushIntervalMs: periodMs > 0 ? Math.max(1, Math.round(periodMs / totalQueries)) : 10,
-      // the fast track only takes queries at priority 10 and above
-      priority: parseInt(process.env.BENCH_PRIORITY || '10', 10),
+      priority: parseInt(process.env.BENCH_PRIORITY || `${QueuePriority.Interactive}`, 10),
       // eslint-disable-next-line no-bitwise
       queueResponseSize: parseInt(process.env.BENCH_RESPONSE_SIZE || `${5 << 20}`, 10),
       queuePayloadSize: parseInt(process.env.BENCH_PAYLOAD_SIZE || `${256 * 1024}`, 10),

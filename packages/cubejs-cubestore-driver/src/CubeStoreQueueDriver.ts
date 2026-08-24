@@ -16,6 +16,7 @@ import {
   QueueId,
   GetActiveAndToProcessResponse,
   QueryKeysTuple,
+  QueuePriority,
 } from '@cubejs-backend/base-driver';
 import { getEnv, getProcessUid } from '@cubejs-backend/shared';
 
@@ -38,11 +39,6 @@ type CubeStoreListResponse = {
   queue_id?: string
   status: string
 };
-
-// Latency-sensitive queries arrive at priority 10 or above: QueryCache uses 10 for a user
-// query, PreAggregationLoader for a build a query is waiting on. Background refresh work
-// sits below that, and it is the regime where claiming on insert buys nothing
-const FastTrackMinPriority = 10;
 
 // cube store convert int64 to string
 type CubeStoreClaimResponse = {
@@ -69,8 +65,12 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     this.sendParameters = getEnv('cubestoreSendableParameters');
   }
 
-  public async useFastTrack(priority: number): Promise<boolean> {
-    if (this.fastTrackEnabled && priority >= FastTrackMinPriority) {
+  /**
+   * Below `Interactive` nothing is blocked on the query, and that is the regime where the
+   * queue runs at its concurrency ceiling for minutes, so the claim never succeeds anyway
+   */
+  public async useFastTrack(priority: QueuePriority): Promise<boolean> {
+    if (this.fastTrackEnabled && priority >= QueuePriority.Interactive) {
       return this.driver.hasCapability('queueAddAndRetrieve');
     }
 
@@ -97,7 +97,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     queryKey: QueryKey,
     queryHandler: string,
     query: AddToQueueQuery,
-    priority: number,
+    priority: QueuePriority,
     options: AddToQueueOptions
   ) {
     const data = {
@@ -139,7 +139,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     queryKey: QueryKey,
     queryHandler: string,
     query: AddToQueueQuery,
-    priority: number,
+    priority: QueuePriority,
     options: AddToQueueOptions
   ): Promise<AddToQueueResponse> {
     const { modifiers, values, addedToQueueTime } = await this.buildAddCommand(queryKey, queryHandler, query, priority, options);

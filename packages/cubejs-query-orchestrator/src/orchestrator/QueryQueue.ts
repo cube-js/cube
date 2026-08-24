@@ -8,6 +8,7 @@ import {
   QueryDef,
   QueryStageStateResponse,
   AddToQueueOptions,
+  QueuePriority,
   ProcessingId,
   RetrieveForProcessingSuccess
 } from '@cubejs-backend/base-driver';
@@ -201,7 +202,7 @@ export class QueryQueue {
     queryHandler: string,
     queryKey: QueryKey,
     query: QueryDef,
-    priority?: number,
+    priority: QueuePriority = QueuePriority.Background,
     executeOptions?: ExecuteInQueueOptions,
   ) {
     const options: AddToQueueOptions = {
@@ -243,11 +244,8 @@ export class QueryQueue {
     const queueConnection = await this.queueDriver.createConnection();
     let waitingContext;
     let streamWait: QueryStreamWait | null = null;
-    try {
-      if (priority == null) {
-        priority = 0;
-      }
 
+    try {
       if (!(priority >= -10000 && priority <= 10000)) {
         throw new Error('Priority should be between -10000 and 10000');
       }

@@ -40,6 +40,22 @@ export type AddToQueueResponse = [
   claim: RetrieveForProcessingSuccess | null,
 ];
 
+/**
+ * Higher priority wins, older wins within a priority. Only the rungs below carry meaning,
+ * the range between them is open: `queuePriority` in a query body and `priority` on a
+ * pre-aggregation are arbitrary integers from -10000 to 10000.
+ */
+export enum QueuePriority {
+  /** A request is blocked on it: a user query, an awaited build, a refresh key */
+  Interactive = 10,
+  /** Warmup sweep, above the background builds it warms */
+  Warmup = 1,
+  /** A build nobody is waiting for */
+  Background = 0,
+  /** Scheduled refresh, newest partition first from here downwards */
+  Scheduled = -1,
+}
+
 export interface AddToQueueQuery {
   isJob: boolean,
   orphanedTimeout: unknown
@@ -79,7 +95,7 @@ export interface QueueDriverConnectionInterface {
    * @param priority
    * @param options
    */
-  addToQueue(queryKey: QueryKey, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse>;
+  addToQueue(queryKey: QueryKey, queryHandler: string, query: AddToQueueQuery, priority: QueuePriority, options: AddToQueueOptions): Promise<AddToQueueResponse>;
   // Return query keys which was sorted by priority and time
   getToProcessQueries(): Promise<QueryKeysTuple[]>;
   getActiveQueries(): Promise<QueryKeysTuple[]>;
