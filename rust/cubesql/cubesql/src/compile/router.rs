@@ -3,18 +3,24 @@ use crate::compile::{
     StatusFlags,
 };
 use sqlparser::ast;
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    str::FromStr,
+    sync::Arc,
+};
 
 use crate::{
     compile::{
+        copy::CopyOptions,
         engine::df::scan::CacheMode,
         error::{CompilationError, CompilationResult},
         parser::parse_sql_to_statement,
-        DatabaseVariable, DatabaseVariablesToUpdate,
+        CopyFromPlan, CreateEmptyTempTablePlan, DatabaseVariable, DatabaseVariablesToUpdate,
     },
     sql::{
         auth_service::SqlAuthServiceAuthenticateRequest,
         dataframe,
+        postgres::copy::MAX_LENGTH_METADATA,
         statement::{
             ApproximateCountDistinctVisitor, CastReplacer, RedshiftDatePartReplacer,
             SensitiveDataSanitizer, SqlParser062Normalizer, ToTimestampReplacer,
@@ -25,6 +31,7 @@ use crate::{
     transport::{MetaContext, SpanId},
 };
 use datafusion::{
+    arrow::datatypes::{DataType, Field, Schema, TimeUnit},
     logical_plan::{
         plan::{Analyze, Explain, ToStringifiedPlan},
         LogicalPlan, PlanType, ToDFSchema,
@@ -175,6 +182,7 @@ impl QueryRouter {
                     constraints,
                     table_options,
                     temporary,
+                    if_not_exists,
                     ..
                 }),
                 DatabaseProtocol::PostgreSQL,
@@ -184,7 +192,44 @@ impl QueryRouter {
                 && *temporary =>
             {
                 let stmt = ast::Statement::Query(query.clone());
-                self.create_table_to_plan(name, &stmt, qtrace, span_id.clone())
+                self.create_table_to_plan(name, &stmt, *if_not_exists, qtrace, span_id.clone())
+                    .await
+            }
+            (
+                ast::Statement::CreateTable(ast::CreateTable {
+                    query: None,
+                    name,
+                    columns,
+                    constraints,
+                    table_options,
+                    temporary,
+                    on_commit,
+                    if_not_exists,
+                    ..
+                }),
+                DatabaseProtocol::PostgreSQL,
+            ) if !columns.is_empty()
+                && constraints.is_empty()
+                && matches!(table_options, ast::CreateTableOptions::None)
+                && *temporary =>
+            {
+                // Rows are always preserved: transactions are not implemented, so
+                // there is no point at which data could be dropped
+                match on_commit {
+                    None | Some(ast::OnCommit::PreserveRows) => (),
+                    Some(on_commit) => {
+                        return Err(CompilationError::unsupported(format!(
+                            "ON COMMIT {} is not supported for a temporary table",
+                            match on_commit {
+                                ast::OnCommit::DeleteRows => "DELETE ROWS",
+                                ast::OnCommit::Drop => "DROP",
+                                ast::OnCommit::PreserveRows => "PRESERVE ROWS",
+                            }
+                        )))
+                    }
+                }
+
+                self.create_empty_table_to_plan(name, columns, *if_not_exists)
                     .await
             }
             (
@@ -193,6 +238,20 @@ impl QueryRouter {
                 },
                 DatabaseProtocol::PostgreSQL,
             ) if object_type == &ast::ObjectType::Table => self.drop_table_to_plan(names).await,
+            (
+                ast::Statement::Copy {
+                    source,
+                    to,
+                    target,
+                    options,
+                    legacy_options,
+                    values,
+                },
+                DatabaseProtocol::PostgreSQL,
+            ) => {
+                self.copy_from_plan(source, *to, target, options, legacy_options, values)
+                    .await
+            }
             _ => Err(CompilationError::unsupported(format!(
                 "Unsupported query type: {stmt}"
             ))),
@@ -261,7 +320,10 @@ impl QueryRouter {
         let plan = self.plan_query(&statement, &mut None, None).await?;
 
         match plan {
-            QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => Ok(QueryPlan::MetaTabular(
+            QueryPlan::MetaOk(_, _)
+            | QueryPlan::MetaTabular(_, _)
+            | QueryPlan::CopyFrom(_)
+            | QueryPlan::CreateEmptyTempTable(_) => Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
                 Box::new(dataframe::DataFrame::new(
                     vec![dataframe::Column::new(
@@ -276,7 +338,7 @@ impl QueryRouter {
                 )),
             )),
             QueryPlan::DataFusionSelect(plan, context)
-            | QueryPlan::CreateTempTable(plan, context, _, _) => {
+            | QueryPlan::CreateTempTable(plan, context, _, _, _) => {
                 // EXPLAIN over CREATE TABLE AS shows the SELECT query plan
                 let plan = Arc::new(plan);
                 let schema = LogicalPlan::explain_schema();
@@ -603,6 +665,7 @@ impl QueryRouter {
         &self,
         name: &ast::ObjectName,
         stmt: &ast::Statement,
+        if_not_exists: bool,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
     ) -> Result<QueryPlan, CompilationError> {
@@ -631,6 +694,7 @@ impl QueryRouter {
                 .value
                 .clone(),
             self.state.temp_tables(),
+            if_not_exists,
         ))
     }
 
@@ -656,8 +720,181 @@ impl QueryRouter {
             ));
         }
         let new_stmt = ast::Statement::Query(Box::new(new_query));
-        self.create_table_to_plan(&into.name, &new_stmt, qtrace, span_id)
+        self.create_table_to_plan(&into.name, &new_stmt, false, qtrace, span_id)
             .await
+    }
+
+    /// Plan for `CREATE TEMPORARY TABLE t (a int, ...)`, which creates an empty
+    /// table to be filled by `COPY ... FROM STDIN`.
+    async fn create_empty_table_to_plan(
+        &self,
+        name: &ast::ObjectName,
+        columns: &[ast::ColumnDef],
+        if_not_exists: bool,
+    ) -> Result<QueryPlan, CompilationError> {
+        let table_name = table_name_from_object_name(name)?;
+
+        let mut fields = Vec::with_capacity(columns.len());
+        for column in columns {
+            let mut nullable = true;
+
+            for option in column.options.iter() {
+                match option.option {
+                    ast::ColumnOption::Null => (),
+                    ast::ColumnOption::NotNull => nullable = false,
+                    _ => {
+                        return Err(CompilationError::unsupported(format!(
+                            "Unsupported column option for a temporary table: {}",
+                            option
+                        )))
+                    }
+                }
+            }
+
+            let mut field = Field::new(
+                &normalize_ident(&column.name),
+                sql_type_to_arrow_type(&column.data_type)?,
+                nullable,
+            );
+
+            // The width of a character type is not part of the Arrow type, and has to
+            // travel with the field for COPY to enforce it
+            if let Some(length) = character_length(&column.data_type) {
+                field = field.with_metadata(Some(BTreeMap::from([(
+                    MAX_LENGTH_METADATA.to_string(),
+                    length.to_string(),
+                )])));
+            }
+
+            fields.push(field);
+        }
+
+        // The table is saved when the plan is executed, and not here: planning also
+        // happens for Parse, Bind and EXPLAIN, none of which may leave a table behind
+        Ok(QueryPlan::CreateEmptyTempTable(Box::new(
+            CreateEmptyTempTablePlan {
+                table_name,
+                schema: Arc::new(Schema::new(fields)),
+                if_not_exists,
+                temp_tables: self.state.temp_tables(),
+            },
+        )))
+    }
+
+    /// Plan for `COPY ... FROM STDIN`. Cubes are read-only, so a temporary table
+    /// of the current session is the only place the data can be loaded into.
+    async fn copy_from_plan(
+        &self,
+        source: &ast::CopySource,
+        to: bool,
+        target: &ast::CopyTarget,
+        options: &[ast::CopyOption],
+        legacy_options: &[ast::CopyLegacyOption],
+        values: &[Option<String>],
+    ) -> Result<QueryPlan, CompilationError> {
+        if to {
+            return Err(CompilationError::unsupported(
+                "COPY TO is not supported, only COPY ... FROM STDIN".to_string(),
+            ));
+        }
+
+        if !matches!(target, ast::CopyTarget::Stdin) {
+            return Err(CompilationError::unsupported(format!(
+                "COPY FROM {} is not supported, only COPY ... FROM STDIN",
+                target
+            )));
+        }
+
+        if !values.is_empty() {
+            return Err(CompilationError::unsupported(
+                "COPY data in the statement itself is not supported, send it as a data stream"
+                    .to_string(),
+            ));
+        }
+
+        // The parser rejects a query as the source of COPY FROM
+        let ast::CopySource::Table {
+            table_name,
+            columns,
+        } = source
+        else {
+            return Err(CompilationError::internal(
+                "COPY FROM must have a table as its target".to_string(),
+            ));
+        };
+
+        let table_name = table_name_from_object_name(table_name)?;
+        let temp_tables = self.state.temp_tables();
+        let Some(temp_table) = temp_tables.get(&table_name) else {
+            return Err(CompilationError::user(format!(
+                "COPY FROM STDIN is only supported for temporary tables, and temporary table \"{}\" does not exist in this session",
+                table_name
+            )));
+        };
+
+        let schema = temp_table.schema();
+        let column_index = |column: &ast::Ident| {
+            let column = normalize_ident(column);
+
+            schema.index_of(&column).map_err(|_| {
+                CompilationError::user(format!(
+                    r#"column "{}" of relation "{}" does not exist"#,
+                    column, table_name
+                ))
+            })
+        };
+
+        let column_indices = match columns.is_empty() {
+            true => (0..schema.fields().len()).collect(),
+            false => {
+                let indices = columns
+                    .iter()
+                    .map(column_index)
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                for (position, index) in indices.iter().enumerate() {
+                    if indices[..position].contains(index) {
+                        return Err(CompilationError::user(format!(
+                            r#"column "{}" is specified more than once"#,
+                            schema.field(*index).name()
+                        )));
+                    }
+                }
+
+                indices
+            }
+        };
+
+        let options = CopyOptions::parse(options, legacy_options)?;
+        for (name, columns) in [
+            ("FORCE_NOT_NULL", &options.force_not_null),
+            ("FORCE_NULL", &options.force_null),
+        ] {
+            for column in columns {
+                let index = schema.index_of(column).map_err(|_| {
+                    CompilationError::user(format!(
+                        r#"column "{}" of relation "{}" does not exist"#,
+                        column, table_name
+                    ))
+                })?;
+
+                // The option speaks about a column the copy loads, and only those
+                if !column_indices.contains(&index) {
+                    return Err(CompilationError::user(format!(
+                        r#"{} column "{}" not referenced by COPY"#,
+                        name, column
+                    )));
+                }
+            }
+        }
+
+        Ok(QueryPlan::CopyFrom(Box::new(CopyFromPlan {
+            table_name,
+            schema,
+            column_indices,
+            options,
+            temp_tables: self.state.temp_tables(),
+        })))
     }
 
     async fn drop_table_to_plan(
@@ -740,6 +977,134 @@ impl QueryRouter {
 
         Ok(plan)
     }
+}
+
+/// Name of a table or a column as it is stored. Unquoted identifiers are
+/// case-insensitive in PostgreSQL, and are folded to lower case.
+pub fn normalize_ident(ident: &ast::Ident) -> String {
+    match ident.quote_style {
+        Some(_) => ident.value.clone(),
+        None => ident.value.to_ascii_lowercase(),
+    }
+}
+
+fn table_name_from_object_name(name: &ast::ObjectName) -> Result<String, CompilationError> {
+    let ast::ObjectName(ident_parts) = name;
+    let Some(table_name) = ident_parts.last() else {
+        return Err(CompilationError::internal(
+            "table name contains no ident parts".to_string(),
+        ));
+    };
+
+    let table_name = table_name.as_ident().ok_or_else(|| {
+        CompilationError::internal("table name is not a plain identifier".to_string())
+    })?;
+
+    Ok(normalize_ident(table_name))
+}
+
+/// Declared width of a character type, which PostgreSQL enforces when data is loaded.
+fn character_length(data_type: &ast::DataType) -> Option<u64> {
+    let length = match data_type {
+        ast::DataType::CharVarying(length)
+        | ast::DataType::CharacterVarying(length)
+        | ast::DataType::Varchar(length)
+        | ast::DataType::Nvarchar(length) => length.as_ref()?,
+        _ => return None,
+    };
+
+    match length {
+        ast::CharacterLength::IntegerLength { length, .. } => Some(*length),
+        ast::CharacterLength::Max => None,
+    }
+}
+
+/// The widest NUMERIC a temporary table can hold: values are stored as 128-bit
+/// decimals, which is narrower than what PostgreSQL supports.
+const MAX_DECIMAL_PRECISION: usize = 38;
+
+fn decimal_precision(precision: u64) -> Result<usize, CompilationError> {
+    if precision < 1 || precision as usize > MAX_DECIMAL_PRECISION {
+        return Err(CompilationError::unsupported(format!(
+            "NUMERIC precision {} must be between 1 and {}",
+            precision, MAX_DECIMAL_PRECISION
+        )));
+    }
+
+    Ok(precision as usize)
+}
+
+/// Type of a column of a temporary table. Only types which `COPY` can load are
+/// accepted, so that a table can never be created that cannot be filled.
+fn sql_type_to_arrow_type(data_type: &ast::DataType) -> Result<DataType, CompilationError> {
+    let arrow_type = match data_type {
+        ast::DataType::Bool | ast::DataType::Boolean => DataType::Boolean,
+        ast::DataType::SmallInt(_) | ast::DataType::Int2(_) => DataType::Int16,
+        ast::DataType::Int(_) | ast::DataType::Integer(_) | ast::DataType::Int4(_) => {
+            DataType::Int32
+        }
+        ast::DataType::BigInt(_) | ast::DataType::Int8(_) => DataType::Int64,
+        ast::DataType::Real | ast::DataType::Float4 => DataType::Float32,
+        ast::DataType::Double(_) | ast::DataType::DoublePrecision | ast::DataType::Float8 => {
+            DataType::Float64
+        }
+        ast::DataType::Float(precision) => match precision {
+            ast::ExactNumberInfo::Precision(precision) if *precision <= 24 => DataType::Float32,
+            _ => DataType::Float64,
+        },
+        ast::DataType::Decimal(info) | ast::DataType::Numeric(info) => match info {
+            ast::ExactNumberInfo::None => DataType::Decimal(MAX_DECIMAL_PRECISION, 10),
+            ast::ExactNumberInfo::Precision(precision) => {
+                DataType::Decimal(decimal_precision(*precision)?, 0)
+            }
+            ast::ExactNumberInfo::PrecisionAndScale(precision, scale) => {
+                let precision = decimal_precision(*precision)?;
+                let scale = *scale as usize;
+
+                if scale > precision {
+                    return Err(CompilationError::unsupported(format!(
+                        "NUMERIC scale {} must not exceed the precision {}",
+                        scale, precision
+                    )));
+                }
+
+                DataType::Decimal(precision, scale)
+            }
+        },
+        ast::DataType::CharVarying(_)
+        | ast::DataType::CharacterVarying(_)
+        | ast::DataType::Varchar(_)
+        | ast::DataType::Nvarchar(_)
+        | ast::DataType::Text
+        | ast::DataType::String(_)
+        | ast::DataType::Uuid
+        | ast::DataType::JSON
+        | ast::DataType::JSONB => DataType::Utf8,
+        // A fixed width character type is blank padded to its width, and its trailing
+        // blanks do not count in comparisons: a text column carries neither
+        ast::DataType::Char(_) | ast::DataType::Character(_) => {
+            return Err(CompilationError::unsupported(format!(
+                "Unsupported column type for a temporary table: {}, use VARCHAR or TEXT",
+                data_type
+            )))
+        }
+        ast::DataType::Date => DataType::Date32,
+        // A time zone changes what the values of the column mean, so a column which
+        // asks for one is refused rather than quietly stored without it
+        ast::DataType::Timestamp(
+            _,
+            ast::TimezoneInfo::None | ast::TimezoneInfo::WithoutTimeZone,
+        ) => DataType::Timestamp(TimeUnit::Nanosecond, None),
+        ast::DataType::Datetime(_) => DataType::Timestamp(TimeUnit::Nanosecond, None),
+        other => {
+            return Err(CompilationError::unsupported(format!(
+                "Unsupported column type for a temporary table: {}",
+                other
+            )))
+        }
+    };
+
+    Ok(arrow_type)
 }
 
 pub fn rewrite_statement(stmt: ast::Statement) -> ast::Statement {
