@@ -64,7 +64,7 @@ impl SqlNode for TimeShiftSqlNode {
                         .get(&ev.full_name())
                         .or_else(|| {
                             if self.substituted.contains_key(&ev.full_name()) {
-                                self.shifts.get_for_symbol(node)
+                                self.shifts.shift_for_substituted_column(node)
                             } else {
                                 None
                             }

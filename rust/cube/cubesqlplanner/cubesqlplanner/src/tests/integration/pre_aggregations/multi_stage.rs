@@ -516,3 +516,115 @@ async fn test_multi_stage_time_shift_pre_agg_on_partially_shifted_stored_segment
         insta::assert_snapshot!(result);
     }
 }
+
+// The shifted time dimension is read inside a measure's own SQL this time.
+// The rollup stores that measure aggregated from unshifted values, which no
+// offset recovers, so it cannot serve the shifted leaf either.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_time_shift_pre_agg_on_measure_reading_shifted_dimension() {
+    let schema = MockSchema::from_yaml_file(MULTI_DEP_YAML)
+        .only_pre_aggregations(&["late_total_by_batch_month"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {r#"
+        measures:
+          - mdd_events.late_total
+          - mdd_events.late_prev_month
+        time_dimensions:
+          - dimension: mdd_events.batch_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: mdd_events.batch_at
+    "#};
+
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    assert!(
+        pre_aggrs.is_empty(),
+        "Rollup stores a measure computed from the shifted dimension; got {:?}",
+        pre_aggrs.iter().map(|u| u.name().clone()).collect_vec()
+    );
+
+    if let Some(result) = ctx.try_execute(query, MULTI_DEP_SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// The stored dimension is a plain reference to the shifted one. Its column
+// holds unshifted values and the renderer resolves the reference through to
+// what it points at rather than offsetting the column, so the rollup cannot
+// serve the shifted leaf.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_time_shift_pre_agg_on_stored_reference_dimension() {
+    let schema = MockSchema::from_yaml_file(MULTI_DEP_YAML)
+        .only_pre_aggregations(&["total_by_batch_month_with_ref"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {r#"
+        measures:
+          - mdd_events.total
+          - mdd_events.total_prev_month
+        dimensions:
+          - mdd_events.happened_at_ref
+        time_dimensions:
+          - dimension: mdd_events.batch_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: mdd_events.batch_at
+          - id: mdd_events.happened_at_ref
+    "#};
+
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    assert!(
+        pre_aggrs.is_empty(),
+        "Rollup stores a reference to the shifted dimension; got {:?}",
+        pre_aggrs.iter().map(|u| u.name().clone()).collect_vec()
+    );
+
+    if let Some(result) = ctx.try_execute(query, MULTI_DEP_SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// The rollup stores a member the shift reaches, but the query never selects
+// it, so nothing ever reads that column and the stored measures are still
+// usable. Rejecting on a member the query does not read costs a rollup for
+// no correctness gain.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_time_shift_pre_agg_keeps_rollup_when_unshiftable_member_unused() {
+    let schema = MockSchema::from_yaml_file(MULTI_DEP_YAML)
+        .only_pre_aggregations(&["total_by_batch_month_with_ref"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {r#"
+        measures:
+          - mdd_events.total
+          - mdd_events.total_prev_month
+        time_dimensions:
+          - dimension: mdd_events.batch_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: mdd_events.batch_at
+    "#};
+
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    assert_eq!(
+        pre_aggrs.len(),
+        2,
+        "Rollup stores happened_at_ref but the query does not select it, so it stays usable"
+    );
+
+    // Same values the query produces from base SQL, so keeping the rollup
+    // costs nothing in correctness.
+    if let Some(result) = ctx.try_execute(query, MULTI_DEP_SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

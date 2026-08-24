@@ -34,6 +34,25 @@ impl TimeShiftState {
         self.dimensions_shifts.get(&owned.full_name())
     }
 
+    /// The shift a stored column standing for this member can carry.
+    ///
+    /// A column is shifted by offsetting it, which only stands in for the
+    /// shifted member when the member is a time dimension evaluated in place:
+    /// a reference is rendered through to what it points at, and a non-time
+    /// member has no meaning under an interval. Both the gate that admits a
+    /// pre-aggregation and the node that renders from one ask this, so the two
+    /// cannot come to different conclusions.
+    pub fn shift_for_substituted_column(
+        &self,
+        symbol: &Rc<MemberSymbol>,
+    ) -> Option<&DimensionTimeShift> {
+        let dimension = resolve_base_symbol(symbol).as_dimension().ok()?;
+        if dimension.is_reference() || !dimension.is_time() {
+            return None;
+        }
+        self.get_for_symbol(symbol)
+    }
+
     /// True when the symbol itself, or any member it is built from, is
     /// shifted. Unlike `get_for_symbol` this answers whether a shift is
     /// involved at all, not whether one can be attributed to the symbol.

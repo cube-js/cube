@@ -3,6 +3,7 @@ use super::*;
 use crate::logical_plan::visitor::{LogicalPlanRewriter, NodeRewriteResult};
 use crate::logical_plan::*;
 use crate::planner::collectors::{collect_cube_names_from_symbols, has_multi_stage_members};
+use crate::planner::filter::typed_filter::resolve_base_symbol;
 use crate::planner::filter::FilterItem;
 use crate::planner::filter::FilterOp;
 use crate::planner::join_hints::JoinHints;
@@ -137,15 +138,16 @@ impl PreAggregationOptimizer {
         is_user_query: bool,
     ) -> Result<Option<Rc<Query>>, CubeError> {
         for pre_aggregation in compiled_pre_aggregations.iter() {
-            if !Self::can_carry_time_shifts(pre_aggregation, time_shifts) {
-                continue;
-            }
             let external = pre_aggregation.external.unwrap_or(false);
             let date_range =
                 Self::extract_date_range(&query.filter(), &self.query_tools, time_shifts, external);
-            if let Some(rewritten) =
-                self.try_rewrite_simple_query(query, pre_aggregation, date_range, is_user_query)?
-            {
+            if let Some(rewritten) = self.try_rewrite_simple_query(
+                query,
+                pre_aggregation,
+                date_range,
+                is_user_query,
+                time_shifts,
+            )? {
                 return Ok(Some(rewritten));
             }
         }
@@ -159,6 +161,7 @@ impl PreAggregationOptimizer {
         pre_aggregation: &Rc<CompiledPreAggregation>,
         date_range: Option<(String, String)>,
         is_user_query: bool,
+        time_shifts: &TimeShiftState,
     ) -> Result<Option<Rc<Query>>, CubeError> {
         // Row identity for an ungrouped read is judged against the join this
         // very node will render, taken from the node itself rather than
@@ -177,6 +180,14 @@ impl PreAggregationOptimizer {
             pre_aggregation,
             row_grain,
         )? {
+            if !Self::can_carry_time_shifts(
+                pre_aggregation,
+                &matched_measures,
+                &Self::read_member_names(&query.schema(), &query.filter()),
+                time_shifts,
+            ) {
+                return Ok(None);
+            }
             let source =
                 self.make_pre_aggregation_source(pre_aggregation, &matched_measures, date_range)?;
             let new_query = Query::builder()
@@ -488,24 +499,78 @@ impl PreAggregationOptimizer {
     // either, so the two agree: whenever a shift is involved but cannot be
     // attributed, the pre-aggregation cannot serve the shifted leaf.
     //
-    // Every member the pre-aggregation stores is checked, not just its time
-    // dimensions: dimensions and segments are substituted by column too, and
-    // one computed from a shifted member is just as wrong when read unshifted.
+    // Grouping members — time dimensions, dimensions and segments — are
+    // substituted by column, so a pre-aggregation can only serve a shifted
+    // leaf when every stored member a shift reaches is one whose column can
+    // carry that shift. `shift_for_substituted_column` decides that, and the
+    // rendering node asks it too, so a member admitted here is one that will
+    // actually be offset.
+    //
+    // A measure column holds an aggregate, and a shift changes which rows
+    // feed it rather than the value itself, so no offset applies at all. A
+    // stored measure reading a shifted member is therefore always unusable,
+    // however cleanly the shift could be attributed to it. Only the measures
+    // matching consumed are examined, since the rest are never read.
+    // Resolved names of every member the query reads, so a stored member no
+    // one reads cannot decide anything.
+    fn read_member_names(schema: &LogicalSchema, filter: &LogicalFilter) -> HashSet<String> {
+        let mut symbols: Vec<Rc<MemberSymbol>> = schema
+            .dimensions
+            .iter()
+            .chain(schema.time_dimensions.iter())
+            .chain(schema.measures.iter())
+            .cloned()
+            .collect();
+        for item in filter
+            .dimensions_filters
+            .iter()
+            .chain(filter.time_dimensions_filters.iter())
+            .chain(filter.segments.iter())
+        {
+            item.find_all_member_evaluators(&mut symbols);
+        }
+        symbols
+            .into_iter()
+            .map(|symbol| {
+                resolve_base_symbol(&symbol)
+                    .resolve_reference_chain()
+                    .full_name()
+            })
+            .collect()
+    }
+
     fn can_carry_time_shifts(
         pre_aggregation: &CompiledPreAggregation,
+        matched_measures: &HashSet<String>,
+        read_members: &HashSet<String>,
         time_shifts: &TimeShiftState,
     ) -> bool {
         if time_shifts.is_empty() {
             return true;
         }
-        pre_aggregation
+        let is_read = |member: &Rc<MemberSymbol>| {
+            read_members.contains(
+                &resolve_base_symbol(member)
+                    .resolve_reference_chain()
+                    .full_name(),
+            )
+        };
+        let grouping_members_carry_shift = pre_aggregation
             .time_dimensions
             .iter()
             .chain(pre_aggregation.dimensions.iter())
             .chain(pre_aggregation.segments.iter())
+            .filter(|member| is_read(member))
             .all(|member| {
-                !time_shifts.has_shift_under(member) || time_shifts.get_for_symbol(member).is_some()
-            })
+                !time_shifts.has_shift_under(member)
+                    || time_shifts.shift_for_substituted_column(member).is_some()
+            });
+        grouping_members_carry_shift
+            && pre_aggregation
+                .measures
+                .iter()
+                .filter(|measure| matched_measures.contains(&measure.full_name()))
+                .all(|measure| !time_shifts.has_shift_under(measure))
     }
 
     fn extract_date_range(
