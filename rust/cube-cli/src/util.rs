@@ -178,6 +178,25 @@ pub fn nonempty_ref(s: &str) -> Result<String, String> {
     Ok(s.to_string())
 }
 
+/// `nonempty` with a message specific to a LIST FILTER — `dbt history --status`, and
+/// anything that follows it — where an empty value is neither a filter nor nothing at
+/// all: `push` sends `status=`, and every runs / no runs / a complaint are three answers
+/// a server could reasonably give it.
+///
+/// The reachable case is the same one the two above were written for: a CI script whose
+/// `$STATUS` did not expand, where the run this refuses would otherwise have listed
+/// whatever the server made of an empty field.
+pub fn nonempty_filter(s: &str) -> Result<String, String> {
+    if s.trim().is_empty() {
+        return Err(format!(
+            "{EMPTY_VALUE_REFUSED} selects nothing — and it is not dropped, but sent as an \
+             empty filter, leaving what that matches to the server rather than to you"
+        ));
+    }
+
+    Ok(s.to_string())
+}
+
 /// A branch name to PRINT, when the payload might not have carried one.
 ///
 /// Only for prose and suggested commands, never for a JSON document: a gate reading
@@ -525,6 +544,14 @@ mod tests {
         assert!(nonempty_ref("main").is_ok());
         assert!(nonempty_ref("").is_err());
         assert!(nonempty_ref("\t").is_err());
+        assert!(nonempty_filter("FAILED").is_ok());
+        assert!(nonempty_filter("").is_err());
+        assert!(nonempty_filter("  ").is_err());
+        // All three open with the phrase the command-tree walk partitions on, so a guard
+        // that ends up on a branch argument is recognised as one wherever it came from.
+        for refusal in [nonempty(""), nonempty_ref(""), nonempty_filter("")] {
+            assert!(refusal.unwrap_err().contains(EMPTY_VALUE_REFUSED));
+        }
     }
 
     #[test]

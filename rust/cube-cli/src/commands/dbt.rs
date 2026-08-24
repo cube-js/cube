@@ -80,11 +80,13 @@ enum Cmd {
     History {
         /// Deployment id
         deployment: i64,
-        /// Only runs with this status: RUNNING, COMPLETED, FAILED, CANCELLED, UNKNOWN
-        #[arg(long)]
+        /// Only runs with this status, case-sensitive: RUNNING, COMPLETED, FAILED,
+        /// CANCELLED, UNKNOWN
+        #[arg(long, value_parser = util::nonempty_filter)]
         status: Option<String>,
-        /// Only runs started this way: manual, api, webhook, agent, unknown
-        #[arg(long)]
+        /// Only runs started this way, case-sensitive: manual, api, webhook, agent,
+        /// unknown
+        #[arg(long, value_parser = util::nonempty_filter)]
         trigger: Option<String>,
         /// Page size for cursor-based pagination (at most 100 per page)
         #[arg(long)]
@@ -749,10 +751,17 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             after,
         } => {
             let mut query = Vec::new();
-            // Sent as given, unchecked: the two vocabularies are the server's, and a
-            // filter the CLI does not know yet is one the server can still honour. A
-            // value it cannot is a loud 400 naming the field, where a list hard-coded
-            // here would refuse a run this tenant has and this build has not heard of.
+            // Sent as given, unchecked against a list: the two vocabularies are the
+            // server's, and a filter this build has not heard of is one the server can
+            // still honour, where a list hard-coded here would refuse a run this tenant
+            // has. Only the empty string is refused, and at parse time — `push` does not
+            // drop it, it sends `status=`, and what that selects is not ours to guess.
+            //
+            // The case is the server's as well, and the two vocabularies do not share it
+            // — statuses upper, triggers lower. Hence the help spelling both out and
+            // saying so: a mis-cased value is the one mistake that may come back as an
+            // empty table rather than as a complaint, and an empty table reads as an
+            // answer.
             util::push(&mut query, "status", &status);
             util::push(&mut query, "trigger", &trigger);
             util::push(&mut query, "first", &first);
