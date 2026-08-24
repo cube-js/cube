@@ -235,7 +235,7 @@ crate::di_service!(ClusterImpl, [Cluster]);
 /// must reproduce. Each of these shapes both the worker subtree and the node that combines it, so a
 /// receiver planning its half from a different value returns wrong rows instead of failing. They
 /// travel with the query so that the sender's configuration decides for the whole plan.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlanningFlags {
     pub group_by_limit_factor: usize,
     pub topk_strategy: TopKAggregateStrategy,
@@ -2397,17 +2397,39 @@ mod tests {
                 flags: Some(flags),
             }));
         assert_eq!(params.worker_partition_count, 7);
-        let flags = params.flags.unwrap();
-        assert_eq!(flags.group_by_limit_factor, 5);
-        assert_eq!(
-            flags.topk_strategy,
-            TopKAggregateStrategy::VectorizedStreaming
-        );
+        assert_eq!(params.flags, Some(flags));
     }
 
     #[test]
-    fn planning_flags_fall_back_to_the_receiver_configuration() {
-        let config = Config::test("planning_flags_fall_back_to_the_receiver_configuration")
+    fn planning_flags_strategy_wire_names() {
+        // The names are the cross-node contract, so a renamed variant must not change them.
+        #[derive(Serialize)]
+        struct FlagsWithStrategyAsString {
+            group_by_limit_factor: usize,
+            topk_strategy: &'static str,
+        }
+
+        for (name, strategy) in [
+            ("streaming", TopKAggregateStrategy::Streaming),
+            (
+                "vectorized_streaming",
+                TopKAggregateStrategy::VectorizedStreaming,
+            ),
+            ("full_merge", TopKAggregateStrategy::FullMerge),
+        ] {
+            let buffer = to_flexbuffers(&FlagsWithStrategyAsString {
+                group_by_limit_factor: 1,
+                topk_strategy: name,
+            });
+            let flags: PlanningFlags = from_flexbuffers(&buffer);
+            assert_eq!(flags.topk_strategy, strategy, "wire name {}", name);
+        }
+    }
+
+    /// The values a receiver falls back to when the sender sends no flags.
+    #[test]
+    fn planning_flags_from_config() {
+        let config = Config::test("planning_flags_from_config")
             .update_config(|mut c| {
                 c.group_by_limit_factor = 4;
                 c.topk_aggregate_strategy = TopKAggregateStrategy::FullMerge;

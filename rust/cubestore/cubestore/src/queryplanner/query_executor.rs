@@ -579,9 +579,10 @@ impl QueryExecutorImpl {
         worker_planning_params: WorkerPlanningParams,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<Arc<SessionContext>, CubeError> {
-        // A sender that does not send the flags planned from its own configuration, which this
-        // node's configuration reproduces: an explicitly set value is set on every node of a
-        // cluster, and an unset one still defaults to the same value in both binaries.
+        // A sender that does not send the flags planned from its own configuration, and this
+        // node's configuration reproduces it as long as the value is unset (both binaries default
+        // to the same one) or set on every node. A value set on the router alone is the one case
+        // it cannot reproduce, so keep such a value set cluster-wide until every node sends flags.
         let planning_flags = worker_planning_params
             .flags
             .unwrap_or_else(|| PlanningFlags::from_config(self.config.as_ref()));
@@ -2541,7 +2542,53 @@ fn slice_copy(a: &dyn Array, start: usize, len: usize) -> ArrayRef {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cluster::MockCluster;
+    use crate::config::TopKAggregateStrategy;
+    use crate::queryplanner::planning::PlanningMeta;
     use datafusion::arrow::datatypes::Field;
+    use datafusion::common::DFSchema;
+    use datafusion::logical_expr::EmptyRelation;
+    use std::collections::HashMap;
+
+    /// The flags the router stamped must reach the worker, not silently decay to the absent case
+    /// that makes the worker plan from its own configuration.
+    #[test]
+    fn cluster_send_exec_sends_its_planning_flags() -> Result<(), CubeError> {
+        let flags = PlanningFlags {
+            group_by_limit_factor: 3,
+            topk_strategy: TopKAggregateStrategy::FullMerge,
+        };
+        let input: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(Arc::new(Schema::empty())));
+        let plan = PreSerializedPlan::try_new(
+            LogicalPlan::EmptyRelation(EmptyRelation {
+                produce_one_row: false,
+                schema: Arc::new(DFSchema::empty()),
+            }),
+            PlanningMeta {
+                indices: Vec::new(),
+                multi_part_subtree: HashMap::new(),
+                pushable_chunk_filters: Vec::new(),
+            },
+            None,
+        )?;
+        let exec = ClusterSendExec {
+            properties: ClusterSendExec::compute_properties(input.properties(), 2),
+            partitions: Vec::new(),
+            cluster: Arc::new(MockCluster::new()),
+            serialized_plan: Arc::new(plan),
+            input_for_optimizations: input,
+            use_streaming: false,
+            limit_and_reverse: None,
+            required_input_ordering: None,
+            worker_sort_and_limit: None,
+            planning_flags: flags,
+        };
+
+        let params = exec.worker_planning_params();
+        assert_eq!(params.worker_partition_count, 2);
+        assert_eq!(params.flags, Some(flags));
+        Ok(())
+    }
 
     #[test]
     fn test_batch_to_dataframe() -> Result<(), CubeError> {

@@ -596,6 +596,10 @@ pub trait ConfigObj: DIService {
     /// lives: `false` (default) coalesces the partial aggregate's input to one partition (one hash
     /// table per worker, "over merge"); `true` keeps the raw multi-partition input so it runs per
     /// partition ("under merge").
+    ///
+    /// Unlike [`ConfigObj::group_by_limit_factor`], this one stays node-local and is not part of
+    /// [`PlanningFlags`]: it only moves a partition coalesce below the partial aggregate, leaving
+    /// the subtree's schema and the partition count the router sees the same either way.
     fn group_by_limit_per_partition(&self) -> bool;
 
     /// Replace the sort-preserving merge feeding a grouped Linear (hash) aggregate with a plain
@@ -1320,17 +1324,22 @@ pub async fn init_test_logger() {
 /// A worker reads its own value only for a query whose sender did not send any flags, i.e. one
 /// from a node that predates them and therefore planned from its own configuration.
 ///
-/// Serialized as part of those flags, deliberately without a catch-all variant: a strategy this
-/// binary does not know about must fail the query loudly rather than fall back to a value the
-/// sender did not plan with.
+/// Serialized as part of those flags under the same names `CUBESTORE_TOPK_STRATEGY` accepts, which
+/// are therefore part of the cross-node contract: renaming a variant must not change them.
+/// Deliberately without a catch-all variant: a strategy this binary does not know about must fail
+/// the query rather than fall back to a value the sender did not plan with. The receiving node fails to deserialize the message and drops the connection, so
+/// the reason is in its own log while the sender reports a connection error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TopKAggregateStrategy {
     /// Original streaming NRA merge with per-row state (default).
+    #[serde(rename = "streaming")]
     Streaming,
     /// Same streaming NRA merge (keeps early termination, bounded router memory), but vectorized.
+    #[serde(rename = "vectorized_streaming")]
     VectorizedStreaming,
     /// ClickHouse-style full re-aggregation on the router + fetch-limited sort. Drops early
     /// termination, so the router materializes every distinct group.
+    #[serde(rename = "full_merge")]
     FullMerge,
 }
 
