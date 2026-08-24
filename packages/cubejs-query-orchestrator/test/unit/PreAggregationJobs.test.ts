@@ -71,7 +71,7 @@ class MockDriver {
   }
 }
 
-type ImportBehavior = 'ok' | 'fail' | 'hang';
+type ImportBehavior = 'ok' | 'fail' | 'hang' | 'fail-cleanup';
 
 /**
  * Emulates Cube Store. `importBehavior` reproduces the shape from the incident:
@@ -83,6 +83,8 @@ class ExternalMockDriver extends MockDriver {
   public indexes: any[] = [];
 
   public importBehavior: ImportBehavior = 'ok';
+
+  public failTableListingOnce: boolean = false;
 
   public importStarted: Promise<void> = Promise.resolve();
 
@@ -115,6 +117,19 @@ class ExternalMockDriver extends MockDriver {
       await this.query(query, params);
     }
     this.indexes = this.indexes.concat(indexesSql);
+
+    if (this.importBehavior === 'fail-cleanup') {
+      this.failTableListingOnce = true;
+    }
+  }
+
+  public async getTablesQuery(schema: string) {
+    if (this.failTableListingOnce) {
+      this.failTableListingOnce = false;
+      throw new Error('Transient error while listing tables');
+    }
+
+    return super.getTablesQuery(schema);
   }
 }
 
@@ -323,6 +338,30 @@ describe('pre-aggregation build jobs', () => {
     );
 
     expect(status).not.toEqual('done');
+  });
+
+  // Orphaned tables cleanup runs once the rows are already in place. It can
+  // fail on its own, and that says nothing about the partition it just built.
+  test('cleanup failure after the rows landed is not reported as failure', async () => {
+    externalMockDriver.importBehavior = 'fail-cleanup';
+
+    const result = await orchestrator.fetchQuery(jobQuery('cleanup failure job query') as any);
+    const [{ targetTableName, queryKey }] = result;
+
+    // The listing that orphaned tables cleanup runs right after the upload fails
+    await waitFor(() => externalMockDriver.indexes.length > 0 && !externalMockDriver.failTableListingOnce);
+
+    const [, status] = await orchestrator.isPartitionExist(
+      'cleanup failure job query',
+      true,
+      'default',
+      'stb_pre_aggregations',
+      targetTableName,
+      queryKey,
+      'test-token',
+    );
+
+    expect(status).toEqual('done');
   });
 
   // A failed jobs-API build must surface as `failure`, not as `done`.
