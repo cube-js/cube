@@ -856,13 +856,7 @@ impl SqlService for SqlServiceImpl {
                     } else {
                         let worker = &workers[0];
                         cluster
-                            .run_select(
-                                worker,
-                                plan,
-                                WorkerPlanningParams {
-                                    worker_partition_count: 1,
-                                },
-                            )
+                            .run_select(worker, plan, WorkerPlanningParams::no_worker())
                             .await?;
                     }
                     panic!("worker did not panic")

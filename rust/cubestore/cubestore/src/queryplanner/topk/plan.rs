@@ -616,7 +616,7 @@ pub fn plan_topk(
     // Full-merge strategy: workers send their groups unsorted, the router re-aggregates with one
     // vectorized hash aggregate and takes the top-k with a fetch-limited sort. Drops early
     // termination (so the router materializes every distinct group), so it is opt-in and skips HLL.
-    if ext_planner.topk_strategy == TopKAggregateStrategy::FullMerge
+    if ext_planner.planning_flags.topk_strategy == TopKAggregateStrategy::FullMerge
         && agg_fun
             .iter()
             .all(|(f, _)| *f != TopKAggregateFunction::Merge)
@@ -679,7 +679,8 @@ pub fn plan_topk(
         None
     };
 
-    let merge_version = if ext_planner.topk_strategy == TopKAggregateStrategy::VectorizedStreaming
+    let merge_version = if ext_planner.planning_flags.topk_strategy
+        == TopKAggregateStrategy::VectorizedStreaming
         && topk_v2_supported(lower_node, group_expr_len, agg_fun.as_slice())
     {
         TopKMergeVersion::V2

@@ -1,5 +1,5 @@
 use crate::cluster::{
-    pick_worker_by_ids, pick_worker_by_partitions, Cluster, WorkerPlanningParams,
+    pick_worker_by_ids, pick_worker_by_partitions, Cluster, PlanningFlags, WorkerPlanningParams,
 };
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
@@ -567,9 +567,8 @@ impl QueryExecutorImpl {
             cluster,
             serialized_plan,
             self.memory_handler.clone(),
-            self.config.group_by_limit_factor(),
+            PlanningFlags::from_config(self.config.as_ref()),
             self.config.group_by_limit_per_partition(),
-            self.config.topk_aggregate_strategy(),
         ))
     }
 
@@ -580,14 +579,20 @@ impl QueryExecutorImpl {
         worker_planning_params: WorkerPlanningParams,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<Arc<SessionContext>, CubeError> {
+        // A sender that does not send the flags planned from its own configuration, and this
+        // node's configuration reproduces it as long as the value is unset (both binaries default
+        // to the same one) or set on every node. A value set on the router alone is the one case
+        // it cannot reproduce, so keep such a value set cluster-wide until every node sends flags.
+        let planning_flags = worker_planning_params
+            .flags
+            .unwrap_or_else(|| PlanningFlags::from_config(self.config.as_ref()));
         self.make_context(CubeQueryPlanner::new_on_worker(
             serialized_plan,
-            worker_planning_params,
+            worker_planning_params.worker_partition_count,
             self.memory_handler.clone(),
             data_loaded_size.clone(),
-            self.config.group_by_limit_factor(),
+            planning_flags,
             self.config.group_by_limit_per_partition(),
-            self.config.topk_aggregate_strategy(),
         ))
     }
 
@@ -1482,6 +1487,8 @@ pub struct ClusterSendExec {
     pub required_input_ordering: Option<LexRequirement>,
     /// Not used in execution, only stored to allow consistent optimization on router and worker.
     pub worker_sort_and_limit: Option<(Vec<(usize, bool, bool)>, usize)>,
+    /// The flags this node planned with, sent to the worker so it plans its half the same way.
+    pub planning_flags: PlanningFlags,
 }
 
 pub type PartitionWithFilters = (u64, RowRange);
@@ -1506,6 +1513,7 @@ impl ClusterSendExec {
         limit_and_reverse: Option<(usize, bool)>,
         worker_sort_and_limit: Option<(Vec<(usize, bool, bool)>, usize)>,
         required_input_ordering: Option<LexRequirement>,
+        planning_flags: PlanningFlags,
     ) -> Result<Self, CubeError> {
         let partitions = Self::distribute_to_workers(
             cluster.config().as_ref(),
@@ -1525,6 +1533,7 @@ impl ClusterSendExec {
             limit_and_reverse,
             required_input_ordering,
             worker_sort_and_limit,
+            planning_flags,
         })
     }
 
@@ -1551,6 +1560,7 @@ impl ClusterSendExec {
         WorkerPlanningParams {
             // Or, self.partitions.len().
             worker_partition_count: self.properties().output_partitioning().partition_count(),
+            flags: Some(self.planning_flags),
         }
     }
 
@@ -1847,6 +1857,7 @@ impl ClusterSendExec {
             limit_and_reverse: self.limit_and_reverse,
             worker_sort_and_limit: self.worker_sort_and_limit.clone(),
             required_input_ordering: new_required_input_ordering,
+            planning_flags: self.planning_flags,
         }
     }
 
@@ -1915,6 +1926,7 @@ impl ExecutionPlan for ClusterSendExec {
             limit_and_reverse: self.limit_and_reverse,
             worker_sort_and_limit: self.worker_sort_and_limit.clone(),
             required_input_ordering: self.required_input_ordering.clone(),
+            planning_flags: self.planning_flags,
         }))
     }
 
@@ -2530,7 +2542,53 @@ fn slice_copy(a: &dyn Array, start: usize, len: usize) -> ArrayRef {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cluster::MockCluster;
+    use crate::config::TopKAggregateStrategy;
+    use crate::queryplanner::planning::PlanningMeta;
     use datafusion::arrow::datatypes::Field;
+    use datafusion::common::DFSchema;
+    use datafusion::logical_expr::EmptyRelation;
+    use std::collections::HashMap;
+
+    /// The flags the router stamped must reach the worker, not silently decay to the absent case
+    /// that makes the worker plan from its own configuration.
+    #[test]
+    fn cluster_send_exec_sends_its_planning_flags() -> Result<(), CubeError> {
+        let flags = PlanningFlags {
+            group_by_limit_factor: 3,
+            topk_strategy: TopKAggregateStrategy::FullMerge,
+        };
+        let input: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(Arc::new(Schema::empty())));
+        let plan = PreSerializedPlan::try_new(
+            LogicalPlan::EmptyRelation(EmptyRelation {
+                produce_one_row: false,
+                schema: Arc::new(DFSchema::empty()),
+            }),
+            PlanningMeta {
+                indices: Vec::new(),
+                multi_part_subtree: HashMap::new(),
+                pushable_chunk_filters: Vec::new(),
+            },
+            None,
+        )?;
+        let exec = ClusterSendExec {
+            properties: ClusterSendExec::compute_properties(input.properties(), 2),
+            partitions: Vec::new(),
+            cluster: Arc::new(MockCluster::new()),
+            serialized_plan: Arc::new(plan),
+            input_for_optimizations: input,
+            use_streaming: false,
+            limit_and_reverse: None,
+            required_input_ordering: None,
+            worker_sort_and_limit: None,
+            planning_flags: flags,
+        };
+
+        let params = exec.worker_planning_params();
+        assert_eq!(params.worker_partition_count, 2);
+        assert_eq!(params.flags, Some(flags));
+        Ok(())
+    }
 
     #[test]
     fn test_batch_to_dataframe() -> Result<(), CubeError> {

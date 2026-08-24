@@ -32,8 +32,7 @@ use itertools::{EitherOrBoth, Itertools};
 use std::any::Any;
 use std::fmt::Formatter;
 
-use crate::cluster::{Cluster, WorkerPlanningParams};
-use crate::config::TopKAggregateStrategy;
+use crate::cluster::{Cluster, PlanningFlags};
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{
@@ -1969,9 +1968,10 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
 pub struct CubeExtensionPlanner {
     pub cluster: Option<Arc<dyn Cluster>>,
     // Set on the workers.
-    pub worker_planning_params: Option<WorkerPlanningParams>,
+    pub worker_partition_count: Option<usize>,
     pub serialized_plan: Arc<PreSerializedPlan>,
-    pub topk_strategy: TopKAggregateStrategy,
+    /// On the router, this node's own configuration; on a worker, what the router sent.
+    pub planning_flags: PlanningFlags,
 }
 
 #[async_trait]
@@ -2116,16 +2116,19 @@ impl CubeExtensionPlanner {
                 limit_and_reverse,
                 worker_sort_and_limit,
                 required_input_ordering,
+                self.planning_flags,
             )?))
         } else {
-            let worker_planning_params = self.worker_planning_params.expect("cluster_send_partition_count must be set when CubeExtensionPlanner::cluster is None");
+            let worker_partition_count = self.worker_partition_count.expect(
+                "worker_partition_count must be set when CubeExtensionPlanner::cluster is None",
+            );
             Ok(Arc::new(WorkerExec::new(
                 input,
                 max_batch_rows,
                 limit_and_reverse,
                 required_input_ordering,
                 worker_sort_and_limit,
-                worker_planning_params,
+                worker_partition_count,
             )))
         }
     }
@@ -2150,13 +2153,11 @@ impl WorkerExec {
         limit_and_reverse: Option<(usize, bool)>,
         required_input_ordering: Option<LexRequirement>,
         worker_sort_and_limit: Option<WorkerSortAndLimit>,
-        worker_planning_params: WorkerPlanningParams,
+        worker_partition_count: usize,
     ) -> WorkerExec {
         // This, importantly, gives us the same PlanProperties as ClusterSendExec.
-        let properties = ClusterSendExec::compute_properties(
-            input.properties(),
-            worker_planning_params.worker_partition_count,
-        );
+        let properties =
+            ClusterSendExec::compute_properties(input.properties(), worker_partition_count);
         WorkerExec {
             input,
             max_batch_rows,
