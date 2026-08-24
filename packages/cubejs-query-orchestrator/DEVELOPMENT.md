@@ -269,6 +269,13 @@ The item is claimed when the prefix has a concurrency slot for it *and* for ever
 already queued — `active + pending < concurrency`, where `concurrency` is the same budget
 `QUEUE RETRIEVE CONCURRENCY` uses and `pending` does not count the item itself.
 
+The driver only emits the command for queries at **priority 10 or above**. That is where
+the latency-sensitive work sits — `QueryCache` submits a user query at 10, and
+`PreAggregationLoader` uses 10 for a build a request is waiting on — while background
+refresh comes in below it. A background sweep runs the queue at its concurrency ceiling for
+minutes, which is the one regime where the claim never succeeds and the extra `concurrency`
+parameter is pure overhead.
+
 `payload IS NULL` in the response means the item was not claimed — the condition failed,
 the item was already active, or it belongs to another process — and the caller falls back
 to the normal path with nothing lost, because the item is enqueued either way.

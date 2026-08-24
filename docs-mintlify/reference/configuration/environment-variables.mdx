@@ -195,7 +195,10 @@ and we don't recommend enabling it in production yet.
 
 Enables the preview fast-track path for Cube Store query queues. When enabled,
 Cube can atomically enqueue and claim a query when queue concurrency is
-available, reducing queue coordination round trips. This requires Cube Store
+available, reducing queue coordination round trips. It applies to queries at
+queue priority 10 and above, which is where user-facing queries and the
+pre-aggregation builds a request waits on are submitted; background refresh runs
+below that and keeps using the regular path. This requires Cube Store
 1.7.25 or newer; against an older version Cube keeps using the regular path.
 
 | Possible Values | Default in Development | Default in Production |

@@ -633,7 +633,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
         try {
           const query: QueryKey = ['select * from fast_track', []];
-          const result = await queue.executeInQueue('foo', query, query);
+          const result = await queue.executeInQueue('foo', query, query, 10);
 
           expect(result).toBe('select * from fast_track bar');
           expect(driverQuery.mock.calls.some(([sql]) => sql.startsWith('QUEUE ADD_AND_RETRIEVE'))).toBe(true);
@@ -649,12 +649,27 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
       test('concurrent clients execute the query once', async () => {
         const results = await Promise.all([
-          queue.executeInQueue('delay', 'fast_track_concurrent', { delay: 400, result: '2' }),
-          queue.executeInQueue('delay', 'fast_track_concurrent', { delay: 400, result: '2' })
+          queue.executeInQueue('delay', 'fast_track_concurrent', { delay: 400, result: '2' }, 10),
+          queue.executeInQueue('delay', 'fast_track_concurrent', { delay: 400, result: '2' }, 10)
         ]);
 
         expect(results).toStrictEqual(['20', '20']);
         expect(delayCount).toBe(1);
+      });
+
+      test('a background priority query takes the normal path', async () => {
+        const driverQuery = jest.spyOn(CubeStoreDriver.prototype, 'query');
+
+        try {
+          const query: QueryKey = ['select * from slow_track', []];
+          const result = await queue.executeInQueue('foo', query, query, 9);
+
+          expect(result).toBe('select * from slow_track bar');
+          expect(driverQuery.mock.calls.some(([sql]) => sql.startsWith('QUEUE ADD_AND_RETRIEVE'))).toBe(false);
+          expect(driverQuery.mock.calls.some(([sql]) => sql.startsWith('QUEUE ADD PRIORITY'))).toBe(true);
+        } finally {
+          driverQuery.mockRestore();
+        }
       });
 
       test('a claim is not given out while the concurrency budget is taken', async () => {

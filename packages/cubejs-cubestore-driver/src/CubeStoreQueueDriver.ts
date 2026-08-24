@@ -39,6 +39,11 @@ type CubeStoreListResponse = {
   status: string
 };
 
+// Latency-sensitive queries arrive at priority 10 or above: QueryCache uses 10 for a user
+// query, PreAggregationLoader for a build a query is waiting on. Background refresh work
+// sits below that, and it is the regime where claiming on insert buys nothing
+const FastTrackMinPriority = 10;
+
 // cube store convert int64 to string
 type CubeStoreClaimResponse = {
   id: string,
@@ -64,8 +69,8 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     this.sendParameters = getEnv('cubestoreSendableParameters');
   }
 
-  public async useFastTrack(): Promise<boolean> {
-    if (this.fastTrackEnabled) {
+  public async useFastTrack(priority: number): Promise<boolean> {
+    if (this.fastTrackEnabled && priority >= FastTrackMinPriority) {
       return this.driver.hasCapability('queueAddAndRetrieve');
     }
 
@@ -139,7 +144,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
   ): Promise<AddToQueueResponse> {
     const { modifiers, values, addedToQueueTime } = await this.buildAddCommand(queryKey, queryHandler, query, priority, options);
 
-    const fastTrack = await this.useFastTrack();
+    const fastTrack = await this.useFastTrack(priority);
     if (fastTrack) {
       values.push(this.options.concurrency);
     }

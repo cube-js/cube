@@ -73,7 +73,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
       await options.beforeAll();
     }
 
-    const createBenchmark = async (benchSettings: { totalQueries: number, queueResponseSize: number, queuePayloadSize: number, currency: number, pushIntervalMs: number }) => {
+    const createBenchmark = async (benchSettings: { totalQueries: number, queueResponseSize: number, queuePayloadSize: number, currency: number, pushIntervalMs: number, priority: number }) => {
       const counters = {
         connections: 0,
         methods: {},
@@ -270,7 +270,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
                 large_str: 'a'.repeat(benchSettings.queuePayloadSize)
               },
               orphanedTimeout: 120
-            }, 1, {
+            }, benchSettings.priority, {
               stageQueryKey: 1,
               requestId: 'request-id',
               spanId: 'span-id'
@@ -326,6 +326,8 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
       currency: parseInt(process.env.BENCH_CONCURRENCY || '50', 10),
       totalQueries,
       pushIntervalMs: periodMs > 0 ? Math.max(1, Math.round(periodMs / totalQueries)) : 10,
+      // the fast track only takes queries at priority 10 and above
+      priority: parseInt(process.env.BENCH_PRIORITY || '10', 10),
       // eslint-disable-next-line no-bitwise
       queueResponseSize: parseInt(process.env.BENCH_RESPONSE_SIZE || `${5 << 20}`, 10),
       queuePayloadSize: parseInt(process.env.BENCH_PAYLOAD_SIZE || `${256 * 1024}`, 10),
