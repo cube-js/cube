@@ -659,6 +659,20 @@ hosts, a prefilled compare link to open it yourself.
 
 </Steps>
 
+### Push a cube from Analytics Chat
+
+Ask [the agent](/docs/explore-analyze/analytics-chat) to promote a cube to dbt, or to
+edit an existing dbt model, instead of opening the push dialog yourself—for example,
+"push the orders cube to dbt" or "add a total_amount column to the stg_orders dbt
+model." The agent opens a live sandboxed clone of your dbt repository, reads
+`dbt_project.yml` and neighboring models to match your project's conventions, then
+drafts and writes the model's `.sql` and `.yml` files and runs `dbt parse`/`dbt
+compile` in the sandbox—iterating until the change is valid—before handing it back to
+you to actually deliver via the push flow above.
+
+This requires [push](#enable-push) to be enabled on the deployment; it inherits dbt
+push's preview status.
+
 ### What gets pushed
 
 Each push creates exactly two new files:
