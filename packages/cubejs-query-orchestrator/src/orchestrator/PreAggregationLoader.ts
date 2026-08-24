@@ -101,6 +101,8 @@ export class PreAggregationLoader {
 
   private readonly externalRefresh: boolean;
 
+  private buildLanded: boolean = false;
+
   public constructor(
     private readonly driverFactory: DriverFactory,
     private readonly logger: LoggerFn,
@@ -493,19 +495,22 @@ export class PreAggregationLoader {
         });
 
         try {
-          const result = await refreshStrategy.bind(this)(
+          return await refreshStrategy.bind(this)(
             client,
             newVersionEntry,
             saveCancelFn,
             invalidationKeys
           );
-          await this.reportBuildStatus(targetTableName, { status: 'done' });
-          return result;
         } catch (e: any) {
-          await this.reportBuildStatus(targetTableName, {
-            status: 'failure',
-            error: (e.message || e).toString(),
-          });
+          // Post-build cleanup runs after the rows have landed and can fail on
+          // its own. The partition is complete either way, so it keeps the
+          // outcome the strategy already reported.
+          if (!this.buildLanded) {
+            await this.reportBuildStatus(targetTableName, {
+              status: 'failure',
+              error: (e.message || e).toString(),
+            });
+          }
 
           // It's required to remove touch keys, because they are unique per run/table, and it causes
           // a large number of touch keys in the cache store
@@ -534,10 +539,28 @@ export class PreAggregationLoader {
   }
 
   /**
-   * Persists the build outcome so the jobs API can tell a finished build from a
-   * versioned table that merely exists. Recorded for every build, not just for
-   * the ones a job started: the queue de-duplicates on the query key, so a job
-   * regularly ends up waiting on a build some other request enqueued.
+   * Marks the rows as landed in the partition table. From here on the table
+   * speaks for itself, so the record that a build is in flight goes away and
+   * nothing but a live build is left behind in the cache store.
+   */
+  protected async reportBuildLanded(targetTableName: string): Promise<void> {
+    this.buildLanded = true;
+
+    try {
+      await this.preAggregations.removePreAggregationBuildStatus(targetTableName);
+    } catch (e: any) {
+      this.logger('Error on dropping pre-aggregation build status', {
+        error: (e.stack || e), preAggregation: this.preAggregation, requestId: this.requestId,
+      });
+    }
+  }
+
+  /**
+   * Persists that a build is running or has failed, so the jobs API can tell an
+   * unfinished build from a versioned table that merely exists. Recorded for
+   * every build, not just for the ones a job started: the queue de-duplicates
+   * on the query key, so a job regularly ends up waiting on a build some other
+   * request enqueued.
    */
   private async reportBuildStatus(targetTableName: string, status: PreAggregationBuildStatus): Promise<void> {
     try {
@@ -602,6 +625,7 @@ export class PreAggregationLoader {
       ));
 
       await this.createIndexes(client, newVersionEntry, saveCancelFn, queryOptions);
+      await this.reportBuildLanded(targetTableName);
       await this.loadCache.fetchTables(this.preAggregation);
     } finally {
       // We must clean orphaned in any cases: success or exception
@@ -997,6 +1021,7 @@ export class PreAggregationLoader {
       throw error;
     });
     this.logger('Uploading external pre-aggregation completed', queryOptions);
+    await this.reportBuildLanded(table);
 
     await this.loadCache.fetchTables(this.preAggregation);
     await this.dropOrphanedTables(externalDriver, table, saveCancelFn, true, queryOptions);

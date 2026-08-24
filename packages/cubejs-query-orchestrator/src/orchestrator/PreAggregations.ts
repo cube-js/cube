@@ -140,13 +140,18 @@ type PreAggJob = {
 };
 
 /**
- * Outcome of a build for a particular versioned partition table. Tracked
+ * State of a build for a particular versioned partition table, tracked
  * separately from the table itself: the versioned table becomes visible to
- * `getTablesQuery` as soon as it is created, which is long before the rows
- * are imported into it.
+ * `getTablesQuery` as soon as it is created, which is long before the rows are
+ * imported into it. A finished build has no record — the complete table speaks
+ * for itself — so only builds in flight and failures are kept.
+ *
+ * `startedAt` is stamped by whichever instance runs the build and read by
+ * whichever instance serves the status request, so it is compared against a
+ * different machine's clock.
  */
 export type PreAggregationBuildStatus = {
-  status: 'building' | 'done' | 'failure',
+  status: 'building' | 'failure',
   error?: string,
   startedAt?: number,
 };
@@ -155,7 +160,9 @@ const PRE_AGG_BUILD_STATUS_PERSIST_TIME = 86400;
 
 /**
  * How much longer than the queue execution timeout a build is still believed
- * to be running. The slack covers the queue writing the timeout failure down.
+ * to be running. The slack covers the queue writing the timeout failure down,
+ * and the clock difference between the instance that started the build and the
+ * one reading its status.
  */
 const ABANDONED_BUILD_TIMEOUT_FACTOR = 2;
 
@@ -375,6 +382,10 @@ export class PreAggregations {
     return await this.queryCache.getCacheDriver().get(this.preAggBuildStatusRedisKey(tableName)) || null;
   }
 
+  public async removePreAggregationBuildStatus(tableName: string): Promise<void> {
+    await this.queryCache.getCacheDriver().remove(this.preAggBuildStatusRedisKey(tableName));
+  }
+
   /**
    * The queue times a build out on its own and records the failure, so a build
    * that is still marked as running long past that timeout is one whose process
@@ -525,16 +536,16 @@ export class PreAggregations {
     const result = await conn.getResult(key);
     this.queue[dataSource].getQueueDriver().release(conn);
 
-    // fetching the build outcome. The queue result is readable only once, so
-    // the persisted build status is the durable source of truth here.
+    // fetching the state of the build. The queue result is readable only once,
+    // so this record is the durable source of truth here.
     const buildStatus = await this.getPreAggregationBuildStatus(table);
 
     // calculating status. A build that is known to be running or to have failed
     // wins over the existence of the versioned table: the table is created
     // before the rows are imported into it and it is left behind when the
-    // import fails or is killed. Without such a record the table is all we
-    // have, which is also the only thing to go by when the partition was
-    // already up to date and no build was run for it at all.
+    // import fails or is killed. A finished build leaves no record, and neither
+    // does a partition that was already up to date and never rebuilt, so in
+    // both of those the table is what the answer rests on.
     let status: string;
     if (buildStatus?.status === 'failure') {
       status = `failure: ${buildStatus.error}`;
