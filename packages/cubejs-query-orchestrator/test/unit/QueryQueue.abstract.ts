@@ -753,6 +753,30 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           queue.queueDriver.release(connection);
         }
       });
+
+      test('a failing dispatch does not surface to the client', async () => {
+        const query: QueryKey = ['select * from dispatch_failure', []];
+        const connection = await queue.queueDriver.createConnection();
+        // The retrieval already made the item active, so a throwing dispatch must be logged and
+        // left to the heartbeat reclaim rather than failing the request the way `processQuery`
+        // would never fail it
+        const sendProcessMessage = jest.spyOn(queue as any, 'sendProcessMessageFn')
+          .mockRejectedValueOnce(new Error('the worker is gone'));
+
+        try {
+          await expect(
+            queue.executeInQueue('foo', query, query, QueuePriority.Interactive)
+          ).rejects.toBeInstanceOf(ContinueWaitError);
+
+          expect(logger.mock.calls.map(([message]) => message)).toContain('Error while processing message');
+        } finally {
+          sendProcessMessage.mockRestore();
+          // The reclaim only comes after heartBeatTimeout, too late for the suite to wait for
+          await connection.getQueryAndRemove(connection.redisHash(query), null);
+
+          queue.queueDriver.release(connection);
+        }
+      });
     });
   });
 };

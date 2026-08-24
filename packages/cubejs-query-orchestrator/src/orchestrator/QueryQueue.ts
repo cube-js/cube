@@ -308,7 +308,7 @@ export class QueryQueue {
 
       if (retrieved) {
         // The item is active already, there is nothing for reconcile to pick up
-        await this.sendProcessMessageFn(this.retrievedQuery(queryKeyHash, queueId, retrieved));
+        await this.dispatchQuery(this.retrievedQuery(queryKeyHash, queueId, retrieved));
       } else {
         await this.reconcileQueue();
       }
@@ -808,10 +808,14 @@ export class QueryQueue {
       return;
     }
 
+    await this.dispatchQuery(retrieved);
+  }
+
+  protected async dispatchQuery(retrieved: RetrievedQuery): Promise<void> {
     try {
       await this.sendProcessMessageFn(retrieved);
     } catch (e: any) {
-      this.logger('Error while sending process message', {
+      this.logger('Error while processing message', {
         queueId: retrieved.queueId,
         queryKey: retrieved.query.queryKey,
         requestId: retrieved.query.requestId,
