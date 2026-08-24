@@ -42,6 +42,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     const processMessagePromises: Promise<any>[] = [];
     const processCancelPromises: Promise<any>[] = [];
     let cancelledQuery;
+    let streamCallOrder: string[] = [];
 
     const tenantPrefix = crypto.randomBytes(6).toString('hex');
 
@@ -71,6 +72,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         });
       },
       sendProcessMessageFn: async (retrieved) => {
+        streamCallOrder.push('dispatch');
         processMessagePromises.push(queue.executeQuery(retrieved));
       },
       sendCancelMessageFn: async (query) => {
@@ -108,6 +110,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       delayCount = 0;
       streamCount = 0;
       streamHandlerDelay = 250;
+      streamCallOrder = [];
     });
 
     afterAll(async () => {
@@ -386,15 +389,47 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       const stream = await queue.executeInQueue('stream', key, { aliasNameToMember: {} }, 0);
       await awaitProcessing();
 
-      // The handler can emit `streamStarted` and finish before executeInQueue awaits for
-      // it, which is safe only because the listener is subscribed before the dispatch
-      expect(stream).toBeDefined();
-
+      // A stream which never arrived surfaces as a ContinueWaitError out of executeInQueue,
+      // so reaching this line is already the assertion
       for await (const chunk of stream) {
         console.log('streaming chunk: ', chunk);
       }
 
       expect(streamCount).toEqual(1);
+    });
+
+    test('the stream listener is subscribed before the dispatch', async () => {
+      streamHandlerDelay = 0;
+
+      const proto = QueryQueue.prototype as any;
+      const { waitForQueryStream } = proto;
+      const spy = jest.spyOn(proto, 'waitForQueryStream').mockImplementation(
+        function subscribeAndRecord(this: unknown, ...args: unknown[]) {
+          streamCallOrder.push('subscribe');
+
+          return waitForQueryStream.apply(this, args);
+        }
+      );
+
+      try {
+        const key: QueryKey = ['select * from table_ordering', []];
+        key.persistent = true;
+        const stream = await queue.executeInQueue('stream', key, { aliasNameToMember: {} }, QueuePriority.Background);
+        await awaitProcessing();
+
+        for await (const chunk of stream) {
+          console.log('streaming chunk: ', chunk);
+        }
+
+        // Subscribing after the dispatch loses the `streamStarted` event of a handler which
+        // starts fast. It is masked by the `streams` map fallback in waitForQueryStream, so
+        // only the call order pins it down
+        expect(streamCallOrder).toContain('subscribe');
+        expect(streamCallOrder).toContain('dispatch');
+        expect(streamCallOrder.indexOf('subscribe')).toBeLessThan(streamCallOrder.indexOf('dispatch'));
+      } finally {
+        spy.mockRestore();
+      }
     });
 
     test('removed before reconciled', async () => {

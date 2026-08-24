@@ -200,6 +200,13 @@ Two consequences of retrieving before the hand-off:
   recovered by the stalled-heartbeat / `TO_CANCEL` path; `freeProcessingLock` is a no-op on
   Cube Store, so the retrieval cannot be cheaply undone.
 
+A stream query is dispatched while `executeInQueue` is still running, so `waitForQueryStream`
+subscribes to `streamStarted` *before* the dispatch — a handler which starts fast would
+otherwise emit into no listener. Two things have to fail before that costs a request: the
+event, and the `streams` map lookup `waitForQueryStream` does before it arms its timeout.
+That fallback is why reverting the subscribe order does not break the streaming tests, and
+why the ordering has a test of its own asserting the call sequence.
+
 ```mermaid
 sequenceDiagram
     autonumber
