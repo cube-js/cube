@@ -28,7 +28,7 @@ export type QueryHandlersMap = Record<string, QueryHandlerFn>;
 
 export type RetrievedQuery = {
   queryKeyHash: QueryKeyHash;
-  queueId: QueueId | null;
+  queueId: QueueId;
   processingId: ProcessingId;
   queueSize: number;
   query: QueryDef;
@@ -366,23 +366,13 @@ export class QueryQueue {
     }
   }
 
-  /**
-   * A retrieval from the queue driver is the same thing `retrieveQueryForProcessing` produces, it
-   * just came back with the insert instead of a separate retrieval.
-   */
-  protected retrievedQuery(queryKeyHash: QueryKeyHash, queueId: QueueId | null, retrieved: RetrieveForProcessingSuccess): RetrievedQuery {
-    const [, retrievedQueueId, , queueSize, query] = retrieved;
-    // The id identifies the processing lock for every command downstream
-    const processingQueueId = retrievedQueueId ?? queueId;
-
-    if (processingQueueId === null) {
-      throw new Error('Queue driver retrieved a query without reporting its queue id');
-    }
+  protected retrievedQuery(queryKeyHash: QueryKeyHash, queueId: QueueId, retrieved: RetrieveForProcessingSuccess): RetrievedQuery {
+    const [, , , queueSize, query] = retrieved;
 
     return {
       queryKeyHash,
-      queueId: processingQueueId,
-      processingId: processingQueueId,
+      queueId,
+      processingId: queueId,
       queueSize,
       query,
     };
