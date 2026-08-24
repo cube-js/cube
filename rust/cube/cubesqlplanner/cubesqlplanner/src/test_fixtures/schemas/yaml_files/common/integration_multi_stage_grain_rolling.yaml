@@ -1,0 +1,134 @@
+cubes:
+  - name: returns
+    sql_table: grain_returns
+
+    dimensions:
+      - name: day
+        sql: day
+        type: time
+
+      - name: security
+        sql: security
+        type: string
+
+      - name: irr
+        sql: irr
+        type: number
+
+      - name: weight
+        sql: weight
+        type: number
+
+    measures:
+      - name: weight_sum
+        sql: "{CUBE.weight}"
+        type: sum
+
+      - name: irr_weight_sum
+        sql: "{CUBE.irr} * {CUBE.weight}"
+        type: sum
+
+      - name: daily_irr_weight
+        multi_stage: true
+        sql: "{CUBE.irr_weight_sum}"
+        type: number
+
+      - name: daily_weight
+        multi_stage: true
+        sql: "{CUBE.weight_sum}"
+        type: number
+
+      # Reference point: the same log-return sum with `grain.include` alone.
+      - name: log_return_sum
+        multi_stage: true
+        sql: "LN(1.0 + ({CUBE.daily_irr_weight} / NULLIF({CUBE.daily_weight}, 0)) / 100.0)"
+        type: sum
+        grain:
+          include:
+            - returns.day
+
+      - name: twr
+        multi_stage: true
+        sql: "EXP({CUBE.log_return_sum}) - 1"
+        type: number
+
+      # Same declaration plus a year-to-date window. The window has to compose
+      # with the grain: the log return is still summed per day, the window only
+      # decides which days fall into each bucket.
+      - name: log_return_sum_ytd
+        multi_stage: true
+        sql: "LN(1.0 + ({CUBE.daily_irr_weight} / NULLIF({CUBE.daily_weight}, 0)) / 100.0)"
+        type: sum
+        grain:
+          include:
+            - returns.day
+        rolling_window:
+          type: to_date
+          granularity: year
+
+      - name: twr_ytd
+        multi_stage: true
+        sql: "EXP({CUBE.log_return_sum_ytd}) - 1"
+        type: number
+
+      # Trailing variant of the same window, wide enough to cover every day.
+      - name: log_return_sum_1y
+        multi_stage: true
+        sql: "LN(1.0 + ({CUBE.daily_irr_weight} / NULLIF({CUBE.daily_weight}, 0)) / 100.0)"
+        type: sum
+        grain:
+          include:
+            - returns.day
+        rolling_window:
+          trailing: 1 year
+          offset: end
+
+      - name: twr_1y
+        multi_stage: true
+        sql: "EXP({CUBE.log_return_sum_1y}) - 1"
+        type: number
+
+      # Same composition with the grain written as an explicit granularity of
+      # the rolling time dimension rather than the raw dimension.
+      - name: log_return_sum_ytd_day_granularity
+        multi_stage: true
+        sql: "LN(1.0 + ({CUBE.daily_irr_weight} / NULLIF({CUBE.daily_weight}, 0)) / 100.0)"
+        type: sum
+        grain:
+          include:
+            - returns.day.day
+        rolling_window:
+          type: to_date
+          granularity: year
+
+      - name: twr_ytd_day_granularity
+        multi_stage: true
+        sql: "EXP({CUBE.log_return_sum_ytd_day_granularity}) - 1"
+        type: number
+
+      # Control for the same grain form without a window.
+      - name: log_return_sum_day_granularity
+        multi_stage: true
+        sql: "LN(1.0 + ({CUBE.daily_irr_weight} / NULLIF({CUBE.daily_weight}, 0)) / 100.0)"
+        type: sum
+        grain:
+          include:
+            - returns.day.day
+
+      - name: twr_day_granularity
+        multi_stage: true
+        sql: "EXP({CUBE.log_return_sum_day_granularity}) - 1"
+        type: number
+
+      # Partition-shaping grain keys have no meaning next to a window frame;
+      # the planner must say so instead of quietly ignoring them.
+      - name: log_return_sum_ytd_keep_only
+        multi_stage: true
+        sql: "LN(1.0 + ({CUBE.daily_irr_weight} / NULLIF({CUBE.daily_weight}, 0)) / 100.0)"
+        type: sum
+        grain:
+          keep_only:
+            - returns.security
+        rolling_window:
+          type: to_date
+          granularity: year

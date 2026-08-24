@@ -799,6 +799,30 @@ impl MultiStageQueryPlanner {
                     }
                 }
 
+                // Of the grain keys only `include` reaches the rolling
+                // assembly. It extends the grain the values inside a bucket are
+                // computed at, which the base CTE carries anyway. `exclude` and
+                // `keep_only` narrow the grain the value is *reported* at, and a
+                // narrowed value has to be broadcast back onto the query grid;
+                // the rolling window node has no side enumerating that grid, so
+                // there is nothing to broadcast from. Reject them instead of
+                // computing at the unnarrowed grain and calling it the answer.
+                let grain = measure
+                    .multi_stage()
+                    .map(|ms| ms.grain.clone())
+                    .unwrap_or_default();
+                let has_partition_grain =
+                    |g: &Option<Vec<Rc<MemberSymbol>>>| g.as_ref().is_some_and(|v| !v.is_empty());
+                if has_partition_grain(&grain.exclude) || has_partition_grain(&grain.keep_only) {
+                    return Err(CubeError::user(format!(
+                        "Measure {} declares `rolling_window` together with `grain.exclude` or \
+                         `grain.keep_only`, which is not supported. Only `grain.include` can be \
+                         combined with a rolling window.",
+                        member.full_name(),
+                    )));
+                }
+                let grain_include = grain.include.clone().unwrap_or_default();
+
                 let ungrouped = measure.is_rolling_window() && !measure.is_additive();
 
                 let mut time_dimensions = self
@@ -828,8 +852,14 @@ impl MultiStageQueryPlanner {
                             scope,
                         )?
                     } else {
+                        // Without a time dimension the window collapses to a
+                        // single bucket over the whole date range, so there is
+                        // no frame to build and no outer stage to carry the
+                        // aggregation. What the query asks for is the measure's
+                        // own multi-stage definition — aggregation and grain
+                        // included — over the window's range.
                         self.make_queries_descriptions(
-                            base_member,
+                            MemberSymbol::new_measure(transforms::strip_rolling_window(&measure)),
                             base_state,
                             descriptions,
                             resolved_multi_stage_dimensions,
@@ -858,6 +888,18 @@ impl MultiStageQueryPlanner {
                     &rolling_window,
                     state.clone(),
                 )?;
+
+                // `grain.include` extends the grain the values inside the window
+                // are computed at. The frame still keys off the base time
+                // dimension, so the extension only splits rows the outer
+                // aggregation merges back together.
+                let base_rolling_state = if grain_include.is_empty() {
+                    base_rolling_state
+                } else {
+                    let mut extended = base_rolling_state.as_ref().clone();
+                    extended.add_dimensions(grain_include);
+                    Rc::new(extended)
+                };
 
                 let time_series =
                     self.add_time_series(time_dimension.clone(), state.clone(), descriptions)?;

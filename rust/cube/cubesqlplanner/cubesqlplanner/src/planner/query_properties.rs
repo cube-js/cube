@@ -711,13 +711,24 @@ impl QueryProperties {
     }
 
     /// Append `dimensions` to the existing list, deduplicating by
-    /// reference-chain-resolved full name.
+    /// reference-chain-resolved full name. A dimension the grain already
+    /// carries as a time dimension is dropped rather than appended: a time
+    /// dimension's full name pins its granularity, so an entry that matches
+    /// one would render the very same column under the very same alias.
     pub fn add_dimensions(&mut self, dimensions: Vec<Rc<MemberSymbol>>) {
+        let time_dimension_names = self
+            .time_dimensions
+            .iter()
+            .map(|d| d.clone().resolve_reference_chain().full_name())
+            .collect::<HashSet<_>>();
+        let added = dimensions.into_iter().filter(|d| {
+            !time_dimension_names.contains(&d.clone().resolve_reference_chain().full_name())
+        });
         self.dimensions = self
             .dimensions
             .iter()
             .cloned()
-            .chain(dimensions.into_iter())
+            .chain(added)
             .unique_by(|d| d.clone().resolve_reference_chain().full_name())
             .collect_vec();
         self.invalidate_join_groups_cache();
