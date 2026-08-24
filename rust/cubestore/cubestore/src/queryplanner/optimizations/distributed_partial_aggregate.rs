@@ -1,4 +1,3 @@
-use crate::cluster::WorkerPlanningParams;
 use crate::queryplanner::check_memory::CheckMemoryExec;
 use crate::queryplanner::group_by_limit_aggregate::GroupByLimitAggregateExec;
 use crate::queryplanner::inline_aggregate::{InlineAggregateExec, InlineAggregateMode};
@@ -106,9 +105,7 @@ pub fn push_aggregate_to_workers(
                     .next()
                     .unwrap(),
                 w.worker_sort_and_limit.clone(),
-                WorkerPlanningParams {
-                    worker_partition_count: w.properties().output_partitioning().partition_count(),
-                },
+                w.properties().output_partitioning().partition_count(),
             ))
         } else {
             return Ok(p_final);
@@ -314,9 +311,7 @@ pub fn push_worker_sort_and_limit(
             w.limit_and_reverse.clone(),
             w.required_input_ordering.clone(),
             w.worker_sort_and_limit.clone(),
-            WorkerPlanningParams {
-                worker_partition_count: w.properties().output_partitioning().partition_count(),
-            },
+            w.properties().output_partitioning().partition_count(),
         )));
     }
 
@@ -1260,9 +1255,7 @@ mod tests {
             limit_and_reverse,
             None,
             None,
-            WorkerPlanningParams {
-                worker_partition_count: 1,
-            },
+            1,
         ))
     }
 

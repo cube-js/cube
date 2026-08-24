@@ -26,7 +26,7 @@ use crate::cluster::transport::{ClusterTransport, MetaStoreTransport, WorkerConn
 use crate::config::injection::{DIService, Injector};
 use crate::config::is_router;
 #[allow(unused_imports)]
-use crate::config::{Config, ConfigObj, RepartitionStrategy};
+use crate::config::{Config, ConfigObj, RepartitionStrategy, TopKAggregateStrategy};
 use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobRunnerPool, JobStatus, JobType};
 use crate::metastore::{
@@ -231,12 +231,36 @@ pub struct ClusterImpl {
 
 crate::di_service!(ClusterImpl, [Cluster]);
 
+/// Planning decisions the sending node takes from its own configuration and that the receiving node
+/// must reproduce. Each of these shapes both the worker subtree and the node that combines it, so a
+/// receiver planning its half from a different value returns wrong rows instead of failing. They
+/// travel with the query so that the sender's configuration decides for the whole plan.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub struct PlanningFlags {
+    pub group_by_limit_factor: usize,
+    pub topk_strategy: TopKAggregateStrategy,
+}
+
+impl PlanningFlags {
+    pub fn from_config(config: &dyn ConfigObj) -> PlanningFlags {
+        PlanningFlags {
+            group_by_limit_factor: config.group_by_limit_factor(),
+            topk_strategy: config.topk_aggregate_strategy(),
+        }
+    }
+}
+
 /// Parameters that the worker node uses to plan queries.  Generally, it needs to construct the same
 /// query plans as the router node (or if there are multiple levels of cluster send, the node from
 /// which it received the query).  We include the necessary information here.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct WorkerPlanningParams {
     pub worker_partition_count: usize,
+    /// Absent from a sender that predates the flags. Such a sender planned its half from its own
+    /// configuration, so the receiver falls back to its own -- the same value, as long as the two
+    /// binaries still agree on the defaults.
+    #[serde(default)]
+    pub flags: Option<PlanningFlags>,
 }
 
 impl WorkerPlanningParams {
@@ -244,6 +268,7 @@ impl WorkerPlanningParams {
     pub fn no_worker() -> WorkerPlanningParams {
         WorkerPlanningParams {
             worker_partition_count: 1,
+            flags: None,
         }
     }
 }
@@ -2315,6 +2340,84 @@ mod tests {
     use super::*;
     use crate::config::Config;
     use std::fs;
+
+    /// The wire shape a node that predates the planning flags writes.
+    #[derive(Serialize, Deserialize)]
+    struct WorkerPlanningParamsWithoutFlags {
+        worker_partition_count: usize,
+    }
+
+    fn to_flexbuffers<T: Serialize>(value: &T) -> Vec<u8> {
+        let mut ser = flexbuffers::FlexbufferSerializer::new();
+        value.serialize(&mut ser).unwrap();
+        ser.take_buffer()
+    }
+
+    fn from_flexbuffers<'de, T: Deserialize<'de>>(buffer: &'de [u8]) -> T {
+        T::deserialize(flexbuffers::Reader::get_root(buffer).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn planning_flags_absent_from_a_sender_that_omits_them() {
+        // A message from a node that predates the flags must still be read, and must leave the
+        // flags absent so that the receiver falls back to its own configuration -- which is what
+        // that sender planned its half from.
+        let buffer = to_flexbuffers(&WorkerPlanningParamsWithoutFlags {
+            worker_partition_count: 3,
+        });
+        let params: WorkerPlanningParams = from_flexbuffers(&buffer);
+        assert_eq!(params.worker_partition_count, 3);
+        assert!(params.flags.is_none());
+    }
+
+    #[test]
+    fn planning_flags_are_ignored_by_a_receiver_that_does_not_know_them() {
+        // The reverse direction: a peer that predates the flags must still read the rest of the
+        // message rather than fail on the field it does not know.
+        let buffer = to_flexbuffers(&WorkerPlanningParams {
+            worker_partition_count: 3,
+            flags: Some(PlanningFlags {
+                group_by_limit_factor: 2,
+                topk_strategy: TopKAggregateStrategy::FullMerge,
+            }),
+        });
+        let params: WorkerPlanningParamsWithoutFlags = from_flexbuffers(&buffer);
+        assert_eq!(params.worker_partition_count, 3);
+    }
+
+    #[test]
+    fn planning_flags_round_trip() {
+        let flags = PlanningFlags {
+            group_by_limit_factor: 5,
+            topk_strategy: TopKAggregateStrategy::VectorizedStreaming,
+        };
+        let params: WorkerPlanningParams =
+            from_flexbuffers(&to_flexbuffers(&WorkerPlanningParams {
+                worker_partition_count: 7,
+                flags: Some(flags),
+            }));
+        assert_eq!(params.worker_partition_count, 7);
+        let flags = params.flags.unwrap();
+        assert_eq!(flags.group_by_limit_factor, 5);
+        assert_eq!(
+            flags.topk_strategy,
+            TopKAggregateStrategy::VectorizedStreaming
+        );
+    }
+
+    #[test]
+    fn planning_flags_fall_back_to_the_receiver_configuration() {
+        let config = Config::test("planning_flags_fall_back_to_the_receiver_configuration")
+            .update_config(|mut c| {
+                c.group_by_limit_factor = 4;
+                c.topk_aggregate_strategy = TopKAggregateStrategy::FullMerge;
+                c
+            })
+            .config_obj();
+        let flags = PlanningFlags::from_config(config.as_ref());
+        assert_eq!(flags.group_by_limit_factor, 4);
+        assert_eq!(flags.topk_strategy, TopKAggregateStrategy::FullMerge);
+    }
 
     fn config_with_workers(name: &str, workers: Vec<String>) -> Arc<dyn ConfigObj> {
         Config::test(name)
