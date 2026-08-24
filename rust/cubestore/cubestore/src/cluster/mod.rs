@@ -67,7 +67,7 @@ use opentelemetry::Context as OtelContext;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::pin::Pin;
 use std::sync::Weak;
@@ -2109,12 +2109,6 @@ impl ClusterImpl {
         };
         log::debug!("Got {} partitions, running the warmup", partitions.len());
 
-        // Absent files are looked up in batches: the pass is expected to find plenty of them, and
-        // the metastore of a select worker is a request to the main node, which is busy with the
-        // rest of the cluster starting up.
-        const ABSENT_BATCH: usize = 256;
-        let mut absent = AbsentWarmupFiles::default();
-
         for (p, chunks) in partitions {
             if self.node_name_by_partition(&p) != self.server_name {
                 continue;
@@ -2128,9 +2122,7 @@ impl ClusterImpl {
                     .remote_fs
                     .download_file(file.clone(), p.get_row().file_size())
                     .await;
-                if self.report_unless_absent(result, &file) {
-                    absent.partition_ids.push(p.get_id());
-                }
+                self.report_warmup_download(result, &file);
             }
             for c in chunks {
                 if self.stop_token.is_cancelled() {
@@ -2145,151 +2137,27 @@ impl ClusterImpl {
                     .remote_fs
                     .download_file(file.clone(), c.get_row().file_size())
                     .await;
-                if self.report_unless_absent(result, &file) {
-                    absent.chunk_ids.push(c.get_id());
-                }
-            }
-            if ABSENT_BATCH <= absent.len() {
-                self.report_absent_warmup_files(std::mem::take(&mut absent))
-                    .await;
+                self.report_warmup_download(result, &file);
             }
         }
-        // Only a pass that ran to the end gets here: the cancellation paths above leave their
-        // batch unchecked, since the next start walks the whole list again anyway and the metastore
-        // is on its way down with us.
-        self.report_absent_warmup_files(absent).await;
         log::debug!("Startup warmup finished");
         return;
     }
 
-    /// Reports a failed download and returns whether the reason was the file being absent, which on
-    /// its own says nothing: only the metastore can tell whether the pass is simply behind or the
-    /// data is gone, and it is asked in batches.
-    fn report_unless_absent(&self, result: Result<String, CubeError>, remote_path: &str) -> bool {
+    /// A file that is gone by the time the pass reaches it is the normal case: the walk takes as
+    /// long as it takes and compaction removes what it replaces meanwhile, so its absence says how
+    /// far behind the snapshot the pass ran rather than that anything is wrong. A file that is
+    /// really missing is reported by the query that needs it, which is also the one that can tell,
+    /// since by then the metastore either still names the file or does not.
+    fn report_warmup_download(&self, result: Result<String, CubeError>, remote_path: &str) {
         match result {
-            Ok(_) => false,
-            Err(e) if e.is_file_not_found() => true,
-            Err(e) => {
-                log::error!("Warmup of {} failed: {:?}", remote_path, e);
-                false
+            Ok(_) => {}
+            Err(e) if e.is_file_not_found() => {
+                app_metrics::WARMUP_MISSING.increment();
+                log::debug!("Skipping warmup of {}: {}", remote_path, e.message);
             }
+            Err(e) => log::error!("Warmup of {} failed: {:?}", remote_path, e),
         }
-    }
-
-    /// Files that are gone by the time the pass reaches them are the normal case: the walk takes as
-    /// long as it takes and compaction removes what it replaces meanwhile. Files the metastore still
-    /// names are really missing, which is worth an error of its own, reported per batch so that a
-    /// table whose objects an operator or a lifecycle rule really removed does not bring back the
-    /// flood of lines this check exists to remove.
-    async fn report_absent_warmup_files(&self, absent: AbsentWarmupFiles) {
-        if absent.len() == 0 {
-            return;
-        }
-        let (named_partitions, named_chunks) = match self
-            .named_warmup_files(&absent.partition_ids, &absent.chunk_ids)
-            .await
-        {
-            Ok(named) => named,
-            Err(e) => {
-                // Assuming either verdict would either hide missing data or report a batch of live
-                // files as lost, so report that the check itself did not happen.
-                log::warn!(
-                    "Could not check {} absent warmup file(s) against the metastore: {}. \
-                     Unchecked partitions: {:?}, chunks: {:?}",
-                    absent.len(),
-                    e,
-                    absent.partition_ids,
-                    absent.chunk_ids
-                );
-                return;
-            }
-        };
-
-        let active_partitions = absent
-            .partition_ids
-            .iter()
-            .filter(|id| named_partitions.contains(id))
-            .collect::<Vec<_>>();
-        if !active_partitions.is_empty() {
-            log::error!(
-                "Files of {} active partition(s) are missing in remote fs: {:?}",
-                active_partitions.len(),
-                active_partitions
-            );
-        }
-        let active_chunks = absent
-            .chunk_ids
-            .iter()
-            .filter(|id| named_chunks.contains(id))
-            .collect::<Vec<_>>();
-        if !active_chunks.is_empty() {
-            log::error!(
-                "Files of {} active chunk(s) are missing in remote fs: {:?}",
-                active_chunks.len(),
-                active_chunks
-            );
-        }
-
-        let active = active_partitions.len() + active_chunks.len();
-        let stale = absent.len() - active;
-        if 0 < active {
-            app_metrics::WARMUP_MISSING_ACTIVE.add(active as i64);
-        }
-        if 0 < stale {
-            app_metrics::WARMUP_MISSING_STALE.add(stale as i64);
-            log::debug!(
-                "Skipping {} warmup file(s) replaced since the snapshot",
-                stale
-            );
-        }
-    }
-
-    /// Which of the files the metastore still names. The batch reads leave out the ids they no
-    /// longer hold, which is what tells a deleted row apart from a metastore we could not reach.
-    async fn named_warmup_files(
-        &self,
-        partition_ids: &[u64],
-        chunk_ids: &[u64],
-    ) -> Result<(HashSet<u64>, HashSet<u64>), CubeError> {
-        let mut named_partitions = HashSet::new();
-        if !partition_ids.is_empty() {
-            for p in self
-                .meta_store
-                .get_partitions_out_of_queue(partition_ids.to_vec())
-                .await?
-            {
-                if p.get_row().has_main_table_file() {
-                    named_partitions.insert(p.get_id());
-                }
-            }
-        }
-
-        let mut named_chunks = HashSet::new();
-        if !chunk_ids.is_empty() {
-            for c in self
-                .meta_store
-                .get_chunks_out_of_queue(chunk_ids.to_vec())
-                .await?
-            {
-                if c.get_row().active() {
-                    named_chunks.insert(c.get_id());
-                }
-            }
-        }
-        Ok((named_partitions, named_chunks))
-    }
-}
-
-/// Warmup files that turned out to be absent, waiting to be checked against the metastore.
-#[derive(Default)]
-struct AbsentWarmupFiles {
-    partition_ids: Vec<u64>,
-    chunk_ids: Vec<u64>,
-}
-
-impl AbsentWarmupFiles {
-    fn len(&self) -> usize {
-        self.partition_ids.len() + self.chunk_ids.len()
     }
 }
 
@@ -2456,8 +2324,6 @@ pub fn pick_worker_by_partitions<'a>(
 mod tests {
     use super::*;
     use crate::config::Config;
-    use crate::queryplanner::trace_data_loaded::DataLoadedSize;
-    use crate::store::compaction::CompactionService;
     use std::fs;
 
     fn config_with_workers(name: &str, workers: Vec<String>) -> Arc<dyn ConfigObj> {
@@ -2467,69 +2333,6 @@ mod tests {
                 c
             })
             .config_obj()
-    }
-
-    /// Compaction replacing a chunk with a partition file is exactly the race the warmup loses when
-    /// it reaches a file hours after the snapshot that named it.
-    #[tokio::test]
-    async fn warmup_file_reference_follows_the_metastore() {
-        Config::test("warmup_file_reference")
-            .start_test(async move |services| {
-                let service = services.sql_service;
-                let meta_store = services.meta_store;
-                let cluster = services.cluster;
-
-                service.exec_query("CREATE SCHEMA test").await?;
-                service.exec_query("CREATE TABLE test.warm (a int)").await?;
-                service
-                    .exec_query("INSERT INTO test.warm (a) VALUES (1), (2)")
-                    .await?;
-
-                let partition = meta_store
-                    .get_partitions_with_chunks_created_seconds_ago(-1000)
-                    .await?
-                    .remove(0);
-                let partition_id = partition.get_id();
-                let index_id = partition.get_row().get_index_id();
-                let chunk_id = meta_store
-                    .get_chunks_by_partition(partition_id, false)
-                    .await?[0]
-                    .get_id();
-
-                let (named_partitions, named_chunks) = cluster
-                    .named_warmup_files(&[partition_id], &[chunk_id])
-                    .await?;
-                assert!(named_chunks.contains(&chunk_id));
-                // The partition holds no data of its own until it is compacted.
-                assert!(named_partitions.is_empty());
-
-                services
-                    .injector
-                    .get_service_typed::<dyn CompactionService>()
-                    .await
-                    .compact(partition_id, DataLoadedSize::new())
-                    .await?;
-
-                // Compaction moved the rows into a partition file of its own and left the chunk
-                // and its parent behind, which is what makes their files disappear under a pass
-                // that is still walking an older snapshot.
-                let compacted_id = meta_store
-                    .get_active_partitions_by_index_id(index_id)
-                    .await?
-                    .remove(0)
-                    .get_id();
-                assert_ne!(compacted_id, partition_id);
-                // An id the metastore no longer holds at all is left out of the batch read, the
-                // same as one it holds as inactive.
-                let (named_partitions, named_chunks) = cluster
-                    .named_warmup_files(&[partition_id, compacted_id], &[chunk_id, u64::MAX])
-                    .await?;
-                assert_eq!(named_partitions, HashSet::from([compacted_id]));
-                assert!(named_chunks.is_empty());
-
-                Ok::<(), CubeError>(())
-            })
-            .await;
     }
 
     #[test]
