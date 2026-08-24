@@ -9,8 +9,17 @@ use crate::planner::{CubeNameSymbol, CubeTableSymbol};
 use crate::utils::sql_expression_scanner::analyze_template_arg_contexts;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use lazy_static::lazy_static;
+use regex::Regex;
 use std::collections::HashMap;
 use std::rc::Rc;
+
+lazy_static! {
+    /// A whole template element made of a cube-name placeholder followed only by
+    /// dotted identifiers.
+    static ref INTERPOLATED_REFERENCE_RE: Regex =
+        Regex::new(r"^\s*\{arg:(\d+)\}((?:\.[A-Za-z_$][A-Za-z0-9_$]*)+)\s*$").unwrap();
+}
 
 /// Reference to a cube from a SQL template.
 ///
@@ -86,6 +95,18 @@ impl SqlDependency {
     pub fn is_cube_ref(&self) -> bool {
         matches!(self, SqlDependency::CubeRef(_))
     }
+}
+
+/// What one element of a reference declaration names, as read off the compiled
+/// template by `SqlCall::reference_items`.
+#[derive(Clone, Debug)]
+pub enum SqlCallReference {
+    Symbol(Rc<MemberSymbol>),
+    /// Member path of an element that interpolated the cube name, still to be
+    /// resolved against the data model.
+    Path(Vec<String>),
+    /// Element naming no member, rendered for diagnostics.
+    Unresolved(String),
 }
 
 /// Namespace for the placeholder prefixes recognised inside a
@@ -547,6 +568,117 @@ impl SqlCall {
         }
     }
 
+    /// What each element of a reference declaration (a pre-aggregation
+    /// `measures:` / `dimensions:` / `segments:` / `time_dimension:`) names,
+    /// in declaration order.
+    ///
+    /// An element referencing a member yields that member's symbol. An element
+    /// that interpolated the cube itself — ``(CUBE) => `${CUBE}.created_at` `` —
+    /// depends on the cube name and keeps the member as literal text, so it
+    /// yields the path to resolve: the cube reference's path followed by the
+    /// literal segments. Anything else names no member and is reported as
+    /// unresolved, rendered for diagnostics.
+    ///
+    /// An element wrapping a member reference in an expression still yields that
+    /// member, since the member is a dependency of its own — only the cube-name
+    /// form has nothing to fall back on.
+    pub fn reference_items(&self) -> Vec<SqlCallReference> {
+        let elements = match &self.template {
+            SqlTemplate::String(s) => std::slice::from_ref(s),
+            SqlTemplate::StringVec(strings) => strings.as_slice(),
+        };
+        let mut taken = vec![false; self.deps.len()];
+        let mut result = Vec::new();
+        for element in elements {
+            let arg_indices = Self::template_arg_indices(element);
+            let names_symbol = arg_indices
+                .iter()
+                .any(|index| self.deps.get(*index).is_some_and(|dep| dep.is_symbol()));
+            if names_symbol {
+                for index in arg_indices {
+                    // An index the recorded dependencies don't cover names
+                    // nothing; the rest of the element is still read.
+                    let Some(symbol) = self.deps.get(index).and_then(|dep| dep.as_symbol()) else {
+                        continue;
+                    };
+                    if taken[index] {
+                        continue;
+                    }
+                    taken[index] = true;
+                    result.push(SqlCallReference::Symbol(symbol.clone()));
+                }
+                continue;
+            }
+            match self.interpolated_reference_path(element) {
+                Some(path) => result.push(SqlCallReference::Path(path)),
+                None => result.push(SqlCallReference::Unresolved(
+                    self.render_for_diagnostics(element),
+                )),
+            }
+        }
+        // A symbol no element referenced: keep it rather than lose a member the
+        // declaration depends on.
+        for (index, dep) in self.deps.iter().enumerate() {
+            if !taken[index] {
+                if let Some(symbol) = dep.as_symbol() {
+                    result.push(SqlCallReference::Symbol(symbol.clone()));
+                }
+            }
+        }
+        result
+    }
+
+    // Path of an element made of a cube-name placeholder followed only by dotted
+    // identifiers; `None` when the element has any other shape.
+    fn interpolated_reference_path(&self, element: &str) -> Option<Vec<String>> {
+        let captures = INTERPOLATED_REFERENCE_RE.captures(element)?;
+        let index = captures.get(1)?.as_str().parse::<usize>().ok()?;
+        let cube_ref = self.deps.get(index)?.as_cube_ref()?.as_name()?;
+        let mut path = cube_ref.path().clone();
+        path.extend(
+            captures
+                .get(2)?
+                .as_str()
+                .split('.')
+                .skip(1)
+                .map(String::from),
+        );
+        Some(path)
+    }
+
+    // `{arg:N}` indices in the order they appear in the element.
+    fn template_arg_indices(element: &str) -> Vec<usize> {
+        let needle = format!("{{{}:", SqlCallArg::ARG_PREFIX);
+        let mut result = Vec::new();
+        let mut rest = element;
+        while let Some(start) = rest.find(&needle) {
+            rest = &rest[start + needle.len()..];
+            let Some(end) = rest.find('}') else {
+                break;
+            };
+            if let Ok(index) = rest[..end].parse::<usize>() {
+                result.push(index);
+            }
+            rest = &rest[end + 1..];
+        }
+        result
+    }
+
+    // Element with its dependencies replaced by the members and cubes they name,
+    // for error messages about an element that names no member.
+    fn render_for_diagnostics(&self, element: &str) -> String {
+        let deps = self
+            .deps
+            .iter()
+            .map(|dep| match dep {
+                SqlDependency::Symbol(symbol) => symbol.full_name(),
+                SqlDependency::CubeRef(cube_ref) => cube_ref.cube_name().clone(),
+            })
+            .collect_vec();
+        Self::substitute_template(element, &deps, &[], &[], &[], &[])
+            .unwrap_or_else(|_| element.to_string())
+    }
+
     /// Number of member-symbol dependencies. Cube refs are not
     /// counted.
     pub fn dependencies_count(&self) -> usize {
@@ -701,5 +833,208 @@ impl crate::utils::debug::DebugSql for SqlCall {
             &[],
         )
         .unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_fixtures::cube_bridge::MockSchema;
+    use crate::test_fixtures::test_utils::TestContext;
+    use indoc::indoc;
+
+    fn test_context() -> TestContext {
+        let schema = MockSchema::from_yaml(indoc! {"
+            cubes:
+              - name: orders
+                sql: SELECT * FROM orders
+                dimensions:
+                  - name: id
+                    type: number
+                    sql: id
+                    primary_key: true
+                  - name: status
+                    type: string
+                    sql: status
+                  - name: created_at
+                    type: time
+                    sql: created_at
+                measures:
+                  - name: count
+                    type: count
+        "})
+        .unwrap();
+        TestContext::new(schema).unwrap()
+    }
+
+    fn cube_name_dep(cube_name: &str, path: &[&str]) -> SqlDependency {
+        SqlDependency::CubeRef(CubeRef::Name(CubeNameSymbol::new(
+            cube_name.to_string(),
+            path.iter().map(|p| p.to_string()).collect(),
+        )))
+    }
+
+    fn call(template: SqlTemplate, deps: Vec<SqlDependency>) -> SqlCall {
+        SqlCall::new(
+            template,
+            deps,
+            vec![],
+            vec![],
+            SecutityContextProps::default(),
+        )
+    }
+
+    fn single(template: &str, deps: Vec<SqlDependency>) -> SqlCall {
+        call(SqlTemplate::String(template.to_string()), deps)
+    }
+
+    /// Reference items as comparable strings: `symbol:<full name>`,
+    /// `path:<dotted path>`, `unresolved:<rendered element>`.
+    fn described(sql_call: &SqlCall) -> Vec<String> {
+        sql_call
+            .reference_items()
+            .iter()
+            .map(|item| match item {
+                SqlCallReference::Symbol(symbol) => format!("symbol:{}", symbol.full_name()),
+                SqlCallReference::Path(path) => format!("path:{}", path.join(".")),
+                SqlCallReference::Unresolved(rendered) => format!("unresolved:{}", rendered),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_cube_name_followed_by_member_yields_path() {
+        let sql_call = single("{arg:0}.created_at", vec![cube_name_dep("orders", &[])]);
+
+        assert_eq!(described(&sql_call), vec!["path:orders.created_at"]);
+    }
+
+    #[test]
+    fn test_surrounding_whitespace_is_ignored() {
+        let sql_call = single("  {arg:0}.created_at\n", vec![cube_name_dep("orders", &[])]);
+
+        assert_eq!(described(&sql_call), vec!["path:orders.created_at"]);
+    }
+
+    #[test]
+    fn test_join_path_is_kept() {
+        // `${CUBE.users}.name` — the cube reference carries the cubes traversed,
+        // and the member name follows as literal text.
+        let sql_call = single("{arg:0}.name", vec![cube_name_dep("users", &["orders"])]);
+
+        assert_eq!(described(&sql_call), vec!["path:orders.users.name"]);
+    }
+
+    #[test]
+    fn test_literal_segments_after_the_cube_are_all_kept() {
+        let sql_call = single("{arg:0}.users.name", vec![cube_name_dep("orders", &[])]);
+
+        assert_eq!(described(&sql_call), vec!["path:orders.users.name"]);
+    }
+
+    #[test]
+    fn test_every_element_of_a_reference_list_is_resolved() {
+        let sql_call = call(
+            SqlTemplate::StringVec(vec![
+                "{arg:0}.count".to_string(),
+                "{arg:1}.name".to_string(),
+            ]),
+            vec![cube_name_dep("orders", &[]), cube_name_dep("users", &[])],
+        );
+
+        assert_eq!(
+            described(&sql_call),
+            vec!["path:orders.count", "path:users.name"]
+        );
+    }
+
+    // A member reference produces a symbol dependency of its own.
+    #[test]
+    fn test_member_dependency_is_reported_as_a_symbol() {
+        let ctx = test_context();
+        let symbol = ctx.create_dimension("orders.created_at").unwrap();
+        let sql_call = single("{arg:0}", vec![SqlDependency::Symbol(symbol)]);
+
+        assert_eq!(described(&sql_call), vec!["symbol:orders.created_at"]);
+    }
+
+    // Declaration order survives a list mixing both forms — join hints and
+    // lambda member matching read the compiled list positionally.
+    #[test]
+    fn test_declaration_order_is_kept_for_a_mixed_list() {
+        let ctx = test_context();
+        let symbol = ctx.create_dimension("orders.status").unwrap();
+        let sql_call = call(
+            SqlTemplate::StringVec(vec![
+                "{arg:0}.created_at".to_string(),
+                "{arg:1}".to_string(),
+            ]),
+            vec![cube_name_dep("orders", &[]), SqlDependency::Symbol(symbol)],
+        );
+
+        assert_eq!(
+            described(&sql_call),
+            vec!["path:orders.created_at", "symbol:orders.status"]
+        );
+    }
+
+    // An element naming a member through an expression names no single member.
+    #[test]
+    fn test_element_carrying_an_expression_is_unresolved() {
+        for (template, expected) in [
+            ("{arg:0}.created_at + 1", "unresolved:orders.created_at + 1"),
+            (
+                "date_trunc('day', {arg:0}.created_at)",
+                "unresolved:date_trunc('day', orders.created_at)",
+            ),
+            ("{arg:0}", "unresolved:orders"),
+            ("{arg:0}.", "unresolved:orders."),
+            ("{arg:0}.2days", "unresolved:orders.2days"),
+        ] {
+            let sql_call = single(template, vec![cube_name_dep("orders", &[])]);
+
+            assert_eq!(
+                described(&sql_call),
+                vec![expected],
+                "unexpected reference items for `{}`",
+                template
+            );
+        }
+    }
+
+    // `${CUBE.sql()}` renders the cube's table expression, not its name, so it
+    // cannot start a member path.
+    #[test]
+    fn test_cube_table_reference_is_unresolved() {
+        let ctx = test_context();
+        let cube_table = ctx
+            .query_tools()
+            .compiler()
+            .borrow_mut()
+            .add_cube_table_evaluator("orders".to_string(), vec![])
+            .unwrap();
+        let sql_call = single(
+            "{arg:0}.created_at",
+            vec![SqlDependency::CubeRef(CubeRef::Table(cube_table))],
+        );
+
+        assert_eq!(described(&sql_call), vec!["unresolved:orders.created_at"]);
+    }
+
+    // An index the recorded dependencies don't cover must not be read as one.
+    #[test]
+    fn test_placeholder_out_of_bounds_next_to_a_member_is_skipped() {
+        let ctx = test_context();
+        let symbol = ctx.create_dimension("orders.status").unwrap();
+        let sql_call = single("{arg:0} || {arg:7}", vec![SqlDependency::Symbol(symbol)]);
+
+        assert_eq!(described(&sql_call), vec!["symbol:orders.status"]);
+    }
+
+    #[test]
+    fn test_placeholder_out_of_bounds_is_unresolved() {
+        let sql_call = single("{arg:3}.created_at", vec![cube_name_dep("orders", &[])]);
+
+        assert_eq!(described(&sql_call), vec!["unresolved:{arg:3}.created_at"]);
     }
 }
