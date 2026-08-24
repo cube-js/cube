@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.26](https://github.com/cube-js/cube/compare/v1.7.25...v1.7.26) (2026-08-24)
+
+### Bug Fixes
+
+- **cubestore:** transmit the router's planning flags with the query ([#11628](https://github.com/cube-js/cube/issues/11628)) ([d48a64e](https://github.com/cube-js/cube/commit/d48a64ee7a9c1f00cbab243ff303ee66fabcbc87))
+- **tesseract:** keep time_shift when a pre-aggregation serves the query ([#11599](https://github.com/cube-js/cube/issues/11599)) ([23255e2](https://github.com/cube-js/cube/commit/23255e27d6ba2e04d23819bf3a0d8b30102347bb))
+- **tesseract:** parenthesize member SQL spliced into filter templates ([#11502](https://github.com/cube-js/cube/issues/11502)) ([e9f5407](https://github.com/cube-js/cube/commit/e9f540774f049e329b8133ee2451686b34684991))
+- **tesseract:** resolve pre-agg refs interpolating the cube ([#11602](https://github.com/cube-js/cube/issues/11602)) ([cc16c17](https://github.com/cube-js/cube/commit/cc16c17bb06700f28ebc2882420d723cc88c5c05))
+
+### Features
+
+- **cube-cli:** run and follow a dbt sync from the CLI ([#11612](https://github.com/cube-js/cube/issues/11612)) ([f5ee250](https://github.com/cube-js/cube/commit/f5ee250cb5874a53a8da7b4114b085ac8629f741)), closes [#11562](https://github.com/cube-js/cube/issues/11562)
+- Queue - support fast track feature ([#11618](https://github.com/cube-js/cube/issues/11618)) ([749e0ab](https://github.com/cube-js/cube/commit/749e0abe7b59db7c2a71a2e781361bf0ce2c3edb))
+
 ## [1.7.25](https://github.com/cube-js/cube/compare/v1.7.24...v1.7.25) (2026-08-21)
 
 ### Bug Fixes
