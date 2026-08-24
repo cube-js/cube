@@ -241,8 +241,17 @@ impl ExecutionPlan for InlineAggregateExec {
                 // it out loud rather than degrade quietly.
                 log::warn!(
                     "Input of an inline {:?} aggregate is no longer sorted on the group keys, \
-                     falling back to a hash aggregate",
-                    self.mode
+                     falling back to a hash aggregate. Group by [{}], new input order mode {:?}, \
+                     new input ordering {:?}",
+                    self.mode,
+                    self.group_by
+                        .expr()
+                        .iter()
+                        .map(|(_, name)| name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    aggregate.input_order_mode(),
+                    aggregate.input().properties().output_ordering()
                 );
                 Arc::new(aggregate.clone().with_limit(None))
             }
@@ -450,6 +459,41 @@ mod tests {
     }
 
     /// A group continuing in the next input batch must not be emitted early with a partial sum.
+    /// A partial aggregate runs once per input partition, so its reported partitioning must
+    /// follow a re-childed input. A stale single-partition count makes the parent coalesce
+    /// execute only partition 0 and silently drop the rows of the rest -- the row loss this node
+    /// was fixed for. Built over a 1-partition input so its cache says 1, then re-childed onto 3.
+    #[test]
+    fn output_partitioning_follows_rechilded_input() {
+        let schema = test_schema();
+        let one = sorted_source(
+            &schema,
+            vec![vec![make_batch(&schema, &[(1, 10), (2, 20)])]],
+        );
+        let exec = partial_sum_inline_aggregate(one, None);
+        assert_eq!(exec.properties().output_partitioning().partition_count(), 1);
+
+        let three: Vec<Vec<RecordBatch>> = (0..3)
+            .map(|i| vec![make_batch(&schema, &[(i, 10), (i + 10, 20)])])
+            .collect();
+        let rechilded = exec
+            .with_new_children(vec![sorted_source(&schema, three)])
+            .unwrap();
+
+        assert!(
+            rechilded.as_any().is::<InlineAggregateExec>(),
+            "re-childing a still-sorted input must keep the streaming exec"
+        );
+        assert_eq!(
+            rechilded
+                .properties()
+                .output_partitioning()
+                .partition_count(),
+            3,
+            "exec must report its re-childed input's partition count, not a stale 1"
+        );
+    }
+
     #[test]
     fn limit_emits_only_closed_groups() {
         let schema = test_schema();

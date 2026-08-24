@@ -6887,6 +6887,7 @@ mod tests {
                 // Rows reachable only through the first of several scanned partitions is what
                 // the regression is about, so wait for the data to be split across partitions
                 // and fail loudly rather than silently testing a single-partition scan.
+                // Compaction settles in a few iterations; the bound is a ceiling, not a wait.
                 let mut scanned_partitions = TableValue::Int(0);
                 for _ in 0..1200 {
                     tokio::time::sleep(Duration::from_millis(50)).await;
@@ -6912,15 +6913,24 @@ mod tests {
                 // The last month of the range, so the matching rows sit in the last partition
                 // the scan visits and never in the first one -- reading only the first partition
                 // has to show up as a missing row rather than by chance returning the right one.
-                let single_value = service
-                    .exec_query(
-                        "SELECT site_id, CAST(month_code AS INT) mc, sum(hours) v FROM pa.rollup \
-                         WHERE (equipment_type = 'QC') AND (CAST(month_code AS INT) = '202612') \
-                         AND (site_id = 'PSE') GROUP BY 1, 2",
-                    )
-                    .await?
-                    .collect()
-                    .await?;
+                let query = "SELECT site_id, CAST(month_code AS INT) mc, sum(hours) v \
+                             FROM pa.rollup \
+                             WHERE (equipment_type = 'QC') \
+                             AND (CAST(month_code AS INT) = '202612') \
+                             AND (site_id = 'PSE') GROUP BY 1, 2";
+
+                // Pinning every group column to a single value is what hands the aggregate to
+                // the streaming implementation, and only that one carried a stale partition
+                // count. Without this the test would keep passing on a plan that never exercises
+                // the fix.
+                let worker_plan = pp_phys_plan(service.plan_query(query).await?.worker.as_ref());
+                assert!(
+                    worker_plan.contains("InlinePartialAggregate"),
+                    "expected a streaming partial aggregate, got:\n{}",
+                    worker_plan
+                );
+
+                let single_value = service.exec_query(query).await?.collect().await?;
                 assert_eq!(
                     single_value.get_rows(),
                     &vec![Row::new(vec![
