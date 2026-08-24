@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { ChildProcess, fork } from 'child_process';
 import { createPromiseLock, MethodName, pausePromise } from '@cubejs-backend/shared';
-import { QueueDriverConnectionInterface, QueueDriverInterface, } from '@cubejs-backend/base-driver';
+import { QueueDriverConnectionInterface, QueueDriverInterface, QueuePriority } from '@cubejs-backend/base-driver';
 import { LocalQueueDriver, QueryQueue, QueryQueueOptions } from '../../src';
 
 export type QueryQueueTestOptions = Pick<QueryQueueOptions, 'cacheAndQueueDriver' | 'cubeStoreDriverFactory'> & {
@@ -73,7 +73,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
       await options.beforeAll();
     }
 
-    const createBenchmark = async (benchSettings: { totalQueries: number, queueResponseSize: number, queuePayloadSize: number, currency: number }) => {
+    const createBenchmark = async (benchSettings: { totalQueries: number, queueResponseSize: number, queuePayloadSize: number, currency: number, pushIntervalMs: number, priority: QueuePriority }) => {
       const counters = {
         connections: 0,
         methods: {},
@@ -270,7 +270,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
                 large_str: 'a'.repeat(benchSettings.queuePayloadSize)
               },
               orphanedTimeout: 120
-            }, 1, {
+            }, benchSettings.priority, {
               stageQueryKey: 1,
               requestId: 'request-id',
               spanId: 'span-id'
@@ -287,7 +287,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
 
         processingPromisses.push(running);
         await running;
-      }, 10);
+      }, benchSettings.pushIntervalMs);
 
       await lock.promise;
       await awaitProcessing();
@@ -317,12 +317,19 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
       }, { depth: null });
     };
 
+    const totalQueries = parseInt(process.env.BENCH_TOTAL_QUERIES || '1000', 10);
+    // BENCH_PERIOD_MS spreads the queries evenly over that window instead of pushing them
+    // as fast as the loop allows, which is what decides whether the queue ever backlogs
+    const periodMs = parseInt(process.env.BENCH_PERIOD_MS || '0', 10);
+
     await createBenchmark({
-      currency: 50,
-      totalQueries: 1_000,
+      currency: parseInt(process.env.BENCH_CONCURRENCY || '50', 10),
+      totalQueries,
+      pushIntervalMs: periodMs > 0 ? Math.max(1, Math.round(periodMs / totalQueries)) : 10,
+      priority: parseInt(process.env.BENCH_PRIORITY || `${QueuePriority.Interactive}`, 10),
       // eslint-disable-next-line no-bitwise
-      queueResponseSize: 5 << 20,
-      queuePayloadSize: 256 * 1024,
+      queueResponseSize: parseInt(process.env.BENCH_RESPONSE_SIZE || `${5 << 20}`, 10),
+      queuePayloadSize: parseInt(process.env.BENCH_PAYLOAD_SIZE || `${256 * 1024}`, 10),
     });
 
     if (options.afterAll) {

@@ -8,7 +8,9 @@ import {
   QueryDef,
   QueryStageStateResponse,
   AddToQueueOptions,
-  ProcessingId
+  QueuePriority,
+  ProcessingId,
+  RetrieveForProcessingSuccess
 } from '@cubejs-backend/base-driver';
 import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 
@@ -24,19 +26,24 @@ export type QueryHandlerFn = (query: QueryDef, cancelHandler: CancelHandlerFn) =
 export type StreamHandlerFn = (query: QueryDef, stream: QueryStream) => Promise<unknown>;
 export type QueryHandlersMap = Record<string, QueryHandlerFn>;
 
-export type ClaimedQuery = {
+export type RetrievedQuery = {
   queryKeyHash: QueryKeyHash;
-  queueId: QueueId | null;
+  queueId: QueueId;
   processingId: ProcessingId;
   queueSize: number;
   query: QueryDef;
 };
 
-export type SendProcessMessageFn = (claimed: ClaimedQuery) => Promise<void> | void;
+export type SendProcessMessageFn = (retrieved: RetrievedQuery) => Promise<void> | void;
 export type SendCancelMessageFn = (query: QueryDef, queueId: QueueId | null) => Promise<void> | void;
 
 export type ExecuteInQueueOptions = Omit<AddToQueueOptions, 'queueId'> & {
   spanId?: string
+};
+
+export type QueryStreamWait = {
+  promise: Promise<QueryStream | null>,
+  dispose: () => void,
 };
 
 export type QueryQueueOptions = {
@@ -126,7 +133,7 @@ export class QueryQueue {
     this.orphanedTimeout = options.orphanedTimeout || 120;
     this.heartBeatInterval = options.heartBeatInterval || 30;
 
-    this.sendProcessMessageFn = options.sendProcessMessageFn || ((claimed) => { this.executeQuery(claimed); });
+    this.sendProcessMessageFn = options.sendProcessMessageFn || ((retrieved) => { this.executeQuery(retrieved); });
     this.sendCancelMessageFn = options.sendCancelMessageFn || ((query, queueId) => { this.processCancel(query, queueId); });
     this.queryHandlers = options.queryHandlers;
     this.streamHandler = options.streamHandler;
@@ -195,7 +202,7 @@ export class QueryQueue {
     queryHandler: string,
     queryKey: QueryKey,
     query: QueryDef,
-    priority?: number,
+    priority: QueuePriority = QueuePriority.Background,
     executeOptions?: ExecuteInQueueOptions,
   ) {
     const options: AddToQueueOptions = {
@@ -236,11 +243,9 @@ export class QueryQueue {
 
     const queueConnection = await this.queueDriver.createConnection();
     let waitingContext;
-    try {
-      if (priority == null) {
-        priority = 0;
-      }
+    let streamWait: QueryStreamWait | null = null;
 
+    try {
       if (!(priority >= -10000 && priority <= 10000)) {
         throw new Error('Priority should be between -10000 and 10000');
       }
@@ -260,16 +265,10 @@ export class QueryQueue {
         if (jobExists) return null;
       }
 
-      const time = new Date().getTime();
-      const keyScore = time + (10000 - priority) * 1E14;
-
       options.orphanedTimeout = query.orphanedTimeout;
 
-      const orphanedTimeout = 'orphanedTimeout' in query ? query.orphanedTimeout : this.orphanedTimeout;
-      const orphanedTime = time + (orphanedTimeout * 1000);
-
-      const [added, queueId, queueSize, addedToQueueTime] = await queueConnection.addToQueue(
-        keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
+      const [added, queueId, queueSize, addedToQueueTime, retrieved] = await queueConnection.addToQueue(
+        queryKey, queryHandler, query, priority, options
       );
 
       if (added > 0) {
@@ -297,13 +296,25 @@ export class QueryQueue {
           preAggregation: query.preAggregation,
           addedToQueueTime,
           persistent: !!queryKey.persistent,
+          fastTrack: !!retrieved,
         });
       }
 
-      await this.reconcileQueue();
+      // Subscribing after the dispatch would lose the `streamStarted` event of a handler
+      // which starts fast
+      if (queryHandler === 'stream') {
+        streamWait = this.waitForQueryStream(queryKeyHash);
+      }
+
+      if (retrieved) {
+        // The item is active already, there is nothing for reconcile to pick up
+        await this.dispatchQuery(this.retrievedQuery(queryKeyHash, queueId, retrieved));
+      } else {
+        await this.reconcileQueue();
+      }
 
       if (!added) {
-        const queryDef = await queueConnection.getQueryDef(queryKeyHash, queueId);
+        const queryDef = retrieved ? retrieved[4] : await queueConnection.getQueryDef(queryKeyHash, queueId);
         if (queryDef) {
           waitingContext = {
             queueId,
@@ -316,7 +327,9 @@ export class QueryQueue {
         }
       }
 
-      const [active, toProcess] = await queueConnection.getQueryStageState(true);
+      // A retrieval carries the active keys of its prefix, and a retrieved query is never pending,
+      // so it has no place in the queue to report
+      const [active, toProcess] = retrieved ? [retrieved[2], undefined] : await queueConnection.getQueryStageState(true);
 
       this.logger('Waiting for query', {
         ...waitingContext,
@@ -324,44 +337,12 @@ export class QueryQueue {
         activeQueryKeys: active,
         toProcessQueryKeys: toProcess,
         active: active.indexOf(queryKeyHash) !== -1,
-        queueIndex: toProcess.indexOf(queryKeyHash),
+        queueIndex: toProcess ? toProcess.indexOf(queryKeyHash) : -1,
+        fastTrack: !!retrieved,
       });
 
-      // Stream processing goes here under assumption there's no way of a stream close just after it was added to the `streams` map.
-      // Otherwise `streamStarted` event listener should go before the `reconcileQueue` call.
-      // TODO: Fix an issue with a fast execution of stream handler which caused by removal of QueryStream from streams,
-      // while EventListener doesnt start to listen for started stream event
-      if (queryHandler === 'stream') {
-        const self = this;
-        result = await new Promise((resolve) => {
-          let timeoutTimerId = null;
-
-          const onStreamStarted = (streamStartedHash) => {
-            if (streamStartedHash === queryKeyHash) {
-              if (timeoutTimerId) {
-                clearTimeout(timeoutTimerId);
-              }
-
-              resolve(self.getQueryStream(queryKeyHash));
-            }
-          };
-
-          self.streamEvents.addListener('streamStarted', onStreamStarted);
-
-          const stream = this.getQueryStream(queryKeyHash);
-          if (stream) {
-            self.streamEvents.removeListener('streamStarted', onStreamStarted);
-            resolve(stream);
-          } else {
-            timeoutTimerId = setTimeout(
-              () => {
-                self.streamEvents.removeListener('streamStarted', onStreamStarted);
-                resolve(null);
-              },
-              this.continueWaitTimeout * 10000
-            );
-          }
-        });
+      if (streamWait) {
+        result = await streamWait.promise;
       } else {
         // Result here won't be fetched for a jobed build query (initialized by
         // the /cubejs-system/v1/pre-aggregations/jobs endpoint).
@@ -380,8 +361,71 @@ export class QueryQueue {
       }
       throw error;
     } finally {
+      streamWait?.dispose();
       this.queueDriver.release(queueConnection);
     }
+  }
+
+  protected retrievedQuery(queryKeyHash: QueryKeyHash, queueId: QueueId, retrieved: RetrieveForProcessingSuccess): RetrievedQuery {
+    const [, , , queueSize, query] = retrieved;
+
+    return {
+      queryKeyHash,
+      queueId,
+      processingId: queueId,
+      queueSize,
+      query,
+    };
+  }
+
+  /**
+   * `dispose` releases the listener and the timer, it's a no-op once the promise resolved.
+   */
+  protected waitForQueryStream(queryKeyHash: QueryKeyHash): QueryStreamWait {
+    let timeoutTimerId: ReturnType<typeof setTimeout> | null = null;
+    let onStreamStarted: ((streamStartedHash: QueryKeyHash) => void) | null = null;
+
+    const dispose = () => {
+      if (timeoutTimerId) {
+        clearTimeout(timeoutTimerId);
+        timeoutTimerId = null;
+      }
+
+      if (onStreamStarted) {
+        this.streamEvents.removeListener('streamStarted', onStreamStarted);
+        onStreamStarted = null;
+      }
+    };
+
+    const promise = new Promise<QueryStream | null>((resolve) => {
+      onStreamStarted = (streamStartedHash) => {
+        if (streamStartedHash === queryKeyHash) {
+          dispose();
+
+          resolve(this.getQueryStream(queryKeyHash) ?? null);
+        }
+      };
+
+      this.streamEvents.addListener('streamStarted', onStreamStarted);
+
+      const stream = this.getQueryStream(queryKeyHash);
+      if (stream) {
+        dispose();
+
+        resolve(stream);
+      } else {
+        timeoutTimerId = setTimeout(
+          () => {
+            dispose();
+
+            resolve(null);
+          },
+          this.continueWaitTimeout * 10000
+        );
+      }
+    });
+
+    return { promise, dispose };
   }
 
   /**
@@ -601,7 +645,7 @@ export class QueryQueue {
         .slice(0, toProcessLimit)
         .map(([queryKey, queueId]) => this.processQuery(queryKey, queueId));
 
-      // Awaits the claim of every picked query, not their execution.
+      // Awaits the retrieval of every picked query, not their execution.
       await Promise.all(tasks);
     } finally {
       this.queueDriver.release(queueConnection);
@@ -746,21 +790,25 @@ export class QueryQueue {
   }
 
   /**
-   * Claims the query specified by the `queryKeyHashed` and hands it over for execution.
+   * Retrieves the query specified by the `queryKeyHashed` and hands it over for execution.
    */
   protected async processQuery(queryKeyHashed: QueryKeyHash, queueId: QueueId | null): Promise<void> {
-    const claimed = await this.claimQueryForProcessing(queryKeyHashed, queueId);
-    if (!claimed) {
+    const retrieved = await this.retrieveQueryForProcessing(queryKeyHashed, queueId);
+    if (!retrieved) {
       return;
     }
 
+    await this.dispatchQuery(retrieved);
+  }
+
+  protected async dispatchQuery(retrieved: RetrievedQuery): Promise<void> {
     try {
-      await this.sendProcessMessageFn(claimed);
+      await this.sendProcessMessageFn(retrieved);
     } catch (e: any) {
-      this.logger('Error while sending process message', {
-        queueId: claimed.queueId,
-        queryKey: claimed.query.queryKey,
-        requestId: claimed.query.requestId,
+      this.logger('Error while processing message', {
+        queueId: retrieved.queueId,
+        queryKey: retrieved.query.queryKey,
+        requestId: retrieved.query.requestId,
         error: (e.stack || e).toString(),
         queuePrefix: this.redisQueuePrefix
       });
@@ -769,10 +817,10 @@ export class QueryQueue {
 
   /**
    * Acquires the processing lock for the query specified by the `queryKeyHashed` and moves it to
-   * the active set. Returns `null` when the claim didn't succeed, which means another node is
+   * the active set. Returns `null` when the retrieval didn't succeed, which means another node is
    * already running the query or the concurrency budget is full.
    */
-  protected async claimQueryForProcessing(queryKeyHashed: QueryKeyHash, queueId: QueueId | null): Promise<ClaimedQuery | null> {
+  protected async retrieveQueryForProcessing(queryKeyHashed: QueryKeyHash, queueId: QueueId | null): Promise<RetrievedQuery | null> {
     const queueConnection = await this.queueDriver.createConnection();
 
     let insertedCount;
@@ -852,12 +900,12 @@ export class QueryQueue {
   }
 
   /**
-   * Executes a claimed query: runs its handler while keeping the queue heartbeat alive, then acks
+   * Executes a retrieved query: runs its handler while keeping the queue heartbeat alive, then acks
    * the result. It's the counterpart of `sendProcessMessageFn` and the entry point for a custom
    * implementation which hands the query over to another process.
    */
-  public async executeQuery(claimed: ClaimedQuery): Promise<void> {
-    const { queryKeyHash: queryKeyHashed, queueId, processingId, queueSize, query } = claimed;
+  public async executeQuery(retrieved: RetrievedQuery): Promise<void> {
+    const { queryKeyHash: queryKeyHashed, queueId, processingId, queueSize, query } = retrieved;
 
     const queueConnection = await this.queueDriver.createConnection();
 

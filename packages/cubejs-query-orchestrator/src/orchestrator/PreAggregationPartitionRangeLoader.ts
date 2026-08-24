@@ -12,7 +12,7 @@ import {
   parseUtcIntoLocalDate,
   LoggerFn,
 } from '@cubejs-backend/shared';
-import { InlineTable, TableStructure } from '@cubejs-backend/base-driver';
+import { InlineTable, QueuePriority, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
 import { QueryCache, QueryWithParams } from './QueryCache';
 import {
@@ -104,7 +104,7 @@ export class PreAggregationPartitionRangeLoader {
         renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold
           || queryOptions?.renewalThreshold || 24 * 60 * 60,
         waitForRenew: this.waitForRenew,
-        priority: this.priority(10),
+        priority: this.priority(QueuePriority.Interactive),
         requestId: this.requestId,
         dataSource: this.dataSource,
         useInMemory: true,
@@ -122,7 +122,7 @@ export class PreAggregationPartitionRangeLoader {
       (this.preAggregation.invalidateKeyQueries || []).map(
         (sqlQuery) => (
           this.loadCache.keyQueryResult(
-            this.replacePartitionSqlAndParams(sqlQuery, range, partitionTableName), this.waitForRenew, this.priority(10)
+            this.replacePartitionSqlAndParams(sqlQuery, range, partitionTableName), this.waitForRenew, this.priority(QueuePriority.Interactive)
           )
         )
       )

@@ -17,6 +17,7 @@ import {
   CacheDriverInterface,
   TableStructure,
   DriverInterface, QueryKey,
+  QueuePriority,
 } from '@cubejs-backend/base-driver';
 
 import { QueryQueue, QueryQueueOptions } from './QueryQueue';
@@ -214,7 +215,7 @@ export class QueryCache {
       )
     );
 
-    let queuePriority = 10;
+    let queuePriority: QueuePriority = QueuePriority.Interactive;
 
     if (Number.isInteger(queryBody.queuePriority)) {
       queuePriority = queryBody.queuePriority;

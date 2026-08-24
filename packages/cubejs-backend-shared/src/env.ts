@@ -2025,6 +2025,7 @@ const variables: Record<string, (...args: any) => any> = {
     .default('true')
     .asBoolStrict(),
   queueExternalId: () => get('CUBEJS_QUEUE_EXTERNAL_ID').default('false').asBool(),
+  queueFastTrack: () => get('CUBEJS_QUEUE_FAST_TRACK').default('false').asBool(),
   scheduledRefreshDefault: () => get(
     'CUBEJS_SCHEDULED_REFRESH_DEFAULT'
   ).default('true').asBoolStrict(),

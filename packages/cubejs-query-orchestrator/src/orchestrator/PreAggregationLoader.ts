@@ -8,6 +8,7 @@ import {
   DriverCapabilities,
   DriverInterface,
   isDownloadTableCSVData,
+  QueuePriority,
   SaveCancelFn,
   StreamOptions,
   UnloadOptions
@@ -297,7 +298,7 @@ export class PreAggregationLoader {
         // We don't want to wait for the jobed build query result. So we run the
         // executeInQueue method and immediately return the LoadPreAggregationResult object.
         this
-          .executeInQueue(invalidationKeys, this.priority(10), newVersionEntry)
+          .executeInQueue(invalidationKeys, this.priority(QueuePriority.Interactive), newVersionEntry)
           .catch((e: any) => {
             this.logger('Pre-aggregations build job error', {
               preAggregation: this.preAggregation,
@@ -315,7 +316,7 @@ export class PreAggregationLoader {
           buildRangeEnd: this.preAggregation.buildRangeEnd,
         };
       } else {
-        await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
+        await this.executeInQueue(invalidationKeys, this.priority(QueuePriority.Interactive), newVersionEntry);
         return mostRecentResult();
       }
     }
@@ -328,7 +329,7 @@ export class PreAggregationLoader {
           queryKey: this.preAggregationQueryKey(invalidationKeys),
           newVersionEntry
         });
-        await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
+        await this.executeInQueue(invalidationKeys, this.priority(QueuePriority.Interactive), newVersionEntry);
         return mostRecentResult();
       } else if (versionEntry.content_version !== newVersionEntry.content_version) {
         if (this.waitForRenew) {
@@ -338,7 +339,7 @@ export class PreAggregationLoader {
             queryKey: this.preAggregationQueryKey(invalidationKeys),
             newVersionEntry
           });
-          await this.executeInQueue(invalidationKeys, this.priority(0), newVersionEntry);
+          await this.executeInQueue(invalidationKeys, this.priority(QueuePriority.Background), newVersionEntry);
           return mostRecentResult();
         } else {
           this.scheduleRefresh(invalidationKeys, newVersionEntry);
@@ -351,7 +352,7 @@ export class PreAggregationLoader {
         queryKey: this.preAggregationQueryKey(invalidationKeys),
         newVersionEntry
       });
-      await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
+      await this.executeInQueue(invalidationKeys, this.priority(QueuePriority.Interactive), newVersionEntry);
       return mostRecentResult();
     }
     const targetTableName = this.targetTableName(versionEntry);
@@ -387,14 +388,14 @@ export class PreAggregationLoader {
     return version(versionArray);
   }
 
-  protected priority(defaultValue: number): number {
+  protected priority(defaultValue: QueuePriority): QueuePriority {
     return this.preAggregation.priority != null ? this.preAggregation.priority : defaultValue;
   }
 
   protected getInvalidationKeyValues() {
     return Promise.all(
       (this.preAggregation.invalidateKeyQueries || []).map(
-        (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(10))
+        (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(QueuePriority.Interactive))
       )
     );
   }
@@ -403,7 +404,7 @@ export class PreAggregationLoader {
     if (this.preAggregation.partitionInvalidateKeyQueries) {
       return Promise.all(
         (this.preAggregation.partitionInvalidateKeyQueries || []).map(
-          (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(10))
+          (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(QueuePriority.Interactive))
         )
       );
     } else {
@@ -418,7 +419,7 @@ export class PreAggregationLoader {
       queryKey: this.preAggregationQueryKey(invalidationKeys),
       newVersionEntry
     });
-    this.executeInQueue(invalidationKeys, this.priority(0), newVersionEntry)
+    this.executeInQueue(invalidationKeys, this.priority(QueuePriority.Background), newVersionEntry)
       .catch(e => {
         if (!(e instanceof ContinueWaitError)) {
           this.logger('Error refreshing pre-aggregation', {
@@ -428,7 +429,7 @@ export class PreAggregationLoader {
       });
   }
 
-  protected async executeInQueue(invalidationKeys: InvalidationKeys, priority: number, newVersionEntry: VersionEntry) {
+  protected async executeInQueue(invalidationKeys: InvalidationKeys, priority: QueuePriority, newVersionEntry: VersionEntry) {
     const queue = await this.preAggregations.getQueue(this.preAggregation.dataSource);
     return queue.executeInQueue(
       'query',

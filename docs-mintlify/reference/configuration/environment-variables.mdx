@@ -184,6 +184,27 @@ The port of the Cube Store deployment.
 | ------------------- | ---------------------- | --------------------- |
 | A valid port number | `3030`                 | `3030`                |
 
+## `CUBEJS_QUEUE_FAST_TRACK`
+
+<Warning>
+
+The fast-track path is experimental and off by default. Its behavior may still change,
+and we don't recommend enabling it in production yet.
+
+</Warning>
+
+Enables the preview fast-track path for Cube Store query queues. When enabled,
+Cube can atomically enqueue and retrieve a query when queue concurrency is
+available, reducing queue coordination round trips. It applies to queries at
+queue priority 10 and above, which is where user-facing queries and the
+pre-aggregation builds a request waits on are submitted; background refresh runs
+below that and keeps using the regular path. This requires Cube Store
+1.7.25 or newer; against an older version Cube keeps using the regular path.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBEJS_DATASOURCES`
 
 A comma-separated list of data source names. Data sources defined here can be

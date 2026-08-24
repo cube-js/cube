@@ -5,7 +5,8 @@ import crypto from 'crypto';
 import { Required } from '@cubejs-backend/shared';
 import {
   PreAggregationDescription,
-  PreAggregationPartitionRangeLoader
+  PreAggregationPartitionRangeLoader,
+  QueuePriority
 } from '@cubejs-backend/query-orchestrator';
 
 import { CubejsServerCore } from './server';
@@ -576,7 +577,9 @@ export class RefreshScheduler {
           return {
             preAggregations: partitions.map(partition => ({
               ...partition,
-              priority: preAggregationsWarmup ? 1 : queryCursor - queries.length
+              priority: preAggregationsWarmup
+                ? QueuePriority.Warmup
+                : QueuePriority.Scheduled - (queries.length - 1 - queryCursor)
             })),
             cacheMode: 'must-revalidate',
             requestId: context.requestId,
