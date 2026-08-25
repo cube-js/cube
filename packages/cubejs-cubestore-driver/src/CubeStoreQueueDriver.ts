@@ -364,11 +364,15 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
   }
 
   public async retrieveForProcessing(hash: QueryKeyHash, _queueId: QueueId): Promise<RetrieveForProcessingSuccess | null> {
-    const [row] = await this.driver.query<CubeStoreRetrieveResponse>('QUEUE RETRIEVE EXTENDED CONCURRENCY ? ?', [
+    const rows = await this.driver.query<CubeStoreRetrieveResponse>('QUEUE RETRIEVE CONCURRENCY ? ?', [
       this.options.concurrency,
       this.prefixKey(hash),
     ]);
-    return this.decodeRetrievedFromRow(row, 'retrieveForProcessing');
+    if (rows.length) {
+      return this.decodeRetrievedFromRow(rows[0], 'retrieveForProcessing');
+    }
+
+    return null;
   }
 
   public async getResultBlocking(hash: QueryKeyHash, queueId: QueueId): Promise<QueryDef | null> {
