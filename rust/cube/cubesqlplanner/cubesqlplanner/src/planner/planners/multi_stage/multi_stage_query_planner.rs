@@ -799,36 +799,10 @@ impl MultiStageQueryPlanner {
                     }
                 }
 
-                // Of the grain keys only `include` reaches the rolling
-                // assembly. It extends the grain the values inside a bucket are
-                // computed at, which the base CTE carries anyway. `exclude` and
-                // `keep_only` narrow the grain the value is *reported* at, and a
-                // narrowed value has to be broadcast back onto the query grid;
-                // the rolling window node has no side enumerating that grid, so
-                // there is nothing to broadcast from. Reject them instead of
-                // computing at the unnarrowed grain and calling it the answer.
-                //
-                // `reduce_by` and `group_by` compile into the same two lists, so
-                // the message names both spellings — the model may contain
-                // neither of the words the grain keys are called by here.
                 let grain = measure
                     .multi_stage()
                     .map(|ms| ms.grain.clone())
                     .unwrap_or_default();
-                // `keep_only` is an intersection, so declaring it empty narrows
-                // the grain to nothing rather than meaning "no key given";
-                // `exclude` subtracts, so an empty list really does nothing.
-                let narrows_grain = grain.exclude.as_ref().is_some_and(|v| !v.is_empty())
-                    || grain.keep_only.is_some();
-                if narrows_grain {
-                    return Err(CubeError::user(format!(
-                        "Measure {} declares `rolling_window` together with `grain.exclude` / \
-                         `reduce_by` or `grain.keep_only` / `group_by`, which is not supported. \
-                         Only `grain.include` (`add_group_by`) can be combined with a rolling \
-                         window.",
-                        member.full_name(),
-                    )));
-                }
                 let grain_include = grain.include.clone().unwrap_or_default();
 
                 let ungrouped = measure.is_rolling_window() && !measure.is_additive();
@@ -890,6 +864,41 @@ impl MultiStageQueryPlanner {
                 let time_dimension =
                     GranularityHelper::find_dimension_with_min_granularity(&time_dimensions)?;
                 let time_dimension = MemberSymbol::new_time_dimension(time_dimension);
+
+                // Of the grain keys only `include` reaches the window assembly.
+                // It extends the grain the values inside a bucket are computed
+                // at, which the base CTE carries anyway. `exclude` and
+                // `keep_only` narrow the grain the value is *reported* at, and a
+                // narrowed value has to be broadcast back onto the query grid;
+                // the rolling window node has no side enumerating that grid, so
+                // there is nothing to broadcast from.
+                //
+                // What is rejected is the narrowing actually happening, not the
+                // keys being declared: `exclude` of a member this grain does not
+                // carry subtracts nothing, and `keep_only` listing everything the
+                // query groups by intersects to the same list. Such a key costs
+                // the query nothing, and the value is the one the measure would
+                // have without it. `partition_filter` only ever removes, so a
+                // shorter list is exactly the case that has no answer here.
+                //
+                // The check sits below the branch above on purpose. Without a
+                // time dimension the window has no frame and the measure is
+                // planned through the ordinary multi-stage path, which narrows
+                // the grain and broadcasts it back the usual way.
+                let narrows = Self::partition_filter(state.dimensions(), &grain).len()
+                    != state.dimensions().len()
+                    || Self::partition_filter(state.time_dimensions(), &grain).len()
+                        != state.time_dimensions().len();
+                if narrows {
+                    return Err(CubeError::user(format!(
+                        "Measure {} narrows the grain of this query through `grain.exclude` / \
+                         `reduce_by` or `grain.keep_only` / `group_by` while also declaring a \
+                         `rolling_window` over {}, which is not supported. Drop the narrowing \
+                         keys, drop the window, or query the measure without a time dimension.",
+                        member.full_name(),
+                        time_dimension.full_name(),
+                    )));
+                }
 
                 let (base_rolling_state, base_time_dimension) = self.make_rolling_base_state(
                     time_dimension.clone(),

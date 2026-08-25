@@ -159,3 +159,39 @@ cubes:
         rolling_window:
           type: to_date
           granularity: year
+
+      # Baseline for the inert-grain pair below: the same rolling sum with no
+      # grain keys at all.
+      - name: weight_ytd
+        multi_stage: true
+        sql: "{CUBE.daily_weight}"
+        type: sum
+        rolling_window:
+          type: to_date
+          granularity: year
+
+      # Whether this narrows anything depends on the query: against a grain
+      # without `security` it subtracts nothing and has to answer as
+      # `weight_ytd` does; against one carrying `security` it pools the two.
+      - name: weight_ytd_reduce_security
+        multi_stage: true
+        sql: "{CUBE.daily_weight}"
+        type: sum
+        reduce_by:
+          - returns.security
+        rolling_window:
+          type: to_date
+          granularity: year
+
+      # `group_by` listing exactly what the query groups by. The intersection is
+      # the identity, so this too has to answer as `weight_ytd` does.
+      - name: weight_ytd_group_by_query_grain
+        multi_stage: true
+        sql: "{CUBE.daily_weight}"
+        type: sum
+        group_by:
+          - returns.security
+          - returns.day
+        rolling_window:
+          type: to_date
+          granularity: year

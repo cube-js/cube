@@ -224,6 +224,12 @@ async fn test_rolling_grain_keep_only_is_rejected() {
           - returns.log_return_sum_ytd_keep_only
         dimensions:
           - returns.security
+        time_dimensions:
+          - dimension: returns.day
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-01-31"
     "#};
 
     let err = ctx
@@ -248,6 +254,12 @@ async fn test_rolling_grain_reduce_by_is_rejected() {
           - returns.log_return_sum_ytd_reduce_by
         dimensions:
           - returns.security
+        time_dimensions:
+          - dimension: returns.day
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-01-31"
     "#};
 
     let err = ctx
@@ -269,6 +281,12 @@ async fn test_rolling_grain_empty_keep_only_is_rejected() {
           - returns.log_return_sum_ytd_empty_keep_only
         dimensions:
           - returns.security
+        time_dimensions:
+          - dimension: returns.day
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-01-31"
     "#};
 
     let err = ctx
@@ -279,4 +297,107 @@ async fn test_rolling_grain_empty_keep_only_is_rejected() {
         "unexpected error: {}",
         err.message
     );
+}
+
+// A narrowing grain key can be inert for a given query: `exclude` of a member
+// the grain does not carry subtracts nothing, and `keep_only` listing exactly
+// what the query groups by intersects to the same list. Such a measure answers
+// like one that declares no grain at all, and that answer is correct.
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_inert_reduce_by_answers_as_plain() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - returns.weight_ytd
+          - returns.weight_ytd_reduce_security
+        time_dimensions:
+          - dimension: returns.day
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-01-31"
+        order:
+          - id: returns.day
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        assert_measures(
+            &result,
+            &[
+                ("returns__weight_ytd", vec![600.0]),
+                ("returns__weight_ytd_reduce_security", vec![600.0]),
+            ],
+        );
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_inert_group_by_answers_as_plain() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - returns.weight_ytd
+          - returns.weight_ytd_group_by_query_grain
+        dimensions:
+          - returns.security
+        time_dimensions:
+          - dimension: returns.day
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-01-31"
+        order:
+          - id: returns.security
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        assert_measures(
+            &result,
+            &[
+                ("returns__weight_ytd", vec![300.0, 300.0]),
+                (
+                    "returns__weight_ytd_group_by_query_grain",
+                    vec![300.0, 300.0],
+                ),
+            ],
+        );
+    }
+}
+
+// The same narrowing key, on a query with no time dimension: no frame is built,
+// the measure goes through the ordinary multi-stage path, and the narrowing is
+// honoured — the value is pooled over both securities while the rows stay per
+// security.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_narrowing_without_time_dimension() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - returns.weight_ytd
+          - returns.weight_ytd_reduce_security
+        dimensions:
+          - returns.security
+        order:
+          - id: returns.security
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        assert_measures(
+            &result,
+            &[
+                ("returns__weight_ytd", vec![300.0, 300.0]),
+                ("returns__weight_ytd_reduce_security", vec![600.0, 600.0]),
+            ],
+        );
+    }
 }
