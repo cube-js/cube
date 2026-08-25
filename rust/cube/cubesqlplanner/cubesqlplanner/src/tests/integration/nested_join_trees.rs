@@ -287,3 +287,75 @@ fn test_nested_trees_pre_aggregation_query_keeps_separate_scans() {
     let sql = ctx.build_sql(query).unwrap();
     assert_eq!(base_scan_count(&sql), 2, "sql: {sql}");
 }
+
+/// A minimum or a maximum does not move when the wider tree replicates the row
+/// it already saw, so it merges on the same grounds a distinct count does.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_nested_trees_min_max_share_one_base_scan() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - carts.max_value
+          - carts.min_value
+          - checkouts.unique_msid
+        dimensions:
+          - sites.country
+        order:
+          - id: sites.country
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(base_scan_count(&sql), 1, "sql: {sql}");
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+/// The same measures on their own, as the values the merged query must
+/// reproduce.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_nested_trees_min_max_alone() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - carts.max_value
+          - carts.min_value
+        dimensions:
+          - sites.country
+        order:
+          - id: sites.country
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(base_scan_count(&sql), 1, "sql: {sql}");
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+/// An average counts every row it is given, so the replication would move it.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_nested_trees_avg_keeps_its_own_scan() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - carts.avg_value
+          - checkouts.unique_msid
+        dimensions:
+          - sites.country
+        order:
+          - id: sites.country
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(base_scan_count(&sql), 2, "sql: {sql}");
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

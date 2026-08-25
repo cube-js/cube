@@ -317,12 +317,16 @@ impl MeasureKind {
     /// reads are each replicated some number of times — and computed by the
     /// same SQL either way.
     ///
-    /// Strictly narrower than `regular_in_multiplied`: a key-based count is
-    /// also safe under multiplication, but only after switching to the
-    /// distinct `MultipliedCount` form, so it does not qualify here.
+    /// Neither narrower nor wider than `regular_in_multiplied`, which answers a
+    /// different question: a key-based count is safe under multiplication too,
+    /// but only once switched to the distinct `MultipliedCount` form, so it
+    /// does not qualify here; a minimum or a maximum needs no such switch and
+    /// qualifies, though that predicate turns it down.
     pub fn survives_row_multiplication(&self) -> bool {
         match self {
-            Self::Aggregated(a) | Self::AggregatedState(a) => a.agg_type().is_distinct(),
+            Self::Aggregated(a) | Self::AggregatedState(a) => {
+                a.agg_type().is_duplicate_insensitive()
+            }
             Self::Count(_) | Self::MultipliedCount(_) | Self::Calculated(_) | Self::Rank => false,
         }
     }

@@ -50,6 +50,15 @@ cubes:
       - name: total_value
         type: sum
         sql: value
+      - name: max_value
+        type: max
+        sql: value
+      - name: min_value
+        type: min
+        sql: value
+      - name: avg_value
+        type: avg
+        sql: value
 
   - name: checkouts
     sql: "SELECT * FROM checkouts"
