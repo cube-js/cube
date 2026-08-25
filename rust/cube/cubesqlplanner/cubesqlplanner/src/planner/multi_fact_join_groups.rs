@@ -325,7 +325,12 @@ impl MultiFactJoinGroups {
             .map(|key| grouped.remove(&key).unwrap())
             .collect::<Vec<_>>();
 
-        if merge_nested && !Self::any_cube_has_pre_aggregations(query_tools, &groups)? {
+        // Cheapest question first: without a nested pair there is nothing to
+        // merge, and the pre-aggregation scan crosses the bridge once per cube.
+        if merge_nested
+            && Self::has_nested_pair(&groups)
+            && !Self::any_cube_has_pre_aggregations(query_tools, &groups)?
+        {
             Self::merge_nested_groups(&mut groups, &resolve)?;
         }
 
@@ -333,6 +338,16 @@ impl MultiFactJoinGroups {
             .into_iter()
             .map(|group| (group.tree, group.measures))
             .collect())
+    }
+
+    /// Whether any group's join tree is contained in another's - the only
+    /// shape `merge_nested_groups` can do anything with.
+    fn has_nested_pair(groups: &[GroupBuild]) -> bool {
+        groups.iter().any(|group| {
+            groups
+                .iter()
+                .any(|other| group.key.is_nested_in(&other.key))
+        })
     }
 
     /// Whether any cube these groups read defines a pre-aggregation.
@@ -405,7 +420,12 @@ impl MultiFactJoinGroups {
                     }
                     let mut hints = other.hints.clone();
                     hints.extend(&group.hints);
-                    let (key, tree) = resolve(&hints)?;
+                    // Resolving is a probe: a hint set the join graph refuses
+                    // means there is no merge to make here, not that the query
+                    // the groups came from is unplannable.
+                    let Ok((key, tree)) = resolve(&hints) else {
+                        continue;
+                    };
                     if key != other.key {
                         continue;
                     }

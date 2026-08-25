@@ -209,3 +209,81 @@ async fn test_nested_trees_separate_pre_aggs_still_match() {
 
     assert_eq!(pre_aggrs.len(), 2, "got {names:?}");
 }
+
+/// A filter on the shallower cube leaves the trees nested, so the merge still
+/// happens and has to keep answering what the unmerged legs would.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_nested_trees_merge_with_filter_on_shallower_cube() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - carts.unique_msid
+          - checkouts.unique_msid
+        dimensions:
+          - sites.country
+        filters:
+          - member: carts.msid
+            operator: equals
+            values:
+              - m1
+        order:
+          - id: sites.country
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(base_scan_count(&sql), 1, "sql: {sql}");
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+/// A filter on the deeper cube pulls it into the base hints, so both measures
+/// resolve to the same tree and there is nothing left to merge.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_nested_trees_filter_on_deeper_cube_leaves_one_tree() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - carts.unique_msid
+          - checkouts.unique_msid
+        dimensions:
+          - sites.country
+        filters:
+          - member: checkouts.msid
+            operator: equals
+            values:
+              - x1
+        order:
+          - id: sites.country
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(base_scan_count(&sql), 1, "sql: {sql}");
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+/// Building a rollup describes the rows to store, and matching later compares
+/// the query's groups against the pre-aggregation's, so the build must be
+/// grouped the way an unmerged query is.
+#[test]
+fn test_nested_trees_pre_aggregation_query_keeps_separate_scans() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - carts.unique_msid
+          - checkouts.unique_msid
+        dimensions:
+          - sites.country
+        pre_aggregation_query: true
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(base_scan_count(&sql), 2, "sql: {sql}");
+}
