@@ -71,9 +71,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           readable.pipe(stream);
         });
       },
-      sendProcessMessageFn: async (retrieved) => {
+      sendProcessMessageFn: async (queryKeyHash, queueId, retrieved) => {
         streamCallOrder.push('dispatch');
-        processMessagePromises.push(queue.executeQuery(retrieved));
+        processMessagePromises.push(queue.executeQuery(queryKeyHash, queueId, retrieved));
       },
       sendCancelMessageFn: async (query) => {
         processCancelPromises.push(queue.processCancel.bind(queue)(query));
@@ -479,10 +479,14 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         );
 
         const firstRetrieval = await connection.retrieveForProcessing(key, queueId);
-        expect(firstRetrieval?.[5]).toBe(true);
+        expect(firstRetrieval).toMatchObject({
+          active: [key],
+          queueSize: 0,
+          def: { queryKey: key },
+        });
 
         const secondRetrieval = await connection2.retrieveForProcessing(key, queueId);
-        expect(secondRetrieval).toStrictEqual([0, null, [key], 0, null, false]);
+        expect(secondRetrieval).toBeNull();
       } finally {
         await connection.getQueryAndRemove(key, null);
         queue.queueDriver.release(connection);
@@ -490,12 +494,14 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       }
     });
 
-    onlyLocalTest('a failed retrieval does not reserve a pending query', async () => {
+    test('a failed retrieval does not reserve a pending query', async () => {
       const connection = await queue.queueDriver.createConnection();
       const connection2 = await queue.queueDriver.createConnection();
       const priority = 10;
-      const firstKey = 'concurrency-first' as any;
-      const secondKey = 'concurrency-second' as any;
+      const firstKey: QueryKey = 'concurrency-first';
+      const secondKey: QueryKey = 'concurrency-second';
+      const firstHash = connection.redisHash(firstKey);
+      const secondHash = connection.redisHash(secondKey);
 
       try {
         const [, firstQueueId] = await connection.addToQueue(
@@ -509,20 +515,25 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           }
         );
 
-        expect((await connection.retrieveForProcessing(firstKey, firstQueueId))?.[5]).toBe(true);
-        expect(await connection2.retrieveForProcessing(secondKey, secondQueueId)).toStrictEqual([
-          0, null, [firstKey], 1, null, false
-        ]);
-        expect(await connection.getToProcessQueries()).toStrictEqual([[secondKey, secondQueueId]]);
+        expect(await connection.retrieveForProcessing(firstHash, firstQueueId)).toMatchObject({
+          active: [firstHash],
+          queueSize: 1,
+          def: { queryKey: firstKey },
+        });
+        expect(await connection2.retrieveForProcessing(secondHash, secondQueueId)).toBeNull();
+        expect(await connection.getToProcessQueries()).toStrictEqual([[secondHash, secondQueueId]]);
 
-        await connection.getQueryAndRemove(firstKey, firstQueueId);
+        await connection.getQueryAndRemove(firstHash, firstQueueId);
 
-        const secondRetrieval = await connection2.retrieveForProcessing(secondKey, secondQueueId);
-        expect(secondRetrieval?.[0]).toBe(1);
-        expect(secondRetrieval?.[5]).toBe(true);
+        const secondRetrieval = await connection2.retrieveForProcessing(secondHash, secondQueueId);
+        expect(secondRetrieval).toMatchObject({
+          active: [secondHash],
+          queueSize: 0,
+          def: { queryKey: secondKey },
+        });
       } finally {
-        await connection.getQueryAndRemove(firstKey, null);
-        await connection.getQueryAndRemove(secondKey, null);
+        await connection.getQueryAndRemove(firstHash, null);
+        await connection.getQueryAndRemove(secondHash, null);
         queue.queueDriver.release(connection);
         queue.queueDriver.release(connection2);
       }
@@ -540,7 +551,11 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
             queueId: queue.generateQueueId(), stageQueryKey: key, requestId: '1'
           }
         );
-        expect((await connection.retrieveForProcessing(key, staleQueueId))?.[5]).toBe(true);
+        expect(await connection.retrieveForProcessing(key, staleQueueId)).toMatchObject({
+          active: [key],
+          queueSize: 0,
+          def: { queryKey },
+        });
         await connection.getQueryAndRemove(key, staleQueueId);
 
         const [, currentQueueId] = await connection.addToQueue(
@@ -550,12 +565,14 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         );
 
         if (options.cacheAndQueueDriver !== 'cubestore') {
-          expect(await connection.retrieveForProcessing(key, staleQueueId)).toStrictEqual([
-            0, null, [], 1, null, false
-          ]);
+          expect(await connection.retrieveForProcessing(key, staleQueueId)).toBeNull();
           expect(await connection.getToProcessQueries()).toStrictEqual([[key, currentQueueId]]);
         }
-        expect((await connection.retrieveForProcessing(key, currentQueueId))?.[5]).toBe(true);
+        expect(await connection.retrieveForProcessing(key, currentQueueId)).toMatchObject({
+          active: [key],
+          queueSize: 0,
+          def: { queryKey, query: ['new'] },
+        });
 
         const staleUpdateResult = await connection.optimisticQueryUpdate(key, { stale: true }, staleQueueId);
         if (options.cacheAndQueueDriver !== 'cubestore') {
@@ -756,8 +773,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           // concurrency is 1, the first query takes the only slot
           const [added1, , , , retrieved1] = await addToQueue(first, 1);
           expect(added1).toBe(1);
-          expect(retrieved1?.[5]).toBe(true);
-          expect(retrieved1?.[4].queryKey).toStrictEqual(first);
+          expect(retrieved1?.def.queryKey).toStrictEqual(first);
 
           // an active item is never retrieved twice
           const [added1again, , , , retrieved1again] = await addToQueue(first, 1);

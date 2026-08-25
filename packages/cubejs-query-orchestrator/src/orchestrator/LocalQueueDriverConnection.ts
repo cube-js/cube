@@ -11,7 +11,7 @@ import {
   QueryKeysTuple,
   GetActiveAndToProcessResponse,
   QueryStageStateResponse,
-  RetrieveForProcessingResponse,
+  RetrieveForProcessingSuccess,
   QueueDriverOptions,
   QueuePriority
 } from '@cubejs-backend/base-driver';
@@ -272,7 +272,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     }
   }
 
-  public async retrieveForProcessing(queryKeyHash: QueryKeyHash, queueId: QueueId): Promise<RetrieveForProcessingResponse> {
+  public async retrieveForProcessing(queryKeyHash: QueryKeyHash, queueId: QueueId): Promise<RetrieveForProcessingSuccess | null> {
     const query = this.state.queryDef[queryKeyHash];
     const activeKeys = this.queueArray(this.state.active) as QueryKeyHash[];
 
@@ -283,14 +283,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
       this.state.active[queryKeyHash] ||
       activeKeys.length >= this.concurrency
     ) {
-      return [
-        0,
-        null,
-        activeKeys,
-        Object.keys(this.state.toProcess).length,
-        null,
-        false
-      ];
+      return null;
     }
 
     this.state.active[queryKeyHash] = { key: queryKeyHash, order: Number(queueId), queueId };
@@ -298,14 +291,11 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
     this.state.heartBeat[queryKeyHash] = { key: queryKeyHash, order: new Date().getTime(), queueId };
 
-    return [
-      1,
-      query.queueId,
-      this.queueArray(this.state.active) as QueryKeyHash[],
-      Object.keys(this.state.toProcess).length,
-      query,
-      true
-    ];
+    return {
+      active: this.queueArray(this.state.active) as QueryKeyHash[],
+      queueSize: Object.keys(this.state.toProcess).length,
+      def: query,
+    };
   }
 
   public async optimisticQueryUpdate(queryKeyHash: QueryKeyHash, toUpdate: any, queueId: QueueId): Promise<boolean> {

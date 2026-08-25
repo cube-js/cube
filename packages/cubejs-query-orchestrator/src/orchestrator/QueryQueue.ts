@@ -25,14 +25,11 @@ export type QueryHandlerFn = (query: QueryDef, cancelHandler: CancelHandlerFn) =
 export type StreamHandlerFn = (query: QueryDef, stream: QueryStream) => Promise<unknown>;
 export type QueryHandlersMap = Record<string, QueryHandlerFn>;
 
-export type RetrievedQuery = {
-  queryKeyHash: QueryKeyHash;
-  queueId: QueueId;
-  queueSize: number;
-  query: QueryDef;
-};
-
-export type SendProcessMessageFn = (retrieved: RetrievedQuery) => Promise<void> | void;
+export type SendProcessMessageFn = (
+  queryKeyHash: QueryKeyHash,
+  queueId: QueueId,
+  retrieved: RetrieveForProcessingSuccess
+) => Promise<void> | void;
 export type SendCancelMessageFn = (query: QueryDef, queueId: QueueId | null) => Promise<void> | void;
 
 export type ExecuteInQueueOptions = Omit<AddToQueueOptions, 'queueId'> & {
@@ -131,7 +128,9 @@ export class QueryQueue {
     this.orphanedTimeout = options.orphanedTimeout || 120;
     this.heartBeatInterval = options.heartBeatInterval || 30;
 
-    this.sendProcessMessageFn = options.sendProcessMessageFn || ((retrieved) => { this.executeQuery(retrieved); });
+    this.sendProcessMessageFn = options.sendProcessMessageFn || (
+      (queryKeyHash, queueId, retrieved) => { this.executeQuery(queryKeyHash, queueId, retrieved); }
+    );
     this.sendCancelMessageFn = options.sendCancelMessageFn || ((query, queueId) => { this.processCancel(query, queueId); });
     this.queryHandlers = options.queryHandlers;
     this.streamHandler = options.streamHandler;
@@ -307,13 +306,13 @@ export class QueryQueue {
 
       if (retrieved) {
         // The item is active already, there is nothing for reconcile to pick up
-        await this.dispatchQuery(this.retrievedQuery(queryKeyHash, queueId, retrieved));
+        await this.dispatchQuery(queryKeyHash, queueId, retrieved);
       } else {
         await this.reconcileQueue();
       }
 
       if (!added) {
-        const queryDef = retrieved ? retrieved[4] : await queueConnection.getQueryDef(queryKeyHash, queueId);
+        const queryDef = retrieved ? retrieved.def : await queueConnection.getQueryDef(queryKeyHash, queueId);
         if (queryDef) {
           waitingContext = {
             queueId,
@@ -328,7 +327,7 @@ export class QueryQueue {
 
       // A retrieval carries the active keys of its prefix, and a retrieved query is never pending,
       // so it has no place in the queue to report
-      const [active, toProcess] = retrieved ? [retrieved[2], undefined] : await queueConnection.getQueryStageState(true);
+      const [active, toProcess] = retrieved ? [retrieved.active, undefined] : await queueConnection.getQueryStageState(true);
 
       this.logger('Waiting for query', {
         ...waitingContext,
@@ -363,17 +362,6 @@ export class QueryQueue {
       streamWait?.dispose();
       this.queueDriver.release(queueConnection);
     }
-  }
-
-  protected retrievedQuery(queryKeyHash: QueryKeyHash, queueId: QueueId, retrieved: RetrieveForProcessingSuccess): RetrievedQuery {
-    const [, , , queueSize, query] = retrieved;
-
-    return {
-      queryKeyHash,
-      queueId,
-      queueSize,
-      query,
-    };
   }
 
   /**
@@ -796,17 +784,21 @@ export class QueryQueue {
       return;
     }
 
-    await this.dispatchQuery(retrieved);
+    await this.dispatchQuery(queryKeyHashed, queueId, retrieved);
   }
 
-  protected async dispatchQuery(retrieved: RetrievedQuery): Promise<void> {
+  protected async dispatchQuery(
+    queryKeyHash: QueryKeyHash,
+    queueId: QueueId,
+    retrieved: RetrieveForProcessingSuccess
+  ): Promise<void> {
     try {
-      await this.sendProcessMessageFn(retrieved);
+      await this.sendProcessMessageFn(queryKeyHash, queueId, retrieved);
     } catch (e: any) {
       this.logger('Error while processing message', {
-        queueId: retrieved.queueId,
-        queryKey: retrieved.query.queryKey,
-        requestId: retrieved.query.requestId,
+        queueId,
+        queryKey: retrieved.def.queryKey,
+        requestId: retrieved.def.requestId,
         error: (e.stack || e).toString(),
         queuePrefix: this.redisQueuePrefix
       });
@@ -817,27 +809,16 @@ export class QueryQueue {
    * Atomically moves the query specified by `queryKeyHashed` to the active set. Returns `null`
    * when another node is already running the query or the concurrency budget is full.
    */
-  protected async retrieveQueryForProcessing(queryKeyHashed: QueryKeyHash, queueId: QueueId): Promise<RetrievedQuery | null> {
+  protected async retrieveQueryForProcessing(queryKeyHashed: QueryKeyHash, queueId: QueueId): Promise<RetrieveForProcessingSuccess | null> {
     const queueConnection = await this.queueDriver.createConnection();
 
-    let insertedCount;
-    let activeKeys;
-    let queueSize;
     let query;
-    let retrievalSucceeded;
 
     try {
-      const retrieveResult = await queueConnection.retrieveForProcessing(queryKeyHashed, queueId);
-      if (retrieveResult) {
-        [insertedCount, , activeKeys, queueSize, query, retrievalSucceeded] = retrieveResult;
-      }
-
-      const activated = activeKeys && activeKeys.indexOf(queryKeyHashed) !== -1;
-      if (!query) {
+      const retrieved = await queueConnection.retrieveForProcessing(queryKeyHashed, queueId);
+      if (!retrieved) {
         query = await queueConnection.getQueryDef(queryKeyHashed, null);
-      }
 
-      if (!query || !insertedCount || !activated || !retrievalSucceeded) {
         // TODO Ideally streaming queries should reconcile queue here after waiting on open slot however in practice continue wait timeout reconciles faster CPU-wise
         // if (query?.queryHandler === 'stream') {
         //   const [active] = await queueConnection.getQueryStageState(true);
@@ -852,22 +833,13 @@ export class QueryQueue {
           queryKey: query && query.queryKey || queryKeyHashed,
           requestId: query && query.requestId,
           queuePrefix: this.redisQueuePrefix,
-          retrievalSucceeded,
           query,
-          insertedCount,
-          activeKeys,
-          activated,
           queryExists: !!query
         });
         return null;
       }
 
-      return {
-        queryKeyHash: queryKeyHashed,
-        queueId,
-        queueSize,
-        query,
-      };
+      return retrieved;
     } catch (e: any) {
       this.logger('Queue storage error', {
         queueId,
@@ -888,8 +860,12 @@ export class QueryQueue {
    * the result. It's the counterpart of `sendProcessMessageFn` and the entry point for a custom
    * implementation which hands the query over to another process.
    */
-  public async executeQuery(retrieved: RetrievedQuery): Promise<void> {
-    const { queryKeyHash: queryKeyHashed, queueId, queueSize, query } = retrieved;
+  public async executeQuery(
+    queryKeyHashed: QueryKeyHash,
+    queueId: QueueId,
+    retrieved: RetrieveForProcessingSuccess
+  ): Promise<void> {
+    const { queueSize, def: query } = retrieved;
 
     const queueConnection = await this.queueDriver.createConnection();
 

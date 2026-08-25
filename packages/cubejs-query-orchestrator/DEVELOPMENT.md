@@ -79,7 +79,8 @@ enum ResultStatus {
 
 `EXTENDED` on `QUEUE RETRIEVE` changes only the failure shape: without it a failed retrieval
 returns zero rows, with it a single row where `payload` and `id` are `NULL` but `pending`
-and `active` are filled. The driver always sends `EXTENDED`.
+and `active` are filled. The driver uses the non-extended form and treats zero rows as a failed
+retrieval.
 
 ## Enqueue and wait: `executeInQueue`
 
@@ -221,13 +222,13 @@ sequenceDiagram
     participant QueryOrchestrator
 
     QueryQueue->>QueueDriver: retrieveForProcessing
-    QueueDriver->>CubeStore: QUEUE RETRIEVE EXTENDED CONCURRENCY ?n ?path
+    QueueDriver->>CubeStore: QUEUE RETRIEVE CONCURRENCY ?n ?path
     CubeStore-->>QueueDriver: RetrieveResponse
-    QueueDriver-->>QueryQueue: [added, queueId, activeKeys, queueSize, def, retrieved]
+    QueueDriver-->>QueryQueue: { active, queueSize, def } | null
     Note over QueueDriver,CubeStore: The retrieval is atomic in Cube Store:<br/>only one node moves the item to active
 
-    alt def && added && activeKeys includes our key && retrieved
-        QueryQueue-)Background: sendProcessMessageFn(RetrievedQuery)
+    alt retrieved
+        QueryQueue-)Background: sendProcessMessageFn(queryKeyHash, queueId, retrieved)
         Note over QueryQueue,Background: Detached from here on: the hand-off returns,<br/>the execution keeps running
 
         Background->>QueueDriver: optimisticQueryUpdate

@@ -9,25 +9,11 @@ export type QueryKeyHash = string & { __type: 'QueryKeyHash' };
 export type QueryKeysTuple = [keyHash: QueryKeyHash, queueId: QueueId];
 export type GetActiveAndToProcessResponse = [active: QueryKeysTuple[], toProcess: QueryKeysTuple[]];
 export type QueryStageStateResponse = [active: string[], toProcess: string[]] | [active: string[], toProcess: string[], defs: Record<string, QueryDef>];
-export type RetrieveForProcessingSuccess = [
-  added: unknown,
-  // Identifies the retrieved generation of the queue item.
-  queueId: QueueId | null,
+export type RetrieveForProcessingSuccess = {
   active: QueryKeyHash[],
-  pending: number,
+  queueSize: number,
   def: QueryDef,
-  retrieved: true
-];
-export type RetrieveForProcessingFail = [
-  added: unknown,
-  // Null when no queue item was retrieved.
-  queueId: QueueId | null,
-  active: QueryKeyHash[],
-  pending: number,
-  def: null,
-  retrieved: false
-];
-export type RetrieveForProcessingResponse = RetrieveForProcessingSuccess | RetrieveForProcessingFail | null;
+};
 export type AddToQueueResponse = [
   added: number,
   queueId: QueueId | null,
@@ -106,7 +92,7 @@ export interface QueueDriverConnectionInterface {
   updateHeartBeat(hash: QueryKeyHash, queueId: QueueId | null): Promise<void>;
   // Atomically moves a queue item to active. Returns null when another node is already
   // processing the query or the concurrency budget is full.
-  retrieveForProcessing(hash: QueryKeyHash, queueId: QueueId): Promise<RetrieveForProcessingResponse>;
+  retrieveForProcessing(hash: QueryKeyHash, queueId: QueueId): Promise<RetrieveForProcessingSuccess | null>;
   optimisticQueryUpdate(hash: QueryKeyHash, toUpdate: unknown, queueId: QueueId): Promise<boolean>;
   cancelQuery(queryKey: QueryKey, queueId: QueueId | null): Promise<QueryDef | null>;
   getQueryAndRemove(hash: QueryKeyHash, queueId: QueueId | null): Promise<[QueryDef]>;

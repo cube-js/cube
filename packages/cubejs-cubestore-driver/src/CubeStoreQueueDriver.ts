@@ -4,7 +4,6 @@ import {
   QueueDriverConnectionInterface,
   QueryStageStateResponse,
   QueryDef,
-  RetrieveForProcessingResponse,
   RetrieveForProcessingSuccess,
   QueueDriverOptions,
   AddToQueueQuery,
@@ -357,30 +356,20 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
       return null;
     }
 
-    return [
-      1,
-      row.id ? parseInt(row.id, 10) : null,
-      this.decodeActiveKeysFromRow(row.active),
-      parseInt(row.pending, 10),
-      this.decodeQueryDefFromRow(row as { payload: string, extra?: string | null }, method),
-      true
-    ];
+    return {
+      active: this.decodeActiveKeysFromRow(row.active),
+      queueSize: parseInt(row.pending, 10),
+      def: this.decodeQueryDefFromRow(row as { payload: string, extra?: string | null }, method),
+    };
   }
 
-  public async retrieveForProcessing(hash: QueryKeyHash, _queueId: QueueId): Promise<RetrieveForProcessingResponse> {
-    const rows = await this.driver.query<CubeStoreRetrieveResponse>('QUEUE RETRIEVE EXTENDED CONCURRENCY ? ?', [
+  public async retrieveForProcessing(hash: QueryKeyHash, _queueId: QueueId): Promise<RetrieveForProcessingSuccess | null> {
+    const rows = await this.driver.query<CubeStoreRetrieveResponse>('QUEUE RETRIEVE CONCURRENCY ? ?', [
       this.options.concurrency,
       this.prefixKey(hash),
     ]);
-    if (rows && rows.length) {
-      return this.decodeRetrievedFromRow(rows[0], 'retrieveForProcessing') || [
-        0,
-        null,
-        this.decodeActiveKeysFromRow(rows[0].active),
-        parseInt(rows[0].pending, 10),
-        null,
-        false
-      ];
+    if (rows.length) {
+      return this.decodeRetrievedFromRow(rows[0], 'retrieveForProcessing');
     }
 
     return null;
