@@ -182,12 +182,13 @@ sequenceDiagram
 ## Background execution: `processQuery` → `executeQuery`
 
 `processQuery` retrieves the item and nothing else. What it hands to `sendProcessMessageFn` is a
-`RetrievedQuery` — `{ queryKeyHash, queueId, processingId, queueSize, query }`, plain data on
+`RetrievedQuery` — `{ queryKeyHash, queueId, queueSize, query }`, plain data on
 purpose, so a custom implementation can serialize it and let another process run
 `executeQuery`. The default implementation calls `executeQuery` in-process.
 
-`processingId` is the lock token of the retrieval and always carries the `queueId`. Only the
-memory driver compares it, Cube Store ignores it and keys every command off the `queueId`.
+`queueId` identifies the specific generation of a queue item. The memory driver compares it
+with the active entry before updating or acknowledging a query, while Cube Store keys those
+commands directly off the `queueId`.
 
 `sendProcessMessageFn` must resolve once the hand-off is done, **not** once the query is
 executed: reconcile awaits it, and `executeQuery` ends with `reconcileQueue`, which is
@@ -200,8 +201,8 @@ Two consequences of retrieving before the hand-off:
   `@<processUid>` suffix matches, so `sendProcessMessageFn` is always called on the owning
   process for them — it just must not route them elsewhere.
 - A retrieved item is already active. If a custom hand-off loses the message, the item is only
-  recovered by the stalled-heartbeat / `TO_CANCEL` path; `freeProcessingLock` is a no-op on
-  Cube Store, so the retrieval cannot be cheaply undone.
+  recovered by the stalled-heartbeat / `TO_CANCEL` path; a successful retrieval is not undone
+  when the hand-off fails.
 
 A stream query is dispatched while `executeInQueue` is still running, so `waitForQueryStream`
 subscribes to `streamStarted` *before* the dispatch — a handler which starts fast would
@@ -222,10 +223,10 @@ sequenceDiagram
     QueryQueue->>QueueDriver: retrieveForProcessing
     QueueDriver->>CubeStore: QUEUE RETRIEVE EXTENDED CONCURRENCY ?n ?path
     CubeStore-->>QueueDriver: RetrieveResponse
-    QueueDriver-->>QueryQueue: [added, queueId, activeKeys, queueSize, def, lockAcquired]
+    QueueDriver-->>QueryQueue: [added, queueId, activeKeys, queueSize, def, retrieved]
     Note over QueueDriver,CubeStore: The retrieval is atomic in Cube Store:<br/>only one node moves the item to active
 
-    alt def && added && activeKeys includes our key && lockAcquired
+    alt def && added && activeKeys includes our key && retrieved
         QueryQueue-)Background: sendProcessMessageFn(RetrievedQuery)
         Note over QueryQueue,Background: Detached from here on: the hand-off returns,<br/>the execution keeps running
 
@@ -254,8 +255,7 @@ sequenceDiagram
         Background->>Background: reconcileQueue
         Note over Background: The freed concurrency slot is<br/>immediately given to the next query
     else the retrieval did not succeed
-        QueryQueue->>QueueDriver: freeProcessingLock
-        Note over QueryQueue,QueueDriver: Another node is running it, or the<br/>concurrency budget is full. No-op for Cube Store
+        Note over QueryQueue,QueueDriver: Another node is running it, or the<br/>concurrency budget is full. Queue state is unchanged
     end
 ```
 

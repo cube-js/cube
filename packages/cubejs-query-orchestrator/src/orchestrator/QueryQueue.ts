@@ -9,7 +9,6 @@ import {
   QueryStageStateResponse,
   AddToQueueOptions,
   QueuePriority,
-  ProcessingId,
   RetrieveForProcessingSuccess
 } from '@cubejs-backend/base-driver';
 import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
@@ -29,7 +28,6 @@ export type QueryHandlersMap = Record<string, QueryHandlerFn>;
 export type RetrievedQuery = {
   queryKeyHash: QueryKeyHash;
   queueId: QueueId;
-  processingId: ProcessingId;
   queueSize: number;
   query: QueryDef;
 };
@@ -373,7 +371,6 @@ export class QueryQueue {
     return {
       queryKeyHash,
       queueId,
-      processingId: queueId,
       queueSize,
       query,
     };
@@ -817,9 +814,8 @@ export class QueryQueue {
   }
 
   /**
-   * Acquires the processing lock for the query specified by the `queryKeyHashed` and moves it to
-   * the active set. Returns `null` when the retrieval didn't succeed, which means another node is
-   * already running the query or the concurrency budget is full.
+   * Atomically moves the query specified by `queryKeyHashed` to the active set. Returns `null`
+   * when another node is already running the query or the concurrency budget is full.
    */
   protected async retrieveQueryForProcessing(queryKeyHashed: QueryKeyHash, queueId: QueueId): Promise<RetrievedQuery | null> {
     const queueConnection = await this.queueDriver.createConnection();
@@ -828,16 +824,12 @@ export class QueryQueue {
     let activeKeys;
     let queueSize;
     let query;
-    let processingLockAcquired;
+    let retrievalSucceeded;
 
     try {
-      // The lock token is the queueId, every call which releases the lock has to be handed
-      // the same value retrieveForProcessing got
-      const processingId = queueId;
-
-      const retrieveResult = await queueConnection.retrieveForProcessing(queryKeyHashed, processingId);
+      const retrieveResult = await queueConnection.retrieveForProcessing(queryKeyHashed, queueId);
       if (retrieveResult) {
-        [insertedCount, , activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
+        [insertedCount, , activeKeys, queueSize, query, retrievalSucceeded] = retrieveResult;
       }
 
       const activated = activeKeys && activeKeys.indexOf(queryKeyHashed) !== -1;
@@ -845,7 +837,7 @@ export class QueryQueue {
         query = await queueConnection.getQueryDef(queryKeyHashed, null);
       }
 
-      if (!query || !insertedCount || !activated || !processingLockAcquired) {
+      if (!query || !insertedCount || !activated || !retrievalSucceeded) {
         // TODO Ideally streaming queries should reconcile queue here after waiting on open slot however in practice continue wait timeout reconciles faster CPU-wise
         // if (query?.queryHandler === 'stream') {
         //   const [active] = await queueConnection.getQueryStageState(true);
@@ -857,26 +849,22 @@ export class QueryQueue {
 
         this.logger('Skip processing', {
           queueId,
-          processingId,
           queryKey: query && query.queryKey || queryKeyHashed,
           requestId: query && query.requestId,
           queuePrefix: this.redisQueuePrefix,
-          processingLockAcquired,
+          retrievalSucceeded,
           query,
           insertedCount,
           activeKeys,
           activated,
           queryExists: !!query
         });
-        await queueConnection.freeProcessingLock(queryKeyHashed, processingId, activated);
-
         return null;
       }
 
       return {
         queryKeyHash: queryKeyHashed,
         queueId,
-        processingId,
         queueSize,
         query,
       };
@@ -901,7 +889,7 @@ export class QueryQueue {
    * implementation which hands the query over to another process.
    */
   public async executeQuery(retrieved: RetrievedQuery): Promise<void> {
-    const { queryKeyHash: queryKeyHashed, queueId, processingId, queueSize, query } = retrieved;
+    const { queryKeyHash: queryKeyHashed, queueId, queueSize, query } = retrieved;
 
     const queueConnection = await this.queueDriver.createConnection();
 
@@ -915,7 +903,6 @@ export class QueryQueue {
       const timeInQueue = (new Date()).getTime() - query.addedToQueueTime;
       this.logger('Performing query', {
         queueId,
-        processingId,
         queueSize,
         queryKey: query.queryKey,
         queuePrefix: this.redisQueuePrefix,
@@ -927,7 +914,7 @@ export class QueryQueue {
         preAggregation: query.query?.preAggregation,
         addedToQueueTime: query.addedToQueueTime,
       });
-      await queueConnection.optimisticQueryUpdate(queryKeyHashed, { startQueryTime }, processingId, queueId);
+      await queueConnection.optimisticQueryUpdate(queryKeyHashed, { startQueryTime }, queueId);
 
       let queryProcessHeartbeat = Date.now();
       const heartBeatTimer = setInterval(
@@ -1011,7 +998,7 @@ export class QueryQueue {
                   async (cancelHandler) => {
                     localCancelHandler = cancelHandler;
                     try {
-                      await queueConnection.optimisticQueryUpdate(queryKeyHashed, { cancelHandler }, processingId, queueId);
+                      await queueConnection.optimisticQueryUpdate(queryKeyHashed, { cancelHandler }, queueId);
                     } catch (e: any) {
                       this.logger('Error while query update', {
                         queueId,
@@ -1035,7 +1022,6 @@ export class QueryQueue {
 
         this.logger('Performing query completed', {
           queueId,
-          processingId,
           queueSize,
           duration: ((new Date()).getTime() - startQueryTime),
           queryKey: query.queryKey,
@@ -1054,7 +1040,6 @@ export class QueryQueue {
         };
         this.logger('Error while querying', {
           queueId,
-          processingId,
           queueSize,
           duration: ((new Date()).getTime() - startQueryTime),
           queryKey: query.queryKey,
@@ -1073,7 +1058,6 @@ export class QueryQueue {
           if (queryWithCancelHandle) {
             this.logger('Cancelling query due to timeout', {
               queueId,
-              processingId,
               queryKey: queryWithCancelHandle.queryKey,
               queuePrefix: this.redisQueuePrefix,
               requestId: queryWithCancelHandle.requestId,
@@ -1092,11 +1076,10 @@ export class QueryQueue {
         clearInterval(heartBeatTimer);
       }
 
-      if (!(await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, processingId, queueId))) {
+      if (!(await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, queueId))) {
         this.logger('Orphaned execution result', {
           queueId,
-          processingId,
-          warn: 'Result for query was not set due to processing lock wasn\'t acquired',
+          warn: 'Result for query was not set because the queue item is no longer active',
           queryKey: query.queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: query.requestId,
