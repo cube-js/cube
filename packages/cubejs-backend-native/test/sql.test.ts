@@ -424,6 +424,94 @@ describe('SQLInterface', () => {
     await native.shutdownInterface(instance, 'fast');
   });
 
+  test('client disconnect ends the /cubesql stream gracefully, not as an error', async () => {
+    // A client that closes the response stream before the result set has been
+    // fully written (a cancelled dashboard, a closed browser tab, an aborted
+    // fetch) ends the request gracefully. It is the same situation as a
+    // `Continue wait` handed back to a client that stops waiting for the
+    // result: nobody is left to read the rows, so there is nothing to do but
+    // stop. It must not be reported as `Cube SQL Error` — that event feeds
+    // error rates and query history — and no error payload should be pushed
+    // into the stream that is already gone.
+    const loadEvents: string[] = [];
+    const methods = {
+      ...interfaceMethods(),
+      // Return data in both stream and non-stream mode: `CUBESQL_STREAM_MODE`
+      // only picks the streaming branch for limits above
+      // `non_streaming_query_max_row_limit`, and this test must behave the
+      // same either way.
+      sqlApiLoad: jest.fn(async ({ streaming, query }: any) => {
+        if (streaming) {
+          return { stream: new FakeRowStream(query) };
+        }
+        return {
+          results: [
+            {
+              annotation: {
+                measures: {},
+                dimensions: {},
+                segments: {},
+                timeDimensions: {},
+              },
+              data: {
+                members: ['KibanaSampleDataEcommerce.order_date'],
+                columns: [['2024-01-01T00:00:00.000']],
+              },
+            },
+          ],
+        };
+      }),
+      logLoadEvent: ({ event }: { event: string; properties: any }) => {
+        loadEvents.push(event);
+      },
+    };
+
+    const instance = await native.registerInterface({
+      ...methods,
+      canSwitchUserForSession: (_payload: any) => true,
+    });
+
+    const chunks: string[] = [];
+    const cubeSqlStream = new Writable({
+      write(chunk, _enc, callback) {
+        chunks.push(chunk.toString('utf-8'));
+        callback();
+        // Simulate the client going away right after the JSONL schema header.
+        this.destroy();
+      },
+    });
+    // The native side holds a reference to the stream and only learns it is
+    // gone through the `close` event, so the writes already in flight (and the
+    // final `end()`) hit a destroyed stream and emit ERR_STREAM_DESTROYED.
+    // Collect them instead of letting them become an unhandled 'error'.
+    const streamErrors: Error[] = [];
+    cubeSqlStream.on('error', (err) => {
+      streamErrors.push(err);
+    });
+
+    try {
+      await native.execSql(
+        instance,
+        'SELECT order_date FROM KibanaSampleDataEcommerce ORDER BY order_date DESC LIMIT 100000;',
+        cubeSqlStream
+      );
+
+      expect(loadEvents).toContain('Load Request');
+      expect(loadEvents).not.toContain('Cube SQL Error');
+      // Neither terminal event fires: the query never completed, and the
+      // disconnect is not a failure. Asserting this also keeps the test
+      // honest — it would pass vacuously if the query had simply finished
+      // before the `close` event arrived.
+      expect(loadEvents).not.toContain('Load Request Success');
+      // Only the schema header made it out, and nothing that looks like an
+      // error was written into the closed stream.
+      expect(chunks.length).toBeGreaterThan(0);
+      expect(chunks.join('')).not.toContain('"error"');
+    } finally {
+      await native.shutdownInterface(instance, 'fast');
+    }
+  });
+
   test('external flag is surfaced in /cubesql JSONL schema header when set to true', async () => {
     // End-to-end coverage of the cubesql -> backend-native -> JSONL path:
     // the non-streaming `load` returns a V1LoadResponseColumnar with

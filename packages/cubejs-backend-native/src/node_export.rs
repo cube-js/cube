@@ -233,6 +233,20 @@ async fn write_jsonl_message(
     .await
 }
 
+/// How a `/v1/cubesql` request ended when nothing actually failed.
+enum SqlQueryOutcome {
+    /// The whole result set was streamed to the client.
+    Completed,
+    /// The client closed the response stream before the result set was fully
+    /// written. This is a graceful end of the request, not a query error: it is
+    /// the same situation as a `Continue wait` handed back to a client that
+    /// stops waiting for the result - nobody is waiting for the rows anymore,
+    /// so there is nothing left to do but stop. Reporting it as an error would
+    /// pollute error rates and query history with client-side navigation,
+    /// cancelled dashboards and closed browser tabs.
+    ClientDisconnected,
+}
+
 async fn handle_sql_query(
     services: Arc<NodeCubeServices>,
     native_auth_ctx: Arc<NativeSQLAuthContext>,
@@ -243,7 +257,7 @@ async fn handle_sql_query(
     timezone: Option<String>,
     throw_continue_wait: bool,
     request_id: Option<String>,
-) -> Result<(), CubeError> {
+) -> Result<SqlQueryOutcome, CubeError> {
     let span_id = Some(Arc::new(SpanId::new(
         request_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
         serde_json::json!({ "sql": sql_query }),
@@ -477,14 +491,22 @@ async fn handle_sql_query(
         };
 
         let result = tokio::select! {
+            // Dropping the `execute()` future here cancels the query stream,
+            // which is exactly what we want: there is no consumer left for it.
             _ = close_rx => {
-                Err(CubeError::internal("Client disconnected".to_string()))
+                Ok(SqlQueryOutcome::ClientDisconnected)
             }
-            res = execute() => res
+            res = execute() => res.map(|_| SqlQueryOutcome::Completed),
         };
 
         match &result {
-            Ok(_) => {
+            Ok(SqlQueryOutcome::ClientDisconnected) => {
+                log::debug!(
+                    "Client disconnected before the result was fully written, span id: {:?}",
+                    span_id.as_ref().map(|span_id| &span_id.span_id)
+                );
+            }
+            Ok(SqlQueryOutcome::Completed) => {
                 session_clone
                     .session_manager
                     .server
@@ -668,6 +690,9 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             };
 
             let args = match result {
+                // Includes `SqlQueryOutcome::ClientDisconnected`: the stream is
+                // already gone, so there is nobody to hand an error payload to,
+                // and a disconnect is not an error to report in the first place.
                 Ok(_) => vec![],
                 Err(err) => {
                     let mut error_response = Map::new();
