@@ -1,8 +1,6 @@
 export type QueryDef = any;
 // Primary key of Queue item
 export type QueueId = string | number | bigint;
-// The lock token of a retrieval, always the item's queueId. Only the memory driver compares it.
-export type ProcessingId = string | number | bigint;
 export type QueryKey = (string | [string, any[]]) & {
   persistent?: true,
 };
@@ -13,21 +11,21 @@ export type GetActiveAndToProcessResponse = [active: QueryKeysTuple[], toProcess
 export type QueryStageStateResponse = [active: string[], toProcess: string[]] | [active: string[], toProcess: string[], defs: Record<string, QueryDef>];
 export type RetrieveForProcessingSuccess = [
   added: unknown,
-  // QueueId is required for Cube Store, other providers don't support it
+  // Identifies the retrieved generation of the queue item.
   queueId: QueueId | null,
   active: QueryKeyHash[],
   pending: number,
   def: QueryDef,
-  lockAquired: true
+  retrieved: true
 ];
 export type RetrieveForProcessingFail = [
   added: unknown,
-  // QueueId is required for Cube Store, other providers don't support it
+  // Null when no queue item was retrieved.
   queueId: QueueId | null,
   active: QueryKeyHash[],
   pending: number,
   def: null,
-  lockAquired: false
+  retrieved: false
 ];
 export type RetrieveForProcessingResponse = RetrieveForProcessingSuccess | RetrieveForProcessingFail | null;
 export type AddToQueueResponse = [
@@ -106,14 +104,13 @@ export interface QueueDriverConnectionInterface {
   getStalledQueries(): Promise<QueryKeysTuple[]>;
   getQueryStageState(onlyKeys: boolean): Promise<QueryStageStateResponse>;
   updateHeartBeat(hash: QueryKeyHash, queueId: QueueId | null): Promise<void>;
-  // Trying to acquire a lock for processing a queue item, this method can return null when
-  // multiple nodes tries to process the same query
-  retrieveForProcessing(hash: QueryKeyHash, processingId: ProcessingId): Promise<RetrieveForProcessingResponse>;
-  freeProcessingLock(hash: QueryKeyHash, processingId: ProcessingId, activated: unknown): Promise<void>;
-  optimisticQueryUpdate(hash: QueryKeyHash, toUpdate: unknown, processingId: ProcessingId, queueId: QueueId | null): Promise<boolean>;
+  // Atomically moves a queue item to active. Returns null when another node is already
+  // processing the query or the concurrency budget is full.
+  retrieveForProcessing(hash: QueryKeyHash, queueId: QueueId): Promise<RetrieveForProcessingResponse>;
+  optimisticQueryUpdate(hash: QueryKeyHash, toUpdate: unknown, queueId: QueueId): Promise<boolean>;
   cancelQuery(queryKey: QueryKey, queueId: QueueId | null): Promise<QueryDef | null>;
   getQueryAndRemove(hash: QueryKeyHash, queueId: QueueId | null): Promise<[QueryDef]>;
-  setResultAndRemoveQuery(hash: QueryKeyHash, executionResult: any, processingId: ProcessingId, queueId: QueueId | null): Promise<unknown>;
+  setResultAndRemoveQuery(hash: QueryKeyHash, executionResult: any, queueId: QueueId): Promise<unknown>;
   release(): void;
   //
   getQueriesToCancel(): Promise<QueryKeysTuple[]>

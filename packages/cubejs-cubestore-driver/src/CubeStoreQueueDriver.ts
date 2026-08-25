@@ -12,7 +12,6 @@ import {
   AddToQueueResponse,
   QueryKey,
   QueryKeyHash,
-  ProcessingId,
   QueueId,
   GetActiveAndToProcessResponse,
   QueryKeysTuple,
@@ -182,10 +181,6 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     return null;
   }
 
-  public async freeProcessingLock(_hash: QueryKeyHash, _processingId: string, _activated: unknown): Promise<void> {
-    // nothing to do
-  }
-
   public async getActiveQueries(): Promise<QueryKeysTuple[]> {
     const rows = await this.driver.query<CubeStoreListResponse>('QUEUE ACTIVE ?', [
       this.options.redisQueuePrefix
@@ -336,7 +331,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     return null;
   }
 
-  public async optimisticQueryUpdate(hash: QueryKeyHash, toUpdate: unknown, _processingId: ProcessingId, queueId: QueueId): Promise<boolean> {
+  public async optimisticQueryUpdate(hash: QueryKeyHash, toUpdate: unknown, queueId: QueueId): Promise<boolean> {
     await this.driver.query('QUEUE MERGE_EXTRA ? ?', [
       // queryKeyHash as compatibility fallback
       queueId || this.prefixKey(hash),
@@ -372,7 +367,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     ];
   }
 
-  public async retrieveForProcessing(hash: QueryKeyHash, _processingId: string): Promise<RetrieveForProcessingResponse> {
+  public async retrieveForProcessing(hash: QueryKeyHash, _queueId: QueueId): Promise<RetrieveForProcessingResponse> {
     const rows = await this.driver.query<CubeStoreRetrieveResponse>('QUEUE RETRIEVE EXTENDED CONCURRENCY ? ?', [
       this.options.concurrency,
       this.prefixKey(hash),
@@ -404,7 +399,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     return null;
   }
 
-  public async setResultAndRemoveQuery(hash: QueryKeyHash, executionResult: unknown, _processingId: ProcessingId, queueId: QueueId): Promise<boolean> {
+  public async setResultAndRemoveQuery(hash: QueryKeyHash, executionResult: unknown, queueId: QueueId): Promise<boolean> {
     const rows = await this.driver.query('QUEUE ACK ? ?', [
       // queryKeyHash as compatibility fallback
       queueId || this.prefixKey(hash),

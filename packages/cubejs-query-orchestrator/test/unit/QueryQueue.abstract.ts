@@ -465,76 +465,111 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       }
     });
 
-    onlyLocalTest('queue driver lock obtain race condition', async () => {
-      const connection: any = await queue.queueDriver.createConnection();
-      const connection2: any = await queue.queueDriver.createConnection();
-      const priority = 10;
-
-      await queue.reconcileQueue();
-
-      const [, raceQueueId] = await connection.addToQueue(
-        'race', 'handler', ['select'], priority, { queueId: queue.generateQueueId(), stageQueryKey: 'race' }
-      );
-
-      const [, race2QueueId] = await connection.addToQueue(
-        'race2', 'handler2', ['select2'], priority, { queueId: queue.generateQueueId(), stageQueryKey: 'race2' }
-      );
-
-      // Neither is locked yet, so both releases are no-ops
-      await connection.freeProcessingLock('race', raceQueueId, true);
-      await connection.freeProcessingLock('race2', race2QueueId, true);
-
-      await connection2.retrieveForProcessing('race2', race2QueueId);
-
-      const retrieve6 = await connection.retrieveForProcessing('race', raceQueueId);
-      console.log(retrieve6);
-      expect(!!retrieve6[5]).toBe(true);
-
-      console.log(await connection.getQueryAndRemove('race'));
-      console.log(await connection.getQueryAndRemove('race2'));
-
-      await queue.queueDriver.release(connection);
-      await queue.queueDriver.release(connection2);
-    });
-
-    onlyLocalTest('activated but lock is not acquired', async () => {
+    onlyLocalTest('an active query cannot be retrieved twice', async () => {
       const connection = await queue.queueDriver.createConnection();
       const connection2 = await queue.queueDriver.createConnection();
       const priority = 10;
+      const key = 'active-retrieval' as any;
 
-      await queue.reconcileQueue();
+      try {
+        const [, queueId] = await connection.addToQueue(
+          key, 'handler', <any>['select'], priority, {
+            queueId: queue.generateQueueId(), stageQueryKey: key, requestId: '1'
+          }
+        );
 
-      const [, activated1QueueId] = await connection.addToQueue(
-        'activated1', 'handler', <any>['select'], priority, { queueId: queue.generateQueueId(), stageQueryKey: 'race', requestId: '1' }
-      );
+        const firstRetrieval = await connection.retrieveForProcessing(key, queueId);
+        expect(firstRetrieval?.[5]).toBe(true);
 
-      const [, activated2QueueId] = await connection.addToQueue(
-        'activated2', 'handler2', <any>['select2'], priority, { queueId: queue.generateQueueId(), stageQueryKey: 'race2', requestId: '1' }
-      );
+        const secondRetrieval = await connection2.retrieveForProcessing(key, queueId);
+        expect(secondRetrieval).toStrictEqual([0, null, [key], 0, null, false]);
+      } finally {
+        await connection.getQueryAndRemove(key, null);
+        queue.queueDriver.release(connection);
+        queue.queueDriver.release(connection2);
+      }
+    });
 
-      const retrieve1 = await connection.retrieveForProcessing('activated1' as any, activated1QueueId);
-      console.log(retrieve1);
-      const retrieve2 = await connection2.retrieveForProcessing('activated2' as any, activated2QueueId);
-      console.log(retrieve2);
-      console.log(await connection.freeProcessingLock('activated1' as any, activated1QueueId, retrieve1 && retrieve1[2].indexOf('activated1' as any) !== -1));
+    onlyLocalTest('a failed retrieval does not reserve a pending query', async () => {
+      const connection = await queue.queueDriver.createConnection();
+      const connection2 = await queue.queueDriver.createConnection();
+      const priority = 10;
+      const firstKey = 'concurrency-first' as any;
+      const secondKey = 'concurrency-second' as any;
 
-      // Another node reaches the same item, so it comes with the same lock token and loses
-      const retrieve3 = await connection.retrieveForProcessing('activated2' as any, activated2QueueId);
-      expect(retrieve3).toBeNull();
+      try {
+        const [, firstQueueId] = await connection.addToQueue(
+          firstKey, 'handler', <any>['select'], priority, {
+            queueId: queue.generateQueueId(), stageQueryKey: firstKey, requestId: '1'
+          }
+        );
+        const [, secondQueueId] = await connection.addToQueue(
+          secondKey, 'handler2', <any>['select2'], priority, {
+            queueId: queue.generateQueueId(), stageQueryKey: secondKey, requestId: '1'
+          }
+        );
 
-      console.log(retrieve2[2].indexOf('activated2' as any) !== -1);
-      console.log(await connection2.freeProcessingLock('activated2' as any, activated2QueueId, retrieve2 && retrieve2[2].indexOf('activated2' as any) !== -1));
+        expect((await connection.retrieveForProcessing(firstKey, firstQueueId))?.[5]).toBe(true);
+        expect(await connection2.retrieveForProcessing(secondKey, secondQueueId)).toStrictEqual([
+          0, null, [firstKey], 1, null, false
+        ]);
+        expect(await connection.getToProcessQueries()).toStrictEqual([[secondKey, secondQueueId]]);
 
-      const retrieve4 = await connection.retrieveForProcessing('activated2' as any, activated2QueueId);
-      console.log(retrieve4);
-      expect(retrieve4[0]).toBe(1);
-      expect(!!retrieve4[5]).toBe(true);
+        await connection.getQueryAndRemove(firstKey, firstQueueId);
 
-      console.log(await connection.getQueryAndRemove('activated1' as any, null));
-      console.log(await connection.getQueryAndRemove('activated2' as any, null));
+        const secondRetrieval = await connection2.retrieveForProcessing(secondKey, secondQueueId);
+        expect(secondRetrieval?.[0]).toBe(1);
+        expect(secondRetrieval?.[5]).toBe(true);
+      } finally {
+        await connection.getQueryAndRemove(firstKey, null);
+        await connection.getQueryAndRemove(secondKey, null);
+        queue.queueDriver.release(connection);
+        queue.queueDriver.release(connection2);
+      }
+    });
 
-      await queue.queueDriver.release(connection);
-      await queue.queueDriver.release(connection2);
+    test('stale queueId cannot update or acknowledge a requeued query', async () => {
+      const connection = await queue.queueDriver.createConnection();
+      const queryKey = 'requeued-query' as QueryKey;
+      const key = connection.redisHash(queryKey);
+      const priority = 10;
+
+      try {
+        const [, staleQueueId] = await connection.addToQueue(
+          queryKey, 'handler', <any>['old'], priority, {
+            queueId: queue.generateQueueId(), stageQueryKey: key, requestId: '1'
+          }
+        );
+        expect((await connection.retrieveForProcessing(key, staleQueueId))?.[5]).toBe(true);
+        await connection.getQueryAndRemove(key, staleQueueId);
+
+        const [, currentQueueId] = await connection.addToQueue(
+          queryKey, 'handler', <any>['new'], priority, {
+            queueId: queue.generateQueueId(), stageQueryKey: key, requestId: '2'
+          }
+        );
+
+        if (options.cacheAndQueueDriver !== 'cubestore') {
+          expect(await connection.retrieveForProcessing(key, staleQueueId)).toStrictEqual([
+            0, null, [], 1, null, false
+          ]);
+          expect(await connection.getToProcessQueries()).toStrictEqual([[key, currentQueueId]]);
+        }
+        expect((await connection.retrieveForProcessing(key, currentQueueId))?.[5]).toBe(true);
+
+        const staleUpdateResult = await connection.optimisticQueryUpdate(key, { stale: true }, staleQueueId);
+        if (options.cacheAndQueueDriver !== 'cubestore') {
+          expect(staleUpdateResult).toBe(false);
+        }
+        expect(await connection.setResultAndRemoveQuery(key, { result: 'stale' }, staleQueueId)).toBe(false);
+        const currentQuery = await connection.getQueryDef(key, currentQueueId);
+        expect(currentQuery).toMatchObject({ query: ['new'] });
+        expect(currentQuery).not.toHaveProperty('stale');
+        expect(await connection.getActiveQueries()).toStrictEqual([[key, currentQueueId]]);
+      } finally {
+        await connection.getQueryAndRemove(key, null);
+        queue.queueDriver.release(connection);
+      }
     });
 
     // eslint-disable-next-line no-unused-expressions
