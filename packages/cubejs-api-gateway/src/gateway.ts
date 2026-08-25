@@ -84,6 +84,7 @@ import { SubscriptionServer, WebSocketSendMessageFn } from './ws/subscription-se
 import { LocalSubscriptionStore } from './ws/local-subscription-store';
 import {
   getPivotQuery,
+  cubeSqlRequestSchema,
   getQueryGranularity,
   normalizeQuery,
   normalizeQueryCancelPreAggregations,
@@ -438,7 +439,12 @@ class ApiGateway {
         try {
           await this.assertApiScope('data', req.context?.securityContext);
 
-          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext, req.body.cache);
+          const { error, value: body } = cubeSqlRequestSchema.validate(req.body);
+          if (error) {
+            throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
+          }
+
+          await this.sqlServer.execSql(body.query, res, req.context?.securityContext, body.cache);
         } catch (e: any) {
           this.handleError({
             e,
@@ -887,7 +893,7 @@ class ApiGateway {
         throw new UserError('No job description provided');
       }
 
-      const { error } = preAggsJobsRequestSchema.validate(query);
+      const { error, value } = preAggsJobsRequestSchema.validate(query);
       if (error) {
         throw new UserError(`Invalid Job query format: ${error.message || error.toString()}`);
       }
@@ -896,7 +902,7 @@ class ApiGateway {
         case 'post':
           result = await this.preAggregationsJobsPOST(
             context,
-            <PreAggsSelector>query.selector
+            <PreAggsSelector>value.selector
           );
           if (result.length === 0) {
             throw new UserError(

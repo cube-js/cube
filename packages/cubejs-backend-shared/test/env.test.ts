@@ -95,3 +95,52 @@ describe('getEnv', () => {
     expect(getEnv('livePreview')).toBe(false);
   });
 });
+
+describe('getEnv(scheduledRefreshTimezones)', () => {
+  afterEach(() => {
+    delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES;
+  });
+
+  test('scheduledRefreshTimezones - unset resolves to an empty list', () => {
+    delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES;
+    expect(getEnv('scheduledRefreshTimezones')).toEqual([]);
+  });
+
+  test('scheduledRefreshTimezones - trims and normalizes each entry', () => {
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = 'utc, europe/berlin';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual(['UTC', 'Europe/Berlin']);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = 'America/New_York';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual(['America/New_York']);
+  });
+
+  // Trailing/repeated separators are common in .env files and compose YAML.
+  test('scheduledRefreshTimezones - ignores empty entries', () => {
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = 'UTC,';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual(['UTC']);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = 'UTC,,America/Los_Angeles';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual(['UTC', 'America/Los_Angeles']);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = ' UTC , ';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual(['UTC']);
+  });
+
+  test('scheduledRefreshTimezones - blank resolves to an empty list', () => {
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = '';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual([]);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = '   ';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual([]);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = ',';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual([]);
+  });
+
+  test('scheduledRefreshTimezones(exception)', () => {
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = 'UTC,Nope/Zone';
+    expect(() => getEnv('scheduledRefreshTimezones')).toThrowError(
+      'Value "Nope/Zone" is not valid for CUBEJS_SCHEDULED_REFRESH_TIMEZONES. Must be a comma-separated list of valid IANA time zone names, e.g. UTC,America/Los_Angeles.'
+    );
+  });
+});

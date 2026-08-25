@@ -1260,3 +1260,36 @@ describe('OptsHandler class', () => {
     expect(permissions).toEqual(['graphql', 'meta', 'data', 'jobs']);
   });
 });
+
+describe('OptsHandler timezone validation', () => {
+  beforeEach(() => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+  });
+
+  afterEach(() => {
+    delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES;
+  });
+
+  test('must throw at construction if CUBEJS_SCHEDULED_REFRESH_TIMEZONES has an invalid entry', () => {
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = 'UTC,Nope/Zone';
+
+    expect(() => new CubejsServerCoreExposed(conf))
+      .toThrow(/CUBEJS_SCHEDULED_REFRESH_TIMEZONES/);
+  });
+
+  test('must throw at construction if CreateOptions.scheduledRefreshTimeZones has an invalid entry', () => {
+    expect(() => new CubejsServerCoreExposed({
+      ...conf,
+      scheduledRefreshTimeZones: ['UTC', 'Nope/Zone'],
+    })).toThrow(/valid IANA time zone name/);
+  });
+
+  test('must canonicalize CreateOptions.scheduledRefreshTimeZones', () => {
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      scheduledRefreshTimeZones: ['utc', 'america/new_york'],
+    });
+
+    expect(core.options.scheduledRefreshTimeZones).toEqual(['UTC', 'America/New_York']);
+  });
+});
