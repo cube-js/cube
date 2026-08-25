@@ -71,9 +71,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           readable.pipe(stream);
         });
       },
-      sendProcessMessageFn: async (retrieved) => {
+      sendProcessMessageFn: async (queryKeyHash, queueId, retrieved) => {
         streamCallOrder.push('dispatch');
-        processMessagePromises.push(queue.executeQuery(retrieved));
+        processMessagePromises.push(queue.executeQuery(queryKeyHash, queueId, retrieved));
       },
       sendCancelMessageFn: async (query) => {
         processCancelPromises.push(queue.processCancel.bind(queue)(query));
