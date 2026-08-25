@@ -223,6 +223,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             "rolling_window_two_aggregates",
             rolling_window_two_aggregates,
         ),
+        t(
+            "rolling_window_two_aggregates_ratio",
+            rolling_window_two_aggregates_ratio,
+        ),
         t("decimal_index", decimal_index),
         t("decimal_order", decimal_order),
         t("float_index", float_index),
@@ -5988,6 +5992,49 @@ ORDER BY 1 ASC";
             (3, None, None),
             (4, Some(5), Some(500)),
             (5, None, None),
+        ])
+    );
+    Ok(())
+}
+
+async fn rolling_window_two_aggregates_ratio(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Data(day int, loc int, n int, m int)")
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.Data(day, loc, n, m) VALUES (1, 1, 10, 1000), \
+                                                       (3, 1, 3, 300), \
+                                                       (5, 1, 5, 500)",
+        )
+        .await?;
+
+    // One of the two aggregates is only read through an expression (`sm / sn`), so nothing in the
+    // projection names it. The rolling node pairs its aggregates with the names the projection
+    // gives them, and a name missing for one aggregate used to drop that aggregate's field from
+    // the node's schema while the enclosing subquery kept the wider schema it was built with --
+    // `optimize_projections` then asked the narrower schema for a field it no longer had and
+    // panicked with an index out of bounds. The multi-aggregate rewrite declines, so this runs as
+    // a plain aggregate over the range join.
+    let query = "SELECT `q`.`day`, `q`.`loc`, `q`.`sn`, `q`.`avg_n` FROM (
+  SELECT `s0`.`date_from` `day`, `b`.`loc` `loc`, sum(`b`.`n`) `sn`, sum(`b`.`m`) / sum(`b`.`n`) `avg_n`
+  FROM (SELECT date_from `date_from`, date_from + 1 `date_to`
+        FROM (select unnest(generate_series(1, 5, 1))) AS series(date_from)) `s0`
+  LEFT JOIN (SELECT day `d`, loc `loc`, n `n`, m `m` FROM s.Data) `b`
+    ON `b`.`d` > `s0`.`date_to` - 1 AND `b`.`d` <= `s0`.`date_to`
+  GROUP BY 1, 2) `q`
+ORDER BY 1 ASC";
+    assert_plan_omits(&service, query, "RollingWindowAgg").await?;
+    let r = service.exec_query(query).await?;
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1i64, None, None, None),
+            (2, Some(1i64), Some(3i64), Some(100i64)),
+            (3, None, None, None),
+            (4, Some(1), Some(5), Some(100)),
+            (5, None, None, None),
         ])
     );
     Ok(())
