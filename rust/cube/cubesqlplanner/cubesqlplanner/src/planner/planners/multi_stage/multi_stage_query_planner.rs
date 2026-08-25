@@ -807,6 +807,10 @@ impl MultiStageQueryPlanner {
                 // the rolling window node has no side enumerating that grid, so
                 // there is nothing to broadcast from. Reject them instead of
                 // computing at the unnarrowed grain and calling it the answer.
+                //
+                // `reduce_by` and `group_by` compile into the same two lists, so
+                // the message names both spellings — the model may contain
+                // neither of the words the grain keys are called by here.
                 let grain = measure
                     .multi_stage()
                     .map(|ms| ms.grain.clone())
@@ -815,9 +819,10 @@ impl MultiStageQueryPlanner {
                     |g: &Option<Vec<Rc<MemberSymbol>>>| g.as_ref().is_some_and(|v| !v.is_empty());
                 if has_partition_grain(&grain.exclude) || has_partition_grain(&grain.keep_only) {
                     return Err(CubeError::user(format!(
-                        "Measure {} declares `rolling_window` together with `grain.exclude` or \
-                         `grain.keep_only`, which is not supported. Only `grain.include` can be \
-                         combined with a rolling window.",
+                        "Measure {} declares `rolling_window` together with `grain.exclude` / \
+                         `reduce_by` or `grain.keep_only` / `group_by`, which is not supported. \
+                         Only `grain.include` (`add_group_by`) can be combined with a rolling \
+                         window.",
                         member.full_name(),
                     )));
                 }

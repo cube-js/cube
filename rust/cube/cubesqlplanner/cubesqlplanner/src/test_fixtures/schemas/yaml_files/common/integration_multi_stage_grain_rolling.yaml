@@ -132,3 +132,17 @@ cubes:
         rolling_window:
           type: to_date
           granularity: year
+
+      # `reduce_by` compiles into the same list as `grain.exclude`, so the same
+      # rejection has to reach a model written in the older spelling.
+      - name: log_return_sum_ytd_reduce_by
+        multi_stage: true
+        sql: "LN(1.0 + ({CUBE.daily_irr_weight} / NULLIF({CUBE.daily_weight}, 0)) / 100.0)"
+        type: sum
+        add_group_by:
+          - returns.day
+        reduce_by:
+          - returns.security
+        rolling_window:
+          type: to_date
+          granularity: year

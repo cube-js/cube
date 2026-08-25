@@ -235,3 +235,27 @@ async fn test_rolling_grain_keep_only_is_rejected() {
         err.message
     );
 }
+
+// The older `reduce_by` / `group_by` spellings compile into the same grain
+// lists, so a model that never writes the word `grain` must still be told
+// which of its own keys the message is about.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_grain_reduce_by_is_rejected() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - returns.log_return_sum_ytd_reduce_by
+        dimensions:
+          - returns.security
+    "#};
+
+    let err = ctx
+        .build_sql(query)
+        .expect_err("reduce_by must be rejected");
+    assert!(
+        err.message.contains("reduce_by") && err.message.contains("group_by"),
+        "unexpected error: {}",
+        err.message
+    );
+}
