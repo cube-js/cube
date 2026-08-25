@@ -569,7 +569,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         expect(await connection.retrieveForProcessing(key, currentQueueId)).toMatchObject({
           active: [key],
           queueSize: 0,
-          def: { queryKey },
+          def: { queryKey, query: ['new'] },
         });
 
         const staleUpdateResult = await connection.optimisticQueryUpdate(key, { stale: true }, staleQueueId);
