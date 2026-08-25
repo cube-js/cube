@@ -513,8 +513,8 @@ async fn handle_sql_query(
                 // dropped, which is what happens now anyway. What must not
                 // happen is reporting it as a failure.
                 log::debug!(
-                    "Client disconnected before the result was fully written, span id: {:?}",
-                    span_id.as_ref().map(|span_id| &span_id.span_id)
+                    "Client disconnected before the result was fully written, span id: {}",
+                    span_id.as_ref().map(|s| s.span_id.as_str()).unwrap_or("-")
                 );
             }
             Ok(SqlQueryOutcome::Completed) => {

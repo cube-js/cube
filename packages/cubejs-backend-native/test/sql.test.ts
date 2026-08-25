@@ -483,11 +483,8 @@ describe('SQLInterface', () => {
     // The native side holds a reference to the stream and only learns it is
     // gone through the `close` event, so the writes already in flight (and the
     // final `end()`) hit a destroyed stream and emit ERR_STREAM_DESTROYED.
-    // Collect them instead of letting them become an unhandled 'error'.
-    const streamErrors: Error[] = [];
-    cubeSqlStream.on('error', (err) => {
-      streamErrors.push(err);
-    });
+    // Swallow them: an unhandled 'error' would fail the test.
+    cubeSqlStream.on('error', jest.fn());
     // `exec_sql` delivers a failure as the *argument* to the stream's `end`,
     // not through `write`, so the spy has to be in place before `execSql`
     // roots the function.
