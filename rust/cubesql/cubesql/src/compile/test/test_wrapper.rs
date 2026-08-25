@@ -3519,4 +3519,43 @@ async fn test_wrapper_limitless_post_processing_union_of_distinct_selects() {
         "limited branches: {:?}",
         requests
     );
+
+    // A limit above the `UNION` reaches the branches only when there is nothing between them
+    // that it cannot move through: `UnionSortLimitPushDown` copies it into each input, and
+    // the regular limit push down carries it to the scans
+    let requests = context
+        .convert_sql_to_cube_query(
+            "SELECT 'Medical Claims (MX)' AS table_type, customer_gender AS market \
+             FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+             UNION ALL \
+             SELECT 'Pharmacy Claims (RX)' AS table_type, content AS market \
+             FROM Logs GROUP BY 1, 2 \
+             LIMIT 1000",
+        )
+        .await
+        .expect("union all under a limit should compile")
+        .as_logical_plan()
+        .find_cube_scans()
+        .into_iter()
+        .map(|scan| scan.request)
+        .collect::<Vec<_>>();
+    assert!(
+        requests.iter().all(|request| request.limit == Some(1000)),
+        "branches under an outer limit: {:?}",
+        requests
+    );
+
+    // The `DISTINCT` of a plain `UNION` is such a node, so the same limit stops above it and
+    // the branches stay unlimited
+    let error = context
+        .convert_sql_to_cube_query(&format!("{query} LIMIT 1000"))
+        .await
+        .expect_err("outer limit should not reach branches through the union's distinct");
+    assert!(
+        error
+            .to_string()
+            .contains("CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING"),
+        "unexpected error: {}",
+        error
+    );
 }
