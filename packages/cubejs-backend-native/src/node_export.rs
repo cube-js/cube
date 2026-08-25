@@ -239,13 +239,19 @@ enum SqlQueryOutcome {
     /// The whole result set was streamed to the client.
     Completed,
     /// The client closed the response stream before the result set was fully
-    /// written. This attempt delivered nothing, but the request is not over: a
-    /// `throwContinueWait` client polls with the same request id and comes back
-    /// for another attempt, and the queued query stays alive as long as it
-    /// keeps doing so. That makes this the same outcome as a `Continue wait`,
-    /// and it is reported as one - not as an error, and not silently, since a
-    /// terminal event is what lets query history account for the request's
-    /// running time.
+    /// written, so this attempt delivered nothing. It is reported as a
+    /// `Continue wait`: that is the event which closes out an attempt that
+    /// produced no result, and closing it is what lets query history account
+    /// for the request's running time - `Load Request` is logged when the
+    /// attempt starts, so silence here would leave the request dangling.
+    ///
+    /// Whether the client comes back is not something this end of the stream
+    /// can know, and the reporting deliberately does not depend on it: under
+    /// `throwContinueWait` it polls with the same request id and the queued
+    /// query stays alive while it keeps doing so, and without the flag this is
+    /// the end of the road. Either way the attempt is over having produced
+    /// nothing, which is all the event claims. What it must not claim is that
+    /// the query failed.
     ClientDisconnected,
 }
 
@@ -547,10 +553,11 @@ async fn handle_sql_query(
 
                 // `Load Request` was already logged above, so every outcome
                 // owes it a terminal event: without one the request dangles and
-                // its running time cannot be accounted for. The client is
-                // expected back for another attempt, so the outcome is a
-                // `Continue wait` - the name query history already understands,
-                // rather than a new one it would log and drop.
+                // its running time cannot be accounted for. `Continue wait` is
+                // the name query history already reads for an attempt that
+                // produced no result, rather than a new one it would log and
+                // drop. See `SqlQueryOutcome::ClientDisconnected` for why this
+                // is not gated on `throw_continue_wait`.
                 log_continue_wait(&session_clone, &span_id, sql_query).await?;
             }
             Ok(SqlQueryOutcome::Completed) => {

@@ -424,104 +424,117 @@ describe('SQLInterface', () => {
     await native.shutdownInterface(instance, 'fast');
   });
 
-  test('client disconnect ends the /cubesql stream gracefully, not as an error', async () => {
+  // Both `throwContinueWait` states, because the flag is an opt-in that only
+  // `@cubejs-client/core` sets: with it the client polls and comes back for
+  // another attempt, without it this disconnect is the end of the road. The
+  // reporting is the same either way — the attempt delivered no result and has
+  // to be closed out — so pin both rather than leave the off case incidental.
+  test.each([
+    ['throwContinueWait off', undefined],
+    ['throwContinueWait on', true],
+  ])(
+    'client disconnect ends the /cubesql stream gracefully, not as an error (%s)',
+    async (_name, throwContinueWait) => {
     // A client that closes the response stream before the result set has been
-    // fully written (a cancelled dashboard, a closed browser tab, an aborted
-    // fetch) ends the request gracefully. It is the same situation as a
-    // `Continue wait` handed back to a client that stops waiting for the
-    // result: nobody is left to read the rows, so there is nothing to do but
-    // stop. It must not be reported as `Cube SQL Error` — that event feeds
-    // error rates and query history — and no error payload should be pushed
-    // into the stream that is already gone.
-    const loadEvents: string[] = [];
-    const methods = {
-      ...interfaceMethods(),
-      // Return data in both stream and non-stream mode: `CUBESQL_STREAM_MODE`
-      // only picks the streaming branch for limits above
-      // `non_streaming_query_max_row_limit`, and this test must behave the
-      // same either way.
-      sqlApiLoad: jest.fn(async ({ streaming, query }: any) => {
-        if (streaming) {
-          return { stream: new FakeRowStream(query) };
-        }
-        return {
-          results: [
-            {
-              annotation: {
-                measures: {},
-                dimensions: {},
-                segments: {},
-                timeDimensions: {},
+    // fully written ends the attempt without delivering anything. It must not
+    // be reported as `Cube SQL Error` — that event feeds error rates and query
+    // history — and no error payload should be pushed into the stream that is
+    // already gone.
+      const loadEvents: string[] = [];
+      const methods = {
+        ...interfaceMethods(),
+        // Return data in both stream and non-stream mode: `CUBESQL_STREAM_MODE`
+        // only picks the streaming branch for limits above
+        // `non_streaming_query_max_row_limit`, and this test must behave the
+        // same either way.
+        sqlApiLoad: jest.fn(async ({ streaming, query }: any) => {
+          if (streaming) {
+            return { stream: new FakeRowStream(query) };
+          }
+          return {
+            results: [
+              {
+                annotation: {
+                  measures: {},
+                  dimensions: {},
+                  segments: {},
+                  timeDimensions: {},
+                },
+                data: {
+                  members: ['KibanaSampleDataEcommerce.order_date'],
+                  columns: [['2024-01-01T00:00:00.000']],
+                },
               },
-              data: {
-                members: ['KibanaSampleDataEcommerce.order_date'],
-                columns: [['2024-01-01T00:00:00.000']],
-              },
-            },
-          ],
-        };
-      }),
-      logLoadEvent: ({ event }: { event: string; properties: any }) => {
-        loadEvents.push(event);
-      },
-    };
+            ],
+          };
+        }),
+        logLoadEvent: ({ event }: { event: string; properties: any }) => {
+          loadEvents.push(event);
+        },
+      };
 
-    const instance = await native.registerInterface({
-      ...methods,
-      canSwitchUserForSession: (_payload: any) => true,
-    });
+      const instance = await native.registerInterface({
+        ...methods,
+        canSwitchUserForSession: (_payload: any) => true,
+      });
 
-    const chunks: string[] = [];
-    const cubeSqlStream = new Writable({
-      write(chunk, _enc, callback) {
-        chunks.push(chunk.toString('utf-8'));
-        callback();
-        // Simulate the client going away right after the JSONL schema header.
-        this.destroy();
-      },
-    });
-    // The native side holds a reference to the stream and only learns it is
-    // gone through the `close` event, so the writes already in flight (and the
-    // final `end()`) hit a destroyed stream and emit ERR_STREAM_DESTROYED.
-    // Swallow them: an unhandled 'error' would fail the test.
-    cubeSqlStream.on('error', jest.fn());
-    // `exec_sql` delivers a failure as the *argument* to the stream's `end`,
-    // not through `write`, so the spy has to be in place before `execSql`
-    // roots the function.
-    const endSpy = jest.spyOn(cubeSqlStream, 'end');
+      const chunks: string[] = [];
+      const cubeSqlStream = new Writable({
+        write(chunk, _enc, callback) {
+          chunks.push(chunk.toString('utf-8'));
+          callback();
+          // Simulate the client going away right after the JSONL schema header.
+          this.destroy();
+        },
+      });
+      // The native side holds a reference to the stream and only learns it is
+      // gone through the `close` event, so the writes already in flight (and the
+      // final `end()`) hit a destroyed stream and emit ERR_STREAM_DESTROYED.
+      // Swallow them: an unhandled 'error' would fail the test.
+      cubeSqlStream.on('error', jest.fn());
+      // `exec_sql` delivers a failure as the *argument* to the stream's `end`,
+      // not through `write`, so the spy has to be in place before `execSql`
+      // roots the function.
+      const endSpy = jest.spyOn(cubeSqlStream, 'end');
 
-    try {
-      await native.execSql(
-        instance,
-        'SELECT order_date FROM KibanaSampleDataEcommerce ORDER BY order_date DESC LIMIT 100000;',
-        cubeSqlStream
-      );
+      try {
+        await native.execSql(
+          instance,
+          'SELECT order_date FROM KibanaSampleDataEcommerce ORDER BY order_date DESC LIMIT 100000;',
+          cubeSqlStream,
+          null,
+          'stale-if-slow',
+          undefined,
+          throwContinueWait
+        );
 
-      expect(loadEvents).toContain('Load Request');
-      expect(loadEvents).not.toContain('Cube SQL Error');
-      // `Load Request` is logged when the attempt starts, so the disconnect
-      // owes it a terminal event — otherwise the request dangles and query
-      // history cannot account for its running time. The one it gets is
-      // `Continue wait`, because the client is expected back for another
-      // attempt. Asserting `Load Request Success` is absent also keeps the
-      // test honest: it would pass vacuously had the query simply finished
-      // before the `close` event arrived.
-      expect(loadEvents).toContain('Continue wait');
-      expect(loadEvents).not.toContain('Load Request Success');
-      // The stream is closed with no error payload. This is the half of the
-      // fix that `loadEvents` does not cover, and it has to be asserted on
-      // `end` rather than on the written chunks: `exec_sql` passes the
-      // `{"error": ...}` JSONL line to `end` as an argument.
-      expect(endSpy).toHaveBeenCalled();
-      expect(endSpy.mock.calls[0]).toHaveLength(0);
-      // Only the JSONL schema header made it out — everything after it hit a
-      // stream that was already destroyed.
-      expect(chunks).toHaveLength(1);
-      expect(JSON.parse(chunks[0].trim()).schema).toBeDefined();
-    } finally {
-      await native.shutdownInterface(instance, 'fast');
+        expect(loadEvents).toContain('Load Request');
+        expect(loadEvents).not.toContain('Cube SQL Error');
+        // `Load Request` is logged when the attempt starts, so the disconnect
+        // owes it a terminal event — otherwise the request dangles and query
+        // history cannot account for its running time. `Continue wait` is the
+        // event that closes an attempt which produced no result, which is what
+        // happened here whether or not the client intends to poll again.
+        // Asserting `Load Request Success` is absent also keeps the test honest:
+        // it would pass vacuously had the query simply finished before the
+        // `close` event arrived.
+        expect(loadEvents).toContain('Continue wait');
+        expect(loadEvents).not.toContain('Load Request Success');
+        // The stream is closed with no error payload. This is the half of the
+        // fix that `loadEvents` does not cover, and it has to be asserted on
+        // `end` rather than on the written chunks: `exec_sql` passes the
+        // `{"error": ...}` JSONL line to `end` as an argument.
+        expect(endSpy).toHaveBeenCalled();
+        expect(endSpy.mock.calls[0]).toHaveLength(0);
+        // Only the JSONL schema header made it out — everything after it hit a
+        // stream that was already destroyed.
+        expect(chunks).toHaveLength(1);
+        expect(JSON.parse(chunks[0].trim()).schema).toBeDefined();
+      } finally {
+        await native.shutdownInterface(instance, 'fast');
+      }
     }
-  });
+  );
 
   test('external flag is surfaced in /cubesql JSONL schema header when set to true', async () => {
     // End-to-end coverage of the cubesql -> backend-native -> JSONL path:
