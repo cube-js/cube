@@ -23,14 +23,6 @@ pub struct JoinKey {
 }
 
 impl JoinKey {
-    pub fn root(&self) -> &String {
-        &self.root
-    }
-
-    pub fn joins(&self) -> &Vec<JoinItemStatic> {
-        &self.joins
-    }
-
     /// Whether this key's joins are all present in `other`, which holds
     /// strictly more of them - i.e. `other` walks the same cube graph from
     /// the same root and keeps walking.

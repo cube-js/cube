@@ -325,7 +325,7 @@ impl MultiFactJoinGroups {
             .map(|key| grouped.remove(&key).unwrap())
             .collect::<Vec<_>>();
 
-        if merge_nested {
+        if merge_nested && !Self::any_cube_has_pre_aggregations(query_tools, &groups)? {
             Self::merge_nested_groups(&mut groups, &resolve)?;
         }
 
@@ -333,6 +333,42 @@ impl MultiFactJoinGroups {
             .into_iter()
             .map(|group| (group.tree, group.measures))
             .collect())
+    }
+
+    /// Whether any cube these groups read defines a pre-aggregation.
+    ///
+    /// A rollup is matched against one group at a time, so groups folded
+    /// together can only be served by a rollup spanning all of them, which
+    /// usually does not exist - the query would fall back to reading the raw
+    /// tables, costing it far more than the scan the merge saves. Deciding this
+    /// up front is coarse: it stands down whenever a rollup could exist, not
+    /// only when one would actually have matched.
+    fn any_cube_has_pre_aggregations(
+        query_tools: &Rc<State>,
+        groups: &[GroupBuild],
+    ) -> Result<bool, CubeError> {
+        let mut seen = HashSet::new();
+        for group in groups.iter() {
+            let cubes = std::iter::once(group.tree.root().name().clone()).chain(
+                group
+                    .tree
+                    .joins()
+                    .iter()
+                    .map(|item| item.cube().name().clone()),
+            );
+            for cube_name in cubes {
+                if !seen.insert(cube_name.clone()) {
+                    continue;
+                }
+                let pre_aggregations = query_tools
+                    .cube_evaluator()
+                    .pre_aggregations_for_cube_as_array(cube_name)?;
+                if !pre_aggregations.is_empty() {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
     }
 
     /// Folds a group into another one that walks the same cube graph further,
@@ -403,7 +439,10 @@ impl MultiFactJoinGroups {
     /// classified into is decided from its own join tree elsewhere.
     ///
     /// Multi-stage measures are planned through their own CTE pipeline rather
-    /// than as a leaf of this join, so they are never moved.
+    /// than as a leaf of this join, so they are never moved. Neither is a
+    /// member expression: it names no member to anchor it to a cube, so what it
+    /// reads is whatever rows the join it lands on produces - `COUNT(*)` over a
+    /// wider tree counts the fanned-out rows and answers a different question.
     fn group_survives_join(
         measures: &[Rc<MemberSymbol>],
         join: &Rc<JoinTree>,
@@ -412,16 +451,17 @@ impl MultiFactJoinGroups {
             if has_multi_stage_members(measure, false)? {
                 return Ok(false);
             }
-            for item in collect_multiplied_measures(measure, join)? {
-                if !item.multiplied {
-                    continue;
-                }
-                let survives = item
-                    .measure
-                    .as_measure()
-                    .map(|m| m.kind().survives_row_multiplication())
-                    .unwrap_or(false);
-                if !survives {
+            // `join` is only a candidate here, not the tree the query will
+            // render, so a shape it rejects means this merge is off - not that
+            // the query is unplannable.
+            let Ok(items) = collect_multiplied_measures(measure, join) else {
+                return Ok(false);
+            };
+            for item in items {
+                let Ok(leaf) = item.measure.as_measure() else {
+                    return Ok(false);
+                };
+                if item.multiplied && !leaf.kind().survives_row_multiplication() {
                     return Ok(false);
                 }
             }

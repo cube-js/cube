@@ -9,9 +9,16 @@
 //! so they only ever replicate a row, and a distinct aggregation is immune to
 //! that. A plain count or a sum is not, and keeps its own group.
 
-use crate::test_fixtures::cube_bridge::MockSchema;
+use crate::cube_bridge::member_expression::MemberExpressionExpressionDef;
+use crate::cube_bridge::member_sql::MemberSql;
+use crate::cube_bridge::options_member::OptionsMember;
+use crate::test_fixtures::cube_bridge::{
+    members_from_strings, MockBaseQueryOptions, MockMemberExpressionDefinition, MockMemberSql,
+    MockSchema,
+};
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
+use std::rc::Rc;
 
 fn create_context() -> TestContext {
     let schema = MockSchema::from_yaml_file("common/integration_nested_join_trees.yaml");
@@ -136,4 +143,69 @@ async fn test_nested_trees_ungrouped_keeps_separate_scans() {
 
     let sql = ctx.build_sql(query).unwrap();
     assert_eq!(base_scan_count(&sql), 2, "sql: {sql}");
+}
+
+fn make_measure_expression(name: &str, cube: &str, sql: &str) -> OptionsMember {
+    let member_sql: Rc<dyn MemberSql> = Rc::new(MockMemberSql::new(sql).unwrap());
+    let expr = MockMemberExpressionDefinition::builder()
+        .expression_name(Some(name.to_string()))
+        .name(Some(name.to_string()))
+        .cube_name(Some(cube.to_string()))
+        .expression(MemberExpressionExpressionDef::Sql(member_sql))
+        .build();
+    OptionsMember::MemberExpression(Rc::new(expr))
+}
+
+/// A `COUNT(*)` member expression references no member of any cube, so what it
+/// counts is decided entirely by the join tree it lands on. Moving it into a
+/// wider tree would silently turn it into a count of the fanned-out rows.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_nested_trees_count_star_expression_keeps_its_own_scan() {
+    let ctx = create_context();
+
+    let total_count = make_measure_expression("total_count", "sites", "COUNT(*)");
+    let mut measures = vec![total_count];
+    measures.extend(members_from_strings(vec!["checkouts.unique_msid"]));
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .measures(Some(measures))
+            .dimensions(Some(members_from_strings(vec!["sites.country"])))
+            .build(),
+    );
+
+    let sql = ctx.build_sql_from_options(options.clone()).unwrap();
+    assert_eq!(base_scan_count(&sql), 2, "sql: {sql}");
+
+    if let Some(result) = ctx.try_execute_pg_from_options(options, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+/// Each cube has its own rollup keyed by the shared dimension. Folding the
+/// groups leaves one query that no single rollup covers, so the merge has to
+/// stand down where per-leg rollups are available.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_nested_trees_separate_pre_aggs_still_match() {
+    let schema = MockSchema::from_yaml_file("common/integration_nested_join_trees_pre_aggs.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {"
+        measures:
+          - carts.unique_msid
+          - checkouts.unique_msid
+        dimensions:
+          - sites.country
+        order:
+          - id: sites.country
+    "};
+
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    let names: Vec<&str> = pre_aggrs.iter().map(|u| u.name().as_str()).collect();
+
+    assert_eq!(pre_aggrs.len(), 2, "got {names:?}");
 }
