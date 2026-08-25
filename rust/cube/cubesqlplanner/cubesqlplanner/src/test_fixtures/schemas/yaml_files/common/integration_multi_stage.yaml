@@ -414,6 +414,16 @@ cubes:
                 include:
                     - orders.created_at
 
+          # The declared grain is a dimension of another cube, so it does not
+          # supply the dimension the sql reads.
+          - name: amount_first_half_of_month_grain_of_other_cube
+            type: sum
+            sql: "CASE WHEN EXTRACT(DAY FROM {CUBE.created_at}) <= 15 THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+            grain:
+                include:
+                    - customers.city
+
           # Undeclared read one stage further out: the dimension is read by a
           # measure whose aggregated dependency is itself multi-stage.
           - name: amount_prev_month_first_half
