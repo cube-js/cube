@@ -152,30 +152,32 @@ function pickBucket(buckets: PriorityBucket[], assigned: number[], index: number
   return best;
 }
 
+const envInt = (name: string, fallback: number) => parseInt(process.env[name] || `${fallback}`, 10);
+
 function readSettings(driver: string, workers: number): BenchSettings {
-  const totalQueries = parseInt(process.env.BENCH_TOTAL_QUERIES || '1000', 10);
+  const totalQueries = envInt('BENCH_TOTAL_QUERIES', 1000);
   // BENCH_PERIOD_MS spreads the queries evenly over that window instead of pushing them
   // as fast as the loop allows, which is what decides whether the queue ever backlogs
-  const periodMs = parseInt(process.env.BENCH_PERIOD_MS || '0', 10);
+  const periodMs = envInt('BENCH_PERIOD_MS', 0);
 
   return {
     driver,
     fastTrack: process.env.CUBEJS_QUEUE_FAST_TRACK === 'true',
     workers,
-    concurrency: parseInt(process.env.BENCH_CONCURRENCY || '50', 10),
+    concurrency: envInt('BENCH_CONCURRENCY', 50),
     totalQueries,
     periodMs,
     pushIntervalMs: periodMs > 0 && totalQueries > 0 ? Math.max(1, Math.round(periodMs / totalQueries)) : 10,
-    priority: parseInt(process.env.BENCH_PRIORITY || `${QueuePriority.Interactive}`, 10),
+    priority: envInt('BENCH_PRIORITY', QueuePriority.Interactive),
     priorityMix: parsePriorityMix(process.env.BENCH_PRIORITY_MIX),
-    handlerLatencyMs: parseInt(process.env.BENCH_HANDLER_LATENCY_MS || '1500', 10),
+    handlerLatencyMs: envInt('BENCH_HANDLER_LATENCY_MS', 1500),
     // eslint-disable-next-line no-bitwise
-    queueResponseSize: parseInt(process.env.BENCH_RESPONSE_SIZE || `${5 << 20}`, 10),
-    queuePayloadSize: parseInt(process.env.BENCH_PAYLOAD_SIZE || `${256 * 1024}`, 10),
-    workerReconcileMs: parseInt(process.env.BENCH_WORKER_RECONCILE_MS || '50', 10),
-    warmupQueries: parseInt(process.env.BENCH_WARMUP_QUERIES || '0', 10),
-    idleTailMs: parseInt(process.env.BENCH_IDLE_TAIL_MS || '0', 10),
-    tickMs: parseInt(process.env.BENCH_TICK_MS || '1000', 10),
+    queueResponseSize: envInt('BENCH_RESPONSE_SIZE', 5 << 20),
+    queuePayloadSize: envInt('BENCH_PAYLOAD_SIZE', 256 * 1024),
+    workerReconcileMs: envInt('BENCH_WORKER_RECONCILE_MS', 50),
+    warmupQueries: envInt('BENCH_WARMUP_QUERIES', 0),
+    idleTailMs: envInt('BENCH_IDLE_TAIL_MS', 0),
+    tickMs: envInt('BENCH_TICK_MS', 1000),
   };
 }
 
@@ -189,47 +191,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
       const counters = createCounters();
 
       const tenantPrefix = crypto.randomBytes(6).toString('hex');
-      const queue = new QueryQueue(`${tenantPrefix}#test_query_queue`, {
-        queryHandlers: {
-          query: async (_query) => {
-            counters.handlersStarted++;
-            await pausePromise(benchSettings.handlerLatencyMs);
-            counters.handlersFinished++;
-
-            return {
-              payload: 'a'.repeat(benchSettings.queueResponseSize),
-            };
-          },
-          stream: async (_query, _stream) => {
-            throw new Error('streaming handler is not supported for testing');
-          }
-        },
-        cancelHandlers: {
-          query: async (_query) => {
-            console.error('Cancel handler was called for query');
-          },
-        },
-        continueWaitTimeout: 60 * 2,
-        executionTimeout: 20,
-        orphanedTimeout: 60 * 5,
-        concurrency: benchSettings.concurrency,
-        logger: (event, _params) => {
-          if (event in counters.events) {
-            counters.events[event]++;
-          } else {
-            counters.events[event] = 1;
-          }
-
-          // stderr, not stdout: stdout carries the BENCH_RESULT/BENCH_TICK lines the suite
-          // runner parses, and it is shared with every worker
-          if (event.includes('error')) {
-            console.error(event, _params);
-          }
-        },
-        queueDriverFactory: makeQueueDriverFactory(counters, options.cubeStoreDriverFactory),
-        cacheAndQueueDriver: options.cacheAndQueueDriver,
-        cubeStoreDriverFactory: options.cubeStoreDriverFactory,
-      });
+      const queue = createBenchQueue(`${tenantPrefix}#test_query_queue`, counters, benchSettings, options);
 
       type WorkerState = {
         worker: ChildProcess,
@@ -243,14 +205,6 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
       const shutdown = { requested: false };
       const diedEarly = { count: 0 };
 
-      const emptySnapshot = (): WorkerSnapshot => ({
-        handlersStarted: 0,
-        handlersFinished: 0,
-        methods: {},
-        events: {},
-        fastTrack: { attempts: 0, hits: 0 },
-      });
-
       if (numWorkers > 0) {
         const workerPath = path.resolve(__dirname, 'QueueBenchWorker.js');
 
@@ -262,7 +216,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
 
           const state: WorkerState = {
             worker: w,
-            latest: emptySnapshot(),
+            latest: counterSnapshot(createCounters()),
             baseline: EMPTY_AGGREGATE(),
             awaiting: null,
             alive: true,
@@ -368,7 +322,6 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
 
       const runStartedAt = Date.now();
       let phase: Phase = benchSettings.warmupQueries > 0 ? 'warmup' : 'measure';
-      let measureStartedAt = runStartedAt;
       let baseline = EMPTY_AGGREGATE();
       let baselineMain = EMPTY_AGGREGATE();
 
@@ -376,8 +329,8 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
       let completed = 0;
       const failed = { continueWait: 0, timeout: 0, other: 0 };
       const errorSamples: string[] = [];
-      let latencies: number[] = [];
       let latenciesByPriority: Record<number, number[]> = {};
+      const latencies = () => Object.values(latenciesByPriority).flat();
 
       const inFlight = () => pushed - completed - failed.continueWait - failed.timeout - failed.other;
 
@@ -419,7 +372,6 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
             completed++;
 
             const latencyMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
-            latencies.push(latencyMs);
             (latenciesByPriority[priority] ||= []).push(latencyMs);
           } catch (e: any) {
             if (e instanceof ContinueWaitError) {
@@ -540,7 +492,6 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
         failed.continueWait = 0;
         failed.timeout = 0;
         failed.other = 0;
-        latencies = [];
         latenciesByPriority = {};
         errorSamples.splice(0);
         prevDriverCalls = 0;
@@ -548,7 +499,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
       }
 
       phase = 'measure';
-      measureStartedAt = Date.now();
+      const measureStartedAt = Date.now();
 
       await runPusher(benchSettings.totalQueries, benchSettings.pushIntervalMs);
       const pushEndedAt = Date.now();
@@ -621,8 +572,6 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
       const round = (v: number | null, digits = 3) => (v === null ? null : Number(v.toFixed(digits)));
 
       const result = {
-        // 2: driverCalls stops including the idle tail, and main/workers decompose the total
-        benchSchema: 2,
         runId: process.env.BENCH_RUN_ID || null,
         suite: process.env.BENCH_SUITE || null,
         label: process.env.BENCH_LABEL || null,
@@ -651,7 +600,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
           errorSamples,
           workersDiedEarly: diedEarly.count,
         },
-        latencyMs: percentiles(latencies),
+        latencyMs: percentiles(latencies()),
         latencyMsByPriority: Object.fromEntries(
           Object.entries(latenciesByPriority).map(([priority, samples]) => [priority, percentiles(samples)])
         ),

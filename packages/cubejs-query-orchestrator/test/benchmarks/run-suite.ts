@@ -10,6 +10,7 @@ import yargs from 'yargs';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { hideBin } from 'yargs/helpers';
 import { pausePromise } from '@cubejs-backend/shared';
+import { driverCallsTotal } from './instrument';
 import { BenchRun, estimateRunMs, rhoOf, Suite, SUITES, suiteByName } from './suites';
 
 type Args = {
@@ -262,6 +263,14 @@ async function executeRun(suite: Suite, benchRun: BenchRun, fastTrack: boolean, 
 
 const fmt = (v: any, digits = 2) => (typeof v === 'number' ? Number(v.toFixed(digits)) : '—');
 
+function markdown(header: string[], rows: (string | number)[][]): string {
+  return [
+    `| ${header.join(' | ')} |`,
+    `|${header.map(() => '---').join('|')}|`,
+    ...rows.map((row) => `| ${row.join(' | ')} |`),
+  ].join('\n');
+}
+
 /**
  * The workers poll reconcile on a timer that production does not have, and at a low ρ that poll is
  * most of the traffic — it dilutes the headline badly. The submitting process is the honest view.
@@ -273,7 +282,7 @@ function mainCallsPerQuery(record: RunRecord): number | null {
     return null;
   }
 
-  return Object.values<any>(methods).reduce((acc, m) => acc + m.started, 0) / completed;
+  return driverCallsTotal({ methods }) / completed;
 }
 
 /**
@@ -311,7 +320,7 @@ function markdownTable(records: RunRecord[]): string {
   }
 
   const header = ['run', 'ρ', 'rate q/s', 'done off→on', 'fail off→on', 'calls/pushed off→on', 'main calls/q off→on', 'Δ main', 'peak calls/s off→on', 'p95 ms off→on', 'elapsed s off→on', 'FT hit%', 'lost'];
-  const lines = [`| ${header.join(' | ')} |`, `|${header.map(() => '---').join('|')}|`];
+  const rows: (string | number)[][] = [];
 
   for (const [key, { off, on }] of byLabel) {
     const sample = on || off;
@@ -322,9 +331,9 @@ function markdownTable(records: RunRecord[]): string {
     const degraded = (off?.outcome?.workersDiedEarly ?? 0) > 0 || (on?.outcome?.workersDiedEarly ?? 0) > 0;
 
     if (off?.error || on?.error) {
-      lines.push(`| ${key} | ${[`off: ${off?.error || 'ok'}`, `on: ${on?.error || 'ok'}`].join(', ')} ${header.slice(2).map(() => '| —').join(' ')} |`);
+      rows.push([key, `off: ${off?.error || 'ok'}, on: ${on?.error || 'ok'}`, ...header.slice(2).map(() => '—')]);
     } else if (sample) {
-      lines.push(`| ${[
+      rows.push([
         degraded ? `⚠ ${key}` : key,
         fmt(sample.derived?.actualRho),
         fmt(sample.derived?.actualRateQps),
@@ -338,11 +347,11 @@ function markdownTable(records: RunRecord[]): string {
         `${fmt((off?.timing?.elapsedMs ?? 0) / 1000, 1)}→${fmt((on?.timing?.elapsedMs ?? 0) / 1000, 1)}`,
         typeof missRate === 'number' ? `${((1 - missRate) * 100).toFixed(1)}%` : '—',
         `${off?.events?.merged?.['Orphaned execution result'] ?? 0}→${on?.events?.merged?.['Orphaned execution result'] ?? 0}`,
-      ].join(' | ')} |`);
+      ]);
     }
   }
 
-  return lines.join('\n');
+  return markdown(header, rows);
 }
 
 function idleTable(records: RunRecord[]): string | null {
@@ -351,21 +360,17 @@ function idleTable(records: RunRecord[]): string | null {
     return null;
   }
 
-  const header = ['run', 'fast track', 'workers', 'reconcile ms', 'idle calls', 'calls/s/process'];
-  const lines = [`| ${header.join(' | ')} |`, `|${header.map(() => '---').join('|')}|`];
-
-  for (const r of idle) {
-    lines.push(`| ${[
+  return markdown(
+    ['run', 'fast track', 'workers', 'reconcile ms', 'idle calls', 'calls/s/process'],
+    idle.map((r) => [
       `${r.suite}/${r.label}`,
       r.settings.fastTrack ? 'on' : 'off',
       r.settings.workers,
       r.settings.workerReconcileMs,
       r.idle.driverCalls,
       fmt(r.idle.callsPerSecPerProcess),
-    ].join(' | ')} |`);
-  }
-
-  return lines.join('\n');
+    ]),
+  );
 }
 
 function report(records: RunRecord[]) {
@@ -381,15 +386,14 @@ function report(records: RunRecord[]) {
 
 function dryRun(suites: Suite[], args: Args) {
   let totalMs = 0;
-  const header = ['suite', 'run', 'axis', 'ρ', 'queries', 'period s', 'est. s per pass'];
-  const lines = [`| ${header.join(' | ')} |`, `|${header.map(() => '---').join('|')}|`];
+  const rows: (string | number)[][] = [];
 
   for (const suite of suites) {
     for (const benchRun of selectRuns(suite, args)) {
       const est = estimateRunMs(benchRun.env);
       totalMs += (est + args.settleMs) * args.fastTrack.length * args.repeat;
 
-      lines.push(`| ${[
+      rows.push([
         suite.name,
         benchRun.label,
         JSON.stringify(benchRun.axis),
@@ -397,11 +401,11 @@ function dryRun(suites: Suite[], args: Args) {
         benchRun.env.BENCH_TOTAL_QUERIES,
         fmt(parseInt(benchRun.env.BENCH_PERIOD_MS || '0', 10) / 1000, 0),
         Math.round(est / 1000),
-      ].join(' | ')} |`);
+      ]);
     }
   }
 
-  console.log(lines.join('\n'));
+  console.log(markdown(['suite', 'run', 'axis', 'ρ', 'queries', 'period s', 'est. s per pass'], rows));
   console.log(`\n${args.fastTrack.length} pass(es) per run — estimated total ${(totalMs / 60000).toFixed(0)} min`);
 }
 
