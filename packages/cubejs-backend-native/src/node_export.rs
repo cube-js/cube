@@ -3,6 +3,7 @@ use cubesql::compile::{convert_statement_to_cube_query, get_df_batches};
 use cubesql::config::processing_loop::ShutdownMode;
 use cubesql::sql::dataframe::arrow_to_column_type;
 use cubesql::sql::ColumnType;
+use cubesql::sql::Session;
 use cubesql::transport::{SpanId, TransportService};
 use futures::StreamExt;
 
@@ -238,13 +239,51 @@ enum SqlQueryOutcome {
     /// The whole result set was streamed to the client.
     Completed,
     /// The client closed the response stream before the result set was fully
-    /// written. This is a graceful end of the request, not a query error: it is
-    /// the same situation as a `Continue wait` handed back to a client that
-    /// stops waiting for the result - nobody is waiting for the rows anymore,
-    /// so there is nothing left to do but stop. Reporting it as an error would
-    /// pollute error rates and query history with client-side navigation,
-    /// cancelled dashboards and closed browser tabs.
+    /// written. This attempt delivered nothing, but the request is not over: a
+    /// `throwContinueWait` client polls with the same request id and comes back
+    /// for another attempt, and the queued query stays alive as long as it
+    /// keeps doing so. That makes this the same outcome as a `Continue wait`,
+    /// and it is reported as one - not as an error, and not silently, since a
+    /// terminal event is what lets query history account for the request's
+    /// running time.
     ClientDisconnected,
+}
+
+/// Records a `Continue wait` load event for a `/v1/cubesql` attempt that ends
+/// without delivering a result while the request itself continues.
+///
+/// `Load Request` is logged when the attempt starts, so leaving an attempt with
+/// no terminal event makes the request look perpetually in flight and its
+/// running time unaccountable. `Continue wait` is the event the query history
+/// consumer already reads for "not done, the client will be back", which is
+/// exactly what both callers mean.
+async fn log_continue_wait(
+    session: &Arc<Session>,
+    span_id: &Option<Arc<SpanId>>,
+    sql_query: &str,
+) -> Result<(), CubeError> {
+    let Some(auth_context) = session.state.auth_context() else {
+        return Ok(());
+    };
+
+    session
+        .session_manager
+        .server
+        .transport
+        .log_load_state(
+            span_id.clone(),
+            auth_context,
+            session.state.get_load_request_meta("sql"),
+            "Continue wait".to_string(),
+            serde_json::json!({
+                "query": {
+                    "sql": sql_query,
+                },
+                "apiType": "sql",
+                "duration": span_id.as_ref().map(|span_id| span_id.duration()),
+            }),
+        )
+        .await
 }
 
 async fn handle_sql_query(
@@ -501,21 +540,18 @@ async fn handle_sql_query(
 
         match &result {
             Ok(SqlQueryOutcome::ClientDisconnected) => {
-                // Deliberately no terminal load event, not even a non-error
-                // one. `Load Request` was already logged above, so a
-                // disconnected request stays open-ended for whoever consumes
-                // these events - unlike a `Continue wait`, whose client comes
-                // back with the same request id and closes the span on a later
-                // attempt. Naming a terminal event for it (`Load Request
-                // Cancelled` or such) only pays off once the query history
-                // consumer knows how to render it, and picking that name is
-                // not this change's call: until then it would be logged and
-                // dropped, which is what happens now anyway. What must not
-                // happen is reporting it as a failure.
                 log::debug!(
                     "Client disconnected before the result was fully written, span id: {}",
                     span_id.as_ref().map(|s| s.span_id.as_str()).unwrap_or("-")
                 );
+
+                // `Load Request` was already logged above, so every outcome
+                // owes it a terminal event: without one the request dangles and
+                // its running time cannot be accounted for. The client is
+                // expected back for another attempt, so the outcome is a
+                // `Continue wait` - the name query history already understands,
+                // rather than a new one it would log and drop.
+                log_continue_wait(&session_clone, &span_id, sql_query).await?;
             }
             Ok(SqlQueryOutcome::Completed) => {
                 session_clone
@@ -540,7 +576,12 @@ async fn handle_sql_query(
                     .await?;
             }
             Err(err) => {
-                if !err.message.eq_ignore_ascii_case("continue wait") {
+                if err.message.eq_ignore_ascii_case("continue wait") {
+                    // Same reasoning as the disconnect above: the client is
+                    // told to come back, and that has to be recorded for the
+                    // request's running time to add up.
+                    log_continue_wait(&session_clone, &span_id, sql_query).await?;
+                } else {
                     session_clone
                         .session_manager
                         .server

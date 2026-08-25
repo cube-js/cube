@@ -499,10 +499,14 @@ describe('SQLInterface', () => {
 
       expect(loadEvents).toContain('Load Request');
       expect(loadEvents).not.toContain('Cube SQL Error');
-      // Neither terminal event fires: the query never completed, and the
-      // disconnect is not a failure. Asserting this also keeps the test
-      // honest — it would pass vacuously if the query had simply finished
+      // `Load Request` is logged when the attempt starts, so the disconnect
+      // owes it a terminal event — otherwise the request dangles and query
+      // history cannot account for its running time. The one it gets is
+      // `Continue wait`, because the client is expected back for another
+      // attempt. Asserting `Load Request Success` is absent also keeps the
+      // test honest: it would pass vacuously had the query simply finished
       // before the `close` event arrived.
+      expect(loadEvents).toContain('Continue wait');
       expect(loadEvents).not.toContain('Load Request Success');
       // The stream is closed with no error payload. This is the half of the
       // fix that `loadEvents` does not cover, and it has to be asserted on
