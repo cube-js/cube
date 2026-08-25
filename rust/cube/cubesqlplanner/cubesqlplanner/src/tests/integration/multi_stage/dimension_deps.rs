@@ -58,6 +58,36 @@ async fn test_undeclared_time_dimension_read_is_reported() {
     );
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn test_report_spells_out_the_grain_the_member_is_computed_at() {
+    let message = expect_error("amount_first_half_of_month");
+
+    assert!(
+        message.contains("orders.created_at (month)"),
+        "The error must spell out the grain the member is computed at:\n{}",
+        message
+    );
+    assert!(
+        message.contains("at a granularity"),
+        "A granularity of the dimension the sql reads must not read as a match:\n{}",
+        message
+    );
+}
+
+/// A grain declared at another cube's dimension: naming the read dimension
+/// alone would repeat what the model already says, so the grain the member is
+/// actually computed at is what tells the two apart.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_report_names_a_grain_declared_at_another_cube() {
+    let message = expect_error("amount_first_half_of_month_grain_of_other_cube");
+
+    assert!(
+        message.contains("orders.created_at") && message.contains("customers.city"),
+        "The error must name both the dimension the sql reads and the declared grain:\n{}",
+        message
+    );
+}
+
 /// The reading member consumes a time-shifted multi-stage measure, so its own
 /// grain is settled one stage above the leaf that would have to carry the
 /// dimension.
