@@ -3397,3 +3397,126 @@ async fn test_wrapper_limitless_post_processing_ungrouped_aggregate() {
         error
     );
 }
+
+/// A `UNION` of two `SELECT DISTINCT`s over different cubes, the shape a BI user writes to
+/// list the values of a dimension across two views.
+///
+/// Nothing about it can be pushed down: the branches read different cubes, so each one is a
+/// Cube query of its own and the `UNION` can only be run in DataFusion. DataFusion also
+/// collapses the per-branch `DISTINCT`s into the one above the `UNION`, which leaves each
+/// branch an ungrouped scan of raw rows rather than the grouped request a `SELECT DISTINCT`
+/// on its own compiles to. Both branches are then truncated to the row cap before the
+/// `DISTINCT` ever sees them, so values missing from the answer are missing silently.
+#[tokio::test]
+async fn test_wrapper_limitless_post_processing_union_of_distinct_selects() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query = "SELECT DISTINCT 'Medical Claims (MX)' AS table_type, customer_gender AS market \
+                 FROM KibanaSampleDataEcommerce \
+                 UNION \
+                 SELECT DISTINCT 'Pharmacy Claims (RX)' AS table_type, content AS market \
+                 FROM Logs";
+
+    // Without the check the query still runs, over two truncated ungrouped scans
+    let logical_plan =
+        convert_select_to_query_plan(query.to_string(), DatabaseProtocol::PostgreSQL)
+            .await
+            .as_logical_plan();
+    let requests = logical_plan
+        .find_cube_scans()
+        .into_iter()
+        .map(|scan| scan.request)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        requests,
+        vec![
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                ungrouped: Some(true),
+                ..Default::default()
+            },
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["Logs.content".to_string()]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                ungrouped: Some(true),
+                ..Default::default()
+            },
+        ]
+    );
+
+    let mut config = ConfigObjImpl::default();
+    config.fail_on_limitless_post_processing = true;
+    let context = TestContext::with_config(DatabaseProtocol::PostgreSQL, Arc::new(config)).await;
+    let error = context
+        .convert_sql_to_cube_query(query)
+        .await
+        .expect_err("union of unlimited branches should fail");
+    assert!(
+        error
+            .to_string()
+            .contains("CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING"),
+        "unexpected error: {}",
+        error
+    );
+
+    // Grouping each branch instead of distinct-ing it is the better query - the data source
+    // does the deduplication, so the cap lands on distinct values rather than raw rows - but
+    // the branches are still unlimited, so the `UNION` on top can still truncate
+    let grouped = "SELECT 'Medical Claims (MX)' AS table_type, customer_gender AS market \
+                   FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+                   UNION \
+                   SELECT 'Pharmacy Claims (RX)' AS table_type, content AS market \
+                   FROM Logs GROUP BY 1, 2";
+    let requests = convert_select_to_query_plan(grouped.to_string(), DatabaseProtocol::PostgreSQL)
+        .await
+        .as_logical_plan()
+        .find_cube_scans()
+        .into_iter()
+        .map(|scan| scan.request)
+        .collect::<Vec<_>>();
+    assert!(
+        requests.iter().all(|request| request.ungrouped.is_none()),
+        "grouped branches: {:?}",
+        requests
+    );
+    let error = context
+        .convert_sql_to_cube_query(grouped)
+        .await
+        .expect_err("union of unlimited grouped branches should fail");
+    assert!(
+        error
+            .to_string()
+            .contains("CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING"),
+        "unexpected error: {}",
+        error
+    );
+
+    // A limit on each branch bounds what the `UNION` reads, and the check passes
+    let limited = "(SELECT 'Medical Claims (MX)' AS table_type, customer_gender AS market \
+                   FROM KibanaSampleDataEcommerce GROUP BY 1, 2 LIMIT 1000) \
+                   UNION \
+                   (SELECT 'Pharmacy Claims (RX)' AS table_type, content AS market \
+                   FROM Logs GROUP BY 1, 2 LIMIT 1000)";
+    let requests = context
+        .convert_sql_to_cube_query(limited)
+        .await
+        .expect("union of limited branches should compile")
+        .as_logical_plan()
+        .find_cube_scans()
+        .into_iter()
+        .map(|scan| scan.request)
+        .collect::<Vec<_>>();
+    assert!(
+        requests.iter().all(|request| request.limit == Some(1000)),
+        "limited branches: {:?}",
+        requests
+    );
+}
