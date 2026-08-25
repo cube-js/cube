@@ -357,7 +357,53 @@ returns items highest priority first (oldest first within a priority) and reconc
 The fast track selects itself, so it is priority blind with nothing to compensate. That is
 what the `active + pending < concurrency` condition rules out: retrieving leaves a free slot
 for every item already pending, so no item is jumped over, and once the budget gets tight
-the fast track steps aside and lets reconcile pick by priority. Note that a retrieved item
-goes straight to active and never becomes pending, so a burst onto an idle queue still
-fast-tracks every query — items only start accumulating in pending once the concurrency
-budget is exhausted, which is exactly when the condition should stop firing.
+the fast track steps aside and lets reconcile pick by priority. A retrieved item goes straight
+to active and never becomes pending, so a burst onto an idle queue fast-tracks exactly one
+concurrency budget's worth and no more: items start accumulating in pending the moment the
+budget is exhausted, which is when the condition stops firing. S3 measures this exactly —
+50 retrievals out of 1000 at concurrency 50, 200 out of 1000 at concurrency 200 — so on a
+burst the saving scales as `concurrency / burst size`, not with the size of the burst.
+
+## Benchmarks
+
+The harness lives in `test/benchmarks/` and is compiled by the ordinary `yarn tsc` — jest never
+picks it up (`testMatch` is `*.test.ts`). Runs go through the suite runner:
+
+```bash
+yarn tsc
+yarn bench:suite --list                  # what the suites are
+yarn bench:suite S1 --dry-run            # the matrix with computed ρ and wall clock, run this first
+yarn bench:suite S1                      # off and on, one pass each
+yarn bench:suite --report .context/bench-results/S1-….jsonl
+```
+
+Every run emits one `BENCH_RESULT {json}` line plus a `BENCH_TICK {json}` per second; the runner
+collects both into `.context/bench-results/<suites>-<stamp>.jsonl` and prints a markdown summary.
+A single run can also be driven straight from env vars against
+`dist/test/benchmarks/QueueCubestore.bench.js` (or `QueueMemory.bench.js`) — see `readSettings`
+in `QueueBench.abstract.ts` for the full list.
+
+The one axis that decides everything is the load factor:
+
+```
+ρ = arrival_rate / capacity,   capacity = concurrency / handler_latency
+```
+
+The fast track saves a round trip only while the concurrency budget has a free slot, so ρ is
+what the suites sweep. `driverCalls.fastTrack.missRate` is the direct measure of the cost side:
+an `ADD_AND_RETRIEVE` that comes back without a retrieval is a round trip spent for nothing.
+Eligibility is read off the connection's `useFastTrack`, so a driver that cannot fast track
+never registers an attempt.
+
+Two things about the numbers are artifacts of the harness rather than production behaviour:
+
+- Workers poll `reconcileQueue` on a timer (`BENCH_WORKER_RECONCILE_MS`, default 50ms) because a
+  worker never submits and so has no submit-time reconcile to bootstrap from. Production
+  reconcile is event-driven. This poll dominates `getQueriesToCancel` / `getActiveAndToProcess`
+  and is the entire traffic of the idle-floor suite, which is why S5 measures two intervals.
+- Payload defaults are 5MB responses / 256KB query bodies, but the suites deliberately run at
+  64KB / 16KB. S7 owns the payload axis.
+
+`driverCalls` is snapshotted after drain and before the idle tail, so on a suite with
+`BENCH_IDLE_TAIL_MS` the tail's polling lands in `idle.driverCalls` and nowhere else — and
+`main` plus `workers` add up to `total` exactly.
