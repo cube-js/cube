@@ -501,6 +501,17 @@ async fn handle_sql_query(
 
         match &result {
             Ok(SqlQueryOutcome::ClientDisconnected) => {
+                // Deliberately no terminal load event, not even a non-error
+                // one. `Load Request` was already logged above, so a
+                // disconnected request stays open-ended for whoever consumes
+                // these events - unlike a `Continue wait`, whose client comes
+                // back with the same request id and closes the span on a later
+                // attempt. Naming a terminal event for it (`Load Request
+                // Cancelled` or such) only pays off once the query history
+                // consumer knows how to render it, and picking that name is
+                // not this change's call: until then it would be logged and
+                // dropped, which is what happens now anyway. What must not
+                // happen is reporting it as a failure.
                 log::debug!(
                     "Client disconnected before the result was fully written, span id: {:?}",
                     span_id.as_ref().map(|span_id| &span_id.span_id)
