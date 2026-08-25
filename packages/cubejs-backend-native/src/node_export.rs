@@ -242,9 +242,18 @@ enum SqlQueryOutcome {
     /// written, so this attempt delivered nothing. It is reported as a
     /// `Continue wait`: the event query history already reads for an attempt
     /// that produced no result. `Load Request` is logged when the attempt
-    /// starts, and nothing else reports this outcome - the JS promise being
-    /// awaited is simply abandoned - so without this the attempt has no end at
-    /// all and the time it spent cannot be attributed.
+    /// starts, so without this the attempt usually has no end at all and the
+    /// time it spent cannot be attributed - dropping the future abandons the JS
+    /// load rather than cancelling it, and an abandoned load that resolves, or
+    /// never settles, reports nothing.
+    ///
+    /// The exception is an abandoned load that goes on to *reject*: it still
+    /// runs in its own promise (`sql-server.ts`), and the gateway routes the
+    /// rejection into `handleError`, which logs its own `Continue wait`. A
+    /// disconnect racing the continue-wait boundary therefore double-logs -
+    /// CUB-4099's disconnects cluster around 61s against a ~60s boundary, so
+    /// this is not rare. Two rows saying the same thing beat none, so the call
+    /// is not gated on it, but that is where a duplicate comes from.
     ///
     /// Whether the client comes back is not something this end of the stream
     /// can know, and the reporting deliberately does not depend on it: under
@@ -554,8 +563,8 @@ async fn handle_sql_query(
                     span_id.as_ref().map(|s| s.span_id.as_str()).unwrap_or("-")
                 );
 
-                // Nothing else reports this outcome, so without this the
-                // attempt ends unrecorded and the time it spent cannot be
+                // Usually nothing else reports this outcome, so without this
+                // the attempt ends unrecorded and the time it spent cannot be
                 // attributed. `Continue wait` is the name query history already
                 // reads for an attempt that produced no result, rather than a
                 // new one it would log and drop. See
@@ -593,9 +602,10 @@ async fn handle_sql_query(
                 // it again, both into the sink `logLoadEvent` writes to. #10649
                 // stopped this arm reporting it as a `Cube SQL Error`; logging
                 // it as anything from here would just be a third copy. The
-                // disconnect arm has no such JS-side counterpart - the promise
-                // it was awaiting is abandoned, unreported - which is why that
-                // one does log.
+                // disconnect arm usually has no such JS-side counterpart -
+                // the promise it was awaiting is abandoned rather than
+                // cancelled, and only reports if it later rejects - which is
+                // why that one does log.
                 if !err.message.eq_ignore_ascii_case("continue wait") {
                     session_clone
                         .session_manager
