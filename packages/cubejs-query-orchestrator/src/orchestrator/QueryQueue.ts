@@ -313,7 +313,7 @@ export class QueryQueue {
       }
 
       if (!added) {
-        const queryDef = retrieved ? retrieved[4] : await queueConnection.getQueryDef(queryKeyHash, queueId);
+        const queryDef = retrieved ? retrieved.def : await queueConnection.getQueryDef(queryKeyHash, queueId);
         if (queryDef) {
           waitingContext = {
             queueId,
@@ -328,7 +328,7 @@ export class QueryQueue {
 
       // A retrieval carries the active keys of its prefix, and a retrieved query is never pending,
       // so it has no place in the queue to report
-      const [active, toProcess] = retrieved ? [retrieved[2], undefined] : await queueConnection.getQueryStageState(true);
+      const [active, toProcess] = retrieved ? [retrieved.active, undefined] : await queueConnection.getQueryStageState(true);
 
       this.logger('Waiting for query', {
         ...waitingContext,
@@ -366,13 +366,11 @@ export class QueryQueue {
   }
 
   protected retrievedQuery(queryKeyHash: QueryKeyHash, queueId: QueueId, retrieved: RetrieveForProcessingSuccess): RetrievedQuery {
-    const [, , , queueSize, query] = retrieved;
-
     return {
       queryKeyHash,
       queueId,
-      queueSize,
-      query,
+      queueSize: retrieved.queueSize,
+      query: retrieved.def,
     };
   }
 
@@ -820,24 +818,13 @@ export class QueryQueue {
   protected async retrieveQueryForProcessing(queryKeyHashed: QueryKeyHash, queueId: QueueId): Promise<RetrievedQuery | null> {
     const queueConnection = await this.queueDriver.createConnection();
 
-    let insertedCount;
-    let activeKeys;
-    let queueSize;
     let query;
-    let retrievalSucceeded;
 
     try {
-      const retrieveResult = await queueConnection.retrieveForProcessing(queryKeyHashed, queueId);
-      if (retrieveResult) {
-        [insertedCount, , activeKeys, queueSize, query, retrievalSucceeded] = retrieveResult;
-      }
-
-      const activated = activeKeys && activeKeys.indexOf(queryKeyHashed) !== -1;
-      if (!query) {
+      const retrieved = await queueConnection.retrieveForProcessing(queryKeyHashed, queueId);
+      if (!retrieved) {
         query = await queueConnection.getQueryDef(queryKeyHashed, null);
-      }
 
-      if (!query || !insertedCount || !activated || !retrievalSucceeded) {
         // TODO Ideally streaming queries should reconcile queue here after waiting on open slot however in practice continue wait timeout reconciles faster CPU-wise
         // if (query?.queryHandler === 'stream') {
         //   const [active] = await queueConnection.getQueryStageState(true);
@@ -852,22 +839,13 @@ export class QueryQueue {
           queryKey: query && query.queryKey || queryKeyHashed,
           requestId: query && query.requestId,
           queuePrefix: this.redisQueuePrefix,
-          retrievalSucceeded,
           query,
-          insertedCount,
-          activeKeys,
-          activated,
           queryExists: !!query
         });
         return null;
       }
 
-      return {
-        queryKeyHash: queryKeyHashed,
-        queueId,
-        queueSize,
-        query,
-      };
+      return this.retrievedQuery(queryKeyHashed, queueId, retrieved);
     } catch (e: any) {
       this.logger('Queue storage error', {
         queueId,

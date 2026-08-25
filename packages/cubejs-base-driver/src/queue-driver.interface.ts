@@ -9,25 +9,12 @@ export type QueryKeyHash = string & { __type: 'QueryKeyHash' };
 export type QueryKeysTuple = [keyHash: QueryKeyHash, queueId: QueueId];
 export type GetActiveAndToProcessResponse = [active: QueryKeysTuple[], toProcess: QueryKeysTuple[]];
 export type QueryStageStateResponse = [active: string[], toProcess: string[]] | [active: string[], toProcess: string[], defs: Record<string, QueryDef>];
-export type RetrieveForProcessingSuccess = [
-  added: unknown,
-  // Identifies the retrieved generation of the queue item.
-  queueId: QueueId | null,
+export type RetrieveForProcessingSuccess = {
   active: QueryKeyHash[],
-  pending: number,
+  queueSize: number,
   def: QueryDef,
-  retrieved: true
-];
-export type RetrieveForProcessingFail = [
-  added: unknown,
-  // Null when no queue item was retrieved.
-  queueId: QueueId | null,
-  active: QueryKeyHash[],
-  pending: number,
-  def: null,
-  retrieved: false
-];
-export type RetrieveForProcessingResponse = RetrieveForProcessingSuccess | RetrieveForProcessingFail | null;
+};
+export type RetrieveForProcessingResponse = RetrieveForProcessingSuccess | null;
 export type AddToQueueResponse = [
   added: number,
   queueId: QueueId | null,
