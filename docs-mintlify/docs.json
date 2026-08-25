@@ -317,7 +317,6 @@
               "admin/deployment/encryption-keys",
               "admin/deployment/limits",
               "admin/deployment/infrastructure",
-              "admin/deployment/maintenance-window",
               {
                 "group": "Dedicated Infrastructure",
                 "root": "admin/deployment/dedicated/index",
