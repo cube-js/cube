@@ -129,9 +129,12 @@ const S4: Suite = {
 };
 
 function idleRun(workers: number, reconcileMs: number): BenchRun {
+  // Nothing polls without a worker, so the interval is not an axis of the control run
+  const polled = workers > 0;
+
   return run(
-    `idle-w${workers}-r${reconcileMs}`,
-    { workers, reconcileMs },
+    polled ? `idle-w${workers}-r${reconcileMs}` : `idle-w${workers}`,
+    polled ? { workers, reconcileMs } : { workers },
     {
       WORKERS: `${workers}`,
       BENCH_TOTAL_QUERIES: '0',

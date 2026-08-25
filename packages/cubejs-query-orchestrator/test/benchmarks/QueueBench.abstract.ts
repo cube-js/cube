@@ -3,18 +3,19 @@ import path from 'path';
 import { ChildProcess, fork } from 'child_process';
 import { createPromiseLock, pausePromise } from '@cubejs-backend/shared';
 import { QueuePriority } from '@cubejs-backend/base-driver';
-import { ContinueWaitError, QueryQueue, QueryQueueOptions, TimeoutError } from '../../src';
+import { ContinueWaitError, QueryQueueOptions, TimeoutError } from '../../src';
 import {
   BenchCounters,
+  cloneMethods,
+  createBenchQueue,
   createCounters,
   driverCallsTotal,
-  makeQueueDriverFactory,
   MethodCounter,
   mergeEvents,
   mergeMethods,
   percentiles,
 } from './instrument';
-import { ParentMessage, WorkerSnapshot } from './protocol';
+import { counterSnapshot, ParentMessage, WorkerSnapshot } from './protocol';
 
 export type QueryQueueTestOptions = Pick<QueryQueueOptions, 'cacheAndQueueDriver' | 'cubeStoreDriverFactory'> & {
   beforeAll?: () => Promise<void>,
@@ -65,7 +66,7 @@ const EMPTY_AGGREGATE = (): Aggregate => ({
 
 function toAggregate(source: Pick<BenchCounters, 'methods' | 'events' | 'handlersStarted' | 'handlersFinished' | 'fastTrack'>): Aggregate {
   return {
-    methods: JSON.parse(JSON.stringify(source.methods)),
+    methods: cloneMethods(source.methods),
     events: { ...source.events },
     handlersStarted: source.handlersStarted,
     handlersFinished: source.handlersFinished,
@@ -219,8 +220,10 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
             counters.events[event] = 1;
           }
 
+          // stderr, not stdout: stdout carries the BENCH_RESULT/BENCH_TICK lines the suite
+          // runner parses, and it is shared with every worker
           if (event.includes('error')) {
-            console.log(event, _params);
+            console.error(event, _params);
           }
         },
         queueDriverFactory: makeQueueDriverFactory(counters, options.cubeStoreDriverFactory),
@@ -238,6 +241,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
       const workerStates: WorkerState[] = [];
       const numWorkers = options.workers || 0;
       const shutdown = { requested: false };
+      const diedEarly = { count: 0 };
 
       const emptySnapshot = (): WorkerSnapshot => ({
         handlersStarted: 0,
@@ -283,6 +287,9 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
           // timeout for a reply that cannot come, while the run reports as if it were still there
           w.on('exit', (code, signal) => {
             if (!shutdown.requested) {
+              // Counted into the result too: on stderr alone this reads as a healthy run in
+              // the .jsonl, and a degraded point would get compared against a whole one
+              diedEarly.count++;
               console.error(`[Worker ${i}] exited early with ${signal || `code ${code}`} — its counters stop here`);
             }
 
@@ -550,9 +557,15 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
       await drain();
       const drainEndedAt = Date.now();
 
-      // Without a fresh pull the idle delta absorbs up to a tick of worker polling that predates it
+      // Everything the run reports as its cost comes from this one snapshot, taken after drain
+      // and before the idle tail: worker polling during the tail is never charged to the
+      // queries, and because the three views come from a single instant the per-process
+      // breakdown adds up to the total exactly. Without a fresh pull the idle delta would
+      // absorb up to a tick of worker polling that predates it.
       await collectWorkerSnapshots();
-      const aggBeforeIdle = subAggregate(snapshotAggregate(), baseline);
+      const measured = subAggregate(snapshotAggregate(), baseline);
+      const measuredMain = subAggregate(toAggregate(counters), baselineMain);
+      const measuredWorkers = workerStates.map((ws) => subAggregate(toAggregate(ws.latest), ws.baseline));
 
       if (benchSettings.idleTailMs > 0) {
         phase = 'idle';
@@ -562,8 +575,9 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
       clearInterval(tickIntervalId);
       await collectWorkerSnapshots();
 
-      const finalAgg = subAggregate(snapshotAggregate(), baseline);
-      const idleDriverCalls = benchSettings.idleTailMs > 0 ? finalAgg.driverCalls - aggBeforeIdle.driverCalls : 0;
+      const idleDriverCalls = benchSettings.idleTailMs > 0
+        ? subAggregate(snapshotAggregate(), baseline).driverCalls - measured.driverCalls
+        : 0;
 
       shutdown.requested = true;
 
@@ -607,6 +621,8 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
       const round = (v: number | null, digits = 3) => (v === null ? null : Number(v.toFixed(digits)));
 
       const result = {
+        // 2: driverCalls stops including the idle tail, and main/workers decompose the total
+        benchSchema: 2,
         runId: process.env.BENCH_RUN_ID || null,
         suite: process.env.BENCH_SUITE || null,
         label: process.env.BENCH_LABEL || null,
@@ -633,35 +649,36 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
           inFlightAtEnd: inFlight(),
           failed: { ...failed, total: failed.continueWait + failed.timeout + failed.other },
           errorSamples,
+          workersDiedEarly: diedEarly.count,
         },
         latencyMs: percentiles(latencies),
         latencyMsByPriority: Object.fromEntries(
           Object.entries(latenciesByPriority).map(([priority, samples]) => [priority, percentiles(samples)])
         ),
         driverCalls: {
-          total: finalAgg.driverCalls,
-          perQuery: completed > 0 ? round(finalAgg.driverCalls / completed) : null,
+          total: measured.driverCalls,
+          perQuery: completed > 0 ? round(measured.driverCalls / completed) : null,
           peakPerSec: Math.round(peakDriverCallsPerSec),
-          byMethod: finalAgg.methods,
-          main: subAggregate(toAggregate(counters), baselineMain).methods,
-          workers: workerStates.map((ws) => subAggregate(toAggregate(ws.latest), ws.baseline).methods),
+          byMethod: measured.methods,
+          main: measuredMain.methods,
+          workers: measuredWorkers.map((agg) => agg.methods),
           fastTrack: {
-            ...finalAgg.fastTrack,
-            missRate: finalAgg.fastTrack.attempts > 0
-              ? round(1 - finalAgg.fastTrack.hits / finalAgg.fastTrack.attempts)
+            ...measured.fastTrack,
+            missRate: measured.fastTrack.attempts > 0
+              ? round(1 - measured.fastTrack.hits / measured.fastTrack.attempts)
               : null,
           },
         },
         events: {
-          merged: finalAgg.events,
-          main: subAggregate(toAggregate(counters), baselineMain).events,
-          workers: workerStates.map((ws) => subAggregate(toAggregate(ws.latest), ws.baseline).events),
+          merged: measured.events,
+          main: measuredMain.events,
+          workers: measuredWorkers.map((agg) => agg.events),
         },
         handlers: {
-          started: finalAgg.handlersStarted,
-          finished: finalAgg.handlersFinished,
-          main: counters.handlersFinished - baselineMain.handlersFinished,
-          workers: workerStates.map((ws) => ws.latest.handlersFinished - ws.baseline.handlersFinished),
+          started: measured.handlersStarted,
+          finished: measured.handlersFinished,
+          main: measuredMain.handlersFinished,
+          workers: measuredWorkers.map((agg) => agg.handlersFinished),
         },
         idle: {
           driverCalls: idleDriverCalls,
@@ -672,7 +689,12 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
         connections: counters.connections,
       };
 
-      console.log(`BENCH_RESULT ${JSON.stringify(result)}`);
+      // stdout is a pipe under the suite runner, and a pipe write is asynchronous on POSIX —
+      // the process.exit below would be free to drop a half-written line. console.log offers
+      // no completion callback, so this one line goes out through write().
+      await new Promise<void>((resolve) => {
+        process.stdout.write(`BENCH_RESULT ${JSON.stringify(result)}\n`, () => resolve());
+      });
 
       if (!process.env.BENCH_RUN_ID) {
         console.dir({ message: 'Result', ...result }, { depth: null });

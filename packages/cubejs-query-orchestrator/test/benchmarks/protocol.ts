@@ -1,15 +1,9 @@
-import { MethodCounter } from './instrument';
-
-export type WorkerBenchSettings = {
-  queueResponseSize: number,
-  concurrency: number,
-  handlerLatencyMs: number,
-};
+import { BenchCounters, BenchQueueSettings, cloneMethods, MethodCounter } from './instrument';
 
 export type WorkerStartMessage = {
   type: 'start',
   tenantPrefix: string,
-  benchSettings: WorkerBenchSettings,
+  benchSettings: BenchQueueSettings,
   reconcileIntervalMs: number,
 };
 
@@ -29,3 +23,14 @@ export type WorkerSnapshot = {
 export type ParentMessage =
   | { type: 'counters', seq: number, data: WorkerSnapshot }
   | { type: 'done' };
+
+/** Detached from the live counters, so a snapshot in flight over IPC cannot keep moving */
+export function counterSnapshot(counters: Omit<BenchCounters, 'connections'>): WorkerSnapshot {
+  return {
+    handlersStarted: counters.handlersStarted,
+    handlersFinished: counters.handlersFinished,
+    methods: cloneMethods(counters.methods),
+    events: { ...counters.events },
+    fastTrack: { ...counters.fastTrack },
+  };
+}

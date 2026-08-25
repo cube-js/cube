@@ -28,6 +28,30 @@ type Args = {
 
 const commaList = (v: unknown): string[] => String(v).split(',').map((s) => s.trim()).filter(Boolean);
 
+const FAST_TRACK_PASSES: Record<string, boolean> = { on: true, true: true, off: false, false: false };
+
+/**
+ * Every other option is validated by yargs — `choices`, `check`, `strict`. Mapping an
+ * unrecognised token to `off` would run a pass the caller did not ask for and label it as if
+ * they had.
+ */
+function parseFastTrackPasses(v: unknown): boolean[] {
+  const passes = commaList(v).map((token) => {
+    const pass = FAST_TRACK_PASSES[token.toLowerCase()];
+    if (pass === undefined) {
+      throw new Error(`--fast-track: expected on/off, got "${token}"`);
+    }
+
+    return pass;
+  });
+
+  if (passes.length === 0) {
+    throw new Error('--fast-track needs at least one pass, e.g. --fast-track=off,on');
+  }
+
+  return passes;
+}
+
 function parseArgs(argv: string[]): Args {
   const parsed = yargs(argv)
     .scriptName('bench:suite')
@@ -51,7 +75,7 @@ function parseArgs(argv: string[]): Args {
     .option('fast-track', {
       describe: 'Which passes to run for each configuration',
       default: 'off,on',
-      coerce: (v: unknown) => commaList(v).map((p) => p === 'on' || p === 'true'),
+      coerce: parseFastTrackPasses,
     })
     .option('settle', {
       describe: 'Pause between runs, ms — lets the previous run\'s connections go away',
@@ -130,11 +154,29 @@ function resultsDir(): string {
   return dir;
 }
 
+// Seconds included: the sink appends, so a minute-granularity name silently merges two sweeps
+// of the same suites into one file and the summary then keeps only the last pair per label
 function stamp(): string {
-  return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 16);
+  return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 }
 
 type RunRecord = any;
+
+/**
+ * A throw inside the readline listener escapes the run loop entirely — no sink.end(), no
+ * summary, and every remaining point in the sweep skipped. A corrupt line is reachable: the
+ * bench child shares its stdout pipe with every worker it forks, and a pipe only guarantees
+ * atomic writes up to PIPE_BUF.
+ */
+function parseBenchLine(line: string, prefix: string, onError: (message: string) => void): any | null {
+  try {
+    return JSON.parse(line.slice(prefix.length));
+  } catch (e: any) {
+    onError(`unparseable ${prefix.trim()} line (${e.message}): ${line.slice(0, 200)}`);
+
+    return null;
+  }
+}
 
 function selectRuns(suite: Suite, args: Args): BenchRun[] {
   return args.only ? suite.runs.filter((r) => args.only!.some((o) => r.label.includes(o))) : suite.runs;
@@ -162,14 +204,25 @@ async function executeRun(suite: Suite, benchRun: BenchRun, fastTrack: boolean, 
   });
 
   let result: RunRecord = null;
+  let malformed = 0;
+  const onMalformed = (message: string) => {
+    malformed++;
+    console.error(`  !! ${runId}: ${message}`);
+  };
 
   const rl = readline.createInterface({ input: child.stdout! });
   rl.on('line', (line) => {
     if (line.startsWith('BENCH_RESULT ')) {
-      result = JSON.parse(line.slice('BENCH_RESULT '.length));
-      sink.write(`${JSON.stringify({ type: 'run', ...result })}\n`);
+      const parsed = parseBenchLine(line, 'BENCH_RESULT ', onMalformed);
+      if (parsed) {
+        result = parsed;
+        sink.write(`${JSON.stringify({ type: 'run', ...result })}\n`);
+      }
     } else if (line.startsWith('BENCH_TICK ')) {
-      sink.write(`${JSON.stringify({ type: 'tick', ...JSON.parse(line.slice('BENCH_TICK '.length)) })}\n`);
+      const parsed = parseBenchLine(line, 'BENCH_TICK ', onMalformed);
+      if (parsed) {
+        sink.write(`${JSON.stringify({ type: 'tick', ...parsed })}\n`);
+      }
     } else {
       console.log(`  | ${line}`);
     }
@@ -189,7 +242,14 @@ async function executeRun(suite: Suite, benchRun: BenchRun, fastTrack: boolean, 
   clearTimeout(timer);
 
   if (!result) {
-    const error = timedOut ? `timed out after ${timeoutMs}ms` : `exited with code ${code} without a BENCH_RESULT`;
+    let error: string;
+    if (timedOut) {
+      error = `timed out after ${timeoutMs}ms`;
+    } else if (malformed > 0) {
+      error = `exited with code ${code}, and ${malformed} line(s) were unparseable`;
+    } else {
+      error = `exited with code ${code} without a BENCH_RESULT`;
+    }
     console.error(`  !! ${runId}: ${error}`);
     const failure = { runId, suite: suite.name, label: benchRun.label, axis: benchRun.axis, settings: { fastTrack }, error };
     sink.write(`${JSON.stringify({ type: 'run', ...failure })}\n`);
@@ -258,12 +318,14 @@ function markdownTable(records: RunRecord[]): string {
     const missRate = on?.driverCalls?.fastTrack?.missRate;
     const mainOff = mainCallsPerQuery(off);
     const mainOn = mainCallsPerQuery(on);
+    // A run that lost a worker measured fewer processes than its axis claims
+    const degraded = (off?.outcome?.workersDiedEarly ?? 0) > 0 || (on?.outcome?.workersDiedEarly ?? 0) > 0;
 
     if (off?.error || on?.error) {
       lines.push(`| ${key} | ${[`off: ${off?.error || 'ok'}`, `on: ${on?.error || 'ok'}`].join(', ')} ${header.slice(2).map(() => '| —').join(' ')} |`);
     } else if (sample) {
       lines.push(`| ${[
-        key,
+        degraded ? `⚠ ${key}` : key,
         fmt(sample.derived?.actualRho),
         fmt(sample.derived?.actualRateQps),
         `${off?.outcome?.completed ?? '—'}→${on?.outcome?.completed ?? '—'}`,
@@ -355,19 +417,29 @@ function dryRun(suites: Suite[], args: Args) {
   }
 
   if (args.report) {
-    const records = fs.readFileSync(args.report, 'utf-8')
-      .split('\n')
-      .filter((l) => l.trim())
-      .map((l) => JSON.parse(l))
-      .filter((r) => r.type === 'run');
+    const records: RunRecord[] = [];
+    let unreadable = 0;
+
+    // A sweep that was killed leaves a truncated last line, and one throw here used to lose
+    // the whole file rather than the one record
+    for (const line of fs.readFileSync(args.report, 'utf-8').split('\n').filter((l) => l.trim())) {
+      try {
+        const record = JSON.parse(line);
+        if (record.type === 'run') {
+          records.push(record);
+        }
+      } catch (e: any) {
+        unreadable++;
+      }
+    }
+
+    if (unreadable > 0) {
+      console.error(`!! skipped ${unreadable} unreadable line(s) in ${args.report}`);
+    }
 
     report(records);
 
     return;
-  }
-
-  if (args.suites.length === 0) {
-    throw new Error('Usage: run-suite.js <suite|all> [--driver=…] [--fast-track=off,on] [--only=…] [--dry-run] | --list | --report <file.jsonl>');
   }
 
   const suites = args.suites.includes('all')

@@ -402,3 +402,7 @@ Two things about the numbers are artifacts of the harness rather than production
   and is the entire traffic of the idle-floor suite, which is why S5 measures two intervals.
 - Payload defaults are 5MB responses / 256KB query bodies, but the suites deliberately run at
   64KB / 16KB. S7 owns the payload axis.
+
+`driverCalls` is snapshotted after drain and before the idle tail, so on a suite with
+`BENCH_IDLE_TAIL_MS` the tail's polling lands in `idle.driverCalls` and nowhere else — and
+`main` plus `workers` add up to `total` exactly.

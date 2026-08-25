@@ -1,12 +1,12 @@
 import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
-import { MethodName } from '@cubejs-backend/shared';
+import { MethodName, pausePromise } from '@cubejs-backend/shared';
 import {
   AddToQueueResponse,
   QueueDriverConnectionInterface,
   QueueDriverInterface,
   QueuePriority,
 } from '@cubejs-backend/base-driver';
-import { LocalQueueDriver } from '../../src';
+import { LocalQueueDriver, QueryQueue, QueryQueueOptions } from '../../src';
 
 export type MethodCounter = { started: number, finished: number };
 
@@ -28,6 +28,10 @@ export function createCounters(): BenchCounters {
     handlersFinished: 0,
     fastTrack: { attempts: 0, hits: 0 },
   };
+}
+
+export function countEvent(counters: Pick<BenchCounters, 'events'>, event: string) {
+  counters.events[event] = (counters.events[event] || 0) + 1;
 }
 
 export function driverCallsTotal(counters: Pick<BenchCounters, 'methods'>): number {
@@ -53,6 +57,10 @@ export function mergeEvents(into: Record<string, number>, from: Record<string, n
   }
 
   return into;
+}
+
+export function cloneMethods(methods: Record<string, MethodCounter>): Record<string, MethodCounter> {
+  return mergeMethods({}, methods);
 }
 
 export type Percentiles = { count: number, mean: number, p50: number, p90: number, p95: number, p99: number, max: number };
@@ -87,6 +95,20 @@ async function fastTrackEligible(connection: QueueDriverConnectionInterface, pri
   return typeof useFastTrack === 'function' ? useFastTrack.call(connection, priority) : false;
 }
 
+/** `addToQueue` is wrapped separately, so that it can also record the fast track outcome */
+const TRACKED_METHODS: MethodName<QueueDriverConnectionInterface>[] = [
+  'getResult',
+  'getQueriesToCancel',
+  'getActiveAndToProcess',
+  'retrieveForProcessing',
+  'getQueryDef',
+  'setResultAndRemoveQuery',
+  'getQueryStageState',
+  'getResultBlocking',
+  'optimisticQueryUpdate',
+  'getQueryAndRemove',
+];
+
 function patchQueueDriverConnectionForTrack(connection: QueueDriverConnectionInterface, counters: BenchCounters): QueueDriverConnectionInterface {
   function wrapAsyncMethod<M extends MethodName<QueueDriverConnectionInterface>>(methodName: M): any {
     return async (...args: Parameters<QueueDriverConnectionInterface[M]>) => {
@@ -109,6 +131,7 @@ function patchQueueDriverConnectionForTrack(connection: QueueDriverConnectionInt
   const trackedAddToQueue = wrapAsyncMethod('addToQueue');
 
   const tracked: Record<string, any> = {
+    ...Object.fromEntries(TRACKED_METHODS.map((methodName) => [methodName, wrapAsyncMethod(methodName)])),
     addToQueue: async (...args: Parameters<QueueDriverConnectionInterface['addToQueue']>) => {
       const eligible = await fastTrackEligible(connection, args[3]);
       if (eligible) {
@@ -122,16 +145,6 @@ function patchQueueDriverConnectionForTrack(connection: QueueDriverConnectionInt
 
       return result;
     },
-    getResult: wrapAsyncMethod('getResult'),
-    getQueriesToCancel: wrapAsyncMethod('getQueriesToCancel'),
-    getActiveAndToProcess: wrapAsyncMethod('getActiveAndToProcess'),
-    retrieveForProcessing: wrapAsyncMethod('retrieveForProcessing'),
-    getQueryDef: wrapAsyncMethod('getQueryDef'),
-    setResultAndRemoveQuery: wrapAsyncMethod('setResultAndRemoveQuery'),
-    getQueryStageState: wrapAsyncMethod('getQueryStageState'),
-    getResultBlocking: wrapAsyncMethod('getResultBlocking'),
-    optimisticQueryUpdate: wrapAsyncMethod('optimisticQueryUpdate'),
-    getQueryAndRemove: wrapAsyncMethod('getQueryAndRemove'),
   };
 
   // Spreading the connection would copy own properties only and silently drop every method that
@@ -191,4 +204,60 @@ export function makeQueueDriverFactory(counters: BenchCounters, cubeStoreDriverF
         throw new Error(`Unsupported driver: ${driverType}`);
     }
   };
+}
+
+export type BenchQueueSettings = {
+  queueResponseSize: number,
+  concurrency: number,
+  handlerLatencyMs: number,
+};
+
+/**
+ * The submitter and the workers have to run the same queue: any difference between the two
+ * would show up in the results as a difference between processes
+ */
+export function createBenchQueue(
+  queueName: string,
+  counters: BenchCounters,
+  settings: BenchQueueSettings,
+  options: Pick<QueryQueueOptions, 'cacheAndQueueDriver' | 'cubeStoreDriverFactory'>,
+  logPrefix = '',
+): QueryQueue {
+  return new QueryQueue(queueName, {
+    queryHandlers: {
+      query: async () => {
+        counters.handlersStarted++;
+        await pausePromise(settings.handlerLatencyMs);
+        counters.handlersFinished++;
+
+        return {
+          payload: 'a'.repeat(settings.queueResponseSize),
+        };
+      },
+      stream: async () => {
+        throw new Error('streaming handler is not supported for testing');
+      },
+    },
+    cancelHandlers: {
+      query: async () => {
+        console.error(`${logPrefix}Cancel handler was called for query`);
+      },
+    },
+    continueWaitTimeout: 60 * 2,
+    executionTimeout: 20,
+    orphanedTimeout: 60 * 5,
+    concurrency: settings.concurrency,
+    logger: (event, params) => {
+      countEvent(counters, event);
+
+      // stderr, not stdout: stdout carries the BENCH_RESULT/BENCH_TICK lines the suite
+      // runner parses, and it is shared with every worker
+      if (event.includes('error')) {
+        console.error(`${logPrefix}${event}`, params);
+      }
+    },
+    queueDriverFactory: makeQueueDriverFactory(counters, options.cubeStoreDriverFactory),
+    cacheAndQueueDriver: options.cacheAndQueueDriver,
+    cubeStoreDriverFactory: options.cubeStoreDriverFactory,
+  });
 }
