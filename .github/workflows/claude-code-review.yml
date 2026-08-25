@@ -70,6 +70,12 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           track_progress: true
+          # An attempt to fight noisy inline comments that carry no actual finding:
+          # comments are buffered and classified by Haiku after the session, so
+          # tool-probing chatter ("Test comment — does this work?") is dropped instead
+          # of landing on the PR. Action-side default is already true; pinned here so a
+          # future default flip doesn't silently change review behaviour.
+          classify_inline_comments: true
           # Allow PRs opened by coding-agent bots (e.g. cursor) to trigger reviews.
           allowed_bots: "cursor[bot]"
           prompt: |
