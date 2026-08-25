@@ -14,7 +14,6 @@ export type RetrieveForProcessingSuccess = {
   queueSize: number,
   def: QueryDef,
 };
-export type RetrieveForProcessingResponse = RetrieveForProcessingSuccess | null;
 export type AddToQueueResponse = [
   added: number,
   queueId: QueueId | null,
@@ -93,7 +92,7 @@ export interface QueueDriverConnectionInterface {
   updateHeartBeat(hash: QueryKeyHash, queueId: QueueId | null): Promise<void>;
   // Atomically moves a queue item to active. Returns null when another node is already
   // processing the query or the concurrency budget is full.
-  retrieveForProcessing(hash: QueryKeyHash, queueId: QueueId): Promise<RetrieveForProcessingResponse>;
+  retrieveForProcessing(hash: QueryKeyHash, queueId: QueueId): Promise<RetrieveForProcessingSuccess | null>;
   optimisticQueryUpdate(hash: QueryKeyHash, toUpdate: unknown, queueId: QueueId): Promise<boolean>;
   cancelQuery(queryKey: QueryKey, queueId: QueueId | null): Promise<QueryDef | null>;
   getQueryAndRemove(hash: QueryKeyHash, queueId: QueueId | null): Promise<[QueryDef]>;

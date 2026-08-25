@@ -11,7 +11,7 @@ import {
   QueryKeysTuple,
   GetActiveAndToProcessResponse,
   QueryStageStateResponse,
-  RetrieveForProcessingResponse,
+  RetrieveForProcessingSuccess,
   QueueDriverOptions,
   QueuePriority
 } from '@cubejs-backend/base-driver';
@@ -272,7 +272,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     }
   }
 
-  public async retrieveForProcessing(queryKeyHash: QueryKeyHash, queueId: QueueId): Promise<RetrieveForProcessingResponse> {
+  public async retrieveForProcessing(queryKeyHash: QueryKeyHash, queueId: QueueId): Promise<RetrieveForProcessingSuccess | null> {
     const query = this.state.queryDef[queryKeyHash];
     const activeKeys = this.queueArray(this.state.active) as QueryKeyHash[];
 

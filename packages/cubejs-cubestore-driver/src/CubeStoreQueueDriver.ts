@@ -4,7 +4,6 @@ import {
   QueueDriverConnectionInterface,
   QueryStageStateResponse,
   QueryDef,
-  RetrieveForProcessingResponse,
   RetrieveForProcessingSuccess,
   QueueDriverOptions,
   AddToQueueQuery,
@@ -364,7 +363,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     };
   }
 
-  public async retrieveForProcessing(hash: QueryKeyHash, _queueId: QueueId): Promise<RetrieveForProcessingResponse> {
+  public async retrieveForProcessing(hash: QueryKeyHash, _queueId: QueueId): Promise<RetrieveForProcessingSuccess | null> {
     const [row] = await this.driver.query<CubeStoreRetrieveResponse>('QUEUE RETRIEVE EXTENDED CONCURRENCY ? ?', [
       this.options.concurrency,
       this.prefixKey(hash),
