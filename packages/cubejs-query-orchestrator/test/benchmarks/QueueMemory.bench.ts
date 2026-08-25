@@ -12,7 +12,7 @@ const beforeAll = async () => {
 };
 
 QueryQueueBenchmark(
-  'Memory Queue',
+  'memory',
   {
     cacheAndQueueDriver: 'memory',
     beforeAll,

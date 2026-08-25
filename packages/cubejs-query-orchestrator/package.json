@@ -21,6 +21,7 @@
     "unit": "jest --runInBand --forceExit --coverage --verbose test/unit",
     "integration": "jest --runInBand --verbose test/integration",
     "integration:cubestore": "jest --runInBand --verbose test/integration/cubestore",
+    "bench:suite": "node dist/test/benchmarks/run-suite.js",
     "lint": "eslint src/* test/* --ext .ts,.js",
     "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
   },
@@ -41,9 +42,11 @@
     "@types/jest": "^29",
     "@types/node": "^22",
     "@types/ramda": "^0.27.32",
+    "@types/yargs": "^17.0.31",
     "jest": "^29",
     "ts-jest": "^29",
-    "typescript": "~5.2.2"
+    "typescript": "~5.2.2",
+    "yargs": "^17.7.1"
   },
   "license": "Apache-2.0",
   "eslintConfig": {
