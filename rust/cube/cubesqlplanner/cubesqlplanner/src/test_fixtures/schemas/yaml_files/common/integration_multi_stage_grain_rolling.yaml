@@ -146,3 +146,16 @@ cubes:
         rolling_window:
           type: to_date
           granularity: year
+
+      # An empty `keep_only` intersects the grain down to nothing, so it narrows
+      # just as a populated one does and must be rejected the same way.
+      - name: log_return_sum_ytd_empty_keep_only
+        multi_stage: true
+        sql: "LN(1.0 + ({CUBE.daily_irr_weight} / NULLIF({CUBE.daily_weight}, 0)) / 100.0)"
+        type: sum
+        add_group_by:
+          - returns.day
+        group_by: []
+        rolling_window:
+          type: to_date
+          granularity: year

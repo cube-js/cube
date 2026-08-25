@@ -815,9 +815,12 @@ impl MultiStageQueryPlanner {
                     .multi_stage()
                     .map(|ms| ms.grain.clone())
                     .unwrap_or_default();
-                let has_partition_grain =
-                    |g: &Option<Vec<Rc<MemberSymbol>>>| g.as_ref().is_some_and(|v| !v.is_empty());
-                if has_partition_grain(&grain.exclude) || has_partition_grain(&grain.keep_only) {
+                // `keep_only` is an intersection, so declaring it empty narrows
+                // the grain to nothing rather than meaning "no key given";
+                // `exclude` subtracts, so an empty list really does nothing.
+                let narrows_grain = grain.exclude.as_ref().is_some_and(|v| !v.is_empty())
+                    || grain.keep_only.is_some();
+                if narrows_grain {
                     return Err(CubeError::user(format!(
                         "Measure {} declares `rolling_window` together with `grain.exclude` / \
                          `reduce_by` or `grain.keep_only` / `group_by`, which is not supported. \
@@ -857,12 +860,12 @@ impl MultiStageQueryPlanner {
                             scope,
                         )?
                     } else {
-                        // Without a time dimension the window collapses to a
-                        // single bucket over the whole date range, so there is
-                        // no frame to build and no outer stage to carry the
-                        // aggregation. What the query asks for is the measure's
-                        // own multi-stage definition — aggregation and grain
-                        // included — over the window's range.
+                        // Without a time dimension there is no series to walk,
+                        // so the window collapses to a single bucket: no frame
+                        // to build, and no outer stage to carry the aggregation.
+                        // What is left is the measure's own multi-stage
+                        // definition — aggregation and grain included — over the
+                        // base state prepared above.
                         self.make_queries_descriptions(
                             MemberSymbol::new_measure(transforms::strip_rolling_window(&measure)),
                             base_state,

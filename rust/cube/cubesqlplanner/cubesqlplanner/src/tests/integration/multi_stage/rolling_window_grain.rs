@@ -259,3 +259,24 @@ async fn test_rolling_grain_reduce_by_is_rejected() {
         err.message
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_grain_empty_keep_only_is_rejected() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - returns.log_return_sum_ytd_empty_keep_only
+        dimensions:
+          - returns.security
+    "#};
+
+    let err = ctx
+        .build_sql(query)
+        .expect_err("an empty keep_only must be rejected");
+    assert!(
+        err.message.contains("grain.keep_only"),
+        "unexpected error: {}",
+        err.message
+    );
+}
