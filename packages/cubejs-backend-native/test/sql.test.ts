@@ -488,6 +488,10 @@ describe('SQLInterface', () => {
     cubeSqlStream.on('error', (err) => {
       streamErrors.push(err);
     });
+    // `exec_sql` delivers a failure as the *argument* to the stream's `end`,
+    // not through `write`, so the spy has to be in place before `execSql`
+    // roots the function.
+    const endSpy = jest.spyOn(cubeSqlStream, 'end');
 
     try {
       await native.execSql(
@@ -503,10 +507,16 @@ describe('SQLInterface', () => {
       // honest — it would pass vacuously if the query had simply finished
       // before the `close` event arrived.
       expect(loadEvents).not.toContain('Load Request Success');
-      // Only the schema header made it out, and nothing that looks like an
-      // error was written into the closed stream.
-      expect(chunks.length).toBeGreaterThan(0);
-      expect(chunks.join('')).not.toContain('"error"');
+      // The stream is closed with no error payload. This is the half of the
+      // fix that `loadEvents` does not cover, and it has to be asserted on
+      // `end` rather than on the written chunks: `exec_sql` passes the
+      // `{"error": ...}` JSONL line to `end` as an argument.
+      expect(endSpy).toHaveBeenCalled();
+      expect(endSpy.mock.calls[0]).toHaveLength(0);
+      // Only the JSONL schema header made it out — everything after it hit a
+      // stream that was already destroyed.
+      expect(chunks).toHaveLength(1);
+      expect(JSON.parse(chunks[0].trim()).schema).toBeDefined();
     } finally {
       await native.shutdownInterface(instance, 'fast');
     }
