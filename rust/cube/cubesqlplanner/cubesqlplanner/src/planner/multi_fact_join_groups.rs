@@ -175,6 +175,16 @@ impl MeasuresJoinHints {
     }
 }
 
+/// One group while it is still being assembled: the measures gathered so far
+/// plus what it takes to rebuild their join tree - the `JoinKey` to compare
+/// trees by and the hints to resolve a merged tree from.
+struct GroupBuild {
+    key: JoinKey,
+    tree: Rc<JoinTree>,
+    measures: Vec<Rc<MemberSymbol>>,
+    hints: JoinHints,
+}
+
 // --- MultiFactJoinGroups: builds actual join trees ---
 
 /// Resolves a query's `MeasuresJoinHints` into concrete join trees
@@ -203,7 +213,30 @@ impl MultiFactJoinGroups {
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
     ) -> Result<Self, CubeError> {
-        let groups = Self::build_groups(&query_tools, &measures_join_hints)?;
+        Self::build(query_tools, measures_join_hints, false)
+    }
+
+    /// Like `try_new`, but additionally folds a group into another one whose
+    /// join tree contains its own - see `merge_nested_groups` for when that is
+    /// allowed. One group less is one scan of the shared join less.
+    ///
+    /// Only the query's own grouping is built this way. Regrouping a measure
+    /// subset through `for_measures` never merges: a pre-aggregation is matched
+    /// against one leg at a time, so collapsing the legs of an already planned
+    /// query would cost it rollups that are worth far more than the scan saved.
+    pub fn try_new_merging_nested(
+        query_tools: Rc<State>,
+        measures_join_hints: MeasuresJoinHints,
+    ) -> Result<Self, CubeError> {
+        Self::build(query_tools, measures_join_hints, true)
+    }
+
+    fn build(
+        query_tools: Rc<State>,
+        measures_join_hints: MeasuresJoinHints,
+        merge_nested: bool,
+    ) -> Result<Self, CubeError> {
+        let groups = Self::build_groups(&query_tools, &measures_join_hints, merge_nested)?;
         let (dimension_paths, measure_paths) = Self::precompute_paths(&groups);
         Ok(Self {
             query_tools,
@@ -218,12 +251,13 @@ impl MultiFactJoinGroups {
     /// the shared `base_hints`.
     pub fn for_measures(&self, measures: &[Rc<MemberSymbol>]) -> Result<Self, CubeError> {
         let new_hints = self.measures_join_hints.for_measures(measures)?;
-        Self::try_new(self.query_tools.clone(), new_hints)
+        Self::build(self.query_tools.clone(), new_hints, false)
     }
 
     fn build_groups(
         query_tools: &Rc<State>,
         hints: &MeasuresJoinHints,
+        merge_nested: bool,
     ) -> Result<Vec<(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)>, CubeError> {
         let join_tree_builder = JoinTreeBuilder::new(query_tools.clone());
         let resolve = |join_hints: &JoinHints| -> Result<(JoinKey, Rc<JoinTree>), CubeError> {
@@ -238,7 +272,7 @@ impl MultiFactJoinGroups {
                 vec![]
             } else {
                 let (key, join_tree) = resolve(&hints.base_hints)?;
-                vec![(Vec::new(), key, join_tree)]
+                vec![(Vec::new(), key, join_tree, hints.base_hints.clone())]
             }
         } else {
             hints
@@ -261,26 +295,138 @@ impl MultiFactJoinGroups {
                         )));
                     }
                     let (key, join_tree) = resolve(&measure_hints)?;
-                    Ok((vec![mh.measure.clone()], key, join_tree))
+                    Ok((vec![mh.measure.clone()], key, join_tree, measure_hints))
                 })
                 .collect::<Result<Vec<_>, _>>()?
         };
 
         let mut key_order: Vec<JoinKey> = Vec::new();
-        let mut grouped: HashMap<JoinKey, (Rc<JoinTree>, Vec<Rc<MemberSymbol>>)> = HashMap::new();
-        for (measures, key, join_tree) in measures_to_join {
+        let mut grouped: HashMap<JoinKey, GroupBuild> = HashMap::new();
+        for (measures, key, join_tree, join_hints) in measures_to_join {
             if let Some(entry) = grouped.get_mut(&key) {
-                entry.1.extend(measures);
+                entry.measures.extend(measures);
+                entry.hints.extend(&join_hints);
             } else {
                 key_order.push(key.clone());
-                grouped.insert(key, (join_tree, measures));
+                grouped.insert(
+                    key.clone(),
+                    GroupBuild {
+                        key,
+                        tree: join_tree,
+                        measures,
+                        hints: join_hints,
+                    },
+                );
             }
         }
 
-        Ok(key_order
+        let mut groups = key_order
             .into_iter()
             .map(|key| grouped.remove(&key).unwrap())
+            .collect::<Vec<_>>();
+
+        if merge_nested {
+            Self::merge_nested_groups(&mut groups, &resolve)?;
+        }
+
+        Ok(groups
+            .into_iter()
+            .map(|group| (group.tree, group.measures))
             .collect())
+    }
+
+    /// Folds a group into another one that walks the same cube graph further,
+    /// so both are answered by one scan of the shared part instead of two.
+    ///
+    /// The extra joins of the wider tree are `LEFT`, so every row of the
+    /// narrower one survives in it, each replicated one or more times. A
+    /// measure therefore reads the same rows and answers the same value in
+    /// both, provided that replication either does not reach it or does not
+    /// change what it computes - which is what `group_survives_join` decides.
+    ///
+    /// The wider tree is rebuilt from both groups' join hints before that
+    /// question is asked. A tree only knows whether it multiplies the cubes its
+    /// own hints named, and the cube a moving measure sits on may be in the
+    /// wider tree only as a stop on the way to something else, which would
+    /// otherwise answer "not multiplied" for a cube the tree does in fact
+    /// multiply. Rebuilding fills that in; a rebuild that comes back with a
+    /// different key built different joins than the group already has, and is
+    /// skipped rather than merged.
+    ///
+    /// Merging is re-checked against the accumulated measures on every pass, so
+    /// a chain of nested trees only collapses as far as every measure carried
+    /// along stays safe.
+    fn merge_nested_groups(
+        groups: &mut Vec<GroupBuild>,
+        resolve: &impl Fn(&JoinHints) -> Result<(JoinKey, Rc<JoinTree>), CubeError>,
+    ) -> Result<(), CubeError> {
+        loop {
+            let mut merged = None;
+            'outer: for (i, group) in groups.iter().enumerate() {
+                for (j, other) in groups.iter().enumerate() {
+                    if i == j || !group.key.is_nested_in(&other.key) {
+                        continue;
+                    }
+                    let mut hints = other.hints.clone();
+                    hints.extend(&group.hints);
+                    let (key, tree) = resolve(&hints)?;
+                    if key != other.key {
+                        continue;
+                    }
+                    if Self::group_survives_join(&group.measures, &tree)? {
+                        merged = Some((i, j, tree));
+                        break 'outer;
+                    }
+                }
+            }
+            let Some((from, into, tree)) = merged else {
+                return Ok(());
+            };
+            let group = groups.remove(from);
+            // Removing the earlier index shifts everything after it.
+            let into = if into > from { into - 1 } else { into };
+            let target = &mut groups[into];
+            target.measures.extend(group.measures);
+            target.hints.extend(&group.hints);
+            target.tree = tree;
+        }
+    }
+
+    /// Whether every measure of a group computes the same value, by the same
+    /// SQL, when evaluated over `join` instead of its own tree.
+    ///
+    /// A measure whose cube `join` does not multiply reads exactly its own
+    /// rows, so nothing changes. A multiplied one only qualifies if its value
+    /// is immune to replication; a key-based count is deliberately not
+    /// accepted, because staying correct would mean switching it to the
+    /// distinct `MultipliedCount` form, and the render form a measure is
+    /// classified into is decided from its own join tree elsewhere.
+    ///
+    /// Multi-stage measures are planned through their own CTE pipeline rather
+    /// than as a leaf of this join, so they are never moved.
+    fn group_survives_join(
+        measures: &[Rc<MemberSymbol>],
+        join: &Rc<JoinTree>,
+    ) -> Result<bool, CubeError> {
+        for measure in measures.iter() {
+            if has_multi_stage_members(measure, false)? {
+                return Ok(false);
+            }
+            for item in collect_multiplied_measures(measure, join)? {
+                if !item.multiplied {
+                    continue;
+                }
+                let survives = item
+                    .measure
+                    .as_measure()
+                    .map(|m| m.kind().survives_row_multiplication())
+                    .unwrap_or(false);
+                if !survives {
+                    return Ok(false);
+                }
+            }
+        }
+        Ok(true)
     }
 
     /// Hints to use for a measure whose own hint set resolved to empty.
@@ -816,5 +962,103 @@ mod tests {
         // Unknown measure
         let unknown = ctx.create_symbol("customers.count").unwrap();
         assert!(groups.resolve_join_path_for_measure(&unknown).is_none());
+    }
+
+    fn nested_trees_groups(
+        measure_paths: &[&str],
+        merge_nested: bool,
+    ) -> (usize, Vec<Vec<String>>) {
+        let schema = MockSchema::from_yaml_file("common/integration_nested_join_trees.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+
+        let country = ctx.create_symbol("sites.country").unwrap();
+        let measures = measure_paths
+            .iter()
+            .map(|path| ctx.create_symbol(path).unwrap())
+            .collect_vec();
+
+        let hints = MeasuresJoinHints::builder(&JoinHints::new())
+            .add_dimensions(&[country])
+            .build(&measures)
+            .unwrap();
+
+        let groups = if merge_nested {
+            MultiFactJoinGroups::try_new_merging_nested(ctx.query_tools().clone(), hints).unwrap()
+        } else {
+            MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap()
+        };
+
+        let grouped_measures = groups
+            .groups()
+            .iter()
+            .map(|(_, measures)| measures.iter().map(|m| m.full_name()).collect_vec())
+            .collect_vec();
+        (groups.num_groups(), grouped_measures)
+    }
+
+    #[test]
+    fn test_nested_trees_distinct_measures_merge() {
+        // `checkouts` is reached through `carts`, so the tree of a `carts`
+        // measure is contained in the tree of a `checkouts` one. Both measures
+        // are distinct counts, which the fan-out of the wider tree cannot
+        // change, so one group answers both.
+        let (num_groups, measures) =
+            nested_trees_groups(&["carts.unique_msid", "checkouts.unique_msid"], true);
+
+        assert_eq!(num_groups, 1);
+        assert_eq!(
+            measures,
+            vec![vec![
+                "checkouts.unique_msid".to_string(),
+                "carts.unique_msid".to_string()
+            ]]
+        );
+    }
+
+    #[test]
+    fn test_nested_trees_are_kept_apart_without_merging() {
+        let (num_groups, _) =
+            nested_trees_groups(&["carts.unique_msid", "checkouts.unique_msid"], false);
+
+        assert_eq!(num_groups, 2);
+    }
+
+    #[test]
+    fn test_nested_trees_plain_count_does_not_merge() {
+        // The wider tree splits every `carts` row into one row per checkout, so
+        // a plain count over it would answer the number of checkouts.
+        let (num_groups, _) = nested_trees_groups(&["carts.count", "checkouts.unique_msid"], true);
+
+        assert_eq!(num_groups, 2);
+    }
+
+    #[test]
+    fn test_nested_trees_sum_does_not_merge() {
+        let (num_groups, _) =
+            nested_trees_groups(&["carts.total_value", "checkouts.total_amount"], true);
+
+        assert_eq!(num_groups, 2);
+    }
+
+    #[test]
+    fn test_sibling_trees_do_not_merge() {
+        // `orders` and `returns` hang off `customers` side by side, so neither
+        // tree contains the other and there is no shared scan to fold into.
+        let schema = MockSchema::from_yaml_file("common/multi_fact.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+
+        let orders_count = ctx.create_symbol("orders.count").unwrap();
+        let returns_count = ctx.create_symbol("returns.count").unwrap();
+        let customers_name = ctx.create_symbol("customers.name").unwrap();
+
+        let hints = MeasuresJoinHints::builder(&JoinHints::new())
+            .add_dimensions(&[customers_name])
+            .build(&[orders_count, returns_count])
+            .unwrap();
+
+        let groups =
+            MultiFactJoinGroups::try_new_merging_nested(ctx.query_tools().clone(), hints).unwrap();
+
+        assert_eq!(groups.num_groups(), 2);
     }
 }

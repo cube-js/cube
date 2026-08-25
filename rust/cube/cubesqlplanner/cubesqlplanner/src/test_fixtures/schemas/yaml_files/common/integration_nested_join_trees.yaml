@@ -1,0 +1,66 @@
+cubes:
+  - name: sites
+    sql: "SELECT * FROM sites"
+    joins:
+      - name: carts
+        relationship: one_to_many
+        sql: "{sites}.id = {carts.site_id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: country
+        type: string
+        sql: country
+    measures:
+      - name: count
+        type: count
+
+  - name: carts
+    sql: "SELECT * FROM carts"
+    joins:
+      - name: checkouts
+        relationship: one_to_many
+        sql: "{carts}.id = {checkouts.cart_id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: site_id
+        type: number
+        sql: site_id
+      - name: msid
+        type: string
+        sql: msid
+    measures:
+      - name: unique_msid
+        type: count_distinct
+        sql: msid
+      - name: count
+        type: count
+      - name: total_value
+        type: sum
+        sql: value
+
+  - name: checkouts
+    sql: "SELECT * FROM checkouts"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: cart_id
+        type: number
+        sql: cart_id
+      - name: msid
+        type: string
+        sql: msid
+    measures:
+      - name: unique_msid
+        type: count_distinct
+        sql: msid
+      - name: total_amount
+        type: sum
+        sql: amount

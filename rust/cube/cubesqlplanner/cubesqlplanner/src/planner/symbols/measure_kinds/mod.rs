@@ -312,6 +312,20 @@ impl MeasureKind {
             | Self::Rank => None,
         }
     }
+
+    /// Whether the value this kind computes is unchanged when the rows it
+    /// reads are each replicated some number of times — and computed by the
+    /// same SQL either way.
+    ///
+    /// Strictly narrower than `regular_in_multiplied`: a key-based count is
+    /// also safe under multiplication, but only after switching to the
+    /// distinct `MultipliedCount` form, so it does not qualify here.
+    pub fn survives_row_multiplication(&self) -> bool {
+        match self {
+            Self::Aggregated(a) | Self::AggregatedState(a) => a.agg_type().is_distinct(),
+            Self::Count(_) | Self::MultipliedCount(_) | Self::Calculated(_) | Self::Rank => false,
+        }
+    }
 }
 
 impl SymbolDeps for MeasureKind {

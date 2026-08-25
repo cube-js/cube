@@ -22,6 +22,25 @@ pub struct JoinKey {
     joins: Vec<JoinItemStatic>,
 }
 
+impl JoinKey {
+    pub fn root(&self) -> &String {
+        &self.root
+    }
+
+    pub fn joins(&self) -> &Vec<JoinItemStatic> {
+        &self.joins
+    }
+
+    /// Whether this key's joins are all present in `other`, which holds
+    /// strictly more of them - i.e. `other` walks the same cube graph from
+    /// the same root and keeps walking.
+    pub fn is_nested_in(&self, other: &JoinKey) -> bool {
+        self.root == other.root
+            && self.joins.len() < other.joins.len()
+            && self.joins.iter().all(|item| other.joins.contains(item))
+    }
+}
+
 pub struct QueryTools {
     cube_evaluator: Rc<dyn CubeEvaluator>,
     base_tools: Rc<dyn BaseTools>,
