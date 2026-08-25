@@ -240,10 +240,11 @@ enum SqlQueryOutcome {
     Completed,
     /// The client closed the response stream before the result set was fully
     /// written, so this attempt delivered nothing. It is reported as a
-    /// `Continue wait`: that is the event which closes out an attempt that
-    /// produced no result, and closing it is what lets query history account
-    /// for the request's running time - `Load Request` is logged when the
-    /// attempt starts, so silence here would leave the request dangling.
+    /// `Continue wait`: the event query history already reads for an attempt
+    /// that produced no result. `Load Request` is logged when the attempt
+    /// starts, and nothing else reports this outcome - the JS promise being
+    /// awaited is simply abandoned - so without this the attempt has no end at
+    /// all and the time it spent cannot be attributed.
     ///
     /// Whether the client comes back is not something this end of the stream
     /// can know, and the reporting deliberately does not depend on it: under
@@ -255,14 +256,16 @@ enum SqlQueryOutcome {
     ClientDisconnected,
 }
 
-/// Records a `Continue wait` load event for a `/v1/cubesql` attempt that ends
-/// without delivering a result while the request itself continues.
+/// Records a `Continue wait` load event for a `/v1/cubesql` attempt that ended
+/// without delivering a result.
 ///
-/// `Load Request` is logged when the attempt starts, so leaving an attempt with
-/// no terminal event makes the request look perpetually in flight and its
-/// running time unaccountable. `Continue wait` is the event the query history
-/// consumer already reads for "not done, the client will be back", which is
-/// exactly what both callers mean.
+/// `Load Request` is logged when the attempt starts, so an attempt that reports
+/// nothing back leaves no way to attribute the time it spent. `Continue wait`
+/// is the event the query history consumer already reads for "this attempt
+/// produced no result", which is what happened. It does not by itself close the
+/// request - a polling client opens further attempts under the same request id,
+/// and CUB-4099 has one that ran 44 minutes over six of them - but it does give
+/// this attempt an end.
 async fn log_continue_wait(
     session: &Arc<Session>,
     span_id: &Option<Arc<SpanId>>,
@@ -551,13 +554,14 @@ async fn handle_sql_query(
                     span_id.as_ref().map(|s| s.span_id.as_str()).unwrap_or("-")
                 );
 
-                // `Load Request` was already logged above, so every outcome
-                // owes it a terminal event: without one the request dangles and
-                // its running time cannot be accounted for. `Continue wait` is
-                // the name query history already reads for an attempt that
-                // produced no result, rather than a new one it would log and
-                // drop. See `SqlQueryOutcome::ClientDisconnected` for why this
-                // is not gated on `throw_continue_wait`.
+                // Nothing else reports this outcome, so without this the
+                // attempt ends unrecorded and the time it spent cannot be
+                // attributed. `Continue wait` is the name query history already
+                // reads for an attempt that produced no result, rather than a
+                // new one it would log and drop. See
+                // `SqlQueryOutcome::ClientDisconnected` for why it is not gated
+                // on `throw_continue_wait`, and the `Err` arm below for why a
+                // real continue wait deliberately does not log here.
                 log_continue_wait(&session_clone, &span_id, sql_query).await?;
             }
             Ok(SqlQueryOutcome::Completed) => {
@@ -583,12 +587,16 @@ async fn handle_sql_query(
                     .await?;
             }
             Err(err) => {
-                if err.message.eq_ignore_ascii_case("continue wait") {
-                    // Same reasoning as the disconnect above: the client is
-                    // told to come back, and that has to be recorded for the
-                    // request's running time to add up.
-                    log_continue_wait(&session_clone, &span_id, sql_query).await?;
-                } else {
+                // A `Continue wait` that reaches this arm was produced by the
+                // JS side, which already reports it: `OrchestratorApi` logs it
+                // on `ContinueWaitError` and the gateway's `handleError` logs
+                // it again, both into the sink `logLoadEvent` writes to. #10649
+                // stopped this arm reporting it as a `Cube SQL Error`; logging
+                // it as anything from here would just be a third copy. The
+                // disconnect arm has no such JS-side counterpart - the promise
+                // it was awaiting is abandoned, unreported - which is why that
+                // one does log.
+                if !err.message.eq_ignore_ascii_case("continue wait") {
                     session_clone
                         .session_manager
                         .server
