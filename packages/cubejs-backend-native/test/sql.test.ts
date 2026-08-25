@@ -435,11 +435,11 @@ describe('SQLInterface', () => {
   ])(
     'client disconnect ends the /cubesql stream gracefully, not as an error (%s)',
     async (_name, throwContinueWait) => {
-    // A client that closes the response stream before the result set has been
-    // fully written ends the attempt without delivering anything. It must not
-    // be reported as `Cube SQL Error` — that event feeds error rates and query
-    // history — and no error payload should be pushed into the stream that is
-    // already gone.
+      // A client that closes the response stream before the result set has
+      // been fully written ends the attempt without delivering anything. It
+      // must not be reported as `Cube SQL Error` — that event feeds error rates
+      // and query history — and no error payload should be pushed into the
+      // stream that is already gone.
       const loadEvents: string[] = [];
       const methods = {
         ...interfaceMethods(),
