@@ -494,12 +494,14 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       }
     });
 
-    onlyLocalTest('a failed retrieval does not reserve a pending query', async () => {
+    test('a failed retrieval does not reserve a pending query', async () => {
       const connection = await queue.queueDriver.createConnection();
       const connection2 = await queue.queueDriver.createConnection();
       const priority = 10;
-      const firstKey = 'concurrency-first' as any;
-      const secondKey = 'concurrency-second' as any;
+      const firstKey: QueryKey = 'concurrency-first';
+      const secondKey: QueryKey = 'concurrency-second';
+      const firstHash = connection.redisHash(firstKey);
+      const secondHash = connection.redisHash(secondKey);
 
       try {
         const [, firstQueueId] = await connection.addToQueue(
@@ -513,25 +515,25 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           }
         );
 
-        expect(await connection.retrieveForProcessing(firstKey, firstQueueId)).toMatchObject({
-          active: [firstKey],
+        expect(await connection.retrieveForProcessing(firstHash, firstQueueId)).toMatchObject({
+          active: [firstHash],
           queueSize: 1,
           def: { queryKey: firstKey },
         });
-        expect(await connection2.retrieveForProcessing(secondKey, secondQueueId)).toBeNull();
-        expect(await connection.getToProcessQueries()).toStrictEqual([[secondKey, secondQueueId]]);
+        expect(await connection2.retrieveForProcessing(secondHash, secondQueueId)).toBeNull();
+        expect(await connection.getToProcessQueries()).toStrictEqual([[secondHash, secondQueueId]]);
 
-        await connection.getQueryAndRemove(firstKey, firstQueueId);
+        await connection.getQueryAndRemove(firstHash, firstQueueId);
 
-        const secondRetrieval = await connection2.retrieveForProcessing(secondKey, secondQueueId);
+        const secondRetrieval = await connection2.retrieveForProcessing(secondHash, secondQueueId);
         expect(secondRetrieval).toMatchObject({
-          active: [secondKey],
+          active: [secondHash],
           queueSize: 0,
           def: { queryKey: secondKey },
         });
       } finally {
-        await connection.getQueryAndRemove(firstKey, null);
-        await connection.getQueryAndRemove(secondKey, null);
+        await connection.getQueryAndRemove(firstHash, null);
+        await connection.getQueryAndRemove(secondHash, null);
         queue.queueDriver.release(connection);
         queue.queueDriver.release(connection2);
       }
