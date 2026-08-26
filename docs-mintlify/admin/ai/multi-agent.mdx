@@ -137,7 +137,7 @@ A space or agent declared in `agents/config.yml` needs a matching record in Cube
     Add the `spaces:` and `agents:` entries to `agents/config.yml`. In dev mode the pending list reflects your branch, so you can reconcile before merging.
   </Step>
   <Step title="Open the pending configurations">
-    Cube compares the config with the records it created for that deployment, matching each entry by `name`. Entries with no record yet are listed under **Pending Configurations** on the **Agents** page and on **Agents** → **Spaces**, once you pick the deployment. The Semantic Model IDE also shows a **Reconcile agent configs** button with the pending count that links there.
+    Cube compares the config with the records already available to that deployment, matching each entry by `name`. Entries with no record yet are listed under **Pending Configurations** on the **Agents** page and on **Agents** → **Spaces**, once you pick the deployment. The Semantic Model IDE also shows a **Reconcile agent configs** button with the pending count that links there.
   </Step>
   <Step title="Create them">
     Choose the [space scope](#space-scope) and press **Create All**. Spaces are created first, then each agent is linked to the space its `space` property names.
