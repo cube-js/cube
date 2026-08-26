@@ -1,28 +1,13 @@
-import fs from 'fs';
-import path from 'path';
-
-// Read off the directory rather than listed by hand, so a dialect added later cannot
-// quietly escape the invariants below.
-const ADAPTER_DIR = path.join(__dirname, '..', '..', 'src', 'adapter');
-
-function allDialects(): [string, any][] {
-  const classes = fs.readdirSync(ADAPTER_DIR)
-    // Tests run from `dist`, so the adapter dir holds `.js`; `.ts` keeps this working if
-    // they are ever run from source.
-    .map(file => file.match(/^(\w+Query)\.(?:ts|js)$/)?.[1])
-    .filter((name): name is string => !!name && name !== 'BaseQuery')
-    // eslint-disable-next-line global-require, import/no-dynamic-require
-    .map(name => [name, require(path.join(ADAPTER_DIR, name))[name]] as [string, any]);
-
-  expect(classes.length).toBeGreaterThan(10);
-  return classes;
-}
+import { allDialects, dialect } from './allDialects';
 
 // `statements/union` is read by the SQL API when it pushes a set operation down to the
 // data source, and by nothing else, so these assertions are what stands between an edit
 // to one of these templates and a syntax error at a customer's warehouse.
 //
-// Only the templates are read here: a Query needs no compiled model to answer with them.
+// Only the templates are read here, off a bare prototype rather than a query built on a
+// compiled model. That reads the templates a dialect writes unconditionally, which every
+// `statements.union` is today; a dialect that gated one on instance state would need a
+// real query here, since `this` carries nothing.
 function unionTemplate(QueryClass: any): string | undefined {
   return QueryClass.prototype.sqlTemplates
     .call(Object.create(QueryClass.prototype))
@@ -60,17 +45,13 @@ describe('statements/union', () => {
 
   it('leaves the template undefined where a set operation cannot be expressed', () => {
     // A compound select takes no parenthesised operand in SQLite
-    // eslint-disable-next-line global-require, import/no-dynamic-require
-    const { SqliteQuery } = require(path.join(ADAPTER_DIR, 'SqliteQuery'));
-    expect(unionTemplate(SqliteQuery)).toBeUndefined();
+    expect(unionTemplate(dialect('SqliteQuery'))).toBeUndefined();
   });
 
   it('names the mode of the operation where the dialect requires it', () => {
     // GoogleSQL and ClickHouse both reject a bare UNION
     for (const name of ['BigqueryQuery', 'ClickHouseQuery']) {
-      // eslint-disable-next-line global-require, import/no-dynamic-require
-      const QueryClass = require(path.join(ADAPTER_DIR, name))[name];
-      expect(unionTemplate(QueryClass)).toContain('{% if distinct %}DISTINCT{% else %}ALL{% endif %}');
+      expect(unionTemplate(dialect(name))).toContain('{% if distinct %}DISTINCT{% else %}ALL{% endif %}');
     }
   });
 
@@ -82,9 +63,7 @@ describe('statements/union', () => {
       ['MssqlQuery', 'SELECT TOP {{ limit }} * FROM ('],
     ];
     for (const [name, clause] of clauses) {
-      // eslint-disable-next-line global-require, import/no-dynamic-require
-      const QueryClass = require(path.join(ADAPTER_DIR, name))[name];
-      expect(unionTemplate(QueryClass)).toContain(clause);
+      expect(unionTemplate(dialect(name))).toContain(clause);
     }
   });
 });
