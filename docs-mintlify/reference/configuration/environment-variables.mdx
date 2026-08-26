@@ -184,6 +184,20 @@ The port of the Cube Store deployment.
 | ------------------- | ---------------------- | --------------------- |
 | A valid port number | `3030`                 | `3030`                |
 
+## `CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE`
+
+The maximum size of a single message Cube will send to or accept from Cube
+Store. A result above this size is reported as `Cube Store response size
+exceeds the maximum message size`; see
+[message size limits](/docs/pre-aggregations/cube-store-architecture#message-size-limits).
+This is Cube's own limit and is independent of
+[`CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE`](#cubestore_transport_max_message_size),
+which Cube Store applies to what it receives.
+
+| Possible Values      | Default in Development | Default in Production |
+| -------------------- | ---------------------- | --------------------- |
+| A size in bytes      | `104857600` (100 MB)   | `104857600` (100 MB)  |
+
 ## `CUBEJS_QUEUE_FAST_TRACK`
 
 <Warning>
@@ -2149,7 +2163,7 @@ If `true`, then sends telemetry to Cube.
 ## `CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE`
 
 The maximum size of a single message on the WebSocket connection between Cube
-and Cube Store. Messages above this size close the connection; see
+and Cube Store. Messages above this size are answered with an error; see
 [message size limits](/docs/pre-aggregations/cube-store-architecture#message-size-limits).
 
 | Possible Values | Default in Development | Default in Production |

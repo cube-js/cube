@@ -1901,6 +1901,19 @@ const variables: Record<string, (...args: any) => any> = {
   cubeStoreNoHeartBeatTimeout: () => get('CUBEJS_CUBESTORE_NO_HEART_BEAT_TIMEOUT')
     .default('30')
     .asInt(),
+  /**
+   * Maximum size in bytes of a single message exchanged with Cube Store, both
+   * of a query sent to it and of a response received from it.
+   *
+   * It is the only limit that applies to responses, since Cube Store doesn't
+   * cap what it sends. For queries it is independent of, and by default looser
+   * than, CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE (64 MB), which is what Cube
+   * Store itself accepts: a query over that but under this one is refused by
+   * Cube Store rather than by this limit.
+   */
+  cubeStoreMaxMessageSize: () => get('CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE')
+    .default(String(100 * 1024 * 1024))
+    .asIntPositive(),
   cubeStoreRollingWindowJoin: () => get('CUBEJS_CUBESTORE_ROLLING_WINDOW_JOIN')
     .default('true')
     .asBoolStrict(),

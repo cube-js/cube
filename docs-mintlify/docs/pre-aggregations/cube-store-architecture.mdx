@@ -1018,13 +1018,26 @@ A cache entry at or above `CUBESTORE_CACHE_MAX_ENTRY_SIZE` is rejected explicitl
 with `Unable to SET cache with '<key>' key, exceeds maximum allowed size for
 payload: <size>, max allowed: <limit>`.
 
-<Warning>
+A message above the *transport* limit is answered with an error naming the
+size and the limit, and the connection stays up for the other queries
+multiplexed over it:
 
-**Known limitation.** A message above the *transport* limit is not answered
-with an error. The deployment then reports `ConnectionError: CubeStore connection error:
-write EPIPE`.
+```
+Request of 70000000 bytes exceeds the maximum message size of 67108864 bytes.
+Reduce the size of the query, e.g. by sending fewer or smaller inline tables,
+or raise CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE.
+```
 
-</Warning>
+That holds up to twice whichever of the two transport limits above is lower.
+A message beyond it is refused before it can be attributed to a query, so the
+connection is closed instead and the other queries multiplexed over it are
+re-sent on a new one. The close names the limit that refused it, so it says
+which of the two to raise.
+
+A result too large for Cube's own limit is reported the same way, as
+`Cube Store response size exceeds the maximum message size of 100 MB`. That
+limit is [`CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE`](/reference/configuration/environment-variables#cubejs_cubestore_max_message_size),
+which is independent of the Cube Store side and defaults to 100 MB.
 
 If a query hits this limit, reduce the size of its result set — add filters
 or a lower `limit`, drop dimensions, or split it into several queries.
