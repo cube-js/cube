@@ -996,6 +996,52 @@ Because detection is timestamp-based and cancellation is idempotent, it
 does not matter which instance notices first: recovery works even if the
 failed node never comes back.
 
+### Message size limits
+
+Cube talks to the cache and queue store over a single WebSocket connection
+per node, and every cache entry, queue payload, and query result crosses it
+as one message. That transport has a hard ceiling:
+
+| Limit | Environment variable | Default | Allowed range |
+|---|---|---|---|
+| Transport message size | `CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE` | 64 MiB | 16 MiB — 256 MiB |
+| Transport frame size | `CUBESTORE_TRANSPORT_MAX_FRAME_SIZE` | 64 MiB | 4 MiB — 256 MiB |
+| Single cache entry | `CUBESTORE_CACHE_MAX_ENTRY_SIZE` | 63 MiB | up to transport message size − 1 MiB |
+
+Query results are the usual reason these limits are reached. A result is
+handed to the queue store so that every API instance waiting on that query
+can pick it up, and it is written to the cache under its cache key — so a
+result set larger than the transport limit cannot be delivered at all,
+however fast the query that produced it was.
+
+A cache entry above `CUBESTORE_CACHE_MAX_ENTRY_SIZE` is rejected explicitly,
+with `Unable to SET cache with '<key>' key, exceeds maximum allowed size for
+payload: <size>, max allowed: <limit>`.
+
+<Warning>
+
+**Known limitation.** A message above the *transport* limit is not answered
+with an error. Cube Store logs `Websocket error: Capacity(MessageTooLong {
+size: ..., max_size: ... })` and closes the connection. The driver treats
+that as Cube Store having gone away and, on reconnect, resends everything
+that was still in flight — including the oversized message, which
+immediately kills the new connection too.
+
+The deployment then reports `ConnectionError: CubeStore connection error:
+write EPIPE` every few seconds for as long as the loop runs. Because all
+queries on a node share one connection, *unrelated* queries fail alongside
+the oversized one, so the same query can appear to succeed and fail seconds
+apart.
+
+</Warning>
+
+If a query hits this limit, reduce the size of its result set — add filters
+or a lower `limit`, drop dimensions, or split it into several queries. If it
+is a full-table extract, load it from your data source directly instead of
+through Cube's cache. Self-hosted deployments can also raise
+`CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE` up to 256 MiB, but that only moves the
+ceiling — a result set that grows past the new value brings the failure back.
+
 ### Why it lives in Cube Store
 
 Folding the cache and queue into Cube Store is itself a design decision in
