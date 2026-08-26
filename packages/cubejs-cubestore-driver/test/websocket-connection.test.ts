@@ -415,6 +415,29 @@ describe('WebSocketConnection', () => {
         'Cube Store closed the connection: Message too big. Reduce the size of the query'
       );
     }, JEST_TIMEOUT);
+
+    it('does not send the user to the message limit when the frame limit refused it', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      // What Cube Store closes with when CUBESTORE_TRANSPORT_MAX_FRAME_SIZE is
+      // configured below the message limit and is the one that fired.
+      server.handler = (message, mockConnection) => {
+        mockConnection.ws.close(
+          1009,
+          'Message of 9437184 bytes exceeds the maximum frame size of 4194304 bytes'
+        );
+      };
+
+      const promise = query('SELECT 1');
+
+      await expect(promise).rejects.toThrow(
+        'Cube Store closed the connection: ' +
+        'Message of 9437184 bytes exceeds the maximum frame size of 4194304 bytes. ' +
+        'Reduce the size of the query and of the inline tables it sends, or raise ' +
+        'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE or CUBESTORE_TRANSPORT_MAX_FRAME_SIZE ' +
+        'on the Cube Store side.'
+      );
+    }, JEST_TIMEOUT);
   });
 
   it('rejects a query when the connection cannot be re-established', async () => {
