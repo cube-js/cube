@@ -187,18 +187,22 @@ export class WebSocketConnection {
           }
           webSocket.lastHeartBeat = new Date();
         });
-        webSocket.on('close', (code: number) => {
+        webSocket.on('close', (code: number, reason: Buffer) => {
           clearInterval(pingInterval);
 
           const pending = Object.keys(webSocket.sentMessages);
 
           if (pending.length) {
+            // Cube Store names the size and the limit in the close reason. A
+            // peer that closes with 1009 and no reason -- an intermediary, or
+            // an older Cube Store -- leaves only the generic wording.
+            const closeReason = reason?.length ? `${reason}. ` : '';
             const fatalError = webSocket.fatalError || (
               // Cube Store refused a message that didn't fit into its limits.
               code === MESSAGE_TOO_BIG_CLOSE_CODE ? new MessageTooLargeError(
-                'Cube Store closed the connection: message size exceeds the maximum message size Cube Store accepts. ' +
-                'Reduce the size of the query and of the inline tables it sends, or raise ' +
-                'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE on the Cube Store side.'
+                `Cube Store closed the connection: message size exceeds the maximum message size Cube Store accepts. ${closeReason}`
+                + 'Reduce the size of the query and of the inline tables it sends, or raise '
+                + 'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE on the Cube Store side.'
               ) : null
             );
 

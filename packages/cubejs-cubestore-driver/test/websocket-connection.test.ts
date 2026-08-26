@@ -357,20 +357,45 @@ describe('WebSocketConnection', () => {
       connection = new WebSocketConnection(server.url);
 
       server.handler = (message, mockConnection) => {
-        // How Cube Store rejects a message that doesn't fit into its limits.
-        mockConnection.ws.close(1009, 'Message too big');
+        // How Cube Store rejects a message that doesn't fit into its limits,
+        // naming the size and the limit in the close reason.
+        mockConnection.ws.close(
+          1009,
+          'Message of 16452 bytes exceeds the maximum message size of 4096 bytes'
+        );
       };
 
       const promise = query('SELECT 1');
 
       await expect(promise).rejects.toThrow(MessageTooLargeError);
       await expect(promise).rejects.toThrow(
-        'Cube Store closed the connection: message size exceeds the maximum message size Cube Store accepts'
+        'Cube Store closed the connection: message size exceeds the maximum message size Cube Store accepts. ' +
+        'Message of 16452 bytes exceeds the maximum message size of 4096 bytes. ' +
+        'Reduce the size of the query and of the inline tables it sends, or raise ' +
+        'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE on the Cube Store side.'
       );
 
       // Re-sent once before the size is reported, same as an over-limit
       // response: one 1009 close is indistinguishable from a restart.
       expect(server.received).toHaveLength(2);
+    }, JEST_TIMEOUT);
+
+    it('falls back to the generic wording when 1009 carries no reason', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      // An intermediary, or a Cube Store from before it sent a reason.
+      server.handler = (message, mockConnection) => {
+        mockConnection.ws.close(1009);
+      };
+
+      const promise = query('SELECT 1');
+
+      await expect(promise).rejects.toThrow(MessageTooLargeError);
+      await expect(promise).rejects.toThrow(
+        'Cube Store closed the connection: message size exceeds the maximum message size Cube Store accepts. ' +
+        'Reduce the size of the query and of the inline tables it sends, or raise ' +
+        'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE on the Cube Store side.'
+      );
     }, JEST_TIMEOUT);
   });
 
