@@ -288,7 +288,8 @@ straightforward.
 The one exception is a metric whose parts live in different cubes, so there is
 no single cube it could belong to. A view can define its own
 [measures][ref-view-measures] and [dimensions][ref-view-dimensions] as long as
-their `sql` only combines members the view already includes:
+their `sql` only combines members the view already includes — a member that
+reads a column instead is rejected at compile time.
 
 <CodeGroup>
 
@@ -306,6 +307,7 @@ views:
     measures:
       - name: average_line_value
         type: number
+        multi_stage: true
         sql: "{CUBE.total_amount} / NULLIF({CUBE.count}, 0)"
 ```
 
@@ -325,6 +327,7 @@ view(`orders_overview`, {
   measures: {
     average_line_value: {
       type: `number`,
+      multi_stage: true,
       sql: `${CUBE.total_amount} / NULLIF(${CUBE.count}, 0)`
     }
   }
@@ -333,9 +336,11 @@ view(`orders_overview`, {
 
 </CodeGroup>
 
-A view member that reads a column instead of a member is rejected at compile
-time — that logic belongs in a cube. If the referenced measures come from cubes
-that don't join to each other, see [multi-fact views][ref-multi-fact-views].
+[`multi_stage`][ref-multi-stage] matters whenever the parts come from different
+cubes: it aggregates each of them before combining, instead of evaluating the
+expression inside one joined scan where a `one_to_many` join would inflate the
+numerator. If the cubes don't join to each other at all, see [multi-fact
+views][ref-multi-fact-views].
 
 ### Control visibility
 
@@ -506,6 +511,7 @@ parameters.
 [ref-view-public]: /reference/data-modeling/view#public
 [ref-view-measures]: /reference/data-modeling/view#measures
 [ref-view-dimensions]: /reference/data-modeling/view#dimensions
+[ref-multi-stage]: /reference/data-modeling/measures#multi_stage
 [ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
 [ref-view-folders]: /reference/data-modeling/view#folders
 [ref-access-policies]: /reference/data-modeling/data-access-policies

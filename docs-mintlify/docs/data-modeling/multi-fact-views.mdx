@@ -315,7 +315,8 @@ single metric derived from both, such as revenue per order where revenue and
 order count come from different fact tables. Neither cube can define it, because
 neither can reference the other's measures.
 
-Define it on the view instead, and mark it [`multi_stage`][ref-multi-stage]:
+Define it as a [measure of the view][ref-view-measures] instead, and mark it
+[`multi_stage`][ref-multi-stage]:
 
 <CodeGroup>
 

@@ -592,6 +592,7 @@ views:
     measures:
       - name: average_line_value
         type: number
+        multi_stage: true
         sql: "{CUBE.total_amount} / NULLIF({CUBE.count}, 0)"
 ```
 
@@ -611,6 +612,7 @@ view(`orders_overview`, {
   measures: {
     average_line_value: {
       type: `number`,
+      multi_stage: true,
       sql: `${CUBE.total_amount} / NULLIF(${CUBE.count}, 0)`
     }
   }
@@ -624,9 +626,19 @@ member — is rejected at compile time with `View 'orders_overview' defines own
 member 'orders_overview.average_line_value'`. Move that definition to a cube and
 include it instead.
 
-When the referenced measures come from cubes that don't join to each other, mark
-the view measure [`multi_stage`][ref-ref-multi-stage] so it is evaluated after
-each fact has been aggregated. See [multi-fact views][ref-multi-fact-views].
+Mark a measure that combines members of **different cubes**
+[`multi_stage`][ref-ref-multi-stage], as above. Without it the expression is
+evaluated inside a single joined scan, which is only correct when nothing in it
+is affected by the join:
+
+- Across cubes joined `one_to_many`, an aggregate on the one side is taken over
+  the rows the join multiplied, so the result is silently inflated.
+- Across cubes that don't join to each other at all, there is no single join
+  tree to evaluate it in and the query fails with `Can't find join path to
+  join …`. See [multi-fact views][ref-multi-fact-views].
+
+`multi_stage` defers the expression until each referenced measure has been
+aggregated on its own, so neither happens.
 
 ### `dimensions`
 

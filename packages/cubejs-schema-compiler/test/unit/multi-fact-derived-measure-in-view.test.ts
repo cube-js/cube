@@ -151,14 +151,14 @@ views:
         includes:
           - region
     measures:
-      # References inside a view measure are resolved against the view, so they
-      # have to be written as \`{view.member}\`; a bare \`{member}\` does not
-      # resolve. \`multi_stage\` is what lets the ratio be evaluated after both
-      # facts have been aggregated - see the tests below.
+      # References inside a view measure are resolved against the view, so both
+      # \`{CUBE.member}\` and \`{view_name.member}\` work - one of each below - while
+      # a bare \`{member}\` does not resolve at all. \`multi_stage\` is what lets the
+      # ratio be evaluated after both facts have been aggregated.
       - name: aov_basket
         type: number
         multi_stage: true
-        sql: "{retail_analysis.sales_amount} / NULLIF({retail_analysis.transactions_without_returns}, 0)"
+        sql: "{CUBE.sales_amount} / NULLIF({CUBE.transactions_without_returns}, 0)"
       # Same expression without \`multi_stage\`, kept to pin what happens when
       # the ratio is planned as an ordinary calculated measure.
       - name: aov_basket_single_stage
@@ -166,10 +166,14 @@ views:
         sql: "{retail_analysis.sales_amount} / NULLIF({retail_analysis.transactions_without_returns}, 0)"
 `;
 
-const buildSql = async (query: any, useNativeSqlPlanner: boolean = true) => {
-  const compilers = prepareYamlCompiler(model);
-  await compilers.compiler.compile();
+let compilers: any;
 
+beforeAll(async () => {
+  compilers = prepareYamlCompiler(model);
+  await compilers.compiler.compile();
+});
+
+const buildSql = (query: any, useNativeSqlPlanner: boolean = true) => {
   const [sql] = new PostgresQuery(compilers, {
     timezone: 'UTC',
     useNativeSqlPlanner,
@@ -182,16 +186,18 @@ const buildSql = async (query: any, useNativeSqlPlanner: boolean = true) => {
 // Both facts, aggregated on their own before anything is combined.
 const SALES_AMOUNT_AGGREGATE = /sum\("item_location_sales"\.sales_amount\)/;
 const TRANSACTIONS_AGGREGATE = /COUNT\(DISTINCT CASE WHEN .* THEN "sales_line_item"\.transaction_id END\)/;
-// The ratio, taken over the two aggregates once they are lined up on the
-// query's dimensions.
+// The ratio, taken over the two per-fact aggregate columns once they are lined
+// up on the query's dimensions. The subquery aliases the planner puts in front
+// of those columns are deliberately not pinned - only that the numerator and
+// denominator are the aggregated columns, in that order.
 const RATIO_OVER_AGGREGATES =
-  /"q_0"\."item_location_sales__sales_amount" \/ NULLIF\("q_1"\."sales_line_item__transactions_without_returns", 0\)/;
+  /"item_location_sales__sales_amount" \/ NULLIF\("[^"]+"\."sales_line_item__transactions_without_returns", 0\)/;
 
 // Multi-fact queries are planned by Tesseract only, so everything that is
 // expected to produce SQL runs against the native planner.
 describe('Multi-fact derived measure defined on a view', () => {
   it('aggregates each fact cube separately when the components are queried side by side', async () => {
-    const sql = await buildSql({
+    const sql = buildSql({
       measures: [
         'retail_analysis.sales_amount',
         'retail_analysis.transactions_without_returns',
@@ -211,7 +217,7 @@ describe('Multi-fact derived measure defined on a view', () => {
   });
 
   it('divides the two facts once both have been aggregated to the query grain', async () => {
-    const sql = await buildSql({
+    const sql = buildSql({
       measures: ['retail_analysis.aov_basket'],
       dimensions: ['retail_analysis.region'],
     });
@@ -224,7 +230,7 @@ describe('Multi-fact derived measure defined on a view', () => {
   });
 
   it('divides the two facts on the shared date spine', async () => {
-    const sql = await buildSql({
+    const sql = buildSql({
       measures: ['retail_analysis.aov_basket'],
       timeDimensions: [{ dimension: 'retail_analysis.date', granularity: 'day' }],
     });
@@ -235,7 +241,7 @@ describe('Multi-fact derived measure defined on a view', () => {
   });
 
   it('returns the ratio next to its components', async () => {
-    const sql = await buildSql({
+    const sql = buildSql({
       measures: [
         'retail_analysis.sales_amount',
         'retail_analysis.transactions_without_returns',
@@ -250,7 +256,7 @@ describe('Multi-fact derived measure defined on a view', () => {
   });
 
   it('filters the ratio by a dimension shared between the facts', async () => {
-    const sql = await buildSql({
+    const sql = buildSql({
       measures: ['retail_analysis.aov_basket'],
       dimensions: ['retail_analysis.region'],
       filters: [{
@@ -270,37 +276,153 @@ describe('Multi-fact derived measure defined on a view', () => {
   // ordinary calculated measure, so the planner looks for a single join tree
   // covering both fact cubes and there is none - the two facts only meet
   // through the shared dimensions.
-  it('cannot plan the ratio when the view measure is not multi_stage', async () => {
-    await expect(buildSql({
+  it('cannot plan the ratio when the view measure is not multi_stage', () => {
+    expect(() => buildSql({
       measures: ['retail_analysis.aov_basket_single_stage'],
       dimensions: ['retail_analysis.region'],
-    })).rejects.toThrow(/Can't find join path to join .*item_location_sales.*sales_line_item/);
+    })).toThrow(/Can't find join path to join .*item_location_sales.*sales_line_item/);
   });
 
   // Current behaviour, pinned. A segment is the other place cube-owned filter
   // logic could be written once and reused; it does not survive the multi-fact
   // split, so shared filter logic has to live in the measure's own `filters:`
   // (which does travel - see the first test).
-  it('cannot plan a multi-fact query that carries a segment', async () => {
-    await expect(buildSql({
+  it('cannot plan a multi-fact query that carries a segment', () => {
+    expect(() => buildSql({
       measures: ['retail_analysis.aov_basket'],
       dimensions: ['retail_analysis.region'],
       segments: ['retail_analysis.net_sale_transactions'],
-    })).rejects.toThrow(/Can't find join path to join/);
+    })).toThrow(/Can't find join path to join/);
+  });
 
-    // The same segment is fine as long as only its own cube is queried.
-    const sql = await buildSql({
+  it('applies the segment when only its own fact is queried', () => {
+    const sql = buildSql({
       measures: ['retail_analysis.transactions_without_returns'],
       dimensions: ['retail_analysis.region'],
       segments: ['retail_analysis.net_sale_transactions'],
     });
+
     expect(sql).toContain('"sales_line_item".transaction_type NOT IN (\'RETURN\', \'EXCHANGE\')');
   });
 
-  it('is not planned by the legacy planner', async () => {
-    await expect(buildSql({
+  it('is not planned by the legacy planner', () => {
+    expect(() => buildSql({
       measures: ['retail_analysis.aov_basket'],
       dimensions: ['retail_analysis.region'],
-    }, false)).rejects.toThrow(/Can't find join path to join/);
+    }, false)).toThrow(/Can't find join path to join/);
+  });
+
+  // The reference forms a view measure accepts. `{CUBE.member}` and
+  // `{view_name.member}` are both in the model above; a bare `{member}` is
+  // rejected while the view is compiled, so it needs a model of its own.
+  it('rejects a bare member reference in a view measure', async () => {
+    const bareRef = model.replace(
+      '{CUBE.sales_amount} / NULLIF({CUBE.transactions_without_returns}, 0)',
+      '{sales_amount} / NULLIF({transactions_without_returns}, 0)'
+    );
+
+    await expect(prepareYamlCompiler(bareRef).compiler.compile())
+      .rejects.toThrow(/sales_amount is not defined/);
+  });
+});
+
+// The other reason a view measure spanning cubes wants `multi_stage`: even when
+// the cubes DO join, a plain calculated measure is evaluated inside the single
+// joined scan, so a `sum` on the one side is taken over rows the join has
+// multiplied. `multi_stage` aggregates each side first, then divides.
+describe('Derived view measure over a fanned-out join', () => {
+  const fanOutModel = `
+cubes:
+  - name: orders
+    sql: >
+      SELECT 1 AS id, 100 AS amount, 'NYC' AS city UNION ALL
+      SELECT 2 AS id, 200 AS amount, 'NYC' AS city
+    joins:
+      - name: line_items
+        sql: "{CUBE}.id = {line_items}.order_id"
+        relationship: one_to_many
+    dimensions:
+      - name: id
+        sql: "{CUBE}.id"
+        type: number
+        primary_key: true
+      - name: city
+        sql: "{CUBE}.city"
+        type: string
+    measures:
+      - name: total_amount
+        sql: "{CUBE}.amount"
+        type: sum
+
+  - name: line_items
+    sql: >
+      SELECT 10 AS id, 1 AS order_id UNION ALL
+      SELECT 11 AS id, 1 AS order_id UNION ALL
+      SELECT 12 AS id, 2 AS order_id
+    dimensions:
+      - name: id
+        sql: "{CUBE}.id"
+        type: number
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+
+views:
+  - name: orders_overview
+    cubes:
+      - join_path: orders
+        includes:
+          - total_amount
+          - city
+      - join_path: orders.line_items
+        includes:
+          - count
+
+    measures:
+      - name: average_line_value
+        type: number
+        sql: "{CUBE.total_amount} / NULLIF({CUBE.count}, 0)"
+      - name: average_line_value_multi_stage
+        type: number
+        multi_stage: true
+        sql: "{CUBE.total_amount} / NULLIF({CUBE.count}, 0)"
+`;
+
+  let fanOutCompilers: any;
+
+  beforeAll(async () => {
+    fanOutCompilers = prepareYamlCompiler(fanOutModel);
+    await fanOutCompilers.compiler.compile();
+  });
+
+  const buildFanOutSql = (measure: string) => {
+    const [sql] = new PostgresQuery(fanOutCompilers, {
+      timezone: 'UTC',
+      useNativeSqlPlanner: true,
+      measures: [measure],
+      dimensions: ['orders_overview.city'],
+    }).buildSqlAndParams();
+
+    return sql;
+  };
+
+  // Current behaviour, pinned: `sum` runs over the multiplied rows of the join,
+  // so the numerator is larger than the same measure queried on its own.
+  it('inlines a plain calculated measure into the multiplied join', () => {
+    const sql = buildFanOutSql('orders_overview.average_line_value');
+
+    expect(sql).toMatch(/sum\("orders"\.amount\) \/ NULLIF\(count\("line_items"\.id\), 0\)/);
+    expect(sql).toContain('"orders".id = "line_items".order_id');
+  });
+
+  it('aggregates each side before dividing when the measure is multi_stage', () => {
+    const sql = buildFanOutSql('orders_overview.average_line_value_multi_stage');
+
+    // `sum` is taken in a leg that never joins line_items, so nothing multiplies it.
+    expect(sql).toMatch(/sum\("orders"\.amount\) "orders__total_amount"[\s\S]*?GROUP BY 1/);
+    expect(sql).not.toMatch(/sum\("orders"\.amount\) \/ NULLIF/);
+    // The division happens over the two aggregated columns.
+    expect(sql).toMatch(/"orders__total_amount" \/ NULLIF\("[^"]+"\."line_items__count", 0\)/);
   });
 });
