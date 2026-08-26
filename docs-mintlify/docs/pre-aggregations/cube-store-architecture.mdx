@@ -998,9 +998,9 @@ failed node never comes back.
 
 ### Message size limits
 
-Cube talks to the cache and queue store over a single WebSocket connection
-per node, and every cache entry, queue payload, and query result crosses it
-as one message. That transport has a hard ceiling:
+Cube talks to the cache and queue store over a WebSocket connection, and
+every cache entry, queue payload, and query result crosses it as one
+message. That transport has a hard ceiling:
 
 | Limit | Environment variable | Default | Allowed range |
 |---|---|---|---|
