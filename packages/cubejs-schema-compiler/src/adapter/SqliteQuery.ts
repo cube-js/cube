@@ -85,6 +85,9 @@ export class SqliteQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     delete templates.functions.WIDTH_BUCKET;
+    // A compound select takes no parenthesised operands in SQLite, so the SQL API leaves
+    // set operations to post processing here rather than pushing them down.
+    delete templates.statements.union;
     return templates;
   }
 }
