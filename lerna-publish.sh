@@ -8,17 +8,36 @@ if [ "x$BUMP" == "x" ]; then
   BUMP=patch
 fi
 
-# Step 4 cleans up with `git restore --staged --worktree .`, which discards both
-# staged and unstaged changes to tracked files. Refuse to start if the tree
-# already carries any, so that cleanup can only ever undo what this script did.
+# Cleanup below discards staged as well as unstaged changes to tracked files.
+# Refuse to start if the tree already carries any, so that cleanup can only ever
+# undo what this script itself did. This gate runs before the trap is installed,
+# so a tree it rejects is never touched.
 # Untracked files are deliberately not checked: `git restore` cannot touch them,
 # and build output that no .gitignore covers must not block a release.
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   echo "Error: working tree has uncommitted changes to tracked files."
-  echo "Commit or stash them before releasing - step 4 cleanup would discard them."
+  echo "Commit or stash them before releasing - cleanup would discard them."
+  echo "If this is leftover state from a failed release run, discard it with:"
+  echo "  git restore --staged --worktree ."
   GIT_PAGER=cat git status --short --untracked-files=no
   exit 1
 fi
+
+# `set -e` aborts the script before the bump is undone if step 1 or step 2 fails,
+# so clean up from an EXIT trap rather than inline: otherwise a failed run leaves
+# behind the bumped, partly staged tree that trips lerna's working tree
+# validation on the next run. lerna also writes a CHANGELOG.md for any package
+# that lacks one, and a newly created one is untracked, so `git restore` alone
+# would leave it behind - the pathspecs below match the workspace globs
+# ("workspaces" in package.json) and nothing else in the tree.
+cleanup_bump() {
+  status=$?
+  echo "Cleaning up temporary version bump..."
+  git restore --staged --worktree . || true
+  git clean -fdq -- 'packages/*/CHANGELOG.md' 'rust/*/CHANGELOG.md' || true
+  exit $status
+}
+trap cleanup_bump EXIT
 
 echo "Step 1: bumping versions (no commit/push)..."
 yarn lerna version $BUMP \
@@ -38,18 +57,13 @@ if git status --porcelain | grep -q '^ M yarn.lock'; then
   echo "If you see any new entries in yarn.lock with @cubejs-*/* packages - probably not all packages versions were updated."
   GIT_PAGER=cat git diff yarn.lock
 
-  echo "Step 4: cleaning up temporary version bump..."
-  git restore --staged --worktree .
-  git clean -fdq -- '*CHANGELOG.md'
-
   exit 1
 fi
 
-echo "Step 4: cleaning up temporary version bump..."
-git restore --staged --worktree .
-git clean -fdq -- '*CHANGELOG.md'
+# The version commit, tag and release are meant to survive, so stop cleaning up.
+trap - EXIT
 
-echo "Step 5: commit, tag and push version..."
+echo "Step 4: commit, tag and push version..."
 yarn lerna version $BUMP \
   --conventional-commits \
   --force-publish \
