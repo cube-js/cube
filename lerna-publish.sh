@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-. .gh-token
-
 usage() {
   echo "Usage: $0 [bump] [-y|--yes]"
   echo
@@ -34,6 +32,11 @@ if [ ${#CONFIRM[@]} -eq 0 ] && [ ! -t 0 ]; then
   echo "cannot be answered. Re-run with --yes to release unattended."
   exit 1
 fi
+
+# GH_TOKEN, for the release step's --create-release=github. Sourced after the
+# argument checks so that --help works on a checkout that has no .gh-token yet
+# - the file is gitignored, so a fresh clone never has one.
+. .gh-token
 
 # Cleanup below discards staged as well as unstaged changes to tracked files.
 # Refuse to start if the tree already carries any, so that cleanup can only ever
