@@ -12,7 +12,7 @@ Multi-agent is useful when:
 - You need to isolate context (rules, certified queries, memories) between user groups.
 
 <Info>
-  `agents/config.yml` is the source of truth for spaces and agents: you declare them in YAML and Cube creates them for you when you [reconcile](#reconciliation). Neither spaces nor agents can be created in the UI, and their settings are read-only there. Cube links every record it creates to the entry it came from, and matches them by that entry's `name`.
+  `agents/config.yml` is the source of truth for spaces and agents: declaring them there and [reconciling](#reconciliation) is the only supported way to create either. Agents can't be created in the UI, and their settings are read-only there. Cube links every record it creates to the entry it came from, and matches them by that entry's `name`.
 </Info>
 
 ## Architecture
