@@ -204,19 +204,21 @@ export class WebSocketConnection {
 
             // The connection multiplexes messages and an oversized one can't be
             // attributed -- `ws` drops the frame before its message id is read
-            // -- so a message that was alone in flight is the one at fault.
-            // Anything else gets one more round, which answers the innocent
-            // messages and usually leaves the offender alone to be named next
-            // time. Whatever is still in flight after that round is failed
-            // regardless: an offender whose response keeps arriving before the
-            // other answers would otherwise be re-sent forever.
+            // -- so every message in flight gets one more round, which answers
+            // the innocent ones and usually leaves the offender alone to be
+            // named next time. That includes a message that was alone in
+            // flight: the close can just as well be an ordinary disconnect,
+            // and re-sending is what recovers it. Whatever is still in flight
+            // after that round is failed regardless: an offender whose
+            // response keeps arriving before the other answers would otherwise
+            // be re-sent forever.
             if (fatalError) {
               // eslint-disable-next-line no-restricted-syntax
               for (const key of pending) {
                 const sentMessage = webSocket.sentMessages[key];
                 sentMessage.fatalRounds += 1;
 
-                if (pending.length === 1 || sentMessage.fatalRounds > 1) {
+                if (sentMessage.fatalRounds > 1) {
                   delete webSocket.sentMessages[key];
                   sentMessage.reject(fatalError);
                 }

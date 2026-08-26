@@ -179,7 +179,7 @@ describe('WebSocketConnection', () => {
       delete process.env.CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE;
     });
 
-    it('reports a response that is over the limit instead of retrying it', async () => {
+    it('reports a response that is over the limit once its extra round is spent', async () => {
       connection = new WebSocketConnection(server.url);
 
       server.handler = (message, mockConnection) => {
@@ -195,8 +195,10 @@ describe('WebSocketConnection', () => {
         'or raise CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE.'
       );
 
-      // Re-running the query would only produce the same oversized response.
-      expect(server.received).toHaveLength(1);
+      // Re-sent once, since a fatal close on a sole in-flight query can just as
+      // well be an ordinary disconnect. The second oversized response spends
+      // its extra round and the size is reported rather than retried again.
+      expect(server.received).toHaveLength(2);
     }, JEST_TIMEOUT);
 
     it('resends the other queries in flight and attributes the limit to the offender', async () => {
@@ -351,7 +353,7 @@ describe('WebSocketConnection', () => {
       expect(server.connections).toHaveLength(0);
     }, JEST_TIMEOUT);
 
-    it('reports a request Cube Store refused as too big instead of retrying it', async () => {
+    it('reports a request Cube Store refused as too big once its extra round is spent', async () => {
       connection = new WebSocketConnection(server.url);
 
       server.handler = (message, mockConnection) => {
@@ -366,7 +368,9 @@ describe('WebSocketConnection', () => {
         'Cube Store closed the connection: message size exceeds the maximum message size Cube Store accepts'
       );
 
-      expect(server.received).toHaveLength(1);
+      // Re-sent once before the size is reported, same as an over-limit
+      // response: one 1009 close is indistinguishable from a restart.
+      expect(server.received).toHaveLength(2);
     }, JEST_TIMEOUT);
   });
 
