@@ -181,3 +181,63 @@ async fn test_numeric_math_scalar() {
             .unwrap()
     );
 }
+
+/// Reproduces https://github.com/cube-js/cube/issues/11653
+///
+/// `CaseExpr::return_type` in the DataFusion fork resolves to the type of the first
+/// non-NULL THEN branch, but `case_when_no_expr` (the `CASE WHEN cond THEN ...` form)
+/// passes every later THEN branch to `if_then_else` without casting it to that type -
+/// unlike `case_when_with_expr` (the `CASE expr WHEN value THEN ...` form), which does
+/// cast. Nothing coerces the branches at planning time either, so a CASE whose THEN
+/// branches have different types panics at execution with
+/// `true_values downcast failed to array::Int64Array`, which tears down the whole
+/// Postgres connection instead of surfacing a SQL error.
+///
+/// Ignored until the fork coerces THEN branches to the CASE return type.
+#[tokio::test]
+#[ignore]
+async fn test_case_with_heterogeneous_then_types() {
+    init_testing_logger();
+
+    // language=PostgreSQL
+    let query = r#"
+        SELECT
+            CASE
+                WHEN i > 1 THEN 0
+                WHEN i > 0 THEN i
+            END AS c
+        FROM (SELECT 1::int4 AS i) AS t
+        "#;
+
+    let result = execute_query(query.to_string(), DatabaseProtocol::PostgreSQL)
+        .await
+        .unwrap();
+
+    assert!(result.contains("1"), "unexpected result: {}", result);
+}
+
+/// Reproduces https://github.com/cube-js/cube/issues/11653 with the shape a BI tool's
+/// ODBC/JDBC driver emits while discovering columns: a CASE over `pg_catalog` mixing an
+/// integer literal (Int64) with an OID column (UInt32) across its THEN branches.
+///
+/// Ignored until the fork coerces THEN branches to the CASE return type.
+#[tokio::test]
+#[ignore]
+async fn test_case_with_heterogeneous_then_types_pg_catalog() {
+    init_testing_logger();
+
+    // language=PostgreSQL
+    let query = r#"
+        SELECT
+            CASE
+                WHEN t.typtype = 'd' THEN 0
+                WHEN t.typtype = 'b' THEN t.typbasetype
+                ELSE 0
+            END AS base
+        FROM pg_catalog.pg_type t
+        "#;
+
+    execute_query(query.to_string(), DatabaseProtocol::PostgreSQL)
+        .await
+        .unwrap();
+}
