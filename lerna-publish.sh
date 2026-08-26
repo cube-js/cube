@@ -30,14 +30,18 @@ fi
 # that lacks one, and a newly created one is untracked, so `git restore` alone
 # would leave it behind - the pathspecs below match the workspace globs
 # ("workspaces" in package.json) and nothing else in the tree.
+# INT and TERM are named alongside EXIT so an interrupted run is covered without
+# relying on the shell running an EXIT trap for an untrapped signal; the handler
+# disarms itself first so its own `exit` cannot run the cleanup a second time.
 cleanup_bump() {
   status=$?
+  trap - EXIT INT TERM
   echo "Cleaning up temporary version bump..."
   git restore --staged --worktree . || true
   git clean -fdq -- 'packages/*/CHANGELOG.md' 'rust/*/CHANGELOG.md' || true
   exit $status
 }
-trap cleanup_bump EXIT
+trap cleanup_bump EXIT INT TERM
 
 echo "Step 1: bumping versions (no commit/push)..."
 yarn lerna version $BUMP \
@@ -61,7 +65,7 @@ if git status --porcelain | grep -q '^ M yarn.lock'; then
 fi
 
 # The version commit, tag and release are meant to survive, so stop cleaning up.
-trap - EXIT
+trap - EXIT INT TERM
 
 echo "Step 4: commit, tag and push version..."
 yarn lerna version $BUMP \
