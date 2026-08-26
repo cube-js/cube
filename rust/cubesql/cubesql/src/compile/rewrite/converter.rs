@@ -3,7 +3,7 @@ use crate::{
     compile::{
         engine::df::{
             scan::{CubeScanNode, CubeScanOptions, MemberField},
-            wrapper::{CubeScanWrapperNode, WrappedSelectNode},
+            wrapper::{CubeScanWrapperNode, WrappedSelectNode, WrappedUnionNode},
         },
         rewrite::{
             analysis::LogicalPlanAnalysis,
@@ -30,7 +30,7 @@ use crate::{
             ValuesValues, WindowFunctionExprFun, WindowFunctionExprWindowFrame, WrappedSelectAlias,
             WrappedSelectDistinct, WrappedSelectJoinJoinType, WrappedSelectLimit,
             WrappedSelectOffset, WrappedSelectPushToCube, WrappedSelectSelectType,
-            WrappedSelectType,
+            WrappedSelectType, WrappedUnionAlias, WrappedUnionDistinct,
         },
         CubeContext,
     },
@@ -2370,6 +2370,40 @@ impl LanguageToLogicalPlanConverter {
                         alias,
                         distinct,
                         push_to_cube,
+                    )),
+                })
+            }
+            LogicalPlanLanguage::WrappedUnion(params) => {
+                let inputs = match_list_node_ids!(node_by_id, params[0], WrappedUnionInputs)
+                    .into_iter()
+                    .map(|n| self.to_logical_plan(n).map(Arc::new))
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                let distinct: bool = match_data_node!(node_by_id, params[1], WrappedUnionDistinct);
+                let alias: Option<String> =
+                    match_data_node!(node_by_id, params[2], WrappedUnionAlias);
+
+                let Some(first_input) = inputs.first() else {
+                    return Err(CubeError::internal(
+                        "Can't convert wrapped union with no inputs".to_string(),
+                    ));
+                };
+
+                // Same as `Union`: the inputs are union compatible, so the first one's schema
+                // stands for all of them
+                let schema = first_input.schema().as_ref().clone();
+                let schema = match alias {
+                    Some(ref alias) => schema.replace_qualifier(alias.as_str()),
+                    None => schema.strip_qualifiers(),
+                };
+
+                LogicalPlan::Extension(Extension {
+                    node: Arc::new(WrappedUnionNode::new(
+                        Arc::new(schema),
+                        inputs,
+                        distinct,
+                        alias,
+                        None,
                     )),
                 })
             }

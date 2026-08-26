@@ -15,8 +15,9 @@ use crate::{
         rewrite::rewriter::Rewriter,
         test::{
             convert_select_to_query_plan, convert_select_to_query_plan_customized,
-            convert_select_to_query_plan_with_config, init_testing_logger, LogicalPlanTestUtils,
-            TestContext,
+            convert_select_to_query_plan_with_config, convert_sql_to_cube_query,
+            get_test_session_with_config, get_test_tenant_ctx_with_cube_data_sources,
+            init_testing_logger, LogicalPlanTestUtils, TestContext,
         },
         DatabaseProtocol,
     },
@@ -3245,8 +3246,11 @@ async fn test_wrapper_limitless_post_processing_ignored_in_stream_mode() {
 }
 
 /// A limit bounds the rows of the query it sits on, not of a query beside it. Summing
-/// limits and limitless scans over the whole plan would let the limited branch here stand
-/// in for the unlimited one, and the union would read a truncated half without saying so.
+/// limits and limitless scans over the whole plan would let the limited query here stand in
+/// for the unlimited one, and the union would read a truncated half without saying so.
+///
+/// The two queries read different data sources, so the union cannot be pushed down and is
+/// left to post processing, which is what makes the pairing observable at all.
 #[tokio::test]
 async fn test_wrapper_limitless_post_processing_sibling_without_limit() {
     if !Rewriter::sql_push_down_enabled() {
@@ -3256,16 +3260,21 @@ async fn test_wrapper_limitless_post_processing_sibling_without_limit() {
 
     let mut config = ConfigObjImpl::default();
     config.fail_on_limitless_post_processing = true;
-    let context = TestContext::with_config(DatabaseProtocol::PostgreSQL, Arc::new(config)).await;
+    let meta = get_test_tenant_ctx_with_cube_data_sources(vec![("Logs", "other")]);
+    let session =
+        get_test_session_with_config(DatabaseProtocol::PostgreSQL, Arc::new(config), meta.clone())
+            .await;
 
-    let error = context
-        .convert_sql_to_cube_query(
-            "(SELECT customer_gender AS g FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 10) \
-             UNION ALL \
-             (SELECT customer_gender AS g FROM KibanaSampleDataEcommerce GROUP BY 1)",
-        )
-        .await
-        .expect_err("union with an unlimited branch should fail");
+    let error = convert_sql_to_cube_query(
+        &"(SELECT customer_gender AS g FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 10) \
+          UNION ALL \
+          (SELECT content AS g FROM Logs GROUP BY 1)"
+            .to_string(),
+        meta,
+        session,
+    )
+    .await
+    .expect_err("union with an unlimited query should fail");
     assert!(
         error
             .to_string()
@@ -3401,12 +3410,10 @@ async fn test_wrapper_limitless_post_processing_ungrouped_aggregate() {
 /// A `UNION` of two `SELECT DISTINCT`s over different cubes, the shape a BI user writes to
 /// list the values of a dimension across two views.
 ///
-/// Nothing about it can be pushed down: the branches read different cubes, so each one is a
-/// Cube query of its own and the `UNION` can only be run in DataFusion. DataFusion also
-/// collapses the per-branch `DISTINCT`s into the one above the `UNION`, which leaves each
-/// branch an ungrouped scan of raw rows rather than the grouped request a `SELECT DISTINCT`
-/// on its own compiles to. Both branches are then truncated to the row cap before the
-/// `DISTINCT` ever sees them, so values missing from the answer are missing silently.
+/// It used to be planned as a `DISTINCT` over a `UNION` of two ungrouped scans, both of them
+/// truncated to the row cap before the deduplication ever saw them, so values missing from
+/// the answer went missing silently. Both queries reach the same data source, so the whole
+/// set operation is pushed down to it instead.
 #[tokio::test]
 async fn test_wrapper_limitless_post_processing_union_of_distinct_selects() {
     if !Rewriter::sql_push_down_enabled() {
@@ -3420,37 +3427,230 @@ async fn test_wrapper_limitless_post_processing_union_of_distinct_selects() {
                  SELECT DISTINCT 'Pharmacy Claims (RX)' AS table_type, content AS market \
                  FROM Logs";
 
-    // Without the check the query still runs, over two truncated ungrouped scans
+    let mut config = ConfigObjImpl::default();
+    config.fail_on_limitless_post_processing = true;
+    let context = TestContext::with_config(DatabaseProtocol::PostgreSQL, Arc::new(config)).await;
+
+    let logical_plan = context
+        .convert_sql_to_cube_query(query)
+        .await
+        .expect("union of two queries to the same data source should compile")
+        .as_logical_plan();
+
+    // Nothing is left above the pushed down query
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(sql.contains("UNION"), "union is pushed down: {sql}");
+    assert!(
+        logical_plan
+            .find_cube_scans()
+            .iter()
+            .all(|scan| { scan.request.ungrouped == Some(true) && scan.request.limit.is_none() }),
+        "the queries themselves stay unlimited, inside the pushed down SQL: {logical_plan:?}"
+    );
+}
+
+/// The queries of a `UNION` reach the same data source, so the data source can evaluate the
+/// whole set operation and nothing is left for DataFusion to do on top of two truncated
+/// halves.
+#[tokio::test]
+async fn test_wrapper_union_all_push_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        "SELECT 'MX' AS table_type, customer_gender AS market \
+         FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+         UNION ALL \
+         SELECT 'RX' AS table_type, content AS market FROM Logs GROUP BY 1, 2"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(sql.contains("UNION ALL"), "union is pushed down: {sql}");
+    assert!(
+        sql.contains("KibanaSampleDataEcommerce.customer_gender") && sql.contains("Logs.content"),
+        "both queries are in the pushed down SQL: {sql}"
+    );
+    // The row cap lands on the result of the whole set operation, not on either query
+    assert!(
+        sql.trim_end().ends_with(&format!(
+            "LIMIT {}",
+            ConfigObjImpl::default().non_streaming_query_max_row_limit
+        )),
+        "the row cap bounds the union: {sql}"
+    );
+}
+
+/// A plain `UNION` drops duplicates, which the data source does as part of the same set
+/// operation: it is `UNION ALL` with `ALL` left off, not a separate deduplication.
+#[tokio::test]
+async fn test_wrapper_union_distinct_push_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        "SELECT DISTINCT 'MX' AS table_type, customer_gender AS market \
+         FROM KibanaSampleDataEcommerce \
+         UNION \
+         SELECT DISTINCT 'RX' AS table_type, content AS market FROM Logs"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("UNION") && !sql.contains("UNION ALL"),
+        "distinct union is pushed down as UNION: {sql}"
+    );
+}
+
+/// The queries of a `UNION` are a list, not a pair
+#[tokio::test]
+async fn test_wrapper_union_three_queries_push_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        "SELECT 'MX' AS table_type, customer_gender AS market \
+         FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+         UNION ALL \
+         SELECT 'RX' AS table_type, content AS market FROM Logs GROUP BY 1, 2 \
+         UNION ALL \
+         SELECT 'DX' AS table_type, notes AS market \
+         FROM KibanaSampleDataEcommerce GROUP BY 1, 2"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert_eq!(
+        sql.matches("UNION ALL").count(),
+        2,
+        "all three queries are pushed down: {sql}"
+    );
+}
+
+/// A pushed down union is a query like any other, so a projection and a filter above it are
+/// pushed into a select that reads from it.
+#[tokio::test]
+async fn test_wrapper_union_filter_push_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        "SELECT market FROM ( \
+           SELECT 'MX' AS table_type, customer_gender AS market \
+           FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+           UNION ALL \
+           SELECT 'RX' AS table_type, content AS market FROM Logs GROUP BY 1, 2 \
+         ) markets WHERE market = 'female'"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert!(
+        logical_plan.find_filter().is_none(),
+        "no filter is left to post processing: {logical_plan:?}"
+    );
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(sql.contains("UNION ALL"), "union is pushed down: {sql}");
+    assert!(
+        sql.contains("WHERE"),
+        "the filter reads from the pushed down union: {sql}"
+    );
+}
+
+/// A set operation is evaluated by one data source, so queries that reach two of them cannot
+/// be pushed down and the union stays in DataFusion.
+#[tokio::test]
+async fn test_wrapper_union_different_data_sources_not_pushed_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_cube_data_sources(vec![("Logs", "other")]);
+    let session = get_test_session_with_config(
+        DatabaseProtocol::PostgreSQL,
+        Arc::new(ConfigObjImpl::default()),
+        meta.clone(),
+    )
+    .await;
+
+    let logical_plan = convert_sql_to_cube_query(
+        &"SELECT 'MX' AS table_type, customer_gender AS market \
+          FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+          UNION ALL \
+          SELECT 'RX' AS table_type, content AS market FROM Logs GROUP BY 1, 2"
+            .to_string(),
+        meta,
+        session,
+    )
+    .await
+    .expect("union of two data sources should compile")
+    .as_logical_plan();
+
+    assert_eq!(
+        logical_plan.find_cube_scans().len(),
+        2,
+        "every query keeps its own scan: {logical_plan:?}"
+    );
+    assert!(
+        matches!(logical_plan, LogicalPlan::Union(_)),
+        "the union is left to post processing: {logical_plan:?}"
+    );
+}
+
+/// A `Sort` directly above a union is not pushed down yet: the select it would be pushed
+/// into projects nothing, and a query without a projection is not SQL. The union itself is
+/// still pushed down, and the sort of its truncated result is still post processing that
+/// `CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING` reports.
+#[tokio::test]
+async fn test_wrapper_union_sort_left_to_post_processing() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query = "SELECT 'MX' AS table_type, customer_gender AS market \
+                 FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+                 UNION ALL \
+                 SELECT 'RX' AS table_type, content AS market FROM Logs GROUP BY 1, 2 \
+                 ORDER BY 1, 2";
+
     let logical_plan =
         convert_select_to_query_plan(query.to_string(), DatabaseProtocol::PostgreSQL)
             .await
             .as_logical_plan();
-    let requests = logical_plan
-        .find_cube_scans()
-        .into_iter()
-        .map(|scan| scan.request)
-        .collect::<Vec<_>>();
-    assert_eq!(
-        requests,
-        vec![
-            V1LoadRequestQuery {
-                measures: Some(vec![]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                segments: Some(vec![]),
-                order: Some(vec![]),
-                ungrouped: Some(true),
-                ..Default::default()
-            },
-            V1LoadRequestQuery {
-                measures: Some(vec![]),
-                dimensions: Some(vec!["Logs.content".to_string()]),
-                segments: Some(vec![]),
-                order: Some(vec![]),
-                ungrouped: Some(true),
-                ..Default::default()
-            },
-        ]
+    assert!(
+        matches!(logical_plan, LogicalPlan::Sort(_)),
+        "the sort is left to post processing: {logical_plan:?}"
     );
+    let sql = logical_plan
+        .find_cube_scan_wrapped_sql_deep()
+        .wrapped_sql
+        .sql;
+    assert!(sql.contains("UNION ALL"), "union is pushed down: {sql}");
 
     let mut config = ConfigObjImpl::default();
     config.fail_on_limitless_post_processing = true;
@@ -3458,104 +3658,53 @@ async fn test_wrapper_limitless_post_processing_union_of_distinct_selects() {
     let error = context
         .convert_sql_to_cube_query(query)
         .await
-        .expect_err("union of unlimited branches should fail");
+        .expect_err("sorting a truncated union should fail");
     assert!(
         error
             .to_string()
             .contains("CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING"),
-        "unexpected error: {}",
-        error
+        "unexpected error: {error}"
     );
+}
 
-    // Grouping each branch instead of distinct-ing it is the better query - the data source
-    // does the deduplication, so the cap lands on distinct values rather than raw rows - but
-    // the branches are still unlimited, so the `UNION` on top can still truncate
-    let grouped = "SELECT 'Medical Claims (MX)' AS table_type, customer_gender AS market \
-                   FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
-                   UNION \
-                   SELECT 'Pharmacy Claims (RX)' AS table_type, content AS market \
-                   FROM Logs GROUP BY 1, 2";
-    let requests = convert_select_to_query_plan(grouped.to_string(), DatabaseProtocol::PostgreSQL)
-        .await
-        .as_logical_plan()
+/// A limit on one query of a union bounds that query, and the row cap bounds the result of
+/// the whole set operation. Both end up in the pushed down SQL, so neither query is read
+/// through the other's limit.
+#[tokio::test]
+async fn test_wrapper_union_limited_query_push_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = convert_select_to_query_plan(
+        "(SELECT customer_gender AS g FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 10) \
+         UNION ALL \
+         (SELECT content AS g FROM Logs GROUP BY 1)"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .as_logical_plan();
+
+    let limits = logical_plan
         .find_cube_scans()
         .into_iter()
-        .map(|scan| scan.request)
+        .map(|scan| scan.request.limit)
         .collect::<Vec<_>>();
-    assert!(
-        requests.iter().all(|request| request.ungrouped.is_none()),
-        "grouped branches: {:?}",
-        requests
-    );
-    let error = context
-        .convert_sql_to_cube_query(grouped)
-        .await
-        .expect_err("union of unlimited grouped branches should fail");
-    assert!(
-        error
-            .to_string()
-            .contains("CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING"),
-        "unexpected error: {}",
-        error
+    assert_eq!(
+        limits,
+        vec![Some(10), None],
+        "the limit stays with the query it was written on"
     );
 
-    // A limit on each branch bounds what the `UNION` reads, and the check passes
-    let limited = "(SELECT 'Medical Claims (MX)' AS table_type, customer_gender AS market \
-                   FROM KibanaSampleDataEcommerce GROUP BY 1, 2 LIMIT 1000) \
-                   UNION \
-                   (SELECT 'Pharmacy Claims (RX)' AS table_type, content AS market \
-                   FROM Logs GROUP BY 1, 2 LIMIT 1000)";
-    let requests = context
-        .convert_sql_to_cube_query(limited)
-        .await
-        .expect("union of limited branches should compile")
-        .as_logical_plan()
-        .find_cube_scans()
-        .into_iter()
-        .map(|scan| scan.request)
-        .collect::<Vec<_>>();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(sql.contains("UNION ALL"), "union is pushed down: {sql}");
     assert!(
-        requests.iter().all(|request| request.limit == Some(1000)),
-        "limited branches: {:?}",
-        requests
-    );
-
-    // A limit above the `UNION` reaches the branches only when there is nothing between them
-    // that it cannot move through: `UnionSortLimitPushDown` copies it into each input, and
-    // the regular limit push down carries it to the scans
-    let requests = context
-        .convert_sql_to_cube_query(
-            "SELECT 'Medical Claims (MX)' AS table_type, customer_gender AS market \
-             FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
-             UNION ALL \
-             SELECT 'Pharmacy Claims (RX)' AS table_type, content AS market \
-             FROM Logs GROUP BY 1, 2 \
-             LIMIT 1000",
-        )
-        .await
-        .expect("union all under a limit should compile")
-        .as_logical_plan()
-        .find_cube_scans()
-        .into_iter()
-        .map(|scan| scan.request)
-        .collect::<Vec<_>>();
-    assert!(
-        requests.iter().all(|request| request.limit == Some(1000)),
-        "branches under an outer limit: {:?}",
-        requests
-    );
-
-    // The `DISTINCT` of a plain `UNION` is such a node, so the same limit stops above it and
-    // the branches stay unlimited
-    let error = context
-        .convert_sql_to_cube_query(&format!("{query} LIMIT 1000"))
-        .await
-        .expect_err("outer limit should not reach branches through the union's distinct");
-    assert!(
-        error
-            .to_string()
-            .contains("CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING"),
-        "unexpected error: {}",
-        error
+        sql.trim_end().ends_with(&format!(
+            "LIMIT {}",
+            ConfigObjImpl::default().non_streaming_query_max_row_limit
+        )),
+        "the row cap bounds the union: {sql}"
     );
 }

@@ -26,6 +26,7 @@ mod sort_expr;
 mod subquery;
 mod udaf_function;
 mod udf_function;
+mod union;
 mod window;
 mod window_function;
 mod wrapper_pull_up;
@@ -59,6 +60,7 @@ impl RewriteRules for WrapperRules {
 
         self.cube_scan_wrapper_rules(&mut rules);
         self.join_rules(&mut rules);
+        self.union_rules(&mut rules);
         self.wrapper_pull_up_rules(&mut rules);
         self.aggregate_rules(&mut rules);
         self.aggregate_rules_subquery(&mut rules);

@@ -294,6 +294,15 @@ crate::plan_to_language! {
             join_type: JoinType,
         },
 
+        // A set operation over inputs that are all pushed down to the same data source.
+        // Unlike `Union`, which is post processing in DataFusion, this one renders as a
+        // `UNION` in the generated SQL and is evaluated by the data source itself.
+        WrappedUnion {
+            inputs: Vec<LogicalPlan>,
+            distinct: bool,
+            alias: Option<String>,
+        },
+
         CubeScan {
             alias_to_cube: Vec<(String, String)>,
             members: Vec<LogicalPlan>,
@@ -1648,6 +1657,14 @@ fn wrapped_select_joins(left: impl Display, right: impl Display) -> String {
 
 fn wrapped_select_joins_empty_tail() -> String {
     "WrappedSelectJoins".to_string()
+}
+
+fn wrapped_union(inputs: impl Display, distinct: impl Display, alias: impl Display) -> String {
+    format!("(WrappedUnion {inputs} {distinct} {alias})")
+}
+
+fn union(inputs: impl Display, alias: impl Display) -> String {
+    format!("(Union {inputs} {alias})")
 }
 
 fn wrapped_select_filter_expr(left: impl Display, right: impl Display) -> String {

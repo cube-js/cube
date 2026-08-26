@@ -1090,6 +1090,20 @@ impl SqlTemplates {
             context! { join_type => join_type, source => source, condition => condition },
         )
     }
+
+    /// Renders `queries` as a single set operation: `UNION` when `distinct`, `UNION ALL`
+    /// otherwise. `limit` bounds the result of the whole operation, not of any one query.
+    pub fn union(
+        &self,
+        queries: Vec<String>,
+        distinct: bool,
+        limit: Option<usize>,
+    ) -> Result<String, CubeError> {
+        self.render_template(
+            "statements/union",
+            context! { queries => queries, distinct => distinct, limit => limit },
+        )
+    }
 }
 
 #[cfg(test)]

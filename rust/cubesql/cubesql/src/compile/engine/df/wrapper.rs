@@ -839,6 +839,13 @@ impl CubeScanWrapperNode {
                                 .map(|subq| subq.as_ref())
                                 .any(Self::has_ungrouped_wrapped_node)
                     }
+                } else if let Some(wrapped_union) = node.as_any().downcast_ref::<WrappedUnionNode>()
+                {
+                    wrapped_union
+                        .inputs
+                        .iter()
+                        .map(|input| input.as_ref())
+                        .any(Self::has_ungrouped_wrapped_node)
                 } else {
                     false
                 }
@@ -934,6 +941,18 @@ impl CubeScanWrapperNode {
                         node: Arc::new(new_node),
                     }))
                 } else if let Some(node) = wrapped_select_node {
+                    let mut new_node = node.clone();
+                    new_node.limit = Some(new_node.limit.map_or(query_limit as usize, |limit| {
+                        min(limit, query_limit as usize)
+                    }));
+                    Arc::new(LogicalPlan::Extension(Extension {
+                        node: Arc::new(new_node),
+                    }))
+                } else if let Some(node) = extension_node
+                    .as_any()
+                    .downcast_ref::<WrappedUnionNode>()
+                    .cloned()
+                {
                     let mut new_node = node.clone();
                     new_node.limit = Some(new_node.limit.map_or(query_limit as usize, |limit| {
                         min(limit, query_limit as usize)
@@ -1192,6 +1211,18 @@ impl CubeScanWrapperNode {
                             parent_data_source,
                         )
                         .await
+                } else if let Some(wrapped_union_node) = node_any.downcast_ref::<WrappedUnionNode>()
+                {
+                    wrapped_union_node
+                        .generate_sql(
+                            meta,
+                            transport,
+                            load_request_meta,
+                            state,
+                            values,
+                            parent_data_source,
+                        )
+                        .await
                 } else {
                     return Err(CubeError::internal(format!(
                         "Can't generate SQL for node: {node:?}"
@@ -1276,6 +1307,229 @@ impl UserDefinedLogicalNode for CubeScanWrapperNode {
             auth_context: self.auth_context.clone(),
             span_id: self.span_id.clone(),
             config_obj: self.config_obj.clone(),
+        })
+    }
+}
+
+/// A set operation whose inputs all push down to the same data source, rendered as a
+/// `UNION` in the generated SQL rather than run as post processing in DataFusion.
+///
+/// The row limit is not part of the plan the rewriter builds: like [`WrappedSelectNode`],
+/// this node is capped by [`CubeScanWrapperNode::set_max_limit_for_node`] when it ends up
+/// at the root of a wrapped plan.
+#[derive(Debug, Clone)]
+pub struct WrappedUnionNode {
+    pub schema: DFSchemaRef,
+    pub inputs: Vec<Arc<LogicalPlan>>,
+    /// `UNION` when set, `UNION ALL` when not
+    pub distinct: bool,
+    pub alias: Option<String>,
+    pub limit: Option<usize>,
+}
+
+impl WrappedUnionNode {
+    pub fn new(
+        schema: DFSchemaRef,
+        inputs: Vec<Arc<LogicalPlan>>,
+        distinct: bool,
+        alias: Option<String>,
+        limit: Option<usize>,
+    ) -> Self {
+        Self {
+            schema,
+            inputs,
+            distinct,
+            alias,
+            limit,
+        }
+    }
+}
+
+impl WrappedUnionNode {
+    /// Renders every input as its own query and joins them into one set operation.
+    ///
+    /// Every input has to reach the same data source: a set operation the data source
+    /// evaluates cannot span two of them.
+    async fn generate_sql(
+        &self,
+        meta: &MetaContext,
+        transport: Arc<dyn TransportService>,
+        load_request_meta: Arc<LoadRequestMeta>,
+        state: Arc<SessionState>,
+        values: Vec<Option<String>>,
+        parent_data_source: Option<&str>,
+    ) -> result::Result<SqlGenerationResult, CubeError> {
+        let Some((first_input, rest_inputs)) = self.inputs.split_first() else {
+            return Err(CubeError::internal(
+                "Can't generate SQL for wrapped union: no inputs".to_string(),
+            ));
+        };
+
+        let SqlGenerationResult {
+            data_source,
+            from_alias,
+            column_remapping,
+            mut sql,
+            request,
+        } = CubeScanWrapperNode::generate_sql_for_node_rec(
+            meta,
+            Arc::clone(&transport),
+            Arc::clone(&load_request_meta),
+            Arc::clone(&state),
+            Arc::clone(first_input),
+            // Every input must keep the column names of the union's schema, which is the
+            // schema of the first one
+            false,
+            values.clone(),
+            parent_data_source,
+        )
+        .await?;
+
+        let Some(data_source) = data_source else {
+            return Err(CubeError::internal(
+                "Can't generate SQL for wrapped union: no data source for the first input"
+                    .to_string(),
+            ));
+        };
+
+        let mut queries = Vec::with_capacity(self.inputs.len());
+        queries.push(sql.sql.to_string());
+
+        for input in rest_inputs {
+            let input_result = CubeScanWrapperNode::generate_sql_for_node_rec(
+                meta,
+                Arc::clone(&transport),
+                Arc::clone(&load_request_meta),
+                Arc::clone(&state),
+                Arc::clone(input),
+                false,
+                values.clone(),
+                Some(&data_source),
+            )
+            .await?;
+
+            if input_result.data_source.as_ref() != Some(&data_source) {
+                return Err(CubeError::internal(format!(
+                    "Can't generate SQL for wrapped union: inputs use different data sources, {:?} and {:?}",
+                    data_source, input_result.data_source
+                )));
+            }
+
+            // Every input generated its SQL on its own, so its placeholders reference its
+            // own values and have to be remapped onto the combined ones
+            let (input_sql, input_values) = input_result.sql.unpack();
+            let mapping = sql.add_values(input_values);
+            queries.push(SqlQuery::remap_placeholders(&input_sql, &mapping)?);
+        }
+
+        let generator = meta
+            .data_source_to_sql_generator
+            .get(&data_source)
+            .ok_or_else(|| {
+                CubeError::internal(format!(
+                    "Can't generate SQL for wrapped union: no sql generator for '{data_source}' data source"
+                ))
+            })?;
+
+        let resulting_sql = generator
+            .get_sql_templates()
+            .union(queries, self.distinct, self.limit)
+            .map_err(|e| {
+                CubeError::internal(format!("Can't generate SQL for wrapped union: {e}"))
+            })?;
+        sql.replace_sql(resulting_sql);
+
+        // Plans above see the union through a single alias, and read its columns by the
+        // names the first input gave them
+        let alias = self.alias.clone().or(from_alias);
+        let column_remapping = column_remapping
+            .map(|column_remapping| self.requalify_remapping(column_remapping, alias.as_deref()));
+
+        Ok(SqlGenerationResult {
+            data_source: Some(data_source),
+            from_alias: alias,
+            sql,
+            column_remapping,
+            request,
+        })
+    }
+
+    /// The union's own schema drops the qualifiers of the first input, or replaces them with
+    /// its alias, so a column reference from above can carry a qualifier the first input's
+    /// remapping has never seen. Add those references, pointing at the same targets.
+    fn requalify_remapping(
+        &self,
+        column_remapping: ColumnRemapping,
+        alias: Option<&str>,
+    ) -> ColumnRemapping {
+        let mut column_remapping = column_remapping;
+        for field in self.schema.fields() {
+            let name = field.name();
+            let Some(target) = column_remapping
+                .column_remapping
+                .get(&Column::from_name(name.clone()))
+                .cloned()
+            else {
+                continue;
+            };
+            for qualifier in alias.map(str::to_string).into_iter().chain(
+                field
+                    .qualifier()
+                    .filter(|qualifier| Some(qualifier.as_str()) != alias)
+                    .cloned(),
+            ) {
+                column_remapping.column_remapping.insert(
+                    Column {
+                        relation: Some(qualifier),
+                        name: name.clone(),
+                    },
+                    target.clone(),
+                );
+            }
+        }
+        column_remapping
+    }
+}
+
+impl UserDefinedLogicalNode for WrappedUnionNode {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn inputs(&self) -> Vec<&LogicalPlan> {
+        self.inputs.iter().map(|input| input.as_ref()).collect()
+    }
+
+    fn schema(&self) -> &DFSchemaRef {
+        &self.schema
+    }
+
+    fn expressions(&self) -> Vec<Expr> {
+        vec![]
+    }
+
+    fn fmt_for_explain(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "WrappedUnion: distinct={:?}, alias={:?}, limit={:?}",
+            self.distinct, self.alias, self.limit
+        )
+    }
+
+    fn from_template(
+        &self,
+        exprs: &[Expr],
+        inputs: &[LogicalPlan],
+    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+        assert_eq!(inputs.len(), self.inputs.len(), "input size inconsistent");
+        assert_eq!(exprs.len(), 0, "expression size inconsistent");
+
+        Arc::new(WrappedUnionNode {
+            schema: self.schema.clone(),
+            inputs: inputs.iter().cloned().map(Arc::new).collect(),
+            distinct: self.distinct,
+            alias: self.alias.clone(),
+            limit: self.limit,
         })
     }
 }
