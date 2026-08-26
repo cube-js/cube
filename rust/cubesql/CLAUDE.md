@@ -115,15 +115,23 @@ cargo bench
 
 ### Rewrite rules: never traverse a list recursively
 
-Every matcher must match exactly **one** level. Lists in the e-graph are cons cells,
-and they are consumed by dedicated rules that peel one cell at a time — never by a
-transform that walks the list itself.
+Every matcher must match exactly **one** level. A list is consumed by dedicated rules
+that match the list node itself — never by a transform that walks it.
 
+- **Lists are flat, not head/tail.** A list node holds all of its elements as children
+  (`UnionInputs(a, b, c)`), not nested cons cells (`UnionInputs(a, UnionInputs(b, ...))`).
+  Cons lists are legacy — do not add new ones, and prefer converting one you touch.
+  Build them with the flat branch of `add_expr_flat_list_node!` (or an equivalent that
+  adds a single node with every element), register the node in `ListType`, and traverse
+  with `flat_list_pushdown_pullup_rules` / `replacer_flat_push_down_node` /
+  `replacer_flat_pull_up_node`. The flat pull-up matches the whole list in one rule and
+  takes `top_level_elem_vars`, which is how a fact that must hold across every element —
+  all queries reaching the same data source — is enforced.
 - Generate the traversal with the existing helpers rather than by hand:
   `WrapperRules::list_pushdown_pullup_rules` / `flat_list_pushdown_pullup_rules`
   (or `replacer_push_down_node` / `replacer_pull_up_node` underneath them). They emit
-  the `-push-down`, `-pull-up` and `-tail` rules that distribute a replacer over a cons
-  cell and collect it back once both sides are done.
+  the `-push-down`, `-pull-up` and `-tail` rules that distribute a replacer over the
+  list's elements and collect it back once they are all done.
 - Push-down and pull-up are **separate rules**. Do not fold both directions, or the
   list walk, into one rewrite with a big transform.
 - Do not write an imperative reader over `egraph[id].nodes` to collect a list's
