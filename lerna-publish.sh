@@ -50,24 +50,29 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   exit 1
 fi
 
-# `set -e` aborts the script before the bump is undone if step 1 or step 2 fails,
-# so clean up from an EXIT trap rather than inline: otherwise a failed run leaves
-# behind the bumped, partly staged tree that trips lerna's working tree
-# validation on the next run. lerna also writes a CHANGELOG.md for any package
-# that lacks one, and a newly created one is untracked, so `git restore` alone
-# would leave it behind - the pathspecs below match the workspace globs
-# ("workspaces" in package.json) and nothing else in the tree.
+# Step 4 undoes the bump on the happy path, but `set -e` aborts before reaching
+# it if step 1 or step 2 fails, so the same restore also runs from a trap:
+# otherwise a failed run leaves behind the bumped, partly staged tree that trips
+# lerna's working tree validation on the next run.
+# lerna also writes a CHANGELOG.md for any package that lacks one, and a newly
+# created one is untracked, so `git restore` alone would leave it behind - the
+# pathspecs match the workspace globs ("workspaces" in package.json) and
+# nothing else in the tree.
 # INT and TERM are named alongside EXIT so an interrupted run is covered without
 # relying on the shell running an EXIT trap for an untrapped signal; the handler
 # disarms itself first so its own `exit` cannot run the cleanup a second time,
 # then re-raises the signal so an interrupted run does not exit 0.
+restore_bump() {
+  git restore --staged --worktree . || true
+  git clean -fdq -- 'packages/*/CHANGELOG.md' 'rust/*/CHANGELOG.md' || true
+}
+
 cleanup_bump() {
   status=$?
   sig=$1
   trap - EXIT INT TERM
   echo "Cleaning up temporary version bump..."
-  git restore --staged --worktree . || true
-  git clean -fdq -- 'packages/*/CHANGELOG.md' 'rust/*/CHANGELOG.md' || true
+  restore_bump
   if [ -n "$sig" ]; then
     # Die from the signal now that it is untrapped, so the caller sees the run
     # was interrupted. Exiting with $? instead would report the last completed
@@ -103,10 +108,18 @@ if git status --porcelain | grep -q '^ M yarn.lock'; then
   exit 1
 fi
 
-# The version commit, tag and release are meant to survive, so stop cleaning up.
+# Step 1's bump has to come back out before the real one: lerna reads the
+# versions in the tree to compute the next ones, and refuses to commit over a
+# dirty tree at all. This is the happy path, not error handling - the trap
+# below only covers the runs that never get here.
+echo "Step 4: cleaning up temporary version bump..."
+restore_bump
+
+# Restore first, then disarm, so an interrupt during the restore is still
+# covered. From here the version commit, tag and release are meant to survive.
 trap - EXIT INT TERM
 
-echo "Step 4: commit, tag and push version..."
+echo "Step 5: commit, tag and push version..."
 yarn lerna version "$BUMP" \
   --conventional-commits \
   --force-publish \
