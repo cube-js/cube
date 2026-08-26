@@ -113,6 +113,32 @@ cargo bench
 3. Add tests with snapshot expectations
 4. Update protocol-specific handling if needed
 
+### Rewrite rules: never traverse a list recursively
+
+Every matcher must match exactly **one** level. Lists in the e-graph are cons cells,
+and they are consumed by dedicated rules that peel one cell at a time — never by a
+transform that walks the list itself.
+
+- Generate the traversal with the existing helpers rather than by hand:
+  `WrapperRules::list_pushdown_pullup_rules` / `flat_list_pushdown_pullup_rules`
+  (or `replacer_push_down_node` / `replacer_pull_up_node` underneath them). They emit
+  the `-push-down`, `-pull-up` and `-tail` rules that distribute a replacer over a cons
+  cell and collect it back once both sides are done.
+- Push-down and pull-up are **separate rules**. Do not fold both directions, or the
+  list walk, into one rewrite with a big transform.
+- Do not write an imperative reader over `egraph[id].nodes` to collect a list's
+  elements inside a transform. An e-class holds many representations, so picking one is
+  arbitrary; the cons shape is also an implementation detail of how the list was built
+  (`add_plan_list_node!`), which a hand-rolled reader silently couples itself to.
+- A transform should only decide scalar facts (a flag, an alias, whether a template
+  exists) about nodes the **pattern** already bound. Relationships between several
+  matched nodes — "both sides reach the same data source" — belong in the pattern, by
+  reusing one pattern variable in both places, so unification enforces them.
+  Caveat worth knowing: `wrapper-subqueries-wrapped-scan-to-pull` (`rules/wrapper/subquery.rs`)
+  re-contexts any `wrapper_pushdown_replacer` over a finished `cube_scan_wrapper` without
+  comparing input data sources — see the `TODO` on it — so unification alone does not
+  currently guarantee data-source agreement for plan-level list elements.
+
 ### Debugging Query Compilation
 ```bash
 # Enable detailed logging
