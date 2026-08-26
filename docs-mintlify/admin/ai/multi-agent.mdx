@@ -11,9 +11,12 @@ Multi-agent is useful when:
 - You want specialized agents with distinct instructions or tool access in the same deployment.
 - You need to isolate context (rules, certified queries, memories) between user groups.
 
-<Warning>
-  Spaces and agents must first be created through the Cube Cloud UI before they can be configured via YAML. The system matches YAML entries to UI-created spaces and agents by their `name` field.
-</Warning>
+<Info>
+  `agents/config.yml` is the source of truth for spaces and agents: you declare them in
+  YAML and Cube creates them for you when you [reconcile](#reconciliation). Agents can't
+  be created in the UI, and their settings are read-only there. Entries are matched to
+  what already exists by their `name` field.
+</Info>
 
 ## Architecture
 
@@ -128,6 +131,42 @@ spaces:
 
 Each agent must reference exactly one space via its `space` property. Multiple agents can share the same space and inherit its rules, certified queries, and memories.
 
+## Reconciliation
+
+A space or agent declared in `agents/config.yml` needs a matching record in Cube before
+users can chat with it. Cube creates those records from your config — that step is
+**reconciliation**:
+
+<Steps>
+  <Step title="Declare the space and the agent in YAML">
+    In dev mode the pending list reflects your branch, so you can reconcile before merging.
+  </Step>
+  <Step title="Open the pending configurations">
+    Cube compares the config with what exists for the deployment, matching on `name`.
+    Entries with no record yet are listed under **Pending Configurations** on the
+    **Agents** page and on **Agents** → **Spaces**, once you pick the deployment. The
+    Semantic Model IDE also shows a **Reconcile agent configs** button with the pending
+    count that links there.
+  </Step>
+  <Step title="Create them">
+    Choose the [space scope](#space-scope) and press **Create All**. Spaces are created
+    first, then each agent is linked to the space its `space` property names.
+  </Step>
+</Steps>
+
+Reconciliation only creates missing spaces and agents, so you need it only when a new
+`name` appears in the config. Every other property — `llm`, `accessible_views`,
+`memory_mode`, rules, certified queries — is read from the `agents/` directory of the
+deployment's data model and takes effect without reconciling. The implicit `auto` space
+and agent of the [single-agent setup](/admin/ai) are never listed as pending.
+
+<Warning>
+  Changing an entry's `name` reads as a new entry: reconciling creates a new space or
+  agent, and the record created from the old name keeps what it stored — an agent's
+  chats, a space's memories — and is flagged **(misconfigured)** because its config no
+  longer exists. Delete that record once you no longer need it.
+</Warning>
+
 ## Space scope
 
 Spaces live at the account level, so one space can be used by agents in more than one deployment. When a space is created, you choose its scope:
@@ -138,7 +177,7 @@ Spaces live at the account level, so one space can be used by agents in more tha
 You pick the scope on the **Agents** → **Spaces** page, in two places:
 
 - **Create space**, when you create a space by hand.
-- The **Create All** panel, shown for spaces and agents declared in `agents/config.yml` that don't exist yet. Its **Create Spaces** control offers **Global** and **Per deployment**.
+- The **Create All** panel of [pending configurations](#reconciliation). Its **Create Spaces** control offers **Global** and **Per deployment**.
 
 Spaces created per deployment are named after the deployment, for example `Product (production)` and `Product (staging)`. Only the displayed name changes — the space stays linked to the space `name` declared in `agents/config.yml`, so the YAML entry keeps matching. You can change the scope of an existing space later on the space's page.
 
