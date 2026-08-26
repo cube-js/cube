@@ -576,10 +576,11 @@ different cubes, which therefore has no single cube to live in.
 Reference the included members as `{CUBE.member}` (or `{view_name.member}`); a
 bare `{member}` does not resolve inside a view.
 
+In the example below, `orders` joins `line_items` `one_to_many`:
+
 <CodeGroup>
 
 ```yaml title="YAML"
-# orders joins line_items one_to_many
 views:
   - name: orders_overview
     cubes:

@@ -289,12 +289,12 @@ The one exception is a metric whose parts live in different cubes, so there is
 no single cube it could belong to. A view can define its own
 [measures][ref-view-measures] and [dimensions][ref-view-dimensions] as long as
 their `sql` only combines members the view already includes — a member that
-reads a column instead is rejected at compile time.
+reads a column instead is rejected at compile time. Here `orders` joins
+`line_items` `one_to_many`:
 
 <CodeGroup>
 
 ```yaml title="YAML"
-# orders joins line_items one_to_many
 views:
   - name: orders_overview
     cubes:
