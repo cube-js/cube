@@ -3779,9 +3779,21 @@ async fn test_wrapper_union_in_join_push_down() {
     .wrapped_sql
     .sql;
 
+    // The union has to be in the SQL as the join's subquery, not merely somewhere in it:
+    // a union that lost its join, or a join that lost its union, would both be wrong
     assert!(
         sql.contains("UNION ALL"),
-        "the join reads a pushed down union: {}",
+        "the union is pushed down: {}",
+        sql
+    );
+    assert!(
+        sql.contains("subqueryJoins"),
+        "the union is read as the join's subquery: {}",
+        sql
+    );
+    assert!(
+        sql.contains("KibanaSampleDataEcommerce.customer_gender") && sql.contains("Logs.content"),
+        "both queries of the union are in the pushed down SQL: {}",
         sql
     );
 }
