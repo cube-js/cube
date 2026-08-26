@@ -1021,18 +1021,8 @@ payload: <size>, max allowed: <limit>`.
 <Warning>
 
 **Known limitation.** A message above the *transport* limit is not answered
-with an error. Cube Store logs `Websocket error: Capacity(MessageTooLong {
-size: ..., max_size: ... })` and closes the connection. The driver treats
-that as Cube Store having gone away and, on reconnect, resends everything
-that was still in flight — including the oversized message, which
-immediately kills the new connection too.
-
-The deployment then reports `ConnectionError: CubeStore connection error:
-write EPIPE` every few seconds for as long as the loop runs. Because all
-queries on a node share one connection, *unrelated* queries fail alongside
-the oversized one, so the same query can appear to succeed and fail seconds
-apart.
-
+with an error. The deployment then reports `ConnectionError: CubeStore connection error:
+write EPIPE`.
 </Warning>
 
 If a query hits this limit, reduce the size of its result set — add filters
