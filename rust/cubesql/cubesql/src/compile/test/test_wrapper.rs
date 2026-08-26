@@ -3084,3 +3084,316 @@ async fn test_wrapper_date_add_negative_and_out_of_range_intervals() {
         );
     }
 }
+
+/// A Cube query is capped at the maximum row limit when the user does not limit it, so
+/// sorting, filtering or joining its result in DataFusion would read an arbitrary slice
+/// of the population. Such a query has to be pushed down in full.
+const LIMITLESS_POST_PROCESSING_QUERY: &str = r#"
+    WITH first_orders AS (
+        SELECT customer_gender, MIN(order_date) AS first_order_at
+        FROM KibanaSampleDataEcommerce
+        GROUP BY 1
+    )
+    SELECT COUNT(DISTINCT customer_gender) AS customers
+    FROM first_orders
+    WHERE first_order_at >= '2024-01-01'::timestamp
+"#;
+
+/// The same shape, with a filter the data source has no template for (`ROUND`), so the
+/// filter cannot leave DataFusion and the truncated read is unavoidable.
+const UNPUSHABLE_LIMITLESS_POST_PROCESSING_QUERY: &str = r#"
+    WITH first_orders AS (
+        SELECT customer_gender, MIN(taxful_total_price) AS cheapest
+        FROM KibanaSampleDataEcommerce
+        GROUP BY 1
+    )
+    SELECT COUNT(DISTINCT customer_gender) AS customers
+    FROM first_orders
+    WHERE ROUND(cheapest) > 10
+"#;
+
+#[tokio::test]
+async fn test_wrapper_limitless_post_processing_pushed_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        LIMITLESS_POST_PROCESSING_QUERY.to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert!(
+        logical_plan.find_filter().is_none(),
+        "no filter is left to post processing: {:?}",
+        logical_plan
+    );
+
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("COUNT(DISTINCT"),
+        "outer aggregate is pushed down: {}",
+        sql
+    );
+    assert!(
+        sql.contains(r#"WHERE ("first_orders"."first_order_at" >= "#),
+        "outer filter is pushed down against the aggregate of the inner query: {}",
+        sql
+    );
+}
+
+#[tokio::test]
+async fn test_wrapper_limitless_post_processing_allowed_by_default() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // Without the flag the query still runs, and still reads a truncated result
+    let query_plan = convert_select_to_query_plan(
+        UNPUSHABLE_LIMITLESS_POST_PROCESSING_QUERY.to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert!(
+        logical_plan.find_filter().is_some(),
+        "filter is left to post processing: {:?}",
+        logical_plan
+    );
+}
+
+#[tokio::test]
+async fn test_wrapper_limitless_post_processing_fails_when_enabled() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let mut config = ConfigObjImpl::default();
+    config.fail_on_limitless_post_processing = true;
+    let context = TestContext::with_config(DatabaseProtocol::PostgreSQL, Arc::new(config)).await;
+
+    // A query that can be pushed down in full is unaffected
+    context
+        .convert_sql_to_cube_query(LIMITLESS_POST_PROCESSING_QUERY)
+        .await
+        .expect("fully pushed down query should compile");
+
+    let error = context
+        .convert_sql_to_cube_query(UNPUSHABLE_LIMITLESS_POST_PROCESSING_QUERY)
+        .await
+        .expect_err("query with unavoidable post processing should fail");
+    assert!(
+        error
+            .to_string()
+            .contains("CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING"),
+        "unexpected error: {}",
+        error
+    );
+}
+
+#[tokio::test]
+async fn test_wrapper_limitless_post_processing_ignored_in_stream_mode() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // Streaming reads every row rather than capping the query, so post processing over it
+    // is correct and there is nothing to prefer pushing down or to fail on
+    let mut config = ConfigObjImpl::default();
+    config.stream_mode = true;
+    config.fail_on_limitless_post_processing = true;
+    let context = TestContext::with_config(DatabaseProtocol::PostgreSQL, Arc::new(config)).await;
+
+    let logical_plan = context
+        .convert_sql_to_cube_query(UNPUSHABLE_LIMITLESS_POST_PROCESSING_QUERY)
+        .await
+        .expect("stream mode should not fail on post processing")
+        .as_logical_plan();
+    assert!(
+        logical_plan.find_filter().is_some(),
+        "filter is left to post processing: {:?}",
+        logical_plan
+    );
+
+    // And a query that the penalty would have reshaped keeps the plan it has without it
+    let logical_plan = context
+        .convert_sql_to_cube_query(
+            "SELECT -taxful_total_price AS neg FROM KibanaSampleDataEcommerce GROUP BY 1 ORDER BY 1 DESC",
+        )
+        .await
+        .expect("stream mode should not fail on post processing")
+        .as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec![
+                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+            ]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            ..Default::default()
+        }
+    );
+}
+
+/// A limit bounds the rows of the query it sits on, not of a query beside it. Summing
+/// limits and limitless scans over the whole plan would let the limited branch here stand
+/// in for the unlimited one, and the union would read a truncated half without saying so.
+#[tokio::test]
+async fn test_wrapper_limitless_post_processing_sibling_without_limit() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let mut config = ConfigObjImpl::default();
+    config.fail_on_limitless_post_processing = true;
+    let context = TestContext::with_config(DatabaseProtocol::PostgreSQL, Arc::new(config)).await;
+
+    let error = context
+        .convert_sql_to_cube_query(
+            "(SELECT customer_gender AS g FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 10) \
+             UNION ALL \
+             (SELECT customer_gender AS g FROM KibanaSampleDataEcommerce GROUP BY 1)",
+        )
+        .await
+        .expect_err("union with an unlimited branch should fail");
+    assert!(
+        error
+            .to_string()
+            .contains("CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING"),
+        "unexpected error: {}",
+        error
+    );
+}
+
+/// A limit only bounds the query while it is at or below the row cap. Anything above is
+/// clamped back down to the cap before the request is sent, so it truncates exactly like
+/// no limit at all - and a large defensive limit is a shape BI tools emit routinely.
+#[tokio::test]
+async fn test_wrapper_limitless_post_processing_limit_above_row_cap() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // Matches `non_streaming_query_max_row_limit` for the default config under test
+    let max_row_limit = ConfigObjImpl::default().non_streaming_query_max_row_limit as i64;
+
+    for (limit, bounded) in [
+        (10, true),
+        (max_row_limit, true),
+        (max_row_limit + 1, false),
+        (max_row_limit * 20, false),
+    ] {
+        let mut config = ConfigObjImpl::default();
+        config.fail_on_limitless_post_processing = true;
+        let context =
+            TestContext::with_config(DatabaseProtocol::PostgreSQL, Arc::new(config)).await;
+
+        // `ROUND` has no template here, so the filter cannot leave post processing
+        let result = context
+            .convert_sql_to_cube_query(&format!(
+                "SELECT COUNT(*) \
+                 FROM ( \
+                     SELECT customer_gender AS gender, MIN(taxful_total_price) AS cheapest \
+                     FROM KibanaSampleDataEcommerce \
+                     GROUP BY 1 \
+                     LIMIT {limit} \
+                 ) first_orders \
+                 WHERE ROUND(cheapest) > 10"
+            ))
+            .await;
+
+        if bounded {
+            result.unwrap_or_else(|error| {
+                panic!(
+                    "LIMIT {} is within the row cap and should compile: {}",
+                    limit, error
+                )
+            });
+        } else {
+            let error = result.err().unwrap_or_else(|| {
+                panic!("LIMIT {} is clamped to the row cap and should fail", limit)
+            });
+            assert!(
+                error
+                    .to_string()
+                    .contains("CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING"),
+                "unexpected error for LIMIT {}: {}",
+                limit,
+                error
+            );
+        }
+    }
+}
+
+/// An `Aggregate` over an ungrouped scan is priced by `ungrouped_aggregates` rather than
+/// by `limitless_post_processing`, so extraction already accounts for it. The rows it
+/// reads are still raw and capped, though, so the operator who turned the check on to be
+/// told about truncated results has to hear about this one too.
+#[tokio::test]
+async fn test_wrapper_limitless_post_processing_ungrouped_aggregate() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // The day of quarter grouping cannot be pushed down, so the aggregate stays in post
+    // processing over an ungrouped scan, and nothing above it drops or reorders rows
+    let query = r#"
+        SELECT
+            CAST("inner_query"."order_date" AS date)
+                - CAST("inner_query"."quarter_start" AS date)
+                + 1 AS "day_of_quarter",
+            MEASURE("inner_query"."sumPrice") AS "revenue"
+        FROM (
+            SELECT
+                "ta_1"."order_date" AS "order_date",
+                CAST(
+                    EXTRACT(YEAR FROM "ta_1"."order_date") || '-'
+                    || EXTRACT(MONTH FROM "ta_1"."order_date") || '-01'
+                AS DATE)
+                + (((MOD(CAST((EXTRACT(MONTH FROM "ta_1"."order_date") - 1)
+                      AS numeric), 3) + 1) - 1) * -1)
+                  * INTERVAL '1 month'
+                AS "quarter_start",
+                CASE WHEN "ta_1"."customer_gender" = 'female'
+                     THEN "ta_1"."sumPrice" END AS "sumPrice"
+            FROM "db"."public"."KibanaSampleDataEcommerce" AS "ta_1"
+        ) "inner_query"
+        GROUP BY 1
+    "#;
+
+    // Without the check the query still runs, reading a capped slice of raw rows
+    let logical_plan =
+        convert_select_to_query_plan(query.to_string(), DatabaseProtocol::PostgreSQL)
+            .await
+            .as_logical_plan();
+    let request = logical_plan.find_cube_scan().request;
+    assert_eq!(request.ungrouped, Some(true));
+    assert_eq!(request.limit, None);
+
+    let mut config = ConfigObjImpl::default();
+    config.fail_on_limitless_post_processing = true;
+    let context = TestContext::with_config(DatabaseProtocol::PostgreSQL, Arc::new(config)).await;
+    let error = context
+        .convert_sql_to_cube_query(query)
+        .await
+        .expect_err("aggregate over an unlimited ungrouped scan should fail");
+    assert!(
+        error
+            .to_string()
+            .contains("CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING"),
+        "unexpected error: {}",
+        error
+    );
+}
