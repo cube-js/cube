@@ -73,8 +73,12 @@ impl BestCubePlan {
             _ => 0,
         };
 
+        // What a wrapper does on its own, as opposed to merely holding a scan: a wrapper
+        // with none of it is an empty wrapper, and preferring it over the plain scan it
+        // wraps would be pointless
         let ast_size_inside_wrapper = match enode {
             LogicalPlanLanguage::WrappedSelect(_) => 1,
+            LogicalPlanLanguage::WrappedUnion(_) => 1,
             _ => 0,
         };
 

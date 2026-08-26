@@ -4600,6 +4600,12 @@ export class BaseQuery {
           '{% if offset is not none %}\nOFFSET {{ offset }}{% endif %}',
         group_by_exprs: '{{ group_by | map(attribute=\'index\') | join(\', \') }}',
         join: '{{ join_type }} JOIN {{ source }} ON {{ condition }}',
+        union: '{% for query in queries %}(\n' +
+          '{{ query | indent(2, true) }}\n' +
+          ')' +
+          '{% if not loop.last %}\nUNION {% if not distinct %}ALL {% endif %}{% endif %}' +
+          '{% endfor %}' +
+          '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}',
         cte: '{{ alias }} AS ({{ query | indent(2, true) }})',
         time_series_select: 'SELECT date_from::timestamp AS "date_from",\n' +
           'date_to::timestamp AS "date_to" \n' +

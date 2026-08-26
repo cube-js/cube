@@ -383,6 +383,14 @@ export class BigqueryQuery extends BaseQuery {
     'GENERATE_TIMESTAMP_ARRAY(TIMESTAMP({{ range_source }}.{{ min_name }}), TIMESTAMP({{ range_source }}.{{ max_name }}), INTERVAL {{ granularity }})\n' +
     '{% endif %}' +
     ') AS d';
+    // GoogleSQL requires a set operator to say which mode it is: a bare UNION does not parse.
+    templates.statements.union = '{% for query in queries %}(\n' +
+      '{{ query | indent(2, true) }}\n' +
+      ')' +
+      '{% if not loop.last %}\nUNION {% if distinct %}DISTINCT{% else %}ALL{% endif %} {% endif %}' +
+      '{% endfor %}' +
+      '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}';
+
     return templates;
   }
 }

@@ -3,7 +3,7 @@ use crate::{
     compile::{
         engine::df::{
             scan::{CubeScanNode, CubeScanOptions, MemberField},
-            wrapper::{CubeScanWrapperNode, WrappedSelectNode},
+            wrapper::{CubeScanWrapperNode, WrappedSelectNode, WrappedUnionNode},
         },
         rewrite::{
             analysis::LogicalPlanAnalysis,
@@ -30,7 +30,7 @@ use crate::{
             ValuesValues, WindowFunctionExprFun, WindowFunctionExprWindowFrame, WrappedSelectAlias,
             WrappedSelectDistinct, WrappedSelectJoinJoinType, WrappedSelectLimit,
             WrappedSelectOffset, WrappedSelectPushToCube, WrappedSelectSelectType,
-            WrappedSelectType,
+            WrappedSelectType, WrappedUnionAlias, WrappedUnionDistinct,
         },
         CubeContext,
     },
@@ -149,6 +149,20 @@ macro_rules! add_binary_expr_list_node {
                 .collect::<Result<Vec<_>, _>>()?;
             to_binary_tree($graph, &list)
         }
+    }};
+}
+
+/// A flat list node: every element is a child of one node. Lists are flat here, and the
+/// cons cells `add_plan_list_node!` builds are legacy.
+macro_rules! add_plan_flat_list_node {
+    ($converter:expr, $value_expr:expr, $query_params:expr, $ctx:expr, $field_variant:ident) => {{
+        let list = $value_expr
+            .iter()
+            .map(|expr| $converter.add_logical_plan_replace_params(expr, $query_params, $ctx))
+            .collect::<Result<Vec<_>, _>>()?;
+        $converter
+            .graph
+            .add(LogicalPlanLanguage::$field_variant(list))
     }};
 }
 
@@ -698,7 +712,8 @@ impl LogicalPlanToLanguageConverter {
                 self.graph.add(LogicalPlanLanguage::Repartition([input]))
             }
             LogicalPlan::Union(node) => {
-                let inputs = add_plan_list_node!(self, node.inputs, query_params, ctx, UnionInputs);
+                let inputs =
+                    add_plan_flat_list_node!(self, node.inputs, query_params, ctx, UnionInputs);
                 let alias = add_data_node!(self, node.alias, UnionAlias);
                 self.graph.add(LogicalPlanLanguage::Union([inputs, alias]))
             }
@@ -2370,6 +2385,40 @@ impl LanguageToLogicalPlanConverter {
                         alias,
                         distinct,
                         push_to_cube,
+                    )),
+                })
+            }
+            LogicalPlanLanguage::WrappedUnion(params) => {
+                let inputs = match_list_node_ids!(node_by_id, params[0], WrappedUnionInputs)
+                    .into_iter()
+                    .map(|n| self.to_logical_plan(n).map(Arc::new))
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                let distinct: bool = match_data_node!(node_by_id, params[1], WrappedUnionDistinct);
+                let alias: Option<String> =
+                    match_data_node!(node_by_id, params[2], WrappedUnionAlias);
+
+                let Some(first_input) = inputs.first() else {
+                    return Err(CubeError::internal(
+                        "Can't convert wrapped union with no inputs".to_string(),
+                    ));
+                };
+
+                // Same as `Union`: the inputs are union compatible, so the first one's schema
+                // stands for all of them
+                let schema = first_input.schema().as_ref().clone();
+                let schema = match alias {
+                    Some(ref alias) => schema.replace_qualifier(alias.as_str()),
+                    None => schema.strip_qualifiers(),
+                };
+
+                LogicalPlan::Extension(Extension {
+                    node: Arc::new(WrappedUnionNode::new(
+                        Arc::new(schema),
+                        inputs,
+                        distinct,
+                        alias,
+                        None,
                     )),
                 })
             }
