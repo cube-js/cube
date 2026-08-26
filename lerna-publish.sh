@@ -3,9 +3,36 @@ set -e
 
 . .gh-token
 
-BUMP=$1
-if [ "x$BUMP" == "x" ]; then
-  BUMP=patch
+usage() {
+  echo "Usage: $0 [bump] [-y|--yes]"
+  echo
+  echo "  bump        version bump to pass to lerna (default: patch)"
+  echo "  -y, --yes   skip lerna's confirmation prompt for the release step"
+  echo
+  echo "The release step asks for confirmation before it commits, tags, pushes and"
+  echo "creates the GitHub release. Pass --yes to run it unattended."
+}
+
+BUMP=patch
+CONFIRM=()
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -y|--yes) CONFIRM=(--yes) ;;
+    -h|--help) usage; exit 0 ;;
+    -*) echo "Error: unknown option: $1"; echo; usage; exit 1 ;;
+    *) BUMP="$1" ;;
+  esac
+  shift
+done
+
+# Without --yes the release step prompts, and lerna's prompt cannot be answered
+# where stdin is not a terminal - it fails there with a bare exit 1 that says
+# nothing about why. Say it here instead.
+if [ ${#CONFIRM[@]} -eq 0 ] && [ ! -t 0 ]; then
+  echo "Error: stdin is not a terminal, so the release step's confirmation prompt"
+  echo "cannot be answered. Re-run with --yes to release unattended."
+  exit 1
 fi
 
 # Cleanup below discards staged as well as unstaged changes to tracked files.
@@ -53,8 +80,10 @@ trap cleanup_bump EXIT
 trap 'cleanup_bump INT' INT
 trap 'cleanup_bump TERM' TERM
 
+# Always unattended: this bump is thrown away by the cleanup above, so there is
+# nothing for an operator to confirm. Only the release step below asks.
 echo "Step 1: bumping versions (no commit/push)..."
-yarn lerna version $BUMP \
+yarn lerna version "$BUMP" \
   --conventional-commits \
   --force-publish \
   --exact \
@@ -78,9 +107,9 @@ fi
 trap - EXIT INT TERM
 
 echo "Step 4: commit, tag and push version..."
-yarn lerna version $BUMP \
+yarn lerna version "$BUMP" \
   --conventional-commits \
   --force-publish \
   --exact \
   --create-release=github \
-  --yes
+  "${CONFIRM[@]}"
