@@ -8,6 +8,7 @@ use crate::{
         WrappedUnionAlias, WrapperReplacerContextAliasToCube,
         WrapperReplacerContextGroupedSubqueries, WrapperReplacerContextInputDataSource,
     },
+    transport::DataSource,
     var, var_iter,
 };
 use egg::{Id, Subst};
@@ -92,6 +93,7 @@ impl WrapperRules {
         let cube_members_out_var = var!(cube_members_out_var);
         let grouped_subqueries_out_var = var!(grouped_subqueries_out_var);
         let input_data_source_out_var = var!(input_data_source_out_var);
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             let Some(inputs) = Self::list_node_ids(egraph, subst[union_inputs_var]) else {
                 return false;
@@ -121,6 +123,16 @@ impl WrapperRules {
             let Some(data_source) = data_source else {
                 return false;
             };
+
+            // A data source that has no union template cannot render a set operation, and
+            // there is no way back to post processing once this plan is chosen
+            if !Self::can_rewrite_template(
+                &DataSource::Specific(&data_source),
+                &meta,
+                "statements/union",
+            ) {
+                return false;
+            }
 
             let mut list = egraph.add(LogicalPlanLanguage::WrappedUnionInputs(vec![]));
             for input in wrapped_inputs.into_iter().rev() {
@@ -173,49 +185,60 @@ impl WrapperRules {
     }
 
     /// Ids of every element of a `UnionInputs` list, in order.
+    ///
+    /// An e-class that holds more than one list is not a list this rule can read: picking
+    /// one of them would drop or reorder the queries of the union, and nothing downstream
+    /// checks that the list still matches the `Union` that was matched. Nothing merges two
+    /// different lists today, so this is a guard rather than a case to handle.
     fn list_node_ids(egraph: &CubeEGraph, list: Id) -> Option<Vec<Id>> {
         let mut ids = vec![];
         let mut seen = HashSet::new();
         let mut current = list;
         loop {
-            // A list that contains itself is not a list this rule can work with, and
-            // following it would not terminate
+            // A list that contains itself is not a list either, and following it would not
+            // terminate
             if !seen.insert(current) {
                 return None;
             }
-            let mut tail = None;
-            for node in egraph[current].nodes.iter() {
-                match node {
-                    LogicalPlanLanguage::UnionInputs(params) => match params[..] {
-                        [] => return Some(ids),
-                        [head, rest] => {
-                            ids.push(head);
-                            tail = Some(rest);
-                        }
-                        _ => return None,
-                    },
-                    _ => {}
-                }
-                if tail.is_some() {
-                    break;
-                }
+
+            let mut lists = egraph[current].nodes.iter().filter_map(|node| match node {
+                LogicalPlanLanguage::UnionInputs(params) => Some(params),
+                _ => None,
+            });
+            let list = lists.next()?;
+            if lists.next().is_some() {
+                return None;
             }
-            current = tail?;
+
+            match list[..] {
+                [] => return Some(ids),
+                [head, tail] => {
+                    ids.push(head);
+                    current = tail;
+                }
+                _ => return None,
+            }
         }
     }
 
     /// The plan a union input wraps, together with the data source it reaches, when that
     /// input is a wrapper that is still open for nodes to be pushed into it.
+    ///
+    /// One input can be wrapped in several ways, and the plan is the same in all of them, so
+    /// any one will do. The data source is not allowed to differ between them: this rule is
+    /// what decides that every input reaches the same one, and reading an arbitrary answer
+    /// to that question would let a union span two of them.
     fn wrapped_input(egraph: &CubeEGraph, input: Id) -> Option<(Id, String)> {
+        let mut wrapped = None;
         for node in egraph[input].nodes.iter() {
-            let LogicalPlanLanguage::CubeScanWrapper([wrapped, finalized]) = node else {
+            let LogicalPlanLanguage::CubeScanWrapper([plan, finalized]) = node else {
                 continue;
             };
             if !var_iter!(egraph[*finalized], CubeScanWrapperFinalized).any(|finalized| !finalized)
             {
                 continue;
             }
-            for node in egraph[*wrapped].nodes.iter() {
+            for node in egraph[*plan].nodes.iter() {
                 let LogicalPlanLanguage::WrapperPullupReplacer([plan, context]) = node else {
                     continue;
                 };
@@ -223,17 +246,20 @@ impl WrapperRules {
                     let LogicalPlanLanguage::WrapperReplacerContext(params) = node else {
                         continue;
                     };
-                    let Some(data_source) =
+                    for data_source in
                         var_iter!(egraph[params[6]], WrapperReplacerContextInputDataSource)
                             .flat_map(|data_source| data_source.clone())
-                            .next()
-                    else {
-                        continue;
-                    };
-                    return Some((*plan, data_source));
+                    {
+                        match &wrapped {
+                            None => wrapped = Some((*plan, data_source)),
+                            Some((_, wrapped_data_source))
+                                if wrapped_data_source == &data_source => {}
+                            Some(_) => return None,
+                        }
+                    }
                 }
             }
         }
-        None
+        wrapped
     }
 }

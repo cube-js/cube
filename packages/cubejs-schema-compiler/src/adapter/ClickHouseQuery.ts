@@ -295,6 +295,15 @@ export class ClickHouseQuery extends BaseQuery {
     '{% endfor %}' +
     ') AS dates';
 
+    // ClickHouse rejects a bare UNION unless `union_default_mode` is set, so a set
+    // operation has to say which one it is.
+    templates.statements.union = '{% for query in queries %}(\n' +
+      '{{ query | indent(2, true) }}\n' +
+      ')' +
+      '{% if not loop.last %}\nUNION {% if distinct %}DISTINCT{% else %}ALL{% endif %} {% endif %}' +
+      '{% endfor %}' +
+      '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}';
+
     return templates;
   }
 }

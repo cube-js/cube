@@ -844,8 +844,7 @@ impl CubeScanWrapperNode {
                     wrapped_union
                         .inputs
                         .iter()
-                        .map(|input| input.as_ref())
-                        .any(Self::has_ungrouped_wrapped_node)
+                        .any(|input| Self::has_ungrouped_wrapped_node(input))
                 } else {
                     false
                 }
@@ -1343,9 +1342,7 @@ impl WrappedUnionNode {
             limit,
         }
     }
-}
 
-impl WrappedUnionNode {
     /// Renders every input as its own query and joins them into one set operation.
     ///
     /// Every input has to reach the same data source: a set operation the data source
@@ -1445,6 +1442,11 @@ impl WrappedUnionNode {
         let column_remapping = column_remapping
             .map(|column_remapping| self.requalify_remapping(column_remapping, alias.as_deref()));
 
+        // The column names of the union are the first input's, so its remapping is the one
+        // that describes them for the plans above.
+        // TODO only the first input's request is carried up, so the request that travels
+        //  with this SQL describes one input out of several. `WrappedSelectNode` drops the
+        //  requests of its joins the same way
         Ok(SqlGenerationResult {
             data_source: Some(data_source),
             from_alias: alias,

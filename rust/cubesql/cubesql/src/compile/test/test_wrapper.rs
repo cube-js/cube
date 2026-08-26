@@ -3630,6 +3630,36 @@ async fn test_wrapper_union_different_data_sources_not_pushed_down() {
     );
 }
 
+/// A data source with no union template cannot render a set operation. The rule has to
+/// know that before the plan is chosen, because SQL generation has no way back to post
+/// processing.
+#[tokio::test]
+async fn test_wrapper_union_without_template_not_pushed_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = convert_select_to_query_plan_customized(
+        "SELECT 'MX' AS table_type, customer_gender AS market \
+         FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+         UNION ALL \
+         SELECT 'RX' AS table_type, content AS market FROM Logs GROUP BY 1, 2"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        // An empty template removes it from this data source
+        vec![("statements/union".to_string(), "".to_string())],
+    )
+    .await
+    .as_logical_plan();
+
+    assert!(
+        matches!(logical_plan, LogicalPlan::Union(_)),
+        "the union is left to post processing: {:?}",
+        logical_plan
+    );
+}
+
 /// A `Sort` directly above a union is not pushed down yet: the select it would be pushed
 /// into projects nothing, and a query without a projection is not SQL. The union itself is
 /// still pushed down, and the sort of its truncated result is still post processing that
