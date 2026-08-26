@@ -12,7 +12,7 @@ Multi-agent is useful when:
 - You need to isolate context (rules, certified queries, memories) between user groups.
 
 <Info>
-  `agents/config.yml` is the source of truth for spaces and agents: you declare them in YAML and Cube creates them for you when you [reconcile](#reconciliation). Agents can't be created in the UI, and their settings are read-only there; a space can be created by hand, but it won't satisfy a `spaces:` entry — see [Space scope](#space-scope). Cube links every record it creates to the entry it came from, and matches them by that entry's `name`.
+  `agents/config.yml` is the source of truth for spaces and agents: you declare them in YAML and Cube creates them for you when you [reconcile](#reconciliation). Neither spaces nor agents can be created in the UI, and their settings are read-only there. Cube links every record it creates to the entry it came from, and matches them by that entry's `name`.
 </Info>
 
 ## Architecture
@@ -159,12 +159,9 @@ Spaces live at the account level, so one space can be used by agents in more tha
 - **Global** — one space that agents in every deployment can use.
 - **Per deployment** — the space is available to a single deployment only.
 
-You pick the scope on the **Agents** → **Spaces** page, in two places:
+You pick the scope when you [reconcile](#reconciliation): the **Create All** panel's **Create Spaces** control offers **Global** and **Per deployment**. You can change the scope of an existing space later on its page, under **Agents** → **Spaces**.
 
-- **Create space**, when you create a space by hand. Such a space carries no link to a `spaces:` entry, so an entry declaring that space still reads as pending and reconciling creates a second one — declare it in YAML and [reconcile](#reconciliation) instead.
-- The **Create All** panel of [pending configurations](#reconciliation). Its **Create Spaces** control offers **Global** and **Per deployment**.
-
-Spaces created per deployment are named after the deployment, for example `Product (production)` and `Product (staging)`. Only the displayed name changes — the space stays linked to the `spaces:` entry it was created from, so the YAML entry keeps matching. You can change the scope of an existing space later on the space's page.
+Spaces created per deployment are named after the deployment, for example `Product (production)` and `Product (staging)`. Only the displayed name changes — the space stays linked to the `spaces:` entry it was created from, so the YAML entry keeps matching.
 
 Choose per-deployment scope when the same `spaces:` entry is declared in several deployments — typically development, staging, and production fed from branches of one data model — and you don't want them sharing what the space stores.
 
