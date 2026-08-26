@@ -289,21 +289,14 @@ The one exception is a metric whose parts live in different cubes, so there is
 no single cube it could belong to. A view can define its own
 [measures][ref-view-measures] and [dimensions][ref-view-dimensions] as long as
 their `sql` only combines members the view already includes — a member that
-reads a column instead is rejected at compile time. Here `orders` joins
-`line_items` `one_to_many`:
+reads a column instead is rejected at compile time:
 
 <CodeGroup>
 
 ```yaml title="YAML"
 views:
   - name: orders_overview
-    cubes:
-      - join_path: orders
-        includes:
-          - total_amount
-      - join_path: orders.line_items
-        includes:
-          - count
+    # cubes: … includes orders.total_amount and line_items.count
 
     measures:
       - name: average_line_value
@@ -314,16 +307,7 @@ views:
 
 ```javascript title="JavaScript"
 view(`orders_overview`, {
-  cubes: [
-    {
-      join_path: orders,
-      includes: [`total_amount`]
-    },
-    {
-      join_path: orders.line_items,
-      includes: [`count`]
-    }
-  ],
+  // cubes: … includes orders.total_amount and line_items.count
 
   measures: {
     average_line_value: {
@@ -339,9 +323,10 @@ view(`orders_overview`, {
 
 [`multi_stage`][ref-multi-stage] matters whenever the parts come from different
 cubes: it aggregates each of them before combining, instead of evaluating the
-expression inside one joined scan where a `one_to_many` join would inflate the
-numerator. If the cubes don't join to each other at all, see [multi-fact
-views][ref-multi-fact-views].
+expression inside one joined scan where a `one_to_many` join between them would
+inflate the numerator. If the cubes don't join to each other at all, see
+[multi-fact views][ref-multi-fact-views]. The full example, with the `cubes`
+block, is on the [view reference][ref-view-measures].
 
 ### Control visibility
 
