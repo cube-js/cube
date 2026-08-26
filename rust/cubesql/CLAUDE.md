@@ -134,10 +134,14 @@ transform that walks the list itself.
   exists) about nodes the **pattern** already bound. Relationships between several
   matched nodes — "both sides reach the same data source" — belong in the pattern, by
   reusing one pattern variable in both places, so unification enforces them.
-  Caveat worth knowing: `wrapper-subqueries-wrapped-scan-to-pull` (`rules/wrapper/subquery.rs`)
-  re-contexts any `wrapper_pushdown_replacer` over a finished `cube_scan_wrapper` without
-  comparing input data sources — see the `TODO` on it — so unification alone does not
-  currently guarantee data-source agreement for plan-level list elements.
+- A push-down replacer must never end up on top of an already pulled-up subtree. Inputs
+  that arrive as a finished `cube_scan_wrapper(wrapper_pullup_replacer(..))` — the queries
+  of a set operation, the sides of a join — have nothing left to push into, so their list
+  carries a **pull-up** replacer and is consumed by pull-up rules. Putting a push-down
+  replacer there instead makes `wrapper-subqueries-wrapped-scan-to-pull`
+  (`rules/wrapper/subquery.rs`) match, which re-contexts the element without comparing
+  input data sources — see the `TODO` on it. That rule is for the subquery path only;
+  reaching it from anywhere else means the rules above it are shaped wrong.
 
 ### Debugging Query Compilation
 ```bash

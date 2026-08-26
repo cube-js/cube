@@ -1667,6 +1667,22 @@ fn union(inputs: impl Display, alias: impl Display) -> String {
     format!("(Union {inputs} {alias})")
 }
 
+fn union_inputs(left: impl Display, right: impl Display) -> String {
+    format!("(UnionInputs {left} {right})")
+}
+
+fn union_inputs_empty_tail() -> String {
+    "(UnionInputs)".to_string()
+}
+
+fn wrapped_union_inputs(left: impl Display, right: impl Display) -> String {
+    format!("(WrappedUnionInputs {left} {right})")
+}
+
+fn wrapped_union_inputs_empty_tail() -> String {
+    "(WrappedUnionInputs)".to_string()
+}
+
 fn wrapped_select_filter_expr(left: impl Display, right: impl Display) -> String {
     format!("(WrappedSelectFilterExpr {} {})", left, right)
 }
