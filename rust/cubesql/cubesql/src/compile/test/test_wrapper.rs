@@ -3660,6 +3660,50 @@ async fn test_wrapper_union_without_template_not_pushed_down() {
     );
 }
 
+/// A union left to post processing keeps every one of its queries. `UnionInputs` is a flat
+/// list, so the converter reads it back with `match_list_node_ids!` rather than by walking
+/// cons cells — this pins that round trip at more than two queries, where the two shapes
+/// differ.
+#[tokio::test]
+async fn test_wrapper_union_three_queries_not_pushed_down_keeps_every_query() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = convert_select_to_query_plan_customized(
+        "SELECT 'MX' AS table_type, customer_gender AS market \
+         FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+         UNION ALL \
+         SELECT 'RX' AS table_type, content AS market FROM Logs GROUP BY 1, 2 \
+         UNION ALL \
+         SELECT 'DX' AS table_type, notes AS market \
+         FROM KibanaSampleDataEcommerce GROUP BY 1, 2"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        // An empty template removes it from this data source
+        vec![("statements/union".to_string(), "".to_string())],
+    )
+    .await
+    .as_logical_plan();
+
+    let LogicalPlan::Union(union) = &logical_plan else {
+        panic!("the union is left to post processing: {:?}", logical_plan);
+    };
+    assert_eq!(
+        union.inputs.len(),
+        3,
+        "every query survives the round trip: {:?}",
+        logical_plan
+    );
+    assert_eq!(
+        logical_plan.find_cube_scans().len(),
+        3,
+        "every query keeps its own scan: {:?}",
+        logical_plan
+    );
+}
+
 /// A `Sort` directly above a union is not pushed down yet: the select it would be pushed
 /// into projects nothing, and a query without a projection is not SQL. The union itself is
 /// still pushed down, and the sort of its truncated result is still post processing that
