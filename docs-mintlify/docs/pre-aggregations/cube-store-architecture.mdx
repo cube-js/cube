@@ -1014,7 +1014,7 @@ can pick it up, and it is written to the cache under its cache key — so a
 result set larger than the transport limit cannot be delivered at all,
 however fast the query that produced it was.
 
-A cache entry above `CUBESTORE_CACHE_MAX_ENTRY_SIZE` is rejected explicitly,
+A cache entry at or above `CUBESTORE_CACHE_MAX_ENTRY_SIZE` is rejected explicitly,
 with `Unable to SET cache with '<key>' key, exceeds maximum allowed size for
 payload: <size>, max allowed: <limit>`.
 
