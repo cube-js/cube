@@ -9,7 +9,7 @@ use crate::{
         WrapperReplacerContextGroupedSubqueries, WrapperReplacerContextInputDataSource,
     },
     transport::DataSource,
-    var, var_iter,
+    var, var_iter, var_list_iter,
 };
 use egg::{Id, Subst};
 use std::collections::HashSet;
@@ -186,39 +186,46 @@ impl WrapperRules {
 
     /// Ids of every element of a `UnionInputs` list, in order.
     ///
-    /// An e-class that holds more than one list is not a list this rule can read: picking
-    /// one of them would drop or reorder the queries of the union, and nothing downstream
-    /// checks that the list still matches the `Union` that was matched. Nothing merges two
-    /// different lists today, so this is a guard rather than a case to handle.
+    /// Mirrors `match_list_node_ids!`, which the converter uses to read this same list: an
+    /// element is any node that is not itself a `UnionInputs`, so the traversal does not
+    /// depend on the list being cons cells the way `add_plan_list_node!` builds it today.
+    ///
+    /// Unlike the converter it reads e-classes rather than one node per id, so it fails
+    /// closed where the converter has no such case: an e-class holding more than one
+    /// `UnionInputs` is not a list this rule can read, since picking one of them would drop
+    /// or reorder the queries of the union, and nothing downstream checks that the list
+    /// still matches the `Union` that was matched.
     fn list_node_ids(egraph: &CubeEGraph, list: Id) -> Option<Vec<Id>> {
-        let mut ids = vec![];
-        let mut seen = HashSet::new();
-        let mut current = list;
-        loop {
-            // A list that contains itself is not a list either, and following it would not
-            // terminate
-            if !seen.insert(current) {
-                return None;
-            }
-
-            let mut lists = egraph[current].nodes.iter().filter_map(|node| match node {
-                LogicalPlanLanguage::UnionInputs(params) => Some(params),
-                _ => None,
-            });
-            let list = lists.next()?;
+        fn collect(
+            egraph: &CubeEGraph,
+            id: Id,
+            seen: &mut HashSet<Id>,
+            ids: &mut Vec<Id>,
+        ) -> Option<()> {
+            let mut lists = var_list_iter!(egraph[id], UnionInputs);
+            let Some(list) = lists.next() else {
+                // Not a list node, so it is an element of the list that holds it
+                ids.push(id);
+                return Some(());
+            };
             if lists.next().is_some() {
                 return None;
             }
-
-            match list[..] {
-                [] => return Some(ids),
-                [head, tail] => {
-                    ids.push(head);
-                    current = tail;
-                }
-                _ => return None,
+            // A list that contains itself is not a list either, and following it would not
+            // terminate
+            if !seen.insert(id) {
+                return None;
             }
+
+            for id in list {
+                collect(egraph, *id, seen, ids)?;
+            }
+            Some(())
         }
+
+        let mut ids = vec![];
+        collect(egraph, list, &mut HashSet::new(), &mut ids)?;
+        Some(ids)
     }
 
     /// The plan a union input wraps, together with the data source it reaches, when that
