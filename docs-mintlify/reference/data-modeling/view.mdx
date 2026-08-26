@@ -579,13 +579,14 @@ bare `{member}` does not resolve inside a view.
 <CodeGroup>
 
 ```yaml title="YAML"
+# orders joins line_items one_to_many
 views:
   - name: orders_overview
     cubes:
       - join_path: orders
         includes:
           - total_amount
-      - join_path: line_items
+      - join_path: orders.line_items
         includes:
           - count
 
@@ -604,7 +605,7 @@ view(`orders_overview`, {
       includes: [`total_amount`]
     },
     {
-      join_path: line_items,
+      join_path: orders.line_items,
       includes: [`count`]
     }
   ],

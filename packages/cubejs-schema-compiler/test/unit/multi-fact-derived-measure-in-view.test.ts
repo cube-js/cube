@@ -419,8 +419,10 @@ views:
   it('aggregates each side before dividing when the measure is multi_stage', () => {
     const sql = buildFanOutSql('orders_overview.average_line_value_multi_stage');
 
-    // `sum` is taken in a leg that never joins line_items, so nothing multiplies it.
-    expect(sql).toMatch(/sum\("orders"\.amount\) "orders__total_amount"[\s\S]*?GROUP BY 1/);
+    // `sum` is taken in a leg that never joins line_items, so nothing multiplies
+    // it. The span is tempered against `line_items` so the assertion fails if
+    // that leg ever picks the join back up.
+    expect(sql).toMatch(/sum\("orders"\.amount\) "orders__total_amount"(?:(?!line_items)[\s\S])*?GROUP BY 1/);
     expect(sql).not.toMatch(/sum\("orders"\.amount\) \/ NULLIF/);
     // The division happens over the two aggregated columns.
     expect(sql).toMatch(/"orders__total_amount" \/ NULLIF\("[^"]+"\."line_items__count", 0\)/);
