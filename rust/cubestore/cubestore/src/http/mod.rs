@@ -82,21 +82,40 @@ const TRANSPORT_SIZE_HEADROOM: usize = 2;
 /// `CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE` or `CUBESTORE_TRANSPORT_MAX_FRAME_SIZE`,
 /// and renders it as a close reason. `warp` boxes the underlying `tungstenite`
 /// error, so it has to be recovered through `source()`.
-fn message_too_large_reason(e: &warp::Error) -> Option<String> {
+fn message_too_large_reason(
+    e: &warp::Error,
+    max_message_size: usize,
+    max_frame_size: usize,
+) -> Option<String> {
     match e.source()?.downcast_ref::<tungstenite::Error>()? {
         tungstenite::Error::Capacity(tungstenite::error::CapacityError::MessageTooLong {
             size,
             max_size,
-        }) => Some(format!(
-            "Message of {} bytes exceeds the maximum message size of {} bytes",
-            size,
+        }) => {
             // `max_size` is the backstop the transport was configured with,
             // which is the configured limit times the headroom. Report what
             // the operator actually set, since that is the number they can
-            // change -- and divide rather than naming the message limit, so
-            // that a frame limit configured below it reports itself.
-            max_size / TRANSPORT_SIZE_HEADROOM
-        )),
+            // change.
+            let configured = max_size / TRANSPORT_SIZE_HEADROOM;
+            // The same error covers both caps and doesn't say which one
+            // fired, so the value has to name the knob: a frame limit
+            // configured below the message limit would otherwise be reported
+            // as a message limit that never refused anything, sending an
+            // operator to the wrong environment variable. When the two are
+            // equal, as they are by default, the number is the same either
+            // way and the message limit is the one to name.
+            let limit = if configured == max_message_size {
+                "message"
+            } else if configured == max_frame_size {
+                "frame"
+            } else {
+                "transport"
+            };
+            Some(format!(
+                "Message of {} bytes exceeds the maximum {} size of {} bytes",
+                size, limit, configured
+            ))
+        }
         _ => None,
     }
 }
@@ -255,7 +274,7 @@ impl HttpServer {
                                         // reserved for this instead of dropping the connection
                                         // silently, so the client can report the size rather than
                                         // a bare disconnect it would otherwise retry.
-                                        match message_too_large_reason(&e) {
+                                        match message_too_large_reason(&e, max_message_size, max_frame_size) {
                                             Some(reason) => {
                                                 error!("Websocket message too large: {}", reason);
                                                 let send_res = web_socket.send(
@@ -2022,6 +2041,82 @@ mod tests {
                     frame.reason.contains(&format!(
                         "exceeds the maximum message size of {} bytes",
                         max_message_size
+                    )),
+                    "unexpected close reason: {}",
+                    frame.reason
+                );
+            }
+            msg => panic!("Close frame expected, got: {:?}", msg),
+        }
+
+        http_server.stop_processing().await;
+        Ok(())
+    }
+
+    /// The close reason names whichever limit refused the message. The same
+    /// capacity error covers both, so a frame limit configured below the
+    /// message limit would otherwise be reported as a message limit that never
+    /// refused anything.
+    #[tokio::test]
+    async fn ws_message_too_large_names_the_frame_limit_test() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let max_frame_size = 4 * 1024;
+        let max_message_size = max_frame_size * 4;
+        let mut auth = MockSqlAuthService::new();
+        auth.expect_authenticate().return_const(Ok(None));
+
+        let http_server = Arc::new(HttpServer::new(
+            "127.0.0.1:53035".to_string(),
+            Arc::new(auth),
+            Arc::new(SqlServiceMock {
+                message_counter: AtomicU64::new(0),
+            }),
+            Duration::from_millis(100),
+            Duration::from_millis(10000),
+            Duration::from_millis(1000),
+            max_message_size,
+            max_frame_size,
+        ));
+        {
+            let http_server = http_server.clone();
+            cube_ext::spawn(async move { http_server.run_server().await });
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let (mut socket, _) = connect_async(Url::parse("ws://127.0.0.1:53035/ws").unwrap())
+            .await
+            .unwrap();
+
+        // Past the frame backstop but inside the message one, so the frame
+        // limit is what refuses it.
+        socket
+            .send(Message::binary(
+                HttpMessage {
+                    message_id: 1,
+                    command: HttpCommand::Query {
+                        query: "s".repeat(max_frame_size * TRANSPORT_SIZE_HEADROOM * 2),
+                        inline_tables: vec![],
+                        trace_obj: None,
+                        parameters: None,
+                        response_format: QueryResultFormat::Legacy,
+                    },
+                    connection_id: Some("foo".to_string()),
+                }
+                .bytes(),
+            ))
+            .await
+            .unwrap();
+
+        let msg = socket.next().await.unwrap().unwrap();
+        match msg {
+            Message::Close(Some(frame)) => {
+                assert_eq!(u16::from(frame.code), MESSAGE_TOO_BIG_CLOSE_CODE);
+                assert!(
+                    frame.reason.contains(&format!(
+                        "exceeds the maximum frame size of {} bytes",
+                        max_frame_size
                     )),
                     "unexpected close reason: {}",
                     frame.reason

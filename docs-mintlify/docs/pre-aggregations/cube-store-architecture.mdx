@@ -1028,9 +1028,11 @@ Reduce the size of the query, e.g. by sending fewer or smaller inline tables,
 or raise CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE.
 ```
 
-That holds up to twice the configured limit. A message beyond it is refused
-before it can be attributed to a query, so the connection is closed instead
-and the other queries multiplexed over it are re-sent on a new one.
+That holds up to twice whichever of the two transport limits above is lower.
+A message beyond it is refused before it can be attributed to a query, so the
+connection is closed instead and the other queries multiplexed over it are
+re-sent on a new one. The close names the limit that refused it, so it says
+which of the two to raise.
 
 A result too large for Cube's own limit is reported the same way, as
 `Cube Store response size exceeds the maximum message size of 100 MB`. That
