@@ -308,6 +308,101 @@ The combined result shows measures from each fact table side by side:
 Charlie has no orders and Diana has no returns — both are still included
 with `NULL` values for the missing fact table.
 
+## Combining facts in one measure
+
+Putting measures from two facts side by side is often not the goal — you want a
+single metric derived from both, such as revenue per order where revenue and
+order count come from different fact tables. Neither cube can define it, because
+neither can reference the other's measures.
+
+Define it on the view instead, and mark it [`multi_stage`][ref-multi-stage]:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: customer_overview
+    cubes:
+      - join_path: orders
+        prefix: true
+        includes:
+          - count
+          - total_amount
+      - join_path: returns
+        prefix: true
+        includes:
+          - total_refund
+      - join_path: customers
+        includes:
+          - name
+          - city
+      - join_path: dates
+        includes:
+          - date
+
+    measures:
+      - name: refund_rate
+        type: number
+        multi_stage: true
+        sql: "{CUBE.returns_total_refund} / NULLIF({CUBE.orders_total_amount}, 0)"
+```
+
+```javascript title="JavaScript"
+view(`customer_overview`, {
+  cubes: [
+    {
+      join_path: orders,
+      prefix: true,
+      includes: [`count`, `total_amount`]
+    },
+    {
+      join_path: returns,
+      prefix: true,
+      includes: [`total_refund`]
+    },
+    {
+      join_path: customers,
+      includes: [`name`, `city`]
+    },
+    {
+      join_path: dates,
+      includes: [`date`]
+    }
+  ],
+
+  measures: {
+    refund_rate: {
+      type: `number`,
+      multi_stage: true,
+      sql: `${CUBE.returns_total_refund} / NULLIF(${CUBE.orders_total_amount}, 0)`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+`multi_stage` is what makes this work. It defers the expression to a stage that
+runs _after_ the per-fact subqueries have been aggregated and joined, so the
+division happens once per row of the combined result:
+
+```sql
+-- one aggregating subquery per fact, at the query's grain
+SUM(orders.amount)   GROUP BY city
+SUM(returns.refund)  GROUP BY city
+-- final stage, once the two are joined on city
+total_refund / NULLIF(total_amount, 0)
+```
+
+Without `multi_stage`, the same expression is planned as an ordinary calculated
+measure. Cube then looks for a single join tree covering both fact cubes, finds
+none — the facts only meet through the shared dimensions — and the query fails
+with `Can't find join path to join …`, naming both facts. If you see that error
+on a measure that spans facts, `multi_stage` is what's missing.
+
+The measure is queried like any other, on its own or next to its components, and
+grouped by any of the shared dimensions.
+
 ## Joining views in the SQL API
 
 You don't have to define a dedicated multi-fact view to get multi-fact
@@ -518,14 +613,28 @@ the multi-fact join on the full set of common dimensions.
 **Common dimension filters** (like `city = 'New York'` or `date > '2025-01-01'`)
 are applied to every subquery, ensuring consistent filtering across all facts.
 
-**Fact-specific filters** (like `orders.status = 'completed'`) are applied only
-to that fact's subquery. Other fact subqueries remain unaffected.
-
 **Measure filters** (like `orders_count > 1`) are applied as `HAVING`
 conditions after the subqueries are joined.
 
-[Segments][ref-segments] that belong to a specific fact table are applied only
-to that fact's subquery.
+**Fact-specific filters and [segments][ref-segments]** — anything that belongs to
+one fact table rather than a shared dimension — can't be used in a multi-fact
+query. Every grouped dimension, filter and segment has to be reachable from all
+facts, so a query that carries one fails with `Can't find join path to join …`.
+The same members are fine as soon as only that fact's measures are requested,
+since the query is no longer multi-fact.
+
+To narrow one fact inside a multi-fact query, put the condition in the measure's
+own [`filters`][ref-measure-filters] on its cube. It travels with the measure
+into that fact's subquery and leaves the others alone:
+
+```yaml
+measures:
+  - name: completed_amount
+    sql: amount
+    type: sum
+    filters:
+      - sql: "{CUBE}.status = 'completed'"
+```
 
 ## Join path requirements
 
@@ -533,9 +642,13 @@ to that fact's subquery.
 - Dimension tables should be included in the view at **root-level join paths**,
   not nested under a specific fact (e.g., `customers`, not `orders.customers`)
 - Use `prefix` on fact cubes to disambiguate identically named members
+- Everything a multi-fact query groups or filters by must be shared by all facts
 
 [ref-views]: /docs/data-modeling/views
 [ref-view-ref]: /reference/data-modeling/view
 [ref-segments]: /reference/data-modeling/segments
+[ref-measure-filters]: /reference/data-modeling/measures#filters
+[ref-multi-stage]: /reference/data-modeling/measures#multi_stage
+[ref-view-measures]: /reference/data-modeling/view#measures
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [link-tesseract]: https://cube.dev/blog/introducing-tesseract
