@@ -368,11 +368,14 @@ describe('WebSocketConnection', () => {
       const promise = query('SELECT 1');
 
       await expect(promise).rejects.toThrow(MessageTooLargeError);
+      // The reason replaces the generic clause rather than being appended to
+      // it, so the sizes are stated once.
       await expect(promise).rejects.toThrow(
-        'Cube Store closed the connection: message size exceeds the maximum message size Cube Store accepts. ' +
+        'Cube Store closed the connection: ' +
         'Message of 16452 bytes exceeds the maximum message size of 4096 bytes. ' +
         'Reduce the size of the query and of the inline tables it sends, or raise ' +
-        'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE on the Cube Store side.'
+        'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE or CUBESTORE_TRANSPORT_MAX_FRAME_SIZE ' +
+        'on the Cube Store side.'
       );
 
       // Re-sent once before the size is reported, same as an over-limit
@@ -394,7 +397,22 @@ describe('WebSocketConnection', () => {
       await expect(promise).rejects.toThrow(
         'Cube Store closed the connection: message size exceeds the maximum message size Cube Store accepts. ' +
         'Reduce the size of the query and of the inline tables it sends, or raise ' +
-        'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE on the Cube Store side.'
+        'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE or CUBESTORE_TRANSPORT_MAX_FRAME_SIZE ' +
+        'on the Cube Store side.'
+      );
+    }, JEST_TIMEOUT);
+
+    it('does not double the full stop when 1009 carries a punctuated reason', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      server.handler = (message, mockConnection) => {
+        mockConnection.ws.close(1009, 'Message too big.');
+      };
+
+      const promise = query('SELECT 1');
+
+      await expect(promise).rejects.toThrow(
+        'Cube Store closed the connection: Message too big. Reduce the size of the query'
       );
     }, JEST_TIMEOUT);
   });

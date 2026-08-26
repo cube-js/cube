@@ -193,16 +193,25 @@ export class WebSocketConnection {
           const pending = Object.keys(webSocket.sentMessages);
 
           if (pending.length) {
-            // Cube Store names the size and the limit in the close reason. A
-            // peer that closes with 1009 and no reason -- an intermediary, or
-            // an older Cube Store -- leaves only the generic wording.
-            const closeReason = reason?.length ? `${reason}. ` : '';
+            // Cube Store names the size and the limit that refused it here,
+            // which is strictly better than the generic wording, so it
+            // replaces it rather than being appended to it. Peer-supplied
+            // text lands in an error a user reads, so control characters are
+            // folded out and the trailing full stop is normalised rather than
+            // assumed absent. A peer that closes with 1009 and no reason --
+            // an intermediary, or an older Cube Store -- keeps the generic
+            // wording, which is the only reason it still exists.
+            const closeReason = reason?.length
+              // eslint-disable-next-line no-control-regex
+              ? `${reason}`.replace(/[\u0000-\u001F\u007F]+/g, ' ').replace(/\s*\.?\s*$/, '')
+              : '';
             const fatalError = webSocket.fatalError || (
               // Cube Store refused a message that didn't fit into its limits.
               code === MESSAGE_TOO_BIG_CLOSE_CODE ? new MessageTooLargeError(
-                `Cube Store closed the connection: message size exceeds the maximum message size Cube Store accepts. ${closeReason}`
+                `Cube Store closed the connection: ${closeReason || 'message size exceeds the maximum message size Cube Store accepts'}. `
                 + 'Reduce the size of the query and of the inline tables it sends, or raise '
-                + 'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE on the Cube Store side.'
+                + 'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE or CUBESTORE_TRANSPORT_MAX_FRAME_SIZE '
+                + 'on the Cube Store side.'
               ) : null
             );
 
