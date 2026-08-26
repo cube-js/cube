@@ -3439,13 +3439,14 @@ async fn test_wrapper_limitless_post_processing_union_of_distinct_selects() {
 
     // Nothing is left above the pushed down query
     let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-    assert!(sql.contains("UNION"), "union is pushed down: {sql}");
+    assert!(sql.contains("UNION"), "union is pushed down: {}", sql);
     assert!(
         logical_plan
             .find_cube_scans()
             .iter()
             .all(|scan| { scan.request.ungrouped == Some(true) && scan.request.limit.is_none() }),
-        "the queries themselves stay unlimited, inside the pushed down SQL: {logical_plan:?}"
+        "the queries themselves stay unlimited, inside the pushed down SQL: {:?}",
+        logical_plan
     );
 }
 
@@ -3471,10 +3472,11 @@ async fn test_wrapper_union_all_push_down() {
 
     let logical_plan = query_plan.as_logical_plan();
     let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-    assert!(sql.contains("UNION ALL"), "union is pushed down: {sql}");
+    assert!(sql.contains("UNION ALL"), "union is pushed down: {}", sql);
     assert!(
         sql.contains("KibanaSampleDataEcommerce.customer_gender") && sql.contains("Logs.content"),
-        "both queries are in the pushed down SQL: {sql}"
+        "both queries are in the pushed down SQL: {}",
+        sql
     );
     // The row cap lands on the result of the whole set operation, not on either query
     assert!(
@@ -3482,7 +3484,8 @@ async fn test_wrapper_union_all_push_down() {
             "LIMIT {}",
             ConfigObjImpl::default().non_streaming_query_max_row_limit
         )),
-        "the row cap bounds the union: {sql}"
+        "the row cap bounds the union: {}",
+        sql
     );
 }
 
@@ -3509,7 +3512,8 @@ async fn test_wrapper_union_distinct_push_down() {
     let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(
         sql.contains("UNION") && !sql.contains("UNION ALL"),
-        "distinct union is pushed down as UNION: {sql}"
+        "distinct union is pushed down as UNION: {}",
+        sql
     );
 }
 
@@ -3542,7 +3546,8 @@ async fn test_wrapper_union_three_queries_push_down() {
     assert_eq!(
         sql.matches("UNION ALL").count(),
         2,
-        "all three queries are pushed down: {sql}"
+        "all three queries are pushed down: {}",
+        sql
     );
 }
 
@@ -3570,13 +3575,15 @@ async fn test_wrapper_union_filter_push_down() {
     let logical_plan = query_plan.as_logical_plan();
     assert!(
         logical_plan.find_filter().is_none(),
-        "no filter is left to post processing: {logical_plan:?}"
+        "no filter is left to post processing: {:?}",
+        logical_plan
     );
     let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-    assert!(sql.contains("UNION ALL"), "union is pushed down: {sql}");
+    assert!(sql.contains("UNION ALL"), "union is pushed down: {}", sql);
     assert!(
         sql.contains("WHERE"),
-        "the filter reads from the pushed down union: {sql}"
+        "the filter reads from the pushed down union: {}",
+        sql
     );
 }
 
@@ -3613,11 +3620,13 @@ async fn test_wrapper_union_different_data_sources_not_pushed_down() {
     assert_eq!(
         logical_plan.find_cube_scans().len(),
         2,
-        "every query keeps its own scan: {logical_plan:?}"
+        "every query keeps its own scan: {:?}",
+        logical_plan
     );
     assert!(
         matches!(logical_plan, LogicalPlan::Union(_)),
-        "the union is left to post processing: {logical_plan:?}"
+        "the union is left to post processing: {:?}",
+        logical_plan
     );
 }
 
@@ -3644,13 +3653,14 @@ async fn test_wrapper_union_sort_left_to_post_processing() {
             .as_logical_plan();
     assert!(
         matches!(logical_plan, LogicalPlan::Sort(_)),
-        "the sort is left to post processing: {logical_plan:?}"
+        "the sort is left to post processing: {:?}",
+        logical_plan
     );
     let sql = logical_plan
         .find_cube_scan_wrapped_sql_deep()
         .wrapped_sql
         .sql;
-    assert!(sql.contains("UNION ALL"), "union is pushed down: {sql}");
+    assert!(sql.contains("UNION ALL"), "union is pushed down: {}", sql);
 
     let mut config = ConfigObjImpl::default();
     config.fail_on_limitless_post_processing = true;
@@ -3663,7 +3673,8 @@ async fn test_wrapper_union_sort_left_to_post_processing() {
         error
             .to_string()
             .contains("CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING"),
-        "unexpected error: {error}"
+        "unexpected error: {}",
+        error
     );
 }
 
@@ -3699,12 +3710,13 @@ async fn test_wrapper_union_limited_query_push_down() {
     );
 
     let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-    assert!(sql.contains("UNION ALL"), "union is pushed down: {sql}");
+    assert!(sql.contains("UNION ALL"), "union is pushed down: {}", sql);
     assert!(
         sql.trim_end().ends_with(&format!(
             "LIMIT {}",
             ConfigObjImpl::default().non_streaming_query_max_row_limit
         )),
-        "the row cap bounds the union: {sql}"
+        "the row cap bounds the union: {}",
+        sql
     );
 }

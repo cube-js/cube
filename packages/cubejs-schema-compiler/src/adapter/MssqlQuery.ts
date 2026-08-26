@@ -359,6 +359,16 @@ export class MssqlQuery extends BaseQuery {
       '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}\nOFFSET {% if offset is not none %}{{ offset }}{% else %}0{% endif %} ROWS' +
       '\nFETCH NEXT {% if limit is not none %}{{ limit }}{% else %}2147483647{% endif %} ROWS ONLY{% endif %}' +
       '{% if ctes %}\nOPTION (MAXRECURSION 0){% endif %}';
+    // T-SQL has no LIMIT, and neither TOP nor OFFSET/FETCH can be attached to a set
+    // operation directly (OFFSET/FETCH also requires an ORDER BY), so a bounded set
+    // operation is read through a derived table.
+    templates.statements.union = '{% if limit is not none %}SELECT TOP {{ limit }} * FROM (\n{% endif %}' +
+      '{% for query in queries %}(\n' +
+      '{{ query | indent(2, true) }}\n' +
+      ')' +
+      '{% if not loop.last %}\nUNION {% if not distinct %}ALL {% endif %}{% endif %}' +
+      '{% endfor %}' +
+      '{% if limit is not none %}\n) AS union_result{% endif %}';
     // MSSQL has no boolean type — a segment projected as a dimension must be a BIT.
     templates.expressions.wrap_segment_select = 'CAST((CASE WHEN {{ expr }} THEN 1 ELSE 0 END) AS BIT)';
     // Reading a segment back from a pre-aggregation: it is a stored BIT column,

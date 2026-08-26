@@ -245,6 +245,13 @@ export class OracleQuery extends BaseQuery {
       '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
       '{% if offset is not none %}\nOFFSET {{ offset }} ROWS{% endif %}' +
       '{% if limit is not none %}\nFETCH NEXT {{ limit }} ROWS ONLY{% endif %}';
+    // Oracle row-limiting syntax again: the base template ends a set operation with LIMIT.
+    templates.statements.union = '{% for query in queries %}(\n' +
+      '{{ query | indent(2, true) }}\n' +
+      ')' +
+      '{% if not loop.last %}\nUNION {% if not distinct %}ALL {% endif %}{% endif %}' +
+      '{% endfor %}' +
+      '{% if limit is not none %}\nFETCH NEXT {{ limit }} ROWS ONLY{% endif %}';
     // Oracle has no `::` cast and no `VALUES` row-constructor table source. Build the
     // series with TO_TIMESTAMP + UNION ALL SELECT ... FROM DUAL, and no `AS` before
     // the derived-table alias (Oracle forbids it). `seria` items are [from, to] pairs.
