@@ -812,30 +812,15 @@ export class QueryQueue {
   protected async retrieveQueryForProcessing(queryKeyHashed: QueryKeyHash, queueId: QueueId): Promise<RetrieveForProcessingSuccess | null> {
     const queueConnection = await this.queueDriver.createConnection();
 
-    let query;
-
     try {
       const retrieved = await queueConnection.retrieveForProcessing(queryKeyHashed, queueId);
       if (!retrieved) {
-        query = await queueConnection.getQueryDef(queryKeyHashed, null);
-
-        // TODO Ideally streaming queries should reconcile queue here after waiting on open slot however in practice continue wait timeout reconciles faster CPU-wise
-        // if (query?.queryHandler === 'stream') {
-        //   const [active] = await queueConnection.getQueryStageState(true);
-        //   if (active && active.length > 0) {
-        //     await Promise.race(active.map(keyHash => queueConnection.getResultBlocking(keyHash)));
-        //     await this.reconcileQueue();
-        //   }
-        // }
-
         this.logger('Skip processing', {
           queueId,
-          queryKey: query && query.queryKey || queryKeyHashed,
-          requestId: query && query.requestId,
+          queryKey: queryKeyHashed,
           queuePrefix: this.redisQueuePrefix,
-          query,
-          queryExists: !!query
         });
+
         return null;
       }
 
@@ -843,8 +828,7 @@ export class QueryQueue {
     } catch (e: any) {
       this.logger('Queue storage error', {
         queueId,
-        queryKey: query && query.queryKey || queryKeyHashed,
-        requestId: query && query.requestId,
+        queryKey: queryKeyHashed,
         error: (e.stack || e).toString(),
         queuePrefix: this.redisQueuePrefix
       });
