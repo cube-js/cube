@@ -89,7 +89,13 @@ fn message_too_large_reason(e: &warp::Error) -> Option<String> {
             max_size,
         }) => Some(format!(
             "Message of {} bytes exceeds the maximum message size of {} bytes",
-            size, max_size
+            size,
+            // `max_size` is the backstop the transport was configured with,
+            // which is the configured limit times the headroom. Report what
+            // the operator actually set, since that is the number they can
+            // change -- and divide rather than naming the message limit, so
+            // that a frame limit configured below it reports itself.
+            max_size / TRANSPORT_SIZE_HEADROOM
         )),
         _ => None,
     }
@@ -2010,8 +2016,13 @@ mod tests {
         match msg {
             Message::Close(Some(frame)) => {
                 assert_eq!(u16::from(frame.code), MESSAGE_TOO_BIG_CLOSE_CODE);
+                // The configured limit, not the backstop the transport is
+                // given: that is the number an operator set and can change.
                 assert!(
-                    frame.reason.contains("exceeds the maximum message size"),
+                    frame.reason.contains(&format!(
+                        "exceeds the maximum message size of {} bytes",
+                        max_message_size
+                    )),
                     "unexpected close reason: {}",
                     frame.reason
                 );
@@ -2089,7 +2100,10 @@ mod tests {
             .error()
             .unwrap_or_default();
         assert!(
-            error.contains("exceeds the maximum message size"),
+            error.contains(&format!(
+                "exceeds the maximum message size of {} bytes",
+                max_message_size
+            )),
             "unexpected error: {}",
             error
         );
