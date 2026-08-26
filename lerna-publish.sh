@@ -27,13 +27,13 @@ if git status --porcelain | grep -q '^ M yarn.lock'; then
   GIT_PAGER=cat git diff yarn.lock
 
   echo "Step 4: cleaning up temporary version bump..."
-  git restore .
+  git restore --staged --worktree .
 
   exit 1
 fi
 
 echo "Step 4: cleaning up temporary version bump..."
-git restore .
+git restore --staged --worktree .
 
 echo "Step 5: commit, tag and push version..."
 yarn lerna version $BUMP \
@@ -41,3 +41,4 @@ yarn lerna version $BUMP \
   --force-publish \
   --exact \
   --create-release=github \
+  --yes
