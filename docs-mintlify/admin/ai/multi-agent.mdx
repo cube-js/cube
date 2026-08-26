@@ -12,7 +12,7 @@ Multi-agent is useful when:
 - You need to isolate context (rules, certified queries, memories) between user groups.
 
 <Info>
-  `agents/config.yml` is the source of truth for spaces and agents: you declare them in YAML and Cube creates them for you when you [reconcile](#reconciliation). Agents can't be created in the UI, and their settings are read-only there. A space can be created by hand, but it isn't linked to any `spaces:` entry — declare it in YAML and reconcile instead, so the entry matches. Entries are matched to what already exists by their `name` field.
+  `agents/config.yml` is the source of truth for spaces and agents: you declare them in YAML and Cube creates them for you when you [reconcile](#reconciliation). Agents can't be created in the UI, and their settings are read-only there; a space can be, but not linked to a `spaces:` entry — see [Space scope](#space-scope). Entries are matched to what already exists by their `name` field.
 </Info>
 
 ## Architecture
@@ -161,7 +161,7 @@ Spaces live at the account level, so one space can be used by agents in more tha
 
 You pick the scope on the **Agents** → **Spaces** page, in two places:
 
-- **Create space**, when you create a space by hand.
+- **Create space**, when you create a space by hand. Such a space carries no link to a `spaces:` entry, so an entry declaring that space still reads as pending and reconciling creates a second one — declare it in YAML and [reconcile](#reconciliation) instead.
 - The **Create All** panel of [pending configurations](#reconciliation). Its **Create Spaces** control offers **Global** and **Per deployment**.
 
 Spaces created per deployment are named after the deployment, for example `Product (production)` and `Product (staging)`. Only the displayed name changes — the space stays linked to the space `name` declared in `agents/config.yml`, so the YAML entry keeps matching. You can change the scope of an existing space later on the space's page.
