@@ -283,6 +283,51 @@ control which members are exposed, how they're named, and how they're
 organized. This keeps your model [DRY][wiki-dry] and makes maintenance
 straightforward.
 
+### Define a metric on a view when it spans cubes
+
+The one exception is a metric whose parts live in different cubes, so there is
+no single cube it could belong to. A view can define its own
+[measures][ref-view-measures] and [dimensions][ref-view-dimensions] as long as
+their `sql` only combines members the view already includes — a member that
+reads a column instead is rejected at compile time:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_overview
+    # cubes: … includes orders.total_amount and line_items.count
+
+    measures:
+      - name: average_line_value
+        type: number
+        multi_stage: true
+        sql: "{CUBE.total_amount} / NULLIF({CUBE.count}, 0)"
+```
+
+```javascript title="JavaScript"
+view(`orders_overview`, {
+  // cubes: … includes orders.total_amount and line_items.count
+
+  measures: {
+    average_line_value: {
+      type: `number`,
+      multi_stage: true,
+      sql: `${CUBE.total_amount} / NULLIF(${CUBE.count}, 0)`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+[`multi_stage`][ref-multi-stage] matters whenever the parts come from different
+cubes: it aggregates each of them before combining, instead of evaluating the
+expression inside one joined scan where a `one_to_many` join between them would
+inflate the numerator. If the cubes don't join to each other at all, see
+[multi-fact views][ref-multi-fact-views]. The full example, with the `cubes`
+block, is on the [view reference][ref-view-measures].
+
 ### Control visibility
 
 Not every view should be publicly accessible. Use [`public`][ref-view-public]
@@ -450,6 +495,10 @@ parameters.
 [ref-view-description]: /reference/data-modeling/view#description
 [ref-view-title]: /reference/data-modeling/view#title
 [ref-view-public]: /reference/data-modeling/view#public
+[ref-view-measures]: /reference/data-modeling/view#measures
+[ref-view-dimensions]: /reference/data-modeling/view#dimensions
+[ref-multi-stage]: /reference/data-modeling/measures#multi_stage
+[ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
 [ref-view-folders]: /reference/data-modeling/view#folders
 [ref-access-policies]: /reference/data-modeling/data-access-policies
 [ref-ai-context]: /docs/data-modeling/ai-context

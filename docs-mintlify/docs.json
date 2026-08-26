@@ -640,6 +640,7 @@
                       "recipes/data-modeling/nested-aggregates",
                       "recipes/data-modeling/filtered-aggregates",
                       "recipes/data-modeling/share-of-total",
+                      "recipes/data-modeling/average-order-value",
                       "recipes/data-modeling/period-over-period"
                     ]
                   },
