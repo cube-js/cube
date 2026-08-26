@@ -207,11 +207,12 @@ export class WebSocketConnection {
             // -- so every message in flight gets one more round, which answers
             // the innocent ones and usually leaves the offender alone to be
             // named next time. That includes a message that was alone in
-            // flight: the close can just as well be an ordinary disconnect,
-            // and re-sending is what recovers it. Whatever is still in flight
-            // after that round is failed regardless: an offender whose
-            // response keeps arriving before the other answers would otherwise
-            // be re-sent forever.
+            // flight: `fatalError` says an oversized frame was seen on this
+            // socket, not which query produced it, and it can be the response
+            // to a query rejected on an earlier round that was still on the
+            // wire. Whatever is still in flight after its round is failed
+            // regardless: an offender whose response keeps arriving before the
+            // other answers would otherwise be re-sent forever.
             if (fatalError) {
               // eslint-disable-next-line no-restricted-syntax
               for (const key of pending) {
