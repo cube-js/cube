@@ -39,14 +39,18 @@ describe('statements/union', () => {
       return;
     }
 
-    // Every query of the operation, and only the ones it was given
+    // Every query of the operation, rendered rather than merely looped over
     expect(template).toContain('{% for query in queries %}');
-    // The row cap bounds the result of the whole operation
-    expect(template).toMatch(/\{%\s*if limit is not none\s*%\}/);
-    // However the dialect spells the operator, `ALL` is what keeps the duplicates, so it
-    // belongs to the branch that keeps them and to no other
-    expect(template).toMatch(/UNION.*ALL/s);
-    expect(template).toMatch(/\{%\s*if (not )?distinct\s*%\}/);
+    expect(template).toContain('{{ query');
+    // The row cap bounds the result of the whole operation, and is interpolated into the
+    // clause that bounds it rather than only guarding it
+    expect(template).toMatch(/\{%\s*if limit is not none\s*%\}[^]*\{\{\s*limit\s*\}\}/);
+    // However the dialect spells the operator, `ALL` is what keeps the duplicates, so
+    // every `ALL` sits on the branch that keeps them and nowhere else. The dialects write
+    // that branch two ways: naming only `ALL`, or naming both modes.
+    const keepsDuplicates = /\{%\s*if not distinct\s*%\}ALL|\{%\s*if distinct\s*%\}DISTINCT\{%\s*else\s*%\}ALL/;
+    expect(template).toMatch(keepsDuplicates);
+    expect(template.replace(new RegExp(keepsDuplicates.source, 'g'), '')).not.toContain('ALL');
     // Balanced tags: an unclosed block renders as a template error at query time
     expect((template.match(/\{%\s*if /g) || []).length)
       .toEqual((template.match(/\{%\s*endif\s*%\}/g) || []).length);
