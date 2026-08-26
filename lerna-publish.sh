@@ -32,16 +32,26 @@ fi
 # ("workspaces" in package.json) and nothing else in the tree.
 # INT and TERM are named alongside EXIT so an interrupted run is covered without
 # relying on the shell running an EXIT trap for an untrapped signal; the handler
-# disarms itself first so its own `exit` cannot run the cleanup a second time.
+# disarms itself first so its own `exit` cannot run the cleanup a second time,
+# then re-raises the signal so an interrupted run does not exit 0.
 cleanup_bump() {
   status=$?
+  sig=$1
   trap - EXIT INT TERM
   echo "Cleaning up temporary version bump..."
   git restore --staged --worktree . || true
   git clean -fdq -- 'packages/*/CHANGELOG.md' 'rust/*/CHANGELOG.md' || true
+  if [ -n "$sig" ]; then
+    # Die from the signal now that it is untrapped, so the caller sees the run
+    # was interrupted. Exiting with $? instead would report the last completed
+    # command's status, which is 0 when the signal lands between commands.
+    kill -"$sig" $$
+  fi
   exit $status
 }
-trap cleanup_bump EXIT INT TERM
+trap cleanup_bump EXIT
+trap 'cleanup_bump INT' INT
+trap 'cleanup_bump TERM' TERM
 
 echo "Step 1: bumping versions (no commit/push)..."
 yarn lerna version $BUMP \
