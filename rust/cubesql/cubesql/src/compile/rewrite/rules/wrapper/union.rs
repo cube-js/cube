@@ -3,9 +3,9 @@ use crate::{
         cube_scan_wrapper, distinct, rewrite,
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
-        transforming_rewrite, union, union_inputs, union_inputs_empty_tail, wrapped_union,
-        wrapped_union_inputs, wrapped_union_inputs_empty_tail, wrapper_pullup_replacer,
-        wrapper_replacer_context, LogicalPlanLanguage, UnionAlias, WrappedUnionAlias,
+        transforming_list_rewrite_with_lists_and_vars, union, wrapped_union,
+        wrapper_pullup_replacer, wrapper_replacer_context, ListApplierListPattern, ListPattern,
+        ListType, LogicalPlanLanguage, UnionAlias, WrappedUnionAlias,
         WrapperReplacerContextAliasToCube, WrapperReplacerContextGroupedSubqueries,
         WrapperReplacerContextInputDataSource,
     },
@@ -18,73 +18,44 @@ impl WrapperRules {
     pub fn union_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             // The queries of a union arrive already pulled up, so there is nothing to push
-            // into them and the list carries a pull-up replacer rather than a push-down one.
-            //
-            // Only the head of the list is matched, to bind the data source that every
-            // other query has to agree with; `wrapper-union-inputs-pull-up` is what checks
-            // the rest, one query at a time.
-            transforming_rewrite(
-                "wrapper-push-down-union-to-cube-scan",
-                union(
-                    union_inputs(
-                        cube_scan_wrapper(
-                            wrapper_pullup_replacer(
-                                "?head",
-                                wrapper_replacer_context(
-                                    "?head_alias_to_cube",
-                                    "?head_push_to_cube",
-                                    "?head_in_projection",
-                                    "?head_cube_members",
-                                    "?head_grouped_subqueries",
-                                    "?head_ungrouped_scan",
-                                    "?input_data_source",
-                                ),
+            // into them: the whole list is matched at once and every query is unwrapped into
+            // the set operation. `?input_data_source` is a top level element variable, so
+            // every query has to reach the same data source for this to match at all — a
+            // union spanning two of them is left to post processing without a check of its
+            // own.
+            transforming_list_rewrite_with_lists_and_vars(
+                "wrapper-pull-up-union",
+                ListType::UnionInputs,
+                ListPattern {
+                    pattern: union("?list", "?union_alias"),
+                    list_var: "?list".to_string(),
+                    elem: cube_scan_wrapper(
+                        wrapper_pullup_replacer(
+                            "?elem",
+                            wrapper_replacer_context(
+                                "?elem_alias_to_cube",
+                                "?elem_push_to_cube",
+                                "?elem_in_projection",
+                                "?elem_cube_members",
+                                "?elem_grouped_subqueries",
+                                "?elem_ungrouped_scan",
+                                "?input_data_source",
                             ),
-                            "CubeScanWrapperFinalized:false",
                         ),
-                        "?tail",
+                        "CubeScanWrapperFinalized:false",
                     ),
-                    "?union_alias",
-                ),
-                cube_scan_wrapper(
+                },
+                &cube_scan_wrapper(
                     wrapper_pullup_replacer(
                         wrapped_union(
-                            wrapper_pullup_replacer(
-                                union_inputs(
-                                    cube_scan_wrapper(
-                                        wrapper_pullup_replacer(
-                                            "?head",
-                                            wrapper_replacer_context(
-                                                "?head_alias_to_cube",
-                                                "?head_push_to_cube",
-                                                "?head_in_projection",
-                                                "?head_cube_members",
-                                                "?head_grouped_subqueries",
-                                                "?head_ungrouped_scan",
-                                                "?input_data_source",
-                                            ),
-                                        ),
-                                        "CubeScanWrapperFinalized:false",
-                                    ),
-                                    "?tail",
-                                ),
-                                wrapper_replacer_context(
-                                    "?out_alias_to_cube",
-                                    // A set operation is evaluated by the data source, so
-                                    // nothing above it reaches a Cube load query anymore
-                                    "WrapperReplacerContextPushToCube:false",
-                                    "WrapperReplacerContextInProjection:false",
-                                    "?out_cube_members",
-                                    "?out_grouped_subqueries",
-                                    "WrapperReplacerContextUngroupedScan:false",
-                                    "?input_data_source",
-                                ),
-                            ),
+                            "?new_list",
                             "WrappedUnionDistinct:false",
                             "?wrapped_union_alias",
                         ),
                         wrapper_replacer_context(
                             "?out_alias_to_cube",
+                            // A set operation is evaluated by the data source, so nothing
+                            // above it reaches a Cube load query anymore
                             "WrapperReplacerContextPushToCube:false",
                             "WrapperReplacerContextInProjection:false",
                             "?out_cube_members",
@@ -95,6 +66,12 @@ impl WrapperRules {
                     ),
                     "CubeScanWrapperFinalized:false",
                 ),
+                [ListApplierListPattern {
+                    list_type: ListType::WrappedUnionInputs,
+                    new_list_var: "?new_list".to_string(),
+                    elem_pattern: "?elem".to_string(),
+                }],
+                &["?input_data_source"],
                 self.transform_union(
                     "?union_alias",
                     "?input_data_source",
@@ -103,62 +80,6 @@ impl WrapperRules {
                     "?out_cube_members",
                     "?out_grouped_subqueries",
                 ),
-            ),
-            // One query of the set operation, peeled off the head of the list. The data
-            // source of the query and of the list are the same variable, so a query that
-            // reaches another one leaves a replacer behind rather than a union, and the
-            // plain post processing plan outprices it.
-            rewrite(
-                "wrapper-union-inputs-pull-up",
-                wrapper_pullup_replacer(
-                    union_inputs(
-                        cube_scan_wrapper(
-                            wrapper_pullup_replacer(
-                                "?head",
-                                wrapper_replacer_context(
-                                    "?head_alias_to_cube",
-                                    "?head_push_to_cube",
-                                    "?head_in_projection",
-                                    "?head_cube_members",
-                                    "?head_grouped_subqueries",
-                                    "?head_ungrouped_scan",
-                                    "?input_data_source",
-                                ),
-                            ),
-                            "CubeScanWrapperFinalized:false",
-                        ),
-                        "?tail",
-                    ),
-                    wrapper_replacer_context(
-                        "?alias_to_cube",
-                        "?push_to_cube",
-                        "?in_projection",
-                        "?cube_members",
-                        "?grouped_subqueries",
-                        "?ungrouped_scan",
-                        "?input_data_source",
-                    ),
-                ),
-                wrapped_union_inputs(
-                    "?head",
-                    wrapper_pullup_replacer(
-                        "?tail",
-                        wrapper_replacer_context(
-                            "?alias_to_cube",
-                            "?push_to_cube",
-                            "?in_projection",
-                            "?cube_members",
-                            "?grouped_subqueries",
-                            "?ungrouped_scan",
-                            "?input_data_source",
-                        ),
-                    ),
-                ),
-            ),
-            rewrite(
-                "wrapper-union-inputs-tail",
-                wrapper_pullup_replacer(union_inputs_empty_tail(), "?context"),
-                wrapped_union_inputs_empty_tail(),
             ),
             // `UNION` is `UNION ALL` with the duplicates dropped, so the data source can do
             // both at once and the deduplication does not have to happen in DataFusion

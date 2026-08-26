@@ -124,9 +124,12 @@ that match the list node itself — never by a transform that walks it.
   Build them with the flat branch of `add_expr_flat_list_node!` (or an equivalent that
   adds a single node with every element), register the node in `ListType`, and traverse
   with `flat_list_pushdown_pullup_rules` / `replacer_flat_push_down_node` /
-  `replacer_flat_pull_up_node`. The flat pull-up matches the whole list in one rule and
+  `replacer_flat_pull_up_node`, or `transforming_list_rewrite_with_lists_and_vars` when the
+  output needs a node no pattern can spell out (a cleared replacer context, an alias
+  converted to another node type). The flat pull-up matches the whole list in one rule and
   takes `top_level_elem_vars`, which is how a fact that must hold across every element —
-  all queries reaching the same data source — is enforced.
+  all queries reaching the same data source — is enforced: name the variable there and
+  unification does the rest, with no comparison of your own.
 - Generate the traversal with the existing helpers rather than by hand:
   `WrapperRules::list_pushdown_pullup_rules` / `flat_list_pushdown_pullup_rules`
   (or `replacer_push_down_node` / `replacer_pull_up_node` underneath them). They emit

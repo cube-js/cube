@@ -152,6 +152,20 @@ macro_rules! add_binary_expr_list_node {
     }};
 }
 
+/// A flat list node: every element is a child of one node. Lists are flat here, and the
+/// cons cells `add_plan_list_node!` builds are legacy.
+macro_rules! add_plan_flat_list_node {
+    ($converter:expr, $value_expr:expr, $query_params:expr, $ctx:expr, $field_variant:ident) => {{
+        let list = $value_expr
+            .iter()
+            .map(|expr| $converter.add_logical_plan_replace_params(expr, $query_params, $ctx))
+            .collect::<Result<Vec<_>, _>>()?;
+        $converter
+            .graph
+            .add(LogicalPlanLanguage::$field_variant(list))
+    }};
+}
+
 macro_rules! add_plan_list_node {
     ($converter:expr, $value_expr:expr, $query_params:expr, $ctx:expr, $field_variant:ident) => {{
         let list = $value_expr
@@ -698,7 +712,8 @@ impl LogicalPlanToLanguageConverter {
                 self.graph.add(LogicalPlanLanguage::Repartition([input]))
             }
             LogicalPlan::Union(node) => {
-                let inputs = add_plan_list_node!(self, node.inputs, query_params, ctx, UnionInputs);
+                let inputs =
+                    add_plan_flat_list_node!(self, node.inputs, query_params, ctx, UnionInputs);
                 let alias = add_data_node!(self, node.alias, UnionAlias);
                 self.graph.add(LogicalPlanLanguage::Union([inputs, alias]))
             }
