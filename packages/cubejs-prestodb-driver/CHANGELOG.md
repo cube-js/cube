@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.73](https://github.com/cube-js/cube/compare/v1.6.72...v1.6.73) (2026-08-26)
+
+**Note:** Version bump only for package @cubejs-backend/prestodb-driver
+
 ## [1.6.72](https://github.com/cube-js/cube/compare/v1.6.71...v1.6.72) (2026-08-18)
 
 **Note:** Version bump only for package @cubejs-backend/prestodb-driver

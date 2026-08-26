@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.73](https://github.com/cube-js/cube/compare/v1.6.72...v1.6.73) (2026-08-26)
+
+### Bug Fixes
+
+- Validate query timezone against IANA zones ([#11575](https://github.com/cube-js/cube/issues/11575)) ([7f7a59e](https://github.com/cube-js/cube/commit/7f7a59eebd36bb28b0b5b6e8bd3954c500d5f370))
+
 ## [1.6.72](https://github.com/cube-js/cube/compare/v1.6.71...v1.6.72) (2026-08-18)
 
 ### Performance Improvements
