@@ -4,6 +4,10 @@ import path from 'path';
 // Tests run from `dist`, so this resolves to the compiled adapters.
 const ADAPTER_DIR = path.join(__dirname, '..', '..', 'src', 'adapter');
 
+// The adapter directory holds far more than this; the floor is only here so a scan that
+// silently matched nothing fails loudly rather than passing every invariant vacuously.
+const MIN_DIALECTS = 10;
+
 /**
  * Every dialect, read off the adapter directory rather than listed by hand, so a dialect
  * added later cannot quietly escape an invariant asserted over all of them.
@@ -18,8 +22,10 @@ export function allDialects(): [string, any][] {
     // eslint-disable-next-line global-require, import/no-dynamic-require
     .map(name => [name, require(path.join(ADAPTER_DIR, name))[name]] as [string, any]);
 
-  if (classes.length < 10) {
-    throw new Error(`Expected the adapter directory to hold more dialects than ${classes.length}`);
+  if (classes.length < MIN_DIALECTS) {
+    throw new Error(
+      `Expected the adapter directory to hold at least ${MIN_DIALECTS} dialects, found ${classes.length}`
+    );
   }
 
   return classes;

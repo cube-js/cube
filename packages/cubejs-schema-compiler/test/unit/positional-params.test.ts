@@ -1,6 +1,6 @@
 import { BigqueryQuery } from '../../src/adapter/BigqueryQuery';
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
-import { allDialects as allDialectsWithNames } from './allDialects';
+import { allDialects } from './allDialects';
 import { prepareJsCompiler } from './PrepareCompiler';
 
 // `?` placeholders are positional: a value referenced from two places in the
@@ -70,9 +70,7 @@ describe('positional params', () => {
     const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(model);
     await compiler.compile();
 
-    const allDialects = () => allDialectsWithNames().map(([, QueryClass]) => QueryClass);
-
-    const reusingPositionalDialects = allDialects().filter(QueryClass => {
+    const reusingPositionalDialects = allDialects().filter(([, QueryClass]) => {
       const query = new QueryClass({ joinGraph, cubeEvaluator, compiler }, {
         measures: ['orders.count'],
         timezone: 'UTC',
@@ -80,7 +78,7 @@ describe('positional params', () => {
       const indexedPlaceholder = query.sqlTemplates().params.param.includes('param_index');
 
       return !indexedPlaceholder && query.shouldReuseParams;
-    }).map(QueryClass => QueryClass.name);
+    }).map(([name]) => name);
 
     expect(reusingPositionalDialects).toEqual([]);
   });
