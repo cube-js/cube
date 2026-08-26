@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.27](https://github.com/cube-js/cube/compare/v1.7.26...v1.7.27) (2026-08-26)
+
+### Bug Fixes
+
+- **schema-compiler:** a cube that extends another broke the parent's multi-stage measures ([#11641](https://github.com/cube-js/cube/issues/11641)) ([657f4e1](https://github.com/cube-js/cube/commit/657f4e18ae75c69dd4db4057e14867f8a7d91247))
+
 ## [1.7.26](https://github.com/cube-js/cube/compare/v1.7.25...v1.7.26) (2026-08-24)
 
 ### Bug Fixes

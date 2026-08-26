@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.27](https://github.com/cube-js/cube/compare/v1.7.26...v1.7.27) (2026-08-26)
+
+### Bug Fixes
+
+- **cubestore:** inline aggregate dropped rows past the first partition ([#11631](https://github.com/cube-js/cube/issues/11631)) ([6f3e66d](https://github.com/cube-js/cube/commit/6f3e66d4fcf89733a21d730d3e90fcb493a72dd0))
+
 ## [1.7.26](https://github.com/cube-js/cube/compare/v1.7.25...v1.7.26) (2026-08-24)
 
 ### Bug Fixes

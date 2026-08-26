@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.27](https://github.com/cube-js/cube/compare/v1.7.26...v1.7.27) (2026-08-26)
+
+### Bug Fixes
+
+- **backend-native:** treat a client disconnect on /v1/cubesql as a graceful end ([#11649](https://github.com/cube-js/cube/issues/11649)) ([e803c6c](https://github.com/cube-js/cube/commit/e803c6cb58610c5da1a0710664a99d3047a6b3de))
+
 ## [1.7.26](https://github.com/cube-js/cube/compare/v1.7.25...v1.7.26) (2026-08-24)
 
 **Note:** Version bump only for package @cubejs-backend/native
