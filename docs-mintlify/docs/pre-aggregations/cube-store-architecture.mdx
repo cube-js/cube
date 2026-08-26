@@ -1027,11 +1027,10 @@ write EPIPE`.
 </Warning>
 
 If a query hits this limit, reduce the size of its result set — add filters
-or a lower `limit`, drop dimensions, or split it into several queries. If it
-is a full-table extract, load it from your data source directly instead of
-through Cube's cache. Self-hosted deployments can also raise
-`CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE` up to 256 MiB, but that only moves the
-ceiling — a result set that grows past the new value brings the failure back.
+or a lower `limit`, drop dimensions, or split it into several queries.
+Self-hosted deployments can raise the ceiling instead, but
+`CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE` and `CUBESTORE_TRANSPORT_MAX_FRAME_SIZE`
+have to go up together, since a message is sent as a single frame.
 
 ### Why it lives in Cube Store
 
