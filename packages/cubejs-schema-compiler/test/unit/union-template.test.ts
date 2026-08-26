@@ -24,8 +24,10 @@ describe('statements/union', () => {
       return;
     }
 
+    // The operator itself: without it the rendered SQL is not a set operation at all
+    expect(template).toMatch(/\bUNION\b/);
     // Every query of the operation, rendered rather than merely looped over
-    expect(template).toContain('{% for query in queries %}');
+    expect(template).toMatch(/\{%\s*for query in queries\s*%\}/);
     expect(template).toContain('{{ query');
     // The row cap bounds the result of the whole operation, and is interpolated into the
     // clause that bounds it rather than only guarding it
@@ -37,9 +39,9 @@ describe('statements/union', () => {
     expect(template).toMatch(keepsDuplicates);
     expect(template.replace(new RegExp(keepsDuplicates.source, 'g'), '')).not.toContain('ALL');
     // Balanced tags: an unclosed block renders as a template error at query time
-    expect((template.match(/\{%\s*if /g) || []).length)
+    expect((template.match(/\{%\s*if\b/g) || []).length)
       .toEqual((template.match(/\{%\s*endif\s*%\}/g) || []).length);
-    expect((template.match(/\{%\s*for /g) || []).length)
+    expect((template.match(/\{%\s*for\b/g) || []).length)
       .toEqual((template.match(/\{%\s*endfor\s*%\}/g) || []).length);
   });
 
