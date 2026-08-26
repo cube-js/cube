@@ -12,10 +12,7 @@ Multi-agent is useful when:
 - You need to isolate context (rules, certified queries, memories) between user groups.
 
 <Info>
-  `agents/config.yml` is the source of truth for spaces and agents: you declare them in
-  YAML and Cube creates them for you when you [reconcile](#reconciliation). Agents can't
-  be created in the UI, and their settings are read-only there. Entries are matched to
-  what already exists by their `name` field.
+  `agents/config.yml` is the source of truth for spaces and agents: you declare them in YAML and Cube creates them for you when you [reconcile](#reconciliation). Agents can't be created in the UI, and their settings are read-only there. A space can be created by hand, but it isn't linked to any `spaces:` entry — declare it in YAML and reconcile instead, so the entry matches. Entries are matched to what already exists by their `name` field.
 </Info>
 
 ## Architecture
@@ -133,38 +130,26 @@ Each agent must reference exactly one space via its `space` property. Multiple a
 
 ## Reconciliation
 
-A space or agent declared in `agents/config.yml` needs a matching record in Cube before
-users can chat with it. Cube creates those records from your config — that step is
-**reconciliation**:
+A space or agent declared in `agents/config.yml` needs a matching record in Cube before users can chat with it. Cube creates those records from your config — that step is **reconciliation**:
 
 <Steps>
   <Step title="Declare the space and the agent in YAML">
     In dev mode the pending list reflects your branch, so you can reconcile before merging.
   </Step>
   <Step title="Open the pending configurations">
-    Cube compares the config with what exists for the deployment, matching on `name`.
-    Entries with no record yet are listed under **Pending Configurations** on the
-    **Agents** page and on **Agents** → **Spaces**, once you pick the deployment. The
-    Semantic Model IDE also shows a **Reconcile agent configs** button with the pending
-    count that links there.
+    Cube compares the config with what exists for the deployment, matching on `name`. Entries with no record yet are listed under **Pending Configurations** on the **Agents** page and on **Agents** → **Spaces**, once you pick the deployment. The Semantic Model IDE also shows a **Reconcile agent configs** button with the pending count that links there.
   </Step>
   <Step title="Create them">
-    Choose the [space scope](#space-scope) and press **Create All**. Spaces are created
-    first, then each agent is linked to the space its `space` property names.
+    Choose the [space scope](#space-scope) and press **Create All**. Spaces are created first, then each agent is linked to the space its `space` property names.
   </Step>
 </Steps>
 
-Reconciliation only creates missing spaces and agents, so you need it only when a new
-`name` appears in the config. Every other property — `llm`, `accessible_views`,
-`memory_mode`, rules, certified queries — is read from the `agents/` directory of the
-deployment's data model and takes effect without reconciling. The implicit `auto` space
-and agent of the [single-agent setup](/admin/ai) are never listed as pending.
+Reconciliation only creates missing spaces and agents, so you need it only when a new `name` appears in the config. Agent behavior — `llm`, `description`, `accessible_views`, `memory_mode`, rules, certified queries — is read from the `agents/` directory of the deployment's data model and takes effect without reconciling. The implicit `auto` space and agent of the [single-agent setup](/admin/ai) are never listed as pending.
+
+An agent's `space` is the exception: the link is made when the agent is created, so changing it in YAML doesn't move an existing agent. The agent's page flags the mismatch between the space its config names and the space it is linked to, and reconciling again moves it — creating the new space first if that entry has no record yet.
 
 <Warning>
-  Changing an entry's `name` reads as a new entry: reconciling creates a new space or
-  agent, and the record created from the old name keeps what it stored — an agent's
-  chats, a space's memories — and is flagged **(misconfigured)** because its config no
-  longer exists. Delete that record once you no longer need it.
+  Changing an entry's `name` reads as a new entry: reconciling creates a new space or agent, and the record created from the old name keeps what it stored — an agent's chats, a space's memories — and is flagged **(misconfigured)** because its config no longer exists. Delete it from the **Agents** or **Spaces** page once you no longer need it.
 </Warning>
 
 ## Space scope
