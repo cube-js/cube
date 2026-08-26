@@ -72,6 +72,15 @@ impl WrapperRules {
                     elem_pattern: "?elem".to_string(),
                 }],
                 &["?input_data_source"],
+                // One query is not a union, and folding a `Distinct` into a single query
+                // one would leave the deduplication with no operator to render it on
+                2,
+                &[
+                    "?wrapped_union_alias",
+                    "?out_alias_to_cube",
+                    "?out_cube_members",
+                    "?out_grouped_subqueries",
+                ],
                 self.transform_union(
                     "?union_alias",
                     "?input_data_source",

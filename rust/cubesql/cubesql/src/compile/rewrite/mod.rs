@@ -977,6 +977,10 @@ struct ListNodeSearcher {
     list_pattern: Pattern<LogicalPlanLanguage>,
     elem_pattern: Pattern<LogicalPlanLanguage>,
     top_level_elem_vars: Vec<Var>,
+    /// Lists shorter than this do not match. A set operation needs it: one query is not a
+    /// union, and folding a `Distinct` into a single-query one would drop the deduplication
+    /// with no operator to render it on.
+    min_elements: usize,
 }
 
 impl ListNodeSearcher {
@@ -987,7 +991,13 @@ impl ListNodeSearcher {
             list_pattern: list_pattern.parse().unwrap(),
             elem_pattern: elem_pattern.parse().unwrap(),
             top_level_elem_vars: vec![],
+            min_elements: 1,
         }
+    }
+
+    fn with_min_elements(mut self, min_elements: usize) -> Self {
+        self.min_elements = min_elements;
+        self
     }
 
     fn with_top_level_elem_vars(mut self, vars: &[&str]) -> Self {
@@ -1066,7 +1076,7 @@ impl ListNodeSearcher {
         let list_id = list_subst[self.list_var];
         for node in egraph[list_id].iter() {
             let list_children = node.children();
-            if !self.match_node(node) || list_children.is_empty() {
+            if !self.match_node(node) || list_children.len() < self.min_elements.max(1) {
                 continue;
             }
 
@@ -1235,11 +1245,16 @@ struct ListNodeApplier {
     /// Runs once the substitution carries the list's own variables, so it can build nodes
     /// the pattern cannot spell out. Returning false drops this match.
     transform: Option<ListNodeTransform>,
+    /// The variables the transform inserts. Only these are exempt from egg's check that the
+    /// searcher binds every variable the applier uses, so a typo anywhere else in the
+    /// applier still fails when the rule is built rather than when it first matches.
+    transform_vars: Vec<Var>,
 }
 
 impl ListNodeApplier {
-    fn with_transform(mut self, transform: ListNodeTransform) -> Self {
+    fn with_transform(mut self, transform: ListNodeTransform, transform_vars: &[&str]) -> Self {
         self.transform = Some(transform);
+        self.transform_vars = transform_vars.iter().map(|v| v.parse().unwrap()).collect();
         self
     }
 }
@@ -1267,6 +1282,7 @@ impl ListNodeApplier {
     ) -> Self {
         Self {
             transform: None,
+            transform_vars: vec![],
             list_pattern: list_pattern.parse().unwrap(),
             lists: lists
                 .into_iter()
@@ -1328,17 +1344,12 @@ impl Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeApplier {
     }
 
     fn vars(&self) -> Vec<Var> {
-        // A transform inserts variables of its own, which the searcher cannot bind. This is
-        // what `TransformingPattern` does by leaving `vars` at its empty default.
-        if self.transform.is_some() {
-            return vec![];
-        }
-
         let mut vars = self.list_pattern.vars();
         for list in &self.lists {
             vars.extend(list.elem_pattern.vars());
             vars.retain(|v| *v != list.new_list_var); // this is bound by the applier itself
         }
+        vars.retain(|v| !self.transform_vars.contains(v)); // and these by the transform
         vars
     }
 }
@@ -2516,6 +2527,8 @@ pub fn transforming_list_rewrite_with_lists_and_vars<T>(
     applier_pattern: &str,
     lists: impl IntoIterator<Item = ListApplierListPattern>,
     top_level_elem_vars: &[&str],
+    min_elements: usize,
+    transform_vars: &[&str],
     transform_fn: T,
 ) -> CubeRewrite
 where
@@ -2527,9 +2540,10 @@ where
         &searcher.pattern,
         &searcher.elem,
     )
-    .with_top_level_elem_vars(top_level_elem_vars);
-    let applier =
-        ListNodeApplier::from_lists(applier_pattern, lists).with_transform(Box::new(transform_fn));
+    .with_top_level_elem_vars(top_level_elem_vars)
+    .with_min_elements(min_elements);
+    let applier = ListNodeApplier::from_lists(applier_pattern, lists)
+        .with_transform(Box::new(transform_fn), transform_vars);
     Rewrite::new(name.to_string(), searcher, applier).unwrap()
 }
 

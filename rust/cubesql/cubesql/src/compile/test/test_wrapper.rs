@@ -17,7 +17,7 @@ use crate::{
             convert_select_to_query_plan, convert_select_to_query_plan_customized,
             convert_select_to_query_plan_with_config, convert_sql_to_cube_query,
             get_test_session_with_config, get_test_tenant_ctx_with_cube_data_sources,
-            init_testing_logger, LogicalPlanTestUtils, TestContext,
+            init_testing_logger, member_expression_sql, LogicalPlanTestUtils, TestContext,
         },
         DatabaseProtocol,
     },
@@ -3693,13 +3693,25 @@ async fn test_wrapper_union_three_queries_not_pushed_down_keeps_every_query() {
     assert_eq!(
         union.inputs.len(),
         3,
-        "every query survives the round trip: {:?}",
+        "one input per query: {:?}",
         logical_plan
     );
+    // The list is written and read back positionally, so identity and order are what the
+    // flat conversion put at risk: a reader that reversed it, or yielded one query twice,
+    // would still leave three of everything. Order is not cosmetic for a union — the output
+    // column names come from the first query, and `WrappedUnionNode` renders it specially.
     assert_eq!(
-        logical_plan.find_cube_scans().len(),
-        3,
-        "every query keeps its own scan: {:?}",
+        logical_plan
+            .find_cube_scans()
+            .iter()
+            .map(|scan| member_expression_sql(&scan.request.dimensions))
+            .collect::<Vec<_>>(),
+        vec![
+            vec!["KibanaSampleDataEcommerce.customer_gender".to_string()],
+            vec!["Logs.content".to_string()],
+            vec!["KibanaSampleDataEcommerce.notes".to_string()],
+        ],
+        "every query survives the round trip, in order: {:?}",
         logical_plan
     );
 }
