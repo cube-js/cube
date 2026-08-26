@@ -69,7 +69,8 @@ A modal window with an authentication prompt will appear. Choose the deployments
 that you want to work with in Microsoft Excel and click **Authorize**.
 Once you see the `Access Granted` message, close the modal window.
 
-If you want to revoke the authentication, open the add-in menu and click
+The add-in menu shows the current tenant, Cube account, deployment, and signed-in
+user. If you want to revoke the authentication, open the add-in menu and click
 **Sign out**.
 
 ## Create reports via pivot table
@@ -88,7 +89,13 @@ Cube Cloud for Excel works only with [views][ref-views], not cubes.
 Click on members to add them to **Rows** and **Measures**.
 If needed, drag dimensions from **Rows** to **Columns**. Click on
 the funnel buttons to add members to **Filters**. Click on **×** to
-remove members from a query.
+remove members from a query. Drag members within **Measures** to reorder them
+in the output.
+
+When a dimension is on **Columns**, the **Measure position** option controls
+how measures nest relative to the column values: **After columns** (default)
+nests measures under each column value, while **Before columns** makes each
+measure span all column values.
 
 <Frame>
   <img src="https://ucarecdn.com/670fda9d-358a-4345-9242-7888d8aaedd8/" />
