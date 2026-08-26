@@ -3750,3 +3750,38 @@ async fn test_wrapper_union_limited_query_push_down() {
         sql
     );
 }
+
+/// A pushed down union is a query the rest of the wrapper can build on: joining against one
+/// reads it as a subquery of the Cube query, rather than leaving the union to DataFusion.
+#[tokio::test]
+async fn test_wrapper_union_in_join_push_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let sql = convert_select_to_query_plan(
+        "SELECT k.customer_gender, u.market \
+         FROM KibanaSampleDataEcommerce k \
+         JOIN ( \
+           SELECT 'MX' AS table_type, customer_gender AS market \
+           FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+           UNION ALL \
+           SELECT 'RX' AS table_type, content AS market FROM Logs GROUP BY 1, 2 \
+         ) u ON k.customer_gender = u.market \
+         GROUP BY 1, 2"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .as_logical_plan()
+    .find_cube_scan_wrapped_sql()
+    .wrapped_sql
+    .sql;
+
+    assert!(
+        sql.contains("UNION ALL"),
+        "the join reads a pushed down union: {}",
+        sql
+    );
+}
