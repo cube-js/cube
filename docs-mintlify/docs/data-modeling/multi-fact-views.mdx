@@ -502,16 +502,19 @@ GROUP BY 1, 2
 
 ### Filtering the join
 
-Filters on top of the join are supported and are applied to the merged query:
+Filters on top of the join are pushed into the merged query:
 
-- A `WHERE` clause is pushed into the merged scan. A predicate on a dimension
-  shared by all facts filters the whole result; a predicate on a fact-specific
-  dimension filters only that fact's subquery.
+- A `WHERE` clause is pushed into the merged scan, becoming a filter on the
+  member the predicate refers to.
 - A predicate in the `ON` clause that the planner can attach to a single side
   (for example, a condition on the optional side of a `LEFT JOIN`) becomes a
   filter on that fact. Predicates that the SQL planner can't push to one side
   of an outer join (such as a left-table condition in a `LEFT JOIN ON`) aren't
   supported by the planner and will raise an error.
+
+Pushing the predicate in is only the first step: the merged query is then
+planned like any other multi-fact query, so the member it filters on must be
+[shared by all facts](#filters-and-segments).
 
 ### Join type
 
@@ -618,10 +621,11 @@ conditions after the subqueries are joined.
 
 **Fact-specific filters and [segments][ref-segments]** — anything that belongs to
 one fact table rather than a shared dimension — can't be used in a multi-fact
-query. Every grouped dimension, filter and segment has to be reachable from all
-facts, so a query that carries one fails with `Can't find join path to join …`.
-The same members are fine as soon as only that fact's measures are requested,
-since the query is no longer multi-fact.
+query, however it is written: a `WHERE` clause in the SQL API, a filter in the
+REST (JSON) API, or a segment. Every grouped dimension, filter and segment has
+to be reachable from all facts, so a query that carries one fails with
+`Can't find join path to join …`. The same members are fine as soon as only
+that fact's measures are requested, since the query is no longer multi-fact.
 
 To narrow one fact inside a multi-fact query, put the condition in the measure's
 own [`filters`][ref-measure-filters] on its cube. It travels with the measure
