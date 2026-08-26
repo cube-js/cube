@@ -101,6 +101,16 @@ cubes:
         filters:
           - sql: "{CUBE}.transaction_type <> 'EXCHANGE'"
           - sql: "{CUBE}.fulfillment_channel_group IN ('IN_STORE', 'SHIP_FROM_STORE')"
+      # The same ratio, owned by this cube instead of the view. Referencing the
+      # other fact's measure is what makes it not owned by this cube, which is
+      # what a derived member has to be; the \`multi_stage\` rule is unchanged.
+      - name: aov_basket
+        type: number
+        multi_stage: true
+        sql: "{item_location_sales.sales_amount} / NULLIF({CUBE.transactions_without_returns}, 0)"
+      - name: aov_basket_single_stage
+        type: number
+        sql: "{item_location_sales.sales_amount} / NULLIF({CUBE.transactions_without_returns}, 0)"
 
   - name: item_location_sales
     sql: >
@@ -139,6 +149,8 @@ views:
         includes:
           - transactions_without_returns
           - net_sale_transactions
+          - name: aov_basket
+            alias: aov_basket_from_cube
       # The shared dimension cubes sit at root-level join paths so their
       # dimensions are common to both facts.
       - join_path: dates
@@ -323,6 +335,86 @@ describe('Multi-fact derived measure defined on a view', () => {
 
     await expect(prepareYamlCompiler(bareRef).compiler.compile())
       .rejects.toThrow(/sales_amount is not defined/);
+  });
+});
+
+// The same ratio, owned by `sales_line_item` rather than by the view. A cube
+// measure that references another cube's measure is not owned by its cube -
+// the same property a view measure has - so a metric spanning two facts does
+// not need a view to live in. It can sit in the model, and every view that
+// includes it gets it.
+describe('Multi-fact derived measure defined on a cube', () => {
+  it('divides the two facts once both have been aggregated to the query grain', () => {
+    const sql = buildSql({
+      measures: ['sales_line_item.aov_basket'],
+      dimensions: ['locations.region'],
+    });
+
+    expect(sql).toMatch(SALES_AMOUNT_AGGREGATE);
+    expect(sql).toMatch(TRANSACTIONS_AGGREGATE);
+    expect(sql).toMatch(RATIO_OVER_AGGREGATES);
+    expect(sql).not.toMatch(/sum\("item_location_sales"\.sales_amount\) \/ NULLIF/);
+  });
+
+  it('plans the same way whichever fact owns it', () => {
+    // Only the emitted column alias should differ between the two placements,
+    // so normalising it makes the two plans directly comparable.
+    const normalize = (sql: string) => sql
+      .replace(/"(retail_analysis|sales_line_item)__aov_basket"/g, '"__aov"')
+      .replace(/"retail_analysis__region"/g, '"__region"')
+      .replace(/"locations__region"/g, '"__region"');
+
+    const onView = buildSql({
+      measures: ['retail_analysis.aov_basket'],
+      dimensions: ['retail_analysis.region'],
+    });
+    const onCube = buildSql({
+      measures: ['sales_line_item.aov_basket'],
+      dimensions: ['locations.region'],
+    });
+
+    expect(normalize(onCube)).toEqual(normalize(onView));
+  });
+
+  it('is reachable through a view that includes it', () => {
+    const sql = buildSql({
+      measures: ['retail_analysis.aov_basket_from_cube'],
+      dimensions: ['retail_analysis.region'],
+    });
+
+    expect(sql).toMatch(RATIO_OVER_AGGREGATES);
+  });
+
+  it('reaches the other fact even when the query names only its own cube', () => {
+    const sql = buildSql({ measures: ['sales_line_item.aov_basket'] });
+
+    // No dimensions, so the two legs are aggregated whole and stitched anyway.
+    expect(sql).toMatch(SALES_AMOUNT_AGGREGATE);
+    expect(sql).toMatch(TRANSACTIONS_AGGREGATE);
+    expect(sql).toMatch(RATIO_OVER_AGGREGATES);
+  });
+
+  it('divides the two facts on the shared date spine', () => {
+    const sql = buildSql({
+      measures: ['sales_line_item.aov_basket'],
+      timeDimensions: [{ dimension: 'dates.date', granularity: 'day' }],
+    });
+
+    expect(sql).toContain('DATE_TRUNC(\'day\', "item_location_sales".date) = "dates".date');
+    expect(sql).toContain('DATE_TRUNC(\'day\', "sales_line_item".sold_at) = "dates".date');
+    expect(sql).toMatch(RATIO_OVER_AGGREGATES);
+  });
+
+  // Current behaviour, pinned - the same limit as on the view. Owning the
+  // measure buys the cube nothing here: without `multi_stage` the planner still
+  // looks for one join tree covering both facts and there is none.
+  it('cannot plan the ratio when the cube measure is not multi_stage', () => {
+    // The cubes are listed in the order the planner collected them, which
+    // differs from the view-owned case, so only their presence is pinned.
+    expect(() => buildSql({
+      measures: ['sales_line_item.aov_basket_single_stage'],
+      dimensions: ['locations.region'],
+    })).toThrow(/Can't find join path to join (?=.*item_location_sales)(?=.*sales_line_item)/);
   });
 });
 

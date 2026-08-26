@@ -230,9 +230,9 @@ since one is keyed by day and the other by timestamp.
 
 ### 2. Define AOV on the view
 
-Neither cube can define AOV — neither can reference the other's measures. Define
-it as a [measure of the view][ref-view-measures] and mark it
-[`multi_stage`][ref-multi-stage]:
+AOV can live on the view or on either cube — see [where to put
+it](#where-to-put-the-measure) below. On the view it is a [measure of the
+view][ref-view-measures], marked [`multi_stage`][ref-multi-stage]:
 
 <CodeGroup>
 
@@ -331,8 +331,83 @@ measure, looks for a single join tree covering both fact cubes, and fails with
 
 </Note>
 
+## Where to put the measure
+
+A metric spanning two facts does not have to live on a view. A cube measure may
+reference another cube's measure, which makes it derived rather than owned by
+its cube — the same property a view measure has — so AOV can sit on either fact
+cube instead:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: sales_line_item
+    # …
+
+    measures:
+      - name: transactions_without_returns
+        sql: transaction_id
+        type: count_distinct
+        filters:
+          - sql: "{CUBE}.transaction_type <> 'EXCHANGE'"
+          - sql: "{CUBE}.fulfillment_channel_group IN ('IN_STORE', 'SHIP_FROM_STORE')"
+
+      - name: aov_basket
+        type: number
+        format: currency
+        multi_stage: true
+        sql: "{item_location_sales.sales_amount} / NULLIF({CUBE.transactions_without_returns}, 0)"
+```
+
+```javascript title="JavaScript"
+cube(`sales_line_item`, {
+  // …
+
+  measures: {
+    transactions_without_returns: {
+      sql: `transaction_id`,
+      type: `count_distinct`,
+      filters: [
+        { sql: `${CUBE}.transaction_type <> 'EXCHANGE'` },
+        { sql: `${CUBE}.fulfillment_channel_group IN ('IN_STORE', 'SHIP_FROM_STORE')` }
+      ]
+    },
+
+    aov_basket: {
+      type: `number`,
+      format: `currency`,
+      multi_stage: true,
+      sql: `${item_location_sales.sales_amount} / NULLIF(${CUBE.transactions_without_returns}, 0)`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+Both placements plan identically — the same per-fact subqueries, stitched the
+same way, divided in the same final stage — and `multi_stage` is required either
+way. What differs is reuse and coupling:
+
+| | On a cube | On a view |
+| --- | --- | --- |
+| Reuse | Defined once; every view including it gets it | Redefined in each view that needs it |
+| Coupling | The cube names the other cube's measure | The cubes stay unaware of each other |
+| Query path | Available as `sales_line_item.aov_basket` too | Only through the view |
+
+Prefer the cube when the metric is part of the model that several views expose —
+it keeps [shared logic in cubes][ref-views-shared-logic]. Prefer the view when
+the pairing is a presentation choice for one audience, or when the cubes belong
+to different domains and you would rather not have one reference the other.
+
+A cube-owned measure reaches the other fact whether or not the view naming it
+also includes that fact, so a view can expose AOV without exposing
+`sales_amount`.
+
 [ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
 [ref-multi-stage]: /reference/data-modeling/measures#multi_stage
 [ref-measure-filters]: /reference/data-modeling/measures#filters
 [ref-view-measures]: /reference/data-modeling/view#measures
+[ref-views-shared-logic]: /docs/data-modeling/views#keep-shared-logic-in-cubes
 [link-tesseract]: https://cube.dev/blog/introducing-tesseract
