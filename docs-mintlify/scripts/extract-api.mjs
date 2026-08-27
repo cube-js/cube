@@ -184,11 +184,10 @@ const EXCLUDE_OPERATIONS = new Set([
 // remembered to add. No reader of these docs can call them (tenant admins are
 // rejected server-side), so nothing customer-facing is lost.
 //
-// Keep this string byte-for-byte in sync with SUPER_ADMIN_ONLY_DOC_MARKER in the
-// cubejs-enterprise repo — this repo can't import it directly (separate repo).
-const SUPER_ADMIN_ONLY_MARKER =
-  '**🔒 Cube super admin only.** Requires Cube staff privileges — a tenant administrator cannot ' +
-  'call this endpoint.';
+// A short, stable anchor rather than the full marker sentence — less brittle against
+// upstream rewrapping/rewording, and the residual scan below (which matches even more
+// loosely) is the real safety net if this ever stops matching.
+const SUPER_ADMIN_ONLY_MARKER = 'Cube super admin only';
 
 // Explicit display names for tags whose auto-cleaned form would be unclear or
 // collide. Everything else is cleaned by cleanTag() below.
@@ -346,6 +345,42 @@ if (unmatchedExcludes.length) {
   console.error(
     'Aborting: EXCLUDE_OPERATIONS entries matched nothing (renamed upstream?):\n  ' +
       unmatchedExcludes.join('\n  ')
+  );
+  process.exit(1);
+}
+
+// The SUPER_ADMIN_ONLY_MARKER auto-detection above is an exact-substring match against
+// text authored in a different repo — it fails OPEN, not closed, if that text drifts
+// (rewording, a dropped 🔒, a punctuation change). Two guards restore a fail-closed
+// default without depending on the marker staying exact:
+//
+// Floor: the marker matched nothing at all. Today's spec always has staff-only
+// operations, so zero is almost certainly "the marker stopped matching," not "there
+// are none" — and if that ever becomes a real, deliberate zero, dropping this guard
+// is a one-line edit made by a human looking at exactly this message.
+if (!autoExcludedCount) {
+  console.error(
+    'Aborting: SUPER_ADMIN_ONLY_MARKER matched no operation. Did the marker text change upstream ' +
+      '(packages/console-server/src/api/middlewares/validate-admin-access.ts in cubejs-enterprise)?'
+  );
+  process.exit(1);
+}
+// Residual scan: catch staff-only prose that slipped past the exact marker match —
+// worded more loosely than the marker itself (just "super admin", not the full
+// sentence) so it still fires even when SUPER_ADMIN_ONLY_MARKER no longer matches.
+// NB: "super admin" specifically, not the bare 🔒 — the same lock emoji also opens
+// the unrelated (and legitimately public) ADMIN_ONLY_DOC_MARKER ("🔒 Admin only.").
+const leakedStaffOnly = [];
+for (const [p, ops] of Object.entries(paths)) {
+  for (const m of METHODS) {
+    const text = ops[m]?.['x-mint']?.content ?? ops[m]?.description ?? '';
+    if (/super admin/i.test(text)) leakedStaffOnly.push(`${m.toUpperCase()} ${p}`);
+  }
+}
+if (leakedStaffOnly.length) {
+  console.error(
+    'Aborting: staff-only prose survived exclusion (SUPER_ADMIN_ONLY_MARKER stopped matching?):\n  ' +
+      leakedStaffOnly.join('\n  ')
   );
   process.exit(1);
 }
