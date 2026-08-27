@@ -1,7 +1,8 @@
 import { Socket } from 'net';
+import WebSocket from 'ws';
 
 import { WebSocketConnection } from '../src/WebSocketConnection';
-import { MessageTooLargeError, QueryError } from '../src/errors';
+import { ConnectionError, MessageTooLargeError, QueryError } from '../src/errors';
 import { QueryResultFormat } from '../codegen';
 import {
   answeredBy,
@@ -45,6 +46,22 @@ const waitForBufferedWrite = async (socket: Socket) => {
     }
 
     await new Promise((resolve) => { setImmediate(resolve); });
+  }
+};
+
+/**
+ * Polls until `condition` holds, for assertions about a socket that is torn down
+ * a few ticks after the call that asked for it.
+ */
+const waitUntil = async (condition: () => boolean, description: string) => {
+  const deadline = Date.now() + 5000;
+
+  while (!condition()) {
+    if (Date.now() > deadline) {
+      throw new Error(`Timed out waiting for ${description}`);
+    }
+
+    await new Promise((resolve) => { setTimeout(resolve, 25); });
   }
 };
 
@@ -167,6 +184,154 @@ describe('WebSocketConnection', () => {
 
     await expectAnsweredBy(query('SELECT 1'), 1);
   }, JEST_TIMEOUT);
+
+  describe('close', () => {
+    /** Whether Cube Store has seen the connection go away. */
+    const closedOnTheServer = (index: number) => server.connection(index).ws.readyState === WebSocket.CLOSED;
+
+    it('closes the socket when nothing is in flight', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      await expectAnsweredBy(query('SELECT 1'), 0);
+
+      connection.close();
+
+      await waitUntil(() => closedOnTheServer(0), 'Cube Store to see the connection close');
+      expect((connection as any).webSocket).toBeNull();
+    }, JEST_TIMEOUT);
+
+    it('keeps the connection open until an in-flight query is answered', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      let answer: () => void = () => undefined;
+      server.handler = (message, mockConnection) => {
+        answer = () => mockConnection.ws.send(
+          buildErrorMessage(message.messageId, answeredBy(mockConnection.index))
+        );
+      };
+
+      const promise = query('SELECT 1');
+      await server.waitForMessages(1);
+
+      // An eviction can land mid-query, and Cube Store is already working on the
+      // answer, so closing must not drop it: the socket stays OPEN rather than
+      // going into CLOSING out from under the query.
+      connection.close();
+      expect((connection as any).webSocket.readyState).toBe(WebSocket.OPEN);
+
+      answer();
+      await expectAnsweredBy(promise, 0);
+
+      await waitUntil(() => closedOnTheServer(0), 'the connection to close once drained');
+      expect(server.connections.length).toBe(1);
+    }, JEST_TIMEOUT);
+
+    it('does not establish a new connection for a query issued after close', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      await expectAnsweredBy(query('SELECT 1'), 0);
+      connection.close();
+
+      // The released driver is still reachable from whoever held it, and this is
+      // the call that used to re-open the socket the release had just closed.
+      await expect(query('SELECT 2')).rejects.toThrow(ConnectionError);
+      expect(server.connections.length).toBe(1);
+    }, JEST_TIMEOUT);
+
+    it('gives up on a message Cube Store never answers instead of holding the socket', async () => {
+      // The bound the close waits out. Cube Store keeps answering the pings of a
+      // connection whose query never completes, so without it nothing would ever
+      // close this socket again.
+      process.env.CUBEJS_CUBESTORE_NO_HEART_BEAT_TIMEOUT = '1';
+
+      try {
+        connection = new WebSocketConnection(server.url);
+
+        server.handler = () => undefined;
+
+        const promise = query('SELECT 1');
+        await server.waitForMessages(1);
+
+        connection.close();
+
+        await expect(promise).rejects.toThrow(ConnectionError);
+        await expect(promise).rejects.toThrow('1 message(s) still unanswered');
+
+        await waitUntil(() => closedOnTheServer(0), 'the connection to be closed anyway');
+        expect((connection as any).webSocket).toBeNull();
+      } finally {
+        delete process.env.CUBEJS_CUBESTORE_NO_HEART_BEAT_TIMEOUT;
+      }
+    }, JEST_TIMEOUT);
+
+    it('rejects a query that is still connecting when the connection is closed', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      // `initWebSocket()` creates the socket synchronously, so this close lands
+      // while it is still CONNECTING -- an eviction while the very first query
+      // of an orchestrator is connecting. `ws` reports closing a CONNECTING
+      // socket as an 'error', and nothing else left would settle the promise
+      // the query is awaiting.
+      const promise = query('SELECT 1');
+      connection.close();
+
+      await expect(promise).rejects.toThrow(ConnectionError);
+      await expect(promise).rejects.toThrow('Cube Store connection is closed');
+    }, JEST_TIMEOUT);
+
+    it('does not leave an unhandled rejection when a closed connection errors', async () => {
+      const unhandled: unknown[] = [];
+      const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+      process.on('unhandledRejection', onUnhandled);
+
+      try {
+        connection = new WebSocketConnection(server.url);
+
+        // Establish it, so this socket's `readyPromise` is already settled.
+        await expectAnsweredBy(query('SELECT 1'), 0);
+
+        const socket = (connection as any).webSocket;
+        connection.close();
+
+        // A post-open 'error' on a closed connection. Emitted rather than
+        // provoked because `ws` reports a dying socket as 'close' here, while
+        // the errors that do reach this handler in the wild -- a protocol error,
+        // or a connect retry still pending from before the close -- are not
+        // reproducible against the mock. The handler's contract is the subject:
+        // it schedules a retry, `initWebSocket()` refuses once closed, and
+        // handing that rejection to an already-settled `resolve` leaves nobody
+        // to observe it, which is fatal under Node's default
+        // --unhandled-rejections=throw.
+        socket.emit('error', Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }));
+
+        // Past the retry the handler schedules.
+        await new Promise((resolve) => { setTimeout(resolve, 2500); });
+
+        expect(unhandled).toEqual([]);
+      } finally {
+        process.off('unhandledRejection', onUnhandled);
+      }
+    }, JEST_TIMEOUT);
+
+    it('does not re-open when the socket dies while draining', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      // Cube Store never answers, so the query is still in flight at close.
+      server.handler = () => undefined;
+
+      const promise = query('SELECT 1');
+      await server.waitForMessages(1);
+
+      connection.close();
+      clientSocket().destroy(epipe());
+
+      // The re-send path would ordinarily raise a fresh connection here, whose
+      // heartbeat is exactly what kept an evicted orchestrator alive. Failing
+      // the query is the honest outcome once the connection is closed.
+      await expect(promise).rejects.toThrow(ConnectionError);
+      expect(server.connections.length).toBe(1);
+    }, JEST_TIMEOUT);
+  });
 
   describe('message size limit', () => {
     const MAX_MESSAGE_SIZE = 1024 * 1024;
