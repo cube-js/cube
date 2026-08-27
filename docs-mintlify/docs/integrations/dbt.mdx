@@ -672,6 +672,27 @@ Each push creates exactly two new files:
   from the cube's joins (only to targets that originated in dbt), and the cube's measures
   preserved under `meta.cube.measures` for context.
 
+## Author dbt models from Analytics Chat
+
+<Warning>
+
+Authoring dbt models from Analytics Chat is currently in preview, and its behavior may
+still change. Reach out to the [Cube support team](/admin/account-billing/support) to
+activate this feature for your account.
+
+</Warning>
+
+Ask [the agent](/docs/explore-analyze/analytics-chat) to create or update a dbt
+model — for example, "turn this cube into a dbt model" or "add a `region` column to the
+`orders` dbt model." The agent opens a private **dbt workspace**: a live sandbox scoped
+to that model, where it reads the existing model and YAML files, drafts or edits the
+SQL, runs `dbt` to validate the change, and iterates until it compiles. Once you
+confirm, it publishes the result — a pull request or a direct commit, per your
+[delivery mode](#enable-push) — back to your dbt repository.
+
+This shares its enablement with [dbt push](#push-cubes-to-dbt): activating one activates
+the other, and a model authored from chat is delivered the same way a pushed cube is.
+
 ## Limitations
 
 - **Supported warehouses:** Snowflake, Amazon Redshift, PostgreSQL, Google

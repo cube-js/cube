@@ -244,6 +244,14 @@ work together.
 Call `searchDataModel` before `runQuery` to find exact view and member names rather than
 guessing them.
 
+Pass an optional `branchName` to `runQuery` to query a dev branch's model — the one
+returned by `startDataModelEdit` — instead of the deployed model, so you can verify an
+edit before it's committed. The response reports the branch it actually queried
+(`null` for the deployed model), which never just echoes the argument back. Keep
+`branchName` identical across paginated calls: `runQuery` re-issues the whole query for
+each page, so dropping it on a later page silently switches that page to the deployed
+model.
+
 ### Dashboard authoring
 
 These tools build [workbooks][ref-workbooks] and [dashboards][ref-dashboards]

@@ -103,13 +103,18 @@ opens a bucket that includes its lower bound and excludes the upper one, and two
 open-ended buckets are added at the edges—so `0, 18, 25` yields `< 0`, `[0, 18)`,
 `[18, 25)`, `>= 25`, and no row is dropped. **Label style** renders a bucket as
 `[10, 20)`, `>= 10 and < 20`, or `10 to 19`; the last is offered only while every
-boundary is a whole number. Rows where the dimension is `NULL` are reported as
-`Unknown`.
+boundary is a whole number. Choose **Custom** to type your own label for each
+bucket instead.
+
+By default, rows where the dimension is `NULL` get their own label (**Unknown**,
+editable). Turn off **Label empty values separately** to fold them into the last
+bucket instead.
 
 **Value groups** collect the dimension's values into named sets: pick values, name
 the group, and choose **Add group**. A value belongs to one group at a time.
 Whatever you did not pick—including empty values—falls under **Everything else**,
-which defaults to `Other`.
+which defaults to `Other`. Turn off **Group remaining values** to return `NULL`
+for unpicked and empty values instead.
 
 Bucket labels carry their position as a prefix (`1.`, `2.`, zero-padded past nine
 buckets) so that sorting the column sorts it by value rather than alphabetically,
