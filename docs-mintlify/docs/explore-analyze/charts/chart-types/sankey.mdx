@@ -30,9 +30,9 @@ Cyclic data is rejected rather than drawn. A flow that returns to a node it alre
 A wide breakdown can return more flows than a diagram can carry, and the small ones become unreadable first. Node grouping folds them into a single **Other** node per side, so the tail stays represented as an aggregate instead of vanishing. It is off until you pick a mode, in the Node grouping section of the Fields tab:
 
 - **Minimal share** — fold every node below a percentage of its side's total. A node sitting exactly on the threshold is kept.
-- **Top N** — keep the N largest nodes per side. Tied nodes at the cutoff are kept together, so asking for the top 3 can keep more than 3 when third place is shared.
+- **Top N nodes** — keep the N largest nodes per side. Tied nodes at the cutoff are kept together, so asking for the top 3 can keep more than 3 when third place is shared.
 
-The two sides fold independently, each against its own total, because a node that is small as a target may be large as a source. The bucket's name is yours to set; leave it blank for **Other**.
+The two sides fold independently, each against its own total, because a node that is small as a target may be large as a source. The bucket's name is yours to set; leave it blank for **Other**. When both sides fold at once, the two buckets are named apart — **Other (source)** and **Other (target)** — so one is not read as the other.
 
 {/* Screenshot: Node grouping section with Minimal share selected and a threshold entered. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -42,7 +42,7 @@ The bucket stands for a set of members rather than one, so it has no query behin
 
 ## Truncation
 
-Independently of grouping, a sankey draws at most 50 flows, keeping the largest. This is a backstop against a runaway result, not a legibility control — when it removes anything, a warning appears beside the Flows heading on the Fields tab with the counts, pointing at node grouping, which is the real answer for a diagram too wide to read.
+Independently of grouping, a sankey draws at most 50 flows, keeping the largest. This is a backstop against a runaway result, not a legibility control — when it removes anything, a warning appears beside the Flows heading on the Fields tab saying how many of the total it is showing, pointing at node grouping, which is the real answer for a diagram too wide to read.
 
 ## Data labels
 
@@ -66,7 +66,9 @@ The **Flows** control sets where a ribbon takes its color from:
 
 ## Tooltips
 
-Hovering a ribbon shows the result columns named in **Tooltip fields** on the Fields tab, which starts as every column in the query. Hovering a node shows its name and value.
+Hovering a ribbon shows the result columns named in **Tooltip fields** on the Fields tab, which starts as every column in the query except the three the diagram already draws — source, target and value. Add them back like any other field if you want them repeated. Hovering a node shows its name and value.
+
+See [Tooltips](/docs/explore-analyze/charts/configuration/tooltips) for adding, removing and reordering fields.
 
 ## Drill down
 
