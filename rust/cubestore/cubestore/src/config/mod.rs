@@ -633,6 +633,10 @@ pub trait ConfigObj: DIService {
 
     fn check_ws_orphaned_messages_interval_secs(&self) -> u64;
 
+    /// Concurrent websocket connections allowed per authenticated user.
+    /// 0 disables the limit.
+    fn max_ws_connections_per_user(&self) -> usize;
+
     fn drop_ws_processing_messages_after_secs(&self) -> u64;
 
     fn drop_ws_complete_messages_after_secs(&self) -> u64;
@@ -785,6 +789,7 @@ pub struct ConfigObjImpl {
     pub metadata_cache_time_to_idle_secs: u64,
     pub stream_replay_check_interval_secs: u64,
     pub check_ws_orphaned_messages_interval_secs: u64,
+    pub max_ws_connections_per_user: usize,
     pub drop_ws_processing_messages_after_secs: u64,
     pub drop_ws_complete_messages_after_secs: u64,
     pub skip_kafka_parsing_errors: bool,
@@ -1176,6 +1181,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn check_ws_orphaned_messages_interval_secs(&self) -> u64 {
         self.check_ws_orphaned_messages_interval_secs
+    }
+
+    fn max_ws_connections_per_user(&self) -> usize {
+        self.max_ws_connections_per_user
     }
 
     fn drop_ws_processing_messages_after_secs(&self) -> u64 {
@@ -1960,6 +1969,10 @@ impl Config {
                     "CUBESTORE_CHECK_WS_ORPHANED_MESSAGES_INTERVAL",
                     30,
                 ),
+                max_ws_connections_per_user: env_parse(
+                    "CUBESTORE_MAX_WS_CONNECTIONS_PER_USER",
+                    0,
+                ),
                 drop_ws_processing_messages_after_secs: env_parse(
                     "CUBESTORE_DROP_WS_PROCESSING_MESSAGES_AFTER",
                     60 * 60,
@@ -2192,6 +2205,7 @@ impl Config {
                 gc_loop_interval: 60,
                 stream_replay_check_interval_secs: 60,
                 check_ws_orphaned_messages_interval_secs: 1,
+                max_ws_connections_per_user: 0,
                 drop_ws_processing_messages_after_secs: 60,
                 drop_ws_complete_messages_after_secs: 10,
                 skip_kafka_parsing_errors: false,
@@ -2974,6 +2988,7 @@ impl Config {
                         Duration::from_secs(config.drop_ws_complete_messages_after_secs()),
                         config.transport_max_message_size(),
                         config.transport_max_frame_size(),
+                        config.max_ws_connections_per_user(),
                     )
                 })
                 .await;
