@@ -244,6 +244,12 @@ work together.
 Call `searchDataModel` before `runQuery` to find exact view and member names rather than
 guessing them.
 
+`runQuery` also takes an optional `branchName` to query a [dev branch][ref-dev-mode]
+instead of the deployed model — use it to verify a data model edit before committing it.
+Every response reports the branch it actually ran against (`null` means the deployed
+model). Keep `branchName` identical across paginated calls: dropping it on a later page
+re-runs the query against the deployed model instead of continuing on the branch.
+
 ### Dashboard authoring
 
 These tools build [workbooks][ref-workbooks] and [dashboards][ref-dashboards]
