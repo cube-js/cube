@@ -190,11 +190,11 @@ cubes with `UNION ALL`:
 
 ```sql
 SELECT storage, tier, MEASURE(event_count) AS events
-FROM public.archived_events
+FROM archived_events
 GROUP BY 1, 2
 UNION ALL
 SELECT storage, tier, MEASURE(event_count) AS events
-FROM public.recent_events
+FROM recent_events
 GROUP BY 1, 2
 ```
 
@@ -214,12 +214,12 @@ what that database scans:
 
 ```sql
 SELECT storage, tier, MEASURE(event_count) AS events
-FROM public.archived_events
+FROM archived_events
 WHERE tier = 'enterprise'
 GROUP BY 1, 2
 UNION ALL
 SELECT storage, tier, MEASURE(event_count) AS events
-FROM public.recent_events
+FROM recent_events
 WHERE tier = 'enterprise'
 GROUP BY 1, 2
 ```
@@ -228,20 +228,21 @@ Add a time dimension to both halves to line the databases up on a common grain:
 
 ```sql
 SELECT storage, tier, DATE_TRUNC('day', created_at) AS date, MEASURE(event_count) AS events
-FROM public.archived_events
+FROM archived_events
 GROUP BY 1, 2, 3
 UNION ALL
 SELECT storage, tier, DATE_TRUNC('day', created_at) AS date, MEASURE(event_count) AS events
-FROM public.recent_events
+FROM recent_events
 GROUP BY 1, 2, 3
 ORDER BY 3, 1
 ```
 
 <Note>
 
-Qualifying cube names with the `public` schema, as above, is the reliable form.
-An unqualified cube name whose name also matches a table in the underlying
-database fails to resolve.
+A cube whose name starts with `pg_` cannot be referenced by that name alone: the
+SQL API routes such names to `pg_catalog` and reports `Table or CTE with name
+'pg_...' not found`. Qualify it with the schema that holds cubes — `FROM
+public.pg_costs` — or avoid the prefix.
 
 </Note>
 
@@ -253,11 +254,11 @@ per-tier totals combine events from both databases:
 ```sql
 WITH blended AS (
   SELECT storage, tier, MEASURE(event_count) AS events
-  FROM public.archived_events
+  FROM archived_events
   GROUP BY 1, 2
   UNION ALL
   SELECT storage, tier, MEASURE(event_count) AS events
-  FROM public.recent_events
+  FROM recent_events
   GROUP BY 1, 2
 )
 SELECT tier, SUM(events) AS total, COUNT(DISTINCT storage) AS databases
@@ -276,6 +277,17 @@ ORDER BY 2 DESC
 `UNION` also works where duplicate rows should collapse, as do an outer
 `ORDER BY` and `LIMIT` over the union.
 
+<Warning>
+
+Aggregating over the union like this is only correct for additive measures such
+as `count` and `sum`. Non-additive measures — `count_distinct`, `avg`,
+percentiles — cannot be combined from per-source results: summing distinct
+counts double-counts anything present in both databases, and averaging averages
+ignores how many rows each database contributed. No error is raised, so report
+these measures per data source instead.
+
+</Warning>
+
 ### Inspecting how a query is split
 
 Run `EXPLAIN` on any of these queries to see the plan. It puts a `Union` over one
@@ -285,12 +297,12 @@ appended:
 
 ```sql
 EXPLAIN SELECT storage, tier, MEASURE(event_count) AS events
-FROM public.archived_events
+FROM archived_events
 WHERE tier = 'enterprise'
 GROUP BY 1, 2
 UNION ALL
 SELECT storage, tier, MEASURE(event_count) AS events
-FROM public.recent_events
+FROM recent_events
 WHERE tier = 'enterprise'
 GROUP BY 1, 2
 ```
