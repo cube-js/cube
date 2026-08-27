@@ -121,14 +121,14 @@ export type CacheKey =
   [CacheKeyItem, CacheKeyItem, CacheKeyItem] |
   [CacheKeyItem, CacheKeyItem, CacheKeyItem, CacheKeyItem];
 
-type CacheEntry = {
+export type CacheEntry = {
   time: number;
   result: any;
   renewalKey: string;
   requestId?: string;
 };
 
-type CacheAction =
+export type CacheAction =
   | 'serve-cached'
   | 'refresh-same-request'
   | 'refresh-background'
@@ -172,7 +172,7 @@ export class QueryCache {
 
   protected memoryCache: LRUCache<string, CacheEntry>;
 
-  private static readonly IN_MEMORY_CACHE_DISABLE_PERIOD = 5 * 60 * 1000;
+  protected static readonly IN_MEMORY_CACHE_DISABLE_PERIOD = 5 * 60 * 1000;
 
   public constructor(
     protected readonly cachePrefix: string,
@@ -911,7 +911,7 @@ export class QueryCache {
    * the result it just wrote would restart the fetch on every poll and never converge while
    * the refreshKey keeps moving. Background renew opts out: fresh data is all it exists for.
    */
-  private static decideCacheAction(
+  protected static decideCacheAction(
     entry: CacheEntry,
     renewedAgo: number,
     options: CacheQueryResultOptions,
@@ -939,7 +939,7 @@ export class QueryCache {
     return options.waitForRenew ? 'wait-for-renew' : 'refresh-background';
   }
 
-  private static isMemoryEntryUsable(
+  protected static isMemoryEntryUsable(
     entry: CacheEntry,
     renewedAgo: number,
     expiration: number,
@@ -961,7 +961,7 @@ export class QueryCache {
       entry.renewalKey === renewalKey;
   }
 
-  private cacheOperationContext(
+  protected cacheOperationContext(
     cacheKey: CacheKey,
     expiration: number,
     options: CacheQueryResultOptions,
@@ -986,7 +986,7 @@ export class QueryCache {
     };
   }
 
-  private fetchAndCacheQuery(
+  protected fetchAndCacheQuery(
     query: string | QueryWithParams,
     values: string[],
     ctx: CacheOperationContext,
@@ -1040,7 +1040,7 @@ export class QueryCache {
     });
   }
 
-  private fetchAndCacheQueryInBackground(
+  protected fetchAndCacheQueryInBackground(
     query: string | QueryWithParams,
     values: string[],
     ctx: CacheOperationContext,
@@ -1052,7 +1052,7 @@ export class QueryCache {
     });
   }
 
-  private getFromMemoryCache(ctx: CacheOperationContext): CacheEntry | null {
+  protected getFromMemoryCache(ctx: CacheOperationContext): CacheEntry | null {
     const { redisKey, renewalKey, expiration, options } = ctx;
     const entry = this.memoryCache.get(redisKey);
 
@@ -1078,7 +1078,7 @@ export class QueryCache {
     return entry;
   }
 
-  private storeInMemoryCache(entry: CacheEntry, renewedAgo: number, ctx: CacheOperationContext): void {
+  protected storeInMemoryCache(entry: CacheEntry, renewedAgo: number, ctx: CacheOperationContext): void {
     const { useInMemory, renewalThreshold } = ctx.options;
 
     if (useInMemory && renewedAgo + QueryCache.IN_MEMORY_CACHE_DISABLE_PERIOD <= renewalThreshold * 1000) {

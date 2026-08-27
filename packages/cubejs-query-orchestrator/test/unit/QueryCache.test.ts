@@ -1,25 +1,42 @@
-import { QueryCache } from '../../src';
+import { CacheAction, CacheEntry, CacheQueryResultOptions, QueryCache } from '../../src';
 import { QueryCacheTest } from './QueryCache.abstract';
 
 QueryCacheTest('Local', {
   cacheAndQueueDriver: 'memory',
 });
 
-describe('QueryCache.decideCacheAction', () => {
-  // Cast past `private` so the decision table can be covered without seeding a cache driver.
-  const decideCacheAction = (QueryCache as any).decideCacheAction.bind(QueryCache);
+/**
+ * Opens up the protected decision helper and accepts partial fixtures, so the decision
+ * table can be covered without seeding a cache driver.
+ */
+class QueryCacheOpened extends QueryCache {
+  public static decideCacheAction(
+    entry: Partial<CacheEntry>,
+    renewedAgo: number,
+    options: Partial<CacheQueryResultOptions>,
+    renewalKey?: string,
+  ): CacheAction {
+    return super.decideCacheAction(
+      entry as CacheEntry,
+      renewedAgo,
+      options as CacheQueryResultOptions,
+      renewalKey,
+    );
+  }
+}
 
+describe('QueryCache.decideCacheAction', () => {
   const THRESHOLD = 600;
   const NOT_EXPIRED = 100 * 1000;
   const EXPIRED = 700 * 1000;
 
   type Case = {
     name: string,
-    entry: { time: number, renewalKey?: string, requestId?: string },
+    entry: Partial<CacheEntry>,
     renewedAgo: number,
-    options: Record<string, any>,
+    options: Partial<CacheQueryResultOptions>,
     renewalKey?: string,
-    expected: string,
+    expected: CacheAction,
   };
 
   const cases: Case[] = [
@@ -137,7 +154,7 @@ describe('QueryCache.decideCacheAction', () => {
 
   cases.forEach(({ name, entry, renewedAgo, options, renewalKey, expected }) => {
     it(name, () => {
-      expect(decideCacheAction(entry, renewedAgo, options, renewalKey)).toEqual(expected);
+      expect(QueryCacheOpened.decideCacheAction(entry, renewedAgo, options, renewalKey)).toEqual(expected);
     });
   });
 });
