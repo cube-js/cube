@@ -48,6 +48,10 @@ export class Granularity {
         throw new UserError(`Granularity "${timeDimension.granularity}" does not exist in dimension ${timeDimension.dimension}`);
       }
 
+      if (!customGranularity.interval) {
+        throw new UserError(`Granularity "${this.granularity}" of dimension ${timeDimension.dimension} is defined with 'sql', which is only supported for predefined granularities`);
+      }
+
       this.granularityInterval = customGranularity.interval;
 
       if (customGranularity.origin) {
