@@ -52,6 +52,22 @@ use warp::reject::Reject;
 /// process because it is too large (RFC 6455 section 7.4.1, "Message Too Big").
 const MESSAGE_TOO_BIG_CLOSE_CODE: u16 = 1009;
 
+/// Close code the WebSocket protocol reserves for a peer that should come back
+/// later (RFC 6455 section 7.4.1, "Try Again Later"). An evicted connection was
+/// recycled to make room for a newer one, not broken, and a client that still
+/// needs it should reconnect rather than report a transport failure.
+const CONNECTION_EVICTED_CLOSE_CODE: u16 = 1013;
+
+/// How long the server waits for an evicted connection's close frame to go out.
+///
+/// The connection's entry leaves the counter when it is evicted, not when its
+/// task ends, so this is also how long its descriptor can outlive the slot it
+/// accounted for: the steady-state overshoot is the eviction rate times this
+/// bound. Sending is what can block — a peer whose receive window is closed
+/// keeps the frame in our buffer indefinitely — and a close frame is a handful
+/// of bytes, so a peer that cannot take them within this long is not going to.
+const EVICTED_CLOSE_TIMEOUT: Duration = Duration::from_secs(2);
+
 /// How much room the transport is given above the configured sizes.
 ///
 /// The size limit is enforced here rather than by the transport, so that an
@@ -390,9 +406,21 @@ impl HttpServer {
                                     "Closing websocket connection to admit a newer one for the same user (process_id: {})",
                                     process_id,
                                 );
-                                // A close frame rather than a bare drop, so the client
-                                // sees a clean close and can reconnect on its own terms.
-                                let _ = web_socket.close().await;
+                                // A close frame naming the reason rather than a bare drop,
+                                // so the client can tell being recycled from a network
+                                // blip. Bounded, because the descriptor is already
+                                // unaccounted for: see EVICTED_CLOSE_TIMEOUT.
+                                let close = web_socket.send(Message::close_with(
+                                    CONNECTION_EVICTED_CLOSE_CODE,
+                                    "connection evicted to admit a newer one for the same user",
+                                ));
+                                match tokio::time::timeout(EVICTED_CLOSE_TIMEOUT, close).await {
+                                    Ok(Ok(())) => {}
+                                    Ok(Err(e)) => error!("Websocket close send error: {:?}", e),
+                                    Err(_) => log::warn!(
+                                        "Timed out sending the close frame of an evicted websocket connection"
+                                    ),
+                                }
                                 break;
                             }
                             Some(res) = response_rx.recv() => {
@@ -2240,6 +2268,84 @@ mod tests {
                 .await
                 .expect("a header at the limit should be accepted");
         drop(socket);
+
+        http_server.stop_processing().await;
+        Ok(())
+    }
+
+    /// An evicted connection is told why it is going away, so a client can tell
+    /// being recycled from a network blip, and the cap actually reaches the
+    /// connection rather than only the counter.
+    #[tokio::test]
+    async fn ws_connection_evicted_test() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let mut auth = MockSqlAuthService::new();
+        auth.expect_authenticate().return_const(Ok(None));
+
+        let http_server = Arc::new(HttpServer::new(
+            "127.0.0.1:53036".to_string(),
+            Arc::new(auth),
+            Arc::new(SqlServiceMock {
+                message_counter: AtomicU64::new(0),
+            }),
+            Duration::from_millis(100),
+            Duration::from_millis(10000),
+            Duration::from_millis(1000),
+            64 * 1024,
+            64 * 1024,
+            // One connection per user, so the second one has to evict the first.
+            1,
+        ));
+        {
+            let http_server = http_server.clone();
+            cube_ext::spawn(async move { http_server.run_server().await });
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        fn connect_request(user: &str) -> Request {
+            let mut request = "ws://127.0.0.1:53036/ws".into_client_request().unwrap();
+            request.headers_mut().insert(
+                "authorization",
+                HeaderValue::from_str(&Credentials::new(user, "").as_http_header()).unwrap(),
+            );
+            request
+        }
+
+        let (mut first, _) = connect_async(connect_request("tenant-a"))
+            .await
+            .expect("the first connection is within the cap");
+        let (second, _) = connect_async(connect_request("tenant-a"))
+            .await
+            .expect("the second connection is admitted by evicting the first");
+
+        // Bounded, so a regression in the eviction path fails this test instead of
+        // hanging it: nothing else would ever wake this read.
+        let msg = tokio::time::timeout(Duration::from_secs(10), first.next())
+            .await
+            .expect("the evicted connection must be closed promptly")
+            .expect("the evicted connection is closed, not left open")
+            .unwrap();
+        match msg {
+            Message::Close(Some(frame)) => {
+                assert_eq!(u16::from(frame.code), CONNECTION_EVICTED_CLOSE_CODE);
+                assert!(
+                    frame.reason.contains("evicted"),
+                    "unexpected close reason: {}",
+                    frame.reason
+                );
+            }
+            msg => panic!("Close frame expected, got: {:?}", msg),
+        }
+
+        // Another user is unaffected by tenant-a having been at its cap.
+        let (other, _) = connect_async(connect_request("tenant-b"))
+            .await
+            .expect("a different user has its own slot");
+
+        drop(other);
+        drop(second);
 
         http_server.stop_processing().await;
         Ok(())
