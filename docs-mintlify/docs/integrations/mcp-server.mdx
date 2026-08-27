@@ -239,10 +239,16 @@ work together.
 | Tool | Description | Access |
 | --- | --- | --- |
 | `searchDataModel` | Searches the semantic model by similarity — views and their measures and dimensions — to discover what is queryable. Returns compact records (name, title, description, type) to reference in `runQuery`. | Read-only |
-| `runQuery` | Runs a Cube SQL query (PostgreSQL dialect) against the [SQL API][ref-sql-api]. Returns a schema, a page of rows, and `hasMore` / `totalRows` for pagination via `offset`. | Read-only |
+| `runQuery` | Runs a Cube SQL query (PostgreSQL dialect) against the [SQL API][ref-sql-api]. Returns a schema, a page of rows, and `hasMore` / `totalRows` for pagination via `offset`. Pass the dev `branchName` from `startDataModelEdit` to query that branch instead of the deployed model. | Read-only |
 
 Call `searchDataModel` before `runQuery` to find exact view and member names rather than
 guessing them.
+
+Omitting `branchName` queries the deployed model, exactly as before this parameter existed.
+Passing a `branchName` that isn't an active dev branch — for example the deploy branch's own
+name, or a feature branch with no dev worker running — fails with an error rather than
+silently answering from the deployed model, so a query aimed at the wrong branch never
+looks like a query that just returned no rows.
 
 ### Dashboard authoring
 
@@ -320,6 +326,9 @@ into the MCP server:
   model-editing tools, `getBranchDiff`, `getDeploymentEnv`, and both pre-aggregation
   tools — is offered only to users whose role allows editing the semantic model. A Viewer
   never sees them at all.
+- **Verification happens on the branch, before a merge, not after.** Pass the dev
+  `branchName` to `runQuery` to check that an edit returns the right data — `valid: true`
+  from `writeDataModelFile` only means the model compiles, not that it's correct.
 
 Review pending work with `getDataModelChanges` before you commit.
 
@@ -400,6 +409,8 @@ Call `startDataModelEdit` to enter development mode and get a dev `branchName`. 
 the current source with `listDataModelFiles` and `readDataModelFile`, then apply changes
 with `writeDataModelFile` or `deleteDataModelFile`, passing that `branchName`. Each write
 recompiles the model and reports validation errors, so you can iterate until it compiles.
+Before committing, verify the change returns the right data: call `runQuery` with the same
+`branchName` and check the numbers, since a compiling model can still return wrong results.
 Review the result with `getDataModelChanges`, then commit the branch from the Cube UI to
 publish it.
 
