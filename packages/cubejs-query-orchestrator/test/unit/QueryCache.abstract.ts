@@ -378,23 +378,39 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
     });
 
     describe('cachedQueryResult cold cache (backgroundRenew: false)', () => {
+      beforeAll(() => {
+        expect(cache.options.backgroundRenew).toBe(false);
+      });
+
       it('executes the main query only once instead of racing two fetches for the same key', async () => {
         const mainQuery = `SELECT cold-cache-main-${crypto.randomBytes(8).toString('hex')}`;
         const cacheKeyQuery = `SELECT cold-cache-refresh-key-${crypto.randomBytes(8).toString('hex')}`;
 
-        const mainQueryCalls: string[] = [];
-
+        // Mock below QueryCache and above QueryQueue so duplicate cache submissions remain observable.
         const querySpy = jest.spyOn(cache, 'queryWithRetryAndRelease').mockImplementation(async (query) => {
           if (query === mainQuery) {
-            mainQueryCalls.push(query as string);
             return [{ result: 'ok' }];
           }
-          return [{ refresh_key: '1' }];
+
+          if (query === cacheKeyQuery) {
+            return [{ refresh_key: '1' }];
+          }
+
+          throw new Error(`Unexpected query: ${JSON.stringify(query)}`);
         });
-        const renewCycleSpy = jest.spyOn(cache, 'startRenewCycle');
+        const queryCallCount = (targetQuery: string) => querySpy.mock.calls
+          .filter(([query]) => query === targetQuery).length;
+        const renewQuerySpy = jest.spyOn(cache, 'renewQuery');
+        const startRenewCycle = cache.startRenewCycle.bind(cache);
+        let mainQueryCallsAtRenewCycleStart: number | undefined;
+        const renewCycleSpy = jest.spyOn(cache, 'startRenewCycle').mockImplementation((...args) => {
+          mainQueryCallsAtRenewCycleStart = queryCallCount(mainQuery);
+          return startRenewCycle(...args);
+        });
+        let renewCyclePromise: Promise<unknown> | undefined;
 
         try {
-          await cache.cachedQueryResult(
+          const result = await cache.cachedQueryResult(
             {
               query: mainQuery,
               values: [],
@@ -405,21 +421,33 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
             [],
           );
 
-          // Give the fire-and-forget renew cycle a chance to also hit the queue
-          // for the same (still cold) cache key before asserting.
-          await pausePromise(50);
+          const renewCycleCallIndex = renewQuerySpy.mock.calls.findIndex(
+            ([, , , , , , renewOptions]) => renewOptions.renewCycle
+          );
+          if (renewCycleCallIndex !== -1) {
+            renewCyclePromise = renewQuerySpy.mock.results[renewCycleCallIndex].value;
+            await renewCyclePromise;
+          }
 
-          expect(mainQueryCalls.length).toBe(1);
+          expect(renewCycleCallIndex).not.toBe(-1);
+          expect(result.data).toEqual([{ result: 'ok' }]);
+          expect(mainQueryCallsAtRenewCycleStart).toBe(1);
+          expect(queryCallCount(cacheKeyQuery)).toBe(1);
+          expect(queryCallCount(mainQuery)).toBe(1);
           expect(renewCycleSpy).toHaveBeenCalledTimes(1);
         } finally {
+          await renewCyclePromise?.catch(() => undefined);
           renewCycleSpy.mockRestore();
+          renewQuerySpy.mockRestore();
           querySpy.mockRestore();
         }
       });
 
-      it('does not start a renew cycle when the foreground renewal continues waiting', async () => {
-        const continueWaitError = new ContinueWaitError();
-        const renewQuerySpy = jest.spyOn(cache, 'renewQuery').mockRejectedValue(continueWaitError);
+      it.each([
+        { type: 'ContinueWaitError', error: new ContinueWaitError() },
+        { type: 'a generic error', error: new Error('driver failed') },
+      ])('does not start a renew cycle when the foreground renewal fails with $type', async ({ error }) => {
+        const renewQuerySpy = jest.spyOn(cache, 'renewQuery').mockRejectedValue(error);
         const renewCycleSpy = jest.spyOn(cache, 'startRenewCycle');
 
         try {
@@ -432,7 +460,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
               dataSource: 'default',
             },
             [],
-          )).rejects.toBe(continueWaitError);
+          )).rejects.toBe(error);
 
           expect(renewCycleSpy).not.toHaveBeenCalled();
         } finally {
