@@ -124,6 +124,7 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
           - Controls 
             - Filter
             - Time granularity
+            - Parent
           - AI summary
           - Layout
             - Spacer
