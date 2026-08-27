@@ -168,7 +168,6 @@ const EXCLUDE_OPERATIONS = new Set([
   'PUT /api/v1/resource-policies/group',
   'PUT /api/v1/resource-policies/user',
   'GET /api/v1/app-theme',
-  'GET /api/v1/ai-engineer/active-region',
   'GET /api/v1/ai-engineer/settings',
   // Report folders listing — not part of the public docs surface.
   'GET /api/v1/deployments/{deploymentId}/report-folders',
@@ -282,6 +281,7 @@ const src = yaml.load(fs.readFileSync(SRC, 'utf8'));
 //    trailing slash — a trailing slash breaks Mintlify dev), and clean tags +
 //    operationIds.
 const paths = {};
+const matchedExcludes = new Set();
 for (const [key, val] of Object.entries(src.paths)) {
   if (!INCLUDE_PREFIXES.some((prefix) => key.startsWith(prefix))) continue;
   let newKey = key.length > 1 ? key.replace(/\/$/, '') : key; // drop trailing slash
@@ -289,7 +289,9 @@ for (const [key, val] of Object.entries(src.paths)) {
   for (const m of METHODS) {
     if (!val[m]) continue;
     // Drop explicitly hidden operations before they reach the spec or nav.
-    if (EXCLUDE_OPERATIONS.has(`${m.toUpperCase()} ${newKey}`)) {
+    const excludeKey = `${m.toUpperCase()} ${newKey}`;
+    if (EXCLUDE_OPERATIONS.has(excludeKey)) {
+      matchedExcludes.add(excludeKey);
       delete val[m];
       continue;
     }
@@ -322,6 +324,20 @@ for (const [key, val] of Object.entries(src.paths)) {
 
 if (!Object.keys(paths).length) {
   console.error(`Aborting: no paths matched ${INCLUDE_PREFIXES.join(' / ')}. Check the source spec.`);
+  process.exit(1);
+}
+
+// An EXCLUDE_OPERATIONS entry that matches nothing was likely renamed or moved
+// upstream — silently letting it through would re-publish whatever it was meant
+// to hide (some entries there exist specifically to keep staff-only operations
+// out of the public docs), and `--check` can't catch this: both the committed
+// and freshly generated output would contain the leak.
+const unmatchedExcludes = [...EXCLUDE_OPERATIONS].filter((op) => !matchedExcludes.has(op));
+if (unmatchedExcludes.length) {
+  console.error(
+    'Aborting: EXCLUDE_OPERATIONS entries matched nothing (renamed upstream?):\n  ' +
+      unmatchedExcludes.join('\n  ')
+  );
   process.exit(1);
 }
 
