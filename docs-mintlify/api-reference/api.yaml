@@ -44,6 +44,7 @@ tags:
   - name: Embed
   - name: Embed Tenants
   - name: Dashboard Embed Access
+  - name: OpenAPI Spec
 paths:
   /api/v1/app-config:
     get:
@@ -184,11 +185,22 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Deployment'
+                $ref: '#/components/schemas/DeploymentSettings'
           description: ''
-      summary: Update deployment
+      summary: Update a deployment
       tags:
         - Deployments
+      x-mint:
+        content: >-
+          Update any subset of a deployment’s settings — everything the console’s Settings pages own
+          — and read the full settings back. Fields you omit are left alone, and `templateVariables`
+          is merged key-by-key rather than replaced, so setting one configuration flag never clears
+          the others. `releaseChannelVersion` must be one of the versions `GET
+          /:deploymentId/versions` lists for the target channel (in any of the forms it reports) —
+          anything else is a 400, and the container image is resolved from the version rather than
+          sent. Choosing a version that is not the channel’s latest also sets
+          `releaseChannelVersionHold` unless you send it explicitly, so auto-upgrade does not undo
+          the pin.
   /api/v1/deployments/{deploymentId}/build-status:
     get:
       operationId: buildStatus
@@ -285,6 +297,77 @@ paths:
       summary: Start a dbt sync for a deployment
       tags:
         - dbt Sync
+  /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}:
+    delete:
+      operationId: cancelDbtSync
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: syncJobId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DbtSyncCancelResponse'
+          description: ''
+      summary: Cancel a running dbt sync
+      tags:
+        - dbt Sync
+    get:
+      operationId: getDbtSyncStatus
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: syncJobId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DbtSyncStatusResponse'
+          description: ''
+      summary: Get the status of a dbt sync
+      tags:
+        - dbt Sync
+  /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/result:
+    get:
+      operationId: getDbtSyncResult
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: syncJobId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DbtSyncResultResponse'
+          description: ''
+      summary: Get the result of a completed dbt sync
+      tags:
+        - dbt Sync
   /api/v1/deployments/{deploymentId}/env-vars:
     get:
       operationId: getEnvVariables
@@ -337,7 +420,9 @@ paths:
         content: >-
           Upserts deployment environment variables by name; variables not included keep their
           existing values. Passing the `[ENCRYPTED]` placeholder (the masked read value) is rejected
-          — omit variables you do not intend to change.
+          — omit variables you do not intend to change. New variable names must be POSIX identifiers
+          (`^[A-Za-z_][A-Za-z0-9_]*$`); names already stored on the deployment may be resent
+          unchanged so a legacy name can still be updated or removed.
   /api/v1/deployments/{deploymentId}/environments:
     get:
       operationId: getDeploymentEnvironments
@@ -1575,6 +1660,32 @@ paths:
       summary: Refresh report
       tags:
         - Reports
+  /api/v1/deployments/{deploymentId}/settings:
+    get:
+      operationId: getDeploymentSettings
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentSettings'
+          description: ''
+      summary: Get deployment settings
+      tags:
+        - Deployments
+      x-mint:
+        content: >-
+          Every setting of a deployment in one payload — the full contents of the console Settings
+          pages (general, configuration flags, deploy, launchpad, Cube Store private storage), plus
+          the read-only values displayed alongside them. Secrets are excluded; read environment
+          variables through `/env-vars` instead. Writes go to `PUT /:deploymentId`, which accepts
+          the same fields and returns this payload.
   /api/v1/deployments/{deploymentId}/shared-workspace:
     get:
       operationId: sharedWorkspaceObjects
@@ -1673,6 +1784,32 @@ paths:
       summary: Deployment token
       tags:
         - Deployments
+  /api/v1/deployments/{deploymentId}/versions:
+    get:
+      operationId: listDeploymentVersions
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentVersionsResponse'
+          description: ''
+      summary: List available Cube versions
+      tags:
+        - Deployments
+      x-mint:
+        content: >-
+          Every Cube version this deployment can be switched to — the same set the console’s version
+          picker offers: the head of each release channel, plus the older versions the tenant has
+          run before (its release history). Pass a listed `releaseChannelVersion` to `PUT
+          /:deploymentId`; anything else is rejected. The container image is resolved server-side
+          and is not part of the write surface.
   /api/v1/deployments/{deploymentId}/workbooks:
     get:
       operationId: getWorkbooks
@@ -1918,37 +2055,6 @@ paths:
                 $ref: '#/components/schemas/WorkbookDashboard'
           description: ''
       summary: Update workbook dashboard
-      tags:
-        - Workbooks
-  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread:
-    post:
-      operationId: updatePublishedDashboardAiWidgetThread
-      parameters:
-        - in: path
-          name: deploymentId
-          required: true
-          schema:
-            type: number
-        - in: path
-          name: workbookId
-          required: true
-          schema:
-            type: number
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdatePublishedAiWidgetThreadInput'
-        description: UpdatePublishedAiWidgetThreadInput
-        required: false
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Dashboard'
-          description: ''
-      summary: Update published dashboard AI widget thread
       tags:
         - Workbooks
   /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate:
@@ -3329,6 +3435,25 @@ paths:
       summary: List regions
       tags:
         - Regions
+  /api/v1/spec:
+    get:
+      operationId: getSpec
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+          description: The OpenAPI 3.1 document
+      summary: Get the OpenAPI specification
+      tags:
+        - OpenAPI Spec
+      x-mint:
+        content: >-
+          The full OpenAPI 3.1 document for this API, as served by the build handling the request —
+          every path, parameter, request body and schema. Intended for runtime discovery by clients
+          and agents; `cube spec` wraps it with filtering.
   /api/v1/tenant/settings:
     get:
       operationId: getTenantSettings
@@ -3747,6 +3872,39 @@ paths:
       summary: Create a branch (optionally entering dev mode on it)
       tags:
         - Data Model
+  /build/api/v1/deployments/{deploymentId}/branches/staging-environment:
+    put:
+      operationId: setBranchStagingEnvironment
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetBranchStagingEnvironmentRequest'
+        description: SetBranchStagingEnvironmentRequest
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetBranchStagingEnvironmentResponse'
+          description: ''
+      summary: Enable or disable a branch's staging environment
+      tags:
+        - Data Model
+      x-mint:
+        content: >-
+          Enabling a branch keeps its staging environment always active and accessible at
+          `<deploymentUrl>/dev-mode/{branchName}/cubejs-api/v1`; disabled (the default) it is only
+          active while the branch is viewed in Cube Cloud. Enabled branches are the ones listed by
+          `GET /api/v1/deployments/{deploymentId}/environments?type=staging`. Only shared branches
+          qualify — personal dev branches and the deploy branch are rejected.
   /build/api/v1/deployments/{deploymentId}/commit:
     post:
       operationId: commitChanges
@@ -4243,6 +4401,10 @@ components:
           oneOf:
             - $ref: '#/components/schemas/SheetsUiSettings'
             - type: 'null'
+        timezoneSettings:
+          oneOf:
+            - $ref: '#/components/schemas/TimezoneSettings'
+            - type: 'null'
       required:
         - applyThemeGlobally
       type: object
@@ -4308,6 +4470,10 @@ components:
       properties:
         id:
           type: integer
+        isStagingEnvironmentEnabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         lastHash:
           oneOf:
             - type: string
@@ -5015,6 +5181,60 @@ components:
             - type: string
             - type: 'null'
       type: object
+    CspsConfig:
+      properties:
+        awsRoleArn:
+          oneOf:
+            - type: string
+            - type: 'null'
+        azureClientId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        azureContainer:
+          oneOf:
+            - type: string
+            - type: 'null'
+        azureStorageAccount:
+          oneOf:
+            - type: string
+            - type: 'null'
+        azureTenantId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        enabled:
+          type: boolean
+        gcpServiceAccountEmail:
+          oneOf:
+            - type: string
+            - type: 'null'
+        gcpWorkloadIdentityProvider:
+          oneOf:
+            - type: string
+            - type: 'null'
+        gcsBucket:
+          oneOf:
+            - type: string
+            - type: 'null'
+        s3Bucket:
+          oneOf:
+            - type: string
+            - type: 'null'
+        s3Region:
+          oneOf:
+            - type: string
+            - type: 'null'
+        s3Sse:
+          oneOf:
+            - type: string
+            - type: 'null'
+        storageProvider:
+          type: string
+      required:
+        - enabled
+        - storageProvider
+      type: object
     CspsConfigInput:
       properties:
         awsRoleArn:
@@ -5707,8 +5927,10 @@ components:
         - TEXT
         - FILTER
         - AI
-        - TABS_CONTAINER
         - TIME_GRAIN
+        - SPACER
+        - DIVIDER
+        - CONTAINER
       type: string
     DashboardWidgetInput:
       properties:
@@ -5718,6 +5940,7 @@ components:
               additionalProperties: true
             - type: 'null'
         id:
+          maxLength: 128
           type: string
         position:
           $ref: '#/components/schemas/DashboardWidgetPositionInput'
@@ -5743,8 +5966,10 @@ components:
         - TEXT
         - FILTER
         - AI
-        - TABS_CONTAINER
         - TIME_GRAIN
+        - SPACER
+        - DIVIDER
+        - CONTAINER
       type: string
     DashboardWidgetPosition:
       properties:
@@ -5812,6 +6037,53 @@ components:
       required:
         - success
       type: object
+    DbtSyncCancelResponse:
+      properties:
+        message:
+          type: string
+      required:
+        - message
+      type: object
+    DbtSyncGeneratedFile:
+      properties:
+        path:
+          description: Path of the generated file within the data model project.
+          type: string
+      required:
+        - path
+      type: object
+    DbtSyncManifestStats:
+      properties:
+        macros:
+          type: integer
+        models:
+          type: integer
+        sources:
+          type: integer
+      required:
+        - models
+        - sources
+        - macros
+      type: object
+    DbtSyncProgress:
+      properties:
+        message:
+          oneOf:
+            - type: string
+              description: Human-readable description of what the sync is doing right now.
+            - type: 'null'
+        percentComplete:
+          description: >-
+            Rough completion percentage derived from the stage. Progress reporting only — do not
+            gate on it; gate on the status reaching COMPLETED or FAILED.
+          type: integer
+        stage:
+          description: The stage the sync is currently in, from the same set of values as the sync status.
+          type: string
+      required:
+        - stage
+        - percentComplete
+      type: object
     DbtSyncResponse:
       properties:
         branchName:
@@ -5824,6 +6096,61 @@ components:
         - syncJobId
         - workflowId
         - branchName
+      type: object
+    DbtSyncResultResponse:
+      properties:
+        completedAt:
+          description: When the sync finished, as an ISO 8601 timestamp.
+          type: string
+        cubeCount:
+          description: How many cubes the sync generated from the dbt manifest.
+          type: integer
+        durationMs:
+          description: End-to-end sync duration in milliseconds.
+          type: integer
+        generatedFiles:
+          description: The cube files this sync generated and committed to the branch it created.
+          items:
+            $ref: '#/components/schemas/DbtSyncGeneratedFile'
+          type: array
+        manifestStats:
+          $ref: '#/components/schemas/DbtSyncManifestStats'
+        syncJobId:
+          type: string
+      required:
+        - syncJobId
+        - generatedFiles
+        - manifestStats
+        - cubeCount
+        - completedAt
+        - durationMs
+      type: object
+    DbtSyncStatusResponse:
+      properties:
+        error:
+          oneOf:
+            - type: string
+              description: Why the sync stopped. Present only when the status is FAILED.
+            - type: 'null'
+        progress:
+          $ref: '#/components/schemas/DbtSyncProgress'
+        status:
+          description: >-
+            One of INITIALIZING, CREATING_SANDBOX, UPLOADING_PROJECT, INSTALLING_DEPENDENCIES,
+            RUNNING_DBT_DEPS, COMPILING_DBT, PROCESSING_MANIFEST, WRITING_CUBE_FILES, FINALIZING,
+            COMPLETED, FAILED. COMPLETED and FAILED are the only terminal values: poll until one of
+            them, then read the result. Treat any unrecognized value as still running.
+          type: string
+        syncJobId:
+          type: string
+        updatedAt:
+          description: When this status was last updated, as an ISO 8601 timestamp.
+          type: string
+      required:
+        - syncJobId
+        - status
+        - progress
+        - updatedAt
       type: object
     Deployment:
       properties:
@@ -6031,12 +6358,195 @@ components:
       required:
         - items
       type: object
+    DeploymentSettings:
+      properties:
+        autoDomain:
+          oneOf:
+            - type: string
+            - type: 'null'
+        cloudProvider:
+          $ref: '#/components/schemas/DeploymentSettingsCloudProvider'
+        creationMethod:
+          oneOf:
+            - $ref: '#/components/schemas/DeploymentSettingsCreationMethod'
+            - type: 'null'
+        creationStep:
+          oneOf:
+            - $ref: '#/components/schemas/CreationStep'
+            - type: 'null'
+        cspsConfig:
+          oneOf:
+            - $ref: '#/components/schemas/CspsConfig'
+            - type: 'null'
+        cubeImageCloud:
+          oneOf:
+            - type: string
+            - type: 'null'
+        cubeImageVersion:
+          oneOf:
+            - type: string
+            - type: 'null'
+        customDomain:
+          oneOf:
+            - type: string
+            - type: 'null'
+        defaultLaunchpadViewGroup:
+          oneOf:
+            - type: string
+            - type: 'null'
+        deployBranchMergeAllowed:
+          type: boolean
+        deployBranchName:
+          type: string
+        deployBranchReadOnly:
+          type: boolean
+        deployMode:
+          oneOf:
+            - $ref: '#/components/schemas/DeploymentSettingsDeployMode'
+            - type: 'null'
+        deployProjectRoot:
+          type: string
+        deploymentUrl:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: integer
+        isCold:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        isCubeSqlEnabled:
+          type: boolean
+        isManaged:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        isSupportPreAggregations:
+          type: boolean
+        launchpadTabs:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+        name:
+          type: string
+        region:
+          oneOf:
+            - type: string
+            - type: 'null'
+        releaseChannel:
+          $ref: '#/components/schemas/DeploymentSettingsReleaseChannel'
+        releaseChannelVersion:
+          oneOf:
+            - type: string
+            - type: 'null'
+        releaseChannelVersionHold:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        repoType:
+          oneOf:
+            - $ref: '#/components/schemas/DeploymentSettingsRepoType'
+            - type: 'null'
+        targetPlatform:
+          oneOf:
+            - type: string
+            - type: 'null'
+        template:
+          $ref: '#/components/schemas/DeploymentSettingsTemplate'
+        templateVariables:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+      required:
+        - id
+        - name
+        - template
+        - cloudProvider
+        - releaseChannel
+        - deployBranchName
+        - deployBranchReadOnly
+        - deployBranchMergeAllowed
+        - deployProjectRoot
+        - isCubeSqlEnabled
+        - isSupportPreAggregations
+      type: object
+    DeploymentSettingsCloudProvider:
+      enum:
+        - cubecloud
+        - aws
+        - gcp
+      type: string
+    DeploymentSettingsCreationMethod:
+      enum:
+        - upload
+        - cubecloud
+        - github
+        - ssh
+      type: string
+    DeploymentSettingsDeployMode:
+      enum:
+        - git
+        - cli
+      type: string
+    DeploymentSettingsReleaseChannel:
+      enum:
+        - latest
+        - release
+      type: string
+    DeploymentSettingsRepoType:
+      enum:
+        - git
+        - deployRepo
+      type: string
+    DeploymentSettingsTemplate:
+      enum:
+        - single
+        - simpleCluster
+        - multiCluster
+      type: string
     DeploymentTokenResponse:
       properties:
         cubeApiToken:
           type: string
       required:
         - cubeApiToken
+      type: object
+    DeploymentVersion:
+      properties:
+        isCurrent:
+          type: boolean
+        isLatestInChannel:
+          type: boolean
+        releaseChannel:
+          $ref: '#/components/schemas/DeploymentVersionReleaseChannel'
+        releaseChannelVersion:
+          type: string
+        version:
+          type: string
+      required:
+        - releaseChannelVersion
+        - version
+        - releaseChannel
+        - isLatestInChannel
+        - isCurrent
+      type: object
+    DeploymentVersionReleaseChannel:
+      enum:
+        - latest
+        - release
+      type: string
+    DeploymentVersionsResponse:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/DeploymentVersion'
+          type: array
+      required:
+        - data
       type: object
     DeploymentsListResponse:
       properties:
@@ -6237,6 +6747,10 @@ components:
         showDashboardChat:
           oneOf:
             - type: boolean
+            - type: 'null'
+        timezone:
+          oneOf:
+            - type: string
             - type: 'null'
       type: object
     EmbedTenant:
@@ -7661,6 +8175,10 @@ components:
             - type: 'null'
         id:
           type: integer
+        isSourceReport:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         kind:
           oneOf:
             - $ref: '#/components/schemas/ReportSnapshotDtoKind'
@@ -7839,6 +8357,28 @@ components:
         - name
         - actions
       type: object
+    SetBranchStagingEnvironmentRequest:
+      properties:
+        branchId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        branchName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        enabled:
+          type: boolean
+      required:
+        - enabled
+      type: object
+    SetBranchStagingEnvironmentResponse:
+      properties:
+        data:
+          $ref: '#/components/schemas/BranchResponse'
+      required:
+        - data
+      type: object
     SetEnvVariablesInput:
       properties:
         env_variables:
@@ -7870,6 +8410,15 @@ components:
         branchName:
           oneOf:
             - type: string
+            - type: 'null'
+        ref:
+          oneOf:
+            - type: string
+              description: >-
+                Git ref in the dbt repository to sync from — a branch or a tag, NOT a commit SHA.
+                Overrides the branch saved on the deployment’s dbt git integration for this sync
+                only, so CI can sync the ref under review (e.g. a pull request’s head branch)
+                instead of the tracked branch. The generated Cube branch is named after it.
             - type: 'null'
       type: object
     StartDevModeRequest:
@@ -7972,6 +8521,21 @@ components:
         - url
         - format
       type: object
+    TimezoneSettings:
+      properties:
+        allowUserOverride:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        enabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        timezone:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
     UpdateDashboardEmbeddingInput:
       properties:
         allowEmbed:
@@ -7999,6 +8563,10 @@ components:
       type: object
     UpdateDeploymentInput:
       properties:
+        cloudProvider:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateDeploymentInputCloudProvider'
+            - type: 'null'
         creationMethod:
           oneOf:
             - $ref: '#/components/schemas/UpdateDeploymentInputCreationMethod'
@@ -8008,6 +8576,10 @@ components:
             - $ref: '#/components/schemas/CspsConfigInput'
             - type: 'null'
         customDomain:
+          oneOf:
+            - type: string
+            - type: 'null'
+        defaultLaunchpadViewGroup:
           oneOf:
             - type: string
             - type: 'null'
@@ -8031,11 +8603,48 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        launchpadTabs:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
         name:
           oneOf:
             - type: string
             - type: 'null'
+        region:
+          oneOf:
+            - type: string
+            - type: 'null'
+        releaseChannel:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateDeploymentInputReleaseChannel'
+            - type: 'null'
+        releaseChannelVersion:
+          oneOf:
+            - type: string
+            - type: 'null'
+        releaseChannelVersionHold:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        template:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateDeploymentInputTemplate'
+            - type: 'null'
+        templateVariables:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
       type: object
+    UpdateDeploymentInputCloudProvider:
+      enum:
+        - cubecloud
+        - aws
+        - gcp
+      type: string
     UpdateDeploymentInputCreationMethod:
       enum:
         - upload
@@ -8047,6 +8656,17 @@ components:
       enum:
         - git
         - cli
+      type: string
+    UpdateDeploymentInputReleaseChannel:
+      enum:
+        - latest
+        - release
+      type: string
+    UpdateDeploymentInputTemplate:
+      enum:
+        - single
+        - simpleCluster
+        - multiCluster
       type: string
     UpdateEmbedAccessInput:
       properties:
@@ -8235,20 +8855,6 @@ components:
               type: string
               maxLength: 128
             - type: 'null'
-      type: object
-    UpdatePublishedAiWidgetThreadInput:
-      properties:
-        checksum:
-          oneOf:
-            - type: string
-            - type: 'null'
-        threadId:
-          type: string
-        widgetId:
-          type: string
-      required:
-        - widgetId
-        - threadId
       type: object
     UpdateReportInput:
       properties:

@@ -70,6 +70,10 @@ export class DruidQuery extends BaseQuery {
     templates.functions.UTCTIMESTAMP = 'CURRENT_TIMESTAMP';
     delete templates.functions.WIDTH_BUCKET;
 
+    // Druid only accepts set operations in narrow forms and has no UNION of distinct rows,
+    // so the SQL API leaves them to post processing here.
+    delete templates.statements.union;
+
     return templates;
   }
 }

@@ -29,6 +29,8 @@ pub mod rewrite_engine;
 #[cfg(test)]
 pub mod test_bi_workarounds;
 #[cfg(test)]
+pub mod test_copy;
+#[cfg(test)]
 pub mod test_cube_join;
 #[cfg(test)]
 pub mod test_cube_join_grouped;
@@ -727,6 +729,15 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                         "{{ join_type }} JOIN {{ source }} ON {{ condition }}".to_string(),
                     ),
                     (
+                        "statements/union".to_string(),
+                        r#"{% for query in queries %}(
+{{ query | indent(2, true) }}
+){% if not loop.last %}
+UNION {% if not distinct %}ALL {% endif %}{% endif %}{% endfor %}{% if limit is not none %}
+LIMIT {{ limit }}{% endif %}"#
+                            .to_string(),
+                    ),
+                    (
                         "statements/group_by_exprs".to_string(),
                         "{{ group_by | map(attribute='index') | join(', ') }}".to_string(),
                     ),
@@ -826,6 +837,47 @@ fn get_test_tenant_ctx_with_meta_and_templates(
 
 pub fn get_test_tenant_ctx_with_meta(meta: Vec<CubeMeta>) -> Arc<MetaContext> {
     get_test_tenant_ctx_with_meta_and_templates(meta, vec![])
+}
+
+/// The standard test meta with its cubes spread across several data sources: every cube
+/// named in `cube_data_sources` reaches the data source it is paired with, everything else
+/// reaches `default`.
+pub fn get_test_tenant_ctx_with_cube_data_sources(
+    cube_data_sources: Vec<(&str, &str)>,
+) -> Arc<MetaContext> {
+    let data_source_for_cube = |cube: &str| {
+        cube_data_sources
+            .iter()
+            .find(|(name, _)| *name == cube)
+            .map_or("default", |(_, data_source)| *data_source)
+            .to_string()
+    };
+
+    let meta = get_test_meta();
+    let member_to_data_source: HashMap<_, _> = meta
+        .iter()
+        .flat_map(|cube| {
+            let data_source = data_source_for_cube(&cube.name);
+            cube.dimensions
+                .iter()
+                .map(|d| &d.name)
+                .chain(cube.measures.iter().map(|m| &m.name))
+                .chain(cube.segments.iter().map(|s| &s.name))
+                .map(move |member| (member.clone(), data_source.clone()))
+        })
+        .collect();
+
+    let data_source_to_sql_generator = member_to_data_source
+        .values()
+        .map(|data_source| (data_source.clone(), sql_generator(vec![])))
+        .collect();
+
+    Arc::new(MetaContext::new(
+        meta,
+        member_to_data_source,
+        data_source_to_sql_generator,
+        Uuid::new_v4(),
+    ))
 }
 
 pub async fn get_test_session(
@@ -1201,7 +1253,9 @@ impl TestContext {
                     output.push(frame.print());
                     output_flags = flags;
                 }
-                QueryPlan::CreateTempTable(_, _, _, _) => {
+                QueryPlan::CreateTempTable(_, _, _, _, _)
+                | QueryPlan::CopyFrom(_)
+                | QueryPlan::CreateEmptyTempTable(_) => {
                     // nothing to do
                 }
                 QueryPlan::MetaOk(flags, _) => {

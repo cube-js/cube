@@ -1,11 +1,13 @@
 mod client;
 mod commands;
 mod config;
+mod error;
 mod oauth;
 mod output;
 mod telemetry;
 mod update;
 mod util;
+mod wait;
 
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
@@ -124,6 +126,8 @@ enum Command {
     Regions(commands::regions::Args),
     /// Upload a local project directory to a deployment and build it
     Deploy(commands::deploy::Args),
+    /// Compile a deployment's data model and report compilation errors
+    Validate(commands::validate::Args),
     /// Tail a deployment's pod logs
     Logs(commands::logs::Args),
     /// GitHub integration: link status, installations, repos, and connect
@@ -132,6 +136,8 @@ enum Command {
     /// Manage a deployment's data model files
     #[command(name = "data-model", alias = "dm")]
     DataModel(commands::data_model::Args),
+    /// Run a deployment's dbt sync (pull dbt models in as cubes)
+    Dbt(commands::dbt::Args),
     /// Manage deployment environments and environment tokens
     #[command(alias = "environment", alias = "envs")]
     Environments(commands::environments::Args),
@@ -190,6 +196,8 @@ enum Command {
     /// SCIM v2 user and group provisioning
     Scim(commands::scim::Args),
 
+    /// Show this API's OpenAPI specification (endpoints, parameters, schemas)
+    Spec(commands::spec::Args),
     /// Make an authenticated raw API request (escape hatch)
     Api(commands::api::Args),
     /// Update the CLI to the latest release
@@ -216,9 +224,11 @@ impl Command {
             Deployments(_) => "deployments",
             Regions(_) => "regions",
             Deploy(_) => "deploy",
+            Validate(_) => "validate",
             Logs(_) => "logs",
             Github(_) => "github",
             DataModel(_) => "data-model",
+            Dbt(_) => "dbt",
             Environments(_) => "environments",
             Variables(_) => "variables",
             Folders(_) => "folders",
@@ -239,6 +249,7 @@ impl Command {
             App(_) => "app",
             Meta(_) => "meta",
             Scim(_) => "scim",
+            Spec(_) => "spec",
             Api(_) => "api",
             Update(_) => "update",
             Completion(_) => "completion",
@@ -278,6 +289,9 @@ async fn main() {
     let command_name = command.name();
 
     let result = run(global, command).await;
+    // API failures are commonly caused by a CLI that lags the API, so they
+    // get an extra "try updating" hint below the error.
+    let api_error = result.as_ref().err().is_some_and(error::is_api_error);
 
     if !is_completion {
         let mut props = serde_json::Map::new();
@@ -292,11 +306,20 @@ async fn main() {
         }
         telemetry::flush().await;
     }
-    if let Some(check) = check {
-        update::print_notice(check).await;
-    }
-    if let Err(err) = result {
+    // Print the failure before consulting the release check: only the hint
+    // needs that answer, and a slow or unreachable GitHub must not sit between
+    // the user and the error they are waiting for.
+    if let Err(err) = &result {
         eprintln!("error: {err:#}");
+    }
+    let outcome = update::resolve(check, api_error).await;
+    let announced = update::print_notice(&outcome);
+    if result.is_err() {
+        if api_error {
+            if let Some(hint) = update::api_error_hint(&outcome, announced) {
+                eprintln!("{hint}");
+            }
+        }
         std::process::exit(1);
     }
 }
@@ -312,9 +335,11 @@ async fn run(global: GlobalArgs, command: Command) -> Result<()> {
         Deployments(args) => commands::deployments::command(args, &ctx).await,
         Regions(args) => commands::regions::command(args, &ctx).await,
         Deploy(args) => commands::deploy::command(args, &ctx).await,
+        Validate(args) => commands::validate::command(args, &ctx).await,
         Logs(args) => commands::logs::command(args, &ctx).await,
         Github(args) => commands::github::command(args, &ctx).await,
         DataModel(args) => commands::data_model::command(args, &ctx).await,
+        Dbt(args) => commands::dbt::command(args, &ctx).await,
         Environments(args) => commands::environments::command(args, &ctx).await,
         Variables(args) => commands::variables::command(args, &ctx).await,
         Folders(args) => commands::folders::command(args, &ctx).await,
@@ -335,6 +360,7 @@ async fn run(global: GlobalArgs, command: Command) -> Result<()> {
         App(args) => commands::app::command(args, &ctx).await,
         Meta(args) => commands::meta::command(args, &ctx).await,
         Scim(args) => commands::scim::command(args, &ctx).await,
+        Spec(args) => commands::spec::command(args, &ctx).await,
         Api(args) => commands::api::command(args, &ctx).await,
         Update(args) => commands::update::command(args, &ctx).await,
         Completion(args) => commands::completion::command(args),

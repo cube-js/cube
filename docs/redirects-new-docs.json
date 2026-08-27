@@ -2621,7 +2621,7 @@
   },
   {
     "source": "/product/administration/workspace/maintenance-window",
-    "destination": "https://docs.cube.dev/admin",
+    "destination": "https://docs.cube.dev/admin/deployment/maintenance-window",
     "permanent": true
   },
   {

@@ -114,6 +114,8 @@ export class SnowflakeQuery extends BaseQuery {
     templates.functions.CHARACTERLENGTH = 'LENGTH({{ args[0] }})';
     templates.functions.BTRIM = 'TRIM({{ args_concat }})';
     templates.functions.STRING_AGG = 'LISTAGG({% if distinct %}DISTINCT {% endif %}{{ args_concat }})';
+    // DATEADD is being rewritten to DATE_ADD
+    templates.functions.DATE_ADD = 'DATEADD({{ date_part }}, {{ interval }}, {{ args[0] }})';
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
     // Snowflake `/` is decimal division even for integer operands (output scale
     // is dividend scale + 6), while this template must keep PostgreSQL integer
@@ -130,6 +132,11 @@ export class SnowflakeQuery extends BaseQuery {
     templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\\\'{% endif %}';
     templates.expressions.ilike = '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\\\'{% endif %}';
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
+    // Snowflake has no default LIKE escape character, so the escaping the
+    // planner applies to the value needs an explicit clause - the same one
+    // SnowflakeFilter.likeIgnoreCase emits on the legacy path, and doubled for
+    // the same reason described there.
+    templates.tesseract.ilike = '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }} ESCAPE \'\\\\\'';
     templates.tesseract.join_types_full = 'FULL';
     delete templates.types.interval;
     return templates;

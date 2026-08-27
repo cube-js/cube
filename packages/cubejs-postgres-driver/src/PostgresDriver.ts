@@ -300,25 +300,41 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       // to be of type text for the drivers purposes.
       // TODO: if full implmentation the constraints can be looked up via pg_enum
       // https://www.postgresql.org/docs/9.1/catalog-pg-enum.html
+      //
+      // Postgres creates a row type for every relation and an array type over it, so
+      // selecting all of typcategory = 'A' returns one row per relation in the database.
+      // That's why there is a NOT EXIST filter.
       const customTypes = await conn.query(
         `SELECT
-            oid,
+            t.oid,
             CASE
-                WHEN typcategory = 'E' THEN 'varchar'
-                WHEN typcategory = 'A' THEN 'text'
-                ELSE typname
+                WHEN t.typcategory = 'E' THEN 'varchar'
+                WHEN t.typcategory = 'A' THEN 'text'
+                ELSE t.typname
             END AS typname
         FROM
-            pg_type
+            pg_type t
         WHERE
-            typcategory in ('U', 'E', 'A')`,
+            t.typcategory in ('U', 'E')
+            OR (
+                t.typcategory = 'A'
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM pg_type e
+                    JOIN pg_class c ON c.oid = e.typrelid
+                    WHERE e.oid = t.typelem AND e.typtype = 'c' AND c.relkind <> 'c'
+                )
+            )`,
         []
       );
 
-      this.userDefinedTypes = customTypes.rows.reduce(
-        (prev, current) => ({ [current.oid]: current.typname, ...prev }),
-        {}
-      );
+      const userDefinedTypes: Record<string, string> = {};
+
+      for (const row of customTypes.rows) {
+        userDefinedTypes[row.oid] = row.typname;
+      }
+
+      this.userDefinedTypes = userDefinedTypes;
     }
   }
 

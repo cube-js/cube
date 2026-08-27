@@ -223,7 +223,8 @@
                   "docs/integrations/semantic-layer-sync/tableau"
                 ]
               },
-              "docs/integrations/mcp-server"
+              "docs/integrations/mcp-server",
+              "docs/integrations/agent-skills"
             ]
           }
         ]
@@ -380,6 +381,7 @@
                   "admin/monitoring/monitoring-integrations/cloudwatch",
                   "admin/monitoring/monitoring-integrations/s3",
                   "admin/monitoring/monitoring-integrations/datadog",
+                  "admin/monitoring/monitoring-integrations/gcs",
                   "admin/monitoring/monitoring-integrations/grafana-cloud",
                   "admin/monitoring/monitoring-integrations/new-relic"
                 ]
@@ -639,6 +641,7 @@
                       "recipes/data-modeling/nested-aggregates",
                       "recipes/data-modeling/filtered-aggregates",
                       "recipes/data-modeling/share-of-total",
+                      "recipes/data-modeling/average-order-value",
                       "recipes/data-modeling/period-over-period"
                     ]
                   },
@@ -763,7 +766,9 @@
                   "POST /api/v1/deployments/{deploymentId}/creation-step/reset",
                   "GET /api/v1/deployments/{deploymentId}/logs",
                   "GET /api/v1/deployments/{deploymentId}/pods",
-                  "POST /api/v1/deployments/{deploymentId}/token"
+                  "GET /api/v1/deployments/{deploymentId}/settings",
+                  "POST /api/v1/deployments/{deploymentId}/token",
+                  "GET /api/v1/deployments/{deploymentId}/versions"
                 ]
               },
               {
@@ -804,6 +809,7 @@
                 "pages": [
                   "GET /build/api/v1/deployments/{deploymentId}/branches",
                   "POST /build/api/v1/deployments/{deploymentId}/branches",
+                  "PUT /build/api/v1/deployments/{deploymentId}/branches/staging-environment",
                   "POST /build/api/v1/deployments/{deploymentId}/commit",
                   "GET /build/api/v1/deployments/{deploymentId}/data-model/files",
                   "PUT /build/api/v1/deployments/{deploymentId}/data-model/files",
@@ -847,7 +853,10 @@
                 "group": "dbt Sync",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
-                  "POST /api/v1/deployments/{deploymentId}/dbt-sync"
+                  "POST /api/v1/deployments/{deploymentId}/dbt-sync",
+                  "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}",
+                  "DELETE /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}",
+                  "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/result"
                 ]
               },
               {
@@ -886,7 +895,6 @@
                   "PUT /api/v1/deployments/{deploymentId}/workbooks/{workbookId}",
                   "DELETE /api/v1/deployments/{deploymentId}/workbooks/{workbookId}",
                   "PUT /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard",
-                  "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread",
                   "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate",
                   "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/publish"
                 ]
@@ -1024,6 +1032,13 @@
                 "pages": [
                   "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/embed-access",
                   "PUT /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/embed-access"
+                ]
+              },
+              {
+                "group": "OpenAPI Spec",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/spec"
                 ]
               },
               {
@@ -1239,6 +1254,10 @@
     {
       "source": "/docs/integrations/power-bi/ntlm",
       "destination": "/reference/core-data-apis/dax-api/ntlm"
+    },
+    {
+      "source": "/api-reference/workbooks/update-published-dashboard-ai-widget-thread",
+      "destination": "/api-reference/workbooks/update-workbook-dashboard"
     }
   ]
 }

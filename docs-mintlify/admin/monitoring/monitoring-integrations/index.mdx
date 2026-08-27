@@ -54,6 +54,9 @@ following guides and configuration examples to get tool-specific instructions:
   <Card title="Datadog" href="/admin/monitoring/monitoring-integrations/datadog">
     Export logs and metrics to Datadog.
   </Card>
+  <Card title="Google Cloud Storage" href="/admin/monitoring/monitoring-integrations/gcs">
+    Archive logs to a Google Cloud Storage bucket.
+  </Card>
   <Card title="Grafana Cloud" href="/admin/monitoring/monitoring-integrations/grafana-cloud">
     Export logs and metrics to Grafana Cloud.
   </Card>
@@ -141,6 +144,46 @@ If you'd like to adjust severity levels of logs from API instances and the
 refresh scheduler, use the [`CUBEJS_LOG_LEVEL`](/reference/configuration/environment-variables#cubejs_log_level) environment variable.
 
 </Info>
+
+### Fields in exported logs
+
+Before a log record reaches a sink, the following fields are attached to it:
+
+| Field | Description |
+| --- | --- |
+| `deployment_id` | Identifier of the [deployment][ref-deployments]. |
+| `deployment_name` | Name of the deployment. |
+| `hostname` | Host name of the node that the record comes from. |
+| `pod_name` | Name of the pod that the record comes from. |
+| `service` | Name of the component that the record comes from, matching the input name: `cubejs-server`, `refresh-scheduler`, `warmup-job`, or `cubestore`. Records from the `query-history` input use `query-history` on `datadog_logs` sinks. |
+| `level` | Severity of the record, lower-cased: `error`, `warn`, `info`, or `debug`. Records with the `trace` severity are exported as `debug`, and records that carry no severity as `info`. |
+| `status` | Duplicate of `level`, for tools that expect the severity in a `status` field, e.g. Datadog. |
+| `origin` | Always `cube_cloud`. |
+
+Records from the `query-history` input carry a different set of fields, see
+[Query History export](#query-history-export).
+
+#### Datadog attributes
+
+Sinks of the `datadog_logs` type additionally get the two fields that Datadog
+uses for attribution:
+
+| Field | Description |
+| --- | --- |
+| `ddsource` | Name of the pod that the record comes from, or `query-history` for records from the `query-history` input. |
+| `ddtags` | Comma-separated list of tags. By default, the deployment name and the host name. |
+
+To send your own tags to Datadog, list them in the `ddtags` option of the sink.
+They are appended to the default ones:
+
+```toml
+[sinks.datadog]
+# type, inputs, default_api_key, etc.
+ddtags = [
+  "env:production",
+  "team:analytics"
+]
+```
 
 ### Sinks for logs
 
@@ -230,6 +273,25 @@ inputs = [
 ]
 ```
 
+### Labels on exported metrics
+
+Metrics are exported with the following Prometheus labels:
+
+| Label | Metrics | Description |
+| --- | --- | --- |
+| `pod_name` | `cube_cpu_usage_ratio`, `cube_memory_usage_ratio` | Name of the pod that the measurement was taken on. |
+| `deployment_id` | `cube_requests_*` | Identifier of the [deployment][ref-deployments]. |
+| `api_type` | `cube_requests_*` | Type of [data API][ref-apis] that served the requests (`rest`, `sql`, etc.), the same values as in [Query History][ref-query-history]. `unknown` if the API type is not known. |
+| `request_source` | `cube_requests_*` | Source of the requests: `ai-engineer` for requests coming from AI features, `other` for any other source, `unknown` if the requests carry no source. |
+
+Request metrics are reported per `api_type` and `request_source` combination, so
+you can break down request counts and latency by data API:
+
+```text
+cube_requests_total{deployment_id="12345",api_type="rest",request_source="unknown"} 42
+cube_requests_total{deployment_id="12345",api_type="sql",request_source="ai-engineer"} 7
+```
+
 ### Sinks for metrics
 
 Metrics are exported in the Prometheus format which is compatible with the
@@ -291,6 +353,20 @@ available on the [Enterprise plan](https://cube.dev/pricing).
 
 </Note>
 
+<Warning>
+
+Query History export also requires the **Monitoring Integrations Tier** of your
+deployment to be set to **Medium (Up to 50 GB/mo)**. You can find it under
+**Settings → Monitoring Integrations**; deployments default to **X-Small (Up to 10
+GB/mo)**.
+
+On **X-Small** or **Small**, Query History export fails silently: no events reach
+any sink, including a `console` sink, and no error is logged. If the tier is not
+available in your deployment settings, ask your Cube contact or the [Cube support
+team][ref-support] to set it.
+
+</Warning>
+
 <iframe
   width="100%"
   height="400"
@@ -321,6 +397,7 @@ Exported data includes the following fields:
 | --- | --- |
 | `trace_id` | Unique identifier of the API request. |
 | `account_name` | Name of the Cube Cloud account. |
+| `query_history_link` | Link to the request in [Query History][ref-query-history]. |
 | `deployment_id` | Identifier of the [deployment][ref-deployments]. |
 | `environment_name` | Name of the [environment][ref-environments], `NULL` for production. |
 | `api_type` | Type of [data API][ref-apis] used (`rest`, `sql`, etc.), `NULL` for errors. |
@@ -332,6 +409,11 @@ Exported data includes the following fields:
 | `end_time_unix_ms` | End time of the execution, Unix timestamp in milliseconds. |
 | `api_response_duration_ms` | Duration of the execution in milliseconds. |
 | `cache_type` | [Cache type][ref-cache-type]: `no_cache`, `pre_aggregations_in_cube_store`, etc. |
+
+Unlike other logs, Query History records don't carry the
+[fields listed above](#fields-in-exported-logs), except for `origin`. On sinks of
+the `datadog_logs` type, they also get `service` and `ddsource` set to
+`query-history`, and `ddtags`.
 
 <Note>
 
@@ -376,3 +458,4 @@ Query History export.
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-cache-type]: /docs/pre-aggregations#cache-type
 [ref-query-history-export-recipe]: /admin/monitoring/query-history-export
+[ref-support]: /admin/account-billing/support

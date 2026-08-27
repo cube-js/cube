@@ -1,0 +1,289 @@
+{
+  "cube": {
+    "environment": {
+      "CUBEJS_API_SECRET": "mysupersecret",
+      "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
+      "CUBEJS_CUBESTORE_HOST": "store",
+      "CUBEJS_DB_TYPE": "trino",
+      "CUBEJS_DB_HOST": "data",
+      "CUBEJS_DB_PORT": "8080",
+      "CUBEJS_DB_PRESTO_CATALOG": "memory",
+      "CUBEJS_DB_NAME": "default",
+      "CUBEJS_DB_USER": "test",
+      "CUBEJS_PG_SQL_PORT": "5656",
+      "CUBEJS_SQL_USER": "admin",
+      "CUBEJS_SQL_PASSWORD": "admin_password",
+      "CUBESQL_SQL_PUSH_DOWN": "true",
+      "CUBEJS_TESSERACT_SQL_PLANNER": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}",
+      "CUBEJS_TRANSPILATION_NATIVE": "${DRIVERS_TESTS_CUBEJS_TRANSPILATION_NATIVE}"
+    },
+    "depends_on": [
+      "data"
+    ],
+    "links": [
+      "data"
+    ],
+    "ports": [
+      "4000",
+      "5656"
+    ]
+  },
+  "data": {
+    "image": "trinodb/trino:476",
+    "ports": [
+      "8080"
+    ],
+    "entrypoint": [
+      "/bin/bash",
+      "-c",
+      "echo 'query.max-stage-count=1000' >> /etc/trino/config.properties && exec /usr/lib/trino/bin/run-trino"
+    ]
+  },
+  "cast": {
+    "SELECT_PREFIX": "",
+    "SELECT_SUFFIX": "",
+    "DATE_PREFIX": "date_parse(",
+    "DATE_SUFFIX": ", '%Y-%m-%d')",
+    "CREATE_TBL_PREFIX": "CREATE TABLE ",
+    "CREATE_TBL_SUFFIX": " AS ",
+    "CREATE_SUB_PREFIX": "(",
+    "CREATE_SUB_SUFFIX": ")"
+  },
+  "tables": {
+    "products": "products",
+    "customers": "customers",
+    "ecommerce": "ecommerce",
+    "bigecommerce": "bigecommerce",
+    "retailcalendar": "retailcalendar"
+  },
+  "preAggregations": {
+    "Products": [],
+    "Customers": [
+      {
+        "name": "RA",
+        "measures": [
+          "CUBE.count",
+          "CUBE.runningTotal"
+        ]
+      }
+    ],
+    "ECommerce": [
+      {
+        "name": "SA",
+        "dimensions": [
+          "CUBE.productName"
+        ],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": [
+          "CUBE.productName"
+        ],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "partition_granularity": "month",
+        "dimensions": [
+          "CUBE.productName"
+        ],
+        "measures": [
+          "CUBE.count"
+        ]
+      },
+      {
+        "name": "CountByProduct",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": [
+          "CUBE.productName"
+        ],
+        "measures": [
+          "CUBE.countApproxByCustomer"
+        ]
+      },
+      {
+        "name": "TBuildOnlyHalfYear",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "build_only_half_year",
+        "partition_granularity": "year",
+        "dimensions": [
+          "CUBE.productName"
+        ],
+        "measures": [
+          "CUBE.totalQuantity"
+        ]
+      }
+    ],
+    "BigECommerce": [
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "year",
+        "dimensions": [
+          "CUBE.productName",
+          "CUBE.id"
+        ],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "partition_granularity": "month",
+        "dimensions": [],
+        "measures": [
+          "CUBE.count"
+        ]
+      },
+      {
+        "name": "CountByProduct",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": [
+          "CUBE.productName"
+        ],
+        "measures": [
+          "CUBE.countApproxByCustomer"
+        ]
+      },
+      {
+        "name": "CategoryFlat",
+        "dimensions": [
+          "CUBE.productName",
+          "CUBE.id",
+          "CUBE.category"
+        ],
+        "measures": [
+          "CUBE.totalProfit"
+        ]
+      }
+    ]
+  },
+  "skip": [
+    "---------------------------------------",
+    "SKIPPED FOR ALL                        ",
+    "---------------------------------------",
+    "Trino returns rows in a different order between runs when the query does not",
+    "order them itself, so these two cannot be pinned to a snapshot.",
+    "---------------------------------------",
+    "querying Products: dimensions -- doesn't work wo ordering",
+    "SQL API: Nested Rollup over asterisk",
+    "---------------------------------------",
+    "Requires Tesseract.                    ",
+    "---------------------------------------",
+    "querying BigECommerce: rolling window by 2 day without date range",
+    "querying BigECommerce: rolling window by 2 month without date range",
+    "querying BigECommerce: rolling window YTD without date range",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
+    "querying SwitchSourceTest: simple cross join",
+    "querying SwitchSourceTest: full cross join",
+    "querying SwitchSourceTest: filter by switch dimensions",
+    "---------------------------------------",
+    "Trino rejects the ordinal GROUP BY references (\"GROUP BY expression must be a",
+    "column reference: 1\") that the SQL API pushes down for a rollup.",
+    "---------------------------------------",
+    "SQL API: Simple Rollup",
+    "SQL API: Complex Rollup",
+    "SQL API: Rollup with aliases",
+    "SQL API: Rollup over exprs",
+    "SQL API: Nested Rollup",
+    "SQL API: Nested Rollup with aliases",
+    "SQL API: Extended nested Rollup over asterisk",
+    "---------------------------------------",
+    "Requires Tesseract: the legacy planner produces different numbers here, so",
+    "the committed snapshots are the Tesseract ones (same split as the other",
+    "fixtures).                             ",
+    "---------------------------------------",
+    "querying BigECommerce: multi-stage group by time dimension",
+    "querying BigECommerce: SeveralMultiStageMeasures",
+    "querying BigECommerce: two multi-stage branches sharing one pre-aggregation",
+    "querying BigECommerce: base measure plus multi-stage over non-partitioned pre-aggregation",
+    "querying BigECommerce with Retail Calendar: totalCountRetailYearAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "SQL API: Timeshift measure from cube",
+    "Tesseract: SQL API: Timeshift measure from cube",
+    "---------------------------------------",
+    "Trino has no WEEK interval unit and PrestodbQuery rejects multi-part",
+    "intervals; both planners hit these, see the tesseractSkip notes below.",
+    "---------------------------------------",
+    "querying BigECommerce: rolling window by 2 week",
+    "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
+    "querying custom granularities ECommerce: count by three_months_by_march + dimension"
+  ],
+  "tesseractSkip": [
+    "---------------------------------------",
+    "SKIPPED FOR ALL                        ",
+    "---------------------------------------",
+    "Trino returns rows in a different order between runs when the query does not",
+    "order them itself, so these two cannot be pinned to a snapshot.",
+    "---------------------------------------",
+    "querying Products: dimensions -- doesn't work wo ordering",
+    "SQL API: Nested Rollup over asterisk",
+    "---------------------------------------",
+    "Trino has no WEEK interval unit: `INTERVAL '2' week` is a parse error",
+    "(\"mismatched input 'week'\"), so every rolling window measured in weeks fails.",
+    "---------------------------------------",
+    "querying BigECommerce: rolling window by 2 week",
+    "querying BigECommerce: rolling window YTD (month + week)",
+    "querying BigECommerce: rolling window YTD (month + week + no gran)",
+    "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "---------------------------------------",
+    "PrestodbQuery rejects intervals with more than one date part outright",
+    "(\"Athena/Presto supports only simple intervals with one date part\"), which is",
+    "what the three_months_by_march custom granularity offset needs.",
+    "---------------------------------------",
+    "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
+    "querying custom granularities ECommerce: count by three_months_by_march + dimension",
+    "---------------------------------------",
+    "Trino rejects the ordinal GROUP BY references (\"GROUP BY expression must be a",
+    "column reference: 1\") that the SQL API pushes down for a rollup.",
+    "---------------------------------------",
+    "SQL API: Nested Rollup",
+    "SQL API: Nested Rollup with aliases"
+  ]
+}

@@ -414,13 +414,98 @@ impl MultiStageQueryPlanner {
         }) {
             return Ok(());
         }
+        let grain = Self::grain_members(grain_state, parent_state);
+        // A granularity of the very dimension the sql reads looks like a match in
+        // the listing, so the one case where reading the grain is not enough to
+        // tell them apart is spelled out.
+        let target = dimension.clone().resolve_reference_chain().full_name();
+        let hint = if grain
+            .iter()
+            .any(|m| Self::granular_time_dimension_base(m).as_ref() == Some(&target))
+        {
+            format!(
+                " The grain carries {target} at a granularity, which is a value of its own and not \
+                 the dimension itself."
+            )
+        } else {
+            String::new()
+        };
+        let grain = if grain.is_empty() {
+            "no dimensions".to_string()
+        } else {
+            grain
+                .iter()
+                .map(Self::describe_grain_member)
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
         Err(CubeError::user(format!(
             "Multi-stage member {member} reads dimension {dimension}, which is not part of the \
-             grain it is computed at. Add {dimension} to `grain.include` of {member}, or remove \
-             it from the member's sql.",
+             grain it is computed at ({grain}).{hint} Add {dimension} to `grain.include` of \
+             {member}, or remove it from the member's sql.",
             member = member.full_name(),
             dimension = dimension.full_name(),
         )))
+    }
+
+    // The grain the member is computed at: the stage's own dimensions and, when
+    // the assembly broadcasts back onto the query grid, the keys side.
+    fn grain_members(
+        grain_state: &QueryProperties,
+        parent_state: &QueryProperties,
+    ) -> Vec<Rc<MemberSymbol>> {
+        let mut members: Vec<Rc<MemberSymbol>> = Vec::new();
+        for state in [grain_state, parent_state] {
+            for dimension in state
+                .dimensions()
+                .iter()
+                .chain(state.time_dimensions().iter())
+            {
+                let resolved = dimension.clone().resolve_reference_chain();
+                if !members
+                    .iter()
+                    .any(|m| m.full_name() == resolved.full_name())
+                {
+                    members.push(resolved);
+                }
+            }
+        }
+        members
+    }
+
+    // A time dimension carries its granularity inside its name, which reads as a
+    // member of its own; the granularity is named separately instead.
+    fn describe_grain_member(member: &Rc<MemberSymbol>) -> String {
+        match member.as_ref() {
+            MemberSymbol::TimeDimension(time_dimension) => match time_dimension.granularity() {
+                Some(granularity) => format!(
+                    "{} ({})",
+                    time_dimension
+                        .base_symbol()
+                        .clone()
+                        .resolve_reference_chain()
+                        .full_name(),
+                    granularity
+                ),
+                None => member.full_name(),
+            },
+            _ => member.full_name(),
+        }
+    }
+
+    fn granular_time_dimension_base(member: &Rc<MemberSymbol>) -> Option<String> {
+        match member.as_ref() {
+            MemberSymbol::TimeDimension(time_dimension) => {
+                time_dimension.granularity().as_ref().map(|_| {
+                    time_dimension
+                        .base_symbol()
+                        .clone()
+                        .resolve_reference_chain()
+                        .full_name()
+                })
+            }
+            _ => None,
+        }
     }
 
     /// Plans CASE-SWITCH dependencies: collects, per dependency, the

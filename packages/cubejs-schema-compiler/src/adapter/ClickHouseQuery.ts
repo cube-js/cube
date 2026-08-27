@@ -265,6 +265,9 @@ export class ClickHouseQuery extends BaseQuery {
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.UTCTIMESTAMP = 'now(\'UTC\')';
     templates.functions.STRING_AGG = 'arrayStringConcat(group{% if distinct %}Uniq{% endif %}Array({{ args[0] }}), {{ args[1] }})';
+    // DATEADD is being rewritten to DATE_ADD. The operator form is used instead of
+    // addDate(), which only exists since ClickHouse 23.9
+    templates.functions.DATE_ADD = '({{ args[0] }} + INTERVAL {{ interval }} {{ date_part }})';
     // TODO: Introduce additional filter in jinja? or parseDateTimeBestEffort?
     // https://github.com/ClickHouse/ClickHouse/issues/19351
     templates.expressions.timestamp_literal = 'parseDateTimeBestEffort(\'{{ value }}\')';
@@ -291,6 +294,15 @@ export class ClickHouseQuery extends BaseQuery {
     '{% if not loop.last %} UNION ALL\n{% endif %}' +
     '{% endfor %}' +
     ') AS dates';
+
+    // ClickHouse rejects a bare UNION unless `union_default_mode` is set, so a set
+    // operation has to say which one it is.
+    templates.statements.union = '{% for query in queries %}(\n' +
+      '{{ query | indent(2, true) }}\n' +
+      ')' +
+      '{% if not loop.last %}\nUNION {% if distinct %}DISTINCT{% else %}ALL{% endif %} {% endif %}' +
+      '{% endfor %}' +
+      '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}';
 
     return templates;
   }

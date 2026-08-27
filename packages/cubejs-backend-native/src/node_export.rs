@@ -3,6 +3,7 @@ use cubesql::compile::{convert_statement_to_cube_query, get_df_batches};
 use cubesql::config::processing_loop::ShutdownMode;
 use cubesql::sql::dataframe::arrow_to_column_type;
 use cubesql::sql::ColumnType;
+use cubesql::sql::Session;
 use cubesql::transport::{SpanId, TransportService};
 use futures::StreamExt;
 
@@ -233,6 +234,76 @@ async fn write_jsonl_message(
     .await
 }
 
+/// How a `/v1/cubesql` request ended when nothing actually failed.
+enum SqlQueryOutcome {
+    /// The whole result set was streamed to the client.
+    Completed,
+    /// The client closed the response stream before the result set was fully
+    /// written, so this attempt delivered nothing. It is reported as a
+    /// `Continue wait`: the event query history already reads for an attempt
+    /// that produced no result. `Load Request` is logged when the attempt
+    /// starts, so without this the attempt usually has no end at all and the
+    /// time it spent cannot be attributed - dropping the future abandons the JS
+    /// load rather than cancelling it, and an abandoned load that resolves, or
+    /// never settles, reports nothing.
+    ///
+    /// The exception is an abandoned load that goes on to *reject*: it still
+    /// runs in its own promise (`sql-server.ts`), and the gateway routes the
+    /// rejection into `handleError`, which logs its own `Continue wait`. A
+    /// disconnect racing the continue-wait boundary therefore double-logs -
+    /// CUB-4099's disconnects cluster around 61s against a ~60s boundary, so
+    /// this is not rare. Two rows saying the same thing beat none, so the call
+    /// is not gated on it, but that is where a duplicate comes from.
+    ///
+    /// Whether the client comes back is not something this end of the stream
+    /// can know, and the reporting deliberately does not depend on it: under
+    /// `throwContinueWait` it polls with the same request id and the queued
+    /// query stays alive while it keeps doing so, and without the flag this is
+    /// the end of the road. Either way the attempt is over having produced
+    /// nothing, which is all the event claims. What it must not claim is that
+    /// the query failed.
+    ClientDisconnected,
+}
+
+/// Records a `Continue wait` load event for a `/v1/cubesql` attempt that ended
+/// without delivering a result.
+///
+/// `Load Request` is logged when the attempt starts, so an attempt that reports
+/// nothing back leaves no way to attribute the time it spent. `Continue wait`
+/// is the event the query history consumer already reads for "this attempt
+/// produced no result", which is what happened. It does not by itself close the
+/// request - a polling client opens further attempts under the same request id,
+/// and CUB-4099 has one that ran 44 minutes over six of them - but it does give
+/// this attempt an end.
+async fn log_continue_wait(
+    session: &Arc<Session>,
+    span_id: &Option<Arc<SpanId>>,
+    sql_query: &str,
+) -> Result<(), CubeError> {
+    let Some(auth_context) = session.state.auth_context() else {
+        return Ok(());
+    };
+
+    session
+        .session_manager
+        .server
+        .transport
+        .log_load_state(
+            span_id.clone(),
+            auth_context,
+            session.state.get_load_request_meta("sql"),
+            "Continue wait".to_string(),
+            serde_json::json!({
+                "query": {
+                    "sql": sql_query,
+                },
+                "apiType": "sql",
+                "duration": span_id.as_ref().map(|span_id| span_id.duration()),
+            }),
+        )
+        .await
+}
+
 async fn handle_sql_query(
     services: Arc<NodeCubeServices>,
     native_auth_ctx: Arc<NativeSQLAuthContext>,
@@ -243,7 +314,7 @@ async fn handle_sql_query(
     timezone: Option<String>,
     throw_continue_wait: bool,
     request_id: Option<String>,
-) -> Result<(), CubeError> {
+) -> Result<SqlQueryOutcome, CubeError> {
     let span_id = Some(Arc::new(SpanId::new(
         request_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
         serde_json::json!({ "sql": sql_query }),
@@ -477,14 +548,32 @@ async fn handle_sql_query(
         };
 
         let result = tokio::select! {
+            // Dropping the `execute()` future here cancels the query stream,
+            // which is exactly what we want: there is no consumer left for it.
             _ = close_rx => {
-                Err(CubeError::internal("Client disconnected".to_string()))
+                Ok(SqlQueryOutcome::ClientDisconnected)
             }
-            res = execute() => res
+            res = execute() => res.map(|_| SqlQueryOutcome::Completed),
         };
 
         match &result {
-            Ok(_) => {
+            Ok(SqlQueryOutcome::ClientDisconnected) => {
+                log::debug!(
+                    "Client disconnected before the result was fully written, span id: {}",
+                    span_id.as_ref().map(|s| s.span_id.as_str()).unwrap_or("-")
+                );
+
+                // Usually nothing else reports this outcome, so without this
+                // the attempt ends unrecorded and the time it spent cannot be
+                // attributed. `Continue wait` is the name query history already
+                // reads for an attempt that produced no result, rather than a
+                // new one it would log and drop. See
+                // `SqlQueryOutcome::ClientDisconnected` for why it is not gated
+                // on `throw_continue_wait`, and the `Err` arm below for why a
+                // real continue wait deliberately does not log here.
+                log_continue_wait(&session_clone, &span_id, sql_query).await?;
+            }
+            Ok(SqlQueryOutcome::Completed) => {
                 session_clone
                     .session_manager
                     .server
@@ -507,6 +596,16 @@ async fn handle_sql_query(
                     .await?;
             }
             Err(err) => {
+                // A `Continue wait` that reaches this arm was produced by the
+                // JS side, which already reports it: `OrchestratorApi` logs it
+                // on `ContinueWaitError` and the gateway's `handleError` logs
+                // it again, both into the sink `logLoadEvent` writes to. #10649
+                // stopped this arm reporting it as a `Cube SQL Error`; logging
+                // it as anything from here would just be a third copy. The
+                // disconnect arm usually has no such JS-side counterpart -
+                // the promise it was awaiting is abandoned rather than
+                // cancelled, and only reports if it later rejects - which is
+                // why that one does log.
                 if !err.message.eq_ignore_ascii_case("continue wait") {
                     session_clone
                         .session_manager
@@ -668,6 +767,9 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             };
 
             let args = match result {
+                // Includes `SqlQueryOutcome::ClientDisconnected`: the stream is
+                // already gone, so there is nobody to hand an error payload to,
+                // and a disconnect is not an error to report in the first place.
                 Ok(_) => vec![],
                 Err(err) => {
                     let mut error_response = Map::new();

@@ -18,6 +18,7 @@ import {
   FROM_PARTITION_RANGE,
   MAX_SOURCE_ROW_LIMIT,
   QueryAlias,
+  canonicalTimezone,
   getEnv,
   localTimestampToUtc,
   timeSeries as timeSeriesBase,
@@ -297,6 +298,18 @@ export class BaseQuery {
     this.from = this.options.from;
     this.multiStageQuery = this.options.multiStageQuery;
     this.timezone = this.options.timezone;
+
+    // Backstop for every dialect convertTz() sink: callers that bypass the API gateway
+    // (queryRewrite, refresh scheduler, SQL API sessions) reach the dialects through here.
+    if (this.timezone) {
+      const timezone = canonicalTimezone(this.timezone);
+      if (!timezone) {
+        throw new UserError(`Incorrect timezone ${this.timezone}`);
+      }
+
+      this.timezone = timezone;
+    }
+
     this.rowLimit = this.options.rowLimit;
     this.offset = this.options.offset;
     /** @type {import('./PreAggregations').PreAggregations} */
@@ -939,7 +952,7 @@ export class BaseQuery {
       dimensions: this.options.dimensions,
       segments: this.options.segments,
       timeDimensions: this.options.timeDimensions,
-      timezone: this.options.timezone,
+      timezone: this.timezone,
       joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
       securityContext: this.contextSymbols.securityContext,
@@ -997,7 +1010,7 @@ export class BaseQuery {
       dimensions: this.options.dimensions,
       segments: this.options.segments,
       timeDimensions: this.options.timeDimensions,
-      timezone: this.options.timezone,
+      timezone: this.timezone,
       joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
       order,
@@ -4587,6 +4600,12 @@ export class BaseQuery {
           '{% if offset is not none %}\nOFFSET {{ offset }}{% endif %}',
         group_by_exprs: '{{ group_by | map(attribute=\'index\') | join(\', \') }}',
         join: '{{ join_type }} JOIN {{ source }} ON {{ condition }}',
+        union: '{% for query in queries %}(\n' +
+          '{{ query | indent(2, true) }}\n' +
+          ')' +
+          '{% if not loop.last %}\nUNION {% if not distinct %}ALL {% endif %}{% endif %}' +
+          '{% endfor %}' +
+          '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}',
         cte: '{{ alias }} AS ({{ query | indent(2, true) }})',
         time_series_select: 'SELECT date_from::timestamp AS "date_from",\n' +
           'date_to::timestamp AS "date_to" \n' +
@@ -4678,6 +4697,21 @@ export class BaseQuery {
         lt: '{{ column }} < {{ param }}',
         lte: '{{ column }} <= {{ param }}',
         like_pattern: '{% if start_wild %}\'%\' || {% endif %}{{ value }}{% if end_wild %}|| \'%\'{% endif %}',
+        // Character the native planner uses to escape `%`, `_` and itself inside
+        // a user-supplied LIKE value, mirroring what BaseFilter.escapeWildcardChars
+        // does on the legacy path. Without it the planner skips escaping entirely
+        // and a user searching for a literal `%` gets a wildcard instead, matching
+        // every row. Backslash is the default LIKE escape character in Postgres,
+        // MySQL, BigQuery, ClickHouse and Cube Store, so no ESCAPE clause is
+        // needed here - and Cube Store's parser rejects one outright, which is
+        // why this must stay a bare escape character. Dialects whose LIKE has no
+        // default escape character add the explicit clause themselves: Presto and
+        // Trino in `like_pattern`, MSSQL, Oracle and Snowflake in
+        // `tesseract.ilike` (their pattern is wrapped, so the clause cannot go
+        // inside it), and DuckDB and Pinot likewise in `tesseract.ilike` - those
+        // two live in their driver packages rather than in this directory, so a
+        // sweep of only this directory will miss them.
+        like_escape_char: '\\',
         always_true: '1 = 1'
 
       },

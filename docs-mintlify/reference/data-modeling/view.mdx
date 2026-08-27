@@ -294,7 +294,7 @@ can change their values, switch operators, or remove them entirely.
 
 Each entry has a `member` (a dimension or measure exposed by the view), an
 `operator`, and a list of `values` — or a single `value`, which is natural for
-single-value operators. Null-check operators take no value.
+single-value operators. The null and empty checks take no value.
 
 <Info>
 
@@ -366,13 +366,23 @@ view(`orders_view`, {
 ##### Operators
 
 Operators use the same labels data consumers see in the workbook filter bar —
-what you see in the filter bar is what you type: `is`, `is not`, `after date`,
-`after or on date`, `before date`, `before or on date`, `between`, `contains`,
-`not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`,
-`is null`, `is not null`.
+what you see in the filter bar is what you type:
+
+- Any member: `is`, `is not`, `is null`, `is not null`.
+- Strings: `contains`, `not contains`, `starts with`, `not starts with`,
+  `ends with`, `not ends with`, `is empty`, `is not empty`.
+- Numbers: `greater than`, `greater than or equal`, `less than`,
+  `less than or equal`, `between`.
+- Dates and times: `after`, `after or on`, `before`, `before or on`, `between`,
+  and the period comparisons `in the month`, `not in the month`,
+  `in the quarter`, `not in the quarter`, `in the year`, `not in the year`. A
+  period comparison takes any date inside the period, so `in the year` with
+  `2026-03-14` means all of 2026.
 
 Operators are case-insensitive and whitespace-tolerant. Internal type names and
-REST API aliases (e.g. `equals`, `gte`, `inDateRange`) are also accepted.
+REST (JSON) API aliases (e.g. `equals`, `gte`, `inDateRange`) are also accepted,
+as are the older `after date` / `before or on date` spellings the filter bar used
+before the noun was dropped.
 
 On a date or time member, `is` with a relative value is an **equality** at that
 value's grain, not a range — `is yesterday` matches yesterday only (e.g.
@@ -555,6 +565,127 @@ If you'd like to override the [format][ref-dim-format] of a member, you can use 
 
 If you'd like to override the [metadata][ref-dim-meta] of a member, you can use the
 `meta` parameter. Note that the `meta` is overridded as a whole.
+
+### `measures`
+
+The `measures` parameter defines measures on the view itself. A view measure is
+always _derived_: its `sql` may only reference members that the view already
+includes, never columns of a table. Use it for a metric whose parts come from
+different cubes. (A cube can own such a metric too, by referencing the other
+cube's member; the [average order value recipe][ref-recipe-aov] compares the two
+placements.)
+
+Reference the included members as `{CUBE.member}` (or `{view_name.member}`); a
+bare `{member}` does not resolve inside a view.
+
+In the example below, `orders` joins `line_items` `one_to_many`:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_overview
+    cubes:
+      - join_path: orders
+        includes:
+          - total_amount
+      - join_path: orders.line_items
+        includes:
+          - count
+
+    measures:
+      - name: average_line_value
+        type: number
+        multi_stage: true
+        sql: "{CUBE.total_amount} / NULLIF({CUBE.count}, 0)"
+```
+
+```javascript title="JavaScript"
+view(`orders_overview`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: [`total_amount`]
+    },
+    {
+      join_path: orders.line_items,
+      includes: [`count`]
+    }
+  ],
+
+  measures: {
+    average_line_value: {
+      type: `number`,
+      multi_stage: true,
+      sql: `${CUBE.total_amount} / NULLIF(${CUBE.count}, 0)`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+A view measure that owns its SQL — anything that reads a column rather than a
+member — is rejected at compile time with `View 'orders_overview' defines own
+member 'orders_overview.average_line_value'`. Move that definition to a cube and
+include it instead.
+
+Mark a measure that combines members of **different cubes**
+[`multi_stage`][ref-ref-multi-stage], as above. Without it the expression is
+evaluated inside a single joined scan, which is only correct when nothing in it
+is affected by the join:
+
+- Across cubes joined `one_to_many`, an aggregate on the one side is taken over
+  the rows the join multiplied, so the result is silently inflated.
+- Across cubes that don't join to each other at all, there is no single join
+  tree to evaluate it in and the query fails with `Can't find join path to
+  join …`. See [multi-fact views][ref-multi-fact-views].
+
+`multi_stage` defers the expression until each referenced measure has been
+aggregated on its own, so neither happens.
+
+### `dimensions`
+
+The `dimensions` parameter defines dimensions on the view itself, under the same
+rule as [`measures`](#measures): the `sql` may only combine members the view
+already includes.
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_overview
+    cubes:
+      - join_path: orders.products
+        includes:
+          - category
+          - name
+
+    dimensions:
+      - name: category_and_name
+        type: string
+        sql: "{CUBE.category} || ' / ' || {CUBE.name}"
+```
+
+```javascript title="JavaScript"
+view(`orders_overview`, {
+  cubes: [
+    {
+      join_path: orders.products,
+      includes: [`category`, `name`]
+    }
+  ],
+
+  dimensions: {
+    category_and_name: {
+      type: `string`,
+      sql: `${CUBE.category} || ' / ' || ${CUBE.name}`
+    }
+  }
+})
+```
+
+</CodeGroup>
 
 ### `folders`
 
@@ -981,6 +1112,9 @@ The `access_policy` parameter is used to configure [access policies][ref-ref-dap
 [ref-naming]: /docs/data-modeling/concepts/syntax#naming
 [ref-apis]: /reference
 [ref-ref-cubes]: /reference/data-modeling/cube
+[ref-ref-multi-stage]: /reference/data-modeling/measures#multi_stage
+[ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
+[ref-recipe-aov]: /recipes/data-modeling/average-order-value#where-to-put-the-measure
 [ref-ref-hierarchies]: /reference/data-modeling/hierarchies
 [ref-ref-dap]: /reference/data-modeling/data-access-policies
 [ref-rest-query-ops]: /reference/core-data-apis/rest-api/query-format#filters-operators

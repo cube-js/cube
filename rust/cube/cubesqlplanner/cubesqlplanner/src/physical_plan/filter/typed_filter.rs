@@ -34,13 +34,13 @@ impl ToSql for TypedFilter {
         let resolved = resolve_base_symbol(self.member_evaluator());
         let member_sql = visitor.apply_for_filter(&resolved, node_processor, templates)?;
 
-        let ctx = FilterSqlContext {
-            member_sql: &member_sql,
-            query_tools: &query_tools,
-            plan_templates: templates,
-            use_db_time_zone: !filters_ctx.use_local_tz,
-            use_raw_values: self.use_raw_values(),
-        };
+        let ctx = FilterSqlContext::new(
+            &member_sql,
+            &query_tools,
+            templates,
+            !filters_ctx.use_local_tz,
+            self.use_raw_values(),
+        );
 
         dispatch_to_sql(self.operation(), &ctx)
     }
@@ -76,13 +76,13 @@ impl TypedFilter {
                 } else {
                     column_sql.as_str()
                 };
-                let ctx = FilterSqlContext {
+                let ctx = FilterSqlContext::new(
                     member_sql,
                     query_tools,
                     plan_templates,
                     use_db_time_zone,
-                    use_raw_values: self.use_raw_values(),
-                };
+                    self.use_raw_values(),
+                );
                 dispatch_to_sql(self.operation(), &ctx)
             }
             FilterParamsColumn::Compiled(compiled) => {
@@ -141,13 +141,13 @@ impl TypedFilter {
             // RollingWindowOffset carries [from, to, trailing, leading, offset];
             // only the from/to dates are filter-param args for the callback.
             FilterOp::DateRange(_) | FilterOp::DateSingle(_) | FilterOp::RollingWindowOffset(_) => {
-                let ctx = FilterSqlContext {
-                    member_sql: "",
+                let ctx = FilterSqlContext::new(
+                    "",
                     query_tools,
                     plan_templates,
                     use_db_time_zone,
-                    use_raw_values: self.use_raw_values(),
-                };
+                    self.use_raw_values(),
+                );
                 let from = self
                     .values()
                     .first()

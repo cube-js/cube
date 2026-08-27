@@ -294,6 +294,15 @@ crate::plan_to_language! {
             join_type: JoinType,
         },
 
+        // A set operation over inputs that are all pushed down to the same data source.
+        // Unlike `Union`, which is post processing in DataFusion, this one renders as a
+        // `UNION` in the generated SQL and is evaluated by the data source itself.
+        WrappedUnion {
+            inputs: Vec<LogicalPlan>,
+            distinct: bool,
+            alias: Option<String>,
+        },
+
         CubeScan {
             alias_to_cube: Vec<(String, String)>,
             members: Vec<LogicalPlan>,
@@ -927,6 +936,8 @@ pub enum ListType {
     WrappedSelectAggrExpr,
     WrappedSelectWindowExpr,
     CubeScanMembers,
+    UnionInputs,
+    WrappedUnionInputs,
 }
 
 impl ListType {
@@ -948,6 +959,8 @@ impl ListType {
             Self::WrappedSelectAggrExpr => wrapped_select_aggr_expr_empty_tail(),
             Self::WrappedSelectWindowExpr => wrapped_select_window_expr_empty_tail(),
             Self::CubeScanMembers => cube_scan_members_empty_tail(),
+            Self::UnionInputs => union_inputs_empty_tail(),
+            Self::WrappedUnionInputs => wrapped_union_inputs_empty_tail(),
         }
     }
 }
@@ -964,6 +977,10 @@ struct ListNodeSearcher {
     list_pattern: Pattern<LogicalPlanLanguage>,
     elem_pattern: Pattern<LogicalPlanLanguage>,
     top_level_elem_vars: Vec<Var>,
+    /// Lists shorter than this do not match. A set operation needs it: one query is not a
+    /// union, and folding a `Distinct` into a single-query one would drop the deduplication
+    /// with no operator to render it on.
+    min_elements: usize,
 }
 
 impl ListNodeSearcher {
@@ -974,7 +991,13 @@ impl ListNodeSearcher {
             list_pattern: list_pattern.parse().unwrap(),
             elem_pattern: elem_pattern.parse().unwrap(),
             top_level_elem_vars: vec![],
+            min_elements: 1,
         }
+    }
+
+    fn with_min_elements(mut self, min_elements: usize) -> Self {
+        self.min_elements = min_elements;
+        self
     }
 
     fn with_top_level_elem_vars(mut self, vars: &[&str]) -> Self {
@@ -1034,6 +1057,12 @@ impl ListNodeSearcher {
             ListType::CubeScanMembers => {
                 matches!(node, LogicalPlanLanguage::CubeScanMembers(_))
             }
+            ListType::UnionInputs => {
+                matches!(node, LogicalPlanLanguage::UnionInputs(_))
+            }
+            ListType::WrappedUnionInputs => {
+                matches!(node, LogicalPlanLanguage::WrappedUnionInputs(_))
+            }
         }
     }
 
@@ -1047,7 +1076,7 @@ impl ListNodeSearcher {
         let list_id = list_subst[self.list_var];
         for node in egraph[list_id].iter() {
             let list_children = node.children();
-            if !self.match_node(node) || list_children.is_empty() {
+            if !self.match_node(node) || list_children.len() < self.min_elements.max(1) {
                 continue;
             }
 
@@ -1196,6 +1225,8 @@ impl ListNodeApplierList {
             ListType::WrappedSelectAggrExpr => LogicalPlanLanguage::WrappedSelectAggrExpr(list),
             ListType::WrappedSelectWindowExpr => LogicalPlanLanguage::WrappedSelectWindowExpr(list),
             ListType::CubeScanMembers => LogicalPlanLanguage::CubeScanMembers(list),
+            ListType::UnionInputs => LogicalPlanLanguage::UnionInputs(list),
+            ListType::WrappedUnionInputs => LogicalPlanLanguage::WrappedUnionInputs(list),
         }
     }
 }
@@ -1206,9 +1237,26 @@ pub struct ListApplierListPattern {
     elem_pattern: String,
 }
 
+type ListNodeTransform = Box<dyn Fn(&mut CubeEGraph, &mut Subst) -> bool + Sync + Send>;
+
 struct ListNodeApplier {
     list_pattern: PatternAst<LogicalPlanLanguage>,
     lists: Vec<ListNodeApplierList>,
+    /// Runs once the substitution carries the list's own variables, so it can build nodes
+    /// the pattern cannot spell out. Returning false drops this match.
+    transform: Option<ListNodeTransform>,
+    /// The variables the transform inserts. Only these are exempt from egg's check that the
+    /// searcher binds every variable the applier uses, so a typo anywhere else in the
+    /// applier still fails when the rule is built rather than when it first matches.
+    transform_vars: Vec<Var>,
+}
+
+impl ListNodeApplier {
+    fn with_transform(mut self, transform: ListNodeTransform, transform_vars: &[&str]) -> Self {
+        self.transform = Some(transform);
+        self.transform_vars = transform_vars.iter().map(|v| v.parse().unwrap()).collect();
+        self
+    }
 }
 
 impl ListNodeApplier {
@@ -1233,6 +1281,8 @@ impl ListNodeApplier {
         lists: impl IntoIterator<Item = ListApplierListPattern>,
     ) -> Self {
         Self {
+            transform: None,
+            transform_vars: vec![],
             list_pattern: list_pattern.parse().unwrap(),
             lists: lists
                 .into_iter()
@@ -1278,6 +1328,11 @@ impl Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeApplier {
             }
             let mut subst = subst.clone();
             subst.extend(list_substs[0].iter());
+            if let Some(transform) = &self.transform {
+                if !transform(egraph, &mut subst) {
+                    return;
+                }
+            }
             let new_id = egraph.add_instantiation(&self.list_pattern, &subst);
             if egraph.union(eclass, new_id) {
                 result_ids.push(new_id);
@@ -1294,6 +1349,7 @@ impl Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeApplier {
             vars.extend(list.elem_pattern.vars());
             vars.retain(|v| *v != list.new_list_var); // this is bound by the applier itself
         }
+        vars.retain(|v| !self.transform_vars.contains(v)); // and these by the transform
         vars
     }
 }
@@ -1648,6 +1704,22 @@ fn wrapped_select_joins(left: impl Display, right: impl Display) -> String {
 
 fn wrapped_select_joins_empty_tail() -> String {
     "WrappedSelectJoins".to_string()
+}
+
+fn wrapped_union(inputs: impl Display, distinct: impl Display, alias: impl Display) -> String {
+    format!("(WrappedUnion {inputs} {distinct} {alias})")
+}
+
+fn union(inputs: impl Display, alias: impl Display) -> String {
+    format!("(Union {inputs} {alias})")
+}
+
+fn union_inputs_empty_tail() -> String {
+    "(UnionInputs)".to_string()
+}
+
+fn wrapped_union_inputs_empty_tail() -> String {
+    "(WrappedUnionInputs)".to_string()
 }
 
 fn wrapped_select_filter_expr(left: impl Display, right: impl Display) -> String {
@@ -2442,6 +2514,37 @@ where
             Vec::new()
         }
     }
+}
+
+/// `list_rewrite_with_lists_and_vars` with a transform. The transform runs once the
+/// substitution carries the list's own variables — including the `top_level_elem_vars`
+/// every element agreed on — so it can build what a pattern cannot: a cleared replacer
+/// context, an alias converted to another node type.
+pub fn transforming_list_rewrite_with_lists_and_vars<T>(
+    name: &str,
+    list_type: ListType,
+    searcher: ListPattern,
+    applier_pattern: &str,
+    lists: impl IntoIterator<Item = ListApplierListPattern>,
+    top_level_elem_vars: &[&str],
+    min_elements: usize,
+    transform_vars: &[&str],
+    transform_fn: T,
+) -> CubeRewrite
+where
+    T: Fn(&mut CubeEGraph, &mut Subst) -> bool + Sync + Send + 'static,
+{
+    let searcher = ListNodeSearcher::new(
+        list_type,
+        &searcher.list_var,
+        &searcher.pattern,
+        &searcher.elem,
+    )
+    .with_top_level_elem_vars(top_level_elem_vars)
+    .with_min_elements(min_elements);
+    let applier = ListNodeApplier::from_lists(applier_pattern, lists)
+        .with_transform(Box::new(transform_fn), transform_vars);
+    Rewrite::new(name.to_string(), searcher, applier).unwrap()
 }
 
 pub fn transform_original_expr_to_alias(

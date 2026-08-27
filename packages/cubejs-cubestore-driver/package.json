@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/cubestore-driver",
   "description": "Cube Store driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.7.19",
+  "version": "1.7.28",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -22,14 +22,15 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint src/*.ts",
-    "lint:fix": "eslint --fix src/*.ts"
+    "lint": "eslint src/*.ts test/*.ts",
+    "lint:fix": "eslint --fix src/*.ts test/*.ts",
+    "unit": "jest --coverage"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.7.19",
-    "@cubejs-backend/cubestore": "1.7.19",
-    "@cubejs-backend/native": "1.7.19",
-    "@cubejs-backend/shared": "1.7.19",
+    "@cubejs-backend/base-driver": "1.7.28",
+    "@cubejs-backend/cubestore": "1.7.28",
+    "@cubejs-backend/native": "1.7.28",
+    "@cubejs-backend/shared": "1.7.28",
     "csv-write-stream": "^2.0.0",
     "flatbuffers": "25.9.23",
     "fs-extra": "^9.1.0",
@@ -40,7 +41,7 @@
     "ws": "^7.4.3"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.19",
+    "@cubejs-backend/linter": "1.7.28",
     "@types/csv-write-stream": "^2.0.0",
     "@types/jest": "^29",
     "@types/node": "^22",

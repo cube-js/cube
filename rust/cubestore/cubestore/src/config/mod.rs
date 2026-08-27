@@ -55,6 +55,7 @@ use futures::future::join_all;
 use log::Level;
 use log::{debug, error};
 use mockall::automock;
+use serde::{Deserialize, Serialize};
 use simple_logger::SimpleLogger;
 use std::fmt::Display;
 use std::future::Future;
@@ -585,20 +586,27 @@ pub trait ConfigObj: DIService {
     fn repartition_check_overlapping_children(&self) -> bool;
     /// Factor `f` controlling when the worker-side partial hash aggregate trims its output to the
     /// top-k groups. Trimming happens only when the number of local groups exceeds `f * k`, where
-    /// `k = limit + offset`. `0` disables the optimization.
+    /// `k = limit + offset`. `0` disables the optimization. Whether the trim runs decides the shape
+    /// of both halves of a split plan, so it rides in [`PlanningFlags`]; a worker uses its own value
+    /// only when the sender sent no flags.
     fn group_by_limit_factor(&self) -> usize;
 
     /// When the worker group-by-limit hash trim is active, controls where the worker's hash table
     /// lives: `false` (default) coalesces the partial aggregate's input to one partition (one hash
     /// table per worker, "over merge"); `true` keeps the raw multi-partition input so it runs per
     /// partition ("under merge").
+    ///
+    /// Unlike [`ConfigObj::group_by_limit_factor`], this one stays node-local and is not part of
+    /// [`PlanningFlags`]: it only moves a partition coalesce below the partial aggregate, leaving
+    /// the subtree's schema and the partition count the router sees the same either way.
     fn group_by_limit_per_partition(&self) -> bool;
 
     /// Replace the sort-preserving merge feeding a grouped Linear (hash) aggregate with a plain
     /// partition coalesce (the hash aggregate ignores input order, so the per-row merge is wasted).
     fn coalesce_under_hash_aggregate(&self) -> bool;
 
-    /// Router-side merge strategy for distributed value-ordered top-k.
+    /// Router-side merge strategy for distributed value-ordered top-k. The router's value governs
+    /// the whole query; see [`TopKAggregateStrategy`].
     fn topk_aggregate_strategy(&self) -> TopKAggregateStrategy;
 
     fn allow_decimal128(&self) -> bool;
@@ -1304,14 +1312,25 @@ pub async fn init_test_logger() {
 
 /// Router-side merge strategy for distributed value-ordered top-k (`SELECT ... GROUP BY x ORDER BY
 /// agg(...) LIMIT k`). Selected by `CUBESTORE_TOPK_STRATEGY`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Both halves of a split plan must be planned from the same value, or the router combines a worker
+/// stream whose ordering it does not have and returns wrong rows instead of failing. So it rides in
+/// [`PlanningFlags`], and a worker uses its own value only when the sender sent no flags.
+///
+/// The wire names are the env names and must survive a variant rename. No catch-all variant: an
+/// unknown strategy fails the message deserialize, which the receiver logs and the sender sees as a
+/// dropped connection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TopKAggregateStrategy {
     /// Original streaming NRA merge with per-row state (default).
+    #[serde(rename = "streaming")]
     Streaming,
     /// Same streaming NRA merge (keeps early termination, bounded router memory), but vectorized.
+    #[serde(rename = "vectorized_streaming")]
     VectorizedStreaming,
     /// ClickHouse-style full re-aggregation on the router + fetch-limited sort. Drops early
     /// termination, so the router materializes every distinct group.
+    #[serde(rename = "full_merge")]
     FullMerge,
 }
 

@@ -186,6 +186,80 @@ SET TIME ZONE 'UTC';
 Use `DEFAULT` to reset the time zone to its default. The `LOCAL` form
 (`SET TIME ZONE LOCAL`) is not supported.
 
+### `CREATE TEMPORARY TABLE`
+
+Synopsis:
+
+```sql
+CREATE TEMPORARY TABLE table_name AS query
+CREATE TEMPORARY TABLE table_name ( column_name data_type [, ...] )
+```
+
+Creates a table that lives for the duration of the session, either filled by a
+query or empty, to be filled by [`COPY`](#copy). Temporary tables can be joined
+with cubes, and are dropped with `DROP TABLE`.
+
+Column types are limited to those `COPY` can load:
+
+- `boolean`
+- `smallint`, `integer`, `bigint`
+- `real`, `double precision`, `numeric` (up to a precision of 38)
+- `varchar`, `text`, and the other variable-width character types (`character
+  varying`, `nvarchar`, `string`), as well as `uuid`, `json` and `jsonb`, all of
+  which are stored as text
+- `date`, `timestamp` (and `datetime`) without a time zone
+
+A `numeric` without a precision holds `numeric(38, 10)`, so values are rounded to
+ten decimal places. Give the precision and scale to keep more of them.
+
+Fixed-width `character`/`char` columns are not accepted: PostgreSQL pads their
+values to the declared width and ignores trailing blanks when comparing them, which
+a text column does not do. Use `varchar` or `text` instead.
+
+The amount of data held is capped per session and per server, by the
+`CUBESQL_TEMP_TABLE_SESSION_MEM` (10 MiB) and `CUBESQL_TEMP_TABLE_TOTAL_MEM`
+(100 MiB) environment variables.
+
+### `COPY`
+
+Synopsis:
+
+```sql
+COPY table_name [ ( column_name [, ...] ) ]
+FROM STDIN
+[ [ WITH ] ( option [, ...] ) ]
+```
+
+Loads data sent by the client into a [temporary
+table](#create-temporary-table). Only `FROM STDIN` is supported: cubes are a
+read-only data source, so a temporary table is the only place data can go, and
+a file or a program target would read on the Cube host rather than on the
+machine running the client.
+
+Columns not listed in the statement are left `NULL`. Repeating the command
+appends more rows to the table.
+
+Supported options: `FORMAT` (`text` or `csv`), `DELIMITER`, `NULL`, `HEADER`,
+`QUOTE`, `ESCAPE`, `FORCE_NOT_NULL`, `FORCE_NULL`, and `ENCODING` (`UTF8`
+only). They behave as [in PostgreSQL][link-postgres-copy], including their
+defaults. The pre-9.0 syntax (e.g. `CSV HEADER`) is supported as well; the
+`BINARY` format is not.
+
+Example, using the `\copy` command of `psql` to load a CSV file:
+
+```sql
+CREATE TEMPORARY TABLE targets (city text, target numeric(10, 2));
+CREATE TABLE
+
+\copy targets FROM 'targets.csv' WITH (FORMAT csv, HEADER)
+COPY 42
+
+SELECT city, SUM(count), MAX(target)
+FROM orders CROSS JOIN targets
+WHERE orders.city = targets.city
+GROUP BY 1;
+```
+
 ## SQL functions and operators
 
 SQL API currently implements a subset of functions and operators [supported by
@@ -534,6 +608,7 @@ See the [XIRR recipe](/recipes/data-modeling/xirr) for more details.
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-graphql-api]: /reference/core-data-apis/graphql-api
 [link-postgres-funcs]: https://www.postgresql.org/docs/current/functions.html
+[link-postgres-copy]: https://www.postgresql.org/docs/current/sql-copy.html
 [link-github-sql-api]: https://github.com/cube-js/cube/issues?q=is%3Aopen+is%3Aissue+label%3Aapi%3Asql
 [link-github-new-sql-api-issue]: https://github.com/cube-js/cube/issues/new?assignees=&labels=&projects=&template=sql_api_query_issue.md&title=
 [link-xirr]: https://support.microsoft.com/en-us/office/xirr-function-de1242ec-6477-445b-b11b-a303ad9adc9d

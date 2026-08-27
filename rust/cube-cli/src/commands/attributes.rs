@@ -15,12 +15,18 @@ enum Cmd {
     /// List user attribute definitions
     #[command(alias = "ls")]
     List {
-        /// Pagination offset
+        /// Deprecated: pagination offset (use --after)
         #[arg(long)]
         offset: Option<u64>,
-        /// Maximum number of items to return
+        /// Deprecated: maximum number of items to return (use --first)
         #[arg(long)]
         limit: Option<u64>,
+        /// Page size for cursor-based pagination
+        #[arg(long)]
+        first: Option<u64>,
+        /// Cursor for the next page (from a previous pageInfo.endCursor)
+        #[arg(long)]
+        after: Option<String>,
         /// Name
         #[arg(long)]
         name: Option<String>,
@@ -97,18 +103,35 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         Cmd::List {
             offset,
             limit,
+            first,
+            after,
             name,
             attr_type,
         } => {
+            let page_field = util::paging_field(
+                util::OFFSET_LIMIT_IN_QUERY,
+                offset,
+                limit,
+                first,
+                after.as_deref(),
+            )?;
             let mut query = Vec::new();
             util::push(&mut query, "offset", &offset);
             util::push(&mut query, "limit", &limit);
+            util::push(&mut query, "first", &first);
+            util::push(&mut query, "after", &after);
             util::push(&mut query, "name", &name);
             util::push(&mut query, "type", &attr_type);
             let res = api.get("/api/v1/user-attributes/", &query).await?;
-            output::print_list(
+            // Attributes page in the database: `items` already holds exactly the
+            // requested page and keeps doing so once the deprecated `data` is
+            // removed, so render `items`. Asking for `data` here would turn a
+            // future no-op into a failure on a command the server still honors.
+            // The flags are still validated: the two paging styles can't mix.
+            output::print_list_from(
                 ctx.json,
                 &res,
+                page_field,
                 &[
                     ("ID", "id"),
                     ("NAME", "name"),
@@ -116,7 +139,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     ("DISPLAY NAME", "displayName"),
                     ("DEFAULT", "defaultValue"),
                 ],
-            );
+            )?;
         }
         Cmd::Create {
             name,

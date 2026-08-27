@@ -184,6 +184,38 @@ The port of the Cube Store deployment.
 | ------------------- | ---------------------- | --------------------- |
 | A valid port number | `3030`                 | `3030`                |
 
+## `CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE`
+
+The maximum size of a single message Cube will send to or accept from Cube
+Store. A result above this size is reported as `Cube Store response size
+exceeds the maximum message size`; see
+[message size limits](/docs/pre-aggregations/cube-store-architecture#message-size-limits).
+This is Cube's own limit and is independent of
+[`CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE`](#cubestore_transport_max_message_size),
+which Cube Store applies to what it receives.
+
+| Possible Values      | Default in Development | Default in Production |
+| -------------------- | ---------------------- | --------------------- |
+| A size in bytes      | `104857600` (100 MB)   | `104857600` (100 MB)  |
+
+## `CUBEJS_QUEUE_FAST_TRACK`
+
+<Warning>
+
+The fast-track path is experimental and off by default. Its behavior may still change,
+and we don't recommend enabling it in production yet.
+
+</Warning>
+
+Enables the preview fast-track path for Cube Store query queues. When enabled,
+Cube can atomically enqueue and retrieve a query when queue concurrency is
+available, reducing queue coordination round trips. This requires Cube and Cube Store
+1.7.26 or newer; against an older version Cube keeps using the regular path.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBEJS_DATASOURCES`
 
 A comma-separated list of data source names. Data sources defined here can be
@@ -1106,6 +1138,13 @@ The default [time zone][ref-time-zone] for queries.
 You can set the time zone name in the [TZ Database Name][link-tzdb] format, e.g.,
 `America/Los_Angeles`.
 
+<Warning>
+
+An invalid value fails at server startup. Only TZ Database names are accepted — fixed
+UTC offsets such as `+05:00` are rejected.
+
+</Warning>
+
 This is the fallback. When [user time zones](/admin/time-zones) are enabled for the
 account, a resolved account, personal, dashboard, or embed zone is sent with the query and
 takes precedence over this value.
@@ -1408,6 +1447,13 @@ for][ref-config-sched-refresh-timer].
 | --------------------------------------------------------- | ---------------------- | --------------------- |
 | [A valid timezone from the tz database][wiki-tz-database] | N/A                    | N/A                   |
 
+<Warning>
+
+An invalid value fails at server startup. Only TZ Database names are accepted — fixed
+UTC offsets such as `+05:00` are rejected.
+
+</Warning>
+
 It can be also set using the [`scheduled_refresh_time_zones` configuration
 option](/reference/configuration/config#scheduled_refresh_time_zones).
 
@@ -1526,6 +1572,28 @@ limit set by
 [`CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`](#cubesql_non_streaming_query_max_row_limit),
 are streamed instead and aren't capped by it.
 Queries with a `LIMIT` at or below that limit are not streamed.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
+## `CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING`
+
+If `true`, the [SQL API][ref-sql-api] rejects a query when part of it has to run outside
+the data source over a Cube query with no `LIMIT` clause, or with one above the maximum
+row limit set by
+[`CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`](#cubesql_non_streaming_query_max_row_limit).
+
+Such a query is capped at that limit, without any ordering, and a `LIMIT` above it is
+clamped back down to it. Sorting, filtering, or joining that capped result outside the
+data source treats an arbitrary slice of the rows as if it were the whole population, so
+the answer is wrong rather than merely short. The SQL API pushes these queries down to
+the data source whenever it can; this option controls what happens when it cannot. Leave
+it `false` to keep returning the truncated result, or set it to `true` to fail with an
+error instead.
+
+Queries that are streamed (see [`CUBESQL_STREAM_MODE`](#cubesql_stream_mode)) are never
+capped, so this option has no effect on them.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1816,6 +1884,18 @@ The address/port pair for Cube Store's MySQL-compatible interface.
 | ------------------------- | ---------------------- | --------------------- |
 | A valid address/port pair | `0.0.0.0:3306`         | `0.0.0.0:3306`        |
 
+## `CUBESTORE_CACHE_MAX_ENTRY_SIZE`
+
+The maximum size of a single entry in Cube Store's
+[cache store](/docs/pre-aggregations/cube-store-architecture#cache-and-queue-store).
+Larger entries are rejected. Cannot exceed
+[`CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE`](#cubestore_transport_max_message_size)
+minus 1 MiB.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A size, e.g. `63MiB` | `63MiB`           | `63MiB`               |
+
 ## `CUBESTORE_DATA_DIR`
 
 A path on the local filesystem to store a local replica of the data. Must be
@@ -2079,6 +2159,26 @@ If `true`, then sends telemetry to Cube.
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                 | `true`                |
+
+## `CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE`
+
+The maximum size of a single message on the WebSocket connection between Cube
+and Cube Store. Messages above this size are answered with an error; see
+[message size limits](/docs/pre-aggregations/cube-store-architecture#message-size-limits).
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A size from `16MiB` to `256MiB` | `64MiB` | `64MiB`     |
+
+## `CUBESTORE_TRANSPORT_MAX_FRAME_SIZE`
+
+The maximum size of a single WebSocket frame on the connection between Cube
+and Cube Store. A message is split into frames, so this can be smaller than
+[`CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE`](#cubestore_transport_max_message_size).
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A size from `4MiB` to `256MiB` | `64MiB`  | `64MiB`              |
 
 ## `CUBESTORE_WAL_SPLIT_THRESHOLD`
 

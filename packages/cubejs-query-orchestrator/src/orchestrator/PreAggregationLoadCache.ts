@@ -1,4 +1,4 @@
-import { TableStructure } from '@cubejs-backend/base-driver';
+import { QueuePriority, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
 import { QueryCache, QueryWithParams } from './QueryCache';
 import {
@@ -190,8 +190,8 @@ export class PreAggregationLoadCache {
     return this.versionEntries[redisKey];
   }
 
-  public async keyQueryResult(sqlQuery: QueryWithParams, waitForRenew: boolean, priority: number) {
-    const [query, values, queryOptions]: QueryWithParams = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery, [], {}];
+  public async keyQueryResult(sqlQuery: QueryWithParams, waitForRenew: boolean, priority: QueuePriority) {
+    const [query, values, queryOptions] = sqlQuery;
 
     if (!this.queryResults[this.queryCache.queryRedisKey([query, values])]) {
       this.queryResults[this.queryCache.queryRedisKey([query, values])] = await this.queryCache.cacheQueryResult(

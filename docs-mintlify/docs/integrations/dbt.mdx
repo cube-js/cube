@@ -17,8 +17,9 @@ model into a cube — including dimensions, measures, descriptions, and joins �
 commits the generated files to a branch where you review them before they reach
 production.
 
-Pulls can run manually, from your CI/CD pipeline, or automatically on every push to
-your dbt repository — so your semantic layer stays in sync with dbt as it evolves.
+Pulls can run manually, from your CI/CD pipeline, automatically on every push to your
+dbt repository, or from [Analytics Chat](#trigger-from-analytics-chat) — so your
+semantic layer stays in sync with dbt as it evolves.
 
 <Info>
 
@@ -404,6 +405,19 @@ deployment is shown in the dbt settings card, ready to drop into a CI step.
   />
 </Frame>
 
+The [Cube CLI](/reference/cli#dbt-sync) wraps the same endpoint and can **wait** for
+the sync to finish, which is what turns it into a test gate: sync the ref under
+review, compile it, and fail the job before anything reaches production.
+
+```bash
+cube dbt sync DEPLOYMENT_ID --ref "$GITHUB_HEAD_REF" --wait
+```
+
+`--wait` exits non-zero if the sync fails, and `--ref` syncs the branch being
+reviewed rather than the one saved on the integration. See [dbt sync as a CI test
+gate](/reference/cli#dbt-sync-as-a-ci-test-gate) for the full pipeline, including
+the compile and query steps.
+
 ### Trigger on every push
 
 Register a webhook on your dbt repository so Cube syncs automatically whenever the
@@ -418,6 +432,13 @@ to the branch you're syncing.
     alt="Webhook section of the dbt settings card with the signing secret and callback URL"
   />
 </Frame>
+
+### Trigger from Analytics Chat
+
+Ask [the agent](/docs/explore-analyze/analytics-chat) to check for and pull dbt updates —
+for example, "check for dbt updates and pull them." The agent starts a sync, follows its
+progress, opens the review branch it produces, and summarizes the generated cubes. Ask
+"what happened with my recent dbt syncs?" to have it answer from sync history instead.
 
 ### Review notifications
 

@@ -996,6 +996,55 @@ Because detection is timestamp-based and cancellation is idempotent, it
 does not matter which instance notices first: recovery works even if the
 failed node never comes back.
 
+### Message size limits
+
+Cube talks to the cache and queue store over a WebSocket connection, and
+every cache entry, queue payload, and query result crosses it as one
+message. That transport has a hard ceiling:
+
+| Limit | Environment variable | Default | Allowed range |
+|---|---|---|---|
+| Transport message size | `CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE` | 64 MiB | 16 MiB — 256 MiB |
+| Transport frame size | `CUBESTORE_TRANSPORT_MAX_FRAME_SIZE` | 64 MiB | 4 MiB — 256 MiB |
+| Single cache entry | `CUBESTORE_CACHE_MAX_ENTRY_SIZE` | 63 MiB | up to transport message size − 1 MiB |
+
+Query results are the usual reason these limits are reached. A result is
+handed to the queue store so that every API instance waiting on that query
+can pick it up, and it is written to the cache under its cache key — so a
+result set larger than the transport limit cannot be delivered at all,
+however fast the query that produced it was.
+
+A cache entry at or above `CUBESTORE_CACHE_MAX_ENTRY_SIZE` is rejected explicitly,
+with `Unable to SET cache with '<key>' key, exceeds maximum allowed size for
+payload: <size>, max allowed: <limit>`.
+
+A message above the *transport* limit is answered with an error naming the
+size and the limit, and the connection stays up for the other queries
+multiplexed over it:
+
+```
+Request of 70000000 bytes exceeds the maximum message size of 67108864 bytes.
+Reduce the size of the query, e.g. by sending fewer or smaller inline tables,
+or raise CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE.
+```
+
+That holds up to twice whichever of the two transport limits above is lower.
+A message beyond it is refused before it can be attributed to a query, so the
+connection is closed instead and the other queries multiplexed over it are
+re-sent on a new one. The close names the limit that refused it, so it says
+which of the two to raise.
+
+A result too large for Cube's own limit is reported the same way, as
+`Cube Store response size exceeds the maximum message size of 100 MB`. That
+limit is [`CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE`](/reference/configuration/environment-variables#cubejs_cubestore_max_message_size),
+which is independent of the Cube Store side and defaults to 100 MB.
+
+If a query hits this limit, reduce the size of its result set — add filters
+or a lower `limit`, drop dimensions, or split it into several queries.
+Self-hosted deployments can raise the ceiling instead, but
+`CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE` and `CUBESTORE_TRANSPORT_MAX_FRAME_SIZE`
+have to go up together, since a message is sent as a single frame.
+
 ### Why it lives in Cube Store
 
 Folding the cache and queue into Cube Store is itself a design decision in

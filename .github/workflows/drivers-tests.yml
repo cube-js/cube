@@ -27,7 +27,9 @@ on:
       - 'packages/cubejs-postgres-driver/**'
       - 'packages/cubejs-questdb-driver/**'
       - 'packages/cubejs-redshift-driver/**'
+      - 'packages/cubejs-prestodb-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
+      - 'packages/cubejs-trino-driver/**'
       - 'packages/cubejs-vertica-driver/**'
 
       - 'packages/cubejs-backend-native/**'
@@ -57,7 +59,9 @@ on:
       - 'packages/cubejs-postgres-driver/**'
       - 'packages/cubejs-questdb-driver/**'
       - 'packages/cubejs-redshift-driver/**'
+      - 'packages/cubejs-prestodb-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
+      - 'packages/cubejs-trino-driver/**'
       - 'packages/cubejs-vertica-driver/**'
 
       - 'packages/cubejs-backend-native/**'
@@ -289,6 +293,7 @@ jobs:
           - snowflake-export-bucket-azure-via-storage-integration
           - snowflake-export-bucket-gcs
           - snowflake-export-bucket-gcs-prefix
+          - trino
         use_tesseract_sql_planner: [ true ]
         include:
           - database: postgres
@@ -314,6 +319,8 @@ jobs:
           - database: oracle
             use_tesseract_sql_planner: false
           - database: questdb
+            use_tesseract_sql_planner: false
+          - database: trino
             use_tesseract_sql_planner: false
       fail-fast: false
 

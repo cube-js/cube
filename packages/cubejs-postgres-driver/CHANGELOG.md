@@ -3,6 +3,45 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.28](https://github.com/cube-js/cube/compare/v1.7.27...v1.7.28) (2026-08-26)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+## [1.7.27](https://github.com/cube-js/cube/compare/v1.7.26...v1.7.27) (2026-08-26)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+## [1.7.26](https://github.com/cube-js/cube/compare/v1.7.25...v1.7.26) (2026-08-24)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+## [1.7.25](https://github.com/cube-js/cube/compare/v1.7.24...v1.7.25) (2026-08-21)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+## [1.7.24](https://github.com/cube-js/cube/compare/v1.7.23...v1.7.24) (2026-08-19)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+## [1.7.23](https://github.com/cube-js/cube/compare/v1.7.22...v1.7.23) (2026-08-18)
+
+### Performance Improvements
+
+- **postgres-driver:** build user defined types map in linear time ([#11586](https://github.com/cube-js/cube/issues/11586)) ([4e8dd9b](https://github.com/cube-js/cube/commit/4e8dd9bebe70989852044e18887175cc7f56d98f)), closes [#11149](https://github.com/cube-js/cube/issues/11149)
+- **postgres-driver:** Skip relation array types when loading user defined types ([#11587](https://github.com/cube-js/cube/issues/11587)) ([4547e08](https://github.com/cube-js/cube/commit/4547e0870b0b997cc4b838ff61da219afddfd508)), closes [#11149](https://github.com/cube-js/cube/issues/11149)
+
+## [1.7.22](https://github.com/cube-js/cube/compare/v1.7.21...v1.7.22) (2026-08-18)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+## [1.7.21](https://github.com/cube-js/cube/compare/v1.7.20...v1.7.21) (2026-08-17)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+## [1.7.20](https://github.com/cube-js/cube/compare/v1.7.19...v1.7.20) (2026-08-16)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
 ## [1.7.19](https://github.com/cube-js/cube/compare/v1.7.18...v1.7.19) (2026-08-12)
 
 **Note:** Version bump only for package @cubejs-backend/postgres-driver

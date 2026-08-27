@@ -30,38 +30,25 @@ import {
 } from './types';
 import { lookupDriverClass, isDriver } from './DriverResolvers';
 import type { CubejsServerCore } from './server';
-import optionsValidate from './optionsValidate';
+import { validateOptions } from './optionsValidate';
 
 const { version } = require('../../../package.json');
 
-/**
- * Driver service class.
- */
 export class OptsHandler {
-  /**
-   * Class constructor.
-   */
   public constructor(
     private core: CubejsServerCore,
     private createOptions: CreateOptions,
     private systemOptions?: SystemOptions,
   ) {
-    this.assertOptions(createOptions);
-    const options = cloneDeep(this.createOptions);
+    const options = this.sanitizeOptions(cloneDeep(this.createOptions));
     const driverFactory = this.getDriverFactory(options);
     options.driverFactory = driverFactory;
     options.dbType = this.getDbType(driverFactory);
     this.initializedOptions = this.initializeCoreOptions(options);
   }
 
-  /**
-   * Decorated driverFactory flag.
-   */
   private decoratedFactory = false;
 
-  /**
-   * Returns true if the user provided a custom driverFactory.
-   */
   public isCustomDriverFactory(): boolean {
     return !this.decoratedFactory;
   }
@@ -71,15 +58,9 @@ export class OptsHandler {
    */
   private driverFactoryType: undefined | 'BaseDriver' | 'DriverConfig';
 
-  /**
-   * Initialized options.
-   */
   private initializedOptions: ServerCoreInitializedOptions;
 
-  /**
-   * Assert create options.
-   */
-  private assertOptions(opts: CreateOptions) {
+  private sanitizeOptions<T extends CreateOptions>(opts: T): T {
     if ((opts as any).dbType) {
       throw new Error(
         'CreateOptions.dbType was removed in v1.7.0. ' +
@@ -89,7 +70,10 @@ export class OptsHandler {
       );
     }
 
-    optionsValidate(opts);
+    const validated = validateOptions(opts);
+
+    // Probed for its throw: the only consumer is per-request code (normalizeQuery)
+    getEnv('defaultTimezone');
 
     if (
       !this.isDevMode() &&
@@ -100,6 +84,8 @@ export class OptsHandler {
         'Either CUBEJS_DB_TYPE or CreateOptions.driverFactory must be specified'
       );
     }
+
+    return validated;
   }
 
   /**

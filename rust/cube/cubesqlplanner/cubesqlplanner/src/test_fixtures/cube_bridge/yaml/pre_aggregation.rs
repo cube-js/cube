@@ -161,7 +161,11 @@ impl YamlPreAggregationDefinition {
 }
 
 fn build_array_references(members: Vec<String>) -> Result<Rc<dyn MemberSql>, CubeError> {
-    MockMemberSql::pre_agg_array_refs(members).map(|m| m as Rc<dyn MemberSql>)
+    if members.iter().any(|m| m.contains('{')) {
+        MockMemberSql::pre_agg_array_templates(members).map(|m| m as Rc<dyn MemberSql>)
+    } else {
+        MockMemberSql::pre_agg_array_refs(members).map(|m| m as Rc<dyn MemberSql>)
+    }
 }
 
 fn build_single_reference(member: String) -> Result<Rc<dyn MemberSql>, CubeError> {

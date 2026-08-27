@@ -3,6 +3,52 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.28](https://github.com/cube-js/cube/compare/v1.7.27...v1.7.28) (2026-08-26)
+
+### Features
+
+- **cubesql:** Push UNION down to the data source ([#11651](https://github.com/cube-js/cube/issues/11651)) ([2aba3ac](https://github.com/cube-js/cube/commit/2aba3ac6d15b3f6885df952f3b0380dbbbd5a31d))
+
+## [1.7.27](https://github.com/cube-js/cube/compare/v1.7.26...v1.7.27) (2026-08-26)
+
+### Bug Fixes
+
+- **cubesql:** Prefer SQL pushdown over limitless post-processing ([#11559](https://github.com/cube-js/cube/issues/11559)) ([b022de1](https://github.com/cube-js/cube/commit/b022de166acefa29766c4760f81241e31cf9ac16))
+
+### Features
+
+- **cubesql:** Support `COPY ... FROM STDIN` ([#11538](https://github.com/cube-js/cube/issues/11538)) ([534f839](https://github.com/cube-js/cube/commit/534f8392830df33b7934129cbcbe068984e42903))
+
+## [1.7.26](https://github.com/cube-js/cube/compare/v1.7.25...v1.7.26) (2026-08-24)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.7.25](https://github.com/cube-js/cube/compare/v1.7.24...v1.7.25) (2026-08-21)
+
+### Bug Fixes
+
+- **cubesql:** Support `DATE_ADD` SQL pushdown ([#11539](https://github.com/cube-js/cube/issues/11539)) ([3051ccd](https://github.com/cube-js/cube/commit/3051ccd8c634941dce80235a0e6e823fa8586355))
+
+## [1.7.24](https://github.com/cube-js/cube/compare/v1.7.23...v1.7.24) (2026-08-19)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.7.23](https://github.com/cube-js/cube/compare/v1.7.22...v1.7.23) (2026-08-18)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.7.22](https://github.com/cube-js/cube/compare/v1.7.21...v1.7.22) (2026-08-18)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.7.21](https://github.com/cube-js/cube/compare/v1.7.20...v1.7.21) (2026-08-17)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.7.20](https://github.com/cube-js/cube/compare/v1.7.19...v1.7.20) (2026-08-16)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
 ## [1.7.19](https://github.com/cube-js/cube/compare/v1.7.18...v1.7.19) (2026-08-12)
 
 ### Bug Fixes

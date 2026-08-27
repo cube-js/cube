@@ -3,6 +3,57 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.28](https://github.com/cube-js/cube/compare/v1.7.27...v1.7.28) (2026-08-26)
+
+### Features
+
+- **cubesql:** Push UNION down to the data source ([#11651](https://github.com/cube-js/cube/issues/11651)) ([2aba3ac](https://github.com/cube-js/cube/commit/2aba3ac6d15b3f6885df952f3b0380dbbbd5a31d))
+
+## [1.7.27](https://github.com/cube-js/cube/compare/v1.7.26...v1.7.27) (2026-08-26)
+
+### Bug Fixes
+
+- **schema-compiler:** a cube that extends another broke the parent's multi-stage measures ([#11641](https://github.com/cube-js/cube/issues/11641)) ([657f4e1](https://github.com/cube-js/cube/commit/657f4e18ae75c69dd4db4057e14867f8a7d91247))
+
+## [1.7.26](https://github.com/cube-js/cube/compare/v1.7.25...v1.7.26) (2026-08-24)
+
+### Bug Fixes
+
+- **tesseract:** parenthesize member SQL spliced into filter templates ([#11502](https://github.com/cube-js/cube/issues/11502)) ([e9f5407](https://github.com/cube-js/cube/commit/e9f540774f049e329b8133ee2451686b34684991))
+- **tesseract:** resolve pre-agg refs interpolating the cube ([#11602](https://github.com/cube-js/cube/issues/11602)) ([cc16c17](https://github.com/cube-js/cube/commit/cc16c17bb06700f28ebc2882420d723cc88c5c05))
+
+## [1.7.25](https://github.com/cube-js/cube/compare/v1.7.24...v1.7.25) (2026-08-21)
+
+### Bug Fixes
+
+- **cubesql:** Support `DATE_ADD` SQL pushdown ([#11539](https://github.com/cube-js/cube/issues/11539)) ([3051ccd](https://github.com/cube-js/cube/commit/3051ccd8c634941dce80235a0e6e823fa8586355))
+
+## [1.7.24](https://github.com/cube-js/cube/compare/v1.7.23...v1.7.24) (2026-08-19)
+
+### Bug Fixes
+
+- Validate query timezone against IANA zones ([#11575](https://github.com/cube-js/cube/issues/11575)) ([d1ba22a](https://github.com/cube-js/cube/commit/d1ba22a31cdfdeb07b50cb3fc0763be6c2c57c4a))
+
+## [1.7.23](https://github.com/cube-js/cube/compare/v1.7.22...v1.7.23) (2026-08-18)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.7.22](https://github.com/cube-js/cube/compare/v1.7.21...v1.7.22) (2026-08-18)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.7.21](https://github.com/cube-js/cube/compare/v1.7.20...v1.7.21) (2026-08-17)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.7.20](https://github.com/cube-js/cube/compare/v1.7.19...v1.7.20) (2026-08-16)
+
+### Bug Fixes
+
+- **deps:** bump uuid from 8.3.2 to 11.1.1 across the packages that declare it ([#11534](https://github.com/cube-js/cube/issues/11534)) ([c66cbbe](https://github.com/cube-js/cube/commit/c66cbbe06c0269351395583cef8df64c0d1720ab))
+- **schema-compiler:** escape LIKE wildcards on the native planner ([#11569](https://github.com/cube-js/cube/issues/11569)) ([f050c08](https://github.com/cube-js/cube/commit/f050c080aab52eefbd7c20fef257f3852c66f634)), closes [#11570](https://github.com/cube-js/cube/issues/11570)
+- **tesseract:** project a primary key once in the keys subquery ([#11527](https://github.com/cube-js/cube/issues/11527)) ([528d755](https://github.com/cube-js/cube/commit/528d755d8ef4502917d86b545bf42b8a352775be)), closes [#11455](https://github.com/cube-js/cube/issues/11455)
+
 ## [1.7.19](https://github.com/cube-js/cube/compare/v1.7.18...v1.7.19) (2026-08-12)
 
 ### Bug Fixes

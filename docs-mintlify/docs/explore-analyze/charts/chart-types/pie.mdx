@@ -15,15 +15,19 @@ Standard filled circle. Each slice's arc length is proportional to its value.
 
 ### Donut
 
-A pie with a hollow center. Increase the **Inner radius** value in the Style tab to any non-zero value to switch to a donut. The hollow center can be used to surface a summary value via a [KPI](/docs/explore-analyze/charts/chart-types/kpi) tile on a dashboard, or simply to reduce visual density.
+A pie with a hollow center. Select **Donut** under **Shape** in the Style tab to switch; select **Pie** to switch back.
 
-{/* Screenshot: donut chart — same data as the pie variant, with inner radius applied. Place directly below this heading, half-width centered or side-by-side with pie. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+{/* Screenshot: donut chart — same data as the pie variant. Place directly below this heading, half-width centered or side-by-side with pie. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
-## Inner radius
+## Center total
 
-Drag the **Inner radius** slider in the Style tab or enter a pixel value. Setting it to `0` returns to a full pie.
+A donut shows the measure's grand total in its hole by default, using the measure's number format. Use the **Show total** button in the Data labels section of the Style tab to turn it off or on again.
 
-{/* Screenshot: Style tab with the Inner radius control highlighted. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+The button appears only for a donut, since a pie has no hollow center to fill.
+
+The total uses the font size set in the Data labels section, the same as the slice labels. If you turn on the **Percentage** label, the total also shows `100%` on a second line, since the whole is the entire circle.
+
+{/* Screenshot: donut chart with the center total visible, Style tab showing the Show total button. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ## Color and slice ordering
 

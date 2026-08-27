@@ -271,6 +271,8 @@ export class MssqlQuery extends BaseQuery {
     templates.functions.UTCTIMESTAMP = 'GETUTCDATE()';
     // MSSQL ROUND requires 2 arguments: ROUND(number, length)
     templates.functions.ROUND = 'ROUND({{ args_concat }}{% if args | length < 2 %}, 0{% endif %})';
+    // DATEADD is being rewritten to DATE_ADD
+    templates.functions.DATE_ADD = 'DATEADD({{ date_part }}, {{ interval }}, {{ args[0] }})';
     // NOTE: MSSQL does not support DISTINCT clause. No workaround is available
     delete templates.functions.STRING_AGG;
     // PERCENTILE_CONT works but requires PARTITION BY
@@ -335,7 +337,11 @@ export class MssqlQuery extends BaseQuery {
       'WHERE DATEADD({{ minimal_time_unit }}, 1, date_from) <= max_date';
 
     // MSSQL uses OFFSET/FETCH instead of LIMIT/OFFSET
-    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})';
+    // T-SQL has no default LIKE escape character, so the escaping the planner
+    // applies to the value (see BaseQuery's `like_escape_char`) only takes
+    // effect with an explicit clause. It goes on the predicate rather than in
+    // `like_pattern` because the pattern is wrapped in LOWER(...) here.
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }}) ESCAPE \'\\\'';
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
     templates.statements.select = '{% if ctes %} WITH \n' +
       '{{ ctes | join(\',\n\') }}\n' +
@@ -353,6 +359,16 @@ export class MssqlQuery extends BaseQuery {
       '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}\nOFFSET {% if offset is not none %}{{ offset }}{% else %}0{% endif %} ROWS' +
       '\nFETCH NEXT {% if limit is not none %}{{ limit }}{% else %}2147483647{% endif %} ROWS ONLY{% endif %}' +
       '{% if ctes %}\nOPTION (MAXRECURSION 0){% endif %}';
+    // T-SQL has no LIMIT, and neither TOP nor OFFSET/FETCH can be attached to a set
+    // operation directly (OFFSET/FETCH also requires an ORDER BY), so a bounded set
+    // operation is read through a derived table.
+    templates.statements.union = '{% if limit is not none %}SELECT TOP {{ limit }} * FROM (\n{% endif %}' +
+      '{% for query in queries %}(\n' +
+      '{{ query | indent(2, true) }}\n' +
+      ')' +
+      '{% if not loop.last %}\nUNION {% if not distinct %}ALL {% endif %}{% endif %}' +
+      '{% endfor %}' +
+      '{% if limit is not none %}\n) AS union_result{% endif %}';
     // MSSQL has no boolean type — a segment projected as a dimension must be a BIT.
     templates.expressions.wrap_segment_select = 'CAST((CASE WHEN {{ expr }} THEN 1 ELSE 0 END) AS BIT)';
     // Reading a segment back from a pre-aggregation: it is a stored BIT column,
