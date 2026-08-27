@@ -213,9 +213,26 @@ export class WebSocketConnection {
           // the socket, and everything reachable from it, alive.
           webSocket.teardown();
 
+          if (this.closed) {
+            // Nothing to retry towards: `initWebSocket()` refuses once closed,
+            // and whatever was in flight is dealt with by the 'close' handler.
+            if (webSocket === this.webSocket) {
+              this.webSocket = null;
+            }
+
+            return;
+          }
+
           if (this.currentConnectionTry < this.maxConnectRetries) {
             setTimeout(async () => {
-              resolve(this.initWebSocket());
+              // `.then(resolve, reject)` rather than `resolve(promise)`: once
+              // this socket's `readyPromise` has settled, `resolve` returns
+              // without adopting -- so a rejection handed to it is never
+              // observed, and an unhandled rejection is fatal under Node's
+              // default. The retry above cannot reject for `closed` any more,
+              // but a close landing between this timer being armed and firing
+              // still can, as can anything else `initWebSocket()` throws.
+              this.initWebSocket().then(resolve, reject);
             }, this.retryWaitTime());
           } else {
             reject(new ConnectionError(

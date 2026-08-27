@@ -264,6 +264,40 @@ describe('WebSocketConnection', () => {
       }
     }, JEST_TIMEOUT);
 
+    it('does not leave an unhandled rejection when a closed connection errors', async () => {
+      const unhandled: unknown[] = [];
+      const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+      process.on('unhandledRejection', onUnhandled);
+
+      try {
+        connection = new WebSocketConnection(server.url);
+
+        // Establish it, so this socket's `readyPromise` is already settled.
+        await expectAnsweredBy(query('SELECT 1'), 0);
+
+        const socket = (connection as any).webSocket;
+        connection.close();
+
+        // A post-open 'error' on a closed connection. Emitted rather than
+        // provoked because `ws` reports a dying socket as 'close' here, while
+        // the errors that do reach this handler in the wild -- a protocol error,
+        // or a connect retry still pending from before the close -- are not
+        // reproducible against the mock. The handler's contract is the subject:
+        // it schedules a retry, `initWebSocket()` refuses once closed, and
+        // handing that rejection to an already-settled `resolve` leaves nobody
+        // to observe it, which is fatal under Node's default
+        // --unhandled-rejections=throw.
+        socket.emit('error', Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }));
+
+        // Past the retry the handler schedules.
+        await new Promise((resolve) => { setTimeout(resolve, 2500); });
+
+        expect(unhandled).toEqual([]);
+      } finally {
+        process.off('unhandledRejection', onUnhandled);
+      }
+    }, JEST_TIMEOUT);
+
     it('does not re-open when the socket dies while draining', async () => {
       connection = new WebSocketConnection(server.url);
 
