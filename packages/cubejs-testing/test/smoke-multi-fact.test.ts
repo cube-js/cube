@@ -1,6 +1,7 @@
 import cubejs, { CubeApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, describe, expect, jest, test } from '@jest/globals';
+import { getEnv } from '@cubejs-backend/shared';
 import { BirdBox, getBirdbox } from '../src';
 import {
   DEFAULT_API_TOKEN,
@@ -27,12 +28,11 @@ import {
 //
 // Multi-fact queries are planned by Tesseract only; the legacy planner cannot
 // build a single join tree over two unrelated facts, so there is nothing to
-// assert on that leg of the CI matrix. Tesseract is the default, so this skips
-// only when it has been switched off explicitly - matching `nativeSqlPlanner`
-// in @cubejs-backend/shared, which defaults CUBEJS_TESSERACT_SQL_PLANNER to
-// 'true'.
-const legacyPlanner = process.env.CUBEJS_TESSERACT_SQL_PLANNER === 'false';
-const describeIfTesseract = legacyPlanner ? describe.skip : describe;
+// assert on that leg of the CI matrix. Read the flag the way the server does,
+// so the skip stays in step with what the birdbox instance actually runs -
+// Tesseract is the default, and `asBool` accepts more than the literal
+// 'false' the CI matrix passes.
+const describeIfTesseract = getEnv('nativeSqlPlanner') ? describe : describe.skip;
 
 describeIfTesseract('multi-fact derived measure', () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -122,8 +122,12 @@ describeIfTesseract('multi-fact derived measure', () => {
 
   test('the ratio is taken over the whole result when nothing is grouped', async () => {
     const result = await client.load({ measures: ['RetailAnalysis.aovBasket'] });
+    const rows = result.rawData();
 
+    // Asserted before indexing so an empty result reports as a missing row
+    // rather than a TypeError.
+    expect(rows).toHaveLength(1);
     // 160 dollars over 3 transactions.
-    expect(Number(result.rawData()[0]['RetailAnalysis.aovBasket'])).toBeCloseTo(160 / 3, 5);
+    expect(Number(rows[0]['RetailAnalysis.aovBasket'])).toBeCloseTo(160 / 3, 5);
   });
 });

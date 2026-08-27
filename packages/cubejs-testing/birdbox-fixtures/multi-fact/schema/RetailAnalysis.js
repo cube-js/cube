@@ -3,15 +3,15 @@
 view(`RetailAnalysis`, {
   cubes: [
     {
-      join_path: ItemLocationSales,
+      joinPath: ItemLocationSales,
       includes: [`salesAmount`],
     },
     {
-      join_path: SalesLineItem,
+      joinPath: SalesLineItem,
       includes: [`transactionsWithoutReturns`, { name: `aovBasket`, alias: `aovBasketFromCube` }],
     },
     {
-      join_path: Locations,
+      joinPath: Locations,
       includes: [`region`],
     },
   ],
