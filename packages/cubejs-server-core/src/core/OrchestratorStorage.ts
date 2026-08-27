@@ -36,8 +36,26 @@ export class OrchestratorStorage {
     return Promise.all([...this.storage.values()].map(api => api.testOrchestratorConnections()));
   }
 
+  /**
+   * Every api releases, then the map is cleared, and only then is a failure
+   * reported. An api is spent the moment `release()` is entered — it has stopped
+   * tracking its drivers and closed some of them — so a rejection must not leave
+   * it in the map: `get()` would hand a spent api back out, and a second
+   * `release()` on it is a no-op, so any pool that did survive becomes
+   * unreachable. `allSettled` for the same reason one level down: one pool
+   * refusing to close must not strand the other apis' teardown.
+   */
   public async releaseConnections() {
-    await Promise.all([...this.storage.values()].map(api => api.release()));
-    this.storage.clear();
+    try {
+      const results = await Promise.allSettled([...this.storage.values()].map(api => api.release()));
+
+      const failure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+
+      if (failure) {
+        throw failure.reason;
+      }
+    } finally {
+      this.storage.clear();
+    }
   }
 }
