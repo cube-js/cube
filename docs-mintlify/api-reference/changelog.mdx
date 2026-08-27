@@ -10,13 +10,6 @@ rss: true
 <Update label="2026-08-27" description="v0.4.0" tags={["Added","Changed","Removed"]}>
   ### Added
 
-  #### Regions and PrivateLinks — infrastructure provisioning
-
-  These operations are Cube-staff-only (a tenant admin cannot call them) and, for that reason, are excluded from the public API reference at docs.cube.dev — they're documented here because the SDK still types and ships them. (`GET /api/v1/regions/` itself is not staff-only and stays in the public reference — see the cursor-pagination note below.)
-
-  - Full region lifecycle, gated to Cube super admins: `POST /api/v1/regions` (`RegionsPublicController.createRegion`), `GET`/`PUT`/`DELETE /api/v1/regions/{regionId}` (`getRegion`/`updateRegion`/`destroyRegion`), `POST /api/v1/regions/{regionId}/apply` (`applyRegion`), `GET /api/v1/regions/{regionId}/provisioning-status` (`getRegionProvisioningStatus`), and `GET /api/v1/regions/cloud-provider-catalog` (`listCloudProviderCatalog`). Creating or updating a region only records intent — nothing is built in the cloud until `apply` runs. New schemas: `ProvisionedRegionResponse`, `RegionCreateRequest`, `RegionUpdateRequest`, `RegionProvisioningRunResponse`, `RegionProvisioningStatusResponse`, `RegionCloudProviderCatalogListResponse`, `RegionCloudProviderCatalogResponse`, `RegionCloudProviderRegionResponse`.
-  - PrivateLink management under a region: `GET`/`POST /api/v1/regions/{regionId}/private-links` (`RegionPrivateLinksPublicController.listPrivateLinks`/`createPrivateLink`) and `GET`/`PUT`/`DELETE /api/v1/regions/{regionId}/private-links/{privateLinkId}` (`getPrivateLink`/`updatePrivateLink`/`removePrivateLink`). Like region create/update, writes here only take effect in AWS on the next `apply`. New schemas: `RegionPrivateLinkResponse`, `RegionPrivateLinkCreateRequest`, `RegionPrivateLinkUpdateRequest`, `RegionPrivateLinkRemoveResponse`, `RegionPrivateLinksListResponse`.
-
   #### dbt Sync — status, results and history
 
   - `GET /api/v1/deployments/{deploymentId}/dbt-sync` (`DbtSyncPublicController.listDbtSyncs`) — sync run history, filterable by `status`/`trigger`, cursor-paginated. New schemas: `DbtSyncRun`, `DbtSyncRunListResponse`, `DbtSyncRunPhase`, `DbtSyncRunStats`, `DbtSyncRunTriggerContext`, `DbtSyncRunsQueryStatus`, `DbtSyncRunsQueryTrigger`.
