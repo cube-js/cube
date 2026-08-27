@@ -38,14 +38,29 @@ rss: true
   #### Reports
 
   - `DELETE /api/v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook` (`ReportsPublicController.disconnectReportFromWorkbook`) — removes a single sheet+anchor placement of a report from a spreadsheet, leaving every other placement (in this workbook and others) alone. Addressed by `placementId`, or by `externalWorkbookId` + `sheetName` + `anchorCell`. New schema: `DisconnectReportFromWorkbookInput`.
+  - `PUT .../reports/{reportId}/refresh` now takes a body: new schema `RefreshReportInput` (`placementId`, or `externalWorkbookId` + `sheetName`/`sheetId`/`anchorCell`), addressing the same way as disconnect.
+  - Report placements are now individually addressable and trackable: `ConnectReportToWorkbookInput`, `CreateReportInput` and `UpdateReportInput` each gained `placementId`, `sheetId`, `sheetName`, `anchorCell`, `workbookName`, and `host` (new `ConnectReportToWorkbookInputHost` / `CreateReportInputHost` / `UpdateReportInputHost` enums, `"GOOGLE_SHEETS" | "EXCEL"`). `ReportPlacement` gained the matching `id`, `host`, `sheetId`, `sheetName`, `anchorCell`, `workbookName`, plus `placedAt`/`placedByUserId` and `refreshedAt`/`refreshedByUserId` (new `ReportPlacementHost` enum). `ReportSnapshot` gained `isSourceReport` and `pythonCode`.
 
   #### Cursor pagination on previously offset-only or unpaginated lists
 
-  - `first`/`after` → `items` + `pageInfo` cursor pagination added to: deployment env variables (`GET .../env-vars`), deployment environments and environment tokens, GitHub branches/installations/repositories (`GitHubPublicController.*`), user attributes, groups, users, `GET /api/v1/regions/`, and report folders. The legacy `data`/`count`/`pagination` fields are kept on each response, marked `@deprecated`.
+  - `first`/`after` → `items` + `pageInfo` cursor pagination added to: deployment env variables (`GET .../env-vars`), GitHub branches/installations/repositories (`GitHubPublicController.*`), user attributes (previously `offset`/`limit`), `GET /api/v1/regions/`, report folders, data-model branches and files (`listBranches`/`listFiles`, `BranchesListResponse`/`SourceTreeResponse`), and deployment logs/pods (`DeploymentLogsResponse`/`DeploymentPodsResponse` gain `pageInfo`). Newly-paginated responses keep the legacy `data`/`count`/`pagination` fields, marked `@deprecated`.
+  - `UserGroupsPublicController.listGroups` and `UsersPublicController.getUsers` already had `first`/`after`; what's new on both is a `search` query param (case-insensitive substring match on group name / first name, username, email).
   - `DashboardFilterOperator` / `DashboardFilterInputOperator` gained `is_empty` / `is_not_empty`.
+
+  #### Other new fields
+
+  - New `TimezoneSettings` schema, plus `timezoneSettings` on `AppConfigResponse` and `resolvedTimezone` / `deployBranchName` / `timezoneSettings` on `AIEngineerSettings`.
+  - New `CspsConfig` schema (customer-storage-provider config, mirrored on the existing `CspsConfigInput`).
+  - `scopeDeploymentId` added to the agent-space config schemas.
+  - `measuresAxis` / `measuresPosition` added to `PivotItems` / `PivotItemsInput` (new `PivotItemsMeasuresAxis` / `PivotItemsMeasuresPosition` / `PivotItemsInputMeasuresAxis` / `PivotItemsInputMeasuresPosition` enums, `"columns" | "rows"` and `"before" | "after"`).
+  - `name` / `userCount` added to `InheritedGroupPolicyDto`.
+  - `allowChatWorkspaceAuthoring` added to `EmbedSessionSettings`.
+  - `ref` added to `StartDbtSyncInput`.
 
   ### Changed
 
+  - **BREAKING (TypeScript):** `DeploymentEnvironmentsListResponse.pagination` and `DeploymentEnvironmentTokensListResponse.pagination` moved from required to `pagination?: DeploymentsPagination | null` now that both responses also carry `items`/`pageInfo`. Code under `strictNullChecks` reading `res.pagination.currentPage` without a null check no longer compiles.
+  - **BREAKING (TypeScript):** `NotificationsPublicController.getRecipients`'s cursor params were narrowed — `first?: number | string | null` → `first?: number | null` and `after?: string | number | null` → `after?: string | null` — cleaning up a hand-declared `@OpenAPI({ parameters })` that had merged positionally with the real cursor-param types. A caller passing a numeric `after` or a stringified `first` (both accepted, if oddly typed, before) no longer compiles.
   - `DashboardWidgetDtoType` / `DashboardWidgetInputType` no longer advertise `TABS_CONTAINER` in the type — replaced by `PARENT`, `SPACER`, `DIVIDER`, `CONTAINER` (a `CONTAINER` with `config.layout: 'tabs'` is the current shape for a tabbed container). Existing stored or sent `TABS_CONTAINER` values are still healed server-side for backward compatibility (CUB-3634), so this narrows the advertised type rather than breaking existing integrations at runtime — new code should target `CONTAINER` + `layout`.
   - `PUT /api/v1/deployments/{deploymentId}` (`updateDeployment`) description clarified: writes are a partial merge (omitted fields are left alone, `templateVariables` is merged key-by-key), and `releaseChannelVersion` is validated against `GET .../versions`.
 
