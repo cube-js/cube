@@ -6,4 +6,6 @@ members = [
     "cubeorchestrator",
     "cubesqlplanner/cubesqlplanner",
     "cubesqlplanner/nativebridge",
+    "cubestore-ws-transport",
+    "cubestore-cli",
 ]

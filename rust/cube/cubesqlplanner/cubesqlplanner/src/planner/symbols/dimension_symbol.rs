@@ -1,5 +1,7 @@
 use super::common::Case;
 use super::common::CompiledMemberPath;
+use super::common::MultiStageProperties;
+use super::deps::{self, symbol_deps};
 use super::dimension_kinds::{
     CaseDimension, DimensionKind, GeoDimension, RegularDimension, SwitchDimension,
 };
@@ -12,10 +14,13 @@ use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::GranularityHelper;
 use crate::planner::SqlInterval;
 use crate::planner::TimeDimensionSymbol;
-use crate::planner::{Compiler, CubeRef, SqlCall};
+use crate::planner::{Compiler, SqlCall};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Time-shift entry on a dimension of a calendar cube: shifts the
+/// date range by either a fixed interval, a named slot (e.g.
+/// `prev_year`), or a custom SQL expression.
 #[derive(Clone)]
 pub struct CalendarDimensionTimeShift {
     pub interval: Option<SqlInterval>,
@@ -23,20 +28,38 @@ pub struct CalendarDimensionTimeShift {
     pub sql: Option<Rc<SqlCall>>,
 }
 
+/// `MemberSymbol::Dimension` body: Tesseract representation of a
+/// `dimension` declared in the data model — a value the query can
+/// group, filter or order by, but never aggregate.
 #[derive(Clone)]
 pub struct DimensionSymbol {
-    compiled_path: CompiledMemberPath,
-    kind: DimensionKind,
-    is_reference: bool, // Symbol is a direct reference to another symbol without any calculations
-    is_view: bool,
-    add_group_by: Option<Vec<Rc<MemberSymbol>>>,
-    time_shift: Vec<CalendarDimensionTimeShift>,
-    time_shift_pk_full_name: Option<String>,
-    is_self_time_shift_pk: bool, // If the dimension itself is a primary key and has time shifts, we can not reevaluate itself again while processing time shifts to avoid infinite recursion. So we raise this flag instead.
-    is_multi_stage: bool,
-    is_sub_query: bool,
-    propagate_filters_to_sub_query: bool,
-    mask_sql: Option<Rc<SqlCall>>,
+    pub(super) compiled_path: CompiledMemberPath,
+    pub(super) kind: DimensionKind,
+    pub(super) is_reference: bool, // Symbol is a direct reference to another symbol without any calculations
+    pub(super) is_view: bool,
+    pub(super) multi_stage: Option<MultiStageProperties>,
+    pub(super) time_shift: Vec<CalendarDimensionTimeShift>,
+    pub(super) time_shift_pk_full_name: Option<String>,
+    pub(super) is_self_time_shift_pk: bool, // If the dimension itself is a primary key and has time shifts, we can not reevaluate itself again while processing time shifts to avoid infinite recursion. So we raise this flag instead.
+    pub(super) is_sub_query: bool,
+    pub(super) propagate_filters_to_sub_query: bool,
+    pub(super) mask_sql: Option<Rc<SqlCall>>,
+}
+
+symbol_deps! {
+    DimensionSymbol {
+        kind: dep,
+        mask_sql: dep,
+        compiled_path: skip,
+        is_reference: skip,
+        is_view: skip,
+        multi_stage: skip,
+        time_shift: skip,
+        time_shift_pk_full_name: skip,
+        is_self_time_shift_pk: skip,
+        is_sub_query: skip,
+        propagate_filters_to_sub_query: skip,
+    }
 }
 
 impl DimensionSymbol {
@@ -45,11 +68,10 @@ impl DimensionSymbol {
         kind: DimensionKind,
         is_reference: bool,
         is_view: bool,
-        add_group_by: Option<Vec<Rc<MemberSymbol>>>,
+        multi_stage: Option<MultiStageProperties>,
         time_shift: Vec<CalendarDimensionTimeShift>,
         time_shift_pk_full_name: Option<String>,
         is_self_time_shift_pk: bool,
-        is_multi_stage: bool,
         is_sub_query: bool,
         propagate_filters_to_sub_query: bool,
         mask_sql: Option<Rc<SqlCall>>,
@@ -59,11 +81,10 @@ impl DimensionSymbol {
             kind,
             is_reference,
             is_view,
-            add_group_by,
+            multi_stage,
             time_shift,
             time_shift_pk_full_name,
             is_self_time_shift_pk,
-            is_multi_stage,
             is_sub_query,
             propagate_filters_to_sub_query,
             mask_sql,
@@ -74,6 +95,8 @@ impl DimensionSymbol {
         self.kind.is_calc_group()
     }
 
+    /// String values declared on a `Switch` dimension; empty for any
+    /// other kind.
     pub fn values(&self) -> &[String] {
         match &self.kind {
             DimensionKind::Switch(s) => s.values(),
@@ -81,18 +104,7 @@ impl DimensionSymbol {
         }
     }
 
-    pub(super) fn replace_case(&self, new_case: Case) -> Rc<DimensionSymbol> {
-        let mut new = self.clone();
-        if new_case.is_single_value() {
-            //FIXME - Hack: we don't treat a single-element case as a multi-stage dimension
-            new.is_multi_stage = false;
-        }
-        if let DimensionKind::Case(ref c) = new.kind {
-            new.kind = DimensionKind::Case(c.replace_case(new_case));
-        }
-        Rc::new(new)
-    }
-
+    /// Case-expression body for `DimensionKind::Case`; `None` otherwise.
     pub fn case(&self) -> Option<&Case> {
         match &self.kind {
             DimensionKind::Case(c) => Some(c.case()),
@@ -100,6 +112,7 @@ impl DimensionSymbol {
         }
     }
 
+    /// `None` if the dimension has no primary SQL expression of its own.
     pub fn member_sql(&self) -> Option<&Rc<SqlCall>> {
         match &self.kind {
             DimensionKind::Regular(r) => Some(r.member_sql()),
@@ -121,36 +134,45 @@ impl DimensionSymbol {
         &self.compiled_path
     }
 
-    pub fn strip_join_prefix(&mut self) {
-        self.compiled_path = self.compiled_path.strip_join_prefix();
-    }
-
+    /// Full unique identifier of the symbol: cube path, member name and
+    /// any suffix that distinguishes one symbol from another.
     pub fn full_name(&self) -> String {
         self.compiled_path.full_name().clone()
     }
 
+    /// Default alias of the dimension, derived from the compiled member
+    /// path.
     pub fn alias(&self) -> String {
         self.compiled_path.alias().clone()
     }
 
+    /// True when the cube on the symbol's path actually owns this
+    /// dimension — the cube is required in the join to read the
+    /// dimension from the database. False for view-exposed dimensions,
+    /// multi-stage dimensions, switches, and members defined as pure
+    /// compositions of other members (no `{CUBE}` references).
     pub fn owned_by_cube(&self) -> bool {
-        !self.is_multi_stage && !self.kind.is_switch() && self.kind.is_owned_by_cube()
+        !self.is_multi_stage() && !self.kind.is_switch() && self.kind.is_owned_by_cube()
+    }
+
+    pub fn multi_stage(&self) -> Option<&MultiStageProperties> {
+        self.multi_stage.as_ref()
     }
 
     pub fn is_multi_stage(&self) -> bool {
-        self.is_multi_stage
+        self.multi_stage.is_some()
     }
 
+    /// Direct mapping from the `sub_query` field of the dimension
+    /// definition in the data model.
     pub fn is_sub_query(&self) -> bool {
         self.is_sub_query
     }
 
+    /// Optional SQL expression that wraps the dimension's rendered
+    /// output to mask its value (data hiding / column-level masking).
     pub fn mask_sql(&self) -> &Option<Rc<SqlCall>> {
         &self.mask_sql
-    }
-
-    pub fn add_group_by(&self) -> &Option<Vec<Rc<MemberSymbol>>> {
-        &self.add_group_by
     }
 
     pub fn dimension_type(&self) -> &str {
@@ -177,6 +199,8 @@ impl DimensionSymbol {
         self.kind.is_case()
     }
 
+    /// Direct mapping from the `propagate_filters_to_sub_query` field
+    /// of the dimension definition in the data model.
     pub fn propagate_filters_to_sub_query(&self) -> bool {
         self.propagate_filters_to_sub_query
     }
@@ -189,53 +213,26 @@ impl DimensionSymbol {
         self.is_view
     }
 
+    /// The member this dimension references, or `None` if it is not a
+    /// reference.
     pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
         if !self.is_reference() {
             return None;
         }
-        let deps = self.get_dependencies();
-        if deps.is_empty() {
-            return None;
-        }
-        deps.first().cloned()
-    }
-
-    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let mut result = self.clone();
-        result.kind = self.kind.apply_to_deps(f)?;
-        if let Some(mask) = &self.mask_sql {
-            result.mask_sql = Some(mask.apply_recursive(f)?);
-        }
-        Ok(MemberSymbol::new_dimension(Rc::new(result)))
-    }
-
-    pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
-        // mask_sql is intentionally excluded here: it's compiled in the
-        // context of the cube that owns the dimension (via aliasMember when
-        // the dimension is exposed through a view), which may legitimately
-        // differ from the current cube_name of the symbol. Including it in
-        // the generic validate_regular_member_cube_refs would produce false
-        // foreign-cube errors for view members.
-        self.kind.iter_sql_calls()
+        self.get_dependencies().first().cloned()
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
-        let mut deps = self.kind.get_dependencies();
-        if let Some(mask) = &self.mask_sql {
-            mask.extract_symbol_deps(&mut deps);
-        }
-        deps
+        deps::collect_deps(self)
     }
 
-    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
-        let mut refs = self.kind.get_cube_refs();
-        if let Some(mask) = &self.mask_sql {
-            mask.extract_cube_refs(&mut refs);
-        }
-        refs
+    /// SQL calls inside the kind body. `mask_sql` is intentionally
+    /// excluded: it is compiled against the cube that owns the
+    /// dimension, which differs from the symbol's own `cube_name` when
+    /// the dimension is exposed through a view. Including it in
+    /// cube-ref validation would produce false foreign-cube errors.
+    pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
+        self.kind.iter_sql_calls()
     }
 
     pub fn cube_name(&self) -> String {
@@ -254,6 +251,9 @@ impl DimensionSymbol {
         self.compiled_path.path()
     }
 
+    /// Finds the calendar time-shift defined for the exact `interval`
+    /// and returns it together with the primary-key full name. `None`
+    /// when either the matching shift or the primary key is missing.
     pub fn calendar_time_shift_for_interval(
         &self,
         interval: &SqlInterval,
@@ -272,6 +272,10 @@ impl DimensionSymbol {
         None
     }
 
+    /// Finds the named calendar time-shift and returns it together
+    /// with the primary-key full name. Falls back to this dimension's
+    /// own full name when the dimension is itself the calendar primary
+    /// key.
     pub fn calendar_time_shift_for_named_interval(
         &self,
         interval_name: &String,
@@ -293,6 +297,9 @@ impl DimensionSymbol {
     }
 }
 
+/// Builds a `DimensionSymbol` from a dimension definition pulled out
+/// of the cube schema. When the requested path includes a granularity,
+/// the result is wrapped in a `TimeDimensionSymbol` instead.
 pub struct DimensionSymbolFactory {
     path: SymbolPath,
     sql: Option<Rc<dyn MemberSql>>,
@@ -438,19 +445,14 @@ impl SymbolFactory for DimensionSymbolFactory {
             None
         };
 
-        let add_group_by =
-            if let Some(add_group_by) = &definition.static_data().add_group_by_references {
-                let symbols = add_group_by
-                    .iter()
-                    .map(|add_group_by| compiler.add_dimension_evaluator(add_group_by.clone()))
-                    .collect::<Result<Vec<_>, _>>()?;
-                Some(symbols)
-            } else {
-                None
-            };
+        let multi_stage = MultiStageProperties::from_dimension_definition(
+            path.cube_name(),
+            &definition,
+            compiler,
+        )?;
 
         let is_sub_query = definition.static_data().sub_query.unwrap_or(false);
-        let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
+        let is_multi_stage = multi_stage.is_some();
 
         let kind = if let Some(case_val) = case {
             let dim_type = DimensionType::from_str(&dimension_type)?;
@@ -517,11 +519,10 @@ impl SymbolFactory for DimensionSymbolFactory {
             kind,
             is_reference,
             is_view,
-            add_group_by,
+            multi_stage,
             time_shift,
             time_shift_pk,
             is_self_time_shift_pk,
-            is_multi_stage,
             is_sub_query,
             propagate_filters_to_sub_query,
             mask_sql,

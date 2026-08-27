@@ -1,4 +1,5 @@
 use super::SqlNode;
+use crate::physical_plan::sql_nodes::render_references::RenderReferences;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::query_tools::QueryTools;
@@ -8,14 +9,30 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Applies a per-dimension time shift to time dimensions whose
+/// full name is in `shifts`, by rendering the dimension expression
+/// shifted by the configured interval.
+///
+/// `substituted` names the dimensions rendered as a stored column instead
+/// of being evaluated. Their SQL is never expanded, so the shift cannot be
+/// picked up further down and has to be applied to the column itself.
 pub struct TimeShiftSqlNode {
     shifts: TimeShiftState,
+    substituted: RenderReferences,
     input: Rc<dyn SqlNode>,
 }
 
 impl TimeShiftSqlNode {
-    pub fn new(shifts: TimeShiftState, input: Rc<dyn SqlNode>) -> Rc<Self> {
-        Rc::new(Self { shifts, input })
+    pub fn new(
+        shifts: TimeShiftState,
+        substituted: RenderReferences,
+        input: Rc<dyn SqlNode>,
+    ) -> Rc<Self> {
+        Rc::new(Self {
+            shifts,
+            substituted,
+            input,
+        })
     }
 
     pub fn input(&self) -> &Rc<dyn SqlNode> {
@@ -35,8 +52,34 @@ impl SqlNode for TimeShiftSqlNode {
         let res = match node.as_ref() {
             MemberSymbol::Dimension(ev) => {
                 if !ev.is_reference() && ev.is_time() {
-                    if let Some(shift) = self.shifts.dimensions_shifts.get(&ev.full_name()) {
-                        let shift = shift.interval.clone().unwrap().to_sql();
+                    // The first probe is by exact name on purpose: a dimension
+                    // that gets evaluated has its shift applied when the
+                    // recursion reaches the owned member it wraps, and matching
+                    // it here as well would add the interval twice. Only a
+                    // substituted dimension, which is never expanded, resolves
+                    // through the chain.
+                    let shift = self
+                        .shifts
+                        .dimensions_shifts
+                        .get(&ev.full_name())
+                        .or_else(|| {
+                            if self.substituted.contains_key(&ev.full_name()) {
+                                self.shifts.shift_for_substituted_column(node)
+                            } else {
+                                None
+                            }
+                        });
+                    if let Some(shift) = shift {
+                        let shift = shift
+                            .interval
+                            .as_ref()
+                            .ok_or_else(|| {
+                                CubeError::internal(format!(
+                                    "Time shift for dimension {} has no interval",
+                                    ev.full_name()
+                                ))
+                            })?
+                            .to_sql();
                         let inner_visitor = visitor.with_arg_needs_paren_safe(false);
                         let input = self.input.to_sql(
                             &inner_visitor,

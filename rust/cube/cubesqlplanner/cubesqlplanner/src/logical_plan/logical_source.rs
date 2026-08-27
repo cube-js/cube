@@ -1,6 +1,10 @@
 use super::*;
 use cubenativeutils::CubeError;
 
+/// Enum-of-children adapter used by nodes that accept one of several
+/// `LogicalNode` types as their source. Lets the generic `with_inputs`
+/// machinery rebuild the source from a freshly transformed `PlanNode`
+/// while keeping the variant unchanged.
 pub trait LogicalSource: Sized + PrettyPrint {
     fn as_plan_node(&self) -> PlanNode;
     fn with_plan_node(&self, plan_node: PlanNode) -> Result<Self, CubeError>;

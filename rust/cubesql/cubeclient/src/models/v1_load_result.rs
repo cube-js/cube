@@ -30,6 +30,12 @@ pub struct V1LoadResult<D = models::V1LoadResultDataRow> {
     pub refresh_key_values: Option<Vec<serde_json::Value>>,
     #[serde(rename = "lastRefreshTime", skip_serializing_if = "Option::is_none")]
     pub last_refresh_time: Option<String>,
+    /// `true` when the result was served from an external (CubeStore)
+    /// pre-aggregation — the case where cache freshness on the cubesql
+    /// side actually depends on the pre-agg refresh, as internal
+    /// pre-aggregations hit the source DB and rely on its own caching.
+    #[serde(rename = "external", skip_serializing_if = "Option::is_none")]
+    pub external: Option<bool>,
 }
 
 impl<D: Default> Default for V1LoadResult<D> {
@@ -40,6 +46,7 @@ impl<D: Default> Default for V1LoadResult<D> {
             data: D::default(),
             refresh_key_values: None,
             last_refresh_time: None,
+            external: None,
         }
     }
 }
@@ -52,6 +59,7 @@ impl<D> V1LoadResult<D> {
             data,
             refresh_key_values: None,
             last_refresh_time: None,
+            external: None,
         }
     }
 }

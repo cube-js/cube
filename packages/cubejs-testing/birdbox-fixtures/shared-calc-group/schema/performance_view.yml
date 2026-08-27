@@ -1,0 +1,22 @@
+views:
+  - name: performance_view
+    cubes:
+      - join_path: sales
+        includes:
+          - account
+          - product
+          - date
+          - total
+          - rolling_amount
+          - rolling_amount_change
+          - rolling_amount_growth_pct
+
+      - join_path: share_metrics
+        includes:
+          - rolling_share_change
+          - name: date
+            alias: ms_date
+
+      - join_path: rolling_window_dim
+        includes:
+          - rolling_window

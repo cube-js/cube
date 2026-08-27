@@ -99,3 +99,38 @@ async fn test_single_row_result() {
         insta::assert_snapshot!(result);
     }
 }
+
+// FIXME(tesseract): "Rank measure doesn't support direct evaluation".
+// Repro for the JS sql-generation case "multi stage complex graph with
+// time dimension no granularity": a rank measure (`date_rank`) is used
+// inside another multi-stage formula both in SQL and in a filter, and
+// the outer aggregation filters by yet another rank
+// (`adjusted_amount_rank`) over the formula. With a raw (no
+// granularity) time dimension in the request, the planner ends up
+// emitting `date_rank` straight into a `to_sql` path instead of
+// resolving it through a multi-stage sub-query ref.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_complex_graph_with_rank_and_raw_time_dimension() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.adjusted_amount_sum
+          - orders.total_amount
+        dimensions:
+          - orders.status
+        time_dimensions:
+          - dimension: orders.updated_at
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: orders.status
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

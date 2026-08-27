@@ -7,44 +7,9 @@ const native = loadNative();
 // Test suites should gate themselves on this flag rather than calling the
 // helpers blindly, so a regular debug build doesn't blow up the unit run.
 export const bridgeHarnessAvailable: boolean =
-  typeof native.__testBridgeCompileMemberSql === 'function';
+  typeof native.__testBridgeParseArgsNames === 'function';
 
 export type SqlTemplate = string | string[];
-
-export interface FilterParamsItem {
-  cube_name: string;
-  name: string;
-  // String column → string. Callback column → JS function (call to inspect).
-  column: string | Function;
-}
-
-export interface FilterGroupItem {
-  filter_params: FilterParamsItem[];
-}
-
-export interface SqlTemplateArgs {
-  symbol_paths: string[][];
-  filter_params: FilterParamsItem[];
-  filter_groups: FilterGroupItem[];
-  security_context: { values: string[] };
-}
-
-export interface CompiledMemberSql {
-  template: SqlTemplate;
-  args: SqlTemplateArgs;
-}
-
-export function compileMemberSql(
-  fn: Function,
-  securityContext: object = {}
-): CompiledMemberSql {
-  if (!bridgeHarnessAvailable) {
-    throw new Error(
-      'Bridge test harness is not built. Rebuild with `yarn native:build-debug-bridge-tests`.'
-    );
-  }
-  return native.__testBridgeCompileMemberSql(fn, securityContext);
-}
 
 export function parseArgsNames(fn: Function): string[] {
   return native.__testBridgeParseArgsNames(fn);
@@ -133,4 +98,22 @@ export function expectAllInvocationsOk(result: InvokeResult): void {
       `Bridge invocation failed for ${failures.length} field(s):\n  ${failures.join('\n  ')}`
     );
   }
+}
+
+export interface RustBoxProbeView {
+  value: number;
+  label: string;
+  type_name: string;
+}
+
+export function createRustBoxProbe(value: number, label: string): unknown {
+  return native.__testBridgeRustBoxCreate(value, label);
+}
+
+export function createRustBoxProbeAlt(note: string): unknown {
+  return native.__testBridgeRustBoxCreateAlt(note);
+}
+
+export function unwrapRustBoxProbe(handle: unknown): RustBoxProbeView {
+  return native.__testBridgeRustBoxUnwrap(handle);
 }

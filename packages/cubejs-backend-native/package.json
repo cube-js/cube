@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/native",
-  "version": "1.6.46",
+  "version": "1.7.28",
   "author": "Cube Dev, Inc.",
   "description": "Native module for Cube.js (binding to Rust codebase)",
   "main": "dist/js/index.js",
@@ -33,26 +33,26 @@
     "lint:fix": "eslint --fix test/ js/ --ext .ts"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "files": [
     "dist/js"
   ],
   "devDependencies": {
-    "@cubejs-backend/linter": "1.6.46",
+    "@cubejs-backend/linter": "1.7.28",
     "@types/jest": "^29",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "cargo-cp-artifact": "^0.1.9",
     "jest": "^29",
     "jest-bench": "^29",
     "pg": "^8.11.3",
     "typescript": "~5.2.2",
-    "uuid": "^8.3.2"
+    "uuid": "^11.1.1"
   },
   "dependencies": {
-    "@cubejs-backend/cubesql": "1.6.46",
-    "@cubejs-backend/shared": "1.6.46",
-    "@cubejs-infra/post-installer": "^0.0.7"
+    "@cubejs-backend/cubesql": "1.7.28",
+    "@cubejs-backend/shared": "1.7.28",
+    "@cubejs-infra/post-installer": "^0.1.2"
   },
   "resources": {
     "vars": {
@@ -61,6 +61,7 @@
         "value": [
           "libpython",
           [
+            "3.13",
             "3.12",
             "3.11",
             "3.10",

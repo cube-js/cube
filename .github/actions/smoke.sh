@@ -12,6 +12,8 @@ echo "::group::DuckDB"
 # Should we create a separate job integration-duckdb? I believe not, because it works fast.
 yarn lerna run --concurrency 1 --stream --no-prefix integration:duckdb
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:duckdb
+# Also DuckDB-backed, so it shares this group rather than paying for its own.
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:multi-fact
 echo "::endgroup::"
 
 echo "::group::View Groups"
@@ -42,13 +44,6 @@ echo "::group::Multidb"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:multidb
 echo "::endgroup::"
 
-#echo "::group::Prestodb"
-#docker rm -vf $(docker ps -aq)
-#docker rmi -f $(docker images -aq)
-#docker pull ahanaio/prestodb-sandbox:0.281
-#yarn lerna run --concurrency 1 --stream --no-prefix smoke:prestodb
-#echo "::endgroup::"
-
 echo "::group::Trino"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:trino
 echo "::endgroup::"
@@ -74,4 +69,8 @@ echo "::endgroup::"
 
 echo "::group::RBAC GraphQL"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:rbac-graphql
+echo "::endgroup::"
+
+echo "::group::Links"
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:links
 echo "::endgroup::"

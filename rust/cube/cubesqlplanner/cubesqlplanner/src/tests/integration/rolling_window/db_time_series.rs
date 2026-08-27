@@ -92,6 +92,7 @@ async fn test_db_ts_rolling_with_dimension() {
               - "2024-01-20"
         order:
           - id: orders.category
+          - id: orders.created_at
     "#};
 
     ctx.build_sql(query).unwrap();
@@ -136,28 +137,6 @@ async fn test_db_ts_multiple_rolling() {
         measures:
           - orders.rolling_sum_trailing_7d
           - orders.rolling_count_7d
-        time_dimensions:
-          - dimension: orders.created_at
-            granularity: day
-            dateRange:
-              - "2024-01-10"
-              - "2024-01-20"
-    "#};
-
-    ctx.build_sql(query).unwrap();
-
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
-        insta::assert_snapshot!(result);
-    }
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_db_ts_running_total() {
-    let ctx = create_context();
-
-    let query = indoc! {r#"
-        measures:
-          - orders.running_total
         time_dimensions:
           - dimension: orders.created_at
             granularity: day

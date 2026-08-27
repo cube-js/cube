@@ -17,6 +17,7 @@ import {
   CacheDriverInterface,
   TableStructure,
   DriverInterface, QueryKey,
+  QueuePriority,
 } from '@cubejs-backend/base-driver';
 
 import { QueryQueue, QueryQueueOptions } from './QueryQueue';
@@ -24,7 +25,7 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
-import { getCacheHash } from './utils';
+import { getCacheHash, extractRequestUUID } from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
 
 export type CacheQueryResultOptions = {
@@ -70,8 +71,6 @@ export type Query = {
   preAggregations?: PreAggregationDescription[];
   groupedPartitionPreAggregations?: PreAggregationDescription[][];
   preAggregationsLoadCacheByDataSource?: any;
-  // @deprecated
-  renewQuery?: boolean;
   cacheMode?: CacheMode;
   compilerCacheFn?: <T>(subKey: string[], cacheFn: () => T) => T;
 };
@@ -83,8 +82,6 @@ export type QueryBody = {
   values?: string[];
   loadRefreshKeysOnly?: boolean;
   scheduledRefresh?: boolean;
-  // @deprecated
-  renewQuery?: boolean;
   cacheMode?: CacheMode;
   requestId?: string;
   external?: boolean;
@@ -187,9 +184,6 @@ export class QueryCache {
     });
   }
 
-  /**
-   * Returns cache driver instance.
-   */
   public getCacheDriver(): CacheDriverInterface {
     return this.cacheDriver;
   }
@@ -210,15 +204,10 @@ export class QueryCache {
     queryBody: QueryBody,
     preAggregationsTablesToTempTables: PreAggTableToTempTable[],
   ) {
-    const replacePreAggregationTableNames =
-      (queryAndParams: string | QueryWithParams) => (
-        QueryCache.replacePreAggregationTableNames(
-          queryAndParams,
-          preAggregationsTablesToTempTables,
-        )
-      );
-
-    const query = replacePreAggregationTableNames(queryBody.query);
+    const query = QueryCache.replacePreAggregationTableNamesInSql(
+      queryBody.query,
+      preAggregationsTablesToTempTables,
+    );
 
     const inlineTables = preAggregationsTablesToTempTables.flatMap(
       ([_, preAggregation]) => (
@@ -226,7 +215,7 @@ export class QueryCache {
       )
     );
 
-    let queuePriority = 10;
+    let queuePriority: QueuePriority = QueuePriority.Interactive;
 
     if (Number.isInteger(queryBody.queuePriority)) {
       queuePriority = queryBody.queuePriority;
@@ -238,7 +227,10 @@ export class QueryCache {
 
     const cacheKeyQueries = this
       .cacheKeyQueriesFrom(queryBody)
-      .map(replacePreAggregationTableNames);
+      .map((queryAndParams) => QueryCache.replacePreAggregationTableNames(
+        queryAndParams,
+        preAggregationsTablesToTempTables,
+      ));
 
     const renewalThreshold = queryBody.cacheKeyQueries?.renewalThreshold;
 
@@ -286,8 +278,7 @@ export class QueryCache {
       }
     }
 
-    // renewQuery has been deprecated, but keeping it for now
-    if (queryBody.cacheMode === 'must-revalidate' || queryBody.renewQuery) {
+    if (queryBody.cacheMode === 'must-revalidate') {
       this.logger('Requested renew', { cacheKey, requestId: queryBody.requestId });
       return this.renewQuery(
         query,
@@ -408,33 +399,48 @@ export class QueryCache {
   }
 
   public static extractRequestUUID(requestId: string): string {
-    const idx = requestId.lastIndexOf('-span-');
-
-    return idx !== -1 ? requestId.substring(0, idx) : requestId;
+    return extractRequestUUID(requestId);
   }
 
-  protected static replaceAll(replaceThis, withThis, inThis) {
-    withThis = withThis.replace(/\$/g, '$$$$');
-    return inThis.replace(
-      new RegExp(replaceThis.replace(/([/,!\\^${}[\]().*+?|<>\-&])/g, '\\$&'), 'g'),
-      withThis
+  public static replacePreAggregationTableNamesInSql(
+    sql: string,
+    preAggregationsTablesToTempTables: PreAggTableToTempTableNames[],
+  ): string {
+    // Single-pass replacement with longest-first alternation: sequential
+    // per-name replacement would corrupt names that are prefixes of other
+    // names (e.g. `name1` vs `name10`) and rescan already inserted target
+    // names, which contain the source name as a prefix
+    const sorted = [...preAggregationsTablesToTempTables]
+      .sort(([a], [b]) => b.length - a.length);
+
+    if (!sorted.length) {
+      return sql;
+    }
+
+    const replacements = new Map(
+      sorted.map(([tableName, { targetTableName }]) => [tableName, targetTableName])
     );
+    const replaceRegex = new RegExp(
+      sorted
+        .map(([tableName]) => tableName.replace(/([/,!\\^${}[\]().*+?|<>\-&])/g, '\\$&'))
+        .join('|'),
+      'g'
+    );
+
+    return sql.replace(replaceRegex, (match) => replacements.get(match) as string);
   }
 
   public static replacePreAggregationTableNames(
-    queryAndParams: string | QueryWithParams,
+    queryAndParams: QueryWithParams,
     preAggregationsTablesToTempTables: PreAggTableToTempTableNames[],
-  ): string | QueryWithParams {
-    const [keyQuery, params, queryOptions] = Array.isArray(queryAndParams)
-      ? queryAndParams
-      : [queryAndParams, []];
-    const replacedKeyQuery: string = preAggregationsTablesToTempTables.reduce(
-      (query, [tableName, { targetTableName }]) => QueryCache.replaceAll(tableName, targetTableName, query),
-      keyQuery
-    );
-    return Array.isArray(queryAndParams)
-      ? [replacedKeyQuery, params, queryOptions]
-      : replacedKeyQuery;
+  ): QueryWithParams {
+    const [sql, params, queryOptions] = queryAndParams;
+
+    return [
+      QueryCache.replacePreAggregationTableNamesInSql(sql, preAggregationsTablesToTempTables),
+      params,
+      queryOptions,
+    ];
   }
 
   /**
@@ -656,7 +662,7 @@ export class QueryCache {
           let logged = false;
           Promise
             .all([clientFactory()])
-            .then(([client]) => (<DriverInterface>client).stream(req.query, req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark') }))
+            .then(([client]) => (<DriverInterface>client).stream(req.query, req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark'), requestId: req.requestId }))
             .then((source) => {
               const cleanup = async (error) => {
                 if (source.release) {
@@ -738,9 +744,9 @@ export class QueryCache {
   }
 
   public startRenewCycle(
-    query: string | QueryWithParams,
+    query: string,
     values: string[],
-    cacheKeyQueries: (string | QueryWithParams)[],
+    cacheKeyQueries: QueryWithParams[],
     expireSecs: number,
     cacheKey: CacheKey,
     renewalThreshold: any,
@@ -773,9 +779,9 @@ export class QueryCache {
   }
 
   public renewQuery(
-    query: string | QueryWithParams,
+    query: string,
     values: string[],
-    cacheKeyQueries: (string | QueryWithParams)[],
+    cacheKeyQueries: QueryWithParams[],
     expireSecs: number,
     cacheKey: CacheKey,
     renewalThreshold: any,
@@ -793,7 +799,7 @@ export class QueryCache {
   ) {
     options = options || { dataSource: 'default' };
     return Promise.all(
-      this.loadRefreshKeys(<QueryWithParams[]>cacheKeyQueries, expireSecs, options),
+      this.loadRefreshKeys(cacheKeyQueries, expireSecs, options),
     )
       .catch(e => {
         if (e instanceof ContinueWaitError) {
@@ -857,7 +863,7 @@ export class QueryCache {
 
   @AsyncDebounce()
   public async loadRefreshKey(q: QueryWithParams, expireSecs: number, options: LoadRefreshKeyOptions) {
-    const [query, values, queryOptions]: QueryWithParams = Array.isArray(q) ? q : [q, [], {}];
+    const [query, values, queryOptions] = q;
 
     return this.cacheQueryResult(
       query,

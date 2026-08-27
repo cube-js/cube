@@ -1,0 +1,57 @@
+# Smoke test for: a single matching policy granting full (unmasked) access to a
+# measure, with a row-level filter, and NO group by.
+#
+# Two policies are defined:
+#   - spm_mask_group  → masks all members (member_masking)
+#   - spm_full_group  → full member access + row filter product_id <= 3
+#
+# The test user (single_policy_measure_user) belongs ONLY to spm_full_group, so
+# only the full-access policy matches. Because no matching policy masks the
+# measure, the masked measure must render its REAL aggregated value, and the
+# full-access policy's row-level filter must still be applied — even for a
+# measure-only query with no GROUP BY.
+
+cubes:
+  - name: single_policy_measure_test
+    sql_table: public.line_items
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: product_id
+        sql: product_id
+        type: number
+
+    measures:
+      # Carries a mask, but it is only masked when a masking policy matches.
+      - name: total_quantity
+        sql: quantity
+        type: sum
+        mask: -1
+
+      # Used to assert the row-level filter is applied (max <= 3 when filtered).
+      - name: max_product_id
+        sql: product_id
+        type: max
+
+    access_policy:
+      # Masking policy — targets a group the test user is NOT in.
+      - group: spm_mask_group
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+
+      # Full-access policy with a row filter — the test user IS in this group.
+      - group: spm_full_group
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: product_id
+              operator: lte
+              values:
+                - "3"

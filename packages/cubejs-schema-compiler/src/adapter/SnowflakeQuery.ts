@@ -108,16 +108,36 @@ export class SnowflakeQuery extends BaseQuery {
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
     templates.functions.NOW = 'CURRENT_TIMESTAMP';
+    templates.functions.UTCTIMESTAMP = 'SYSDATE()';
     templates.functions.LOG = 'LOG({% if args[1] is undefined %}10, {% endif %}{{ args_concat }})';
     templates.functions.DLOG10 = 'LOG(10, {{ args_concat }})';
     templates.functions.CHARACTERLENGTH = 'LENGTH({{ args[0] }})';
     templates.functions.BTRIM = 'TRIM({{ args_concat }})';
     templates.functions.STRING_AGG = 'LISTAGG({% if distinct %}DISTINCT {% endif %}{{ args_concat }})';
+    // DATEADD is being rewritten to DATE_ADD
+    templates.functions.DATE_ADD = 'DATEADD({{ date_part }}, {{ interval }}, {{ args[0] }})';
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
+    // Snowflake `/` is decimal division even for integer operands (output scale
+    // is dividend scale + 6), while this template must keep PostgreSQL integer
+    // division semantics. TRUNC rounds toward zero, matching PostgreSQL.
+    templates.expressions.int_division = 'CAST(TRUNC({{ left }} / {{ right }}) AS BIGINT)';
+    // Snowflake can't EXTRACT(EPOCH FROM <interval>), so the epoch of a timestamp
+    // difference (left - right) is rendered as fractional seconds between them.
+    // TIMESTAMPDIFF is measured once at microsecond granularity (no per-second
+    // boundary rounding) and divided to seconds, matching Postgres' fractional
+    // EXTRACT(EPOCH FROM interval).
+    templates.expressions.extract_epoch_diff = 'TIMESTAMPDIFF(MICROSECOND, {{ right }}, {{ left }}) / 1000000';
     templates.expressions.interval = 'INTERVAL \'{{ interval }}\'';
     templates.expressions.timestamp_literal = '\'{{ value }}\'::timestamp_tz';
+    templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\\\'{% endif %}';
+    templates.expressions.ilike = '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\\\'{% endif %}';
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
-    templates.join_types.full = 'FULL';
+    // Snowflake has no default LIKE escape character, so the escaping the
+    // planner applies to the value needs an explicit clause - the same one
+    // SnowflakeFilter.likeIgnoreCase emits on the legacy path, and doubled for
+    // the same reason described there.
+    templates.tesseract.ilike = '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }} ESCAPE \'\\\\\'';
+    templates.tesseract.join_types_full = 'FULL';
     delete templates.types.interval;
     return templates;
   }

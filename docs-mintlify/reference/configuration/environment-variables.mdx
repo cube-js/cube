@@ -31,6 +31,20 @@ different for multitenant setups.
 | --------------- | ---------------------- | --------------------- |
 | A valid string  | `cubejs`               | `cubejs`              |
 
+## `CUBEJS_AUTO_RUN_MODE`
+
+The deployment-wide default for whether [Explore](/docs/explore-analyze/explore)
+and [Workbooks](/docs/explore-analyze/workbooks/querying-data) tabs run their
+query automatically as it's built, or wait for an explicit **Run query**. Set
+via the **Auto-run** switch in [Model Configuration](/docs/data-modeling/configuration#auto-run).
+A view's `meta.auto_run` setting and a user's per-tab toggle both take
+precedence over this default. Only the literal string `false` turns it off —
+any other value (including unset) is treated as on.
+
+| Possible Values | Default in Development | Default in Production |
+| ---------------- | ----------------------- | ----------------------- |
+| `true`, `false`  | `true`                   | `true`                   |
+
 ## `CUBEJS_AWS_KEY`
 
 The AWS Access Key ID to use for database connections.
@@ -80,6 +94,23 @@ The name of the AWS Athena catalog to use for queries.
 | ------------------------------------------------- | ---------------------- | --------------------- |
 | [A valid Athena Catalog name][aws-athena-catalog] | N/A                    | N/A                   |
 
+## `CUBEJS_AWS_ATHENA_ASSUME_ROLE_ARN`
+
+The ARN of the IAM role to assume for Athena access.
+
+| Possible Values      | Default in Development | Default in Production |
+| -------------------- | ---------------------- | --------------------- |
+| A valid IAM role ARN | N/A                    | N/A                   |
+
+## `CUBEJS_AWS_ATHENA_ASSUME_ROLE_EXTERNAL_ID`
+
+The external ID to use when assuming the IAM role, if required by the role's
+trust policy.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A string        | N/A                    | N/A                   |
+
 ## `CUBEJS_DB_SCHEMA`
 
 The name of the schema to use as `information_schema` filter. Reduces count of
@@ -116,8 +147,8 @@ If you'd like to adjust the concurrency for the refresh worker, use
 
 ## `CUBEJS_REFRESH_WORKER_CONCURRENCY`
 
-The number of concurrent connections each query queue of the refresh worker
-has to the database.
+The number of pre-aggregation queries the refresh worker executes concurrently
+against the source database.
 
 | Possible Values | Default in Development       | Default in Production        |
 | --------------- | ---------------------------- | ---------------------------- |
@@ -137,12 +168,6 @@ it should be adjusted accordingly.
 | ------------------------------------ | ---------------------- | --------------------- |
 | A valid number of concurrent queries | 10                     | 10                    |
 
-<Info>
-
-Previously, this environment variable was named [`CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_scheduled_refresh_concurrency).
-
-</Info>
-
 ## `CUBEJS_CUBESTORE_HOST`
 
 The hostname of the Cube Store deployment
@@ -159,6 +184,38 @@ The port of the Cube Store deployment.
 | ------------------- | ---------------------- | --------------------- |
 | A valid port number | `3030`                 | `3030`                |
 
+## `CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE`
+
+The maximum size of a single message Cube will send to or accept from Cube
+Store. A result above this size is reported as `Cube Store response size
+exceeds the maximum message size`; see
+[message size limits](/docs/pre-aggregations/cube-store-architecture#message-size-limits).
+This is Cube's own limit and is independent of
+[`CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE`](#cubestore_transport_max_message_size),
+which Cube Store applies to what it receives.
+
+| Possible Values      | Default in Development | Default in Production |
+| -------------------- | ---------------------- | --------------------- |
+| A size in bytes      | `104857600` (100 MB)   | `104857600` (100 MB)  |
+
+## `CUBEJS_QUEUE_FAST_TRACK`
+
+<Warning>
+
+The fast-track path is experimental and off by default. Its behavior may still change,
+and we don't recommend enabling it in production yet.
+
+</Warning>
+
+Enables the preview fast-track path for Cube Store query queues. When enabled,
+Cube can atomically enqueue and retrieve a query when queue concurrency is
+available, reducing queue coordination round trips. This requires Cube and Cube Store
+1.7.26 or newer; against an older version Cube keeps using the regular path.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBEJS_DATASOURCES`
 
 A comma-separated list of data source names. Data sources defined here can be
@@ -172,6 +229,17 @@ environment variables.
 ```dotenv
 CUBEJS_DATASOURCES=default,datasource1
 ```
+
+<Info>
+
+In Cube Cloud, this variable is **auto-maintained** when sources are managed
+from [**Settings → Data Sources**][ref-config-multiple-ds-cloud]. The page
+writes, updates, and removes it as you add or delete named sources — you
+only need to hand-edit it when configuring Cube Core or when overriding
+the UI from
+[**Settings → Environment Variables**](/admin#environment-variables).
+
+</Info>
 
 ## `CUBEJS_DB_BQ_CREDENTIALS`
 
@@ -401,42 +469,6 @@ A flag to use credentials chain for secrets for S3 connections.
 | Possible Values                                       | Default in Development | Default in Production |
 | ----------------------------------------------------- | ---------------------- | --------------------- |
 | `true`, `false`                                       | `false`                | `false`               |
-
-## `CUBEJS_DB_ELASTIC_APIKEY_ID`
-
-The [ID of the API key from elastic.co][elastic-docs-api-keys]. Required when
-using Elastic Cloud.
-
-| Possible Values               | Default in Development | Default in Production |
-| ----------------------------- | ---------------------- | --------------------- |
-| A valid Elastic.co API key ID | N/A                    | N/A                   |
-
-## `CUBEJS_DB_ELASTIC_APIKEY_KEY`
-
-The [API key from elastic.co][elastic-docs-api-keys]. Required when using
-Elastic Cloud.
-
-| Possible Values            | Default in Development | Default in Production |
-| -------------------------- | ---------------------- | --------------------- |
-| A valid Elastic.co API key | N/A                    | N/A                   |
-
-## `CUBEJS_DB_ELASTIC_OPENDISTRO`
-
-If `true`, then use the Open Distro for Elasticsearch.
-
-| Possible Values | Default in Development | Default in Production |
-| --------------- | ---------------------- | --------------------- |
-| `true`, `false` | N/A                    | N/A                   |
-
-## `CUBEJS_DB_ELASTIC_QUERY_FORMAT`
-
-By default, queries return data in JDBC format, but you can also return data in
-standard Elasticsearch JDBC, JSON, CSV, YAML or raw formats (only JSON and JDBC
-are currently supported).
-
-| Possible Values | Default in Development | Default in Production |
-| --------------- | ---------------------- | --------------------- |
-| `json`, `jdbc`  | N/A                    | N/A                   |
 
 ## `CUBEJS_DB_EXPORT_BUCKET`
 
@@ -743,6 +775,72 @@ for pre-aggregation generation.
 | -------------------------------------------------- | ---------------------- | --------------------- |
 | Whether to force fetch columns in ordinal position | `true`                 | `true`               |
 
+## `CUBEJS_DB_HIVE_TYPE`
+
+The type of Hive server to connect to.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `HIVE`, `CDH`   | `HIVE`                 | `HIVE`                |
+
+## `CUBEJS_DB_HIVE_VER`
+
+The version of the Hive server to connect to.
+
+| Possible Values     | Default in Development | Default in Production |
+| ------------------- | ---------------------- | --------------------- |
+| A valid Hive version | `2.1.1`               | `2.1.1`               |
+
+## `CUBEJS_DB_HIVE_THRIFT_VER`
+
+The version of the Thrift protocol used to connect to Hive.
+
+| Possible Values       | Default in Development | Default in Production |
+| --------------------- | ---------------------- | --------------------- |
+| A valid Thrift version | `0.9.3`               | `0.9.3`               |
+
+## `CUBEJS_DB_HIVE_CDH_VER`
+
+The Cloudera Distribution Hadoop (CDH) version, used when `CUBEJS_DB_HIVE_TYPE`
+is set to `CDH`.
+
+| Possible Values    | Default in Development | Default in Production |
+| ------------------ | ---------------------- | --------------------- |
+| A valid CDH version | N/A                   | N/A                   |
+
+## `CUBEJS_DB_KAFKA_HOST`
+
+Kafka broker host(s) for [Kafka streams mode](/admin/connect-to-data/data-sources/ksqldb#kafka-streams-mode).
+Multiple brokers can be comma-separated.
+
+| Possible Values          | Default in Development | Default in Production |
+| ------------------------ | ---------------------- | --------------------- |
+| A valid Kafka broker URL | N/A                    | N/A                   |
+
+## `CUBEJS_DB_KAFKA_USER`
+
+Username for Kafka broker authentication (SASL PLAIN).
+
+| Possible Values        | Default in Development | Default in Production |
+| ---------------------- | ---------------------- | --------------------- |
+| A valid Kafka username | N/A                    | N/A                   |
+
+## `CUBEJS_DB_KAFKA_PASS`
+
+Password for Kafka broker authentication (SASL PLAIN).
+
+| Possible Values        | Default in Development | Default in Production |
+| ---------------------- | ---------------------- | --------------------- |
+| A valid Kafka password | N/A                    | N/A                   |
+
+## `CUBEJS_DB_KAFKA_USE_SSL`
+
+If `true`, enables SASL_SSL for the Kafka connection.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBEJS_DB_MATERIALIZE_CLUSTER`
 
 The cluster name to use when connecting to [Materialize](/admin/connect-to-data/data-sources/materialize).
@@ -761,6 +859,50 @@ to be [configured][mysql-server-tz-support] properly.
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |
+
+## `CUBEJS_DB_MSSQL_USE_NAMED_TIMEZONES`
+
+This flag controls how time zone conversion is done in the generated SQL for Microsoft
+SQL Server:
+- If it is set to `true`, time zone names are used, with DST-aware conversion via
+`AT TIME ZONE`.
+- If it is set to `false`, numeric offsets are used instead.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
+## `CUBEJS_DB_REDSHIFT_CLUSTER_IDENTIFIER`
+
+The Redshift cluster identifier. Required for IAM authentication.
+
+| Possible Values            | Default in Development | Default in Production |
+| -------------------------- | ---------------------- | --------------------- |
+| A valid cluster identifier | N/A                    | N/A                   |
+
+## `CUBEJS_DB_REDSHIFT_AWS_REGION`
+
+The AWS region of the Redshift cluster. Required for IAM authentication.
+
+| Possible Values    | Default in Development | Default in Production |
+| ------------------ | ---------------------- | --------------------- |
+| A valid AWS region | N/A                    | N/A                   |
+
+## `CUBEJS_DB_REDSHIFT_ASSUME_ROLE_ARN`
+
+The ARN of the IAM role to assume for cross-account access.
+
+| Possible Values      | Default in Development | Default in Production |
+| -------------------- | ---------------------- | --------------------- |
+| A valid IAM role ARN | N/A                    | N/A                   |
+
+## `CUBEJS_DB_REDSHIFT_ASSUME_ROLE_EXTERNAL_ID`
+
+The external ID for the assumed role's trust policy.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A string        | N/A                    | N/A                   |
 
 ## `CUBEJS_DB_SNOWFLAKE_ACCOUNT`
 
@@ -852,6 +994,22 @@ The Snowflake warehouse to use when connecting to the database.
 | ---------------------------------------------------------------------- | ---------------------- | --------------------- |
 | [A valid Snowflake warehouse][snowflake-docs-warehouse] in the account | N/A                    | N/A                   |
 
+## `CUBEJS_DB_SNOWFLAKE_HOST`
+
+Host address to which the driver should connect.
+
+| Possible Values  | Default in Development | Default in Production |
+| ---------------- | ---------------------- | --------------------- |
+| A valid hostname | N/A                    | N/A                   |
+
+## `CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE`
+
+Whether or not [quoted identifiers should be case insensitive](https://docs.snowflake.com/en/sql-reference/identifiers-syntax#double-quoted-identifiers).
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBEJS_DB_PINOT_NULL_HANDLING`
 
 The Startree/Pinot null value support. If `true`, enables null handling.
@@ -875,6 +1033,46 @@ If `true`, enables SSL encryption for database connections from Cube.
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | N/A                    | N/A                   |
+
+## `CUBEJS_DB_SSL_CA`
+
+The contents of a CA bundle in PEM format, or a path to one. For more
+information, check the `options.ca` property for TLS Secure Contexts [in the
+Node.js documentation][nodejs-docs-tls-options].
+
+| Possible Values                    | Default in Development | Default in Production |
+| ---------------------------------- | ---------------------- | --------------------- |
+| A valid CA bundle or a path to one | N/A                    | N/A                   |
+
+## `CUBEJS_DB_SSL_CERT`
+
+The contents of an SSL certificate in PEM format, or a path to one. For more
+information, check the `options.cert` property for TLS Secure Contexts [in the
+Node.js documentation][nodejs-docs-tls-options].
+
+| Possible Values                          | Default in Development | Default in Production |
+| ---------------------------------------- | ---------------------- | --------------------- |
+| A valid SSL certificate or a path to one | N/A                    | N/A                   |
+
+## `CUBEJS_DB_SSL_KEY`
+
+The contents of a private key in PEM format, or a path to one. For more
+information, check the `options.key` property for TLS Secure Contexts [in the
+Node.js documentation][nodejs-docs-tls-options].
+
+| Possible Values                          | Default in Development | Default in Production |
+| ---------------------------------------- | ---------------------- | --------------------- |
+| A valid SSL private key or a path to one | N/A                    | N/A                   |
+
+## `CUBEJS_DB_SSL_SERVERNAME`
+
+The server name to use for SNI (Server Name Indication) when establishing the
+TLS connection. For more information, check the `options.servername` property
+for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options].
+
+| Possible Values   | Default in Development | Default in Production |
+| ----------------- | ---------------------- | --------------------- |
+| A valid host name | N/A                    | N/A                   |
 
 ## `CUBEJS_DB_TYPE`
 
@@ -913,7 +1111,9 @@ specified in an API query.
 
 The maximum [row limit][ref-row-limit] in the result set. An explicit limit in a
 query cannot exceed this value, except for [SQL API][ref-sql-api] queries when
-[streaming mode][ref-sql-api-streaming] is enabled.
+[streaming mode][ref-sql-api-streaming] is enabled. SQL API queries that are not
+streamed can be capped separately, at a lower value, with
+[`CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`](#cubesql_non_streaming_query_max_row_limit).
 
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
@@ -938,6 +1138,17 @@ The default [time zone][ref-time-zone] for queries.
 You can set the time zone name in the [TZ Database Name][link-tzdb] format, e.g.,
 `America/Los_Angeles`.
 
+<Warning>
+
+An invalid value fails at server startup. Only TZ Database names are accepted — fixed
+UTC offsets such as `+05:00` are rejected.
+
+</Warning>
+
+This is the fallback. When [user time zones](/admin/time-zones) are enabled for the
+account, a resolved account, personal, dashboard, or embed zone is sent with the query and
+takes precedence over this value.
+
 ## `CUBEJS_DEFAULT_API_SCOPES`
 
 [API scopes][ref-rest-scopes] used to allow or disallow access to REST (JSON) API
@@ -952,7 +1163,7 @@ option](/reference/configuration/config#context_to_api_scopes).
 
 ## `CUBEJS_DEV_MODE`
 
-If `true`, enables [development mode](/admin/connect-to-data#development-mode).
+If `true`, enables [development mode](/docs/data-modeling/dev-mode).
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1095,6 +1306,14 @@ The logging level for Cube.
 | -------------------------------- | ---------------------- | --------------------- |
 | `error`, `info`, `trace`, `warn` | `warn`                 | `warn`                |
 
+<Note>
+
+In production, Cube emits logs as structured JSON — one JSON object per line,
+each including a `level` field with the log level. In development, logs are
+emitted as human-readable text.
+
+</Note>
+
 See also `CUBESTORE_LOG_LEVEL`.
 See also the [`logger` configuration option](/reference/configuration/config#logger).
 
@@ -1150,6 +1369,33 @@ This allows reusing pre-aggregations across environments, saving both time and c
 
 </Info>
 
+## `CUBEJS_PRE_AGGREGATIONS_DB_*`
+
+Connection variables for a dedicated data source used to build and store the default
+data source's pre-aggregations, instead of its own connection. They mirror the regular
+`CUBEJS_DB_*` connection variables — for example `CUBEJS_PRE_AGGREGATIONS_DB_HOST`,
+`CUBEJS_PRE_AGGREGATIONS_DB_PORT`, `CUBEJS_PRE_AGGREGATIONS_DB_USER`,
+`CUBEJS_PRE_AGGREGATIONS_DB_PASS`, and `CUBEJS_PRE_AGGREGATIONS_DB_SSL`. For a [named data source][ref-config-multiple-ds-decorating-env],
+use the decorated form `CUBEJS_DS_<NAME>_PRE_AGGREGATIONS_DB_*`.
+
+Driver-specific connection variables take the same segment, so the dedicated connection
+is not limited to the `_DB_*` family — for example `CUBEJS_PRE_AGGREGATIONS_JDBC_URL`,
+`CUBEJS_PRE_AGGREGATIONS_AWS_REGION`, and `CUBEJS_PRE_AGGREGATIONS_FIREBOLT_ENGINE_NAME`.
+In the decorated form for a named data source, the `DB_`, `JDBC_`, `AWS_`, `DATABASE`,
+and `FIREBOLT_` variable families are supported.
+
+| Possible Values                                  | Default in Development | Default in Production |
+| ------------------------------------------------ | ---------------------- | --------------------- |
+| Same as the corresponding `CUBEJS_DB_*` variable | Not set                | Not set               |
+
+Setting any one of these variables switches the data source's pre-aggregations onto the
+dedicated connection. Configure it in full: an unset variable falls back to the driver's
+default rather than to its `CUBEJS_DB_*` counterpart. `CUBEJS_PRE_AGGREGATIONS_DB_TYPE` is
+ignored — the dedicated connection always uses the data source's driver. A custom
+[`driver_factory`][ref-config-driver-factory] takes precedence over these variables.
+
+See [pre-aggregation data source][ref-preagg-data-source] for details and examples.
+
 ## `CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH`
 
 If `true`, allows non-strict date range matching for pre-aggregations by default.
@@ -1200,6 +1446,13 @@ for][ref-config-sched-refresh-timer].
 | Possible Values                                           | Default in Development | Default in Production |
 | --------------------------------------------------------- | ---------------------- | --------------------- |
 | [A valid timezone from the tz database][wiki-tz-database] | N/A                    | N/A                   |
+
+<Warning>
+
+An invalid value fails at server startup. Only TZ Database names are accepted — fixed
+UTC offsets such as `+05:00` are rejected.
+
+</Warning>
 
 It can be also set using the [`scheduled_refresh_time_zones` configuration
 option](/reference/configuration/config#scheduled_refresh_time_zones).
@@ -1287,7 +1540,7 @@ option](/reference/configuration/config#can_switch_sql_user).
 ## `CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY`
 
 If `true`, disables the primary key inclusion check for
-[ungrouped queries](/reference/queries#ungrouped-query).
+[ungrouped queries](/reference/core-data-apis/queries#ungrouped-query).
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1314,19 +1567,82 @@ If `true`, enables query pushdown in the [SQL API][ref-sql-api].
 ## `CUBESQL_STREAM_MODE`
 
 If `true`, enables the [streaming mode][ref-sql-api-streaming] in the [SQL API][ref-sql-api].
-When enabled, SQL API queries with an explicit `LIMIT` clause can exceed the
-maximum row limit set by
-[`CUBEJS_DB_QUERY_LIMIT`](#cubejs_db_query_limit).
-Queries without an explicit `LIMIT` still use [`CUBEJS_DB_QUERY_DEFAULT_LIMIT`](#cubejs_db_query_default_limit).
+When enabled, SQL API queries with no `LIMIT` clause, or with one above the maximum row
+limit set by
+[`CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`](#cubesql_non_streaming_query_max_row_limit),
+are streamed instead and aren't capped by it.
+Queries with a `LIMIT` at or below that limit are not streamed.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |
 
+## `CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING`
+
+If `true`, the [SQL API][ref-sql-api] rejects a query when part of it has to run outside
+the data source over a Cube query with no `LIMIT` clause, or with one above the maximum
+row limit set by
+[`CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`](#cubesql_non_streaming_query_max_row_limit).
+
+Such a query is capped at that limit, without any ordering, and a `LIMIT` above it is
+clamped back down to it. Sorting, filtering, or joining that capped result outside the
+data source treats an arbitrary slice of the rows as if it were the whole population, so
+the answer is wrong rather than merely short. The SQL API pushes these queries down to
+the data source whenever it can; this option controls what happens when it cannot. Leave
+it `false` to keep returning the truncated result, or set it to `true` to fail with an
+error instead.
+
+Queries that are streamed (see [`CUBESQL_STREAM_MODE`](#cubesql_stream_mode)) are never
+capped, so this option has no effect on them.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
+## `CUBESQL_CUBE_SCAN_MAX_BATCH_ROWS`
+
+Specifies the maximum number of rows in a single record batch produced when the
+[SQL API][ref-sql-api] reads data from a cube. Larger result sets are split into
+several batches, which lets downstream consumers process them incrementally
+instead of materializing the whole result set at once. In particular, the
+[`/v1/cubesql`][ref-ref-cubesql] endpoint emits one newline-delimited JSON chunk
+per batch.
+
+Set to `0` to disable splitting.
+
+| Possible Values                | Default in Development | Default in Production |
+| ------------------------------ | ---------------------- | --------------------- |
+| A non-negative integer number  | `65536`                | `65536`               |
+
+## `CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`
+
+The maximum [row limit][ref-row-limit] for [SQL API][ref-sql-api] queries that are
+not streamed. A larger `LIMIT` is reduced to this value, unless
+[streaming mode][ref-sql-api-streaming] is enabled, in which case the query is
+streamed instead.
+
+| Possible Values           | Default in Development                            | Default in Production                             |
+| ------------------------- | ------------------------------------------------- | ------------------------------------------------- |
+| A positive integer number | [`CUBEJS_DB_QUERY_LIMIT`](#cubejs_db_query_limit) (`50000`) | [`CUBEJS_DB_QUERY_LIMIT`](#cubejs_db_query_limit) (`50000`) |
+
+Set it below `CUBEJS_DB_QUERY_LIMIT` to let other APIs return large result sets
+while keeping SQL API responses small enough to fit in a single batch, or streamed
+if streaming mode is enabled. Buffering very large non-streamed responses can
+exhaust memory and break the client connection.
+
+<Warning>
+
+This value cannot exceed [`CUBEJS_DB_QUERY_LIMIT`](#cubejs_db_query_limit). If you
+set it higher, Cube logs a warning at startup and falls back to
+`CUBEJS_DB_QUERY_LIMIT`, because non-streamed queries above that limit are rejected
+before they reach the data source.
+
+</Warning>
+
 ## `CUBESQL_SQL_NO_IMPLICIT_ORDER`
 
 If `true`, prevents adding implicit [default `ORDER BY`
-clause](/reference/queries#order) for [SQL API][ref-sql-api] queries.
+clause](/reference/core-data-apis/queries#order) for [SQL API][ref-sql-api] queries.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1387,6 +1703,15 @@ If `true`, the DAX API will expose time dimensions as calendar hierarchies.
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true` | `true` |
+
+## `CUBEJS_DAX_SINGLE_PERSPECTIVE`
+
+If `true`, the DAX API exposes all views as part of a single
+perspective, enabling cross-view filtering.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false` | `false` |
 
 ## `CUBE_XMLA_LANGUAGE`
 
@@ -1489,29 +1814,20 @@ If `true`, then use WebSocket for data fetching.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |
 
-## `CUBEJS_TESSERACT_ORCHESTRATOR`
+## `CUBEJS_TESSERACT_SQL_PLANNER`
 
-If `true`, enables performance optimizations in the query orchestrator,
-such as deserializing Cube Store result sets in native Rust code.
+Enables Tesseract, the [next-generation data modeling engine][link-tesseract],
+which is the default SQL planner and powers
+[multi-stage calculations][ref-multi-stage-calculations]. In versions before v1.7.0,
+Tesseract was not enabled by default. Set to `false` to fall back to the legacy
+planner, which is deprecated and will be removed in the near future.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                 | `true`                |
 
-## `CUBEJS_TESSERACT_SQL_PLANNER`
-
-If `true`, enables Tesseract, the [next-generation data modeling engine][link-tesseract].
-Tesseract powers [multi-stage calculations][ref-multi-stage-calculations].
-
-| Possible Values | Default in Development | Default in Production |
-| --------------- | ---------------------- | --------------------- |
-| `true`, `false` | `false`                 | `false`                |
-
-<Warning>
-
-Tesseract is currently in preview.
-
-</Warning>
+Tesseract-based pre-aggregation matching and planning follows this flag and cannot be
+toggled independently.
 
 ## `CUBESTORE_AWS_ACCESS_KEY_ID`
 
@@ -1538,6 +1854,28 @@ Required when using an AWS instance role.
 | ------------------------- | ---------------------- | --------------------- |
 | A valid number in minutes | `180`                  | `180`                 |
 
+## `CUBESTORE_AWS_WEB_IDENTITY_TOKEN_FILE`
+
+The path to an AWS web identity token file. When `CUBESTORE_AWS_ACCESS_KEY_ID` is
+not set and this variable is present, Cube Store authenticates to S3 using AWS Web
+Identity (for example, [IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
+on Amazon EKS): it exchanges the token for
+temporary credentials via STS `AssumeRoleWithWebIdentity` and re-exchanges them
+when the token file changes.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid file path | N/A                  | N/A                   |
+
+## `CUBESTORE_AWS_ROLE_ARN`
+
+The ARN of the AWS IAM role to assume when using
+[`CUBESTORE_AWS_WEB_IDENTITY_TOKEN_FILE`](#cubestore_aws_web_identity_token_file).
+
+| Possible Values   | Default in Development | Default in Production |
+| ----------------- | ---------------------- | --------------------- |
+| A valid IAM role ARN | N/A                 | N/A                   |
+
 ## `CUBESTORE_BIND_ADDR`
 
 The address/port pair for Cube Store's MySQL-compatible interface.
@@ -1545,6 +1883,18 @@ The address/port pair for Cube Store's MySQL-compatible interface.
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
 | A valid address/port pair | `0.0.0.0:3306`         | `0.0.0.0:3306`        |
+
+## `CUBESTORE_CACHE_MAX_ENTRY_SIZE`
+
+The maximum size of a single entry in Cube Store's
+[cache store](/docs/pre-aggregations/cube-store-architecture#cache-and-queue-store).
+Larger entries are rejected. Cannot exceed
+[`CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE`](#cubestore_transport_max_message_size)
+minus 1 MiB.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A size, e.g. `63MiB` | `63MiB`           | `63MiB`               |
 
 ## `CUBESTORE_DATA_DIR`
 
@@ -1727,6 +2077,17 @@ The timeout for SQL queries in seconds.
 | ------------------- | ---------------------- | --------------------- |
 | A number in seconds | `120`                  | `120`                 |
 
+## `CUBESTORE_QUERY_CACHE_STALE_WHILE_REVALIDATE`
+
+Enables stale-while-revalidate behavior for Cube Store's SQL result cache. When set
+to a number of seconds, a cached result that has expired is still served for up to
+that many seconds while the cache is refreshed in the background. Set to `0` to
+disable.
+
+| Possible Values     | Default in Development | Default in Production |
+| ------------------- | ---------------------- | --------------------- |
+| A number in seconds | `0`                    | `0`                   |
+
 ## `CUBESTORE_REMOTE_DIR`
 
 A path on the local filesystem to store metadata and datasets from all nodes as
@@ -1752,6 +2113,17 @@ The name of a bucket in AWS S3. Required when using AWS S3.
 | Possible Values                        | Default in Development | Default in Production |
 | -------------------------------------- | ---------------------- | --------------------- |
 | [A valid AWS region][aws-docs-regions] | N/A                    | N/A                   |
+
+## `CUBESTORE_S3_SSE`
+
+When set, Cube Store sends the `x-amz-server-side-encryption` header with this
+value on every AWS S3 request. Optional. Useful when an AWS Organizations
+service control policy denies `s3:PutObject` requests that lack this header,
+even if the bucket has default encryption enabled.
+
+| Possible Values                   | Default in Development | Default in Production |
+| --------------------------------- | ---------------------- | --------------------- |
+| `AES256`, `aws:kms`, `aws:kms:dsse` | N/A                    | N/A                   |
 
 ## `CUBESTORE_S3_SUB_PATH`
 
@@ -1788,6 +2160,26 @@ If `true`, then sends telemetry to Cube.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                 | `true`                |
 
+## `CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE`
+
+The maximum size of a single message on the WebSocket connection between Cube
+and Cube Store. Messages above this size are answered with an error; see
+[message size limits](/docs/pre-aggregations/cube-store-architecture#message-size-limits).
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A size from `16MiB` to `256MiB` | `64MiB` | `64MiB`     |
+
+## `CUBESTORE_TRANSPORT_MAX_FRAME_SIZE`
+
+The maximum size of a single WebSocket frame on the connection between Cube
+and Cube Store. A message is split into frames, so this can be smaller than
+[`CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE`](#cubestore_transport_max_message_size).
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A size from `4MiB` to `256MiB` | `64MiB`  | `64MiB`              |
+
 ## `CUBESTORE_WAL_SPLIT_THRESHOLD`
 
 The maximum number of rows to keep in a single chunk of data right after
@@ -1796,6 +2188,27 @@ insertion.
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | A valid number  | `262144`               | `262144`              |
+
+## `CUBESTORE_CHUNKS_COUNT_THRESHOLD`
+
+The number of chunks a partition can accumulate before Cube Store compacts them into
+a single chunk.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `4`                    | `4`                   |
+
+## `CUBESTORE_COMPACTION_READINESS_CHUNKS_THRESHOLD`
+
+The number of chunks at which a table's partitions are considered ready during table
+creation. When set, it must not be lower than
+[`CUBESTORE_CHUNKS_COUNT_THRESHOLD`](#cubestore_chunks_count_threshold), otherwise
+compaction would never reduce the number of chunks below this threshold. By default,
+it is not set.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | N/A                    | N/A                   |
 
 ## `CUBESTORE_WORKER_PORT`
 
@@ -1859,8 +2272,6 @@ The port for a Cube deployment to listen to API connections on.
   https://docs.databricks.com/data/databricks-file-system.html#mount-object-storage-to-dbfs
 [databricks-docs-pat]:
   https://docs.databricks.com/dev-tools/api/latest/authentication.html#token-management
-[elastic-docs-api-keys]:
-  https://www.elastic.co/guide/en/kibana/master/api-keys.html#create-api-key
 [firebolt-docs-account-name]:
   https://docs.firebolt.io/managing-your-account/concepts-and-terminology.html#firebolt-account
 [firebolt-docs-engine-name]:
@@ -1878,9 +2289,12 @@ The port for a Cube deployment to listen to API connections on.
 [motherduck-docs-svc-token]:
   https://motherduck.com/docs/authenticating-to-motherduck/#authentication-using-a-service-token
 [ref-config-db]: /admin/connect-to-data/data-sources
-[ref-config-multiple-ds-decorating-env]: /admin/connect-to-data/advanced/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
+[ref-config-driver-factory]: /reference/configuration/config#driver_factory
+[ref-config-multiple-ds-cloud]: /admin/connect-to-data/multiple-data-sources
+[ref-config-multiple-ds-decorating-env]: /admin/connect-to-data/multiple-data-sources#under-the-hood
+[ref-preagg-data-source]: /docs/pre-aggregations/refreshing-pre-aggregations#pre-aggregation-data-source
 [ref-config-sched-refresh-timer]: /reference/configuration/config#scheduled_refresh_timer
-[ref-rest-scopes]: /reference/rest-api#configuration-api-scopes
+[ref-rest-scopes]: /reference/core-data-apis/rest-api#configuration-api-scopes
 [snowflake-docs-account-id]:
   https://docs.snowflake.com/en/user-guide/admin-account-identifier.html
 [snowflake-docs-connection-options]:
@@ -1892,9 +2306,10 @@ The port for a Cube deployment to listen to API connections on.
 [snowflake-docs-warehouse]:
   https://docs.snowflake.com/en/user-guide/warehouses.html
 [wiki-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-[ref-sql-api]: /reference/sql-api
-[ref-sql-api-streaming]: /reference/sql-api#streaming
-[ref-row-limit]: /reference/queries#row-limit
+[ref-sql-api]: /reference/core-data-apis/sql-api
+[ref-sql-api-streaming]: /reference/core-data-apis/sql-api#streaming
+[ref-ref-cubesql]: /reference/core-data-apis/rest-api/reference#base_path/v1/cubesql
+[ref-row-limit]: /reference/core-data-apis/queries#row-limit
 [mysql-server-tz-support]: https://dev.mysql.com/doc/refman/8.4/en/time-zone-support.html
 [ref-schema-ref-preagg-allownonstrict]: /reference/data-modeling/pre-aggregations#allow_non_strict_date_range_match
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
@@ -1904,8 +2319,9 @@ The port for a Cube deployment to listen to API connections on.
 [ref-context-to-app-id]: /reference/configuration/config#context_to_app_id
 [ref-environments]: /admin/deployment/environments
 [ref-databricks-m2m-oauth]: https://docs.databricks.com/aws/en/dev-tools/auth/oauth-m2m
-[ref-mdx-api]: /reference/mdx-api
-[ref-mdx-api-locale]: /reference/mdx-api#measure-format
+[ref-mdx-api]: /reference/core-data-apis/mdx-api
+[ref-mdx-api-locale]: /reference/core-data-apis/mdx-api#measure-format
 [ref-time-dimensions]: /reference/data-modeling/dimensions#type
-[ref-time-zone]: /reference/queries#time-zone
+[ref-time-zone]: /reference/core-data-apis/queries#time-zone
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
+[nodejs-docs-tls-options]: https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options

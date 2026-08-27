@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/core",
-  "version": "1.6.46",
+  "version": "1.7.28",
   "engines": {},
   "type": "module",
   "repository": {
@@ -40,7 +40,7 @@
     "dayjs": "^1.10.4",
     "ramda": "^0.27.2",
     "url-search-params-polyfill": "^7.0.0",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.1"
   },
   "scripts": {
     "build:client-core": "rm -rf dist && npm run tsc",
@@ -53,11 +53,12 @@
     "lint:fix": "eslint --fix src/* test/ --ext .ts,js"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/tsconfig.tsbuildinfo"
   ],
   "license": "MIT",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.6.46",
+    "@cubejs-backend/linter": "1.7.28",
     "@types/d3-format": "^3",
     "@types/d3-time-format": "^4",
     "@types/moment-range": "^4.0.0",

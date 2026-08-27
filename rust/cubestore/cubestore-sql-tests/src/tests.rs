@@ -2,6 +2,7 @@ use crate::files::write_tmp_file;
 use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
+use cubestore::cachestore::QUEUE_ITEM_EXTERNAL_ID_MAX_LEN;
 use cubestore::metastore::{Column, ColumnType};
 use cubestore::queryplanner::physical_plan_flags::PhysicalPlanFlags;
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
@@ -36,6 +37,10 @@ pub type TestFn = Box<
 pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
     let test_list = vec![
         t("insert", insert),
+        t(
+            "repartition_multi_node_consistency",
+            repartition_multi_node_consistency,
+        ),
         t("select_test", select_test),
         t("refresh_selects", refresh_selects),
         t("negative_numbers", negative_numbers),
@@ -50,6 +55,7 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("float_merge", float_merge),
         t("join", join),
         t("filtered_join", filtered_join),
+        t("cross_join_empty_sort_on", cross_join_empty_sort_on),
         t("three_tables_join", three_tables_join),
         t(
             "three_tables_join_with_filter",
@@ -150,6 +156,8 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("planning_inplace_aggregate", planning_inplace_aggregate),
         t("planning_hints", planning_hints),
         t("planning_inplace_aggregate2", planning_inplace_aggregate2),
+        t("planning_topk_hash_aggregate", planning_topk_hash_aggregate),
+        t("topk_hash_aggregate_trim", topk_hash_aggregate_trim),
         t("topk_large_inputs", topk_large_inputs),
         t("partitioned_index", partitioned_index),
         t(
@@ -206,6 +214,15 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         ),
         t("rolling_window_offsets", rolling_window_offsets),
         t("rolling_window_filtered", rolling_window_filtered),
+        t("rolling_window_no_aggregates", rolling_window_no_aggregates),
+        t(
+            "rolling_window_unused_partition_by",
+            rolling_window_unused_partition_by,
+        ),
+        t(
+            "rolling_window_two_aggregates",
+            rolling_window_two_aggregates,
+        ),
         t("decimal_index", decimal_index),
         t("decimal_order", decimal_order),
         t("float_index", float_index),
@@ -233,6 +250,28 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             "unique_key_and_multi_partitions_hash_aggregate",
             unique_key_and_multi_partitions_hash_aggregate,
         ),
+        t("filter_pushdown_unique_key", filter_pushdown_unique_key),
+        t(
+            "group_by_prefix_sorted_aggregate_multi_partition",
+            group_by_prefix_sorted_aggregate_multi_partition,
+        ),
+        t(
+            "group_by_prefix_limit_high_cardinality",
+            group_by_prefix_limit_high_cardinality,
+        ),
+        t(
+            "planning_aggregate_below_merge_with_limit",
+            planning_aggregate_below_merge_with_limit,
+        ),
+        t(
+            "global_aggregate_no_chunk_merge",
+            global_aggregate_no_chunk_merge,
+        ),
+        t(
+            "global_aggregate_unique_key_keeps_merge",
+            global_aggregate_unique_key_keeps_merge,
+        ),
+        t("prefilter_chunks_shared_scan", prefilter_chunks_shared_scan),
         t("divide_by_zero", divide_by_zero),
         t(
             "filter_multiple_in_for_decimal",
@@ -255,6 +294,11 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             aggregate_index_with_hll_bytes,
         ),
         t("aggregate_index_errors", aggregate_index_errors),
+        t("aggregate_index_decimal", aggregate_index_decimal),
+        t(
+            "aggregate_index_decimal_overflow",
+            aggregate_index_decimal_overflow,
+        ),
         t("inline_tables", inline_tables),
         t("inline_tables_2x", inline_tables_2x),
         t("build_range_end", build_range_end),
@@ -271,8 +315,17 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             "queue_full_workflow_v2_with_external_id",
             queue_full_workflow_v2_with_external_id,
         ),
+        t(
+            "queue_add_external_id_max_len",
+            queue_add_external_id_max_len,
+        ),
         t("queue_latest_result_v1", queue_latest_result_v1),
         t("queue_retrieve_extended", queue_retrieve_extended),
+        t("queue_add_and_retrieve", queue_add_and_retrieve),
+        t(
+            "queue_add_and_retrieve_backlog",
+            queue_add_and_retrieve_backlog,
+        ),
         t("queue_ack_then_result_v1", queue_ack_then_result_v1),
         t("queue_ack_then_result_v2", queue_ack_then_result_v2),
         t(
@@ -298,6 +351,19 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             queue_result_ack_multiple_with_external_id,
         ),
         t("limit_pushdown_group", limit_pushdown_group),
+        t("limit_pushdown_group_having", limit_pushdown_group_having),
+        t(
+            "limit_pushdown_group_nonprefix_order",
+            limit_pushdown_group_nonprefix_order,
+        ),
+        t(
+            "limit_pushdown_group_null_appended",
+            limit_pushdown_group_null_appended,
+        ),
+        t(
+            "limit_pushdown_group_null_order_first",
+            limit_pushdown_group_null_order_first,
+        ),
         t("limit_pushdown_group_order", limit_pushdown_group_order),
         t(
             "limit_pushdown_group_where_order",
@@ -344,6 +410,9 @@ lazy_static::lazy_static! {
     static ref MIGRATION_TEST_EXCLUSION_SET: HashSet<String> = [
         // Tests that would fail and are useless as a migration test.
         "aggregate_index_errors",
+        // Old versions panic building an aggregating index over a decimal measure.
+        "aggregate_index_decimal",
+        "aggregate_index_decimal_overflow",
         "create_table_with_location_invalid_digit",
         "create_table_with_url",
         "hyperloglog_inserts",
@@ -384,6 +453,22 @@ lazy_static::lazy_static! {
         "create_table_with_csv_no_header",
         "create_table_with_csv_no_header_and_delimiter",
         "create_table_with_csv_no_header_and_quotes",
+        "filter_pushdown_unique_key",
+        "group_by_prefix_sorted_aggregate_multi_partition",
+        "group_by_prefix_limit_high_cardinality",
+        "planning_aggregate_below_merge_with_limit",
+        "global_aggregate_no_chunk_merge",
+        "global_aggregate_unique_key_keeps_merge",
+        "limit_pushdown_group_having",
+        "limit_pushdown_group_nonprefix_order",
+        "limit_pushdown_group_null_appended",
+        "limit_pushdown_group_null_order_first",
+        "prefilter_chunks_shared_scan",
+        "planning_topk_hash_aggregate",
+        "topk_hash_aggregate_trim",
+        "queue_add_and_retrieve",
+        "queue_add_and_retrieve_backlog",
+        "queue_add_external_id_max_len",
     ].into_iter().map(ToOwned::to_owned).collect();
 }
 
@@ -830,6 +915,48 @@ async fn join(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
         )
         .await?;
     assert_eq!(to_rows(&result), rows(&[("a", "a"), ("b", "b")]));
+    Ok(())
+}
+
+/// Reproduces CORE-593: a rolling-window pre-aggregation generates a cross/range join (empty
+/// equi-join `on`) over a rollup table plus GROUP BY + ORDER BY. The empty `on` propagates as an
+/// empty `sort_on` to the index scan, which builds a SortPreservingMergeExec with no sort
+/// expressions. With DataFusion 46 such a merge errors at execution ("Sort expressions cannot be
+/// empty for streaming merge") -- but only when the worker has more than one partition to merge,
+/// so the table must hold several chunks.
+async fn cross_join_empty_sort_on(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    let _ = service.exec_query("CREATE SCHEMA foo").await?;
+    let _ = service
+        .exec_query("CREATE TABLE foo.t (source text, n int)")
+        .await?;
+
+    // Separate inserts produce separate chunks, so the index scan merges more than one partition.
+    service
+        .exec_query("INSERT INTO foo.t (source, n) VALUES ('a', 1), ('b', 2)")
+        .await?;
+    service
+        .exec_query("INSERT INTO foo.t (source, n) VALUES ('a', 3)")
+        .await?;
+    service
+        .exec_query("INSERT INTO foo.t (source, n) VALUES ('c', 4)")
+        .await?;
+
+    let result = service
+        .exec_query(
+            "SELECT q.source, sum(q.n) FROM foo.t q \
+             CROSS JOIN (SELECT 1 AS x UNION ALL SELECT 2 AS x) series \
+             GROUP BY q.source ORDER BY q.source",
+        )
+        .await?;
+
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("a".to_string()), TableValue::Int(8)],
+            vec![TableValue::String("b".to_string()), TableValue::Int(4)],
+            vec![TableValue::String("c".to_string()), TableValue::Int(8)],
+        ]
+    );
     Ok(())
 }
 
@@ -3160,6 +3287,195 @@ async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) -> Result<(), C
     Ok(())
 }
 
+async fn planning_topk_hash_aggregate(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Data(url text, day int, hits int)")
+        .await?;
+    service
+        .exec_query("CREATE TABLE s.D3(a int, b int, c int, h int)")
+        .await?;
+
+    // GROUP BY a non-indexed column -> hash (Linear) partial aggregate; ORDER BY the group
+    // column with a LIMIT -> the worker partial aggregate is replaced by GroupByLimitAggregate.
+    let p = service
+        .plan_query("SELECT day, SUM(hits) FROM s.Data GROUP BY 1 ORDER BY 1 LIMIT 10")
+        .await?;
+    let pp = pp_phys_plan_ext(p.worker.as_ref(), &PPOptions::none());
+    assert!(
+        pp.contains("GroupByLimitAggregate, k: 10, factor: 2,"),
+        "expected GroupByLimitAggregate on the worker, got:\n{}",
+        pp
+    );
+
+    // LIMIT + OFFSET -> k = limit + offset.
+    let p = service
+        .plan_query("SELECT day, SUM(hits) FROM s.Data GROUP BY 1 ORDER BY 1 LIMIT 10 OFFSET 5")
+        .await?;
+    let pp = pp_phys_plan_ext(p.worker.as_ref(), &PPOptions::none());
+    assert!(
+        pp.contains("GroupByLimitAggregate, k: 15, factor: 2,"),
+        "expected k=15 (limit+offset), got:\n{}",
+        pp
+    );
+
+    // ORDER BY an aggregate (not a group-by column) -> no trim.
+    let p = service
+        .plan_query("SELECT day, SUM(hits) FROM s.Data GROUP BY 1 ORDER BY 2 DESC LIMIT 10")
+        .await?;
+    let pp = pp_phys_plan_ext(p.worker.as_ref(), &PPOptions::none());
+    assert!(
+        !pp.contains("GroupByLimitAggregate"),
+        "did not expect GroupByLimitAggregate when ordering by an aggregate, got:\n{}",
+        pp
+    );
+
+    // No LIMIT -> no trim.
+    let p = service
+        .plan_query("SELECT day, SUM(hits) FROM s.Data GROUP BY 1 ORDER BY 1")
+        .await?;
+    let pp = pp_phys_plan_ext(p.worker.as_ref(), &PPOptions::none());
+    assert!(
+        !pp.contains("GroupByLimitAggregate"),
+        "did not expect GroupByLimitAggregate without a limit, got:\n{}",
+        pp
+    );
+
+    // ORDER BY a proper SUBSET of GROUP BY (b out of b, c). The worker cut and the router sort must
+    // both use the total order T = [b, c]: the worker trim order carries the tie-break column c, and
+    // the router's global Sort is extended with c so its top-k matches the global top-k by T.
+    let p = service
+        .plan_query("SELECT b, c, SUM(h) FROM s.D3 GROUP BY 1, 2 ORDER BY 1 LIMIT 3")
+        .await?;
+    let worker_pp = pp_phys_plan_ext(p.worker.as_ref(), &PPOptions::none());
+    assert!(
+        worker_pp.contains("GroupByLimitAggregate, k: 3, factor: 2,")
+            && worker_pp.contains("(0, SortOptions { descending: false, nulls_first: false })")
+            && worker_pp.contains("(1, SortOptions { descending: false, nulls_first: true })"),
+        "expected worker trim order [b, c] totalized, got:\n{}",
+        worker_pp
+    );
+    let router_pp = pp_phys_plan_ext(
+        p.router.as_ref(),
+        &PPOptions {
+            show_sort_by: true,
+            ..PPOptions::none()
+        },
+    );
+    assert!(
+        router_pp.contains("b@0") && router_pp.contains("c@1"),
+        "expected router Sort extended with the tie-break column c, got:\n{}",
+        router_pp
+    );
+
+    // Bare LIMIT (no ORDER BY) on a non-indexed group column: the limit can't ride the index, so the
+    // worker still trims to the smallest groups by the full group key -- "any k" made deterministic.
+    // The full group key is the total order, all columns ascending nulls-first.
+    let p = service
+        .plan_query("SELECT day, SUM(hits) FROM s.Data GROUP BY 1 LIMIT 10")
+        .await?;
+    let pp = pp_phys_plan_ext(p.worker.as_ref(), &PPOptions::none());
+    assert!(
+        pp.contains("GroupByLimitAggregate, k: 10, factor: 2,")
+            && pp.contains("(0, SortOptions { descending: false, nulls_first: true })"),
+        "expected GroupByLimitAggregate on a bare LIMIT, got:\n{}",
+        pp
+    );
+
+    // UNION ALL + bare LIMIT: the per-branch trim descriptor must survive the cluster-send pull-up
+    // over the union so the worker still trims above the union.
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, day int, hits int)")
+        .await?;
+    let p = service
+        .plan_query(
+            "SELECT day, SUM(hits) FROM \
+             (SELECT * FROM s.Data UNION ALL SELECT * FROM s.Data2) u GROUP BY 1 LIMIT 10",
+        )
+        .await?;
+    let pp = pp_phys_plan_ext(p.worker.as_ref(), &PPOptions::none());
+    assert!(
+        pp.contains("GroupByLimitAggregate, k: 10, factor: 2,") && pp.contains("Union"),
+        "expected GroupByLimitAggregate over the Union, got:\n{}",
+        pp
+    );
+
+    Ok(())
+}
+
+async fn topk_hash_aggregate_trim(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Data(a int, b int, hits int)")
+        .await?;
+    // 12 distinct (a, b) groups, each with two rows so partial aggregation actually groups.
+    // With k=3 and factor=2 the trim activates (g=12 > 6) but the result must match a full
+    // top-k. ORDER BY a (a proper subset of GROUP BY a, b) exercises totalization: the worker
+    // breaks ties on a by b so the router still receives every needed partial state.
+    service
+        .exec_query(
+            "INSERT INTO s.Data(a, b, hits) VALUES \
+             (1,1,10),(1,1,5),(1,2,1),(1,2,2),\
+             (2,1,7),(2,1,3),(2,2,4),(2,2,6),\
+             (3,1,8),(3,1,2),(3,2,9),(3,2,1),\
+             (4,1,1),(4,1,1),(4,2,1),(4,2,1),\
+             (5,1,1),(5,1,1),(5,2,1),(5,2,1),\
+             (6,1,1),(6,1,1),(6,2,1),(6,2,1)",
+        )
+        .await?;
+
+    // ORDER BY a, b LIMIT 3 (ascending): smallest three groups by (a, b).
+    let r = service
+        .exec_query("SELECT a, b, SUM(hits) FROM s.Data GROUP BY 1, 2 ORDER BY 1, 2 LIMIT 3")
+        .await?;
+    assert_eq!(to_rows(&r), rows(&[(1, 1, 15), (1, 2, 3), (2, 1, 10)]));
+
+    // ORDER BY a, b DESC LIMIT 3: largest three groups by (a, b).
+    let r = service
+        .exec_query(
+            "SELECT a, b, SUM(hits) FROM s.Data GROUP BY 1, 2 ORDER BY 1 DESC, 2 DESC LIMIT 3",
+        )
+        .await?;
+    assert_eq!(to_rows(&r), rows(&[(6, 2, 2), (6, 1, 2), (5, 2, 2)]));
+
+    // ORDER BY a only (a proper subset of GROUP BY a, b), LIMIT 2. The selected group SET is
+    // deterministic (both groups of a=1), but the intra-tie row order is not, so assert as a set.
+    // Each returned group must carry its complete sum regardless of cross-worker tie-breaking,
+    // which is what totalization (append b to the cut order) guarantees.
+    let r = service
+        .exec_query("SELECT a, b, SUM(hits) FROM s.Data GROUP BY 1, 2 ORDER BY 1 LIMIT 2")
+        .await?;
+    let got = to_rows(&r);
+    assert_eq!(got.len(), 2, "expected 2 rows, got: {:?}", got);
+    for expected in rows(&[(1, 1, 15), (1, 2, 3)]) {
+        assert!(
+            got.contains(&expected),
+            "missing {:?} in {:?}",
+            expected,
+            got
+        );
+    }
+
+    // Bare LIMIT 3 (no ORDER BY): the trim orders by the full group key, so "any 3" resolves to the
+    // 3 smallest by (a, b). The result order is unspecified, but the group SET and each group's full
+    // sum must be exact -- the latter guards against undercounting a group split across workers.
+    let r = service
+        .exec_query("SELECT a, b, SUM(hits) FROM s.Data GROUP BY 1, 2 LIMIT 3")
+        .await?;
+    let got = to_rows(&r);
+    assert_eq!(got.len(), 3, "expected 3 rows, got: {:?}", got);
+    for expected in rows(&[(1, 1, 15), (1, 2, 3), (2, 1, 10)]) {
+        assert!(
+            got.contains(&expected),
+            "missing {:?} in {:?}",
+            expected,
+            got
+        );
+    }
+
+    Ok(())
+}
+
 async fn planning_hints(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     service.exec_query("CREATE SCHEMA s").await?;
     service
@@ -3628,8 +3944,8 @@ async fn planning_simple(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
         pp_phys_plan(p.worker.as_ref()),
         "InlineFinalAggregate\
         \n  Worker\
-        \n    InlinePartialAggregate\
-        \n      MergeSort\
+        \n    MergeSort\
+        \n      InlinePartialAggregate\
         \n        Union\
         \n          Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
         \n            Sort\
@@ -5417,6 +5733,263 @@ LIMIT
     //     .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data ROLLING_WINDOW DIMENSION day FROM 10 to 0 EVERY 10")
     //     .await
     //     .unwrap_err();
+    Ok(())
+}
+
+async fn rolling_window_no_aggregates(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Data(day int, name text, n int)")
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.Data(day, name, n) VALUES (1, 'john', 10), \
+                                                     (1, 'sara', 7), \
+                                                     (3, 'sara', 3), \
+                                                     (3, 'john', 9), \
+                                                     (3, 'john', 11), \
+                                                     (5, 'timmy', 5)",
+        )
+        .await?;
+
+    // Regression test for the rolling optimizer (commit 9481045): a grouped
+    // aggregate with no aggregate expressions — a `SELECT DISTINCT dim` key
+    // generator over the time series, as emitted for a multi-rolling-measure
+    // query — used to be rewritten into a RollingWindowAggregate with an empty
+    // `rolling_aggs` list, which panicked in the executor. It must instead run as
+    // a plain aggregate/range-join and return the series dimension keys.
+    let r = service
+        .exec_query(
+            r#"SELECT
+  q_0.`orders__created_at_day`
+FROM
+  (
+    SELECT
+      `orders.created_at_series`.`date_from` `orders__created_at_day`
+    FROM
+      (
+        SELECT
+          date_from as `date_from`,
+          date_from + 1 AS `date_to`
+        FROM (
+            select unnest(generate_series(1, 5, 1))
+        ) AS series(date_from)
+      ) AS `orders.created_at_series`
+      LEFT JOIN (
+        SELECT
+            day `orders__created_at_day`,
+            SUM(n) `orders__rolling_number`
+            FROM s.Data GROUP BY 1
+      ) AS `orders_rolling_number_cumulative__base` ON `orders_rolling_number_cumulative__base`.`orders__created_at_day` > `orders.created_at_series`.`date_to` - 1
+      AND `orders_rolling_number_cumulative__base`.`orders__created_at_day` <= `orders.created_at_series`.`date_to`
+    GROUP BY
+      1
+  ) as q_0
+ORDER BY
+  1 ASC
+LIMIT
+  5000"#,
+        )
+        .await?;
+    assert_eq!(to_rows(&r), rows(&[1i64, 2, 3, 4, 5]));
+    Ok(())
+}
+
+async fn plan_strings(service: &Box<dyn SqlClient>, query: &str) -> Result<String, CubeError> {
+    let res = service
+        .exec_query(&format!("EXPLAIN ANALYZE {}", query))
+        .await?;
+    Ok(res
+        .get_rows()
+        .iter()
+        .flat_map(|r| r.values().iter())
+        .filter_map(|v| match v {
+            TableValue::String(s) => Some(s.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("\n"))
+}
+
+/// Result assertions alone cannot tell an optimized plan from the fallback it degrades to, so
+/// shapes whose whole point is whether a rewrite fires need to say so about the plan itself.
+async fn assert_plan_contains(
+    service: &Box<dyn SqlClient>,
+    query: &str,
+    expected: &str,
+) -> Result<(), CubeError> {
+    let plan = plan_strings(service, query).await?;
+    if !plan.contains(expected) {
+        return Err(CubeError::internal(format!(
+            "`{}` not found in the plan for {}:\n{}",
+            expected, query, plan
+        )));
+    }
+    Ok(())
+}
+
+async fn assert_plan_omits(
+    service: &Box<dyn SqlClient>,
+    query: &str,
+    unexpected: &str,
+) -> Result<(), CubeError> {
+    let plan = plan_strings(service, query).await?;
+    if plan.contains(unexpected) {
+        return Err(CubeError::internal(format!(
+            "`{}` unexpectedly present in the plan for {}:\n{}",
+            unexpected, query, plan
+        )));
+    }
+    Ok(())
+}
+
+async fn rolling_window_unused_partition_by(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Data(day int, name text, n int)")
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.Data(day, name, n) VALUES (1, 'john', 10), \
+                                                     (1, 'sara', 7), \
+                                                     (3, 'sara', 3), \
+                                                     (3, 'john', 9), \
+                                                     (3, 'john', 11), \
+                                                     (5, 'timmy', 5)",
+        )
+        .await?;
+
+    // A rolling window over a series of 7 points, grouped by a partition-by column. Bucket `d`
+    // covers days `d - 1` and `d`, so day 7 has no rows at all and every partition key there is
+    // null. `partition_expr` is how the source produces that column, `inner_partition` is how the
+    // projection above the aggregate exposes it (empty when it only groups by it), and `outer` is
+    // what the consumer selects.
+    let query = |partition_expr: &str, inner_partition: &str, outer: &str| {
+        format!(
+            "SELECT {outer} FROM (
+  SELECT `s0`.`date_from` `day`, {inner_partition} sum(`b`.`num`) `num`
+  FROM (SELECT date_from `date_from`, date_from + 1 `date_to`
+        FROM (select unnest(generate_series(1, 7, 1))) AS series(date_from)) `s0`
+  LEFT JOIN (SELECT day `d`, {partition_expr} `win`, SUM(n) `num` FROM s.Data GROUP BY 1, 2) `b`
+    ON `b`.`d` > `s0`.`date_to` - 1 AND `b`.`d` <= `s0`.`date_to`
+  GROUP BY 1, `b`.`win`) `q`
+ORDER BY 1 ASC, 2 ASC"
+        )
+    };
+
+    // The rolling window always emits dimension + partition_by + rolling aggregates, so a GROUP BY
+    // column the projection it replaces did not select reappears in its output. The rewrite must
+    // not widen the schema of the node it replaces, or every ancestor keeps resolving its columns
+    // against the old one and planning fails with `No field named ...`.
+    let without_partition = rows(&[
+        (1i64, Some(17i64)),
+        (2, Some(17)),
+        (3, Some(23)),
+        (4, Some(23)),
+        (5, Some(5)),
+        (6, Some(5)),
+        (7, None),
+    ]);
+
+    // A calc-group style constant: the source column is not nullable, but the empty bucket at day 7
+    // still has to report a null key for it. The rewrite has to restore the projection's output on
+    // top of the rolling node here, since `win` is grouped by but not selected.
+    let pruned = query("'R12'", "`b`.`win` `win`,", "`q`.`day`, `q`.`num`");
+    assert_plan_contains(&service, &pruned, "RollingWindowAgg").await?;
+    let r = service.exec_query(&pruned).await?;
+    assert_eq!(to_rows(&r), without_partition);
+
+    // Same, but the projection omits the partition-by column outright instead of leaving it to
+    // projection pruning.
+    let r = service
+        .exec_query(&query("'R12'", "", "`q`.`day`, `q`.`num`"))
+        .await?;
+    assert_eq!(to_rows(&r), without_partition);
+
+    // Several partitions, all of them asked for: the rewrite outputs exactly what the projection
+    // did, so nothing has to be restored on top of it.
+    let selected = query(
+        "name",
+        "`b`.`win` `win`,",
+        "`q`.`day`, `q`.`win`, `q`.`num`",
+    );
+    assert_plan_contains(&service, &selected, "RollingWindowAgg").await?;
+    let r = service.exec_query(&selected).await?;
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1i64, Some("john"), Some(10i64)),
+            (1, Some("sara"), Some(7)),
+            (2, Some("john"), Some(10)),
+            (2, Some("sara"), Some(7)),
+            (3, Some("john"), Some(20)),
+            (3, Some("sara"), Some(3)),
+            (4, Some("john"), Some(20)),
+            (4, Some("sara"), Some(3)),
+            (5, Some("timmy"), Some(5)),
+            (6, Some("timmy"), Some(5)),
+            (7, None, None),
+        ])
+    );
+
+    // Several partitions, none of them asked for: the per-partition rows survive, which pins that
+    // the restored projection picks the aggregate and not one of the partition keys.
+    let r = service
+        .exec_query(&query("name", "", "`q`.`day`, `q`.`num`"))
+        .await?;
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1i64, Some(7i64)),
+            (1, Some(10)),
+            (2, Some(7)),
+            (2, Some(10)),
+            (3, Some(3)),
+            (3, Some(20)),
+            (4, Some(3)),
+            (4, Some(20)),
+            (5, Some(5)),
+            (6, Some(5)),
+            (7, None),
+        ])
+    );
+
+    Ok(())
+}
+
+async fn rolling_window_two_aggregates(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Data(day int, n int, m int)")
+        .await?;
+    service
+        .exec_query("INSERT INTO s.Data(day, n, m) VALUES (1, 10, 100), (3, 3, 300), (5, 5, 500)")
+        .await?;
+
+    // The rolling executor advances one group counter across all of its aggregates while each of
+    // them accumulates into its own group space, so with two of them every aggregate past the
+    // first reads slots the others left empty and answers null. Until that is fixed the rewrite
+    // declines, and the query runs as a plain aggregate over the range join.
+    let query = "SELECT `q`.`day`, `q`.`sn`, `q`.`sm` FROM (
+  SELECT `s0`.`date_from` `day`, sum(`b`.`n`) `sn`, sum(`b`.`m`) `sm`
+  FROM (SELECT date_from `date_from`, date_from + 1 `date_to`
+        FROM (select unnest(generate_series(1, 5, 1))) AS series(date_from)) `s0`
+  LEFT JOIN (SELECT day `d`, n `n`, m `m` FROM s.Data) `b`
+    ON `b`.`d` > `s0`.`date_to` - 1 AND `b`.`d` <= `s0`.`date_to`
+  GROUP BY 1) `q`
+ORDER BY 1 ASC";
+    assert_plan_omits(&service, query, "RollingWindowAgg").await?;
+    let r = service.exec_query(query).await?;
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1i64, None, None),
+            (2, Some(3i64), Some(300i64)),
+            (3, None, None),
+            (4, Some(5), Some(500)),
+            (5, None, None),
+        ])
+    );
     Ok(())
 }
 
@@ -7238,9 +7811,9 @@ async fn unique_key_and_multi_partitions(service: Box<dyn SqlClient>) -> Result<
             \n  InlineFinalAggregate, partitions: 1\
             \n    MergeSort, partitions: 1\
             \n      Worker, partitions: 2\
-            \n        GlobalLimit, n: 100, partitions: 1\
-            \n          InlinePartialAggregate, partitions: 1\
-            \n            MergeSort, partitions: 1\
+            \n        MergeSort, partitions: 1\
+            \n          LocalLimit, n: 100, partitions: 2\
+            \n            InlinePartialAggregate, limit: 100, partitions: 2\
             \n              Union, partitions: 2\
             \n                Projection, [a, b], partitions: 1\
             \n                  LastRowByUniqueKey, partitions: 1\
@@ -7311,6 +7884,539 @@ async fn unique_key_and_multi_partitions_hash_aggregate(
         )
         .await?;
     assert_eq!(to_rows(&r), rows(&[(1, 190), (2, 240)]));
+    Ok(())
+}
+
+/// Filters referencing only unique key columns commute with the last-row deduplication
+/// and get pushed below it: onto every scan stream and into the parquet pruning
+/// predicate. Filters on non-key columns must stay above the dedup and out of pruning:
+/// they apply to the last version of a row, acting on individual versions below the
+/// dedup would resurrect overwritten ones.
+async fn filter_pushdown_unique_key(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Versions (a int, b int, val int) unique key (a, b)")
+        .await?;
+
+    service
+        .exec_query(
+            "INSERT INTO s.Versions (a, b, val, __seq) VALUES (1, 1, 10, 1), (2, 2, 20, 2), (3, 3, 5, 3)",
+        )
+        .await?;
+    // Newer versions of (1, 1) and (3, 3) in another chunk
+    service
+        .exec_query("INSERT INTO s.Versions (a, b, val, __seq) VALUES (1, 1, 30, 4), (3, 3, 50, 5)")
+        .await?;
+
+    // A key filter selects whole version groups: only the last version of (1, 1) counts.
+    let query = "SELECT sum(val) FROM s.Versions WHERE a = 1";
+    let r = service.exec_query(query).await?;
+    assert_eq!(to_rows(&r), rows(&[(30)]));
+
+    let p = service.plan_query(query).await?;
+    let worker_plan = pp_phys_plan_ext(
+        p.worker.as_ref(),
+        &PPOptions {
+            show_filters: true,
+            ..PPOptions::none()
+        },
+    );
+    assert!(
+        filters_below_scan(&worker_plan) > 0,
+        "the unique key filter must be pushed below the dedup onto scan streams:\n{}",
+        worker_plan
+    );
+    assert!(
+        scan_line(&worker_plan).contains("predicate:"),
+        "the unique key filter must reach the parquet pruning predicate:\n{}",
+        worker_plan
+    );
+
+    // A non-key filter: the overwritten versions (1, 1, 10) and (3, 3, 5) match val < 25
+    // while their last versions don't. They must not be resurrected.
+    let query = "SELECT sum(val) FROM s.Versions WHERE val < 25";
+    let r = service.exec_query(query).await?;
+    assert_eq!(to_rows(&r), rows(&[(20)]));
+
+    let p = service.plan_query(query).await?;
+    let worker_plan = pp_phys_plan_ext(
+        p.worker.as_ref(),
+        &PPOptions {
+            show_filters: true,
+            ..PPOptions::none()
+        },
+    );
+    assert_eq!(
+        filters_below_scan(&worker_plan),
+        0,
+        "a non-key filter must not be pushed below the dedup:\n{}",
+        worker_plan
+    );
+    assert!(
+        !scan_line(&worker_plan).contains("predicate:"),
+        "a non-key filter must not reach the parquet pruning predicate:\n{}",
+        worker_plan
+    );
+
+    // A mixed conjunction splits: the key conjunct goes below the dedup, the non-key one
+    // stays above. The last version of (3, 3) is 50: it fails val <= 25, and the
+    // overwritten (3, 3, 5) must not pass in its place.
+    let query = "SELECT sum(val) FROM s.Versions WHERE a in (2, 3) AND val <= 25";
+    let r = service.exec_query(query).await?;
+    assert_eq!(to_rows(&r), rows(&[(20)]));
+
+    let p = service.plan_query(query).await?;
+    let worker_plan = pp_phys_plan_ext(
+        p.worker.as_ref(),
+        &PPOptions {
+            show_filters: true,
+            ..PPOptions::none()
+        },
+    );
+    assert!(
+        filters_below_scan(&worker_plan) > 0,
+        "the key conjunct must be pushed below the dedup:\n{}",
+        worker_plan
+    );
+    assert!(
+        !below_scan(&worker_plan).contains("val"),
+        "the non-key conjunct must not appear below the dedup:\n{}",
+        worker_plan
+    );
+    return Ok(());
+
+    fn below_scan(plan: &str) -> &str {
+        let scan_start = plan
+            .find(scan_line(plan))
+            .expect("scan line is a substring of the plan");
+        &plan[scan_start + scan_line(plan).len()..]
+    }
+
+    fn scan_line(plan: &str) -> &str {
+        plan.lines()
+            .find(|l| l.trim_start().starts_with("Scan"))
+            .expect("no Scan in the worker plan")
+    }
+
+    fn filters_below_scan(plan: &str) -> usize {
+        plan.lines()
+            .skip_while(|l| !l.trim_start().starts_with("Scan"))
+            .filter(|l| {
+                let l = l.trim_start();
+                l.starts_with("Filter") && !l.starts_with("FilterByKeyRange")
+            })
+            .count()
+    }
+}
+
+/// Correctness of the sorted partial aggregate executed per partition below the merge: group
+/// keys present in several partitions must combine to the same totals as without the
+/// optimization, with and without LIMIT.
+async fn group_by_prefix_sorted_aggregate_multi_partition(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Data1 (a int, b int, val int, fval double)")
+        .await?;
+    service
+        .exec_query("CREATE TABLE s.Data2 (a int, b int, val int, fval double)")
+        .await?;
+
+    // Group keys with `a` in 4..8 get rows from both tables, i.e. from both partitions of the
+    // union.
+    let mut raw_rows = Vec::new();
+    let mut values1 = Vec::new();
+    for a in 0i64..8 {
+        for b in 0i64..3 {
+            for r in 0i64..2 {
+                let val = a * 31 + b * 17 + r;
+                values1.push(format!("({}, {}, {}, {}.5)", a, b, val, val));
+                raw_rows.push((a, b, val));
+            }
+        }
+    }
+    let mut values2 = Vec::new();
+    for a in 4i64..12 {
+        for b in 0i64..3 {
+            for r in 0i64..2 {
+                let val = a * 13 + b * 7 + r;
+                values2.push(format!("({}, {}, {}, {}.5)", a, b, val, val));
+                raw_rows.push((a, b, val));
+            }
+        }
+    }
+    service
+        .exec_query(&format!(
+            "INSERT INTO s.Data1 (a, b, val, fval) VALUES {}",
+            values1.join(", ")
+        ))
+        .await?;
+    service
+        .exec_query(&format!(
+            "INSERT INTO s.Data2 (a, b, val, fval) VALUES {}",
+            values2.join(", ")
+        ))
+        .await?;
+
+    // Expected aggregates per group; fval = val + 0.5 keeps float sums exactly representable,
+    // so the assertions stay byte-exact regardless of the summation order.
+    let mut groups = std::collections::BTreeMap::<(i64, i64), (i64, i64, i64, i64)>::new();
+    for (a, b, val) in raw_rows {
+        let group = groups.entry((a, b)).or_insert((0, i64::MAX, i64::MIN, 0));
+        group.0 += val;
+        group.1 = group.1.min(val);
+        group.2 = group.2.max(val);
+        group.3 += 1;
+    }
+    let group_row = |((a, b), (sum, min, max, count)): (&(i64, i64), &(i64, i64, i64, i64))| {
+        vec![
+            TableValue::Int(*a),
+            TableValue::Int(*b),
+            TableValue::Int(*sum),
+            TableValue::Int(*min),
+            TableValue::Int(*max),
+            TableValue::Float((*sum as f64 + 0.5 * *count as f64).into()),
+        ]
+    };
+    let expected: Vec<Vec<TableValue>> = groups.iter().map(group_row).collect();
+
+    let query = "SELECT a, b, sum(val), min(val), max(val), sum(fval) FROM (\
+                     SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2\
+                 ) `t` GROUP BY 1, 2";
+
+    let full = service
+        .exec_query(&format!("{} ORDER BY 1, 2", query))
+        .await?;
+    assert_eq!(to_rows(&full), expected);
+
+    // LIMIT must return the same prefix of the full result
+    let limited = service
+        .exec_query(&format!("{} ORDER BY 1, 2 LIMIT 5", query))
+        .await?;
+    assert_eq!(to_rows(&limited), expected[..5]);
+
+    // DESC ordering takes the tail groups
+    let tail = service
+        .exec_query(&format!("{} ORDER BY 1 DESC, 2 DESC LIMIT 5", query))
+        .await?;
+    let expected_tail: Vec<_> = expected.iter().rev().take(5).cloned().collect();
+    assert_eq!(to_rows(&tail), expected_tail);
+
+    // ORDER BY an aggregate must not use the group-order shortcut
+    let by_sum = service
+        .exec_query(&format!("{} ORDER BY 3, 1, 2 LIMIT 4", query))
+        .await?;
+    let mut by_sum_keys: Vec<(i64, i64, i64)> = groups
+        .iter()
+        .map(|((a, b), (sum, ..))| (*sum, *a, *b))
+        .collect();
+    by_sum_keys.sort();
+    let expected_by_sum: Vec<Vec<TableValue>> = by_sum_keys
+        .iter()
+        .take(4)
+        .map(|(_, a, b)| group_row(((&(*a, *b)), &groups[&(*a, *b)])))
+        .collect();
+    assert_eq!(to_rows(&by_sum), expected_by_sum);
+    Ok(())
+}
+
+/// LIMIT short-circuit correctness on group counts below and above the execution batch size
+/// (4096), with duplicate group keys across partitions.
+async fn group_by_prefix_limit_high_cardinality(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Data1 (a int, val int)")
+        .await?;
+    service
+        .exec_query("CREATE TABLE s.Data2 (a int, val int)")
+        .await?;
+
+    // 7500 groups in total, above the 4096 execution batch size; keys 2500..5000 are present
+    // in both tables.
+    for chunk in (0i64..5000).collect::<Vec<_>>().chunks(1000) {
+        let values = chunk
+            .iter()
+            .map(|a| format!("({}, {})", a, a * 3 + 1))
+            .join(", ");
+        service
+            .exec_query(&format!("INSERT INTO s.Data1 (a, val) VALUES {}", values))
+            .await?;
+    }
+    for chunk in (2500i64..7500).collect::<Vec<_>>().chunks(1000) {
+        let values = chunk
+            .iter()
+            .map(|a| format!("({}, {})", a, a * 5 + 2))
+            .join(", ");
+        service
+            .exec_query(&format!("INSERT INTO s.Data2 (a, val) VALUES {}", values))
+            .await?;
+    }
+
+    let expected = |range: std::ops::Range<i64>| -> Vec<Vec<TableValue>> {
+        range
+            .map(|a| {
+                let mut sum = 0;
+                if a < 5000 {
+                    sum += a * 3 + 1;
+                }
+                if a >= 2500 {
+                    sum += a * 5 + 2;
+                }
+                vec![TableValue::Int(a), TableValue::Int(sum)]
+            })
+            .collect()
+    };
+
+    let query = "SELECT a, sum(val) FROM (\
+                     SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2\
+                 ) `t` GROUP BY 1";
+
+    // LIMIT far below the batch size
+    let r = service
+        .exec_query(&format!("{} ORDER BY 1 LIMIT 10", query))
+        .await?;
+    assert_eq!(to_rows(&r), expected(0..10));
+
+    // LIMIT above the batch size
+    let r = service
+        .exec_query(&format!("{} ORDER BY 1 LIMIT 5000", query))
+        .await?;
+    assert_eq!(to_rows(&r), expected(0..5000));
+
+    // DESC takes the last groups (per-partition tail path)
+    let r = service
+        .exec_query(&format!("{} ORDER BY 1 DESC LIMIT 10", query))
+        .await?;
+    let mut expected_tail = expected(7490..7500);
+    expected_tail.reverse();
+    assert_eq!(to_rows(&r), expected_tail);
+
+    // No limit: all the groups
+    let r = service.exec_query(&format!("{} ORDER BY 1", query)).await?;
+    assert_eq!(to_rows(&r), expected(0..7500));
+
+    // No ORDER BY: the limit still descends (the group key is the index sort prefix), so groups
+    // come out in key order and the first 10 are returned.
+    let r = service.exec_query(&format!("{} LIMIT 10", query)).await?;
+    assert_eq!(to_rows(&r), expected(0..10));
+    Ok(())
+}
+
+/// The sorted partial aggregate runs per partition below the merge; the worker limit becomes a
+/// group limit on the aggregate plus a widened row budget on the merge (duplicate group keys
+/// from different partitions make a plain row limit incorrect).
+async fn planning_aggregate_below_merge_with_limit(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Orders(a int, b int, amount int)")
+        .await?;
+
+    let p = service
+        .plan_query(
+            "SELECT a, b, SUM(amount) FROM (\
+                 SELECT * FROM s.Orders UNION ALL SELECT * FROM s.Orders\
+             ) `t` GROUP BY 1, 2",
+        )
+        .await?;
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "InlineFinalAggregate\
+        \n  Worker\
+        \n    MergeSort\
+        \n      InlinePartialAggregate\
+        \n        Union\
+        \n          Scan, index: default:1:[1]:sort_on[a, b], fields: *\
+        \n            Sort\
+        \n              Empty\
+        \n          Scan, index: default:1:[1]:sort_on[a, b], fields: *\
+        \n            Sort\
+        \n              Empty"
+    );
+
+    let p = service
+        .plan_query(
+            "SELECT a, b, SUM(amount) FROM (\
+                 SELECT * FROM s.Orders UNION ALL SELECT * FROM s.Orders\
+             ) `t` GROUP BY 1, 2 ORDER BY 1, 2 LIMIT 5",
+        )
+        .await?;
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Sort, fetch: 5\
+        \n  InlineFinalAggregate\
+        \n    Worker\
+        \n      MergeSort\
+        \n        LocalLimit, n: 5\
+        \n          InlinePartialAggregate, limit: 5\
+        \n            Union\
+        \n              Scan, index: default:1:[1]:sort_on[a, b], fields: *\
+        \n                Sort\
+        \n                  Empty\
+        \n              Scan, index: default:1:[1]:sort_on[a, b], fields: *\
+        \n                Sort\
+        \n                  Empty"
+    );
+
+    // Reverse limit: a per-partition tail below the merge instead of a group limit (the last
+    // groups are unknown until the input ends, so the aggregate can't stop early)
+    let p = service
+        .plan_query(
+            "SELECT a, b, SUM(amount) FROM (\
+                 SELECT * FROM s.Orders UNION ALL SELECT * FROM s.Orders\
+             ) `t` GROUP BY 1, 2 ORDER BY 1 DESC, 2 DESC LIMIT 5",
+        )
+        .await?;
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Sort, fetch: 5\
+        \n  InlineFinalAggregate\
+        \n    Worker\
+        \n      MergeSort\
+        \n        TailLimit, n: 5\
+        \n          InlinePartialAggregate\
+        \n            Union\
+        \n              Scan, index: default:1:[1]:sort_on[a, b], fields: *\
+        \n                Sort\
+        \n                  Empty\
+        \n              Scan, index: default:1:[1]:sort_on[a, b], fields: *\
+        \n                Sort\
+        \n                  Empty"
+    );
+    Ok(())
+}
+
+/// A no-GROUP BY (hash) aggregate over a multi-chunk scan: the chunks must be coalesced, not
+/// merge-sorted -- the aggregate doesn't use the order, and the equality filters on the sort key
+/// prefix make every merge comparison a full-length tie.
+async fn global_aggregate_no_chunk_merge(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query(
+            "CREATE TABLE s.Batch (tenant_id int, deployment_id int, ts timestamp, hits int, hits_failed int)",
+        )
+        .await?;
+    service
+        .exec_query(
+            "CREATE TABLE s.Stream (tenant_id int, deployment_id int, ts timestamp, hits int, hits_failed int)",
+        )
+        .await?;
+
+    // Several inserts = several chunks, like a streaming table
+    for i in 0..3 {
+        let values = (0..50)
+            .map(|j| {
+                format!(
+                    "(25358, 5, '2026-06-03T0{}:00:{:02}.000', {}, {})",
+                    i,
+                    j,
+                    j,
+                    j % 3
+                )
+            })
+            .join(", ");
+        service
+            .exec_query(&format!(
+                "INSERT INTO s.Stream (tenant_id, deployment_id, ts, hits, hits_failed) VALUES {}",
+                values
+            ))
+            .await?;
+    }
+
+    let query = "SELECT sum(hits) hits, sum(hits_failed) hits_failed FROM (\
+                     SELECT * FROM s.Batch WHERE 1 = 0 \
+                     UNION ALL \
+                     SELECT * FROM s.Stream\
+                 ) `t` WHERE tenant_id = 25358 AND deployment_id = 5 \
+                   AND ts >= to_timestamp('2026-06-03T00:00:00.000') \
+                   AND ts <= to_timestamp('2026-06-03T23:59:59.999') \
+                 LIMIT 10000";
+
+    let r = service.exec_query(query).await?;
+    assert_eq!(to_rows(&r), rows(&[(3675, 147)]));
+
+    let p = service.plan_query(query).await?;
+    let worker_plan = pp_phys_plan(p.worker.as_ref());
+    assert!(
+        !worker_plan.contains("MergeSort"),
+        "hash aggregate must not merge-sort the chunks:\n{}",
+        worker_plan
+    );
+    let coalesce_pos = worker_plan.find("CoalescePartitions");
+    let aggregate_pos = worker_plan.find("LinearPartialAggregate");
+    assert!(
+        coalesce_pos.is_some() && aggregate_pos.is_some() && coalesce_pos < aggregate_pos,
+        "the per-partition aggregation must be coalesced above:\n{}",
+        worker_plan
+    );
+    Ok(())
+}
+
+/// A unique key table deduplicates row versions via LastRowByUniqueKey, which needs its input
+/// merge-sorted to keep the versions of a key adjacent. That merge must survive the
+/// no-ordering-needed rewrite under a global aggregate.
+async fn global_aggregate_unique_key_keeps_merge(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Versions (a int, b int, val int) unique key (a, b)")
+        .await?;
+    service
+        .exec_query("INSERT INTO s.Versions (a, b, val, __seq) VALUES (1, 1, 10, 1), (2, 2, 20, 2)")
+        .await?;
+    // A newer version of (1, 1) in another chunk
+    service
+        .exec_query("INSERT INTO s.Versions (a, b, val, __seq) VALUES (1, 1, 30, 3)")
+        .await?;
+
+    let query = "SELECT sum(val) FROM s.Versions";
+    let r = service.exec_query(query).await?;
+    // Only the last version of each key counts: 30 + 20, not 10 + 30 + 20
+    assert_eq!(to_rows(&r), rows(&[(50)]));
+
+    let p = service.plan_query(query).await?;
+    let worker_plan = pp_phys_plan(p.worker.as_ref());
+    assert!(
+        worker_plan.contains("LastRowByUniqueKey") && worker_plan.contains("MergeSort"),
+        "the deduplicating merge must stay in place:\n{}",
+        worker_plan
+    );
+    Ok(())
+}
+
+async fn prefilter_chunks_shared_scan(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Versions (a int, b int, val int) unique key (a, b)")
+        .await?;
+
+    service
+        .exec_query(
+            "INSERT INTO s.Versions (a, b, val, __seq) VALUES (1, 1, 10, 1), (2, 2, 20, 2), (3, 3, 5, 3)",
+        )
+        .await?;
+    // Newer versions of (1, 1) and (3, 3) in another in-memory chunk.
+    service
+        .exec_query("INSERT INTO s.Versions (a, b, val, __seq) VALUES (1, 1, 30, 4), (3, 3, 50, 5)")
+        .await?;
+
+    // Two scans of the same index over the same in-memory chunks: one carries a dedup-safe
+    // key filter (a = 1), the other none. The worker must not trim the shared chunks by the
+    // first scan's predicate, or the unfiltered branch loses rows. Filtered branch dedups to
+    // (1,1)->30 = 30; unfiltered branch dedups to 30+20+50 = 100; total = 130.
+    let query = "SELECT sum(val) FROM (\
+        SELECT val FROM s.Versions WHERE a = 1 \
+        UNION ALL \
+        SELECT val FROM s.Versions\
+    ) t";
+    let r = service.exec_query(query).await?;
+    assert_eq!(to_rows(&r), rows(&[(130)]));
+
     Ok(())
 }
 
@@ -7742,6 +8848,121 @@ async fn aggregate_index_errors(service: Box<dyn SqlClient>) -> Result<(), CubeE
     Ok(())
 }
 
+async fn aggregate_index_decimal(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+
+    // Building an aggregating index runs sum() over the chunk data, and DataFusion widens a
+    // decimal sum's precision. The result must be cast back to the declared column type
+    // instead of failing the chunk build.
+    let file = write_tmp_file(indoc! {"
+        k,v,i
+        books,900.00000,10
+        books,100.50000,20
+        toys,90.00000,5
+        toys,9.50000,7
+    "})?;
+    let path = file.path().to_string_lossy();
+    service
+        .exec_query(
+            format!(
+                "CREATE TABLE s.Orders(k varchar, v decimal, i int)
+                     AGGREGATIONS(sum(v), sum(i))
+                     AGGREGATE INDEX k_agg (k)
+                     LOCATION '{}'",
+                path
+            )
+            .as_str(),
+        )
+        .await?;
+
+    let res = service
+        .exec_query("SELECT k, sum(v), sum(i) FROM s.Orders GROUP BY 1 ORDER BY 1")
+        .await?;
+    assert_eq!(
+        to_rows(&res),
+        [
+            [
+                TableValue::String("books".to_string()),
+                TableValue::Decimal(Decimal::new(100050000)),
+                TableValue::Int(30)
+            ],
+            [
+                TableValue::String("toys".to_string()),
+                TableValue::Decimal(Decimal::new(9950000)),
+                TableValue::Int(12)
+            ],
+        ]
+    );
+
+    // The same shape over INSERT-ed data exercises the in-memory ingestion path.
+    service
+        .exec_query(
+            "CREATE TABLE s.OrdersIns(k varchar, v decimal, i int)
+                     AGGREGATIONS(sum(v), sum(i))
+                     AGGREGATE INDEX k_agg (k)",
+        )
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.OrdersIns (k, v, i) VALUES ('books', 900.00000, 10), \
+                                                      ('books', 100.50000, 20), \
+                                                      ('toys', 90.00000, 5), \
+                                                      ('toys', 9.50000, 7)",
+        )
+        .await?;
+
+    let res = service
+        .exec_query("SELECT k, sum(v), sum(i) FROM s.OrdersIns GROUP BY 1 ORDER BY 1")
+        .await?;
+    assert_eq!(
+        to_rows(&res),
+        [
+            [
+                TableValue::String("books".to_string()),
+                TableValue::Decimal(Decimal::new(100050000)),
+                TableValue::Int(30)
+            ],
+            [
+                TableValue::String("toys".to_string()),
+                TableValue::Decimal(Decimal::new(9950000)),
+                TableValue::Int(12)
+            ],
+        ]
+    );
+    Ok(())
+}
+
+async fn aggregate_index_decimal_overflow(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(k varchar, v decimal(18, 5))
+                     AGGREGATIONS(sum(v))
+                     AGGREGATE INDEX k_agg (k)",
+        )
+        .await?;
+
+    // Each value fits Decimal128(18, 5) (13 integer digits), but the per-key sum does
+    // not. The aggregating index build runs that sum, and the cast back to the declared
+    // type uses safe: false, so the overflow must surface as a diagnosable error — not a
+    // panic in a background task and not a silently stored NULL.
+    let res = service
+        .exec_query("INSERT INTO s.Orders (k, v) VALUES ('a', 9000000000000), ('a', 9000000000000)")
+        .await;
+    match res {
+        Ok(_) => panic!("a sum overflowing the declared decimal precision must fail the insert"),
+        Err(e) => {
+            let msg = e.to_string();
+            assert!(
+                msg.contains("too large to store"),
+                "expected a decimal overflow error, got: {}",
+                msg
+            );
+        }
+    }
+    Ok(())
+}
+
 async fn inline_tables(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     service.exec_query("CREATE SCHEMA Foo").await?;
     service
@@ -8053,12 +9274,12 @@ async fn build_range_end(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     Ok(())
 }
 
-async fn assert_limit_pushdown_using_search_string(
+async fn assert_limit_pushdown_using_search_strings(
     service: &Box<dyn SqlClient>,
     query: &str,
     expected_index: Option<&str>,
     is_limit_expected: bool,
-    search_string: &str,
+    search_strings: &[&str],
 ) -> Result<Vec<Row>, CubeError> {
     let res = service
         .exec_query(&format!("EXPLAIN ANALYZE {}", query))
@@ -8073,18 +9294,17 @@ async fn assert_limit_pushdown_using_search_string(
                     )));
                 }
             }
-            let expected_limit = search_string;
             if is_limit_expected {
-                if !s.contains(expected_limit) {
+                if !search_strings.iter().any(|expected| s.contains(expected)) {
                     return Err(CubeError::internal(format!(
                         "{} expected but not found",
-                        expected_limit
+                        search_strings.join(" or ")
                     )));
                 }
-            } else if s.contains(expected_limit) {
+            } else if let Some(found) = search_strings.iter().find(|e| s.contains(*e)) {
                 return Err(CubeError::internal(format!(
                     "{} unexpected but found",
-                    expected_limit
+                    found
                 )));
             }
         }
@@ -8095,6 +9315,23 @@ async fn assert_limit_pushdown_using_search_string(
     Ok(res.get_rows().clone())
 }
 
+async fn assert_limit_pushdown_using_search_string(
+    service: &Box<dyn SqlClient>,
+    query: &str,
+    expected_index: Option<&str>,
+    is_limit_expected: bool,
+    search_string: &str,
+) -> Result<Vec<Row>, CubeError> {
+    assert_limit_pushdown_using_search_strings(
+        service,
+        query,
+        expected_index,
+        is_limit_expected,
+        &[search_string],
+    )
+    .await
+}
+
 async fn assert_limit_pushdown(
     service: &Box<dyn SqlClient>,
     query: &str,
@@ -8102,15 +9339,17 @@ async fn assert_limit_pushdown(
     is_limit_expected: bool,
     is_tail_limit: bool,
 ) -> Result<Vec<Row>, CubeError> {
-    assert_limit_pushdown_using_search_string(
+    assert_limit_pushdown_using_search_strings(
         service,
         query,
         expected_index,
         is_limit_expected,
         if is_tail_limit {
-            "TailLimit"
+            &["TailLimit"]
         } else {
-            "GlobalLimit"
+            // The worker limit is either a plain row limit or, for a partial aggregate running
+            // per partition below the merge, a group limit on the aggregate.
+            &["GlobalLimit", "InlinePartialAggregate, limit:"]
         },
     )
     .await
@@ -8349,6 +9588,8 @@ async fn limit_pushdown_group(service: Box<dyn SqlClient>) -> Result<(), CubeErr
         )
         .await?;
 
+    // GROUP BY + LIMIT without ORDER BY: the group-by key is a prefix of the index sort key, so
+    // the limit descends to the workers' sorted partial aggregate and groups come out key-ordered.
     let res = assert_limit_pushdown(
         &service,
         "SELECT id, SUM(n) FROM (
@@ -8357,22 +9598,198 @@ async fn limit_pushdown_group(service: Box<dyn SqlClient>) -> Result<(), CubeErr
                 SELECT * FROM foo.pushdown2
                 ) as `tb` GROUP BY 1 LIMIT 3",
         None,
+        true,
+        false,
+    )
+    .await?;
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![TableValue::Int(11), TableValue::Int(43)]),
+            Row::new(vec![TableValue::Int(12), TableValue::Int(45)]),
+            Row::new(vec![TableValue::Int(21), TableValue::Int(40)]),
+        ]
+    );
+    Ok(())
+}
+
+// A HAVING (a filter above the aggregate) must block the group-by limit pushdown: the worker
+// would truncate to its first `limit` groups before HAVING runs on the router, dropping qualifying
+// groups that sort past the truncation point and undercounting the result.
+async fn limit_pushdown_group_having(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA foo").await?;
+    service
+        .exec_query("CREATE TABLE foo.having (id int, n int)")
+        .await?;
+    // Odd ids sum to 100 (pass HAVING), even ids to 1 (filtered out). The first 3 ids (1, 2, 3)
+    // contain only two passing groups, so a per-worker limit-before-HAVING would return 2 rows.
+    let values = (1..=10).map(|id| format!("({}, {})", id, if id % 2 == 1 { 100 } else { 1 }));
+    service
+        .exec_query(&format!(
+            "INSERT INTO foo.having (id, n) VALUES {}",
+            values.collect::<Vec<_>>().join(", ")
+        ))
+        .await?;
+
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT id, SUM(n) FROM foo.having GROUP BY 1 HAVING SUM(n) > 50 LIMIT 3",
+        None,
         false,
         false,
     )
     .await?;
 
-    // TODO upgrade DF limit isn't expected and order can't be validated.
-    // TODO But should we keep existing behavior of always sorted output?
-    assert_eq!(res.len(), 3);
-    // assert_eq!(
-    //     res,
-    //     vec![
-    //         Row::new(vec![TableValue::Int(11), TableValue::Int(43)]),
-    //         Row::new(vec![TableValue::Int(12), TableValue::Int(45)]),
-    //         Row::new(vec![TableValue::Int(21), TableValue::Int(40)]),
-    //     ]
-    // );
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![TableValue::Int(1), TableValue::Int(100)]),
+            Row::new(vec![TableValue::Int(3), TableValue::Int(100)]),
+            Row::new(vec![TableValue::Int(5), TableValue::Int(100)]),
+        ]
+    );
+    Ok(())
+}
+
+// ORDER BY a group column that is not an index-sort prefix, with the same group spread across
+// chunks: the limit can't ride the index, so the per-worker bounded sort kicks in. The sort key is
+// the full group key, so every chunk keeps the global top groups' partial states and the sums stay
+// correct (sorting by the ORDER BY column alone would drop partial states of groups split across
+// chunks and undercount).
+async fn limit_pushdown_group_nonprefix_order(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.ovl (a int, b int, val int) INDEX bidx (a, b)")
+        .await?;
+    // Three chunks; every b in {1, 2, 3} appears in each chunk under a different `a`, so each b
+    // group spans all three chunks.
+    service
+        .exec_query("INSERT INTO s.ovl (a, b, val) VALUES (1, 1, 10), (1, 2, 20), (1, 3, 30)")
+        .await?;
+    service
+        .exec_query("INSERT INTO s.ovl (a, b, val) VALUES (2, 1, 100), (2, 2, 200), (2, 3, 300)")
+        .await?;
+    service
+        .exec_query("INSERT INTO s.ovl (a, b, val) VALUES (3, 1, 1000), (3, 2, 2000), (3, 3, 3000)")
+        .await?;
+
+    let r = service
+        .exec_query("SELECT b, sum(val) FROM s.ovl GROUP BY b ORDER BY b LIMIT 2")
+        .await?;
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![TableValue::Int(1), TableValue::Int(1110)],
+            vec![TableValue::Int(2), TableValue::Int(2220)],
+        ]
+    );
+
+    // DESC keeps the largest keys.
+    let r = service
+        .exec_query("SELECT b, sum(val) FROM s.ovl GROUP BY b ORDER BY b DESC LIMIT 2")
+        .await?;
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![TableValue::Int(3), TableValue::Int(3330)],
+            vec![TableValue::Int(2), TableValue::Int(2220)],
+        ]
+    );
+    Ok(())
+}
+
+/// Multi-column GROUP BY where the appended (non-ORDER-BY) total-order column carries NULLs and the
+/// group spans chunks. `GROUP BY b, c` is not the index prefix, so this is the hash trim path; the
+/// worker cut and the router select both extend the order with the appended column `c`, and they must
+/// agree on its NULL placement or the NULL group's partial states get dropped across chunks
+/// (undercount). The NULL group's membership is fixed by `b` (uniquely smallest), so the assertion
+/// does not depend on the tie order -- only on the sum being fully combined across all three chunks.
+async fn limit_pushdown_group_null_appended(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.nag (a int, b int, c int, val int) INDEX bidx (a, b, c)")
+        .await?;
+    // Three chunks. The (b = 1, c = NULL) group appears in every chunk, so it spans all three and
+    // its sum must combine to 1110. Five distinct (b, c) groups so the trim engages (5 > factor*k).
+    service
+        .exec_query(
+            "INSERT INTO s.nag (a, b, c, val) VALUES \
+             (1, 1, NULL, 10), (1, 2, 20, 1), (1, 3, 30, 1), (1, 4, 40, 1), (1, 5, 50, 1)",
+        )
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.nag (a, b, c, val) VALUES \
+             (1, 1, NULL, 100), (1, 2, 20, 1), (1, 3, 30, 1), (1, 4, 40, 1), (1, 5, 50, 1)",
+        )
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.nag (a, b, c, val) VALUES \
+             (1, 1, NULL, 1000), (1, 2, 20, 1), (1, 3, 30, 1), (1, 4, 40, 1), (1, 5, 50, 1)",
+        )
+        .await?;
+
+    // Smallest b is the NULL-c group; its sum must combine across all three chunks.
+    let r = service
+        .exec_query("SELECT b, c, sum(val) FROM s.nag GROUP BY b, c ORDER BY b LIMIT 1")
+        .await?;
+    assert_eq!(
+        to_rows(&r),
+        vec![vec![
+            TableValue::Int(1),
+            TableValue::Null,
+            TableValue::Int(1110),
+        ]]
+    );
+    Ok(())
+}
+
+/// Explicit `NULLS FIRST` on the ORDER BY column, contradicting the ASC default null placement. The
+/// NULL group must be the single smallest under the query's own order, so `LIMIT 1` must return it.
+/// `GROUP BY b` (b not the index prefix) routes through the hash trim path; the worker cut and the
+/// router select must both rank the NULL group first, or the worker trims it away and the query
+/// silently returns the wrong group. Pins that the total order honors the query's NULL placement
+/// rather than deriving it from the sort direction alone.
+async fn limit_pushdown_group_null_order_first(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.nf (a int, b int, val int) INDEX bidx (a, b)")
+        .await?;
+    // Three chunks; the NULL-b group appears in each (under a different `a`), so it spans all three
+    // and its sum must combine to 1110. Five distinct b groups so the trim engages (5 > factor*k).
+    service
+        .exec_query(
+            "INSERT INTO s.nf (a, b, val) VALUES \
+             (1, NULL, 10), (1, 2, 1), (1, 3, 1), (1, 4, 1), (1, 5, 1)",
+        )
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.nf (a, b, val) VALUES \
+             (2, NULL, 100), (2, 2, 1), (2, 3, 1), (2, 4, 1), (2, 5, 1)",
+        )
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.nf (a, b, val) VALUES \
+             (3, NULL, 1000), (3, 2, 1), (3, 3, 1), (3, 4, 1), (3, 5, 1)",
+        )
+        .await?;
+
+    // ASC NULLS FIRST: the NULL group ranks first, so LIMIT 1 must return it with its combined sum.
+    let r = service
+        .exec_query("SELECT b, sum(val) FROM s.nf GROUP BY b ORDER BY b ASC NULLS FIRST LIMIT 1")
+        .await?;
+    assert_eq!(
+        to_rows(&r),
+        vec![vec![TableValue::Null, TableValue::Int(1110)]]
+    );
     Ok(())
 }
 
@@ -10477,6 +11894,41 @@ fn assert_queue_add_columns(response: &Arc<DataFrame>) {
     );
 }
 
+fn queue_add_and_retrieve_row(
+    id: &str,
+    added: bool,
+    pending: i64,
+    active: Option<&str>,
+    payload: Option<&str>,
+) -> Row {
+    let to_value =
+        |v: Option<&str>| v.map_or(TableValue::Null, |v| TableValue::String(v.to_string()));
+
+    Row::new(vec![
+        TableValue::String(id.to_string()),
+        TableValue::Boolean(added),
+        TableValue::Int(pending),
+        to_value(active),
+        to_value(payload),
+        // extra is always empty for a freshly added item
+        TableValue::Null,
+    ])
+}
+
+fn assert_queue_add_and_retrieve_columns(response: &Arc<DataFrame>) {
+    assert_eq!(
+        response.get_columns(),
+        &vec![
+            Column::new("id".to_string(), ColumnType::String, 0),
+            Column::new("added".to_string(), ColumnType::Boolean, 1),
+            Column::new("pending".to_string(), ColumnType::Int, 2),
+            Column::new("active".to_string(), ColumnType::String, 3),
+            Column::new("payload".to_string(), ColumnType::String, 4),
+            Column::new("extra".to_string(), ColumnType::String, 5),
+        ]
+    );
+}
+
 fn assert_queue_add_and_get_id(response: &Arc<DataFrame>) -> Result<String, CubeError> {
     assert_queue_add_columns(response);
 
@@ -10591,6 +12043,193 @@ async fn queue_retrieve_extended(service: Box<dyn SqlClient>) -> Result<(), Cube
             ]),]
         );
     }
+    Ok(())
+}
+
+async fn queue_add_and_retrieve(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    {
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE PRIORITY 1 "STANDALONE#queue:key1" "payload1" 1"#)
+            .await?;
+        assert_queue_add_and_retrieve_columns(&add_response);
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row(
+                "1",
+                true,
+                0,
+                Some("key1"),
+                Some("payload1")
+            )]
+        );
+    }
+
+    {
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:key2" "payload2" 1"#)
+            .await?;
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row("2", true, 1, Some("key1"), None)]
+        );
+    }
+
+    {
+        // The stored payload is returned, not the payload of this call
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:key2" "payload2-dup" 2"#)
+            .await?;
+        assert_queue_add_and_retrieve_columns(&add_response);
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row(
+                "2",
+                false,
+                0,
+                Some("key1,key2"),
+                Some("payload2")
+            )]
+        );
+    }
+
+    {
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:key1" "payload1" 5"#)
+            .await?;
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row(
+                "1",
+                false,
+                0,
+                Some("key1,key2"),
+                None
+            )]
+        );
+    }
+
+    {
+        let add_response = service
+            .exec_query(r#"QUEUE ADD "STANDALONE#queue:key3" "payload3""#)
+            .await?;
+        assert_queue_add_columns(&add_response);
+    }
+
+    {
+        let pending_response = service
+            .exec_query(r#"QUEUE PENDING "STANDALONE#queue""#)
+            .await?;
+        assert_eq!(
+            pending_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("key3".to_string()),
+                TableValue::String("3".to_string()),
+                TableValue::String("pending".to_string()),
+                TableValue::Null,
+            ]),]
+        );
+
+        let active_response = service
+            .exec_query(r#"QUEUE ACTIVE "STANDALONE#queue""#)
+            .await?;
+        assert_eq!(active_response.get_rows().len(), 2);
+    }
+
+    {
+        // A claimed item can be acknowledged without an explicit QUEUE RETRIEVE
+        let ack_response = service
+            .exec_query(r#"QUEUE ACK "STANDALONE#queue:key1" "result1""#)
+            .await?;
+        assert_eq!(
+            ack_response.get_rows(),
+            &vec![Row::new(vec![TableValue::Boolean(true)])]
+        );
+
+        let result_response = service
+            .exec_query(r#"QUEUE RESULT "STANDALONE#queue:key1""#)
+            .await?;
+        assert_queue_result_columns(&result_response);
+        assert_eq!(
+            result_response.get_rows(),
+            &vec![queue_result_row("result1", "1", None)]
+        );
+    }
+
+    Ok(())
+}
+
+async fn queue_add_and_retrieve_backlog(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    for id in 1..=2 {
+        service
+            .exec_query(&format!(
+                r#"QUEUE ADD "STANDALONE#queue:key{}" "payload{}""#,
+                id, id
+            ))
+            .await?;
+    }
+
+    {
+        // Every concurrency slot is free, but claiming would leave the 2 pending items
+        // a single slot to share, so the item takes its place in the backlog instead
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:key3" "payload3" 2"#)
+            .await?;
+        assert_queue_add_and_retrieve_columns(&add_response);
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row("3", true, 3, None, None)]
+        );
+    }
+
+    {
+        // A slot is left over for every one of the 3 pending items, nothing is jumped over
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:key4" "payload4" 4"#)
+            .await?;
+        assert_queue_add_and_retrieve_columns(&add_response);
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row(
+                "4",
+                true,
+                3,
+                Some("key4"),
+                Some("payload4")
+            )]
+        );
+    }
+
+    {
+        // The very same budget declines the next claim, the slot it took is now busy
+        let add_response = service
+            .exec_query(r#"QUEUE ADD_AND_RETRIEVE "STANDALONE#queue:key5" "payload5" 4"#)
+            .await?;
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![queue_add_and_retrieve_row("5", true, 4, Some("key4"), None)]
+        );
+    }
+
+    {
+        let pending_response = service
+            .exec_query(r#"QUEUE PENDING "STANDALONE#queue""#)
+            .await?;
+        assert_eq!(pending_response.get_rows().len(), 4);
+
+        let active_response = service
+            .exec_query(r#"QUEUE ACTIVE "STANDALONE#queue""#)
+            .await?;
+        assert_eq!(
+            active_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("key4".to_string()),
+                TableValue::String("4".to_string()),
+                TableValue::String("active".to_string()),
+                TableValue::Null,
+            ]),]
+        );
+    }
+
     Ok(())
 }
 
@@ -11147,6 +12786,51 @@ async fn queue_full_workflow_v2_with_external_id(
     Ok(())
 }
 
+async fn queue_add_external_id_max_len(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    let max_id = "x".repeat(QUEUE_ITEM_EXTERNAL_ID_MAX_LEN);
+    let too_long_id = "x".repeat(QUEUE_ITEM_EXTERNAL_ID_MAX_LEN + 1);
+
+    let add_response = service
+        .exec_query(&format!(
+            r#"QUEUE ADD EXTERNAL_ID '{}' "STANDALONE#queue:ext_max_len" "payload_max_len""#,
+            max_id
+        ))
+        .await?;
+    assert_queue_add_and_get_id(&add_response)?;
+
+    for query in [
+        format!(
+            r#"QUEUE ADD EXTERNAL_ID '{}' "STANDALONE#queue:ext_too_long" "payload_too_long""#,
+            too_long_id
+        ),
+        format!(
+            r#"QUEUE ADD_AND_RETRIEVE EXTERNAL_ID '{}' "STANDALONE#queue:ext_too_long" "payload_too_long" 1"#,
+            too_long_id
+        ),
+        format!(
+            r#"QUEUE RESULT EXTERNAL_ID '{}' "STANDALONE#queue:ext_too_long""#,
+            too_long_id
+        ),
+    ] {
+        let err = service.exec_query(&query).await.unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("external_id exceeds maximum allowed length"),
+            "unexpected error for {}: {}",
+            query,
+            err
+        );
+    }
+
+    // The rejected items were never written, only the max-length one
+    let pending = service
+        .exec_query(r#"QUEUE PENDING "STANDALONE#queue""#)
+        .await?;
+    assert_eq!(pending.get_rows().len(), 1);
+
+    Ok(())
+}
+
 async fn queue_result_by_id_external_id_mismatch(
     service: Box<dyn SqlClient>,
 ) -> Result<(), CubeError> {
@@ -11564,6 +13248,81 @@ async fn join_multi_partition_large(service: Box<dyn SqlClient>) -> Result<(), C
         .await?;
     assert_eq!(to_rows(&count_result), vec![vec![TableValue::Int(150)]]);
     Ok(())
+}
+
+async fn repartition_multi_node_consistency(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA foo").await?;
+    service
+        .exec_query("CREATE TABLE foo.numbers (num int)")
+        .await?;
+
+    let n: i64 = 200;
+    for i in 0..n {
+        service
+            .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
+            .await?;
+    }
+
+    // Wait until the table has split and repartition jobs have drained every
+    // inactive parent partition (no active chunk left on an inactive partition),
+    // while the full row set stays readable throughout.
+    let mut stabilized = false;
+    let (mut active_parts, mut pending, mut count) = (0i64, true, 0i64);
+    for _ in 0..150 {
+        let active_parts_df = service
+            .exec_query("SELECT count(*) FROM system.partitions WHERE active = true")
+            .await?;
+        active_parts = scalar_i64(&active_parts_df);
+
+        let inactive = service
+            .exec_query("SELECT id FROM system.partitions WHERE active = false")
+            .await?;
+        let inactive_ids: HashSet<i64> = to_rows(&inactive)
+            .iter()
+            .filter_map(|r| match &r[0] {
+                TableValue::Int(v) => Some(*v),
+                _ => None,
+            })
+            .collect();
+
+        let active_chunks = service
+            .exec_query("SELECT partition_id FROM system.chunks WHERE active = true")
+            .await?;
+        pending = to_rows(&active_chunks).iter().any(|r| match &r[0] {
+            TableValue::Int(v) => inactive_ids.contains(v),
+            _ => false,
+        });
+
+        let count_df = service
+            .exec_query("SELECT count(*) FROM foo.numbers")
+            .await?;
+        count = scalar_i64(&count_df);
+
+        if active_parts > 1 && !pending && count == n {
+            stabilized = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert!(
+        stabilized,
+        "repartition did not stabilize: active_partitions={}, pending_repartition={}, count={} (want active>1, pending=false, count={})",
+        active_parts, pending, count, n
+    );
+
+    let sum = service
+        .exec_query("SELECT sum(num) FROM foo.numbers")
+        .await?;
+    assert_eq!(to_rows(&sum), vec![vec![TableValue::Int(n * (n - 1) / 2)]]);
+
+    Ok(())
+}
+
+fn scalar_i64(d: &DataFrame) -> i64 {
+    match d.get_rows().get(0).map(|r| &r.values()[0]) {
+        Some(TableValue::Int(v)) => *v,
+        _ => 0,
+    }
 }
 
 pub fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {

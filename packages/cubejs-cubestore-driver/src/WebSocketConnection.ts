@@ -4,34 +4,69 @@ import { v4 as uuidv4 } from 'uuid';
 import { InlineTable } from '@cubejs-backend/base-driver';
 import { getEnv, getProcessUid } from '@cubejs-backend/shared';
 import { parseCubestoreResultMessage } from '@cubejs-backend/native';
-import { ConnectionError, QueryError } from './errors';
+import { ConnectionError, MessageTooLargeError, QueryError } from './errors';
 import {
   BinaryValue,
-  BoolValue, Float64Value,
+  BoolValue,
+  Float64Value,
   HttpCommand,
   HttpError,
   HttpMessage,
   HttpParameter,
   HttpParameterValue,
   HttpQuery,
-  HttpResultSet,
   HttpTable,
   Int64Value,
   NullValue,
+  QueryResultFormat,
   StringValue,
 } from '../codegen';
+
+// The WebSocket close code for a message that is too big to be processed: `ws`
+// closes with it when an incoming message is over `maxPayload`, and a peer that
+// refuses a message of ours is expected to close with it as well.
+const MESSAGE_TOO_BIG_CLOSE_CODE = 1009;
+
+// The `ws` error code for an incoming message bigger than `maxPayload`.
+const MAX_PAYLOAD_EXCEEDED_CODE = 'WS_ERR_UNSUPPORTED_MESSAGE_LENGTH';
+
+function formatSize(bytes: number): string {
+  const units: [number, string][] = [[1024 * 1024, 'MB'], [1024, 'KB']];
+
+  for (const [unit, name] of units) {
+    if (bytes >= unit) {
+      return `${Math.round((bytes / unit) * 10) / 10} ${name}`;
+    }
+  }
+
+  return `${bytes} bytes`;
+}
 
 interface SentMessage {
   resolve: (value: any) => void;
   reject: (reason?: any) => void;
   buffer: Uint8Array;
+  // How many connections died under this message from a failure that can't be
+  // attributed to a single message. Used to give it exactly one more round.
+  fatalRounds: number;
 }
+
+export type QueryParameter = null | boolean | number | string | Buffer;
+
+export type WebSocketQueryOptions = {
+  inlineTables?: InlineTable[];
+  queryTracingObj?: any;
+  responseFormat: QueryResultFormat;
+};
 
 interface CubeStoreWebSocket extends WebSocket {
   readyPromise: Promise<CubeStoreWebSocket>;
   lastHeartBeat: Date;
   sentMessages: Record<number, SentMessage>;
   sendAsync: (message: Uint8Array) => Promise<void>;
+  // A failure that killed this socket and that re-sending can't fix, so the
+  // message that caused it is rejected instead of being re-sent.
+  fatalError: Error | null;
 }
 
 export class WebSocketConnection {
@@ -40,6 +75,8 @@ export class WebSocketConnection {
   protected readonly maxConnectRetries: number;
 
   protected readonly noHeartBeatTimeout: number;
+
+  protected readonly maxMessageSize: number;
 
   protected currentConnectionTry: number;
 
@@ -56,6 +93,7 @@ export class WebSocketConnection {
     this.messageCounter = 1;
     this.maxConnectRetries = getEnv('cubeStoreMaxConnectRetries');
     this.noHeartBeatTimeout = getEnv('cubeStoreNoHeartBeatTimeout');
+    this.maxMessageSize = getEnv('cubeStoreMaxMessageSize');
     this.currentConnectionTry = 0;
     this.connectionId = uuidv4();
   }
@@ -65,7 +103,7 @@ export class WebSocketConnection {
       const headers: Record<string, string> = {};
       headers['x-process-id'] = getProcessUid();
 
-      const webSocket = new WebSocket(this.url, { headers }) as CubeStoreWebSocket;
+      const webSocket = new WebSocket(this.url, { headers, maxPayload: this.maxMessageSize }) as CubeStoreWebSocket;
       webSocket.on('upgrade', (response: any) => {
         this.cubeStoreVersion = response.headers['x-cubestore-version'] || null;
       });
@@ -82,23 +120,50 @@ export class WebSocketConnection {
           }
         }, 5000);
 
-        webSocket.sendAsync = async (message: Uint8Array) => new Promise<void>((resolveSend, rejectSend) => {
+        webSocket.sendAsync = async (message: Uint8Array) => new Promise<void>((resolveSend) => {
           // If socket is closing this message should be resent
-          if (webSocket.readyState === WebSocket.OPEN) {
-            webSocket.send(message, (err) => {
-              if (err) {
-                rejectSend(new ConnectionError(
-                  `CubeStore connection error: ${err.message}`,
-                  err
-                ));
-              } else {
-                resolveSend();
-              }
-            });
+          if (webSocket.readyState !== WebSocket.OPEN) {
+            resolveSend();
+            return;
           }
+
+          webSocket.send(message, (err) => {
+            if (err) {
+              // The write failed (EPIPE/ECONNRESET when Cube Store dropped the
+              // connection). The message stays registered in `sentMessages` and
+              // terminating gets 'close' to re-send it over a new connection --
+              // failing it here would surface a spurious `write EPIPE` for a
+              // query that never reached Cube Store.
+              webSocket.terminate();
+            }
+
+            resolveSend();
+          });
         });
         webSocket.on('open', () => resolve(webSocket));
         webSocket.on('error', (err) => {
+          if ((err as any).code === MAX_PAYLOAD_EXCEEDED_CODE) {
+            // Cube Store answered with a message bigger than this connection
+            // accepts, and `ws` is tearing the connection down. Neither
+            // reconnecting nor retrying the query helps: the response would be
+            // just as big. Pending messages are rejected by the 'close' handler.
+            webSocket.fatalError = new MessageTooLargeError(
+              `Cube Store response size exceeds the maximum message size of ${formatSize(this.maxMessageSize)}. ` +
+              'Reduce the amount of data the query returns, e.g. by adding filters or a limit, ' +
+              'or raise CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE.',
+              err
+            );
+
+            if (webSocket === this.webSocket) {
+              this.webSocket = null;
+            }
+
+            // No-op if the connection was already established.
+            reject(webSocket.fatalError);
+
+            return;
+          }
+
           this.currentConnectionTry += 1;
 
           if (this.currentConnectionTry < this.maxConnectRetries) {
@@ -122,16 +187,93 @@ export class WebSocketConnection {
           }
           webSocket.lastHeartBeat = new Date();
         });
-        webSocket.on('close', () => {
+        webSocket.on('close', (code: number, reason: Buffer) => {
           clearInterval(pingInterval);
 
-          if (Object.keys(webSocket.sentMessages).length) {
+          const pending = Object.keys(webSocket.sentMessages);
+
+          if (pending.length) {
+            // Cube Store names the size and the limit that refused it here,
+            // which is strictly better than the generic wording, so it
+            // replaces it rather than being appended to it. Peer-supplied
+            // text lands in an error a user reads, so control characters are
+            // folded out and the trailing full stop is normalised rather than
+            // assumed absent. A peer that closes with 1009 and no reason --
+            // an intermediary, or an older Cube Store -- keeps the generic
+            // wording, which is the only reason it still exists.
+            const closeReason = reason?.length
+              // eslint-disable-next-line no-control-regex
+              ? `${reason}`.replace(/[\u0000-\u001F\u007F]+/g, ' ').replace(/\s*\.?\s*$/, '')
+              : '';
+            const fatalError = webSocket.fatalError || (
+              // Cube Store refused a message that didn't fit into its limits.
+              code === MESSAGE_TOO_BIG_CLOSE_CODE ? new MessageTooLargeError(
+                `Cube Store closed the connection: ${closeReason || 'message size exceeds the maximum message size Cube Store accepts'}. `
+                + 'Reduce the size of the query and of the inline tables it sends, or raise '
+                + 'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE or CUBESTORE_TRANSPORT_MAX_FRAME_SIZE '
+                + 'on the Cube Store side.'
+              ) : null
+            );
+
+            // The connection multiplexes messages and an oversized one can't be
+            // attributed -- `ws` drops the frame before its message id is read
+            // -- so every message in flight gets one more round, which answers
+            // the innocent ones and usually leaves the offender alone to be
+            // named next time. That includes a message that was alone in
+            // flight: `fatalError` says an oversized frame was seen on this
+            // socket, not which query produced it, and it can be the response
+            // to a query rejected on an earlier round that was still on the
+            // wire. Whatever is still in flight after its round is failed
+            // regardless: an offender whose response keeps arriving before the
+            // other answers would otherwise be re-sent forever.
+            if (fatalError) {
+              // eslint-disable-next-line no-restricted-syntax
+              for (const key of pending) {
+                const sentMessage = webSocket.sentMessages[key];
+                sentMessage.fatalRounds += 1;
+
+                if (sentMessage.fatalRounds > 1) {
+                  delete webSocket.sentMessages[key];
+                  sentMessage.reject(fatalError);
+                }
+              }
+
+              if (!Object.keys(webSocket.sentMessages).length) {
+                if (webSocket === this.webSocket) {
+                  this.webSocket = null;
+                }
+
+                return;
+              }
+            } else {
+              // Only consecutive unattributable failures count towards giving
+              // up on a message: a query that outlived an ordinary disconnect
+              // gets its extra round back, so a later, unrelated oversized
+              // response can't fail it on the spot. The loop the counter
+              // bounds is fatal every round, so nothing resets there.
+              // eslint-disable-next-line no-restricted-syntax
+              for (const key of pending) {
+                webSocket.sentMessages[key].fatalRounds = 0;
+              }
+            }
+
             setTimeout(async () => {
               try {
                 const nextWebSocket = await this.initWebSocket();
+                const resent = Object.keys(webSocket.sentMessages);
+
+                // Register the whole batch before writing any of it. Writing
+                // yields, and a socket that closes in between must find every
+                // message of the batch: the ones not registered yet would end
+                // up on a socket whose 'close' has already been handled, with
+                // nobody left to write or to re-send them.
                 // eslint-disable-next-line no-restricted-syntax
-                for (const key of Object.keys(webSocket.sentMessages)) {
+                for (const key of resent) {
                   nextWebSocket.sentMessages[key] = webSocket.sentMessages[key];
+                }
+
+                // eslint-disable-next-line no-restricted-syntax
+                for (const key of resent) {
                   await nextWebSocket.sendAsync(webSocket.sentMessages[key].buffer);
                 }
               } catch (e) {
@@ -150,69 +292,30 @@ export class WebSocketConnection {
         webSocket.on('message', async (msg: Buffer) => {
           const buf = new flatbuffers.ByteBuffer(msg);
           const httpMessage = HttpMessage.getRootAsHttpMessage(buf);
-          const resolvers = webSocket.sentMessages[httpMessage.messageId()];
-          delete webSocket.sentMessages[httpMessage.messageId()];
-          if (!resolvers) {
+
+          const resolver = webSocket.sentMessages[httpMessage.messageId()];
+          if (!resolver) {
             throw new QueryError(`Cube Store missed message id: ${httpMessage.messageId()}`);
           }
 
-          if (getEnv('nativeOrchestrator') && msg.length > 1000) {
-            try {
-              const nativeResMsg = await parseCubestoreResultMessage(msg);
-              resolvers.resolve(nativeResMsg);
-            } catch (e) {
-              resolvers.reject(e);
-            }
-          } else {
-            const commandType = httpMessage.commandType();
+          delete webSocket.sentMessages[httpMessage.messageId()];
 
-            if (commandType === HttpCommand.HttpError) {
-              resolvers.reject(new QueryError(`${httpMessage.command(new HttpError())?.error()}`));
-            } else if (commandType === HttpCommand.HttpResultSet) {
-              const resultSet = httpMessage.command(new HttpResultSet());
+          if (httpMessage.commandType() === HttpCommand.HttpError) {
+            resolver.reject(new QueryError(`${httpMessage.command(new HttpError())?.error()}`));
+            return;
+          }
 
-              if (!resultSet) {
-                resolvers.reject(new QueryError('Empty resultSet'));
-                return;
-              }
-
-              const columnsLen = resultSet.columnsLength();
-              const columns: Array<string> = [];
-              for (let i = 0; i < columnsLen; i++) {
-                const columnName = resultSet.columns(i);
-                if (!columnName) {
-                  resolvers.reject(new QueryError('Column name is not defined'));
-                  return;
-                }
-                columns.push(columnName);
-              }
-
-              const rowLen = resultSet.rowsLength();
-              const result: any[] = [];
-              for (let i = 0; i < rowLen; i++) {
-                const row = resultSet.rows(i);
-                if (!row) {
-                  resolvers.reject(new QueryError('Null row'));
-                  return;
-                }
-                const valueLen = row.valuesLength();
-                const rowObj = {};
-                for (let j = 0; j < valueLen; j++) {
-                  const value = row.values(j);
-                  rowObj[columns[j]] = value?.stringValue();
-                }
-                result.push(rowObj);
-              }
-
-              resolvers.resolve(result);
-            } else {
-              resolvers.reject(new QueryError('Unsupported command'));
-            }
+          try {
+            const nativeResMsg = await parseCubestoreResultMessage(msg);
+            resolver.resolve(nativeResMsg);
+          } catch (e) {
+            resolver.reject(e);
           }
         });
       });
 
       webSocket.sentMessages = {};
+      webSocket.fatalError = null;
       this.webSocket = webSocket;
     }
 
@@ -224,25 +327,43 @@ export class WebSocketConnection {
   }
 
   private async sendMessage(messageId: number, buffer: Uint8Array): Promise<any> {
+    if (buffer.length > this.maxMessageSize) {
+      // Cube Store would close the connection on such a message, which shows up
+      // as an unrelated `write EPIPE`, so report it before sending anything.
+      // This only catches what is over our own limit: Cube Store applies its
+      // own, by default stricter, CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE, and a
+      // message it refuses is reported once it closes the connection.
+      throw new MessageTooLargeError(
+        `Cube Store request size of ${formatSize(buffer.length)} exceeds the maximum message size of ` +
+        `${formatSize(this.maxMessageSize)}. Reduce the size of the query and of the inline tables it sends, ` +
+        'or raise CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE together with CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE ' +
+        'on the Cube Store side.'
+      );
+    }
+
     const socket = await this.initWebSocket();
     return new Promise((resolve, reject) => {
+      socket.sentMessages[messageId] = { resolve, reject, buffer, fatalRounds: 0 };
+
+      // If socket is closing this message should be resent
       if (socket.readyState === WebSocket.OPEN) {
         socket.send(buffer, (err) => {
           if (err) {
-            delete socket.sentMessages[messageId];
-            reject(new ConnectionError(
-              `CubeStore connection error: ${err.message}`,
-              err
-            ));
+            // Leave the message registered and let 'close' re-send it over a
+            // new connection instead of failing it with the write error.
+            socket.terminate();
           }
         });
+      } else if (socket.readyState === WebSocket.CLOSED) {
+        // 'close' already fired for this socket, so no re-send is going to pick
+        // this message up and nothing would ever settle it. That handler also
+        // dropped `this.webSocket`, so trying again establishes a fresh
+        // connection rather than failing a query that was never written. The
+        // `messageId` is deliberately kept, like a re-send: Cube Store
+        // de-duplicates on `(connection_id, message_id)`.
+        delete socket.sentMessages[messageId];
+        this.sendMessage(messageId, buffer).then(resolve, reject);
       }
-
-      socket.sentMessages[messageId] = {
-        resolve,
-        reject,
-        buffer
-      };
     });
   }
 
@@ -322,7 +443,9 @@ export class WebSocketConnection {
     }
   }
 
-  public async query(query: string, inlineTables: InlineTable[], queryTracingObj?: any, parameters?: any): Promise<any[]> {
+  public async query(query: string, parameters: QueryParameter[], options: WebSocketQueryOptions): Promise<any[]> {
+    const { inlineTables, queryTracingObj, responseFormat } = options;
+
     const builder = new flatbuffers.Builder(1024);
     const queryOffset = builder.createString(query);
 
@@ -361,7 +484,7 @@ export class WebSocketConnection {
     }
 
     let parametersOffset: flatbuffers.Offset | null = null;
-    if (parameters) {
+    if (parameters.length > 0) {
       const httpParameterValues: flatbuffers.Offset[] = [];
 
       for (const parameter of parameters) {
@@ -388,6 +511,8 @@ export class WebSocketConnection {
     if (parametersOffset) {
       HttpQuery.addParameters(builder, parametersOffset);
     }
+
+    HttpQuery.addResponseFormat(builder, responseFormat);
 
     const httpQueryOffset = HttpQuery.endHttpQuery(builder);
     const messageId = this.messageCounter++;

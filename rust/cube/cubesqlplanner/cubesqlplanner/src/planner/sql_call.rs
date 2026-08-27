@@ -1,3 +1,4 @@
+use super::symbols::deps::{DepVisitor, DepVisitorMut, SymbolDeps};
 use super::symbols::MemberSymbol;
 use crate::cube_bridge::member_sql::{FilterParamsColumn, SecutityContextProps, SqlTemplate};
 use crate::physical_plan::sql_nodes::{SqlNode, SqlNodesFactory};
@@ -8,9 +9,26 @@ use crate::planner::{CubeNameSymbol, CubeTableSymbol};
 use crate::utils::sql_expression_scanner::analyze_template_arg_contexts;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use lazy_static::lazy_static;
+use regex::Regex;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+lazy_static! {
+    /// A whole template element made of a cube-name placeholder followed only by
+    /// dotted identifiers.
+    static ref INTERPOLATED_REFERENCE_RE: Regex =
+        Regex::new(r"^\s*\{arg:(\d+)\}((?:\.[A-Za-z_$][A-Za-z0-9_$]*)+)\s*$").unwrap();
+}
+
+/// Reference to a cube from a SQL template.
+///
+/// - `Name` — the cube as an identifier (rendered from `{CUBE}` or
+///   `{TABLE}` placeholders); resolves to the cube's quoted name or
+///   alias.
+/// - `Table` — the cube's table expression (rendered from
+///   `{CUBE.sql()}`); resolves to the result of the cube's `sql:`
+///   function, or to a registered pre-aggregation source.
 #[derive(Clone, Debug)]
 pub enum CubeRef {
     Name(Rc<CubeNameSymbol>),
@@ -47,6 +65,8 @@ impl CubeRef {
     }
 }
 
+/// One `{arg:N}` binding inside a `SqlCall` template: either a
+/// member symbol or a cube reference.
 #[derive(Clone, Debug)]
 pub enum SqlDependency {
     Symbol(Rc<MemberSymbol>),
@@ -77,6 +97,27 @@ impl SqlDependency {
     }
 }
 
+/// What one element of a reference declaration names, as read off the compiled
+/// template by `SqlCall::reference_items`.
+#[derive(Clone, Debug)]
+pub enum SqlCallReference {
+    Symbol(Rc<MemberSymbol>),
+    /// Member path of an element that interpolated the cube name, still to be
+    /// resolved against the data model.
+    Path(Vec<String>),
+    /// Element naming no member, rendered for diagnostics.
+    Unresolved(String),
+}
+
+/// Namespace for the placeholder prefixes recognised inside a
+/// `SqlCall` template:
+///
+/// - `arg:N` — Nth `SqlDependency` (member symbol or cube ref).
+/// - `fp:N` — Nth filter param.
+/// - `fg:N` — Nth filter group.
+/// - `sv:N` — Nth security-context value.
+/// - `fpv:N` — Nth filter value, supplied when a compiled
+///   `FILTER_PARAMS` column callback is rendered.
 pub struct SqlCallArg;
 
 impl SqlCallArg {
@@ -84,6 +125,7 @@ impl SqlCallArg {
     const FILTER_PARAM_PREFIX: &'static str = "fp";
     const FILTER_GROUP_PREFIX: &'static str = "fg";
     const SECURITY_VALUE_PREFIX: &'static str = "sv";
+    const FILTER_VALUE_PREFIX: &'static str = "fpv";
 
     pub fn dependency(i: usize) -> String {
         format!("{{{}:{}}}", Self::ARG_PREFIX, i)
@@ -99,17 +141,43 @@ impl SqlCallArg {
     }
 }
 
+/// One `FILTER_PARAMS` binding from the data-model SQL: the filter
+/// member whose predicate should be substituted at render time,
+/// together with the column information used to format it.
 #[derive(Debug, Clone)]
 pub struct SqlCallFilterParamsItem {
     pub filter_symbol_name: String,
     pub column: FilterParamsColumn,
+    /// The column callback compiled into a call of its own, when the
+    /// data model gave one. Its placeholders index its own
+    /// dependencies, so it is rendered on its own rather than spliced
+    /// into the enclosing template.
+    pub compiled_call: Option<Rc<SqlCall>>,
+    /// Whether the query this call is being planned for filters the
+    /// member this binding names. Only then does the column render, so
+    /// only then do the members it reads belong to the enclosing
+    /// member's dependencies — and only then may they pull a cube into
+    /// the join.
+    pub active: bool,
 }
 
+/// `FILTER_GROUP` binding from the data-model SQL: several
+/// `FILTER_PARAMS` items combined into a single substitution.
 #[derive(Clone, Debug)]
 pub struct SqlCallFilterGroupItem {
     pub filter_params: Vec<SqlCallFilterParamsItem>,
 }
 
+/// Tesseract representation of a SQL-like function declared in the
+/// data model (member `sql:`, `mask_sql:`, case branches, measure
+/// filters, and so on). Plays two roles: it stores the template's
+/// dependencies — already resolved to live member symbols and cube
+/// references, not symbolic paths — and it knows how to turn those
+/// dependencies into the final SQL. Placeholders `{arg:N}` /
+/// `{fp:N}` / `{fg:N}` / `{sv:N}` are substituted with the rendered
+/// SQL of the bound dependency, filter param, filter group or
+/// security-context value when the call is evaluated (`eval` /
+/// `eval_vec`).
 #[derive(Clone, Debug)]
 pub struct SqlCall {
     template: SqlTemplate,
@@ -117,9 +185,9 @@ pub struct SqlCall {
     filter_params: Vec<SqlCallFilterParamsItem>,
     filter_groups: Vec<SqlCallFilterGroupItem>,
     security_context: SecutityContextProps,
-    /// Per `{arg:N}` index: whether the surrounding context in the template
-    /// would make a compound substitution unsafe (requiring parentheses).
-    /// Computed once at construction from the template.
+    // Per `{arg:N}` index: whether the surrounding context in the template
+    // would make a compound substitution unsafe (requiring parentheses).
+    // Computed once at construction from the template.
     arg_paren_contexts: HashMap<usize, bool>,
 }
 
@@ -154,12 +222,28 @@ impl SqlCall {
         }
     }
 
+    /// Renders the template into a single SQL string. Errors when
+    /// the template is a `StringVec` — use `eval_vec` for that case.
     pub fn eval(
         &self,
         visitor: &SqlEvaluatorVisitor,
         node_processor: Rc<dyn SqlNode>,
         query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
+        self.eval_with_filter_values(visitor, node_processor, query_tools, templates, &[])
+    }
+
+    /// Renders the call with the filter values a compiled
+    /// `FILTER_PARAMS` column takes through its `{fpv:N}`
+    /// placeholders.
+    pub fn eval_with_filter_values(
+        &self,
+        visitor: &SqlEvaluatorVisitor,
+        node_processor: Rc<dyn SqlNode>,
+        query_tools: Rc<QueryTools>,
+        templates: &PlanSqlTemplates,
+        filter_values: &[String],
     ) -> Result<String, CubeError> {
         if let SqlTemplate::String(template) = &self.template {
             let (filter_params, filter_groups, deps, context_values) =
@@ -171,6 +255,7 @@ impl SqlCall {
                 &filter_params,
                 &filter_groups,
                 &context_values,
+                filter_values,
             )
         } else {
             Err(CubeError::internal(
@@ -179,6 +264,11 @@ impl SqlCall {
         }
     }
 
+    /// Renders the template into one SQL string per element when it
+    /// is a `StringVec`, or a single-element vector for plain
+    /// `String` templates. `StringVec` is produced by pre-aggregation
+    /// dimension / measure reference lists, where the data-model
+    /// definition returns the SQL of all referenced members at once.
     pub fn eval_vec(
         &self,
         visitor: &SqlEvaluatorVisitor,
@@ -197,6 +287,7 @@ impl SqlCall {
                     &filter_params,
                     &filter_groups,
                     &context_values,
+                    &[],
                 )?]
             }
             SqlTemplate::StringVec(templates) => templates
@@ -208,6 +299,7 @@ impl SqlCall {
                         &filter_params,
                         &filter_groups,
                         &context_values,
+                        &[],
                     )
                 })
                 .collect::<Result<Vec<_>, _>>()?,
@@ -215,6 +307,9 @@ impl SqlCall {
         Ok(result)
     }
 
+    /// True when the SQL belongs to a single cube — either it has no
+    /// dependencies at all (a constant expression), or it references
+    /// the owning cube directly through a `{CUBE}` placeholder.
     pub fn is_owned_by_cube(&self) -> bool {
         if self.deps.is_empty() {
             true
@@ -223,6 +318,8 @@ impl SqlCall {
         }
     }
 
+    /// All `CubeRef::Name` dependencies — cube-name placeholders the
+    /// template refers to.
     pub fn cube_name_deps(&self) -> Vec<Rc<CubeNameSymbol>> {
         self.deps
             .iter()
@@ -237,9 +334,10 @@ impl SqlCall {
     }
 
     pub fn get_cube_refs(&self) -> Vec<CubeRef> {
-        let mut result = vec![];
-        self.extract_cube_refs(&mut result);
-        result
+        self.deps
+            .iter()
+            .filter_map(|d| d.as_cube_ref().cloned())
+            .collect()
     }
 
     fn prepare_template_params(
@@ -293,17 +391,52 @@ impl SqlCall {
             .collect::<Result<Vec<_>, _>>()?;
 
         let context_values = self.eval_security_context_values(&query_tools);
+
+        // A FILTER_PARAMS column can itself be a template referencing this
+        // call's members (e.g. `.filter(`${CUBE.col}`)`), so the rendered
+        // predicate may still carry `{arg:N}`/`{sv:N}` placeholders. Resolve
+        // them against the just-computed dependencies before the predicate is
+        // spliced into the outer template, which would otherwise leave them
+        // untouched (the outer pass never rescans substituted values).
+        let filter_params = filter_params
+            .iter()
+            .map(|s| {
+                Self::substitute_template(
+                    s,
+                    &deps,
+                    &filter_params,
+                    &filter_groups,
+                    &context_values,
+                    &[],
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let filter_groups = filter_groups
+            .iter()
+            .map(|s| {
+                Self::substitute_template(
+                    s,
+                    &deps,
+                    &filter_params,
+                    &filter_groups,
+                    &context_values,
+                    &[],
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
         Ok((filter_params, filter_groups, deps, context_values))
     }
 
     /// Substitute placeholders in template string with computed values in a single pass
-    /// Supports placeholders: {arg:N}, {fp:N}, {fg:N}, {sv:N}
+    /// Supports placeholders: {arg:N}, {fp:N}, {fg:N}, {sv:N}, {fpv:N}
     fn substitute_template(
         template: &str,
         deps: &[String],
         filter_params: &[String],
         filter_groups: &[String],
         security_values: &[String],
+        filter_values: &[String],
     ) -> Result<String, CubeError> {
         let mut result = String::with_capacity(template.len());
         let mut chars = template.chars().peekable();
@@ -338,6 +471,7 @@ impl SqlCall {
                             SqlCallArg::FILTER_PARAM_PREFIX => filter_params.get(idx),
                             SqlCallArg::FILTER_GROUP_PREFIX => filter_groups.get(idx),
                             SqlCallArg::SECURITY_VALUE_PREFIX => security_values.get(idx),
+                            SqlCallArg::FILTER_VALUE_PREFIX => filter_values.get(idx),
                             _ => {
                                 result.push('{');
                                 result.push_str(&placeholder);
@@ -390,13 +524,14 @@ impl SqlCall {
                     let mut filter_params_columns = HashMap::new();
                     for itm in items {
                         filter_params_columns
-                            .insert(itm.filter_symbol_name.clone(), itm.column.clone());
+                            .insert(itm.filter_symbol_name.clone(), (*itm).clone());
                     }
 
                     let context = VisitorContext::new_for_filter_params(
                         query_tools.clone(),
                         &SqlNodesFactory::new(),
                         filter_params_columns,
+                        visitor.time_shifts().clone(),
                     );
                     return crate::physical_plan::filter::render_filter_item(
                         &context, &subtree, templates,
@@ -415,11 +550,16 @@ impl SqlCall {
             .collect()
     }
 
+    /// True if the entire template is exactly `{arg:0}` with a single
+    /// member-symbol dependency — i.e. the SQL is a plain reference
+    /// to another member, with no wrapping expression.
     pub fn is_direct_reference(&self) -> bool {
         self.dependencies_count() == 1
             && self.template == SqlTemplate::String(SqlCallArg::dependency(0))
     }
 
+    /// The single member this call references when `is_direct_reference`
+    /// is true; `None` otherwise.
     pub fn resolve_direct_reference(&self) -> Option<Rc<MemberSymbol>> {
         if self.is_direct_reference() {
             self.deps[0].as_symbol().cloned()
@@ -428,10 +568,125 @@ impl SqlCall {
         }
     }
 
+    /// What each element of a reference declaration (a pre-aggregation
+    /// `measures:` / `dimensions:` / `segments:` / `time_dimension:`) names,
+    /// in declaration order.
+    ///
+    /// An element referencing a member yields that member's symbol. An element
+    /// that interpolated the cube itself — ``(CUBE) => `${CUBE}.created_at` `` —
+    /// depends on the cube name and keeps the member as literal text, so it
+    /// yields the path to resolve: the cube reference's path followed by the
+    /// literal segments. Anything else names no member and is reported as
+    /// unresolved, rendered for diagnostics.
+    ///
+    /// An element wrapping a member reference in an expression still yields that
+    /// member, since the member is a dependency of its own — only the cube-name
+    /// form has nothing to fall back on.
+    pub fn reference_items(&self) -> Vec<SqlCallReference> {
+        let elements = match &self.template {
+            SqlTemplate::String(s) => std::slice::from_ref(s),
+            SqlTemplate::StringVec(strings) => strings.as_slice(),
+        };
+        let mut taken = vec![false; self.deps.len()];
+        let mut result = Vec::new();
+        for element in elements {
+            let arg_indices = Self::template_arg_indices(element);
+            let names_symbol = arg_indices
+                .iter()
+                .any(|index| self.deps.get(*index).is_some_and(|dep| dep.is_symbol()));
+            if names_symbol {
+                for index in arg_indices {
+                    // An index the recorded dependencies don't cover names
+                    // nothing; the rest of the element is still read.
+                    let Some(symbol) = self.deps.get(index).and_then(|dep| dep.as_symbol()) else {
+                        continue;
+                    };
+                    if taken[index] {
+                        continue;
+                    }
+                    taken[index] = true;
+                    result.push(SqlCallReference::Symbol(symbol.clone()));
+                }
+                continue;
+            }
+            match self.interpolated_reference_path(element) {
+                Some(path) => result.push(SqlCallReference::Path(path)),
+                None => result.push(SqlCallReference::Unresolved(
+                    self.render_for_diagnostics(element),
+                )),
+            }
+        }
+        // A symbol no element referenced: keep it rather than lose a member the
+        // declaration depends on.
+        for (index, dep) in self.deps.iter().enumerate() {
+            if !taken[index] {
+                if let Some(symbol) = dep.as_symbol() {
+                    result.push(SqlCallReference::Symbol(symbol.clone()));
+                }
+            }
+        }
+        result
+    }
+
+    // Path of an element made of a cube-name placeholder followed only by dotted
+    // identifiers; `None` when the element has any other shape.
+    fn interpolated_reference_path(&self, element: &str) -> Option<Vec<String>> {
+        let captures = INTERPOLATED_REFERENCE_RE.captures(element)?;
+        let index = captures.get(1)?.as_str().parse::<usize>().ok()?;
+        let cube_ref = self.deps.get(index)?.as_cube_ref()?.as_name()?;
+        let mut path = cube_ref.path().clone();
+        path.extend(
+            captures
+                .get(2)?
+                .as_str()
+                .split('.')
+                .skip(1)
+                .map(String::from),
+        );
+        Some(path)
+    }
+
+    // `{arg:N}` indices in the order they appear in the element.
+    fn template_arg_indices(element: &str) -> Vec<usize> {
+        let needle = format!("{{{}:", SqlCallArg::ARG_PREFIX);
+        let mut result = Vec::new();
+        let mut rest = element;
+        while let Some(start) = rest.find(&needle) {
+            rest = &rest[start + needle.len()..];
+            let Some(end) = rest.find('}') else {
+                break;
+            };
+            if let Ok(index) = rest[..end].parse::<usize>() {
+                result.push(index);
+            }
+            rest = &rest[end + 1..];
+        }
+        result
+    }
+
+    // Element with its dependencies replaced by the members and cubes they name,
+    // for error messages about an element that names no member.
+    fn render_for_diagnostics(&self, element: &str) -> String {
+        let deps = self
+            .deps
+            .iter()
+            .map(|dep| match dep {
+                SqlDependency::Symbol(symbol) => symbol.full_name(),
+                SqlDependency::CubeRef(cube_ref) => cube_ref.cube_name().clone(),
+            })
+            .collect_vec();
+        Self::substitute_template(element, &deps, &[], &[], &[], &[])
+            .unwrap_or_else(|_| element.to_string())
+    }
+
+    /// Number of member-symbol dependencies. Cube refs are not
+    /// counted.
     pub fn dependencies_count(&self) -> usize {
         self.deps.iter().filter(|d| d.is_symbol()).count()
     }
 
+    /// Member-symbol dependencies of the call. Cube refs are excluded
+    /// — use `get_cube_refs` for those.
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
         self.deps
             .iter()
@@ -439,33 +694,81 @@ impl SqlCall {
             .collect()
     }
 
-    pub fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
-        for dep in self.deps.iter() {
-            if let Some(s) = dep.as_symbol() {
-                result.push(s.clone())
-            }
-        }
+    fn active_filter_params(&self) -> impl Iterator<Item = &SqlCallFilterParamsItem> {
+        self.filter_params
+            .iter()
+            .chain(
+                self.filter_groups
+                    .iter()
+                    .flat_map(|g| g.filter_params.iter()),
+            )
+            .filter(|item| item.active)
     }
 
-    pub fn extract_cube_refs(&self, result: &mut Vec<CubeRef>) {
-        for dep in self.deps.iter() {
-            if let SqlDependency::CubeRef(cr) = dep {
-                result.push(cr.clone());
-            }
-        }
+    fn filter_params_mut(&mut self) -> impl Iterator<Item = &mut SqlCallFilterParamsItem> {
+        self.filter_params.iter_mut().chain(
+            self.filter_groups
+                .iter_mut()
+                .flat_map(|g| g.filter_params.iter_mut()),
+        )
     }
 
-    pub fn apply_recursive<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Rc<Self>, CubeError> {
-        let mut result = self.clone();
-        for dep in result.deps.iter_mut() {
-            if let SqlDependency::Symbol(ref s) = dep {
-                *dep = SqlDependency::Symbol(s.apply_recursive(f)?);
+    pub fn struct_eq(&self, other: &Self) -> bool {
+        self.template == other.template
+            && self.deps.len() == other.deps.len()
+            && self
+                .deps
+                .iter()
+                .zip(&other.deps)
+                .all(|(a, b)| match (a, b) {
+                    (SqlDependency::Symbol(x), SqlDependency::Symbol(y)) => x == y,
+                    (SqlDependency::CubeRef(x), SqlDependency::CubeRef(y)) => {
+                        x.cube_name() == y.cube_name() && x.path() == y.path()
+                    }
+                    _ => false,
+                })
+    }
+}
+
+impl SymbolDeps for Rc<SqlCall> {
+    fn visit_deps(&self, visitor: &mut dyn DepVisitor) -> std::ops::ControlFlow<()> {
+        for dep in self.deps.iter() {
+            match dep {
+                SqlDependency::Symbol(s) => visitor.symbol(s)?,
+                SqlDependency::CubeRef(cr) => visitor.cube_ref(cr)?,
             }
         }
-        Ok(Rc::new(result))
+        // An active column renders, so what it reads is read by this call too.
+        for item in self.active_filter_params() {
+            if let Some(call) = &item.compiled_call {
+                call.visit_deps(visitor)?;
+            }
+        }
+        std::ops::ControlFlow::Continue(())
+    }
+
+    fn visit_deps_mut(&mut self, visitor: &mut dyn DepVisitorMut) -> Result<(), CubeError> {
+        let mut call = (**self).clone();
+        for dep in call.deps.iter_mut() {
+            if let SqlDependency::Symbol(s) = dep {
+                visitor.symbol(s)?;
+            }
+        }
+        // Reached whatever the activity, so a rewrite never leaves an inactive
+        // column holding a symbol every other reference to it has replaced.
+        for item in call.filter_params.iter_mut() {
+            visitor.filter_params_group(std::slice::from_mut(item))?;
+        }
+        for group in call.filter_groups.iter_mut() {
+            visitor.filter_params_group(&mut group.filter_params)?;
+        }
+        for item in call.filter_params_mut() {
+            if let Some(call) = &mut item.compiled_call {
+                call.visit_deps_mut(visitor)?;
+            }
+        }
+        *self = Rc::new(call);
+        Ok(())
     }
 }
 
@@ -527,7 +830,211 @@ impl crate::utils::debug::DebugSql for SqlCall {
             &filter_params,
             &filter_groups,
             &context_values,
+            &[],
         )
         .unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_fixtures::cube_bridge::MockSchema;
+    use crate::test_fixtures::test_utils::TestContext;
+    use indoc::indoc;
+
+    fn test_context() -> TestContext {
+        let schema = MockSchema::from_yaml(indoc! {"
+            cubes:
+              - name: orders
+                sql: SELECT * FROM orders
+                dimensions:
+                  - name: id
+                    type: number
+                    sql: id
+                    primary_key: true
+                  - name: status
+                    type: string
+                    sql: status
+                  - name: created_at
+                    type: time
+                    sql: created_at
+                measures:
+                  - name: count
+                    type: count
+        "})
+        .unwrap();
+        TestContext::new(schema).unwrap()
+    }
+
+    fn cube_name_dep(cube_name: &str, path: &[&str]) -> SqlDependency {
+        SqlDependency::CubeRef(CubeRef::Name(CubeNameSymbol::new(
+            cube_name.to_string(),
+            path.iter().map(|p| p.to_string()).collect(),
+        )))
+    }
+
+    fn call(template: SqlTemplate, deps: Vec<SqlDependency>) -> SqlCall {
+        SqlCall::new(
+            template,
+            deps,
+            vec![],
+            vec![],
+            SecutityContextProps::default(),
+        )
+    }
+
+    fn single(template: &str, deps: Vec<SqlDependency>) -> SqlCall {
+        call(SqlTemplate::String(template.to_string()), deps)
+    }
+
+    /// Reference items as comparable strings: `symbol:<full name>`,
+    /// `path:<dotted path>`, `unresolved:<rendered element>`.
+    fn described(sql_call: &SqlCall) -> Vec<String> {
+        sql_call
+            .reference_items()
+            .iter()
+            .map(|item| match item {
+                SqlCallReference::Symbol(symbol) => format!("symbol:{}", symbol.full_name()),
+                SqlCallReference::Path(path) => format!("path:{}", path.join(".")),
+                SqlCallReference::Unresolved(rendered) => format!("unresolved:{}", rendered),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_cube_name_followed_by_member_yields_path() {
+        let sql_call = single("{arg:0}.created_at", vec![cube_name_dep("orders", &[])]);
+
+        assert_eq!(described(&sql_call), vec!["path:orders.created_at"]);
+    }
+
+    #[test]
+    fn test_surrounding_whitespace_is_ignored() {
+        let sql_call = single("  {arg:0}.created_at\n", vec![cube_name_dep("orders", &[])]);
+
+        assert_eq!(described(&sql_call), vec!["path:orders.created_at"]);
+    }
+
+    #[test]
+    fn test_join_path_is_kept() {
+        // `${CUBE.users}.name` — the cube reference carries the cubes traversed,
+        // and the member name follows as literal text.
+        let sql_call = single("{arg:0}.name", vec![cube_name_dep("users", &["orders"])]);
+
+        assert_eq!(described(&sql_call), vec!["path:orders.users.name"]);
+    }
+
+    #[test]
+    fn test_literal_segments_after_the_cube_are_all_kept() {
+        let sql_call = single("{arg:0}.users.name", vec![cube_name_dep("orders", &[])]);
+
+        assert_eq!(described(&sql_call), vec!["path:orders.users.name"]);
+    }
+
+    #[test]
+    fn test_every_element_of_a_reference_list_is_resolved() {
+        let sql_call = call(
+            SqlTemplate::StringVec(vec![
+                "{arg:0}.count".to_string(),
+                "{arg:1}.name".to_string(),
+            ]),
+            vec![cube_name_dep("orders", &[]), cube_name_dep("users", &[])],
+        );
+
+        assert_eq!(
+            described(&sql_call),
+            vec!["path:orders.count", "path:users.name"]
+        );
+    }
+
+    // A member reference produces a symbol dependency of its own.
+    #[test]
+    fn test_member_dependency_is_reported_as_a_symbol() {
+        let ctx = test_context();
+        let symbol = ctx.create_dimension("orders.created_at").unwrap();
+        let sql_call = single("{arg:0}", vec![SqlDependency::Symbol(symbol)]);
+
+        assert_eq!(described(&sql_call), vec!["symbol:orders.created_at"]);
+    }
+
+    // Declaration order survives a list mixing both forms — join hints and
+    // lambda member matching read the compiled list positionally.
+    #[test]
+    fn test_declaration_order_is_kept_for_a_mixed_list() {
+        let ctx = test_context();
+        let symbol = ctx.create_dimension("orders.status").unwrap();
+        let sql_call = call(
+            SqlTemplate::StringVec(vec![
+                "{arg:0}.created_at".to_string(),
+                "{arg:1}".to_string(),
+            ]),
+            vec![cube_name_dep("orders", &[]), SqlDependency::Symbol(symbol)],
+        );
+
+        assert_eq!(
+            described(&sql_call),
+            vec!["path:orders.created_at", "symbol:orders.status"]
+        );
+    }
+
+    // An element naming a member through an expression names no single member.
+    #[test]
+    fn test_element_carrying_an_expression_is_unresolved() {
+        for (template, expected) in [
+            ("{arg:0}.created_at + 1", "unresolved:orders.created_at + 1"),
+            (
+                "date_trunc('day', {arg:0}.created_at)",
+                "unresolved:date_trunc('day', orders.created_at)",
+            ),
+            ("{arg:0}", "unresolved:orders"),
+            ("{arg:0}.", "unresolved:orders."),
+            ("{arg:0}.2days", "unresolved:orders.2days"),
+        ] {
+            let sql_call = single(template, vec![cube_name_dep("orders", &[])]);
+
+            assert_eq!(
+                described(&sql_call),
+                vec![expected],
+                "unexpected reference items for `{}`",
+                template
+            );
+        }
+    }
+
+    // `${CUBE.sql()}` renders the cube's table expression, not its name, so it
+    // cannot start a member path.
+    #[test]
+    fn test_cube_table_reference_is_unresolved() {
+        let ctx = test_context();
+        let cube_table = ctx
+            .query_tools()
+            .compiler()
+            .borrow_mut()
+            .add_cube_table_evaluator("orders".to_string(), vec![])
+            .unwrap();
+        let sql_call = single(
+            "{arg:0}.created_at",
+            vec![SqlDependency::CubeRef(CubeRef::Table(cube_table))],
+        );
+
+        assert_eq!(described(&sql_call), vec!["unresolved:orders.created_at"]);
+    }
+
+    // An index the recorded dependencies don't cover must not be read as one.
+    #[test]
+    fn test_placeholder_out_of_bounds_next_to_a_member_is_skipped() {
+        let ctx = test_context();
+        let symbol = ctx.create_dimension("orders.status").unwrap();
+        let sql_call = single("{arg:0} || {arg:7}", vec![SqlDependency::Symbol(symbol)]);
+
+        assert_eq!(described(&sql_call), vec!["symbol:orders.status"]);
+    }
+
+    #[test]
+    fn test_placeholder_out_of_bounds_is_unresolved() {
+        let sql_call = single("{arg:3}.created_at", vec![cube_name_dep("orders", &[])]);
+
+        assert_eq!(described(&sql_call), vec!["unresolved:{arg:3}.created_at"]);
     }
 }

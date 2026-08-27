@@ -6,26 +6,17 @@ use crate::planner::symbols::AggregateWrap;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::any::Any;
-use std::collections::HashSet;
 use std::rc::Rc;
 
+/// Applies the final aggregation wrap to a measure (sum / avg /
+/// count_distinct / pass-through, etc.) using `MeasureKind::aggregate_wrap`.
 pub struct FinalMeasureSqlNode {
     input: Rc<dyn SqlNode>,
-    rendered_as_multiplied_measures: HashSet<String>,
-    count_approx_as_state: bool,
 }
 
 impl FinalMeasureSqlNode {
-    pub fn new(
-        input: Rc<dyn SqlNode>,
-        rendered_as_multiplied_measures: HashSet<String>,
-        count_approx_as_state: bool,
-    ) -> Rc<Self> {
-        Rc::new(Self {
-            input,
-            rendered_as_multiplied_measures,
-            count_approx_as_state,
-        })
+    pub fn new(input: Rc<dyn SqlNode>) -> Rc<Self> {
+        Rc::new(Self { input })
     }
 
     pub fn input(&self) -> &Rc<dyn SqlNode> {
@@ -42,13 +33,8 @@ impl FinalMeasureSqlNode {
             AggregateWrap::PassThrough => Ok(input),
             AggregateWrap::Function(name) => Ok(format!("{}({})", name, input)),
             AggregateWrap::CountDistinct => templates.count_distinct(&input),
-            AggregateWrap::CountDistinctApprox => {
-                if self.count_approx_as_state {
-                    templates.hll_init(input)
-                } else {
-                    templates.count_distinct_approx(input)
-                }
-            }
+            AggregateWrap::CountDistinctApprox => templates.count_distinct_approx(input),
+            AggregateWrap::CountDistinctApproxState => templates.hll_init(input),
         }
     }
 }
@@ -64,13 +50,15 @@ impl SqlNode for FinalMeasureSqlNode {
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Measure(ev) => {
-                let is_multiplied = self
-                    .rendered_as_multiplied_measures
-                    .contains(&ev.full_name());
-                let wrap = ev.kind().aggregate_wrap(is_multiplied);
+                let wrap = ev.kind().aggregate_wrap();
                 let child_visitor = match wrap {
                     AggregateWrap::PassThrough => visitor.clone(),
-                    _ => visitor.with_arg_needs_paren_safe(false),
+                    AggregateWrap::Function(_)
+                    | AggregateWrap::CountDistinct
+                    | AggregateWrap::CountDistinctApprox
+                    | AggregateWrap::CountDistinctApproxState => {
+                        visitor.with_arg_needs_paren_safe(false)
+                    }
                 };
                 let input = self.input.to_sql(
                     &child_visitor,

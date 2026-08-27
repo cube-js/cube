@@ -5,6 +5,10 @@ use itertools::Itertools;
 use std::{collections::HashMap, rc::Rc};
 use typed_builder::TypedBuilder;
 
+/// A matched pre-aggregation usable as a query source — its table
+/// (or rollup join / union), the members it exposes and its
+/// granularity. The physical builder reads members through the
+/// `*_refererences` helpers.
 #[derive(TypedBuilder)]
 pub struct PreAggregation {
     name: String,
@@ -174,7 +178,10 @@ impl PrettyPrint for PreAggregation {
                 result.println("Union:", &state);
                 let state = state.new_level();
                 for item in union.items.iter() {
-                    result.println(&format!("-{}.{}", item.cube_name, item.name), &state);
+                    result.println(
+                        &format!("-{}.{}", item.table.cube_name, item.table.name),
+                        &state,
+                    );
                 }
             }
         }

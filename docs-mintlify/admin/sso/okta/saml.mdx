@@ -57,10 +57,24 @@ user attributes from Okta to Cube Cloud:
 2. Scroll down to the **Attribute statements** section.
 3. Click **Add expression** and create the following entries:
 
-| Name    | Expression                |
-| ------- | ------------------------- |
-| `email` | `user.profile.email`      |
-| `name`  | `user.profile.firstName`  |
+   | Name    | Expression                |
+   | ------- | ------------------------- |
+   | `email` | `user.profile.email`      |
+   | `name`  | `user.profile.firstName`  |
+
+4. If you plan to map Cube roles based on Okta group membership (see
+   [Map roles by group](#map-roles-by-group) below), also add a **Group
+   Attribute Statement**. Scroll to the **Group Attribute Statements**
+   section and add:
+
+   | Name     | Filter                |
+   | -------- | --------------------- |
+   | `groups` | **Matches regex** `.*` |
+
+   Adjust the filter to scope which groups Okta sends — e.g.
+   **Starts with** `cube-` to limit the assertion to Cube-related groups.
+   The attribute name must match the **Groups attribute** value configured
+   in Cube Cloud (defaults to `groups`).
 
 ## Retrieve SAML details from Okta
 
@@ -105,8 +119,7 @@ the **Viewer** role by default. To assign a different role, expand the
 
 The selected role applies **only when a user is first created** during
 provisioning. Existing users are not modified on subsequent SSO logins or
-SCIM updates. It is applied **in addition to** any roles your identity
-provider sends via the role attribute (subject to the `rolesMap`).
+SCIM updates.
 
 <Info>
 
@@ -125,6 +138,41 @@ whether that's because no default is set or the configured role no longer
 exists.
 
 </Warning>
+
+## Map roles by group
+
+For finer-grained role assignment, enable **Map roles by group** in the
+**Advanced Settings** section to assign Cube Cloud roles based on a user's
+Okta group memberships.
+
+To configure group-based role mapping:
+
+1. Make sure Okta sends a group attribute statement on the SAML assertion.
+   See step 4 of [Configure attribute statements in
+   Okta](#configure-attribute-statements-in-okta).
+2. In the SAML configuration form in Cube Cloud, expand **Advanced
+   Settings**.
+3. (Optional) Under **SAML attribute customization**, set the **Groups
+   attribute** to the name of the SAML attribute you configured in Okta.
+   Defaults to `groups`.
+4. Enable the **Map roles by group** toggle.
+5. Click **Add group mapping** and create one entry per group you want to
+   map:
+   - **IdP group name** — the Okta group **display name** exactly as it
+     appears in the SAML assertion (case-insensitive).
+   - **Cube Cloud role** — pick a default or [custom role][ref-custom-roles].
+
+For SAML SSO, group mappings are evaluated **only when a new user is
+auto-provisioned** on first login. If any matching group resolves to a
+Cube Cloud role, those roles are assigned to the new user **instead of**
+the configured [default role](#default-role-for-new-users). The default
+role is used as a fallback when no IdP group matches (or when the mapped
+Cube Cloud roles no longer exist). Existing users' role assignments are
+never modified by subsequent logins.
+
+The same mapping is also applied by [SCIM][ref-scim] when group
+memberships are pushed, so a single configuration drives both SAML SSO
+and SCIM group sync.
 
 ## Test SAML authentication
 

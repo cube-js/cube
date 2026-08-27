@@ -1,7 +1,7 @@
 use std::any::Any;
 
 use super::FunctionArgsDef;
-use super::{inner_types::InnerTypes, object_handle::NativeObjectHandle};
+use super::{inner_types::InnerTypes, object_handle::NativeObjectHandle, NativeRustHandle};
 use crate::wrappers::serializer::NativeSerialize;
 use crate::CubeError;
 
@@ -13,6 +13,7 @@ pub trait NativeContext<IT: InnerTypes>: Clone {
     fn null(&self) -> Result<NativeObjectHandle<IT>, CubeError>;
     fn empty_array(&self) -> Result<IT::Array, CubeError>;
     fn empty_struct(&self) -> Result<IT::Struct, CubeError>;
+    fn rust_box(&self, handle: NativeRustHandle) -> Result<IT::RustBox, CubeError>;
     fn to_string_fn(&self, result: String) -> Result<IT::Function, CubeError>;
     fn global(&self, name: &str) -> Result<NativeObjectHandle<IT>, CubeError>;
     fn make_function<In, Rt, F: FunctionArgsDef<IT::FunctionIT, In, Rt> + 'static>(
@@ -84,6 +85,9 @@ impl<IT: InnerTypes> NativeContextHolder<IT> {
     }
     pub fn empty_struct(&self) -> Result<IT::Struct, CubeError> {
         self.context.empty_struct()
+    }
+    pub fn rust_box(&self, handle: NativeRustHandle) -> Result<IT::RustBox, CubeError> {
+        self.context.rust_box(handle)
     }
     #[allow(dead_code)]
     pub fn to_string_fn(&self, result: String) -> Result<IT::Function, CubeError> {

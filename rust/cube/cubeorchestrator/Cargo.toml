@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+arrow = { version = "58", default-features = false, features = ["ipc"] }
 chrono = { version = "0.4.31", features = ["serde"] }
 cubeshared = { path = "../cubeshared" }
-serde = { version = "1.0.217", features = ["derive"] }
+serde = { version = "1.0.217", features = ["derive", "rc"] }
 serde_json = "1.0.133"
 anyhow = "1.0"
 itertools = "0.13.0"
@@ -22,4 +23,8 @@ criterion = { version = "0.8", default-features = false, features = ["html_repor
 
 [[bench]]
 name = "transform"
+harness = false
+
+[[bench]]
+name = "parser"
 harness = false

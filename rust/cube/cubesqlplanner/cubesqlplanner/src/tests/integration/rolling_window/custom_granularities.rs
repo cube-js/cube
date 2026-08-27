@@ -102,10 +102,6 @@ async fn test_to_date_custom_fiscal_year_with_month_granularity() {
 
 // --- Custom granularity as query granularity ---
 
-// FIXME: Custom granularity as query granularity requires generate_custom_time_series()
-// which is not implemented in mock (todo! in mock_base_tools.rs:81). The planner needs
-// the mock to generate the time series for non-standard intervals (half_year, bi_weekly).
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rolling_sum_with_half_year_query_granularity() {
     let ctx = create_context();
@@ -128,8 +124,6 @@ async fn test_rolling_sum_with_half_year_query_granularity() {
     }
 }
 
-// FIXME: Same — generate_custom_time_series() not implemented in mock.
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rolling_sum_with_bi_weekly_query_granularity() {
     let ctx = create_context();
@@ -152,8 +146,6 @@ async fn test_rolling_sum_with_bi_weekly_query_granularity() {
     }
 }
 
-// FIXME: Same — generate_custom_time_series() not implemented in mock.
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_to_date_with_custom_query_granularity() {
     let ctx = create_context();

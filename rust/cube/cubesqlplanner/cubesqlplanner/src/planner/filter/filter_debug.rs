@@ -12,10 +12,7 @@ impl DebugSql for BaseFilter {
         let values_str = self
             .values()
             .iter()
-            .map(|v| match v {
-                Some(val) => format!("'{}'", val),
-                None => "NULL".to_string(),
-            })
+            .map(|v| v.to_debug_string())
             .collect::<Vec<_>>()
             .join(", ");
 

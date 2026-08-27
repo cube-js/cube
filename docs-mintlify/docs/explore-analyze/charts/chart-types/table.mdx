@@ -1,9 +1,9 @@
 ---
 title: Table
-description: Display query results as a configurable table with pivots, conditional formatting, and inline visualizations.
+description: Display query results as a configurable table with pivots, conditional formatting, and custom styling.
 ---
 
-The table visualization presents query results in a structured grid. Unlike the raw results table in the query panel, the table visualization is designed for sharing — it supports pivots, column display overrides, conditional formatting, custom styling, and inline bar/link/image column rendering.
+The table visualization presents query results in a structured grid. Unlike the raw results table in the query panel, the table visualization is designed for sharing — it supports pivots, conditional formatting, custom styling, and a per-cell menu for links, copy, and drill-down.
 
 {/* TODO screenshot: styled table with pivot and conditional formatting (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -14,6 +14,12 @@ Right-click a column header in the table visualization to hide it. Hidden column
 ## Reordering columns
 
 Drag a column header to reorder columns. Dimensions and measures can be interspersed freely when no pivot is active.
+
+## Sorting
+
+Sorting is set on the query, not on the table — use the column header menus or the **Sort** button. See [Sorting](/docs/explore-analyze/workbooks/querying-data#sorting).
+
+Pivot columns are the exception: they can also be sorted from the table itself, as described under [Pivots](#pivots).
 
 ## Pivots
 
@@ -26,109 +32,468 @@ Pivot behavior:
 - Pivot columns can also be sorted by row values — click a row number to sort by that row, including the totals row.
 - Pivoted columns can be hidden, but hiding is indexed to the specific value (e.g. hiding `status: returned`), not position.
 
-## Table options
+## Row grouping
 
-The **Table** tab in the configuration panel controls layout and display settings:
+Group rows by their leading dimensions into collapsible headers, so each grouped
+dimension's value is shown once for the whole group instead of repeated on every row.
 
-| Option | Description |
-|---|---|
-| **Column width** | **Stretch** fills the full table width; **Fixed** keeps column widths constant regardless of tile size |
-| **Header text** | Controls whether long column headers **truncate** or **wrap** to the next line |
-| **View names** | When enabled, the view/cube name is shown in the column header |
-| **Row numbers** | Adds a row number column on the left |
-| **Group dimensions** | Groups multiple dimensions per row into a collapsible section for subtotaling |
+Turn it on with the **Group rows** toggle in the **Values** section of the **Style**
+tab. The toggle is disabled — with a tooltip explaining why — unless the table has at
+least two row dimensions and no column pivot. You can also ask [Analytics
+Chat](/docs/explore-analyze/analytics-chat) to group the table's rows.
+
+With grouping on, every row dimension except the innermost becomes a group level: rows
+nest one header per level, kept contiguous by that dimension's first-appearance order,
+with the header showing the dimension's value once instead of on every row underneath.
+
+Turning it on also adds a **Row grouping** section to the **Style** tab, with:
+
+- **Expand all groups** / **Collapse all groups** — set every group's expand state at once.
+- Text color, background color, and text formatting for the group header rows.
+
+Each group-level column's card in the **Columns** section gets a **Default state**
+control (**Expanded** or **Collapsed**) that sets whether new groups on that level start
+open or closed. It only sets the default — a viewer's own expand/collapse of an
+individual group isn't affected by changing it afterwards.
+
+{/* TODO screenshot: table with collapsed row groups and the Style tab's Row grouping section */}
 
 ## Column field options
 
-Click the dropdown arrow on any field in the **Fields** section to configure it:
+Configure individual columns in the **Columns** section of the **Style** tab (or via the dropdown arrow on a field in the **Fields** section):
 
 | Option | Description |
 |---|---|
 | **Label** | Override the column header text |
-| **Alignment** | Left, center, or right |
+| **Alignment** | Left, center, or right. Defaults to the column's data type — numbers right, everything else left |
+| **Vertical alignment** | Top, middle, or bottom — where the value sits when the row is taller than one line |
 | **Word wrap** | Allow cell content to wrap to multiple lines |
+| **Width** | **Flex** (a weight) or **Fix** (pixels) — see [Column width](#column-width) |
 | **Hide** | Show or hide the column |
 
-## Display tab — showing columns as links, images, or bars
+When a cell's value is too long for its column and word wrap is off, the value is truncated with an ellipsis. Hover over a truncated cell to see its full value in a tooltip.
 
-By default, columns display their raw value. The **Display** tab for each field lets you change this:
+## Column width
 
-### Links
+Each column's width is set independently on its card in the **Columns** section of the **Style** tab, using the **Flex** / **Fix** pair and the number next to it. A column is in one of two modes:
 
-Display a field's value as a clickable hyperlink. To create dynamic per-row links:
+- **Flex** (the default) — the column shares the table's available width with the other flexible columns, in proportion to its **weight**, entered next to the mode as `×1`. A column with weight `2` is twice as wide as a column with weight `1`. New columns start at weight `1`, so by default all columns share the width equally and the table stretches to fill its tile.
+- **Fix** — the column is locked to an exact pixel width, entered as `px`, and no longer participates in the weight-based distribution. Fixed columns keep their width regardless of the tile size; if the fixed columns don't fill the tile, the remaining space is left blank. Pixel widths start at 10 and step in tens.
 
-1. Add a [calculated field](/docs/explore-analyze/workbooks/calculated-fields) that produces a URL — for example:
-   ```
-   CONCAT("https://example.com/orders/", order_items.order_id)
-   ```
-2. In the table visualization, hide the calculated field column.
-3. In the **Display** tab for the field you want to link, set **Display as** to **Link** and select the hidden URL field as the source.
+You can mix the two: give a label column a fixed width and let the metric columns flex to share the rest.
 
-{/* TODO screenshot: column display dropdown showing Link option selected (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+### Setting widths
 
-### Images
+- **In the panel** — pick **Flex** or **Fix** for a column and enter its weight or pixel value. Switching to **Fix** reuses the column's last fixed width if it had one, and otherwise starts from the width it's currently drawn at.
+- **By dragging** — drag the border between two column headers on the table. The change is saved into the column's current mode (a flexible column keeps flexing at its new relative size; a fixed column updates its pixel width).
+- **Fit** — the **Fit** button on a column's card sizes it to its content and switches it to **Fix** at that width.
 
-Display a field as an image by setting **Display as** to **Image**. Configure height and width. To make the image a link, check **Link image** and set the **Link URL**.
+  <Note>
 
-The URL must be publicly accessible without authentication.
+  Fit measures the rows currently rendered on screen. If a wider value is further down a long, scrolled table, fit again after scrolling to it.
+
+  </Note>
+
+{/* TODO: screenshot — a column card in the Columns section showing the Flex/Fix width control and the Fit button */}
+
+### Bulk controls
+
+At the top of the **Columns** section, three buttons apply a width mode to every column at once:
+
+- **Flex** — converts every column to flexible, deriving each weight from its current width (so the layout doesn't jump). Enabled only when at least one column is fixed.
+- **Fix** — freezes every column at its current rendered pixel width. Enabled only when at least one column is flexible.
+- **Fit** — sizes every column to its content and fixes it at that width, in a single action. Like the per-column **Fit**, it measures the rows currently rendered on screen.
+
+<Note>
+
+Under a column pivot, a width set on a measure applies to every column generated for that measure.
+
+</Note>
+
+## Showing columns as links, bars, sparklines, or images
+
+By default, a column displays its value. It can also be drawn as an inline link, an inline bar, a sparkline, or an image — from the column's card in the **Columns** section of the **Style** tab.
+
+Each card has a **Value** toggle, a **Bars** / **Sparkline** pair, and separate **Link**
+and **Image** buttons:
+
+- **Value** shows the formatted value in the cell. It **composes** with a bar or a sparkline rather than excluding it — a cell can show a bar and its value together.
+- **Bars** and **Sparkline** are mutually exclusive: picking one replaces the other, and clicking the active one again clears it.
+- **Link** and **Image** are independent of each other, so a column can be both — an image with a declared link renders as a clickable thumbnail. Switching one off leaves the other alone.
+- With nothing active, **Value** is forced on and its toggle disabled — so a plain column always shows its value.
+- Each button is offered only where it applies: bars and sparklines on **numeric** columns, **Link** only on a column whose dimension declares links or uses `format: link` (see [Inline links](#inline-links)), and **Image** where the dimension declares `format: imageUrl` or the column's values are image URLs (see [Images](#images)). In link mode the value *is* the link text, so **Value** stays forced on there too; image mode draws the thumbnail instead of the value, so **Value** is forced off and its toggle disabled. With **Link** and **Image** both on, image wins: the thumbnail replaces the link text and becomes the click target. Only bars and sparklines leave the toggle free, because only they draw something the value can sit beside.
+
+{/* TODO: screenshot — a column card showing the Value toggle beside the Bars / Sparkline / Link / Image buttons */}
+
+### Inline links
+
+A column renders its values as clickable links when the data model says so — links are
+declared in the semantic layer, not authored in the chart.
+
+There are two ways to get one:
+
+- **[`links`](/docs/data-modeling/dimensions#links) on the dimension.** The link marked
+  `primary` renders inline on the cell value. Every link on the dimension — primary or not
+  — stays available from the [cell menu](#cell-menu).
+- **[`format: link`](/reference/data-modeling/dimensions#format) on the dimension**, when the
+  value already *is* a URL. Use the object form to show a label instead of the raw URL.
+
+For a column whose dimension declares links, selecting the **Link** button reveals a picker for
+which of the declared links renders inline (inert when the dimension declares only one).
+Clicking the link text opens it; clicking elsewhere in the cell selects it and opens the
+cell menu as usual.
+
+{/* TODO: screenshot — a table with an inline link column and the Style tab's Link button selected */}
 
 ### Inline bars
 
-Display a numeric column as a proportional bar by setting **Display as** to **Bar**. Bars scale relative to the max value in the column. Columns with negative values will split the bar in both directions.
-
-{/* TODO screenshot: table with inline bar column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
-
-## Style options
-
-The **Style** tab controls the visual appearance of the table:
+Display a numeric column as a proportional in-cell bar by selecting the **Bars** button on the column's card. Each bar's length reflects the value's magnitude within the column's range.
 
 | Option | Description |
 |---|---|
-| **Row numbers** | Show or hide the row number column |
-| **Row banding** | Alternates row background between white and a secondary color |
-| **Font size** | Adjust size independently for Headers, Values, and Totals |
-| **Description** | Show a description below the table title |
+| **Show value** | The shared **Value** toggle on the column's card. Turn it off for a bar-only cell. |
+| **Positive bar color** | Fill color for non-negative bars |
+| **Negative bar color** | Fill color for negative bars (used when the column contains both positive and negative values) |
+| **Bar scale** | **Auto** anchors each bar at zero and scales to the column's largest value, so even the smallest value still shows a bar; **Manual** scales against the bounds you set |
+| **Lower / Higher bound** | The minimum and maximum (in the column's raw units) used when **Bar scale** is **Manual**. Pre-filled to match the Auto range, so switching modes doesn't shift the bars. |
 
-### Colors
+When a column contains both positive and negative values, bars are drawn in both directions from a centered zero baseline — positive values to the right, negative to the left — using the positive and negative bar colors. Values outside the scale are clamped to a full or empty bar, but the displayed number is always the true value.
 
-Set background and text colors for table elements:
+{/* TODO screenshot: table with inline bar column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
-- Table headers (background + text)
-- Values (background + text)
-- Banding (background)
-- Hover state
-- Totals row
+### Sparklines
 
-Use the three-dot menu in the Colors section to **reset to defaults** or **copy the color palette** as a JSON string for reuse:
+Display a numeric column as a **sparkline** — a mini trend chart in each cell that plots the measure across a time dimension. Select the **Sparkline** button on the column's card in the **Columns** section of the **Style** tab.
 
-```json
-{"header":{"fontColor":"#fefefe","backgroundColor":"#5339CF"},"banding":{"backgroundColor":"#f5f3ff"}}
-```
+A sparkline needs a time dimension to use as its horizontal axis. When you switch a column to **Sparkline** and pick its horizontal axis time dimension, that dimension is **removed from the table query** (if it was there): the table shows one row per remaining dimension, correctly aggregated, while the sparkline plots the measure's value across the time dimension. Values are always correct for any measure type, including counts of distinct values, averages, and custom measures.
+
+Removing the dimension is a one-way change — turning the sparkline back off doesn't restore it to the query. Add it again yourself if you want it back.
+
+<Note>
+
+The time dimensions on offer come from the **semantic view the query is built on**, not from the query itself — so the **Sparkline** button is disabled whenever that view has no time dimension, and equally for a query not built on a view at all, however many time dimensions the query selects.
+
+</Note>
+
+| Option | Description |
+|---|---|
+| **Horizontal axis** | The time dimension plotted along the sparkline. Picked for you when the view offers only one; choose it here when there are several. |
+| **Granularity** | The time bucket for the horizontal axis. Defaults to the dimension's granularity in the query if present, otherwise month. |
+| **Type** | **Area** (filled line, the default), **Line**, or **Bar** (mini columns). |
+| **Line color** / **Area color** | Stroke color for line and bar; fill color for area. |
+| **Line width** | Stroke width in pixels (Line and Area types). |
+| **Show value** | The shared **Value** toggle on the column's card — shows the measure's value for the row, the same number the cell would show without a sparkline, as a headline next to it. Turn it off for a chart-only cell. Its setting carries over when you switch between inline bars and sparkline. |
+
+A row needs at least two data points to draw a sparkline; cells with fewer fall back to the formatted value.
+
+<Note>
+
+Choose a reasonable granularity for the data's time span. An overly fine granularity (e.g. by the second over several years) makes the background queries return many rows and can compromise the chart's performance.
+
+</Note>
+
+<Note>
+
+Internally, sparklines are powered by additional queries grouped by time dimension and granularity: measures sharing the same dimension and granularity are fetched together, so a chart with several sparklines runs at most one extra query per distinct dimension and granularity combination.
+
+</Note>
+
+{/* TODO screenshot: table with a sparkline column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Images
+
+A column whose values are image URLs can render them as inline thumbnails.
+
+A dimension declared with
+[`format: imageUrl`](/reference/data-modeling/dimensions#format) renders as thumbnails
+straight away, with no chart configuration — the data model is enough. Any other string
+column offers an **Image** button on the column's card once its values look like image
+URLs, so you can render an unmodelled column of URLs without changing the data model.
+
+| Option | Description |
+|---|---|
+| **Image shape** | **Square** or **Circle**. |
+| **Image fit** | **Fit whole image** shows the whole image inside the box; **Fill and crop** fills the box, cropping the overflow. |
+| **Image height** | Thumbnail height in pixels, 20 by default and up to 100, in steps of ten. The row grows to fit it and doesn't shift as images load. |
+
+Cells that can't render an image degrade rather than break: an empty value, a total or
+subtotal row, and a URL whose scheme isn't `https` or `data:image/*` all render as plain
+text, with no request issued. A permitted URL that fails to load leaves a neutral
+placeholder of the same size, so the row never reflows.
+
+Copying a cell copies the URL, not the image — the same value that lands in an export.
+
+A thumbnail is clickable only where the dimension also declares
+[`links`](/docs/data-modeling/dimensions#links); the `imageUrl` format makes a value an
+image source, not a destination. **Image** and **Link** are independent buttons, so a
+column that declares both can render a clickable thumbnail — or you can switch either off
+on its own.
+
+<Info>
+
+Images at `https` URLs are fetched directly by the viewer's browser, so they must be
+publicly reachable — Cube does not proxy or cache them. `data:image/*` values are
+rendered inline and need no network access.
+
+</Info>
+
+{/* TODO screenshot: table with an image column and the Style tab's image controls */}
+
+## Cell menu
+
+Left-clicking a table cell opens a context menu with any [`links` defined on the
+dimension](/docs/data-modeling/dimensions#links) — drill into another dashboard
+(`dashboard:`) or open an external URL (`url:`) — plus **Copy value** and, where
+they apply, **Drill down** options.
+
+**Drill down** works in two ways:
+
+- On a **measure** cell whose data model defines drill members, it opens the
+  underlying rows behind that value.
+- On a **time-dimension** cell shown at a granularity, it opens a submenu of
+  finer granularities. Picking one re-buckets the **same measures** to that
+  granularity, scoped to the period you clicked — drilling `2024` to **Quarter**
+  shows the four quarters of 2024. You can keep drilling, then close the view to
+  return to the original table.
+
+Because a week can straddle two months or quarters, **Week** is never a drill
+target from a coarser granularity — a week cell drills only to **Day** and finer.
+
+## Selecting and copying cells
+
+You can copy a single cell or a rectangular block of cells straight out of the
+table — copied values paste cleanly into a spreadsheet or text editor.
+
+### Copy a single cell
+
+Click the cell to select it, then press **Cmd/Ctrl+C** or choose **Copy value**
+from the [cell menu](#cell-menu). Either way copies that cell's raw
+(unformatted) value.
+
+### Select and copy a range
+
+- **Click and drag** across the cells to sweep out a rectangle, or **Shift+click**
+  a second cell to extend the selection from the first.
+- Press **Cmd/Ctrl+C** to copy the selected cells. When more than one cell is
+  selected, the cell menu also offers **Copy values** and **Copy values with headers** — the
+  latter prepends a row of column titles.
+
+Copied cells use the raw (unformatted) values. A range is joined by tabs across
+columns and newlines across rows, so it lands in a spreadsheet as a matching
+grid; a single cell copies as just its value.
+
+The same single-cell and range selection works in the **Results** table on the query
+panel, not just the table visualization.
+
+## Style options
+
+The **Style** tab controls the visual appearance of the table. It is organized into sections — **Headers**, **Values**, **Totals**, **Columns**, **Borders**, and **Pagination** — each with its own **Reset** button in the section header that appears once you've changed anything in that section.
+
+### Headers, Values, and Totals formatting
+
+Each of these sections has a compact formatting toolbar that sets, for that part of the table:
+
+- **Colors** — text and background color (the paired color chip).
+- **Text format** — **bold**, **italic**, and **underline** toggles.
+- **Alignment** — left, center, or right.
+- **Vertical alignment** — top, middle, or bottom (**Values** only; headers and totals are always a single line).
+- **Overflow** — truncate or wrap long content.
+
+When you don't pick a color, the element uses the theme's default, which adapts to light and dark mode automatically.
+
+Alignment is set independently in each of the three sections, and their defaults differ: headers align left, totals align right, and values follow the column's data type — numbers right, everything else left. A column's own alignment, set in the **Columns** section, overrides all three.
+
+<Note>
+
+The **Values** alignment control shows left until you set it, even where numeric columns are drawn right-aligned. Choosing left there is still meaningful: it pins numeric columns to the left instead of letting them follow their data type.
+
+</Note>
+
+Vertical alignment is always available, but it only has a visible effect once a row is taller than one line — set **Overflow** to wrap, or turn on **Word wrap** for an individual column, and the shorter cells beside a wrapped value will sit at the top, middle, or bottom as you choose. Values are vertically centred unless you choose otherwise. A per-column setting overrides the table-wide one.
+
+The **Values** section also holds these table-wide row toggles, shown as icon buttons:
+
+- **Row numbers** — show or hide the row number column.
+- **Hover row** — highlight the row under the pointer.
+- **Row banding** — alternate the row background with a secondary color (its color chip sits next to the toggle).
+
+The **Totals** section holds the **Column totals** and **Row totals** toggles (see [Totals](#totals)).
+
+### Borders
+
+The **Borders** section of the **Style** tab controls which table borders are drawn. Five borders are configurable, each with its own toggle, color, and width (1–10 pixels):
+
+| Border | Description | Default |
+|---|---|---|
+| **Horizontal borders** | Lines between value rows | On |
+| **Vertical borders** | Lines between columns, running through the header, values, and totals | Off |
+| **Header border** | The line under the header row | On |
+| **Totals border** | The line above the totals row | On |
+| **Outer border** | The frame around the whole table | Off |
+
+Each border is a row in the section: click the **icon button** to toggle the border on or off, and use the **color** swatch and **width** input next to it to style it. Color and width are only available while the border is on. When you don't pick a color, the border uses the theme's default border color, which adapts to light and dark mode automatically.
+
+Next to the first border's width input is a **link** toggle that syncs all widths: while it's on, editing that width applies the same value to every border, so the whole table shares one line weight. It turns on automatically when all borders already share a width, and off as soon as they differ (for example after applying the Accounting preset).
+
+Because every border has its own color and width, styles like a financial report — a thick line under the header, above the totals, and around the table, with thin lines between value rows — are a few clicks away. Or one: see presets below.
+
+{/* TODO screenshot: Borders section with the accounting preset applied (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+#### Border presets
+
+Open the menu in the corner of the Borders section to apply a preset — a one-shot configuration of all five borders that you can tweak further afterwards:
+
+- **Rows (default)** — horizontal row lines with header and totals separators; the standard look.
+- **Full grid** — all borders on; a spreadsheet look.
+- **Minimal** — dark lines under the header and above the totals, nothing else.
+- **Accounting** — thin light row lines with a thick dark header separator, totals separator, and outer frame; a financial-statement look.
+- **None** — no borders at all.
+
+Use **Reset** in the section header to clear all border settings.
+
+### Pagination
+
+The **Pagination** section holds a single toggle, off unless you turn it on. With it off, the table renders every row in one scrollable grid; with it on, rows are split into pages of **50**, with page controls below the table. The page size is fixed and can't be changed.
+
+Totals are pinned to the bottom of the table rather than being part of the paged rows, so a totals row stays visible on every page.
 
 ## Conditional formatting
 
-The **Conditional formatting** tab applies cell or row styling based on conditions you define. Configure:
+The **Formatting** tab applies cell or row styling based on conditions you define. A **rule** picks the field to evaluate, and holds one or more **cases** — each pairing a condition with the styling to apply when it is met. Configure:
 
 1. The field to evaluate
-2. The condition (e.g. greater than, contains, is null)
-3. The styling to apply when the condition is met (background color, text color)
+2. The condition of each case — an operator and, for most operators, a value to compare against (see [Conditions](#conditions))
+3. The styling that case applies (background color, text color, bold/italic/underline, and an [indicator icon](#indicator-icons))
+
+Use **Add case** to give a rule more than one condition — a three-tier indicator, for example, is three cases in one rule. When several could apply to the same cell, the first matching case in the first matching rule wins.
 
 To make a background transparent, open the color picker and clear the hex value.
 
+### Conditions
+
+The operators offered depend on the evaluated field's data type. **is null** and **is not null** are available for every type and take no value.
+
+**Text**
+
+| Operator | Input |
+|---|---|
+| **is**, **is not** | A value |
+| **contains**, **not contains** | A value |
+| **starts with**, **ends with** | A value |
+| **is null**, **is not null** | — |
+
+**Numbers**
+
+| Operator | Input |
+|---|---|
+| **is**, **is not** | A value |
+| **greater than**, **greater than or equal** | A value |
+| **less than**, **less than or equal** | A value |
+| **between** | A lower and an upper bound |
+| **is null**, **is not null** | — |
+
+**Dates**
+
+| Operator | Input |
+|---|---|
+| **is** | A date |
+| **before date**, **after date** | A date |
+| **between** | A start and an end date |
+| **in the last N days** | A number of days |
+| **this week**, **this month**, **this quarter**, **this year** | — |
+| **is null**, **is not null** | — |
+
+**Booleans**
+
+| Operator | Input |
+|---|---|
+| **is true**, **is false** | — |
+| **is null**, **is not null** | — |
+
+### Which cells a rule styles
+
+Each rule's **Format** control sets how far its styling reaches:
+
+- **Source column** — only the column the rule evaluates. The default.
+- **Entire row** — every cell in a matching row.
+- **Select columns** — a chosen set of columns, picked from a checklist in the same popover.
+
+**Select columns** starts with the rule's own field checked. Clearing every column would leave a rule that styles nothing, so it falls back to **Source column** instead.
+
+Under a column pivot, a row spans several values of the same measure (one per pivot combination), so a row-spanning rule (**Entire row** or **Select columns**) styles each measure cell by its own combination's value. Cells with no single value to test — row headers, row dimensions, and any rule whose source dimension has been pivoted into columns — are left unstyled.
+
 {/* TODO screenshot: conditional formatting panel with a condition configured (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
-### Gradient color scale
+### Rule presets
 
-The **Color scale** tab applies a gradient across a column based on value ranges. Configure a minimum color, a midpoint color (optional), and a maximum color. The gradient is applied across all visible rows.
+Picking an entry from the menu next to **Add rule** adds a ready-made rule you can then adjust. It holds three groups:
 
-<Warning>
-If you don't set a mapping value for the scale, the gradient applies across visible rows only. This can produce unexpected results when row limits or pagination are active.
-</Warning>
+- **Indicators** — cases that mark values with an [icon](#indicator-icons) instead of recoloring them.
+- **Conditional formats** — cases that tint the cell: **Above threshold**, **Below threshold**, **2-tier traffic light** (green at or above the threshold, red on the rest), and **3-tier traffic light** (green above the threshold, amber exactly at it, red on the rest).
+- **Color scales** — gradient rules, described under [color scale](#color-scale).
 
-Use the **Treat as zero** toggle to handle null values in the gradient calculation.
+Both indicator and conditional-format presets compare against a single threshold, which starts at `0` — adjust it to the value you're comparing against.
 
-{/* TODO screenshot: table with gradient color scale applied to a numeric column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+### Indicator icons
+
+A conditional-formatting case can also draw an **icon** beside the cell value — an arrow up, an arrow down, a check mark, a cross, a dash, or a dot. This is how you show a goal comparison: set the condition to the threshold you care about, and the icon marks the cells that meet it.
+
+Each case carries its own icon settings, on the row below its text formatting. Pick a shape from the **Icon** dropdown to turn the icon on; the **No icon** option turns it back off. Once a shape is chosen you can also set:
+
+- **Icon color** — starts from the case's text color and is independent from then on, so changing the text color later leaves the icon as you set it.
+- **Icon placement** — **right** of the value (the default) or **left**.
+
+The icon is drawn next to the value, never instead of it. On a column displayed as [inline bars](#inline-bars) or [sparklines](#sparklines), the icon sits beside the bar or the trend line, and it still appears when that column's value is hidden.
+
+Each case draws one icon, so a three-tier indicator — arrow up above target, dash within tolerance, arrow down below — takes three cases. Totals rows are never given an icon.
+
+To add a ready-made indicator rule, open the [preset menu](#rule-presets) and pick from **Indicators**:
+
+- **Achieved or failed** — a green check mark at or above the threshold, a red cross on every other value.
+- **Above or below** — a green arrow up at or above the threshold, a red arrow down on every other value.
+- **Standout or not** — a dot on the values strictly above the threshold, a muted dash on the rest.
+
+All three are two-case, with their icons already set; add the third case yourself if you want a three-tier indicator.
+
+### Color scale
+
+A **color scale** (heat map) tints each cell of a numeric column with a gradient based on where its value falls in the column's range. It is a rule type in the **Formatting** tab, alongside conditional formatting — switch a rule between **Conditional** and **Scale** with the **Type** selector inside the rule.
+
+To add one quickly, open the [preset menu](#rule-presets) and pick from **Color scales**:
+
+- **Outstanding values** — a two-color scale that highlights the highest values.
+- **Divergent values** — a three-color scale that distinguishes low, middle, and high values.
+- **Traffic light gradient** — a red–yellow–green three-color scale.
+
+A color scale requires a **numeric source column**. For non-numeric columns (strings, dates, booleans), the **Scale** type is disabled — use conditional formatting instead.
+
+Configure the gradient with three stops, laid out top-to-bottom to mirror the column:
+
+- **Start** (low end) — anchored at the column **Minimum** by default, or a custom **Number** or **Percentile**.
+- **Center** (optional middle) — **Disabled** by default, which produces a two-color gradient. Enable it for a three-color gradient anchored at the **Midpoint**, **Average**, **Median**, or a custom **Number** / **Percentile**.
+- **End** (high end) — anchored at the column **Maximum** by default, or a custom **Number** or **Percentile**.
+
+Each stop has its own color. The anchor determines *which value* in the column the stop's color is pinned to:
+
+- **Minimum** / **Maximum** — the lowest / highest value in the column.
+- **Midpoint** — the halfway point of the range, i.e. `(minimum + maximum) / 2`. Independent of how the values are distributed.
+- **Average** — the mean of all values (sensitive to outliers).
+- **Median** — the middle value when sorted (robust to outliers).
+- **Number** — a fixed value you enter.
+- **Percentile** — a value at the given percentile (e.g. `90` = the 90th percentile).
+
+For the computed anchors (Minimum, Maximum, Midpoint, Average, Median), the dropdown previews the resolved value from your data.
+
+Use **Reverse color scale** to swap the Start and End colors. **Treat nulls as zero** is on by default, coloring null/blank cells as zero; turn it off to leave them uncolored.
+
+The scale is normalized **per column** — each targeted column uses its own value range, taken from the column's data cells only. With [totals](#totals) enabled, the row totals and subtotal columns are still colored by the scale of the measure they aggregate, but they don't widen its range: a total past the column's highest stop is clamped to that stop's color. Cells in the column totals row are never colored by a scale, since totals rows don't take formatting rules.
+
+{/* TODO screenshot: table with a color scale applied to a numeric column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ## Totals
 
-Enable column totals and row totals from the **Table** configuration tab. Totals rows and columns are styled separately from body cells.
+Enable column totals and row totals from the **Totals** section of the **Style** tab. Totals rows and columns are styled separately from body cells.
+
+### Subtotals
+
+When the table is pivoted by two or more dimensions, you can also enable **subtotals** — a bold **Total for ‹value›** column appended after each pivot group's columns, at every nesting level. Subtotals combine freely with column and row totals, work in workbooks and on dashboards, and — like the other totals — carry over from the results table when you switch the chart type to Table. See [Subtotals](/docs/explore-analyze/workbooks/querying-data#subtotals) for details and limitations.

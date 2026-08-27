@@ -2,6 +2,10 @@ use super::pretty_print::*;
 use crate::planner::filter::{Filter, FilterItem};
 use itertools::Itertools;
 
+/// All filters of a query split by what they target. WHERE-style
+/// filters (`time_dimensions_filters`, `dimensions_filters`,
+/// `segments`) are surfaced together via `all_filters`; HAVING-style
+/// `measures_filter` stays separate.
 #[derive(Default)]
 pub struct LogicalFilter {
     pub dimensions_filters: Vec<FilterItem>,

@@ -12,6 +12,9 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct RawReferenceValue(pub String);
 
+/// Replacement form for a member that is rendered as a reference
+/// instead of being evaluated: a qualified column, a quoted string
+/// literal, or a raw SQL fragment.
 #[derive(Clone)]
 pub enum RenderReferencesType {
     QualifiedColumnName(QualifiedColumnName),
@@ -37,6 +40,8 @@ impl From<RawReferenceValue> for RenderReferencesType {
     }
 }
 
+/// `full_name → RenderReferencesType` map keyed by a member's
+/// `MemberSymbol::full_name`.
 #[derive(Default, Clone)]
 pub struct RenderReferences {
     references: HashMap<String, RenderReferencesType>,
@@ -60,6 +65,8 @@ impl RenderReferences {
     }
 }
 
+/// Substitutes a member with a pre-allocated reference from
+/// `references`, falling through to `input` when no entry exists.
 pub struct RenderReferencesSqlNode {
     input: Rc<dyn SqlNode>,
     references: RenderReferences,

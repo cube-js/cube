@@ -1,15 +1,12 @@
-use super::Compiler;
 use super::ParamsAllocator;
-use crate::cube_bridge::base_query_options::MaskedMemberItem;
+use crate::cube_bridge::base_query_options::{FilterValue, MaskedMemberItem};
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_graph::JoinGraph;
 use crate::cube_bridge::join_item::JoinItemStatic;
-use crate::cube_bridge::security_context::SecurityContext;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
-use crate::planner::filter::compiler::FilterCompiler;
-use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
+use crate::planner::filter::FilterItem;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
@@ -31,27 +28,32 @@ pub struct QueryTools {
     join_graph: Rc<dyn JoinGraph>,
     templates_render: Rc<dyn SqlTemplatesRender>,
     params_allocator: Rc<RefCell<ParamsAllocator>>,
-    evaluator_compiler: Rc<RefCell<Compiler>>,
     timezone: Tz,
     convert_tz_for_raw_time_dimension: bool,
     masked_members: HashSet<String>,
-    // Compiled mask filters keyed by member full path. Populated in try_new
-    // after the QueryTools Rc is constructed (FilterCompiler requires it),
-    // then never mutated again — RefCell only carries the construction phase.
+    // Compiled mask filters keyed by member full path. Populated once by
+    // `State` after the `Rc<QueryTools>` exists (the FilterCompiler needs it),
+    // then read-only — the `RefCell` only carries the construction phase.
+    // Nothing reachable from a stored `FilterItem` holds an `Rc<QueryTools>`,
+    // so this cache forms no reference cycle. It stays here only until the
+    // early-compilation refactor resolves mask filters up front.
     member_mask_filters: RefCell<HashMap<String, FilterItem>>,
 }
 
 impl QueryTools {
+    /// Builds the per-query leaf. The mutable per-query state (the
+    /// `Compiler` and the join-tree cache) lives in `State`, which owns
+    /// this and fills `member_mask_filters` once it has a `Compiler`.
+    /// Keeping `QueryTools` free of any cache that can hold an
+    /// `Rc<QueryTools>` is what prevents the planner's reference-cycle leaks.
     pub fn try_new(
         cube_evaluator: Rc<dyn CubeEvaluator>,
-        security_context: Rc<dyn SecurityContext>,
         base_tools: Rc<dyn BaseTools>,
         join_graph: Rc<dyn JoinGraph>,
         timezone_name: Option<String>,
         export_annotated_sql: bool,
         convert_tz_for_raw_time_dimension: bool,
         masked_members: Option<Vec<MaskedMemberItem>>,
-        member_to_alias: Option<HashMap<String, String>>,
     ) -> Result<Rc<Self>, CubeError> {
         let templates_render = base_tools.sql_templates()?;
         let timezone = if let Some(timezone) = timezone_name {
@@ -61,17 +63,7 @@ impl QueryTools {
         } else {
             Tz::UTC
         };
-        let evaluator_compiler = Rc::new(RefCell::new(Compiler::new(
-            cube_evaluator.clone(),
-            base_tools.clone(),
-            security_context.clone(),
-            timezone.clone(),
-            member_to_alias,
-        )));
 
-        // Phase 1: collect masked member names eagerly; mask filters are
-        // compiled in Phase 2 below (FilterCompiler requires Rc<QueryTools>,
-        // which doesn't exist yet at this point).
         let mut masked_set = HashSet::new();
         if let Some(items) = &masked_members {
             for item in items {
@@ -79,61 +71,34 @@ impl QueryTools {
             }
         }
 
-        let result = Rc::new(Self {
+        Ok(Rc::new(Self {
             cube_evaluator,
             base_tools,
             join_graph,
             templates_render,
             params_allocator: Rc::new(RefCell::new(ParamsAllocator::new(export_annotated_sql))),
-            evaluator_compiler,
             timezone,
             convert_tz_for_raw_time_dimension,
             masked_members: masked_set,
             member_mask_filters: RefCell::new(HashMap::new()),
-        });
-
-        // Phase 2: compile mask filters once now that Rc<QueryTools> exists.
-        // After this, member_mask_filters is treated as immutable for the
-        // lifetime of QueryTools.
-        if let Some(items) = masked_members {
-            Self::compile_mask_filters(&result, items)?;
-        }
-
-        Ok(result)
+        }))
     }
 
-    fn compile_mask_filters(
-        this: &Rc<Self>,
-        items: Vec<MaskedMemberItem>,
-    ) -> Result<(), CubeError> {
-        let mut compiled = HashMap::new();
-        for item in items {
-            let Some(native_filter) = item.filter else {
-                continue;
-            };
-            let mut compiler = this.evaluator_compiler.borrow_mut();
-            let mut filter_compiler = FilterCompiler::new(&mut compiler, this.clone());
-            filter_compiler.add_item(&native_filter)?;
-            let (dimension_filters, _, _) = filter_compiler.extract_result();
-            if dimension_filters.is_empty() {
-                continue;
-            }
-            let filter_item = if dimension_filters.len() == 1 {
-                dimension_filters.into_iter().next().unwrap()
-            } else {
-                FilterItem::Group(Rc::new(FilterGroup::new(
-                    FilterGroupOperator::And,
-                    dimension_filters,
-                )))
-            };
-            compiled.insert(item.member, filter_item);
-        }
-        *this.member_mask_filters.borrow_mut() = compiled;
-        Ok(())
+    /// Installs the compiled mask filters. Called once by `State` after it
+    /// has compiled them (it owns the `Compiler` needed to do so).
+    pub(crate) fn set_member_mask_filters(&self, filters: HashMap<String, FilterItem>) {
+        *self.member_mask_filters.borrow_mut() = filters;
     }
 
     pub fn is_member_masked(&self, member_path: &str) -> bool {
         self.masked_members.contains(member_path)
+    }
+
+    /// Whether the query has any masked members at all. `masked_members` is
+    /// fixed at `try_new`, so this is a cheap, stable signal used to skip
+    /// building the unmasked reference tree for queries with no masking.
+    pub fn has_masked_members(&self) -> bool {
+        !self.masked_members.is_empty()
     }
 
     pub fn member_mask_filter(&self, member_path: &str) -> Option<FilterItem> {
@@ -183,10 +148,6 @@ impl QueryTools {
         Ok((join_key, join))
     }
 
-    pub fn evaluator_compiler(&self) -> &Rc<RefCell<Compiler>> {
-        &self.evaluator_compiler
-    }
-
     pub fn alias_name(&self, name: &str) -> String {
         PlanSqlTemplates::alias_name(name)
     }
@@ -228,20 +189,22 @@ impl QueryTools {
     pub fn allocate_param(&self, name: &str) -> String {
         self.params_allocator.borrow_mut().allocate_param(name)
     }
-    pub fn get_allocated_params(&self) -> Vec<String> {
+    pub fn get_allocated_params(&self) -> Vec<FilterValue> {
         self.params_allocator.borrow().get_params().clone()
     }
+    /// Resolves param placeholders for the dialect the SQL is rendered for.
+    /// Params may only be shared between placeholders when the dialect's
+    /// placeholder addresses its value by index.
     pub fn build_sql_and_params(
         &self,
         sql: &str,
-        should_reuse_params: bool,
         templates: &PlanSqlTemplates,
-    ) -> Result<(String, Vec<String>), CubeError> {
+    ) -> Result<(String, Vec<FilterValue>), CubeError> {
         let native_allocated_params = self.base_tools.get_allocated_params()?;
         self.params_allocator.borrow().build_sql_and_params(
             sql,
             native_allocated_params,
-            should_reuse_params,
+            templates.should_reuse_params()?,
             templates,
         )
     }

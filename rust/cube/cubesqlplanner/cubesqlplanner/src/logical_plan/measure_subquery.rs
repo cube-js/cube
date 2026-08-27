@@ -2,6 +2,9 @@ use super::*;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Inner aggregating subquery for a measure inside a multiplied
+/// aggregate flow — one of the two `AggregateMultipliedSubquerySource`
+/// variants (the other being a raw `Cube`).
 pub struct MeasureSubquery {
     pub schema: Rc<LogicalSchema>,
     pub source: Rc<LogicalJoin>,

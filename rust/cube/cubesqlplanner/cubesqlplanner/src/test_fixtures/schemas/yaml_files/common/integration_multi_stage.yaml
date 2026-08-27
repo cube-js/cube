@@ -64,6 +64,96 @@ cubes:
           - name: created_at
             type: time
             sql: created_at
+          - name: updated_at
+            type: time
+            sql: updated_at
+
+          # CORE-549 neighbor: a dimension `case` referencing a member
+          # (category) not exposed by orders_ms_view. Unlike order_by, `case`
+          # is not re-exported onto the view member, so it is reached through
+          # the view member's direct sql reference and resolves against the
+          # owning cube — it must keep building through the view.
+          - name: category_label
+            type: string
+            case:
+                when:
+                    - sql: "{CUBE.category} = 'books'"
+                      label: Literature
+                else:
+                    label: Other
+
+          # A calc-group (virtual enumeration) dimension used as the switch of
+          # `rolling_amount_switch`: it selects which rolling window the case
+          # measure dispatches to, and carries no stored data.
+          - name: window_kind
+            type: switch
+            values:
+                - R3
+                - YTD
+
+          # Case-switch dimension over a regular string dimension: a filter
+          # on `status` statically prunes the branches.
+          - name: status_case_label
+            type: string
+            case:
+                switch: "{CUBE.status}"
+                when:
+                    - value: completed
+                      sql: "'done'"
+                    - value: pending
+                      sql: "'waiting'"
+                else:
+                    sql: "'other'"
+
+          # Calc group: an abstract enumeration with no backing column.
+          - name: group_mode
+            type: switch
+            values:
+                - by_status
+                - by_category
+
+          # Case-switch dimension driven by the calc group.
+          - name: group_mode_label
+            type: string
+            case:
+                switch: "{CUBE.group_mode}"
+                when:
+                    - value: by_status
+                      sql: "{CUBE.status}"
+                    - value: by_category
+                      sql: "{CUBE.category}"
+                else:
+                    sql: "{CUBE.status}"
+
+          # Every books row is NULL here, so a query grouping by it carries a
+          # NULL dimension key through the multi-stage assembly.
+          - name: category_nullable
+            type: string
+            sql: "NULLIF(category, 'books')"
+
+          # Reads a member and a raw cube column in one expression: the member
+          # half can resolve against a CTE column, the raw half never can.
+          - name: status_and_category
+            type: string
+            sql: "UPPER({CUBE.status}) || {CUBE}.category"
+
+          # Clean sql, with the raw cube column confined to the mask. Reading the
+          # cube refs unfiltered would treat it as a raw read of the dimension.
+          - name: status_upper_masked_by_column
+            type: string
+            sql: "UPPER({CUBE.status})"
+            mask:
+                sql: "{CUBE}.category"
+
+          # Multi-stage time dimension carrying a mask: the mask is not rendered
+          # unless the member is masked, so the dimension it names must not be
+          # required of the CTE.
+          - name: created_at_masked_multi_stage
+            type: time
+            sql: "{CUBE.created_at}"
+            multi_stage: true
+            mask:
+                sql: "{CUBE.category}"
 
           - name: customer_name
             type: string
@@ -90,12 +180,107 @@ cubes:
             type: avg
             sql: amount
 
+          - name: unique_customers
+            type: count_distinct
+            sql: customer_id
+
+          - name: unique_customers_reduce_category
+            type: sum
+            sql: "{CUBE.unique_customers}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: avg_amount_reduce_category
+            type: avg
+            sql: "{CUBE.avg_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: count_reduce_category
+            type: sum
+            sql: "{CUBE.count}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: max_total_amount_reduce_category
+            type: max
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: amount_plus_customers_reduce_category
+            type: number
+            sql: "{CUBE.amount_reduce_category} + {CUBE.unique_customers_reduce_category}"
+            multi_stage: true
+
+          - name: max_amount
+            type: max
+            sql: amount
+
+          - name: max_sum_reduce_category
+            type: sum
+            sql: "{CUBE.max_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          - name: total_by_customer_reduce_category
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            add_group_by:
+                - orders.customer_id
+            reduce_by:
+                - orders.category
+
           - name: amount_by_id
             type: number
             sql: "{CUBE.total_amount}"
             multi_stage: true
             add_group_by:
                 - orders.id
+
+          # `include` grain refs below carry case-switch / calc-group
+          # dimensions: the planner selects them inside the multi-stage CTE,
+          # so static filter pruning must reach them there.
+          - name: amount_by_status_case
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            add_group_by:
+                - orders.status_case_label
+
+          - name: amount_by_group_mode_label
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            add_group_by:
+                - orders.group_mode_label
+
+          - name: amount_by_group_mode
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            add_group_by:
+                - orders.group_mode
+
+          # Case pruning must follow the leaf's own filters: the `exclude`
+          # directive drops the status filter inside this measure's CTEs, so
+          # the case dimension from `include` must stay unpruned there.
+          - name: amount_by_status_case_unfiltered
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            grain:
+                include:
+                    - orders.status_case_label
+            filter:
+                exclude:
+                    - orders.status
 
           - name: amount_by_category
             type: number
@@ -125,6 +310,17 @@ cubes:
             multi_stage: true
             reduce_by:
                 - orders.status
+
+          # reduce_by targets the time dimension itself (bare, no
+          # granularity). When the query selects created_at at some
+          # granularity, that granular dimension must be dropped from the
+          # partition regardless of its granularity suffix (CORE-550).
+          - name: amount_reduce_time
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.created_at
 
           - name: amount_reduce_all
             type: sum
@@ -164,6 +360,14 @@ cubes:
                 - orders.status
                 - orders.created_at.month
 
+          - name: amount_grain_keep_only_status
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            grain:
+                keep_only:
+                    - orders.status
+
           - name: amount_prev_month
             type: number
             sql: "{CUBE.total_amount}"
@@ -190,6 +394,127 @@ cubes:
                 - interval: "1 month"
                   type: prior
                   timeDimension: orders.created_at
+
+          # Reads a plain dimension of its own cube alongside an aggregated
+          # dependency, without declaring it. At month grain the raw
+          # `created_at` value is no column of the CTE this measure is computed
+          # from, and the only rendering left would be the cube alias, which
+          # that CTE's FROM does not contain — the planner rejects it.
+          - name: amount_first_half_of_month
+            type: sum
+            sql: "CASE WHEN EXTRACT(DAY FROM {CUBE.created_at}) <= 15 THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+
+          # The same read, with the grain the sql needs declared.
+          - name: amount_first_half_of_month_with_grain
+            type: sum
+            sql: "CASE WHEN EXTRACT(DAY FROM {CUBE.created_at}) <= 15 THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+            grain:
+                include:
+                    - orders.created_at
+
+          # The declared grain is a dimension of another cube, so it does not
+          # supply the dimension the sql reads.
+          - name: amount_first_half_of_month_grain_of_other_cube
+            type: sum
+            sql: "CASE WHEN EXTRACT(DAY FROM {CUBE.created_at}) <= 15 THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+            grain:
+                include:
+                    - customers.city
+
+          # Undeclared read one stage further out: the dimension is read by a
+          # measure whose aggregated dependency is itself multi-stage.
+          - name: amount_prev_month_first_half
+            type: sum
+            sql: "CASE WHEN EXTRACT(DAY FROM {CUBE.created_at}) <= 15 THEN {CUBE.amount_prev_month} ELSE 0 END"
+            multi_stage: true
+
+          # Undeclared read of a non-time dimension.
+          - name: completed_amount_multi_stage
+            type: sum
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+
+          # Reads the very dimension its own `reduce_by` drops from the stage
+          # grain. The dimension still reaches the CTE from the keys side the
+          # JOIN-model builds on the parent grain, so this one plans.
+          - name: amount_reduce_status_reading_status
+            type: sum
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+            reduce_by:
+                - orders.status
+
+          # Reads a dimension built out of another one. It is no column of the
+          # CTE itself, but renders from the column its own sql reads.
+          - name: amount_by_category_label
+            type: sum
+            sql: "CASE WHEN {CUBE.category_label} = 'Literature' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+
+          # `drill_filters` are held on the symbol and never rendered, so the
+          # dimension this one names puts no column requirement on the CTE.
+          - name: amount_with_drill_filters
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            drill_filters:
+                - sql: "{CUBE.category} = 'books'"
+
+          # A mask is rendered only for members the security context masks, so
+          # the dimension it reads puts no column requirement on the CTE either.
+          - name: amount_with_masked_dimension_read
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            mask:
+                sql: "CASE WHEN {CUBE.category} = 'books' THEN 0 ELSE 1 END"
+
+          # The read resolves through a member, but the same expression also
+          # reaches a raw cube column that no CTE column can stand in for.
+          - name: amount_by_status_and_category
+            type: sum
+            sql: "CASE WHEN {CUBE.status_and_category} = 'X' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+
+          # The dimension read here is clean; only its unrendered mask names a
+          # raw cube column.
+          - name: amount_by_status_upper_masked
+            type: sum
+            sql: "CASE WHEN {CUBE.status_upper_masked_by_column} = 'COMPLETED' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+
+          # Masked, with the dimension the mask reads declared. Pins that an
+          # applied mask is rendered inside the multi-stage CTE and therefore
+          # reads its dimension as a column of it.
+          - name: amount_masked_by_category_in_grain
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            grain:
+                include:
+                    - orders.category
+            mask:
+                sql: "CASE WHEN {CUBE.category} = 'books' THEN -1 ELSE 0 END"
+
+          # Declares a grain its own leaf is computed at.
+          - name: amount_with_status_in_leaf_grain
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            grain:
+                include:
+                    - orders.status
+
+          # Reads the dimension the measure below it declared. A declared grain
+          # widens that measure's own leaf, not the columns its CTE projects, so
+          # this read still has nowhere to come from.
+          - name: amount_reading_a_child_leaf_grain
+            type: sum
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.amount_with_status_in_leaf_grain} ELSE 0 END"
+            multi_stage: true
 
           - name: amount_mom_diff
             type: number
@@ -222,6 +547,126 @@ cubes:
                 - sql: "{CUBE.total_amount}"
                   dir: desc
 
+          # CORE-549: order_by references a measure (avg_amount) that
+          # orders_ms_view does not expose. Through the view the order_by
+          # SqlCall must resolve against the owning cube (orders), not the
+          # view — otherwise planning fails with "Cannot resolve: avg_amount".
+          - name: amount_rank_order_by_hidden
+            type: rank
+            multi_stage: true
+            reduce_by:
+                - orders.status
+            order_by:
+                - sql: "{CUBE.avg_amount}"
+                  dir: desc
+
+          # CORE-549 neighbor: a measure `filters` referencing a member
+          # (category) not exposed by orders_ms_view. `filters` is not
+          # re-exported onto the view member, so it is reached through the
+          # view member's direct sql reference and resolves against the
+          # owning cube — it must keep building through the view.
+          - name: amount_filtered_hidden
+            type: sum
+            sql: amount
+            filters:
+                - sql: "{CUBE.category} = 'books'"
+
+          # Rank reduced by the time dimension (bare) while ordered by a
+          # measure. With created_at selected at a granularity the partition
+          # must be "all outer dims except created_at" (CORE-550); the buggy
+          # planner left created_at_<gran> in PARTITION BY so every partition
+          # held one row and all ranks collapsed to 1.
+          - name: amount_rank_reduce_time
+            type: rank
+            multi_stage: true
+            reduce_by:
+                - orders.created_at
+            order_by:
+                - sql: "{CUBE.total_amount}"
+                  dir: desc
+
+          # Rank by the raw time dimension itself (order_by is a
+          # dimension, not a measure) reduced by created_at — partition
+          # is "all outer dims except created_at". First link in the
+          # chain that reproduces the JS sql-generation scenario
+          # "multi stage complex graph with time dimension no
+          # granularity".
+          - name: date_rank
+            type: rank
+            multi_stage: true
+            reduce_by:
+                - orders.created_at
+            order_by:
+                - sql: "{orders.created_at}"
+                  dir: asc
+
+          # Multi-stage formula that references date_rank in its SQL.
+          - name: adjusted_amount
+            type: number
+            multi_stage: true
+            sql: "{CUBE.total_amount} + 0.1 * {CUBE.date_rank}"
+
+          # Rank over the adjusted_amount measure — second-link rank
+          # that the outer sum filters by.
+          - name: adjusted_amount_rank
+            type: rank
+            multi_stage: true
+            reduce_by:
+                - orders.created_at
+            order_by:
+                - sql: "{CUBE.adjusted_amount}"
+                  dir: asc
+
+          # Outer sum over adjusted_amount filtered by
+          # adjusted_amount_rank = 1, grouped by created_at.
+          - name: adjusted_amount_sum
+            type: sum
+            multi_stage: true
+            sql: "{CUBE.adjusted_amount}"
+            filters:
+                - sql: "{CUBE.adjusted_amount_rank} = 1"
+            add_group_by:
+                - orders.created_at
+
+          # CORE-602: end-of-period rank shared by two sibling consumers.
+          # `eop_rank` keeps the last snapshot per status; both consumers
+          # filter on `{eop_rank} = 1`, so a query selecting both must plan
+          # the rank stage once and join both consumers to it.
+          - name: eop_rank
+            type: rank
+            multi_stage: true
+            order_by:
+                - sql: "{CUBE.created_at}"
+                  dir: desc
+            grain:
+                include:
+                    - orders.status
+                    - orders.created_at
+                keep_only:
+                    - orders.status
+
+          - name: balance_eop_a
+            type: sum
+            multi_stage: true
+            sql: "{CUBE.total_amount}"
+            grain:
+                include:
+                    - orders.status
+                    - orders.created_at
+            filters:
+                - sql: "{CUBE.eop_rank} = 1"
+
+          - name: balance_eop_b
+            type: sum
+            multi_stage: true
+            sql: "{CUBE.total_amount}"
+            grain:
+                include:
+                    - orders.status
+                    - orders.created_at
+            filters:
+                - sql: "{CUBE.eop_rank} = 1"
+
           - name: status_weighted_amount
             type: sum
             multi_stage: true
@@ -241,6 +686,313 @@ cubes:
             rolling_window:
                 trailing: 7 day
                 offset: start
+
+          # Month-based rolling window: whole-month steps are what a rollup
+          # stored at `granularity: month` can serve, so the calc-group case
+          # entrypoints below dispatch between this and the year-to-date
+          # window rather than the 7-day one.
+          - name: rolling_sum_3m
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: 3 month
+
+          # An Aggregate parent that reduces by the time dimension: the child
+          # rolling-window state ends up NARROWER than the root query (no time
+          # dimension), while the leaf still groups per date.
+          - name: rolling_sum_7d_reduce_time
+            type: sum
+            sql: "{CUBE.rolling_sum_7d}"
+            multi_stage: true
+            reduce_by:
+                - orders.created_at
+
+          # Case entrypoint dispatching between two rolling windows on the
+          # `window_kind` calc group: the switch dimension is added to the
+          # grain of the rolling leaves, so every CTE feeding the case must
+          # project it.
+          - name: rolling_amount_switch
+            type: number
+            multi_stage: true
+            case:
+                switch: "{CUBE.window_kind}"
+                when:
+                    - value: R3
+                      sql: "{CUBE.rolling_sum_3m}"
+                else:
+                    sql: "{CUBE.total_amount_ytd}"
+
+          # Change-over-prior-period on top of each rolling window: the
+          # arithmetic layer consumes two rolling-window CTEs and partitions
+          # by the grain it is requested at — which, under the case
+          # entrypoint below, includes the `window_kind` calc group.
+          - name: rolling_sum_3m_prev
+            type: number
+            multi_stage: true
+            sql: "{CUBE.rolling_sum_3m}"
+            time_shift:
+                - interval: 3 month
+                  type: prior
+
+          - name: rolling_sum_3m_change
+            type: number
+            multi_stage: true
+            sql: "({CUBE.rolling_sum_3m} - {CUBE.rolling_sum_3m_prev})"
+
+          - name: total_amount_ytd_prev_year
+            type: number
+            multi_stage: true
+            sql: "{CUBE.total_amount_ytd}"
+            time_shift:
+                - interval: 1 year
+                  type: prior
+
+          - name: total_amount_ytd_change
+            type: number
+            multi_stage: true
+            sql: "({CUBE.total_amount_ytd} - {CUBE.total_amount_ytd_prev_year})"
+
+          - name: rolling_change_switch
+            type: number
+            multi_stage: true
+            case:
+                switch: "{CUBE.window_kind}"
+                when:
+                    - value: R3
+                      sql: "{CUBE.rolling_sum_3m_change}"
+                else:
+                    sql: "{CUBE.total_amount_ytd_change}"
+
+          - name: total_amount_ytd
+            type: sum
+            sql: amount
+            rolling_window:
+                type: to_date
+                granularity: year
+
+          # ── filter: directive variants ────────────────────────────────────
+          - name: amount_exclude_status
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                exclude:
+                    - orders.status
+
+          - name: amount_keep_only_status
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                keep_only:
+                    - orders.status
+
+          # Both directives name `status`: the value ignores the query filter
+          # on it (`filter`) and collapses its partition (`grain`). The result
+          # row set must still be the query's.
+          - name: amount_grain_and_filter_exclude_status
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            grain:
+                exclude:
+                    - orders.status
+            filter:
+                exclude:
+                    - orders.status
+
+          # Share-of-total shape: a grand-total denominator (grain drops every
+          # dimension) that also ignores the query filter on `status`, consumed
+          # by a ratio that coalesces a missing denominator to 0 — so a widened
+          # row set surfaces as extra rows reading 0 rather than NULL.
+          - name: amount_grand_total_unfiltered
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            grain:
+                exclude:
+                    - orders.status
+                    - orders.category
+            filter:
+                exclude:
+                    - orders.status
+
+          - name: amount_share_percent
+            type: number
+            multi_stage: true
+            sql: "coalesce(100 * {CUBE.total_amount} / nullif({CUBE.amount_grand_total_unfiltered}, 0), 0)"
+
+          # A rolling window rewrites the query date range for its base state
+          # (extending it backwards by the trailing interval). The inner measure
+          # below drops that date filter, so detecting the drop must not depend
+          # on the filter still carrying the query's own bounds.
+          - name: amount_no_date_bound
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                exclude:
+                    - orders.created_at
+
+          - name: rolling_amount_no_date_bound
+            type: sum
+            sql: "{CUBE.amount_no_date_bound}"
+            multi_stage: true
+            rolling_window:
+                trailing: 3 month
+
+          # The `include` predicate matches the dropped query filter on
+          # operator and values while naming a different member, so the CTE
+          # dedup key has to compare members to keep the two states apart.
+          - name: amount_exclude_status_include_lookalike
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                exclude:
+                    - orders.status
+                include:
+                    - member: orders.category
+                      operator: notEquals
+                      values: [pending]
+
+          # A rank whose ordering ignores the query filter on `status` and whose
+          # partition drops it. Rank is deliberately left out of the keys side,
+          # so the ranks span the whole universe and the rows do too.
+          - name: category_rank_all_statuses
+            type: rank
+            multi_stage: true
+            grain:
+                exclude:
+                    - orders.status
+            filter:
+                exclude:
+                    - orders.status
+            order_by:
+                - sql: "{CUBE.total_amount}"
+                  dir: desc
+
+          - name: amount_only_completed
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                include:
+                    - member: orders.status
+                      operator: equals
+                      values: [completed]
+
+          - name: amount_or_completed_pending
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                include:
+                    - or:
+                          - member: orders.status
+                            operator: equals
+                            values: [completed]
+                          - member: orders.status
+                            operator: equals
+                            values: [pending]
+
+          - name: amount_after_feb
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                include:
+                    - member: orders.created_at
+                      operator: afterDate
+                      values: ["2024-01-31"]
+
+          - name: amount_replace_status
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                exclude:
+                    - orders.status
+                include:
+                    - member: orders.status
+                      operator: equals
+                      values: [cancelled]
+
+          - name: amount_fixed_completed
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                mode: fixed
+                include:
+                    - member: orders.status
+                      operator: equals
+                      values: [completed]
+
+          # ── chain test: fixed vs relative when wrapped by another multi-stage ──
+          # Inner X measures: same content (include category=books), only mode differs.
+          - name: x_books_relative
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                mode: relative
+                include:
+                    - member: orders.category
+                      operator: equals
+                      values: [books]
+
+          - name: x_books_fixed
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                mode: fixed
+                include:
+                    - member: orders.category
+                      operator: equals
+                      values: [books]
+
+          # Wrapper T measures: filter include status=completed, reference inner X.
+          # When X is computed as a dep of T, X's state inherits T's [status=completed].
+          # X relative → state = [status=completed, category=books] → only completed×books.
+          # X fixed    → state resets to applied_state → [category=books] → all statuses×books.
+          - name: t_chain_relative
+            type: number
+            sql: "{CUBE.x_books_relative}"
+            multi_stage: true
+            filter:
+                include:
+                    - member: orders.status
+                      operator: equals
+                      values: [completed]
+
+          - name: t_chain_fixed
+            type: number
+            sql: "{CUBE.x_books_fixed}"
+            multi_stage: true
+            filter:
+                include:
+                    - member: orders.status
+                      operator: equals
+                      values: [completed]
+
+          # ── filter on segments ────────────────────────────────────────────
+          - name: amount_exclude_segment
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                exclude:
+                    - orders.completed_orders
+
+          - name: amount_keep_only_segment
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                keep_only:
+                    - orders.completed_orders
 
       segments:
           - name: completed_orders
@@ -272,7 +1024,18 @@ views:
           - join_path: orders
             includes:
                 - status
+                - category
                 - created_at
+                - completed_orders
                 - total_amount
+                - amount_exclude_status
+                - amount_keep_only_status
+                - amount_exclude_segment
+                - amount_keep_only_segment
                 - amount_prev_month
                 - mom_growth
+                - amount_reduce_time
+                - amount_rank_reduce_time
+                - amount_rank_order_by_hidden
+                - amount_filtered_hidden
+                - category_label

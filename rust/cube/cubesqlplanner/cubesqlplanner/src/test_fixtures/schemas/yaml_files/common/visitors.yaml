@@ -83,6 +83,9 @@ cubes:
           - name: total_revenue_per_count
             type: number
             sql: "{visitors.count} / {total_revenue}"
+          - name: source_label
+            type: string
+            sql: "MAX({CUBE}.source)"
       segments:
           - name: google
             sql: "{CUBE.source} = 'google'"

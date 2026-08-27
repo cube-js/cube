@@ -4,6 +4,9 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
+/// Marker for an "original SQL" pre-aggregation attached to a cube
+/// — the physical builder uses its name to substitute the cube's
+/// table expression with the matching pre-aggregation source.
 #[derive(Clone, TypedBuilder)]
 pub struct OriginalSqlPreAggregation {
     name: String,
@@ -24,6 +27,9 @@ impl PrettyPrint for OriginalSqlPreAggregation {
     }
 }
 
+/// A cube referenced from the logical plan — wraps the planner's
+/// `BaseCube` and optionally pins a matching "original SQL"
+/// pre-aggregation as the cube's source.
 #[derive(Clone, TypedBuilder)]
 pub struct Cube {
     cube: Rc<BaseCube>,

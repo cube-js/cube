@@ -1,17 +1,18 @@
+use super::planners::multi_stage::PlanningScope;
 use super::planners::QueryPlanner;
-use super::query_tools::QueryTools;
+use super::state::State;
 use super::QueryProperties;
 use crate::logical_plan::OriginalSqlCollector;
 use crate::logical_plan::PreAggregationOptimizer;
 use crate::logical_plan::PreAggregationUsage;
-use crate::logical_plan::Query;
+use crate::logical_plan::RootQuery;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct TopLevelPlanner {
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
     request: Rc<QueryProperties>,
     cubestore_support_multistage: bool,
 }
@@ -19,7 +20,7 @@ pub struct TopLevelPlanner {
 impl TopLevelPlanner {
     pub fn new(
         request: Rc<QueryProperties>,
-        query_tools: Rc<QueryTools>,
+        query_tools: Rc<State>,
         cubestore_support_multistage: bool,
     ) -> Self {
         Self {
@@ -31,9 +32,25 @@ impl TopLevelPlanner {
 
     pub fn plan(&self) -> Result<(String, Vec<PreAggregationUsage>), CubeError> {
         let query_planner = QueryPlanner::new(self.request.clone(), self.query_tools.clone());
-        let logical_plan = query_planner.plan()?;
+        let mut scope = PlanningScope::new();
+        let query = query_planner.plan(&mut scope)?;
+        let logical_plan = Rc::new(
+            RootQuery::builder()
+                .ctes(scope.into_members())
+                .query(query)
+                .build(),
+        );
 
         let (optimized_plan, usages) = self.try_pre_aggregations(logical_plan.clone())?;
+
+        // Match-only mode (refresh/metadata path): the caller only needs the matched
+        // pre-aggregation(s), not the outer query SQL. Skip the physical build, which for a
+        // rolling-window measure would render a time series that requires a date range the
+        // refresh path doesn't provide (and which non-generated-time-series dialects can't
+        // build without one). The pre-agg's own load SQL is built separately on the JS side.
+        if self.request.is_pre_aggregations_match_only() {
+            return Ok((String::new(), usages));
+        }
 
         let is_external = if !usages.is_empty() {
             usages.iter().all(|usage| usage.pre_aggregation.external())
@@ -42,11 +59,19 @@ impl TopLevelPlanner {
         };
 
         let templates = self.query_tools.plan_sql_templates(is_external)?;
-
         let physical_plan_builder =
-            PhysicalPlanBuilder::new(self.query_tools.clone(), templates.clone());
-        let original_sql_pre_aggregations = if !self.request.is_pre_aggregation_query() {
-            OriginalSqlCollector::new(self.query_tools.clone()).collect(&optimized_plan)?
+            PhysicalPlanBuilder::new(self.query_tools.query_tools().clone(), templates.clone());
+
+        // Substitute a cube's base SQL with its `originalSql` pre-aggregation table when:
+        // reading (regular query), or building a rollup that opted in via
+        // `useOriginalSqlPreAggregationsInPreAggregation`.
+        let original_sql_pre_aggregations = if !self.request.is_pre_aggregation_query()
+            || self
+                .request
+                .use_original_sql_pre_aggregations_in_pre_aggregation()
+        {
+            OriginalSqlCollector::new(self.query_tools.query_tools().clone())
+                .collect(&optimized_plan)?
         } else {
             HashMap::new()
         };
@@ -64,8 +89,8 @@ impl TopLevelPlanner {
 
     fn try_pre_aggregations(
         &self,
-        plan: Rc<Query>,
-    ) -> Result<(Rc<Query>, Vec<PreAggregationUsage>), CubeError> {
+        plan: Rc<RootQuery>,
+    ) -> Result<(Rc<RootQuery>, Vec<PreAggregationUsage>), CubeError> {
         let result = if !self.request.is_pre_aggregation_query() {
             let mut pre_aggregation_optimizer = PreAggregationOptimizer::new(
                 self.query_tools.clone(),

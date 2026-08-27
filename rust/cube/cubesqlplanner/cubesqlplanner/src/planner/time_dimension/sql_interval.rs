@@ -63,6 +63,17 @@ impl SqlInterval {
         Ok(res.to_string())
     }
 
+    pub fn is_week_only(&self) -> bool {
+        self.week != 0
+            && self.year == 0
+            && self.quarter == 0
+            && self.month == 0
+            && self.day == 0
+            && self.hour == 0
+            && self.minute == 0
+            && self.second == 0
+    }
+
     pub fn is_trivial(&self) -> bool {
         let fields = [
             self.year,

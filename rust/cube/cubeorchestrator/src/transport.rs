@@ -1,4 +1,4 @@
-use crate::query_result_transform::DBResponsePrimitive;
+use crate::query_result_transform::{ColumnarArray, DBResponsePrimitive};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -304,8 +304,6 @@ pub struct NormalizedQuery {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub renew_query: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub ungrouped: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<ResultType>,
@@ -334,7 +332,7 @@ pub struct TransformDataRequest {
 #[serde(rename_all = "camelCase")]
 pub struct JsRawColumnarData {
     pub members: Vec<String>,
-    pub columns: Vec<Vec<DBResponsePrimitive>>,
+    pub columns: Vec<ColumnarArray>,
 }
 
 #[cfg(test)]

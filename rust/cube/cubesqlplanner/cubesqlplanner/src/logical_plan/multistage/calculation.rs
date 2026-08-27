@@ -6,6 +6,8 @@ use itertools::Itertools;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
+/// Semantic category of a multi-stage measure CTE — drives how the
+/// physical builder shapes the rendered expression.
 #[derive(PartialEq, Clone)]
 pub enum MultiStageCalculationType {
     Rank,
@@ -23,6 +25,8 @@ impl ToString for MultiStageCalculationType {
     }
 }
 
+/// Which SQL window-function flavour, if any, the calculation
+/// renders as.
 #[derive(PartialEq, Clone)]
 pub enum MultiStageCalculationWindowFunction {
     Rank,
@@ -40,6 +44,9 @@ impl ToString for MultiStageCalculationWindowFunction {
     }
 }
 
+/// Measure CTE in a multi-stage chain — wraps a `FullKeyAggregate`
+/// source with the partition / window function / ordering decided
+/// by `calculation_type`.
 #[derive(TypedBuilder)]
 pub struct MultiStageMeasureCalculation {
     schema: Rc<LogicalSchema>,

@@ -8,6 +8,9 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Renders measures inside an ungrouped query. Count-like measures
+/// keep their counting wrap to stay correct without GROUP BY; other
+/// measures pass through without aggregation.
 pub struct UngroupedQueryFinalMeasureSqlNode {
     input: Rc<dyn SqlNode>,
 }
@@ -34,12 +37,12 @@ impl SqlNode for UngroupedQueryFinalMeasureSqlNode {
         let res = match node.as_ref() {
             MemberSymbol::Measure(ev) => {
                 let is_count_like = match ev.kind() {
-                    MeasureKind::Count(_) => true,
-                    MeasureKind::Aggregated(a) => matches!(
+                    MeasureKind::Count(_) | MeasureKind::MultipliedCount(_) => true,
+                    MeasureKind::Aggregated(a) | MeasureKind::AggregatedState(a) => matches!(
                         a.agg_type(),
                         AggregationType::CountDistinct | AggregationType::CountDistinctApprox
                     ),
-                    _ => false,
+                    MeasureKind::Calculated(_) | MeasureKind::Rank => false,
                 };
                 // Count-likes wrap the child in `CASE WHEN … IS NOT NULL THEN 1 END`
                 // (safe), other kinds pass through and must propagate the flag.

@@ -54,22 +54,24 @@ const BRIDGES: BridgeSpec[] = [
       'order',
       'pre_aggregation_id',
       'pre_aggregation_query',
+      'pre_aggregations_match_only',
       'row_limit',
       'security_context',
       'segments',
+      'subquery_joins',
       'time_dimensions',
       'timezone',
       'total_query',
       'ungrouped',
+      'use_original_sql_pre_aggregations_in_pre_aggregation',
     ],
   },
   {
     name: 'baseTools',
     expected: [
       'all_cube_members',
+      'compile_member_sql',
       'driver_tools',
-      'generate_custom_time_series',
-      'generate_time_series',
       'get_allocated_params',
       'get_pre_aggregation_by_name',
       'interval_and_minimal_time_unit',
@@ -87,7 +89,16 @@ const BRIDGES: BridgeSpec[] = [
   { name: 'caseSwitchItem', expected: ['sql', 'value'] },
   {
     name: 'cubeDefinition',
-    expected: ['is_calendar', 'is_view', 'join_map', 'name', 'sql', 'sql_alias', 'sql_table'],
+    expected: [
+      'default_filters',
+      'is_calendar',
+      'is_view',
+      'join_map',
+      'name',
+      'sql',
+      'sql_alias',
+      'sql_table',
+    ],
   },
   {
     name: 'cubeEvaluator',
@@ -114,6 +125,7 @@ const BRIDGES: BridgeSpec[] = [
       'add_group_by_references',
       'case',
       'dimension_type',
+      'filter',
       'latitude',
       'longitude',
       'mask_sql',
@@ -143,6 +155,7 @@ const BRIDGES: BridgeSpec[] = [
       'in_db_time_zone',
       'interval_and_minimal_time_unit',
       'interval_string',
+      'should_reuse_params',
       'sql_templates',
       'subtract_interval',
       'support_generated_series_for_custom_td',
@@ -169,7 +182,9 @@ const BRIDGES: BridgeSpec[] = [
       'add_group_by_references',
       'case',
       'drill_filters',
+      'filter',
       'filters',
+      'grain',
       'group_by_references',
       'mask_sql',
       'measure_type',
@@ -188,6 +203,14 @@ const BRIDGES: BridgeSpec[] = [
     expected: ['cube_name', 'definition', 'expression', 'expression_name', 'name'],
   },
   { name: 'memberOrderBy', expected: ['dir', 'sql'] },
+  {
+    name: 'multiStageFilter',
+    expected: ['exclude', 'include', 'keep_only', 'mode'],
+  },
+  {
+    name: 'multiStageGrain',
+    expected: ['exclude', 'include', 'keep_only'],
+  },
   {
     name: 'preAggregationDescription',
     expected: [
@@ -215,6 +238,10 @@ const BRIDGES: BridgeSpec[] = [
   { name: 'sqlUtils', expected: [] },
   { name: 'structWithSqlMember', expected: ['sql'] },
   { name: 'timeShiftDefinition', expected: ['interval', 'name', 'sql', 'timeshift_type'] },
+  {
+    name: 'viewFilterDefinition',
+    expected: ['member_reference', 'operator', 'unless_references', 'values_references'],
+  },
 ];
 
 const describeBridge = bridgeHarnessAvailable ? describe : describe.skip;

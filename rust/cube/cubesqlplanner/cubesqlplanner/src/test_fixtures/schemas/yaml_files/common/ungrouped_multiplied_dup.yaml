@@ -1,0 +1,38 @@
+# Two customers share the same name, each with one order of the same status, so
+# grouping by the requested dimensions would collapse two distinct primary keys
+# into one row.
+cubes:
+  - name: dup_customers
+    sql: "SELECT * FROM dup_customers"
+    joins:
+      - name: dup_orders
+        relationship: one_to_many
+        sql: "{CUBE.id} = {dup_orders.customer_id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: name
+        type: string
+        sql: name
+    measures:
+      # The aggregate lives inside the measure's own sql, so nothing may wrap it
+      # and the select it lands in has to group.
+      - name: ltv_agg_number
+        type: number
+        sql: "sum(ltv)"
+
+  - name: dup_orders
+    sql: "SELECT * FROM dup_orders"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: customer_id
+        type: number
+        sql: customer_id
+      - name: status
+        type: string
+        sql: status

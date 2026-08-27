@@ -5,6 +5,8 @@ use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Regular rolling window: trailing and/or leading bounds, plus a
+/// time-series offset.
 pub struct MultiStageRegularRollingWindow {
     pub trailing: Option<String>,
     pub leading: Option<String>,
@@ -25,6 +27,8 @@ impl PrettyPrint for MultiStageRegularRollingWindow {
     }
 }
 
+/// `to_date` rolling window — bounded by the start of the
+/// specified granularity (month-to-date, year-to-date, …).
 pub struct MultiStageToDateRollingWindow {
     pub granularity_obj: Rc<Granularity>,
 }
@@ -40,10 +44,11 @@ impl PrettyPrint for MultiStageToDateRollingWindow {
     }
 }
 
+/// Flavour of rolling-window calculation: regular trailing/leading
+/// window or a `to_date` window.
 pub enum MultiStageRollingWindowType {
     Regular(MultiStageRegularRollingWindow),
     ToDate(MultiStageToDateRollingWindow),
-    RunningTotal,
 }
 
 impl PrettyPrint for MultiStageRollingWindowType {
@@ -51,13 +56,13 @@ impl PrettyPrint for MultiStageRollingWindowType {
         match self {
             MultiStageRollingWindowType::Regular(window) => window.pretty_print(result, state),
             MultiStageRollingWindowType::ToDate(window) => window.pretty_print(result, state),
-            MultiStageRollingWindowType::RunningTotal => {
-                result.println("Running Total Rolling Window", state)
-            }
         }
     }
 }
 
+/// Rolling-window CTE — combines a time-series CTE (the date axis)
+/// with a measure CTE and applies the chosen rolling computation
+/// to each point on the series.
 pub struct MultiStageRollingWindow {
     pub schema: Rc<LogicalSchema>,
     pub is_ungrouped: bool,
@@ -124,6 +129,13 @@ impl LogicalNode for MultiStageRollingWindow {
     fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
         check_inputs_len(&inputs, 0, self.node_name())?;
         Ok(self)
+    }
+
+    fn referenced_cte_names(&self) -> Vec<String> {
+        vec![
+            self.time_series_input.name().clone(),
+            self.measure_input.name().clone(),
+        ]
     }
 
     fn node_name(&self) -> &'static str {

@@ -6,6 +6,9 @@ use minijinja::{value::Value, Environment};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
+/// Jinja2 template rendering for SQL templates. The native
+/// implementation keeps the parsed templates locally and renders
+/// without crossing the JS boundary.
 pub trait SqlTemplatesRender {
     fn contains_template(&self, template_name: &str) -> bool;
     fn render_template(&self, name: &str, ctx: Value) -> Result<String, CubeError>;

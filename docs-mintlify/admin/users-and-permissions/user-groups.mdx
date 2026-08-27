@@ -20,7 +20,29 @@ To create a user group:
   <img src="https://lgo0ecceic.ucarecd.net/f66feb98-feee-478e-8371-e3b37602eb4a/" alt="User Groups interface" />
 </Frame>
 
+## Assigning roles to groups
+
+<Warning>
+
+Assigning roles to groups is currently in preview, and the user experience may still
+change. Reach out to the [Cube support team](/admin/account-billing/support) to activate
+this feature for your account.
+
+</Warning>
+
+Open a group and use the **Roles** section to assign [roles][ref-roles] to it. Every member
+of the group gains the access that role grants, and removing the role from the group revokes
+it from all members immediately.
+
+Roles only ever add permissions — there is no precedence and no deny. A user with a Viewer
+role who belongs to a group assigned Developer holds both, and is effectively a Developer.
+This includes Admin: anyone who can edit a group's roles can grant administrative access
+through it.
+
+The **Effective access** section on a user's page lists the roles a user holds directly and
+the roles conferred by a group, with the group named.
 
 [ref-user-attributes]: /admin/users-and-permissions/user-attributes
+[ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-rls]: /docs/data-modeling/access-control/row-level-security
-[ref-dap]: /docs/data-modeling/access-control/data-access-policies
+[ref-dap]: /docs/data-modeling/data-access-policies

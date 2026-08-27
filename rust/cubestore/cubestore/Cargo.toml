@@ -1,6 +1,6 @@
 [package]
 name = "cubestore"
-version = "1.6.46"
+version = "1.7.28"
 authors = ["Cube Dev, Inc."]
 edition = "2021"
 license = "Apache-2.0"
@@ -39,7 +39,8 @@ futures = "0.3.26"
 smallvec = "1.11.0"
 flexbuffers = { version = "0.2.2", features = ["deserialize_human_readable", "serialize_human_readable"] }
 byteorder = "1.3.4"
-log = "0.4.21"
+# `kv` unlocks Record::to_builder, previously enabled transitively via async-std.
+log = { version = "0.4.21", features = ["kv"] }
 simple_logger = { version = "2.3.0" }
 async-trait = "0.1.80"
 actix-rt = "2.7.0"
@@ -53,7 +54,6 @@ chrono = "0.4.38"
 chrono-tz = "0.8.2"
 lazy_static = "1.4.0"
 mockall = "0.8.1"
-async-std = "0.99"
 async-stream = "0.3.6"
 indexmap = "2.10.0"
 itertools = "0.14.0"
@@ -63,7 +63,8 @@ bigdecimal = { version = "0.2.0", features = ["serde"] }
 # Tracking PR with backports: https://github.com/cube-js/rust-s3/pull/1
 # The fork also includes a fix for AWS_STS_REGIONAL_ENDPOINTS
 # See https://github.com/cube-js/rust-s3/pull/1/commits for more details
-rust-s3 = { git = "https://github.com/cube-js/rust-s3.git", rev = "c662b9c66c2929da185c46084fc5f455030ad75f", default-features = false, features = ["tokio", "tokio-native-tls"] }
+# rev = cubestore-0.32.3-backport tip incl. per-operation SSE header (https://github.com/cube-js/rust-s3/pull/2)
+rust-s3 = { git = "https://github.com/cube-js/rust-s3.git", rev = "9deb3475c7963deaa6c30de59771e61af5b15b8f", default-features = false, features = ["tokio", "tokio-native-tls"] }
 deadqueue = "0.2.4"
 reqwest = { version = "0.12.5", features = ["json", "rustls-tls", "stream", "http2"], default-features = false }
 nanoid = "0.3.0"
@@ -91,7 +92,7 @@ opentelemetry-otlp = { version = "0.26.0", default-features = false, features = 
     "trace", "metrics", "logs", "http-proto", "http-json", "reqwest-client", "tokio"
 ] }
 opentelemetry-http = { version = "0.26.0", features = ["reqwest"] }
-lru = "0.6.5"
+lru = "0.18.2"
 moka = { version = "0.10.1", features = ["future"] }
 ctor = "0.1.20"
 json = "0.12.4"

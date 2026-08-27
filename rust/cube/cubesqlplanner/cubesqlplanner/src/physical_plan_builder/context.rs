@@ -2,7 +2,7 @@ use cubenativeutils::CubeError;
 
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::Schema;
-use crate::planner::planners::multi_stage::TimeShiftState;
+use crate::planner::planners::multi_stage::{EvaluationContext, TimeShiftState};
 use crate::planner::MemberSymbol;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -17,7 +17,6 @@ pub struct MultiStageDimensionContext {
 #[derive(Clone, Debug, Default)]
 pub(super) struct PushDownBuilderContext {
     pub alias_prefix: Option<String>,
-    pub render_measure_as_state: bool, //Render measure as state, for example hll state for count_approx
     pub render_measure_for_ungrouped: bool,
     pub time_shifts: TimeShiftState,
     pub original_sql_pre_aggregations: HashMap<String, String>,
@@ -30,6 +29,15 @@ pub(super) struct PushDownBuilderContext {
 }
 
 impl PushDownBuilderContext {
+    /// The single place a CTE's `evaluation_context` is transferred into
+    /// the build context — both the leaf-measure and the
+    /// multiplied-subquery processors go through here, so the two
+    /// stay in sync field-for-field.
+    pub fn apply_evaluation_context(&mut self, evaluation_context: &EvaluationContext) {
+        self.render_measure_for_ungrouped = evaluation_context.measure_for_ungrouped;
+        self.time_shifts = evaluation_context.time_shifts.clone();
+    }
+
     pub fn make_sql_nodes_factory(&self) -> Result<SqlNodesFactory, CubeError> {
         let mut factory = SqlNodesFactory::new();
 
@@ -40,8 +48,6 @@ impl PushDownBuilderContext {
 
         factory.set_time_shifts(common_time_shifts);
         factory.set_calendar_time_shifts(calendar_time_shifts);
-        factory.set_count_approx_as_state(self.render_measure_as_state);
-        factory.set_ungrouped_measure(self.render_measure_for_ungrouped);
         factory.set_original_sql_pre_aggregations(self.original_sql_pre_aggregations.clone());
         Ok(factory)
     }

@@ -9,12 +9,6 @@ Every Cube Cloud deployment provides a number of environments:
 - Multiple [staging environments](#staging-environments).
 - Per-user [development environments](#development-environments).
 
-<Note>
-
-Available on [all plans](https://cube.dev/pricing).
-
-</Note>
-
 ## Production environment
 
 This is the main environment. It runs the data model from the _main branch_.
@@ -57,6 +51,14 @@ regardless of user activity.
 <Frame>
   <img src="https://ucarecdn.com/e0dcce34-a53a-4087-b021-25dbaf730a92/" />
 </Frame>
+
+The same toggle is available in the [CLI][ref-cli] and the [Control Plane
+API][ref-control-plane-api-staging], so it can be scripted, e.g. from CI:
+
+```bash
+cube data-model enable-branch DEPLOYMENT_ID BRANCH_NAME
+cube data-model disable-branch DEPLOYMENT_ID BRANCH_NAME
+```
 
 ### Resources and costs
 
@@ -114,11 +116,13 @@ credentials**][ref-credentials].
 
 
 [ref-dev-mode]: /docs/data-modeling/dev-mode
-[ref-deployment-types]: /docs/deployment/cloud/deployment-types
-[ref-api-instance-scalability]: /docs/deployment/cloud/scalability#auto-scaling-of-api-instances
+[ref-deployment-types]: /admin/deployment/deployment-types
+[ref-api-instance-scalability]: /admin/deployment/scalability#auto-scaling-of-api-instances
 [ref-pricing-deployment-tiers]: /admin/account-billing/pricing
-[ref-suspend]: /docs/deployment/cloud/auto-suspension
-[ref-overview]: /docs/workspace/integrations#review-integrations
-[ref-credentials]: /docs/workspace/integrations#view-api-credentials
-[ref-version]: /docs/deployment/cloud/deployments#cube-version
-[ref-version-channel]: /docs/deployment/cloud/deployments#update-channels
+[ref-suspend]: /admin/deployment/auto-suspension
+[ref-overview]: /admin/connect-to-data/visualization-tools
+[ref-credentials]: /admin/connect-to-data/visualization-tools
+[ref-version]: /admin/deployment#cube-version
+[ref-version-channel]: /admin/deployment#update-channels
+[ref-cli]: /reference/cli
+[ref-control-plane-api-staging]: /reference/control-plane-api#buildapiv1deploymentsdeployment_idbranchesstaging-environment

@@ -1,3 +1,10 @@
+//! DTO layer for talking to the JavaScript side of Cube.
+//!
+//! Every type here mirrors the shape of an object delivered by the
+//! schema compiler — cube and member definitions, filter params,
+//! callbacks, security context, and so on. Tesseract reads these
+//! types as input; no business logic lives here.
+
 pub mod base_query_options;
 pub mod base_tools;
 pub mod case_definition;
@@ -26,6 +33,8 @@ pub mod member_definition;
 pub mod member_expression;
 pub mod member_order_by;
 pub mod member_sql;
+pub mod multi_stage_filter;
+pub mod multi_stage_grain;
 pub mod options_member;
 pub mod pre_aggregation_description;
 pub mod pre_aggregation_obj;
@@ -36,4 +45,6 @@ pub mod sql_templates_render;
 pub mod sql_utils;
 pub mod string_or_sql;
 pub mod struct_with_sql_member;
+pub mod subquery_join;
 pub mod timeshift_definition;
+pub mod view_filter_definition;

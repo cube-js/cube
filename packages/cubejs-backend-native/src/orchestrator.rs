@@ -5,7 +5,7 @@ use cubeorchestrator::query_result_transform::{
     DBResponsePrimitive, RequestResultData, RequestResultDataMulti, TransformedData,
 };
 use cubeorchestrator::transport::{JsRawColumnarData, TransformDataRequest};
-use cubesql::compile::engine::df::scan::{ColumnarValueObject, FieldValue, ValueObject};
+use cubesql::compile::engine::df::scan::{ColumnarValueObject, FieldValue};
 use cubesql::CubeError;
 use neon::context::{Context, FunctionContext, ModuleContext};
 use neon::handle::Handle;
@@ -37,6 +37,7 @@ pub struct ResultWrapper {
     data: Arc<QueryResult>,
     transformed_data: Option<TransformedData>,
     pub last_refresh_time: Option<String>,
+    pub external: bool,
 }
 
 impl ResultWrapper {
@@ -113,6 +114,7 @@ impl ResultWrapper {
             data: query_result,
             transformed_data: None,
             last_refresh_time: None,
+            external: false,
         })
     }
 
@@ -129,94 +131,15 @@ impl ResultWrapper {
 fn db_primitive_to_field_value(value: &DBResponsePrimitive) -> FieldValue<'_> {
     match value {
         DBResponsePrimitive::String(s) => FieldValue::String(Cow::Borrowed(s)),
-        DBResponsePrimitive::Number(n) => FieldValue::Number(*n),
+        DBResponsePrimitive::Int64(n) => FieldValue::Number(*n as f64),
+        DBResponsePrimitive::UInt64(n) => FieldValue::Number(*n as f64),
+        DBResponsePrimitive::Float64(n) => FieldValue::Number(*n),
         DBResponsePrimitive::Boolean(b) => FieldValue::Bool(*b),
+        DBResponsePrimitive::Timestamp(_) => FieldValue::String(Cow::Owned(value.to_string())),
         DBResponsePrimitive::Uncommon(v) => FieldValue::String(Cow::Owned(
             serde_json::to_string(&v).unwrap_or_else(|_| v.to_string()),
         )),
         DBResponsePrimitive::Null => FieldValue::Null,
-    }
-}
-
-impl ValueObject for ResultWrapper {
-    fn len(&mut self) -> Result<usize, CubeError> {
-        if self.transformed_data.is_none() {
-            self.transform_result()?;
-        }
-
-        let data = self.transformed_data.as_ref().unwrap();
-
-        match data {
-            TransformedData::Compact {
-                members: _members,
-                dataset,
-            } => Ok(dataset.len()),
-            TransformedData::Columnar {
-                members: _members,
-                columns,
-            } => Ok(columns.first().map(|c| c.len()).unwrap_or(0)),
-            TransformedData::Vanilla(dataset) => Ok(dataset.len()),
-        }
-    }
-
-    fn get(&mut self, index: usize, field_name: &str) -> Result<FieldValue<'_>, CubeError> {
-        if self.transformed_data.is_none() {
-            self.transform_result()?;
-        }
-
-        let data = self.transformed_data.as_ref().unwrap();
-
-        let value = match data {
-            TransformedData::Compact { members, dataset } => {
-                let Some(row) = dataset.get(index) else {
-                    return Err(CubeError::user(format!(
-                        "Unexpected response from Cube, can't get {} row",
-                        index
-                    )));
-                };
-
-                let Some(member_index) = members.iter().position(|m| m == field_name) else {
-                    // Missing field → NULL, matching `Vanilla` semantics below.
-                    return Ok(FieldValue::Null);
-                };
-
-                row.get(member_index).unwrap_or(&DBResponsePrimitive::Null)
-            }
-            TransformedData::Columnar { members, columns } => {
-                let Some(member_index) = members.iter().position(|m| m == field_name) else {
-                    // Missing field → NULL, matching `Vanilla` semantics below.
-                    return Ok(FieldValue::Null);
-                };
-
-                let Some(column) = columns.get(member_index) else {
-                    return Err(CubeError::user(format!(
-                        "Unexpected response from Cube, missing column for '{}'",
-                        field_name
-                    )));
-                };
-
-                let Some(value) = column.get(index) else {
-                    return Err(CubeError::user(format!(
-                        "Unexpected response from Cube, can't get {} row",
-                        index
-                    )));
-                };
-
-                value
-            }
-            TransformedData::Vanilla(dataset) => {
-                let Some(row) = dataset.get(index) else {
-                    return Err(CubeError::user(format!(
-                        "Unexpected response from Cube, can't get {} row",
-                        index
-                    )));
-                };
-
-                row.get(field_name).unwrap_or(&DBResponsePrimitive::Null)
-            }
-        };
-
-        Ok(db_primitive_to_field_value(value))
     }
 }
 
@@ -330,15 +253,22 @@ pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
     let result = cx.argument::<JsBox<Arc<QueryResult>>>(0)?;
 
     let js_array = cx.execute_scoped(|mut cx| {
-        let js_keys: Vec<Handle<JsString>> = result.members.iter().map(|k| cx.string(k)).collect();
+        let js_keys: Vec<Handle<JsString>> =
+            result.members().iter().map(|k| cx.string(k)).collect();
 
-        let js_array = JsArray::new(&mut cx, result.rows.len());
+        let row_count = result.row_count();
+        let columns: Vec<_> = (0..js_keys.len())
+            .map(|i| result.column(i))
+            .collect::<Result<_, _>>()
+            .or_else(|err| cx.throw_error(err.to_string()))?;
+        let js_array = JsArray::new(&mut cx, row_count);
 
-        for (i, row) in result.rows.iter().enumerate() {
+        for row_idx in 0..row_count {
             let js_row = cx.execute_scoped(|mut cx| {
                 let js_row = JsObject::new(&mut cx);
 
-                for (js_key, value) in js_keys.iter().zip(row.iter()) {
+                for (col_idx, js_key) in js_keys.iter().enumerate() {
+                    let value = &columns[col_idx][row_idx];
                     let js_value: Handle<'_, JsValue> = match value {
                         DBResponsePrimitive::Null => cx.null().upcast(),
                         // For compatibility, we convert all primitives to strings
@@ -351,7 +281,7 @@ pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
                 Ok(js_row)
             })?;
 
-            js_array.set(&mut cx, i as u32, js_row)?;
+            js_array.set(&mut cx, row_idx as u32, js_row)?;
         }
 
         Ok(js_array)

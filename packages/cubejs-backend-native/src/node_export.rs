@@ -3,6 +3,7 @@ use cubesql::compile::{convert_statement_to_cube_query, get_df_batches};
 use cubesql::config::processing_loop::ShutdownMode;
 use cubesql::sql::dataframe::arrow_to_column_type;
 use cubesql::sql::ColumnType;
+use cubesql::sql::Session;
 use cubesql::transport::{SpanId, TransportService};
 use futures::StreamExt;
 
@@ -18,7 +19,7 @@ use crate::cubesql_utils::with_session;
 use crate::logger::NodeBridgeLogger;
 use crate::rest4sql::rest4sql;
 use crate::sql4sql::sql4sql;
-use crate::stream::OnDrainHandler;
+use crate::stream::{OnCloseHandler, OnDrainHandler};
 use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
 use crate::utils::{batch_to_rows, NonDebugInRelease};
@@ -28,6 +29,7 @@ use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
 use cubesqlplanner::planner::base_query::BaseQuery;
 use std::rc::Rc;
 use std::sync::Arc;
+use tokio::sync::oneshot;
 
 use cubesql::telemetry::LocalReporter;
 use cubesql::{telemetry::ReportingLogger, CubeError};
@@ -232,6 +234,76 @@ async fn write_jsonl_message(
     .await
 }
 
+/// How a `/v1/cubesql` request ended when nothing actually failed.
+enum SqlQueryOutcome {
+    /// The whole result set was streamed to the client.
+    Completed,
+    /// The client closed the response stream before the result set was fully
+    /// written, so this attempt delivered nothing. It is reported as a
+    /// `Continue wait`: the event query history already reads for an attempt
+    /// that produced no result. `Load Request` is logged when the attempt
+    /// starts, so without this the attempt usually has no end at all and the
+    /// time it spent cannot be attributed - dropping the future abandons the JS
+    /// load rather than cancelling it, and an abandoned load that resolves, or
+    /// never settles, reports nothing.
+    ///
+    /// The exception is an abandoned load that goes on to *reject*: it still
+    /// runs in its own promise (`sql-server.ts`), and the gateway routes the
+    /// rejection into `handleError`, which logs its own `Continue wait`. A
+    /// disconnect racing the continue-wait boundary therefore double-logs -
+    /// CUB-4099's disconnects cluster around 61s against a ~60s boundary, so
+    /// this is not rare. Two rows saying the same thing beat none, so the call
+    /// is not gated on it, but that is where a duplicate comes from.
+    ///
+    /// Whether the client comes back is not something this end of the stream
+    /// can know, and the reporting deliberately does not depend on it: under
+    /// `throwContinueWait` it polls with the same request id and the queued
+    /// query stays alive while it keeps doing so, and without the flag this is
+    /// the end of the road. Either way the attempt is over having produced
+    /// nothing, which is all the event claims. What it must not claim is that
+    /// the query failed.
+    ClientDisconnected,
+}
+
+/// Records a `Continue wait` load event for a `/v1/cubesql` attempt that ended
+/// without delivering a result.
+///
+/// `Load Request` is logged when the attempt starts, so an attempt that reports
+/// nothing back leaves no way to attribute the time it spent. `Continue wait`
+/// is the event the query history consumer already reads for "this attempt
+/// produced no result", which is what happened. It does not by itself close the
+/// request - a polling client opens further attempts under the same request id,
+/// and CUB-4099 has one that ran 44 minutes over six of them - but it does give
+/// this attempt an end.
+async fn log_continue_wait(
+    session: &Arc<Session>,
+    span_id: &Option<Arc<SpanId>>,
+    sql_query: &str,
+) -> Result<(), CubeError> {
+    let Some(auth_context) = session.state.auth_context() else {
+        return Ok(());
+    };
+
+    session
+        .session_manager
+        .server
+        .transport
+        .log_load_state(
+            span_id.clone(),
+            auth_context,
+            session.state.get_load_request_meta("sql"),
+            "Continue wait".to_string(),
+            serde_json::json!({
+                "query": {
+                    "sql": sql_query,
+                },
+                "apiType": "sql",
+                "duration": span_id.as_ref().map(|span_id| span_id.duration()),
+            }),
+        )
+        .await
+}
+
 async fn handle_sql_query(
     services: Arc<NodeCubeServices>,
     native_auth_ctx: Arc<NativeSQLAuthContext>,
@@ -242,7 +314,7 @@ async fn handle_sql_query(
     timezone: Option<String>,
     throw_continue_wait: bool,
     request_id: Option<String>,
-) -> Result<(), CubeError> {
+) -> Result<SqlQueryOutcome, CubeError> {
     let span_id = Some(Arc::new(SpanId::new(
         request_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
         serde_json::json!({ "sql": sql_query }),
@@ -302,15 +374,16 @@ async fn handle_sql_query(
 
         let session_clone = Arc::clone(&session);
         let span_id_clone = span_id.clone();
+        let span_id_for_schema = span_id.clone();
+
+        let (close_tx, close_rx) = oneshot::channel::<()>();
+        let close_handler =
+            OnCloseHandler::new(channel.clone(), stream_methods.stream.clone(), close_tx);
+        close_handler.handle(stream_methods.on.clone()).await?;
 
         let execute = || async move {
             // todo: can we use compiler_cache?
-            let meta_context = transport_service
-                .meta(native_auth_ctx)
-                .await
-                .map_err(|err| {
-                    CubeError::internal(format!("Failed to get meta context: {}", err))
-                })?;
+            let meta_context = transport_service.meta(native_auth_ctx).await?;
 
             let stmt =
                 parse_sql_to_statement(sql_query, session.state.protocol.clone(), &mut None)?;
@@ -372,11 +445,58 @@ async fn handle_sql_query(
             let mut schema_response = Map::new();
             schema_response.insert("schema".into(), serde_json::to_value(&columns)?);
 
-            if let Some(last_refresh_time) = stream.schema().metadata().get("lastRefreshTime") {
+            // Result freshness metadata is recorded on the span by `load_data`,
+            // so it survives post-processing nodes (a calculated projection over
+            // MEASURE(), a sort, a filter) that rebuild the schema and drop its
+            // metadata. The stream schema is only a fallback for plans with no
+            // span.
+            //
+            // Reading it here, before the first `stream.next()`, relies on
+            // `ExecutionPlan::execute` being async in this DataFusion fork with
+            // every parent awaiting its children's `execute()` before returning
+            // a stream — that is what has already run `load_data` by now. A node
+            // that deferred child execution to first poll would silently empty
+            // this header again, and the tests would not catch it.
+            //
+            // Not covered: stream mode, where `execute` takes the `load_stream`
+            // branch and never calls `load_data`, so neither the span nor the
+            // stream schema carries the metadata and the header omits it.
+            //
+            // Both values take the same precedence: whatever the span reported
+            // wins outright, and the schema is consulted only when the span was
+            // silent. `external` must not be OR-ed with the schema — a span that
+            // folded to `false` because only some of its loads were external
+            // would then be overridden back to `true`, undoing the conservative
+            // fold in `SpanId::set_external`.
+            let (span_last_refresh_time, span_external) = match span_id_for_schema.as_ref() {
+                Some(span_id) => (span_id.last_refresh_time().await, span_id.external().await),
+                None => (None, None),
+            };
+
+            let last_refresh_time = span_last_refresh_time.or_else(|| {
+                stream
+                    .schema()
+                    .metadata()
+                    .get("lastRefreshTime")
+                    .map(|t| t.to_string())
+            });
+            if let Some(last_refresh_time) = last_refresh_time {
                 schema_response.insert(
                     "lastRefreshTime".into(),
-                    serde_json::Value::String(last_refresh_time.clone()),
+                    serde_json::Value::String(last_refresh_time),
                 );
+            }
+
+            let external = span_external.unwrap_or_else(|| {
+                stream
+                    .schema()
+                    .metadata()
+                    .get("external")
+                    .map(|v| v == "true")
+                    .unwrap_or(false)
+            });
+            if external {
+                schema_response.insert("external".into(), serde_json::Value::Bool(true));
             }
 
             write_jsonl_message(
@@ -427,10 +547,33 @@ async fn handle_sql_query(
             Ok::<(), CubeError>(())
         };
 
-        let result = execute().await;
+        let result = tokio::select! {
+            // Dropping the `execute()` future here cancels the query stream,
+            // which is exactly what we want: there is no consumer left for it.
+            _ = close_rx => {
+                Ok(SqlQueryOutcome::ClientDisconnected)
+            }
+            res = execute() => res.map(|_| SqlQueryOutcome::Completed),
+        };
 
         match &result {
-            Ok(_) => {
+            Ok(SqlQueryOutcome::ClientDisconnected) => {
+                log::debug!(
+                    "Client disconnected before the result was fully written, span id: {}",
+                    span_id.as_ref().map(|s| s.span_id.as_str()).unwrap_or("-")
+                );
+
+                // Usually nothing else reports this outcome, so without this
+                // the attempt ends unrecorded and the time it spent cannot be
+                // attributed. `Continue wait` is the name query history already
+                // reads for an attempt that produced no result, rather than a
+                // new one it would log and drop. See
+                // `SqlQueryOutcome::ClientDisconnected` for why it is not gated
+                // on `throw_continue_wait`, and the `Err` arm below for why a
+                // real continue wait deliberately does not log here.
+                log_continue_wait(&session_clone, &span_id, sql_query).await?;
+            }
+            Ok(SqlQueryOutcome::Completed) => {
                 session_clone
                     .session_manager
                     .server
@@ -447,11 +590,22 @@ async fn handle_sql_query(
                             "apiType": "sql",
                             "duration": span_id.as_ref().unwrap().duration(),
                             "isDataQuery": span_id.as_ref().unwrap().is_data_query().await,
+                            "lastRefreshTime": span_id.as_ref().unwrap().last_refresh_time().await,
                         }),
                     )
                     .await?;
             }
             Err(err) => {
+                // A `Continue wait` that reaches this arm was produced by the
+                // JS side, which already reports it: `OrchestratorApi` logs it
+                // on `ContinueWaitError` and the gateway's `handleError` logs
+                // it again, both into the sink `logLoadEvent` writes to. #10649
+                // stopped this arm reporting it as a `Cube SQL Error`; logging
+                // it as anything from here would just be a third copy. The
+                // disconnect arm usually has no such JS-side counterpart -
+                // the promise it was awaiting is abandoned rather than
+                // cancelled, and only reports if it later rejects - which is
+                // why that one does log.
                 if !err.message.eq_ignore_ascii_case("continue wait") {
                     session_clone
                         .session_manager
@@ -613,6 +767,9 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             };
 
             let args = match result {
+                // Includes `SqlQueryOutcome::ClientDisconnected`: the stream is
+                // already gone, so there is nobody to hand an error payload to,
+                // and a disconnect is not an error to report in the first place.
                 Ok(_) => vec![],
                 Err(err) => {
                     let mut error_response = Map::new();

@@ -19,7 +19,7 @@ impl<C: Context<'static>> NeonString<C> {
 impl<C: Context<'static> + 'static> NativeType<NeonInnerTypes<C>> for NeonString<C> {
     fn into_object(self) -> NeonObject<C> {
         let root_holder = RootHolder::from_typed(self.holder);
-        NeonObject::form_root(root_holder)
+        NeonObject::from_root(root_holder)
     }
 }
 
@@ -43,7 +43,7 @@ impl<C: Context<'static>> NeonNumber<C> {
 impl<C: Context<'static> + 'static> NativeType<NeonInnerTypes<C>> for NeonNumber<C> {
     fn into_object(self) -> NeonObject<C> {
         let root_holder = RootHolder::from_typed(self.holder);
-        NeonObject::form_root(root_holder)
+        NeonObject::from_root(root_holder)
     }
 }
 
@@ -67,7 +67,7 @@ impl<C: Context<'static>> NeonBoolean<C> {
 impl<C: Context<'static> + 'static> NativeType<NeonInnerTypes<C>> for NeonBoolean<C> {
     fn into_object(self) -> NeonObject<C> {
         let root_holder = RootHolder::from_typed(self.holder);
-        NeonObject::form_root(root_holder)
+        NeonObject::from_root(root_holder)
     }
 }
 

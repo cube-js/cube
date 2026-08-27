@@ -52,7 +52,8 @@ measures defined as `{sum} / {count}`), then referenced leaf measures will be
 checked for additivity.
 - **Does every member of the query exist in the pre-aggregation?** Cube checks
 that the pre-aggregation contains all dimensions, filter dimensions, and leaf
-measures from the query.
+measures from the query. [`switch` dimensions](#matching-switch-dimensions) are
+an exception: they don't have to be included in the pre-aggregation.
 - **Are any query measures multiplied in the cube's data model?** Cube checks
 if any measures are multiplied via a [`one_to_many`
 relationship][ref-schema-joins-rel] between cubes in the query.
@@ -60,8 +61,6 @@ relationship][ref-schema-joins-rel] between cubes in the query.
 that the time dimension granularity is set in the query.
 - **Are query filter dimensions included in its own dimensions?** Cube checks
 that all filter dimensions are also included as dimensions in the query.
-- **Does every member in the query exist in the pre-aggregation?** Cube checks
-that the pre-aggregation contains all dimensions and measures used in the query.
 
 ### Matching time dimensions
 
@@ -93,6 +92,16 @@ dimension, then a matching pre-aggregation with the same custom granularity will
 be used even if there is also an matching pre-aggregation with a default
 granularity (e.g., `day` or `month`).
 
+<Note>
+
+Provide the date range via [`timeDimensions`][ref-time-dimensions-format] rather
+than an [`inDateRange` filter][ref-in-date-range]. A date range expressed as a
+filter is applied as a generic dimension filter, so it matches only when that
+time dimension is also listed in the pre-aggregation's `dimensions` — the
+granularity matching rules above don't apply to it.
+
+</Note>
+
 ### Matching ungrouped queries
 
 There are extra considerations that apply to matching [ungrouped
@@ -102,6 +111,94 @@ queries][ref-ungrouped-queries]:
 cubes involved in the query.
 - If multiple cubes are referenced in the query, the pre-aggregation should
 include only members of these cubes.
+
+### Matching switch dimensions
+
+A [`switch` dimension][ref-switch] holds a predefined set of values rather than
+data from the upstream data source, and [`case` measures][ref-case] dispatch on
+the selected value. Because its values are known from the data model, a
+pre-aggregation **does not need to include a `switch` dimension** to match a
+query that uses one: the selected value is applied over the pre-aggregation scan.
+
+Leaving the `switch` dimension out keeps the pre-aggregation small — including
+it multiplies the rows by every value in the set:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: sales
+    # ...
+
+    pre_aggregations:
+      - name: rolling
+        measures:
+          - total
+          - r3_amount
+          - ytd_amount
+        dimensions:
+          - account
+          - product
+        time_dimension: date
+        granularity: month
+```
+
+```javascript title="JavaScript"
+cube(`sales`, {
+  // ...
+
+  pre_aggregations: {
+    rolling: {
+      measures: [total, r3_amount, ytd_amount],
+      dimensions: [account, product],
+      time_dimension: date,
+      granularity: `month`
+    }
+  }
+});
+```
+
+</CodeGroup>
+
+Pre-aggregations that *do* include the `switch` dimension keep matching as well,
+so existing definitions are unaffected.
+
+Matching is unaffected by how the `switch` dimension is modeled across cubes. If
+a query returns more rows than expected, that's a modeling concern — see
+[`case` measures][ref-case] — and pre-aggregations accelerate that result rather
+than preventing it.
+
+<Warning>
+
+`switch` dimensions and `case` measures are powered by Tesseract, the
+[next-generation data modeling engine][link-tesseract]. In versions before
+v1.7.0, it was not enabled by default.
+
+</Warning>
+
+## Matching multi-fact and multi-stage queries
+
+A query can decompose into multiple subqueries — for example, a query over a
+[multi-fact view][ref-multi-fact-views] runs a subquery per fact, and a query
+with [multi-stage measures][ref-multi-stage] runs a subquery per stage. Cube
+matches a pre-aggregation to each subquery independently, so a single query can
+be served by several pre-aggregations at once — one per subquery — rather than
+requiring a single pre-aggregation that covers the whole query.
+
+Matching is all-or-nothing across the query, though: if any subquery can't be
+served, the pre-aggregations matched for the others are dropped too and the whole
+query runs against the upstream data source. A common cause is a pre-aggregation
+keyed on its own cube's time dimension while the query groups by another cube's —
+the two are equal by the join condition, but matching only considers members the
+pre-aggregation stores. Key every pre-aggregation on the time dimension the query
+groups by. Results stay correct either way; only the acceleration is lost.
+
+<Warning>
+
+Matching separate pre-aggregations to multi-fact and multi-stage subqueries is
+powered by Tesseract, the [next-generation data modeling engine][link-tesseract]. In versions before v1.7.0, it was not enabled by default.
+
+</Warning>
 
 ## Troubleshooting
 
@@ -137,7 +234,14 @@ configuration option.
 [ref-non-strict-date-range-match]: /reference/data-modeling/pre-aggregations#allow_non_strict_date_range_match
 [ref-non-additive-recipe]: /recipes/pre-aggregations/non-additivity
 [ref-conf-scheduled-refresh-time-zones]: /reference/configuration/config#scheduled_refresh_time_zones
-[ref-ungrouped-queries]: /reference/queries#ungrouped-query
+[ref-ungrouped-queries]: /reference/core-data-apis/queries#ungrouped-query
 [ref-primary-key]: /reference/data-modeling/dimensions#primary_key
 [ref-custom-granularity]: /reference/data-modeling/dimensions#granularities
 [ref-views]: /docs/data-modeling/views
+[ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
+[ref-multi-stage]: /docs/data-modeling/measures#multi_stage
+[ref-switch]: /reference/data-modeling/dimensions#type
+[ref-case]: /reference/data-modeling/measures#case
+[ref-time-dimensions-format]: /reference/core-data-apis/rest-api/query-format#time-dimensions-format
+[ref-in-date-range]: /reference/core-data-apis/rest-api/query-format#indaterange
+[link-tesseract]: https://cube.dev/blog/introducing-tesseract

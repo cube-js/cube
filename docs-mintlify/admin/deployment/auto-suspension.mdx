@@ -55,8 +55,6 @@ When a deployment is auto-suspended:
 API instances are de-provisioned.
 - [Refresh worker][ref-refresh-worker] is suspended, which stops pre-aggregation
 builds and prevents the pre-aggregations from being kept up-to-date.
-- [Semantic Layer Sync][ref-sls] is suspended, which prevents scheduled syncs
-from running.
 - [Monitoring integrations][ref-monitoring] are also suspended, which prevents
 the export of metrics and logs.
 
@@ -114,14 +112,13 @@ longer in certain situations depending on two major factors:
 Complex data models take more time to compile, and complex queries can cause
 response times to be significantly longer than usual.
 
-[ref-deployment-dev-instance]: /docs/deployment/cloud/deployment-types#shared
-[ref-deployment-prod-cluster]: /docs/deployment/cloud/deployment-types#dedicated
-[ref-prod-multi-cluster]: /docs/deployment/cloud/deployment-types#multi-cluster
+[ref-deployment-dev-instance]: /admin/deployment/deployment-types#shared
+[ref-deployment-prod-cluster]: /admin/deployment/deployment-types#dedicated
+[ref-prod-multi-cluster]: /admin/deployment/deployment-types#multi-cluster
 [ref-deployment-pricing]: /admin/account-billing/pricing
-[ref-monitoring]: /admin/deployment/monitoring-integrations
+[ref-monitoring]: /admin/monitoring/monitoring-integrations
 [ref-data-model]: /docs/data-modeling/overview
 [ref-multitenancy]: /embedding/multitenancy
 [self-effects]: #effects-on-experience
 [ref-refresh-worker]: /cube-core/architecture#refresh-worker
-[ref-sls]: /docs/integrations/semantic-layer-sync#on-schedule
-[ref-cube-version]: /admin/deployment/deployments#cube-version
+[ref-cube-version]: /admin/deployment#cube-version

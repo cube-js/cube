@@ -129,8 +129,23 @@ this is the **Viewer** role; to choose a different default role (including
 
 The default role only applies to users created by SCIM (`POST
 /api/scim/v2/Users`). Existing users are not modified by subsequent SCIM
-profile or group updates.
+profile updates.
+
+## Map roles by SCIM group
+
+If you have configured [Map roles by group][ref-saml-map-roles-by-group]
+on the SAML setup page, the same mapping is applied when SCIM pushes
+group memberships from Okta — when Okta adds a user to a pushed group,
+Cube Cloud assigns the mapped role to that user. Role assignment is
+**additive**: removing a user from an Okta group does not strip the
+corresponding role; adjust the user's roles in Cube Cloud manually.
+
+No separate configuration is required on the SCIM side — once the
+mapping is defined on the SAML page, it drives both SAML SSO and SCIM
+group sync. Match is on the group **display name** Okta pushes
+(case-insensitive).
 
 [ref-saml]: /admin/sso/okta/saml
 [ref-saml-default-role]: /admin/sso/okta/saml#default-role-for-new-users
+[ref-saml-map-roles-by-group]: /admin/sso/okta/saml#map-roles-by-group
 [ref-custom-roles]: /admin/users-and-permissions/custom-roles

@@ -27,8 +27,8 @@ See how you can use ksqlDB and Cube Cloud to power real-time analytics in Power 
 
 <Info>
 
-In this video, the SQL API is used to connect to [Power BI][ref-powerbi].
-Currently, it's recommended to use the [DAX API][ref-dax-api].
+In this video, the SQL API is used to connect to Power BI.
+Currently, it's recommended to use the DAX API.
 
 </Info>
 
@@ -332,13 +332,17 @@ cubes:
           - CUBE.status
         unique_key_columns:
           - order_id
+          - user_id
+          - status
+          - created_at_second
         time_dimension: CUBE.created_at
         granularity: second
         partition_granularity: day
+        # ksqlDB does not support NOW(); use CURRENT_TIMESTAMP with INTERVAL arithmetic instead.
         build_range_start:
-          sql: "SELECT date_trunc('day', DATE_SUB(NOW(), INTERVAL '5 hour'))"
+          sql: "SELECT date_trunc('day', CURRENT_TIMESTAMP - INTERVAL '5 hour')"
         build_range_end:
-          sql: "SELECT DATE_ADD(NOW(), INTERVAL '15 minute')"
+          sql: "SELECT CURRENT_TIMESTAMP + INTERVAL '15 minute'"
         refresh_key:
           every: 1 minute
           update_window: 1 hour
@@ -348,7 +352,23 @@ cubes:
             columns:
               - CUBE.user_id
               - CUBE.status
+              - orders__created_at_second
         stream_offset: latest
+        output_column_types:
+          - member: CUBE.order_id
+            type: text
+          - member: CUBE.user_id
+            type: text
+          - member: CUBE.status
+            type: text
+          - member: CUBE.created_at.second
+            type: timestamp
+          - member: CUBE.count
+            type: int
+          - member: CUBE.total_amount
+            type: decimal
+          - member: CUBE.failed_count
+            type: int
 ```
 
 ```javascript title="JavaScript"
@@ -493,15 +513,21 @@ cube("order_events_stream", {
       read_only: true,
       measures: [CUBE.count, CUBE.total_amount, CUBE.failed_count],
       dimensions: [CUBE.order_id, CUBE.user_id, CUBE.status],
-      unique_key_columns: [`order_id`],
+      unique_key_columns: [
+        `order_id`,
+        `user_id`,
+        `status`,
+        `created_at_second`,
+      ],
       time_dimension: CUBE.created_at,
       granularity: `second`,
       partition_granularity: `day`,
+      // ksqlDB does not support NOW(); use CURRENT_TIMESTAMP with INTERVAL arithmetic instead.
       build_range_start: {
-        sql: `SELECT date_trunc('day', DATE_SUB(NOW(), INTERVAL '5 hour'))`,
+        sql: `SELECT date_trunc('day', CURRENT_TIMESTAMP - INTERVAL '5 hour')`,
       },
       build_range_end: {
-        sql: `SELECT DATE_ADD(NOW(), INTERVAL '15 minute')`,
+        sql: `SELECT CURRENT_TIMESTAMP + INTERVAL '15 minute'`,
       },
       refresh_key: {
         every: `1 minute`,
@@ -510,10 +536,19 @@ cube("order_events_stream", {
       },
       indexes: {
         user_status: {
-          columns: [CUBE.user_id, CUBE.status],
+          columns: [CUBE.user_id, CUBE.status, `orders__created_at_second`],
         },
       },
       stream_offset: `latest`,
+      output_column_types: [
+        { member: CUBE.order_id, type: `text` },
+        { member: CUBE.user_id, type: `text` },
+        { member: CUBE.status, type: `text` },
+        { member: CUBE.created_at.second, type: `timestamp` },
+        { member: CUBE.count, type: `int` },
+        { member: CUBE.total_amount, type: `decimal` },
+        { member: CUBE.failed_count, type: `int` },
+      ],
     },
   },
 });
@@ -533,6 +568,9 @@ Key properties for the streaming pre-aggregation:
   from the last processed offset regardless of this setting.
 - `unique_key_columns` — columns that uniquely identify a record, used
   for deduplication (see [below](#unique-key-columns-and-deduplication)).
+- `output_column_types` — declares the output column types for the Cube
+  Store table, required for Kafka streams mode (see
+  [below](#output-column-types)).
 
 #### Primary key and ungrouped queries
 
@@ -557,12 +595,80 @@ or table. Cube discovers its schema automatically. With Kafka streams
 mode enabled, the streaming pre-aggregation reads the backing Kafka topic
 directly — no objects are created in ksqlDB.
 
+#### Topic name matching {#topic-name-matching}
+
+In Kafka streams mode, Cube Store parses the `select_statement`
+(generated from the cube's `sql` property) and matches the `FROM` table
+name against the actual Kafka topic name. On managed platforms like
+Confluent Cloud, the Kafka topic name often differs from the ksqlDB
+stream or table name — for example, a ksqlDB stream called
+`ORDER_EVENTS_STREAM` might be backed by a Kafka topic named
+`pksqlc-abc123ORDER_EVENTS_STREAM`.
+
+The cube's `sql` property must reference the **ksqlDB stream or table
+name** (not the Kafka topic), because Cube uses ksqlDB `DESCRIBE` to
+discover the schema and resolve the backing topic. However, Cube does
+not currently rewrite the `FROM` clause in the generated
+`select_statement` to use the resolved Kafka topic name. If the ksqlDB
+object name differs from the Kafka topic name, Cube Store will fail
+with:
+
+> Topic table ORDER_EVENTS_STREAM is not found
+
+<Warning>
+
+**The ksqlDB stream (or table) name and the backing Kafka topic name
+MUST be identical, including case.** Kafka streams mode will fail if
+they differ in any way.
+
+Take this into account when creating the stream — explicitly set the
+topic name to match the stream name (and vice versa). For example:
+
+```sql
+CREATE STREAM ORDER_EVENTS_STREAM (...)
+  WITH (KAFKA_TOPIC='ORDER_EVENTS_STREAM', VALUE_FORMAT='JSON', ...);
+```
+
+The match is **case-sensitive**: `OrderEvents` and `ORDEREVENTS` are
+treated as different names and will cause the build to fail with
+`Topic table ... is not found`.
+
+This is a known limitation of Kafka streams mode. It does not occur
+when the ksqlDB object name and the Kafka topic name are the same,
+which is the default behavior when ksqlDB creates a stream or table
+with the default topic naming strategy.
+
+</Warning>
+
 ### Unique key columns and deduplication
 
 When `unique_key_columns` is set, Cube Store appends an internal
 sequence column (`__seq`) to the table, populated from the Kafka
 partition offset. The unique key columns together with `__seq` form the
 sort key for all indexes on this table.
+
+Entries in `unique_key_columns` are strings, not member references. Use
+the dimension's own name (for example, `user_id`). To include the time
+dimension as part of the unique key, use the form
+`<time_dimension_name>_<granularity>` — for example, `created_at_second`
+when `granularity` is `second`.
+
+<Warning>
+
+The naming convention for the time dimension inside `unique_key_columns`
+is **not** the same as the column name used in
+[`indexes`](/reference/data-modeling/pre-aggregations#indexes). Indexes
+expect the fully-qualified alias from the generated `select_statement`
+(`<cube_name>__<time_dimension_name>_<granularity>`), while
+`unique_key_columns` expects only `<time_dimension_name>_<granularity>`.
+
+</Warning>
+
+If the pre-aggregation defines `indexes`, every dimension referenced by
+any index must also be listed in `unique_key_columns`. Cube Store uses
+`unique_key_columns` (plus `__seq`) as the sort key for all indexes, so
+an index column that is not part of the unique key cannot be sorted on
+during compaction and the pre-aggregation build will fail.
 
 Deduplication is not applied at ingestion time — all incoming records are
 appended as they arrive. Instead, Cube Store deduplicates during
@@ -578,6 +684,143 @@ listed in `unique_key_columns` is missing from the payload, Cube Store
 falls back to the Kafka message key: for a single unique key column, the
 raw key value is used; for composite keys, the key is expected to be a
 JSON object with matching field names.
+
+### Output column types
+
+In Kafka streams mode, Cube Store creates its internal pre-aggregation
+table based on column type information. By default, column types are
+inferred from the source ksqlDB stream using `DESCRIBE`. However, the
+pre-aggregation's `select_statement` (generated from the rollup
+definition) renames and transforms columns — for example, a source
+column `CREATED_AT` becomes `order_events_stream__created_at_second` in
+the output.
+
+When this renaming happens, the raw source column types no longer match
+the output column names, causing errors like:
+
+> Key column `order_events_stream__id` not found among column definitions
+
+To fix this, define `output_column_types` on the streaming
+pre-aggregation. This tells Cube the exact output column types to use
+for the Cube Store table, and separately passes the source schema so
+Cube Store can deserialize the raw Kafka messages correctly.
+
+<CodeGroup>
+
+```yaml title="YAML"
+pre_aggregations:
+  - name: stream
+    type: rollup
+    read_only: true
+    measures:
+      - CUBE.count
+      - CUBE.total_amount
+      - CUBE.failed_count
+    dimensions:
+      - CUBE.order_id
+      - CUBE.user_id
+      - CUBE.status
+    unique_key_columns:
+      - order_id
+    time_dimension: CUBE.created_at
+    granularity: second
+    partition_granularity: day
+    # ksqlDB does not support NOW(); use CURRENT_TIMESTAMP with INTERVAL arithmetic instead.
+    build_range_start:
+      sql: "SELECT date_trunc('day', CURRENT_TIMESTAMP - INTERVAL '5 hour')"
+    build_range_end:
+      sql: "SELECT CURRENT_TIMESTAMP + INTERVAL '15 minute'"
+    refresh_key:
+      every: 1 minute
+      update_window: 1 hour
+      incremental: true
+    stream_offset: latest
+    output_column_types:
+      - member: CUBE.order_id
+        type: text
+      - member: CUBE.user_id
+        type: text
+      - member: CUBE.status
+        type: text
+      - member: CUBE.created_at.second
+        type: timestamp
+      - member: CUBE.count
+        type: int
+      - member: CUBE.total_amount
+        type: decimal
+      - member: CUBE.failed_count
+        type: int
+```
+
+```javascript title="JavaScript"
+pre_aggregations: {
+  stream: {
+    type: `rollup`,
+    read_only: true,
+    measures: [CUBE.count, CUBE.total_amount, CUBE.failed_count],
+    dimensions: [CUBE.order_id, CUBE.user_id, CUBE.status],
+    unique_key_columns: [`order_id`],
+    time_dimension: CUBE.created_at,
+    granularity: `second`,
+    partition_granularity: `day`,
+    // ksqlDB does not support NOW(); use CURRENT_TIMESTAMP with INTERVAL arithmetic instead.
+    build_range_start: {
+      sql: `SELECT date_trunc('day', CURRENT_TIMESTAMP - INTERVAL '5 hour')`,
+    },
+    build_range_end: {
+      sql: `SELECT CURRENT_TIMESTAMP + INTERVAL '15 minute'`,
+    },
+    refresh_key: {
+      every: `1 minute`,
+      update_window: `1 hour`,
+      incremental: true,
+    },
+    stream_offset: `latest`,
+    output_column_types: [
+      { member: CUBE.order_id, type: `text` },
+      { member: CUBE.user_id, type: `text` },
+      { member: CUBE.status, type: `text` },
+      { member: CUBE.created_at.second, type: `timestamp` },
+      { member: CUBE.count, type: `int` },
+      { member: CUBE.total_amount, type: `decimal` },
+      { member: CUBE.failed_count, type: `int` },
+    ],
+  },
+},
+```
+
+</CodeGroup>
+
+Each entry in `output_column_types` has two properties:
+
+- `member` — a reference to a dimension or measure included in the
+  pre-aggregation. This must be a `CUBE` member reference (for example,
+  `CUBE.user_id`), not a string. For the time dimension, reference it
+  with the rollup granularity attached — for example,
+  `CUBE.created_at.second` when `granularity` is `second`.
+- `type` — the Cube Store column type. Common values: `text`, `int`,
+  `bigint`, `decimal`, `float`, `boolean`, `timestamp`.
+
+Include an entry for every dimension and measure in the pre-aggregation.
+The time dimension must also be listed, with `type: timestamp` and the
+granularity suffix on the member reference as shown above.
+
+When `output_column_types` is defined, Cube uses the aliased column
+names (matching the `select_statement`) for the Cube Store table
+definition and passes the raw source schema separately via
+`source_table`, so Cube Store knows how to deserialize incoming Kafka
+messages. Without it, column names come from the raw ksqlDB `DESCRIBE`
+output and will not match the aliased names in the `select_statement`
+or `unique_key_columns`.
+
+<Warning>
+
+`output_column_types` is required for Kafka streams mode when the
+pre-aggregation uses `unique_key_columns`. Without it, the unique key
+column names will not match the table column definitions, causing the
+pre-aggregation build to fail.
+
+</Warning>
 
 ### Stream format
 
@@ -640,6 +883,46 @@ expression chain to truncate timestamps to the configured granularity
 (e.g., `day`, `hour`, `minute`). Cube Store evaluates these expressions
 natively on each micro-batch during ingestion. Standard SQL functions
 like `date_trunc` are also available in the `select_statement`.
+
+##### Converting `bigint` timestamps
+
+When a source column stores a timestamp as a `bigint` (a common pattern
+in Kafka topics — for example, a `created_at` field with values like
+`1778800167128`), the value must be converted to a timestamp before it
+can be used as a time dimension.
+
+The conversion depends on the unit of the `bigint` value:
+
+- **Milliseconds** (most common, e.g. `Date.now()` in JavaScript, Java's
+  `System.currentTimeMillis()`) — multiply by `1000` before casting,
+  because `CAST(... AS TIMESTAMP(6))` interprets numeric input as
+  **microseconds**. Without the multiplication, a millisecond value like
+  `1778800167128` is read as microseconds and produces a timestamp in
+  1970 instead of the intended date.
+- **Microseconds** — cast directly to `TIMESTAMP(6)`.
+- **Seconds** — multiply by `1000000` before casting.
+
+Apply the conversion in the time dimension's `sql` property:
+
+```javascript
+dimensions: {
+  created_at: {
+    sql: `CAST(${CUBE}.created_at * 1000 AS TIMESTAMP(6))`,
+    type: `time`
+  }
+}
+```
+
+The cast runs first; any granularity truncation generated by Cube
+(`PARSE_TIMESTAMP(FORMAT_TIMESTAMP(CONVERT_TZ(...)))`) then operates on
+the resulting `TIMESTAMP(6)` value.
+
+<Tip>
+  When debugging a `bigint` timestamp issue, temporarily remove
+  `partition_granularity` from the pre-aggregation. This skips
+  partitioned builds and makes it easier to verify the conversion is
+  correct before re-enabling partitioning.
+</Tip>
 
 ### Filtering on the stream
 
@@ -704,9 +987,7 @@ the source column through a scalar function (e.g.,
 `CAST(id AS VARCHAR) AS id`), but not through arbitrary expressions.
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
-[ref-powerbi]: /docs/integrations/power-bi
-[ref-dax-api]: /reference/core-data-apis/dax-api
 [ref-streaming-pre-aggs]: /docs/pre-aggregations/using-pre-aggregations#streaming-pre-aggregations
-[ref-decorated-env-vars]: /admin/connect-to-data/multiple-data-sources#decorated-environment-variables
+[ref-decorated-env-vars]: /admin/connect-to-data/multiple-data-sources#under-the-hood
 [ref-cube-data-source]: /reference/data-modeling/cube#data_source
 [ref-lambda-pre-aggs]: /docs/pre-aggregations/lambda-pre-aggregations

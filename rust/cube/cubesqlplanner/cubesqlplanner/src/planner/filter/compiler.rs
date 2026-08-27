@@ -1,6 +1,6 @@
 use super::base_filter::{BaseFilter, FilterType};
 use super::FilterOperator;
-use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
+use crate::cube_bridge::base_query_options::{FilterItem as NativeFilterItem, FilterValue};
 use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::{Compiler, MemberSymbol};
@@ -8,6 +8,11 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 use std::str::FromStr;
 
+/// Compiles the data-model filter tree into three streams of
+/// `FilterItem`s — filters on dimensions, on time dimensions, and
+/// on measures. Time-dimension `date_range` attributes arrive
+/// separately via `add_time_dimension_item` and are normalised into
+/// `InDateRange` filters.
 pub struct FilterCompiler<'a> {
     evaluator_compiler: &'a mut Compiler,
     query_tools: Rc<QueryTools>,
@@ -27,6 +32,10 @@ impl<'a> FilterCompiler<'a> {
         }
     }
 
+    // TODO classify time-dimension filters into `time_dimension_filters` so
+    // callers like the multi-stage `filter:` directive can route them to
+    // `QueryProperties::time_dimensions_filters` instead of treating every
+    // include as a plain dimension filter.
     pub fn add_item(&mut self, item: &NativeFilterItem) -> Result<(), CubeError> {
         if let Some(item_type) = self.get_item_type(item, &None)? {
             let compiled_item = self.compile_item(item, &item_type)?;
@@ -38,6 +47,9 @@ impl<'a> FilterCompiler<'a> {
         Ok(())
     }
 
+    /// Lifts the optional `date_range` of a time-dimension request
+    /// into an explicit `InDateRange` filter on
+    /// `time_dimension_filters`.
     pub fn add_time_dimension_item(&mut self, item: &Rc<MemberSymbol>) -> Result<(), CubeError> {
         if let Ok(td_item) = item.as_time_dimension() {
             if let Some(date_range) = td_item.date_range_vec() {
@@ -46,7 +58,8 @@ impl<'a> FilterCompiler<'a> {
                     item.clone(),
                     FilterType::Dimension,
                     FilterOperator::InDateRange,
-                    Some(date_range.into_iter().map(|v| Some(v)).collect()),
+                    Some(date_range.into_iter().map(FilterValue::Str).collect()),
+                    None,
                 )?;
                 self.time_dimension_filters.push(FilterItem::Item(filter));
             }
@@ -54,12 +67,23 @@ impl<'a> FilterCompiler<'a> {
         Ok(())
     }
 
+    /// Consumes the compiler and returns the three collected
+    /// streams: `(dimension_filters, time_dimension_filters,
+    /// measure_filters)`.
     pub fn extract_result(self) -> (Vec<FilterItem>, Vec<FilterItem>, Vec<FilterItem>) {
         (
             self.dimension_filters,
             self.time_dimension_filters,
             self.measures_filters,
         )
+    }
+
+    /// Iterator over every compiled filter item across the three buckets.
+    pub fn iter_all_items(&self) -> impl Iterator<Item = &FilterItem> {
+        self.dimension_filters
+            .iter()
+            .chain(self.time_dimension_filters.iter())
+            .chain(self.measures_filters.iter())
     }
 
     fn compile_item(
@@ -97,6 +121,7 @@ impl<'a> FilterCompiler<'a> {
                     item_type.clone(),
                     FilterOperator::from_str(&operator)?,
                     item.values.clone(),
+                    Some(&mut *self.evaluator_compiler),
                 )?))
             } else {
                 Err(CubeError::user(format!(

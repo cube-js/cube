@@ -1,28 +1,26 @@
+use super::window_partition::render_partition_by;
 use super::SqlNode;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::MemberSymbol;
+use crate::planner::{MeasureRenderModifier, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Wraps a measure carrying the `MultiStageWindow` render modifier
+/// as a SQL window function partitioned by the modifier's members.
+/// Everything else goes through `else_processor`.
 pub struct MultiStageWindowNode {
     input: Rc<dyn SqlNode>,
     else_processor: Rc<dyn SqlNode>,
-    partition: Vec<String>,
 }
 
 impl MultiStageWindowNode {
-    pub fn new(
-        input: Rc<dyn SqlNode>,
-        else_processor: Rc<dyn SqlNode>,
-        partition: Vec<String>,
-    ) -> Rc<Self> {
+    pub fn new(input: Rc<dyn SqlNode>, else_processor: Rc<dyn SqlNode>) -> Rc<Self> {
         Rc::new(Self {
             input,
             else_processor,
-            partition,
         })
     }
 
@@ -32,10 +30,6 @@ impl MultiStageWindowNode {
 
     pub fn else_processor(&self) -> &Rc<dyn SqlNode> {
         &self.else_processor
-    }
-
-    pub fn partition(&self) -> &Vec<String> {
-        &self.partition
     }
 }
 
@@ -50,7 +44,10 @@ impl SqlNode for MultiStageWindowNode {
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Measure(m) => {
-                if m.is_multi_stage() && !m.is_calculated() {
+                if let Some(modifier @ MeasureRenderModifier::MultiStageWindow { partition }) =
+                    m.render_modifier()
+                {
+                    modifier.ensure_applies_to(m)?;
                     let inner_visitor = visitor.with_arg_needs_paren_safe(false);
                     let input_sql = self.input.to_sql(
                         &inner_visitor,
@@ -60,11 +57,12 @@ impl SqlNode for MultiStageWindowNode {
                         templates,
                     )?;
 
-                    let partition_by = if self.partition.is_empty() {
-                        "".to_string()
-                    } else {
-                        format!("PARTITION BY {} ", self.partition.join(", "))
-                    };
+                    let partition_by = render_partition_by(
+                        partition,
+                        &inner_visitor,
+                        node_processor.clone(),
+                        templates,
+                    )?;
                     let measure_type = m.measure_type();
                     format!("{measure_type}({measure_type}({input_sql})) OVER ({partition_by})")
                 } else {

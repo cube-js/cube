@@ -43,6 +43,17 @@ impl QueryDateTime {
         )
     }
 
+    pub fn start_of_iso_week(&self) -> Self {
+        let tz = self.date_time.timezone();
+        let date = self.date_time.date_naive();
+        let from_monday = date.weekday().num_days_from_monday() as i64;
+        let monday = date - Duration::days(from_monday);
+        Self::new(
+            tz.with_ymd_and_hms(monday.year(), monday.month(), monday.day(), 0, 0, 0)
+                .unwrap(),
+        )
+    }
+
     pub fn date_time(&self) -> DateTime<Tz> {
         self.date_time
     }

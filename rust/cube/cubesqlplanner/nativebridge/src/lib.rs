@@ -501,6 +501,9 @@ impl NativeService {
                         #required_field_check
                         Ok(Self {native_object, static_data} )
                     }
+                    pub fn native_object(&self) -> &NativeObjectHandle<IT> {
+                        &self.native_object
+                    }
                 }
             }
         } else {
@@ -509,6 +512,9 @@ impl NativeService {
                     pub fn try_new(native_object: NativeObjectHandle<IT>) -> Result<Self, CubeError> {
                         #required_field_check
                         Ok(Self {native_object} )
+                    }
+                    pub fn native_object(&self) -> &NativeObjectHandle<IT> {
+                        &self.native_object
                     }
                 }
             }

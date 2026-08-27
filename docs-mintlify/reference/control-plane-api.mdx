@@ -19,11 +19,11 @@ Control Plane API is only available in Cube Cloud.
 ### Authentication
 
 Control Plane API uses [API key][ref-api-keys] authentication. Include your API
-key in the `Authorization` header with the `Api-Key` prefix:
+key in the `Authorization` header with the `Bearer` prefix:
 
 ```bash
 curl \
-  -H "Authorization: Api-Key YOUR_API_KEY" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments
 ```
 
@@ -77,7 +77,7 @@ Example request:
 
 ```bash
 curl \
-  -H "Authorization: Api-Key YOUR_API_KEY" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   "https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments"
 ```
 
@@ -124,7 +124,7 @@ Example request:
 
 ```bash
 curl \
-  -H "Authorization: Api-Key YOUR_API_KEY" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   "https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments/123/environments"
 ```
 
@@ -190,7 +190,7 @@ Example request:
 ```bash
 curl \
   -X POST \
-  -H "Authorization: Api-Key YOUR_API_KEY" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "security_context": {"tenant_id": "acme"},
@@ -211,6 +211,120 @@ Example response:
 }
 ```
 
+
+### `/build/api/v1/deployments/{deployment_id}/branches/staging-environment`
+
+Send a `PUT` request to enable or disable a branch, i.e. to control whether its
+[staging environment][ref-environments-staging] stays always active. Disabled
+(the default), a staging environment is only active while the branch is viewed
+in the Cube UI; enabled, it remains active and accessible regardless of user
+activity, and it is reported by
+[`/api/v1/deployments/{deployment_id}/environments`](#apiv1deploymentsdeployment_idenvironments)
+as a `staging` environment.
+
+Only shared branches can be enabled — personal development branches and the
+production branch are rejected.
+
+<Info>
+
+Note the `/build` prefix: data model and branch endpoints are served by the
+build API.
+
+</Info>
+
+Path parameters:
+
+| Parameter | Description |
+| --- | --- |
+| `deployment_id` | The deployment ID |
+
+Body parameters:
+
+| Parameter | Description | Required |
+| --- | --- | --- |
+| `enabled` | `true` enables the branch, `false` disables it | Yes |
+| `branchName` | Name of the branch to update | One of `branchName` or `branchId` |
+| `branchId` | ID of the branch to update, as returned by `GET /build/api/v1/deployments/{deployment_id}/branches` | One of `branchName` or `branchId` |
+
+Example request:
+
+```bash
+curl -X PUT \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"branchName": "staging", "enabled": true}' \
+  "https://YOUR_CUBE_CLOUD_HOST/build/api/v1/deployments/123/branches/staging-environment"
+```
+
+Example response:
+
+```json
+{
+  "data": {
+    "id": 456,
+    "name": "staging",
+    "parentBranch": "main",
+    "lastHash": "9f2c1ab",
+    "isStagingEnvironmentEnabled": true
+  }
+}
+```
+
+The same operation is available in the [CLI][ref-cli] as
+`cube data-model enable-branch` / `cube data-model disable-branch`.
+
+### `/api/v1/deployments/{deployment_id}/versions`
+
+Send a `GET` request to list the Cube versions a deployment can be switched
+to — the same set the Cube Cloud UI's version picker offers: the head of each
+[update channel][ref-update-channels], plus the older versions your account has
+run before.
+
+Example request:
+
+```bash
+curl \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  "https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments/123/versions"
+```
+
+Example response:
+
+```json
+{
+  "data": [
+    {
+      "releaseChannelVersion": "cubejs/cube:v1.7.20",
+      "version": "1.7.20",
+      "releaseChannel": "latest",
+      "isLatestInChannel": true,
+      "isCurrent": true
+    },
+    {
+      "releaseChannelVersion": "cubejs/cube:v1.6.69",
+      "version": "1.6.69",
+      "releaseChannel": "latest",
+      "isLatestInChannel": false,
+      "isCurrent": false
+    }
+  ]
+}
+```
+
+To change the version, send a listed value as `releaseChannelVersion` to
+`PUT /api/v1/deployments/{deployment_id}`. Any of `1.7.20`, `v1.7.20` or
+`cubejs/cube:v1.7.20` is accepted; a version that is not on the list is
+rejected with a `400`. The container image is resolved from the version
+server-side and cannot be set directly.
+
+<Note>
+Leaving `releaseChannelVersion` out and sending only `releaseChannel` moves the
+deployment to that channel's latest version.
+</Note>
+
+The same operation is available in the [CLI][ref-cli] as
+`cube deployments versions`, with `cube deployments update ID
+--release-channel-version 1.7.20` to apply one.
 
 ### `/api/v1/audit-logs/export`
 
@@ -243,7 +357,7 @@ Example request:
 
 ```bash
 curl \
-  -H "Authorization: Api-Key YOUR_API_KEY" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -o audit_log.csv \
   "https://YOUR_CUBE_CLOUD_HOST/api/v1/audit-logs/export?start=2024-01-01&end=2024-01-31"
 ```
@@ -252,7 +366,7 @@ Example request with filters:
 
 ```bash
 curl \
-  -H "Authorization: Api-Key YOUR_API_KEY" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -o audit_log.csv \
   "https://YOUR_CUBE_CLOUD_HOST/api/v1/audit-logs/export?start=2024-01-01&end=2024-01-31&eventName=Logged+in&userEmail=user@example.com"
 ```
@@ -260,8 +374,11 @@ curl \
 [ref-core-data-apis]: /reference/core-data-apis
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-metadata-api]: /reference/core-data-apis/rest-api/reference#metadata-api
-[ref-deployments]: /admin/deployment/deployments
-[ref-environments]: /admin/workspace/environments
+[ref-deployments]: /admin/deployment
+[ref-environments]: /admin/deployment/environments
+[ref-environments-staging]: /admin/deployment/environments#staging-environments
+[ref-cli]: /reference/cli
 [ref-api-keys]: /admin/account-billing/api-keys
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-audit-log]: /admin/monitoring/audit-log
+[ref-update-channels]: /admin/deployment#update-channels

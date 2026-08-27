@@ -1,0 +1,496 @@
+/* eslint-disable */
+// Extractor: turns the Console Server *public* OpenAPI spec into a standalone
+// api.yaml covering the whole v1 REST surface for the Mintlify API docs. Unlike
+// the old deployments-only extractor, this includes every /api/v1 endpoint the
+// public spec exposes (deployments and everything scoped to them, plus account,
+// embed, AI, and workspace areas) and auto-discovers tags, so new public
+// endpoints show up without editing this script.
+//
+// SCIM (/api/scim/v2) is intentionally NOT included: its docs are hand-curated
+// in api-reference/scim.yaml. (Both the REST API and SCIM authenticate with a
+// Bearer token; see the securityScheme override below.)
+//
+// One run regenerates ALL derived artifacts from the spec, so they can't drift:
+//   1. api-reference/api.yaml         — the standalone OpenAPI spec
+//   2. docs.json                      — the Platform API nav groups (in place)
+//   3. api-reference/introduction.mdx — the endpoint table (between AUTOGEN markers)
+// Pass --check to verify these are up to date WITHOUT writing (exits non-zero on
+// drift) — run it in CI so a spec change can never leave the committed docs stale.
+//
+// The source spec lives in the (private) cubejs-enterprise repo and is NOT in
+// this repo, so there is no hardcoded path — point the script at the spec via
+// the SRC_SPEC env var (a CLI path arg is also accepted), or set it in
+// docs-mintlify/.env:
+//
+//   SRC_SPEC=/path/to/open-api-spec-public-v3.1.yaml node scripts/extract-api.mjs
+//   node scripts/extract-api.mjs /path/to/open-api-spec-public-v3.1.yaml
+//
+// The spec is generated in cubejs-enterprise/packages/console-server via
+// `yarn generate:open-api:spec-public`.
+import fs from 'fs';
+import path from 'path';
+import { pathToFileURL } from 'url';
+import yaml from 'js-yaml';
+
+// Page slugs in the intro table must be byte-identical to the routes Mintlify
+// generates for the OpenAPI pages, so borrow Mintlify's own slugifier instead of
+// approximating it: it drops apostrophes ("dashboard's" -> "dashboards") and
+// percent-encodes non-ASCII and "/" — a hand-rolled kebab-case would silently
+// emit 404 links. The subpath is not in @mintlify/common's `exports`, so import
+// it by file URL, and fail loudly rather than fall back to a guess.
+const SLUGIFY_PATH = path.join(
+  import.meta.dirname, '..', 'node_modules', '@mintlify', 'common', 'dist', 'slugify.js'
+);
+let mintSlugify;
+try {
+  ({ slugify: mintSlugify } = await import(pathToFileURL(SLUGIFY_PATH).href));
+} catch (err) {
+  console.error(
+    `Aborting: could not load Mintlify's slugifier from\n  ${SLUGIFY_PATH}\n` +
+      `(${err.message})\n\nRun \`yarn install\` in docs-mintlify. If the Mintlify CLI moved the\n` +
+      `file, update SLUGIFY_PATH — page links are only correct when they use Mintlify's own rules.`
+  );
+  process.exit(1);
+}
+
+// Upstream summaries arrive with typographic punctuation, which Mintlify would
+// percent-encode into the page slug (`branch’s` -> `branch%E2%80%99s`). Fold it
+// to ASCII so titles read the same and slugs stay legible.
+function normalizeTypography(s) {
+  return s.replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, '-');
+}
+
+// Load docs-mintlify/.env (SRC_SPEC etc.) if present. A real env var or CLI arg
+// still wins, since loadEnvFile does not clobber already-set process.env keys.
+const envPath = path.join(import.meta.dirname, '..', '.env');
+if (fs.existsSync(envPath)) process.loadEnvFile(envPath);
+
+// --check verifies the committed artifacts are up to date WITHOUT writing them,
+// exiting non-zero if any drifted — wire it into CI so a spec change can never
+// silently leave docs.json / the intro table stale. The spec path is the first
+// non-flag arg (or SRC_SPEC).
+const CHECK = process.argv.slice(2).includes('--check');
+const srcArg = process.argv.slice(2).find((a) => !a.startsWith('--')) || process.env.SRC_SPEC;
+if (!srcArg) {
+  console.error(
+    'No source spec provided. Set the SRC_SPEC env var (or pass a path arg):\n' +
+      '  SRC_SPEC=/path/to/open-api-spec-public-v3.1.yaml node scripts/extract-api.mjs\n' +
+      '  node scripts/extract-api.mjs /path/to/open-api-spec-public-v3.1.yaml\n\n' +
+      'The spec is generated in cubejs-enterprise/packages/console-server via\n' +
+      '`yarn generate:open-api:spec-public` and is not committed to this repo.'
+  );
+  process.exit(1);
+}
+const SRC = path.resolve(srcArg);
+if (!fs.existsSync(SRC)) {
+  console.error(`Source spec not found: ${SRC}`);
+  process.exit(1);
+}
+const ROOT = path.join(import.meta.dirname, '..');
+const OUT = path.join(ROOT, 'api-reference', 'api.yaml');
+const DOCS_JSON = path.join(ROOT, 'docs.json');
+const INTRO_MDX = path.join(ROOT, 'api-reference', 'introduction.mdx');
+const API_REF = '/api-reference/api.yaml';
+// Markers delimiting the auto-generated endpoint table in the intro. They sit
+// OUTSIDE the table, blank-line separated: an MDX expression between table rows
+// terminates the table, so everything after it renders as a paragraph instead of
+// rows. Because of that the whole table is generated — header, Platform API
+// rows, and the SCIM tail (kept here since scim.yaml is hand-curated and not
+// read by this script).
+const INTRO_START =
+  '{/* AUTOGEN:platform-endpoints START — generated by scripts/extract-api.mjs; do not edit by hand */}';
+const INTRO_END = '{/* AUTOGEN:platform-endpoints END */}';
+const INTRO_TABLE_HEAD = '| Entity | Resource | Version |\n| --- | --- | --- |';
+const INTRO_SCIM_ROWS = [
+  '| [Users (SCIM)](/api-reference/scim-users/list-users) | `/api/scim/v2/Users` | SCIM 2.0 |',
+  '| [Groups (SCIM)](/api-reference/scim-groups/list-groups) | `/api/scim/v2/Groups` | SCIM 2.0 |',
+].join('\n');
+
+// Written-file tracker: writes on a normal run, records drift under --check.
+const staleFiles = [];
+function writeOrCheck(file, content) {
+  const current = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+  if (current === content) return;
+  if (CHECK) {
+    staleFiles.push(path.relative(ROOT, file));
+    return;
+  }
+  fs.writeFileSync(file, content);
+  console.log('Wrote', path.relative(ROOT, file));
+}
+
+// Mintlify's route slug for a tag group / operation page — its own slugifier, so
+// the intro-table links resolve to the generated pages (see SLUGIFY_PATH above).
+function kebab(s) {
+  return mintSlugify(normalizeTypography(String(s).trim()));
+}
+// Longest shared path prefix (by segment) across a tag's paths — the "Resource"
+// column value. Falls back to the single path when a tag has just one.
+function commonPathPrefix(pathList) {
+  const split = pathList.map((p) => p.split('/'));
+  const first = split[0];
+  let i = 0;
+  for (; i < first.length; i++) {
+    if (!split.every((s) => s[i] === first[i])) break;
+  }
+  return split.length === 1 ? first.join('/') : first.slice(0, i).join('/') || '/';
+}
+
+// The v1 REST API, on both path families it is served under: /api/v1/… on the
+// main console-server pods, and /build/api/v1/… routed to the build pods (which
+// own the data-model / dev-mode / upload surface). Same host, same Bearer token.
+// SCIM lives in the hand-curated scim.yaml (different auth).
+//
+// Paths are emitted at their real absolute path (no prefix stripping), so the
+// server URL is the tenant host root — see `servers` in the output doc below.
+const INCLUDE_PREFIXES = ['/api/v1/', '/build/api/v1/'];
+const METHODS = ['get', 'post', 'put', 'patch', 'delete'];
+
+// Operations to hide from the public docs even though the source spec exposes
+// them — e.g. stray/internal admin routes that surface a single, incomplete
+// endpoint. Listed as "METHOD /path" using the normalized path (the real absolute
+// path, minus any trailing slash). Kept here so re-pulling an updated upstream
+// spec does NOT resurface them. If a path's only operations are excluded, the
+// whole path (and its now-empty nav group) is dropped automatically.
+const EXCLUDE_OPERATIONS = new Set([
+  // Stray/incomplete admin routes.
+  'DELETE /api/v1/groups/{id}',
+  'GET /api/v1/user-groups',
+  // Account-level / internal admin APIs kept out of the public docs.
+  'GET /api/v1/deployments/{deploymentId}/agent-skills',
+  'GET /api/v1/deployments/{deploymentId}/agents',
+  'POST /api/v1/meta',
+  'GET /api/v1/users',
+  'GET /api/v1/users/embed-theme',
+  'GET /api/v1/users/me',
+  'DELETE /api/v1/user-attributes/{id}',
+  'GET /api/v1/resource-policies',
+  'PUT /api/v1/resource-policies/group',
+  'PUT /api/v1/resource-policies/user',
+  'GET /api/v1/app-theme',
+  'GET /api/v1/ai-engineer/active-region',
+  'GET /api/v1/ai-engineer/settings',
+  // Report folders listing — not part of the public docs surface.
+  'GET /api/v1/deployments/{deploymentId}/report-folders',
+]);
+
+// Explicit display names for tags whose auto-cleaned form would be unclear or
+// collide. Everything else is cleaned by cleanTag() below.
+const TAG_MAP = {
+  'Deployment Environment Public': 'Environments',
+  'Embed Tenant Admin Public': 'Embed Tenants',
+  // Build-pod surface (/build/api/v1). Named for what each area does rather than
+  // the controller, and kept distinct from the same-named /api/v1 tags so the
+  // intro table's "Resource" column stays a real common path prefix.
+  'Deployments Build Public': 'Deployment Creation',
+  'Uploads Public': 'Data Model Uploads',
+  'Git Hub Deployment Public': 'GitHub Connection',
+  // Auto-cleaning title-cases the controller name into "Open Api Spec".
+  'Open Api Spec Public': 'OpenAPI Spec',
+};
+// Preferred nav order. Tags not listed here are appended alphabetically, so the
+// docs stay complete even when the upstream spec adds new areas.
+const TAG_ORDER = [
+  'Deployments', 'Deployment Creation', 'Environments', 'Env Variables', 'Regions',
+  'Data Model', 'Data Model Uploads', 'GitHub', 'GitHub Connection', 'dbt Sync',
+  'Folders', 'Reports', 'Workbooks', 'Notifications', 'Workspace', 'Agents', 'Metadata',
+  'Users', 'Users Admin', 'Groups', 'User Groups',
+  'User Attributes', 'User Attribute Values', 'Resource Policies', 'Tenant Settings',
+  'OAuth Integrations', 'User OAuth Tokens', 'OIDC Token Configs',
+  'App Theme', 'AI Engineer', 'Embed', 'Embed Tenants', 'Dashboard Embed Access',
+  'OpenAPI Spec',
+];
+
+// Mintlify renders the OpenAPI operation `description` as a plain-text node — it
+// does NOT process Markdown or HTML there, so `**bold**` and `` `code` `` show up
+// literally on the page (verified by headless-rendering with Mintlify CLI 4.2.x).
+// The fix is to move the prose into the `x-mint.content` extension instead, which
+// Mintlify DOES render as MDX (so bold/italic/code render), and drop the plain
+// `description` so it isn't also shown unformatted. See applyDescription() below.
+// (Parameter/schema descriptions render fine via a different component, so they
+// are left alone.)
+
+// x-mint.content is MDX, where `{...}` is a JS expression — unescaped prose braces
+// (e.g. `Copy of {original name}`) break the page. Escape braces OUTSIDE inline
+// code spans (inside backticks they're literal and must stay as-is). `**bold**`
+// and `` `code` `` are valid MDX and pass through untouched.
+function toMintContent(s) {
+  return s
+    .split(/(`[^`]*`)/) // keep code spans as their own (odd-index) segments
+    .map((seg, i) => (i % 2 === 1 ? seg : seg.replace(/[{}]/g, (c) => '\\' + c)))
+    .join('');
+}
+
+// Move an operation's Markdown description into x-mint.content (rendered as MDX)
+// and remove the plain `description` so it is not also rendered unformatted.
+//
+// NB: do NOT also set x-mint.metadata.description — Mintlify injects that into the
+// generated page's MDX frontmatter, where prose containing `"`, `:` or `{` breaks
+// the YAML parse (500 / "multiline key may not be an implicit key"). The page just
+// loses its `<meta name="description">`, which is an acceptable trade for not
+// crashing the page.
+function applyDescription(op) {
+  if (typeof op.description !== 'string') return;
+  op['x-mint'] = { content: toMintContent(op.description) };
+  delete op.description;
+}
+
+// Acronym fixups applied to auto-cleaned tags so casing stays consistent in the
+// nav. Ordered longest-match-first: multi-token forms (e.g. the source's spaced
+// "O Auth") must collapse before single-token rules run. Add a rule here whenever
+// a new tag's title-cased form mangles an acronym.
+// Case-insensitive for acronyms the upstream humanizer cases inconsistently:
+// the tag comes through as "O Auth"/"Oidc" but the operation summary as
+// "o auth"/"oidc". Matching either way normalizes both to one canonical form.
+const ACRONYMS = [
+  [/\bo\s*auth\b/gi, 'OAuth'],
+  [/\bgit\s*hub\b/gi, 'GitHub'],
+  [/\boidc\b/gi, 'OIDC'],
+  [/\bscim\b/gi, 'SCIM'],
+  [/\bai\b/gi, 'AI'],
+  // Product spelling: lowercase, even at the start of a tag or summary.
+  [/\bdbt\b/gi, 'dbt'],
+];
+
+// Strip the " Public" suffix the source appends to every tag and normalize
+// acronyms via ACRONYMS; TAG_MAP overrides win.
+function cleanTag(raw) {
+  if (TAG_MAP[raw]) return TAG_MAP[raw];
+  let tag = raw.replace(/\s+Public$/, '');
+  for (const [re, repl] of ACRONYMS) tag = tag.replace(re, repl);
+  return tag;
+}
+
+const src = yaml.load(fs.readFileSync(SRC, 'utf8'));
+
+// 1. Filter to v1 REST paths, normalize keys (keep the real absolute path; drop a
+//    trailing slash — a trailing slash breaks Mintlify dev), and clean tags +
+//    operationIds.
+const paths = {};
+for (const [key, val] of Object.entries(src.paths)) {
+  if (!INCLUDE_PREFIXES.some((prefix) => key.startsWith(prefix))) continue;
+  let newKey = key.length > 1 ? key.replace(/\/$/, '') : key; // drop trailing slash
+  let kept = 0;
+  for (const m of METHODS) {
+    if (!val[m]) continue;
+    // Drop explicitly hidden operations before they reach the spec or nav.
+    if (EXCLUDE_OPERATIONS.has(`${m.toUpperCase()} ${newKey}`)) {
+      delete val[m];
+      continue;
+    }
+    kept++;
+    if (Array.isArray(val[m].tags)) {
+      val[m].tags = val[m].tags.map(cleanTag);
+    }
+    // Mintlify shows the operation description as plain text, so move the prose
+    // into x-mint.content (rendered as MDX) and keep a plain copy for SEO.
+    applyDescription(val[m]);
+    // Normalize acronyms and typography in the summary too (it drives the page
+    // title AND slug), so "O Auth" reads "OAuth" everywhere, not just in the nav
+    // tag, and `branch’s` does not percent-encode into the route.
+    if (typeof val[m].summary === 'string') {
+      val[m].summary = normalizeTypography(val[m].summary);
+      for (const [re, repl] of ACRONYMS) val[m].summary = val[m].summary.replace(re, repl);
+    }
+    // strip "XxxController." prefix from operationId for clean page slugs
+    if (typeof val[m].operationId === 'string') {
+      val[m].operationId = val[m].operationId.replace(/^[^.]*\./, '');
+    }
+  }
+  if (!kept) continue; // every operation on this path was excluded
+  if (paths[newKey]) {
+    console.error(`Aborting: path collision after normalization: ${newKey} (from ${key}).`);
+    process.exit(1);
+  }
+  paths[newKey] = val;
+}
+
+if (!Object.keys(paths).length) {
+  console.error(`Aborting: no paths matched ${INCLUDE_PREFIXES.join(' / ')}. Check the source spec.`);
+  process.exit(1);
+}
+
+// 2. Transitive $ref schema closure.
+function collectRefs(node, acc) {
+  if (Array.isArray(node)) { node.forEach((n) => collectRefs(n, acc)); return; }
+  if (node && typeof node === 'object') {
+    for (const [k, v] of Object.entries(node)) {
+      if (k === '$ref' && typeof v === 'string') {
+        const m = v.match(/^#\/components\/schemas\/(.+)$/);
+        if (m) acc.add(m[1]);
+      } else collectRefs(v, acc);
+    }
+  }
+}
+const wanted = new Set();
+collectRefs(paths, wanted);
+const schemas = {};
+const missing = [];
+const queue = [...wanted];
+while (queue.length) {
+  const name = queue.shift();
+  if (schemas[name]) continue;
+  const def = src.components.schemas[name];
+  if (!def) { missing.push(name); continue; }
+  schemas[name] = def;
+  const sub = new Set();
+  collectRefs(def, sub);
+  for (const s of sub) if (!schemas[s]) queue.push(s);
+}
+// Hard-fail rather than shipping api.yaml with dangling $refs (broken docs).
+if (missing.length) {
+  console.error(
+    'Aborting: referenced schemas not found in the source spec (broken $refs):\n  ' +
+      missing.sort().join('\n  ') +
+      '\nThe upstream spec likely renamed or removed these. Fix the mapping and re-run.'
+  );
+  process.exit(1);
+}
+
+// 3. Determine tag set + order (preferred order first, then any extras A–Z).
+const presentTags = new Set();
+for (const val of Object.values(paths)) {
+  for (const m of METHODS) {
+    if (val[m] && Array.isArray(val[m].tags) && val[m].tags[0]) presentTags.add(val[m].tags[0]);
+  }
+}
+const extras = [...presentTags].filter((t) => !TAG_ORDER.includes(t)).sort();
+if (extras.length) {
+  console.log('Note: tags not in TAG_ORDER (appended A–Z):', extras.join(', '));
+}
+const orderedTags = [...TAG_ORDER.filter((t) => presentTags.has(t)), ...extras];
+
+// 4. Assemble output doc (sorted schemas for stable diff).
+const sortedSchemas = {};
+Object.keys(schemas).sort().forEach((k) => { sortedSchemas[k] = schemas[k]; });
+
+const out = {
+  openapi: '3.1.0',
+  info: {
+    title: 'Cube Platform API',
+    version: '1.0.0',
+    description:
+      'Programmatically manage Cube: deployments and everything scoped to them\n' +
+      '(environments, folders, reports, workbooks, notifications, workspace, and agents),\n' +
+      'plus account-level users, groups, policies, embedding, and AI settings. Data-model\n' +
+      'authoring, dev mode, branches, and uploads live under /build/api/v1 — same host and\n' +
+      'token, routed to the build pods.',
+  },
+  servers: [
+    {
+      url: 'https://{tenant}.cubecloud.dev',
+      description: 'Your tenant host. Replace the whole host if you use a custom domain.',
+      variables: { tenant: { default: 'your-tenant', description: 'Your Cube tenant subdomain' } },
+    },
+  ],
+  security: [{ bearerAuth: [] }],
+  tags: orderedTags.map((t) => ({ name: t })),
+  paths,
+  components: {
+    // The public REST API authenticates with a token sent as
+    // `Authorization: Bearer <token>` (an API key or an OAuth access token). The
+    // source spec's scheme does not reflect the primary runtime auth, so override.
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        description: 'Token authentication. Send `Authorization: Bearer <YOUR_TOKEN>`.',
+      },
+    },
+    schemas: sortedSchemas,
+  },
+};
+
+writeOrCheck(OUT, yaml.dump(out, { lineWidth: 100, noRefs: true }));
+console.log('paths:', Object.keys(paths).length, '| schemas:', Object.keys(schemas).length, '| tags:', orderedTags.length);
+
+// 5. Group operations by tag (pages in source order within a tag) and capture,
+//    per tag, its paths + the first operation's summary — used to build both the
+//    docs.json nav and the intro-table rows.
+const byTag = {};
+const pathsForTag = {};
+const summariesForTag = {};
+for (const [p, val] of Object.entries(paths)) {
+  for (const m of METHODS) {
+    if (!val[m]) continue;
+    const tag = (val[m].tags && val[m].tags[0]) || 'Other';
+    (byTag[tag] = byTag[tag] || []).push(`${m.toUpperCase()} ${p}`);
+    if (!(pathsForTag[tag] || []).includes(p)) (pathsForTag[tag] = pathsForTag[tag] || []).push(p);
+    (summariesForTag[tag] = summariesForTag[tag] || []).push(val[m].summary || '');
+  }
+}
+
+// The tag's representative page for the intro table: its first operation, unless
+// that summary contains a character Mintlify percent-encodes into the route
+// (typically "/"), in which case the first operation with a clean slug reads
+// better in the table. Both resolve; this just avoids `%2F` in the docs source.
+function linkSummaryForTag(tag) {
+  const summaries = summariesForTag[tag] || [''];
+  return summaries.find((s) => !kebab(s).includes('%')) ?? summaries[0];
+}
+
+const groups = orderedTags
+  .filter((t) => byTag[t])
+  .map((t) => ({ group: t, openapi: API_REF, pages: byTag[t] }));
+
+// 6. Rewrite the api.yaml-backed nav groups in docs.json in place, preserving all
+//    other nav (including the SCIM groups, which come from scim.yaml) and their order.
+const docs = JSON.parse(fs.readFileSync(DOCS_JSON, 'utf8'));
+let platformGroup = null;
+(function find(node) {
+  if (platformGroup || !node || typeof node !== 'object') return;
+  if (Array.isArray(node)) return node.forEach(find);
+  if (Array.isArray(node.pages) && node.pages.some((g) => g && g.openapi === API_REF)) {
+    platformGroup = node;
+    return;
+  }
+  Object.values(node).forEach(find);
+})(docs);
+if (!platformGroup) {
+  console.error(`Aborting: no nav group backed by ${API_REF} found in docs.json.`);
+  process.exit(1);
+}
+const nonApi = platformGroup.pages.filter((g) => !(g && g.openapi === API_REF));
+platformGroup.pages = [...groups, ...nonApi];
+writeOrCheck(DOCS_JSON, JSON.stringify(docs, null, 2) + '\n');
+
+// 7. Regenerate the introduction's endpoint table between the AUTOGEN markers.
+//    The entity link mirrors Mintlify's page slug (/api-reference/{kebab tag}/
+//    {kebab summary}); the resource is the tag's common path prefix. The table
+//    is emitted whole (header + rows + SCIM tail) because the markers have to
+//    stay outside it — see INTRO_START above.
+const intro = fs.readFileSync(INTRO_MDX, 'utf8');
+const s = intro.indexOf(INTRO_START);
+const e = intro.indexOf(INTRO_END);
+if (s < 0 || e < 0 || e < s) {
+  console.error(
+    `Aborting: AUTOGEN markers not found in ${path.relative(ROOT, INTRO_MDX)}.\n` +
+      `Add these two lines around (not inside) the endpoint table:\n` +
+      `  ${INTRO_START}\n  ${INTRO_END}`
+  );
+  process.exit(1);
+}
+const rows = groups
+  .map(
+    (g) =>
+      `| [${g.group}](/api-reference/${kebab(g.group)}/${kebab(linkSummaryForTag(g.group))}) ` +
+      `| \`${commonPathPrefix(pathsForTag[g.group])}\` | v1 |`
+  )
+  .join('\n');
+const table = [INTRO_TABLE_HEAD, rows, INTRO_SCIM_ROWS].join('\n');
+const newIntro =
+  intro.slice(0, s + INTRO_START.length) + '\n\n' + table + '\n\n' + intro.slice(e);
+writeOrCheck(INTRO_MDX, newIntro);
+
+// 8. Under --check, fail loudly if anything drifted from the committed files.
+if (CHECK) {
+  if (staleFiles.length) {
+    console.error(
+      '\nOut of date with the source spec:\n  ' +
+        staleFiles.join('\n  ') +
+        '\n\nRun `node scripts/extract-api.mjs` (with SRC_SPEC set) and commit the result.'
+    );
+    process.exit(1);
+  }
+  console.log('\nAPI reference is up to date. ✓');
+}

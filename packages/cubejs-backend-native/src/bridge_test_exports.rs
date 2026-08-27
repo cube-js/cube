@@ -1,17 +1,17 @@
 //! Test endpoints for the Tesseract bridge layer.
 //!
 //! These functions are exported on the native module under names prefixed with
-//! `__testBridge` (e.g. `__testBridgeCompileMemberSql`). They drive real V8
+//! `__testBridge` (e.g. `__testBridgeParseArgsNames`). They drive real V8
 //! through the production bridge code so
 //! that bridge logic can be regression-tested at the unit level rather than
 //! only via end-to-end JS planner tests.
-//!
-//! Stub implementations for trait dependencies (e.g. `BaseTools`) live in this
-//! module; they should fail loudly when an unsupported code path is exercised.
 
 use cubenativeutils::wrappers::bridge_meta::{BridgeFieldKind, BridgeFieldMeta};
 use cubenativeutils::wrappers::neon::neon_guarded_funcion_call;
-use cubenativeutils::wrappers::object::{NativeArray, NativeFunction, NativeStruct, NativeType};
+use cubenativeutils::wrappers::object::{
+    NativeArray, NativeFunction, NativeRustBox, NativeStruct, NativeType,
+};
+use cubenativeutils::wrappers::rust_handle::NativeRustHandle;
 use cubenativeutils::wrappers::serializer::NativeSerialize;
 use cubenativeutils::wrappers::{inner_types::InnerTypes, NativeContextHolder, NativeObjectHandle};
 use cubenativeutils::CubeError;
@@ -46,7 +46,6 @@ use cubesqlplanner::cube_bridge::{
     },
     join_definition::{join_definition_bridge_fields_meta, JoinDefinition, NativeJoinDefinition},
     join_graph::{join_graph_bridge_fields_meta, JoinGraph, NativeJoinGraph},
-    join_hints::JoinHintItem,
     join_item::{join_item_bridge_fields_meta, JoinItem, NativeJoinItem},
     join_item_definition::{
         join_item_definition_bridge_fields_meta, JoinItemDefinition, NativeJoinItemDefinition,
@@ -63,39 +62,38 @@ use cubesqlplanner::cube_bridge::{
         NativeMemberExpressionDefinition,
     },
     member_order_by::{member_order_by_bridge_fields_meta, MemberOrderBy, NativeMemberOrderBy},
-    member_sql::{
-        FilterGroupItem, FilterParamsItem, MemberSql, NativeMemberSql, SqlTemplate, SqlTemplateArgs,
+    multi_stage_filter::{
+        multi_stage_filter_references_bridge_fields_meta, NativeMultiStageFilterReferences,
+    },
+    multi_stage_grain::{
+        multi_stage_grain_references_bridge_fields_meta, NativeMultiStageGrainReferences,
     },
     pre_aggregation_description::{
         pre_aggregation_description_bridge_fields_meta, NativePreAggregationDescription,
         PreAggregationDescription,
     },
-    pre_aggregation_obj::{
-        pre_aggregation_obj_bridge_fields_meta, NativePreAggregationObj, PreAggregationObj,
-    },
+    pre_aggregation_obj::{pre_aggregation_obj_bridge_fields_meta, NativePreAggregationObj},
     pre_aggregation_time_dimension::{
         pre_aggregation_time_dimension_bridge_fields_meta, NativePreAggregationTimeDimension,
         PreAggregationTimeDimension,
     },
-    security_context::{
-        security_context_bridge_fields_meta, NativeSecurityContext, SecurityContext,
-    },
+    security_context::{security_context_bridge_fields_meta, NativeSecurityContext},
     segment_definition::{
         segment_definition_bridge_fields_meta, NativeSegmentDefinition, SegmentDefinition,
     },
-    sql_templates_render::SqlTemplatesRender,
-    sql_utils::{sql_utils_bridge_fields_meta, NativeSqlUtils, SqlUtils},
+    sql_utils::{sql_utils_bridge_fields_meta, NativeSqlUtils},
     struct_with_sql_member::{
         struct_with_sql_member_bridge_fields_meta, NativeStructWithSqlMember, StructWithSqlMember,
     },
     timeshift_definition::{
         time_shift_definition_bridge_fields_meta, NativeTimeShiftDefinition, TimeShiftDefinition,
     },
+    view_filter_definition::{
+        view_filter_definition_bridge_fields_meta, NativeViewFilterDefinition,
+    },
 };
 use neon::prelude::*;
-use std::any::Any;
 use std::collections::HashSet;
-use std::rc::Rc;
 
 enum InvokeStatus {
     Ok,
@@ -155,182 +153,6 @@ impl InvokeResult {
         }
         Ok(NativeObjectHandle::new(map.into_object()))
     }
-}
-
-struct StubBaseTools;
-
-fn stub_err(method: &str) -> CubeError {
-    CubeError::internal(format!(
-        "StubBaseTools::{} called from bridge test harness — \
-         this test path requires a real BaseTools implementation",
-        method
-    ))
-}
-
-impl BaseTools for StubBaseTools {
-    fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
-        self
-    }
-    fn driver_tools(&self, _external: bool) -> Result<Rc<dyn DriverTools>, CubeError> {
-        Err(stub_err("driver_tools"))
-    }
-    fn sql_templates(&self) -> Result<Rc<dyn SqlTemplatesRender>, CubeError> {
-        Err(stub_err("sql_templates"))
-    }
-    fn sql_utils_for_rust(&self) -> Result<Rc<dyn SqlUtils>, CubeError> {
-        Err(stub_err("sql_utils_for_rust"))
-    }
-    fn generate_time_series(
-        &self,
-        _granularity: String,
-        _date_range: Vec<String>,
-    ) -> Result<Vec<Vec<String>>, CubeError> {
-        Err(stub_err("generate_time_series"))
-    }
-    fn generate_custom_time_series(
-        &self,
-        _granularity: String,
-        _date_range: Vec<String>,
-        _origin: String,
-    ) -> Result<Vec<Vec<String>>, CubeError> {
-        Err(stub_err("generate_custom_time_series"))
-    }
-    fn get_allocated_params(&self) -> Result<Vec<String>, CubeError> {
-        Err(stub_err("get_allocated_params"))
-    }
-    fn all_cube_members(&self, _path: String) -> Result<Vec<String>, CubeError> {
-        Err(stub_err("all_cube_members"))
-    }
-    fn interval_and_minimal_time_unit(&self, _interval: String) -> Result<Vec<String>, CubeError> {
-        Err(stub_err("interval_and_minimal_time_unit"))
-    }
-    fn get_pre_aggregation_by_name(
-        &self,
-        _cube_name: String,
-        _name: String,
-    ) -> Result<Rc<dyn PreAggregationObj>, CubeError> {
-        Err(stub_err("get_pre_aggregation_by_name"))
-    }
-    fn pre_aggregation_table_name(
-        &self,
-        _cube_name: String,
-        _name: String,
-    ) -> Result<String, CubeError> {
-        Err(stub_err("pre_aggregation_table_name"))
-    }
-    fn join_tree_for_hints(
-        &self,
-        _hints: Vec<JoinHintItem>,
-    ) -> Result<Rc<dyn JoinDefinition>, CubeError> {
-        Err(stub_err("join_tree_for_hints"))
-    }
-}
-
-fn handles_to_array<IT: InnerTypes>(
-    items: Vec<NativeObjectHandle<IT>>,
-    context: NativeContextHolder<IT>,
-) -> Result<NativeObjectHandle<IT>, CubeError> {
-    let arr = context.empty_array()?;
-    for (i, item) in items.into_iter().enumerate() {
-        arr.set(i as u32, item)?;
-    }
-    Ok(NativeObjectHandle::new(arr.into_object()))
-}
-
-fn template_to_native<IT: InnerTypes>(
-    template: &SqlTemplate,
-    context: NativeContextHolder<IT>,
-) -> Result<NativeObjectHandle<IT>, CubeError> {
-    match template {
-        SqlTemplate::String(s) => s.to_native(context),
-        SqlTemplate::StringVec(strings) => strings.to_native(context),
-    }
-}
-
-fn filter_params_to_native<IT: InnerTypes>(
-    items: &[FilterParamsItem],
-    context: NativeContextHolder<IT>,
-) -> Result<NativeObjectHandle<IT>, CubeError> {
-    let serialized = items
-        .iter()
-        .map(|itm| itm.to_native(context.clone()))
-        .collect::<Result<Vec<_>, _>>()?;
-    handles_to_array(serialized, context)
-}
-
-fn filter_group_to_native<IT: InnerTypes>(
-    group: &FilterGroupItem,
-    context: NativeContextHolder<IT>,
-) -> Result<NativeObjectHandle<IT>, CubeError> {
-    let result = context.empty_struct()?;
-    result.set_field(
-        "filter_params",
-        filter_params_to_native(&group.filter_params, context.clone())?,
-    )?;
-    Ok(NativeObjectHandle::new(result.into_object()))
-}
-
-fn args_to_native<IT: InnerTypes>(
-    args: &SqlTemplateArgs,
-    context: NativeContextHolder<IT>,
-) -> Result<NativeObjectHandle<IT>, CubeError> {
-    let result = context.empty_struct()?;
-    result.set_field(
-        "symbol_paths",
-        args.symbol_paths.to_native(context.clone())?,
-    )?;
-    result.set_field(
-        "filter_params",
-        filter_params_to_native(&args.filter_params, context.clone())?,
-    )?;
-    let groups = args
-        .filter_groups
-        .iter()
-        .map(|g| filter_group_to_native(g, context.clone()))
-        .collect::<Result<Vec<_>, _>>()?;
-    result.set_field("filter_groups", handles_to_array(groups, context.clone())?)?;
-    let security_context = context.empty_struct()?;
-    security_context.set_field(
-        "values",
-        args.security_context.values.to_native(context.clone())?,
-    )?;
-    result.set_field(
-        "security_context",
-        NativeObjectHandle::new(security_context.into_object()),
-    )?;
-    Ok(NativeObjectHandle::new(result.into_object()))
-}
-
-fn compile_member_sql_inner<IT: InnerTypes>(
-    context_holder: NativeContextHolder<IT>,
-    js_fn: NativeObjectHandle<IT>,
-    security_context_obj: NativeObjectHandle<IT>,
-) -> Result<NativeObjectHandle<IT>, CubeError> {
-    let member_sql = NativeMemberSql::try_new(js_fn)?;
-    let security_context: Rc<dyn SecurityContext> =
-        Rc::new(NativeSecurityContext::try_new(security_context_obj)?);
-    let base_tools: Rc<dyn BaseTools> = Rc::new(StubBaseTools);
-
-    let (template, args) = member_sql.compile_template_sql(base_tools, security_context)?;
-
-    let result = context_holder.empty_struct()?;
-    result.set_field(
-        "template",
-        template_to_native(&template, context_holder.clone())?,
-    )?;
-    result.set_field("args", args_to_native(&args, context_holder.clone())?)?;
-    Ok(NativeObjectHandle::new(result.into_object()))
-}
-
-fn compile_member_sql(cx: FunctionContext) -> JsResult<JsValue> {
-    neon_guarded_funcion_call(
-        cx,
-        |context_holder: NativeContextHolder<_>,
-         js_fn: NativeObjectHandle<_>,
-         security_context_obj: NativeObjectHandle<_>| {
-            compile_member_sql_inner(context_holder, js_fn, security_context_obj)
-        },
-    )
 }
 
 fn parse_args_names_inner<IT: InnerTypes>(
@@ -443,6 +265,8 @@ bridge_registry! {
     "memberDefinition"            => NativeMemberDefinition,            member_definition_bridge_fields_meta,            invoke_member_definition;
     "memberExpressionDefinition"  => NativeMemberExpressionDefinition,  member_expression_definition_bridge_fields_meta, invoke_member_expression_definition;
     "memberOrderBy"               => NativeMemberOrderBy,               member_order_by_bridge_fields_meta,              invoke_member_order_by;
+    "multiStageFilter"            => NativeMultiStageFilterReferences,  multi_stage_filter_references_bridge_fields_meta, invoke_multi_stage_filter;
+    "multiStageGrain"             => NativeMultiStageGrainReferences,   multi_stage_grain_references_bridge_fields_meta,  invoke_multi_stage_grain;
     "preAggregationDescription"   => NativePreAggregationDescription,   pre_aggregation_description_bridge_fields_meta,  invoke_pre_aggregation_description;
     "preAggregationObj"           => NativePreAggregationObj,           pre_aggregation_obj_bridge_fields_meta,          invoke_pre_aggregation_obj;
     "preAggregationTimeDimension" => NativePreAggregationTimeDimension, pre_aggregation_time_dimension_bridge_fields_meta, invoke_pre_aggregation_time_dimension;
@@ -451,6 +275,7 @@ bridge_registry! {
     "sqlUtils"                    => NativeSqlUtils,                    sql_utils_bridge_fields_meta,                    invoke_sql_utils;
     "structWithSqlMember"         => NativeStructWithSqlMember,         struct_with_sql_member_bridge_fields_meta,       invoke_struct_with_sql_member;
     "timeShiftDefinition"         => NativeTimeShiftDefinition,         time_shift_definition_bridge_fields_meta,        invoke_time_shift_definition;
+    "viewFilterDefinition"        => NativeViewFilterDefinition,        view_filter_definition_bridge_fields_meta,       invoke_view_filter_definition;
 }
 
 fn list_bridge_fields_inner<IT: InnerTypes>(
@@ -708,10 +533,17 @@ fn invoke_time_shift_definition<IT: InnerTypes>(b: &NativeTimeShiftDefinition<IT
     r
 }
 
+fn invoke_view_filter_definition<IT: InnerTypes>(
+    _b: &NativeViewFilterDefinition<IT>,
+) -> InvokeResult {
+    InvokeResult::new()
+}
+
 fn invoke_cube_definition<IT: InnerTypes>(b: &NativeCubeDefinition<IT>) -> InvokeResult {
     let mut r = InvokeResult::new();
     r.record("sql_table", b.sql_table());
     r.record("sql", b.sql());
+    r.record("default_filters", b.default_filters());
     r
 }
 
@@ -722,6 +554,7 @@ fn invoke_dimension_definition<IT: InnerTypes>(b: &NativeDimensionDefinition<IT>
     r.record("latitude", b.latitude());
     r.record("longitude", b.longitude());
     r.record("time_shift", b.time_shift());
+    r.record("filter", b.filter());
     r.record("mask_sql", b.mask_sql());
     r
 }
@@ -731,10 +564,29 @@ fn invoke_measure_definition<IT: InnerTypes>(b: &NativeMeasureDefinition<IT>) ->
     r.record("sql", b.sql());
     r.record("case", b.case());
     r.record("filters", b.filters());
+    r.record("filter", b.filter());
+    r.record("grain", b.grain());
     r.record("drill_filters", b.drill_filters());
     r.record("order_by", b.order_by());
     r.record("mask_sql", b.mask_sql());
     r
+}
+
+fn invoke_multi_stage_filter<IT: InnerTypes>(
+    _b: &NativeMultiStageFilterReferences<IT>,
+) -> InvokeResult {
+    // MultiStageFilterReferences exposes only serde-static fields (no trait
+    // methods), so there is nothing to round-trip here beyond what `try_new`
+    // already validates. Returning an empty `InvokeResult` matches the
+    // pattern used by other static-only bridges (e.g. filterGroup).
+    InvokeResult::new()
+}
+
+fn invoke_multi_stage_grain<IT: InnerTypes>(
+    _b: &NativeMultiStageGrainReferences<IT>,
+) -> InvokeResult {
+    // Static-only bridge — same shape as `invoke_multi_stage_filter`.
+    InvokeResult::new()
 }
 
 fn invoke_expression_struct<IT: InnerTypes>(b: &NativeExpressionStruct<IT>) -> InvokeResult {
@@ -774,6 +626,7 @@ fn invoke_base_query_options<IT: InnerTypes>(b: &NativeBaseQueryOptions<IT>) -> 
     r.record("join_graph", b.join_graph());
     r.record("security_context", b.security_context());
     r.record("join_hints", b.join_hints());
+    r.record("subquery_joins", b.subquery_joins());
     r
 }
 
@@ -782,14 +635,6 @@ fn invoke_base_tools<IT: InnerTypes>(b: &NativeBaseTools<IT>) -> InvokeResult {
     r.record("driver_tools", b.driver_tools(false));
     r.record("sql_templates", b.sql_templates());
     r.record("sql_utils_for_rust", b.sql_utils_for_rust());
-    r.record(
-        "generate_time_series",
-        b.generate_time_series("day".to_string(), vec![]),
-    );
-    r.record(
-        "generate_custom_time_series",
-        b.generate_custom_time_series("day".to_string(), vec![], "2024-01-01".to_string()),
-    );
     r.record("get_allocated_params", b.get_allocated_params());
     r.record("all_cube_members", b.all_cube_members("Orders".to_string()));
     r.record(
@@ -805,6 +650,10 @@ fn invoke_base_tools<IT: InnerTypes>(b: &NativeBaseTools<IT>) -> InvokeResult {
         b.pre_aggregation_table_name("Orders".to_string(), "main".to_string()),
     );
     r.record("join_tree_for_hints", b.join_tree_for_hints(vec![]));
+    r.skip(
+        "compile_member_sql",
+        "Rc<dyn MemberSql> argument has no auto-default in Rust",
+    );
     r
 }
 
@@ -819,6 +668,7 @@ fn invoke_driver_tools<IT: InnerTypes>(b: &NativeDriverTools<IT>) -> InvokeResul
     r.record("date_time_cast", b.date_time_cast(s()));
     r.record("in_db_time_zone", b.in_db_time_zone(s()));
     r.record("get_allocated_params", b.get_allocated_params());
+    r.record("should_reuse_params", b.should_reuse_params());
     r.record("subtract_interval", b.subtract_interval(s(), s()));
     r.record("add_interval", b.add_interval(s(), s()));
     r.record("interval_string", b.interval_string(s()));
@@ -867,8 +717,89 @@ fn invoke_cube_evaluator<IT: InnerTypes>(b: &NativeCubeEvaluator<IT>) -> InvokeR
     r
 }
 
+#[derive(Debug)]
+struct RustBoxProbe {
+    value: f64,
+    label: String,
+}
+
+/// Distinct probe used to exercise the type-mismatch branch of
+/// `NativeRustHandle::downcast`: callers create an `Alt` box and try to
+/// unwrap it as `RustBoxProbe`, which must fail with a message that names
+/// both the source and target types.
+#[derive(Debug)]
+struct RustBoxProbeAlt {
+    #[allow(dead_code)]
+    note: String,
+}
+
+#[derive(serde::Serialize)]
+struct RustBoxProbeView {
+    value: f64,
+    label: String,
+    type_name: String,
+}
+
+fn rust_box_create_inner<IT: InnerTypes>(
+    context: NativeContextHolder<IT>,
+    value: f64,
+    label: String,
+) -> Result<NativeObjectHandle<IT>, CubeError> {
+    let handle = NativeRustHandle::new(RustBoxProbe { value, label });
+    let rust_box = context.rust_box(handle)?;
+    Ok(NativeObjectHandle::new(rust_box.into_object()))
+}
+
+fn rust_box_create(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(
+        cx,
+        |context_holder: NativeContextHolder<_>, value: f64, label: String| {
+            rust_box_create_inner(context_holder, value, label)
+        },
+    )
+}
+
+fn rust_box_create_alt_inner<IT: InnerTypes>(
+    context: NativeContextHolder<IT>,
+    note: String,
+) -> Result<NativeObjectHandle<IT>, CubeError> {
+    let handle = NativeRustHandle::new(RustBoxProbeAlt { note });
+    let rust_box = context.rust_box(handle)?;
+    Ok(NativeObjectHandle::new(rust_box.into_object()))
+}
+
+fn rust_box_create_alt(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(
+        cx,
+        |context_holder: NativeContextHolder<_>, note: String| {
+            rust_box_create_alt_inner(context_holder, note)
+        },
+    )
+}
+
+fn rust_box_unwrap_inner<IT: InnerTypes>(
+    _context: NativeContextHolder<IT>,
+    obj: NativeObjectHandle<IT>,
+) -> Result<RustBoxProbeView, CubeError> {
+    let rust_box = obj.into_rust_box()?;
+    let probe = rust_box.handle().downcast::<RustBoxProbe>()?;
+    Ok(RustBoxProbeView {
+        value: probe.value,
+        label: probe.label.clone(),
+        type_name: rust_box.handle().type_name().to_string(),
+    })
+}
+
+fn rust_box_unwrap(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(
+        cx,
+        |context_holder: NativeContextHolder<_>, obj: NativeObjectHandle<_>| {
+            rust_box_unwrap_inner(context_holder, obj)
+        },
+    )
+}
+
 pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
-    cx.export_function("__testBridgeCompileMemberSql", compile_member_sql)?;
     cx.export_function("__testBridgeParseArgsNames", parse_args_names)?;
     cx.export_function(
         "__testBridgeInvokeFilterParamsCallback",
@@ -878,5 +809,8 @@ pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("__testBridgeParse", parse_bridge)?;
     cx.export_function("__testBridgeInvoke", invoke_bridge)?;
     cx.export_function("__testBridgeListBridgeNames", list_bridge_names)?;
+    cx.export_function("__testBridgeRustBoxCreate", rust_box_create)?;
+    cx.export_function("__testBridgeRustBoxCreateAlt", rust_box_create_alt)?;
+    cx.export_function("__testBridgeRustBoxUnwrap", rust_box_unwrap)?;
     Ok(())
 }

@@ -401,3 +401,41 @@ async fn test_empty_result_from_filters() {
         insta::assert_snapshot!(result);
     }
 }
+
+// 10.8: Cross-cube aggregating measure (`orders.customer_lifetime_per_order`
+//       = sum {customers.lifetime_value}) plus a dimension reached through a
+//       fan-out join (`returns.reason`). The measure references another
+//       cube, so the planner takes the MeasureSubquery branch — emitting a
+//       dedicated `*_measure_subquery_*` CTE that joins the source cube to
+//       the cross-cube column and then LEFT-joins the keys CTE onto it.
+//
+// FIXME: `MeasureSubquery` for this measure picks `customers` as the join
+// root (driven by JoinGraph) and emits `FROM customers LEFT JOIN orders`.
+// That preserves customers with no orders, leaking their `lifetime_value`
+// into reason buckets through the NULL=NULL key match in the outer FK
+// join — yielding inflated sums (e.g. `wrong_item = 6500` instead of the
+// classic `6000`). Re-enable after the MeasureSubquery is rooted at the
+// owning cube (`orders`) instead of the cross-cube dep's home.
+#[ignore]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_aggregating_cross_cube_measure_with_fanout_dim() {
+    let ctx = create_multi_fact_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.customer_lifetime_per_order
+        dimensions:
+          - returns.reason
+        order:
+          - id: returns.reason
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_multi_fact_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}

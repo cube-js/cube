@@ -6,6 +6,7 @@ import * as flatbuffers from 'flatbuffers';
 
 import { HttpParameter } from './http-parameter.js';
 import { HttpTable } from './http-table.js';
+import { QueryResultFormat } from './query-result-format.js';
 
 
 export class HttpQuery {
@@ -60,8 +61,13 @@ parametersLength():number {
   return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
 }
 
+responseFormat():QueryResultFormat {
+  const offset = this.bb!.__offset(this.bb_pos, 12);
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : QueryResultFormat.Legacy;
+}
+
 static startHttpQuery(builder:flatbuffers.Builder) {
-  builder.startObject(4);
+  builder.startObject(5);
 }
 
 static addQuery(builder:flatbuffers.Builder, queryOffset:flatbuffers.Offset) {
@@ -104,17 +110,22 @@ static startParametersVector(builder:flatbuffers.Builder, numElems:number) {
   builder.startVector(4, numElems, 4);
 }
 
+static addResponseFormat(builder:flatbuffers.Builder, responseFormat:QueryResultFormat) {
+  builder.addFieldInt8(4, responseFormat, QueryResultFormat.Legacy);
+}
+
 static endHttpQuery(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
   return offset;
 }
 
-static createHttpQuery(builder:flatbuffers.Builder, queryOffset:flatbuffers.Offset, traceObjOffset:flatbuffers.Offset, inlineTablesOffset:flatbuffers.Offset, parametersOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createHttpQuery(builder:flatbuffers.Builder, queryOffset:flatbuffers.Offset, traceObjOffset:flatbuffers.Offset, inlineTablesOffset:flatbuffers.Offset, parametersOffset:flatbuffers.Offset, responseFormat:QueryResultFormat):flatbuffers.Offset {
   HttpQuery.startHttpQuery(builder);
   HttpQuery.addQuery(builder, queryOffset);
   HttpQuery.addTraceObj(builder, traceObjOffset);
   HttpQuery.addInlineTables(builder, inlineTablesOffset);
   HttpQuery.addParameters(builder, parametersOffset);
+  HttpQuery.addResponseFormat(builder, responseFormat);
   return HttpQuery.endHttpQuery(builder);
 }
 }

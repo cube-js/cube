@@ -4,6 +4,10 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
+/// Date-axis CTE for a rolling window — generates the series of
+/// points the rolling computation walks over. The range comes
+/// either from a literal `date_range` or from a sibling
+/// `MultiStageGetDateRange` CTE (`get_date_range_multistage_ref`).
 #[derive(TypedBuilder)]
 pub struct MultiStageTimeSeries {
     time_dimension: Rc<MemberSymbol>,
@@ -65,6 +69,10 @@ impl LogicalNode for MultiStageTimeSeries {
     fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
         check_inputs_len(&inputs, 0, self.node_name())?;
         Ok(self)
+    }
+
+    fn referenced_cte_names(&self) -> Vec<String> {
+        self.get_date_range_multistage_ref.iter().cloned().collect()
     }
 
     fn node_name(&self) -> &'static str {

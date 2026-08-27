@@ -54,20 +54,44 @@ export function rowsToColumnar(rawData: any): JsRawColumnarData {
   return { members, columns };
 }
 
+/**
+ * Pivot to columnar before serializing: the row-oriented form repeats
+ * every column name on every row, which inflates JSON size and forces
+ * the Rust side to allocate a per-row map before transposing back to
+ * its native columnar `QueryResult` representation.
+ *
+ * Serialize to a Buffer so the Rust side can decode via
+ * serde_json::from_slice instead of walking a JsValue through the
+ * Neon bridge with JsValueDeserializer. On 5 MB of AoO rows
+ * (~21k rows × 8 fields) the JsValue walk costs ~80 ms locally;
+ * Buffer + serde_json is ~7× faster (M3 MAX) and tracks V8's JSON.parse
+ * (~11 ms on the same payload). On a real server it should be 3-6× slower,
+ * so avoiding the JsValue walk matters even more there.
+ */
+export function rowsToColumnarBuffer(rawData: any): Buffer {
+  return Buffer.from(JSON.stringify(rowsToColumnar(rawData)));
+}
+
 class BaseWrapper {
   public readonly isWrapper: boolean = true;
 }
 
-export class ResultWrapper extends BaseWrapper implements DataResult {
-  private readonly proxy: any;
+// `nativeReference` holds a Neon `JsBox<Arc<QueryResult>>` — a Rust-backed
+// external, Symbol is used to keep it protecting from deserializing in a case of a leak to JsObjectDeserializer
+const NATIVE_REFERENCE = Symbol('nativeReference');
 
+export type NativeQueryResultRef = {
+  __typename?: 'NativeQueryResultRef';
+};
+
+export class ResultWrapper extends BaseWrapper implements DataResult {
   private cache: any;
 
   public cached: Boolean = false;
 
   private readonly isNative: Boolean = false;
 
-  private readonly nativeReference: any;
+  private readonly [NATIVE_REFERENCE]: NativeQueryResultRef | null = null;
 
   private readonly jsResult: any = null;
 
@@ -86,10 +110,10 @@ export class ResultWrapper extends BaseWrapper implements DataResult {
       this.jsResult = input;
     } else {
       this.isNative = true;
-      this.nativeReference = input;
+      this[NATIVE_REFERENCE] = input;
     }
 
-    this.proxy = new Proxy(this, {
+    const proxy = new Proxy(this, {
       get: (target, prop: string | symbol) => {
         // To support iterative access
         if (prop === Symbol.iterator) {
@@ -148,18 +172,24 @@ export class ResultWrapper extends BaseWrapper implements DataResult {
 
       ownKeys: (target) => {
         const array = this.getArray();
-        return [...Object.keys(target), ...Object.keys(array), 'length', 'isNative'];
+
+        return Array.from(new Set<string>([
+          ...Object.keys(target),
+          ...Object.keys(array),
+          'length',
+          'isNative',
+        ]));
       }
     });
-    Object.setPrototypeOf(this.proxy, ResultWrapper.prototype);
+    Object.setPrototypeOf(proxy, ResultWrapper.prototype);
 
-    return this.proxy;
+    return proxy;
   }
 
   private getArray(): ResultRow[] {
     if (!this.cache) {
-      if (this.isNative) {
-        this.cache = getCubestoreResult(this.nativeReference);
+      if (this.isNative && this[NATIVE_REFERENCE] !== null) {
+        this.cache = getCubestoreResult(this[NATIVE_REFERENCE]);
       } else {
         this.cache = this.jsResult;
       }
@@ -176,22 +206,10 @@ export class ResultWrapper extends BaseWrapper implements DataResult {
 
   public getRawData(): any[] {
     if (this.isNative) {
-      return [this.nativeReference];
+      return [this[NATIVE_REFERENCE]];
     }
 
-    // Pivot to columnar before serializing: the row-oriented form repeats
-    // every column name on every row, which inflates JSON size and forces
-    // the Rust side to allocate a per-row map before transposing back to
-    // its native columnar `QueryResult` representation.
-    //
-    // Serialize to a Buffer so the Rust side can decode via
-    // serde_json::from_slice instead of walking a JsValue through the
-    // Neon bridge with JsValueDeserializer. On 5 MB of AoO rows
-    // (~21k rows × 8 fields) the JsValue walk costs ~80 ms locally;
-    // Buffer + serde_json is ~7× faster (M3 MAX) and tracks V8's JSON.parse
-    // (~11 ms on the same payload). On a real server it should be 3-6× slower,
-    // so avoiding the JsValue walk matters even more there.
-    return [Buffer.from(JSON.stringify(rowsToColumnar(this.jsResult)))];
+    return [rowsToColumnarBuffer(this.jsResult)];
   }
 
   public setTransformData(td: any) {

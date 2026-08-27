@@ -47,7 +47,7 @@ export class DuckDBQuery extends BaseQuery {
     const timeUnit = this.diffTimeUnitForInterval(interval);
     const beginOfTime = this.dateTimeCast('\'1970-01-01 00:00:00.000\'');
 
-    return `${this.dateTimeCast(`'${origin}'`)}' + INTERVAL '${interval}' *
+    return `${this.dateTimeCast(`'${origin}'`)} + INTERVAL '${interval}' *
       floor(
         date_diff('${timeUnit}', ${this.dateTimeCast(`'${origin}'`)}, ${source}) /
         date_diff('${timeUnit}', ${beginOfTime}, ${beginOfTime} + INTERVAL '${interval}')
@@ -61,9 +61,28 @@ export class DuckDBQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    // AT TIME ZONE on TIMESTAMPTZ yields a naive TIMESTAMP in UTC (requires the ICU
+    // extension, which is bundled and autoloaded in the DuckDB builds used by the driver)
+    templates.functions.UTCTIMESTAMP = '(NOW() AT TIME ZONE \'UTC\')';
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.functions.STRING_AGG = 'STRING_AGG({% if distinct %}DISTINCT {% endif %}{{ args[0] }}, COALESCE({{ args[1] }}, \'\'))';
+    // DATEADD is being rewritten to DATE_ADD
+    templates.functions.DATE_ADD = '({{ args[0] }} + \'{{ interval }} {{ date_part }}\'::interval)';
+    delete templates.functions.WIDTH_BUCKET;
+    templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
+    templates.expressions.ilike = '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
+    // DuckDB has no default LIKE escape character - the `default_escape` gate on
+    // the two templates above exists for exactly that reason. The native planner
+    // escapes filter values with a backslash (BaseQuery's `like_escape_char`), so
+    // the filter path needs the clause unconditionally to interpret it; without
+    // one, `contains '%'` matches nothing instead of the rows containing a
+    // literal percent sign.
+    templates.tesseract.ilike = '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }} ESCAPE \'\\\'';
+    // DuckDB `/` performs float division even for integer operands (since v0.8);
+    // `//` is integer division truncating toward zero (-7 // 2 = -3), matching
+    // PostgreSQL
+    templates.expressions.int_division = '({{ left }} // {{ right }})';
     return templates;
   }
 

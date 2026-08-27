@@ -86,7 +86,7 @@ WHERE is_completed IS TRUE;
 
 ### Joins
 
-Please [refer to this page](/reference/sql-api/joins) for details
+Please [refer to this page](/reference/core-data-apis/sql-api/joins) for details
 on joins.
 
 
@@ -374,15 +374,17 @@ a [regular query][ref-regular-queries].
 
 ### Row limit edge case
 
-If the `ORDER BY` statement can't be pushed down, ordering would be performed during
-[post-processing][ref-queries-wpp]. If there are more than [50,000 rows][ref-query-default-limit]
-in the result set, this can yield incorrect results.
+When part of a query can't be pushed down, that part is performed during
+[post-processing][ref-queries-wpp]. The [regular query][ref-regular-queries] it reads from
+is cut off at [50,000 rows][ref-query-default-limit] unless a smaller limit of its own
+applies, and the post-processing then runs over only those rows, so the result can be
+incorrect without any error being raised.
 
-However, given that queries to Cube are usually aggregated, this is a very rare case;
-anyway, please keep this limitation in mind when designing your queries.
+Aggregated queries usually return far fewer rows than the limit, so this rarely comes up
+in practice; please keep it in mind when designing your queries.
 
 Consider the following query. Because of the `SUM(total_value) + 2` expression
-in the projection of the outer query, thr SQL API can't push down `ORDER BY`:
+in the projection of the outer query, the SQL API can't push down `ORDER BY`:
 
 ```sql
 SELECT
@@ -406,13 +408,46 @@ As you can see, the sorting operation is done after the regular query and the pr
 +--- CubeScanExecutionPlan
 ```
 
+`ORDER BY` is not the only operation this happens to. Anything left to post-processing
+over a regular query that isn't bounded by a small enough limit behaves the same way, so
+`EXPLAIN` is the reliable way to tell. `CubeScanExecutionPlan` prints the query it will
+run: `CubeScanExecutionPlan, Request:` followed by JSON, or `CubeScanExecutionPlan, SQL:`
+followed by SQL where the query is pushed down. Pushdown can be partial, so operations
+may still sit above a scan that prints `SQL:`. If the JSON has no `limit` key, or the
+limit in the JSON or the printed SQL is larger than the number of rows you expect, the
+row limit is applied when the query runs and every operation above the scan sees at most
+that many rows.
 
-[ref-regular-queries]: /reference/queries#regular-query
-[ref-queries-wpp]: /reference/queries#query-with-post-processing
-[ref-queries-wpd]: /reference/queries#query-with-pushdown
-[ref-data-model-concepts]: /docs/data-modeling/concepts
+If a query of yours has that shape, you can:
+
+- Add an explicit `LIMIT` and confirm with `EXPLAIN` that it reaches the scan. It only
+  does so when the limit ends up directly above the regular query — in the plan above a
+  `SortExec` sits in between, so the limit bounds the final output rather than what the
+  sorting reads.
+- Raise [`CUBEJS_DB_QUERY_LIMIT`][ref-env-db-query-limit] so the intermediate result is
+  truncated later. Non-streaming SQL API queries are capped by
+  [`CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`][ref-env-non-streaming-limit], which
+  defaults to `CUBEJS_DB_QUERY_LIMIT` and can't exceed it — if you've set it explicitly,
+  raise it too.
+- Enable [`CUBESQL_STREAM_MODE`][ref-env-cubesql-stream-mode]: streamed queries aren't
+  capped, so there is nothing to truncate. Whether a query streams is decided by the
+  limit in the scan's request — the one `EXPLAIN` prints — and not by the `LIMIT` clause
+  in your SQL: it streams when that request has no limit, or one above the cap. So this
+  combines with the first workaround only up to a point: a `LIMIT` that reaches the scan
+  and is below the cap turns streaming back off, while one that doesn't reach it, as in
+  the plan above, leaves it on.
+- Restructure the query so it is pushed down in full, e.g. by removing the expression
+  that prevents it.
+
+[ref-regular-queries]: /reference/core-data-apis/queries#regular-query
+[ref-queries-wpp]: /reference/core-data-apis/queries#query-with-post-processing
+[ref-queries-wpd]: /reference/core-data-apis/queries#query-with-pushdown
+[ref-data-model-concepts]: /docs/data-modeling/overview
 [ref-measure-types]: /reference/data-modeling/measures#type
-[ref-query-default-limit]: /reference/queries#row-limit
-[ref-ref-sql-api]: /reference/sql-api/reference
+[ref-query-default-limit]: /reference/core-data-apis/queries#row-limit
+[ref-env-db-query-limit]: /reference/configuration/environment-variables#cubejs_db_query_limit
+[ref-env-cubesql-stream-mode]: /reference/configuration/environment-variables#cubesql_stream_mode
+[ref-env-non-streaming-limit]: /reference/configuration/environment-variables#cubesql_non_streaming_query_max_row_limit
+[ref-ref-sql-api]: /reference/core-data-apis/sql-api/reference
 [link-postgres-boolean]: https://www.postgresql.org/docs/current/datatype-boolean.html
 [link-selection-projection]: https://stackoverflow.com/a/1031101

@@ -72,6 +72,23 @@ Create explicit SAML claims in Entra with the names Cube uses by default.
    - **Display name** — Set **Name** to `name` and **Source attribute** to
      `user.displayname`.
 
+If you plan to map Cube roles based on Entra group membership (see
+[Map roles by group](#map-roles-by-group) below), also add a group claim:
+
+1. Still in **Attributes & Claims**, click **Add a group claim**.
+2. Choose which groups to include (e.g. **Security groups** or **Groups
+   assigned to the application**) and pick a **Source attribute** for the
+   group name. For most setups, select **sAMAccountName** or
+   **Cloud-only group display names** so the assertion carries
+   human-readable group names that match the **IdP group name** values
+   you'll configure in Cube Cloud.
+3. Save the claim.
+
+   Cube reads Entra's canonical groups claim URL
+   (`http://schemas.microsoft.com/ws/2008/06/identity/claims/groups`)
+   automatically, so no further attribute renaming is required on the
+   Entra side.
+
 ## Complete configuration in Cube
 
 Return to the SAML configuration page in Cube and provide the identity
@@ -119,9 +136,7 @@ the **Viewer** role by default. To assign a different role, expand the
 
 The selected role applies **only when a user is first created** during
 provisioning. Existing users are not modified on subsequent SSO logins or
-SCIM updates. It is applied **in addition to** any roles your identity
-provider sends via the [role attribute](#configure-attribute-mappings)
-(subject to the `rolesMap`).
+SCIM updates.
 
 <Info>
 
@@ -141,12 +156,44 @@ exists.
 
 </Warning>
 
-<Info>
+## Map roles by group
 
-Admin status cannot be set via SSO. To grant admin permissions, update
-the user's role manually in Cube under **Team & Security**.
+For finer-grained role assignment, enable **Map roles by group** in the
+**Advanced Settings** section to assign Cube roles based on a user's
+Entra group memberships.
 
-</Info>
+To configure group-based role mapping:
+
+1. Make sure Entra sends a group claim on the SAML assertion. See the
+   group-claim step in [Configure attribute
+   mappings](#configure-attribute-mappings).
+2. In the SAML configuration form in Cube, expand **Advanced Settings**.
+3. (Optional) Under **SAML attribute customization**, set the **Groups
+   attribute** to the simple name of the SAML attribute carrying group
+   memberships. Defaults to `groups`. Cube also reads Entra's canonical
+   groups claim URL automatically, so the default usually works
+   out of the box.
+4. Enable the **Map roles by group** toggle.
+5. Click **Add group mapping** and create one entry per group you want
+   to map:
+   - **IdP group name** — the group display name as it appears in the
+     assertion (case-insensitive). With **Source attribute** set to
+     **sAMAccountName** or **Cloud-only group display names**, this is
+     the human-readable group name. If you left the default (group object
+     ID), use the GUID instead.
+   - **Cube role** — pick a default or [custom role][ref-custom-roles].
+
+For SAML SSO, group mappings are evaluated **only when a new user is
+auto-provisioned** on first login. If any matching group resolves to a
+Cube role, those roles are assigned to the new user **instead of** the
+configured [default role](#default-role-for-new-users). The default role
+is used as a fallback when no IdP group matches (or when the mapped Cube
+roles no longer exist). Existing users' role assignments are never
+modified by subsequent logins.
+
+The same mapping is also applied by [SCIM][ref-scim] when group
+memberships are pushed, so a single configuration drives both SAML SSO
+and SCIM group sync.
 
 ## Assign users
 

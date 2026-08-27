@@ -1,5 +1,6 @@
 ---
 title: Analyzing data from Query History export
+sidebarTitle: Query History export
 description: Walk through exporting Query History to Amazon S3 with Vector and analyzing the files with DuckDB inside Cube.
 ---
 
@@ -9,6 +10,15 @@ analysis.
 
 In this recipe, we will show you how to export Query History data to Amazon S3, and then
 analyze it using Cube by reading the data from S3 using DuckDB.
+
+<Warning>
+
+Before you start, check that the **Monitoring Integrations Tier** of your deployment is
+set to **Medium (Up to 50 GB/mo)**. On a lower tier, [Query History
+export][ref-query-history-export] fails silently — no events reach any sink and no error
+is logged.
+
+</Warning>
 
 <iframe
   width="100%"
@@ -69,6 +79,19 @@ CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID=your-access-key-id
 CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY=your-secret-access-key
 CUBEJS_DB_DUCKDB_S3_REGION=us-east-2
 ```
+
+<Note>
+
+The `aws_s3` sink can also authenticate with the deployment's OIDC identity
+instead of an access key pair — the credentials apply to the whole Vector agent.
+See [Keyless authentication][ref-keyless-auth].
+
+This replaces the `CUBE_CLOUD_MONITORING_AWS_*` pair above, which is Vector's
+**write** path only. The `CUBEJS_DB_DUCKDB_S3_*` variables are separate — they
+belong to the DuckDB data source that reads the exported files back in
+[Data modeling](#data-modeling), and are still required.
+
+</Note>
 
 ## Data modeling
 
@@ -209,6 +232,9 @@ Example query in Playground:
 </Frame>
 
 
-[ref-query-history-export]: /admin/deployment/monitoring-integrations#query-history-export
+
+
+[ref-query-history-export]: /admin/monitoring/monitoring-integrations#query-history-export
 [ref-query-history]: /admin/monitoring/query-history
-[ref-vector-configuration]: /admin/deployment/monitoring-integrations#configuration
+[ref-vector-configuration]: /admin/monitoring/monitoring-integrations#configuration
+[ref-keyless-auth]: /admin/monitoring/monitoring-integrations/cloudwatch#keyless-authentication

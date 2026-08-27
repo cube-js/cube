@@ -53,6 +53,9 @@ cubes:
       - name: unique_status_count
         type: count_distinct
         sql: status
+      - name: approx_unique_count
+        type: count_distinct_approx
+        sql: status
       - name: amount_per_count
         type: number
         sql: "{total_amount} / {count}"
@@ -129,6 +132,14 @@ cubes:
           - status
           - city
 
+      - name: approx_rollup
+        type: rollup
+        measures:
+          - approx_unique_count
+        dimensions:
+          - status
+          - city
+
       - name: mixed_measure_rollup
         type: rollup
         measures:
@@ -158,4 +169,29 @@ cubes:
         segments:
           - high_priority
         time_dimension: created_at
+        granularity: day
+
+      # Groups by the primary key, so every stored row is a single order —
+      # the only shape a rollup may serve an ungrouped query from.
+      - name: primary_key_rollup
+        type: rollup
+        measures:
+          - total_amount
+        dimensions:
+          - id
+          - status
+          - city
+
+      # Same members as `segment_rollup`, but every reference is written as a
+      # cube-name interpolation — `(CUBE) => `${CUBE}.count``.
+      - name: interpolated_refs_rollup
+        type: rollup
+        measures:
+          - '{CUBE}.count'
+          - '{CUBE}.total_amount'
+        dimensions:
+          - '{CUBE}.status'
+        segments:
+          - '{CUBE}.high_priority'
+        time_dimension: '{CUBE}.created_at'
         granularity: day

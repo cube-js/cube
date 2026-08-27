@@ -49,9 +49,8 @@ You can review its [support terms][ref-free-tier-support] and [limits][ref-cloud
 **Starter product tier targets low-scale production that is not business-critical.**
 
 It offers a [Dedicated deployment][ref-cloud-deployment-prod-cluster], the ability
-to use third-party packages from the npm registry, AWS and GCP support in select
-regions, pre-aggregations of up to 150GB in size, auto-suspend controls, and
-[Semantic Layer Sync][ref-sls] with a single BI tool (such as Preset or Metabase).
+to use third-party packages from the npm registry, AWS, GCP, and Azure support in
+select regions, pre-aggregations of up to 150GB in size, and auto-suspend controls.
 
 You can review its [pricing][cube-pricing], [support
 terms][ref-starter-tier-support], and [limits][ref-cloud-limits].
@@ -62,8 +61,8 @@ terms][ref-starter-tier-support], and [limits][ref-cloud-limits].
 
 It offers everything in the [Starter product tier](#starter) as well as enabling
 the use of [Multi-cluster deployments][ref-cloud-deployment-prod-multicluster],
-support for [custom domains][ref-cloud-custom-domains], AWS and GCP support
-in all regions. Cube Cloud provides a 99.95% uptime SLA for this product tier.
+support for [custom domains][ref-cloud-custom-domains], AWS, GCP, and Azure
+support in all regions. Cube Cloud provides a 99.95% uptime SLA for this product tier.
 
 You can review its [pricing][cube-pricing], [support
 terms][ref-premium-tier-support], and [limits][ref-cloud-limits].
@@ -73,9 +72,8 @@ terms][ref-premium-tier-support], and [limits][ref-cloud-limits].
 **Enterprise product tier is suitable for high-scale or mission-critical production
 deployments with more significant security and compliance needs.**
 
-It offers everything in the [Premium product tier](#premium) as well as [Semantic Layer
-Sync][ref-sls] with unlimited supported BI tools, SAML
-support for [single sign-on][ref-sso], Azure support for all regions, [dedicated
+It offers everything in the [Premium product tier](#premium) as well as SAML
+support for [single sign-on][ref-sso], [dedicated
 infrastructure][ref-dedicated-infra], [VPC peering][ref-cloud-vpc-peering],
 [monitoring integrations][ref-monitoring-integrations], and [role-based access
 control][ref-cloud-acl]. Cube Cloud provides a 99.99% uptime SLA for this product tier.
@@ -94,9 +92,8 @@ of deployments within a Cube Cloud account. The consumption is measured in 5-min
 | [Shared deployment][ref-development-instance] | <nobr>1..2</nobr> | Depends on a [chosen tier](#deployment-tiers) |
 | Cube API Instance | <nobr>1..2</nobr> | Depends on a [chosen tier](#deployment-tiers) |
 | Cube Store Worker | <nobr>1..2</nobr> | Depends on a [chosen tier](#cube-store-worker-tiers) |
-| [Semantic Catalog][ref-semantic-catalog] | <nobr>2..4</nobr> | Depends on a [chosen tier](#semantic-catalog-tiers) |
 | [Query History][ref-query-history] | <nobr>0..20</nobr> | Depends on a [chosen tier](#query-history-tiers) |
-| [Monitoring Integrations][ref-monitoring-integrations] | <nobr>1..4</nobr> | Depends on a [chosen tier](#monitoring-integrations-tiers) |
+| [Monitoring Integrations][ref-monitoring-integrations] | — | Available as an [add-on](#monitoring-integrations) on the Enterprise plan |
 
 The following resource types incur CCU consumption and apply to the _whole Cube Cloud
 account_:
@@ -121,7 +118,7 @@ requests through [APIs & integrations][ref-apis] under the following tiers:
 | Tier | <nobr>CCUs per hour</nobr> | <nobr>CPU and memory</nobr> | Dependent features |
 | ---- | :--- | --- | --- |
 | S    | <nobr>4 — _for Dedicated deployment_</nobr><br/><nobr>1 — _for Shared deployment_</nobr><br/><nobr>1 — _for Cube API Instance_</nobr> | 100% | — |
-| M    | <nobr>8 — _for Dedicated deployment_</nobr><br/><nobr>2 — _for Shared deployment_</nobr><br/><nobr>2 — _for Cube API Instance_</nobr> | 200% | [DAX API][ref-dax-api]|
+| M    | <nobr>8 — _for Dedicated deployment_</nobr><br/><nobr>2 — _for Shared deployment_</nobr><br/><nobr>2 — _for Cube API Instance_</nobr> | 200% | DAX API|
 
 You can upgrade to a chosen tier in the
 **Settings** of your deployment.
@@ -136,19 +133,6 @@ pre-aggregations and executing queries against them under the following tiers:
 | ---- | :-----------: | ---------- | ------------------ |
 | S    | 1             | 100%       | —                  |
 | M    | 2             | 200%       | [Data-at-rest encryption][ref-data-at-rest-encryption] with [customer-managed keys][ref-customer-managed-keys] in Cube Store |
-
-You can upgrade to a chosen tier in the
-**Settings** of your deployment.
-
-### Semantic Catalog tiers
-
-[Semantic Catalog][ref-semantic-catalog] provides observability into other data
-tools interoperating with your data model under the following tiers:
-
-| Tier | <nobr>CCUs per hour</nobr> | Data assets |
-| ---- | :-----------: | ---------- |
-| S    | 2             | Up to 30,000 |
-| M    | 4             | Up to 100,000 |
 
 You can upgrade to a chosen tier in the
 **Settings** of your deployment.
@@ -169,18 +153,11 @@ features analyze and visualize the data available under the following tiers:
 You can upgrade to a chosen tier in the
 **Settings** of your deployment.
 
-### Monitoring Integrations tiers
+### Monitoring Integrations
 
-[Monitoring Integrations][ref-monitoring-integrations] feature has the following tiers:
-
-| Tier | CCUs per hour | Exported data  | Dependent features |
-| ---- | :-----------: | -------------- | --- |
-| XS   | 1             | Up to 10 GB/mo | — |
-| S    | 2             | Up to 25 GB/mo | — |
-| M    | 4             | Up to 50 GB/mo | [Query History export][ref-query-history-export] |
-
-You can [upgrade][ref-monitoring-integrations-config] to a chosen tier in the
-**Settings** of your deployment.
+[Monitoring Integrations][ref-monitoring-integrations], including [Query History
+export][ref-query-history-export], are available as an add-on on the Enterprise
+plan. [Contact us][cube-contact-us] for pricing.
 
 ### Audit Log tiers
 
@@ -326,33 +303,29 @@ for the AI token consumption at the **Billing** page of their Cube Cloud account
 
 [cube-pricing]: https://cube.dev/pricing
 [link-contact-us]: https://cube.dev/contact
-[ref-cloud-deployment-dev-instance]: /docs/deployment/cloud/deployment-types#shared
-[ref-cloud-deployment-prod-cluster]: /docs/deployment/cloud/deployment-types#dedicated
-[ref-cloud-limits]: /docs/deployment/cloud/limits
-[ref-monitoring-integrations]: /docs/monitoring/integrations
-[ref-monitoring-integrations-config]: /admin/deployment/monitoring-integrations#configuration
+[ref-cloud-deployment-dev-instance]: /admin/deployment/deployment-types#shared
+[ref-cloud-deployment-prod-cluster]: /admin/deployment/deployment-types#dedicated
+[ref-cloud-limits]: /admin/deployment/limits
+[ref-monitoring-integrations]: /admin/monitoring/monitoring-integrations
 [ref-cloud-acl]: /admin/users-and-permissions/custom-roles
-[ref-cloud-deployment-prod-multicluster]: /docs/deployment/cloud/deployment-types#multi-cluster
-[ref-cloud-custom-domains]: /docs/deployment/cloud/custom-domains
-[ref-cloud-vpc-peering]: /docs/deployment/cloud/vpc
-[ref-sls]: /docs/integrations/semantic-layer-sync
-[ref-support]: /docs/deployment/cloud/support
-[ref-free-tier-support]: /docs/deployment/cloud/support#free
-[ref-starter-tier-support]: /docs/deployment/cloud/support#starter
-[ref-premium-tier-support]: /docs/deployment/cloud/support#premium
-[ref-enterprise-tier-support]: /docs/deployment/cloud/support#enterprise
+[ref-cloud-deployment-prod-multicluster]: /admin/deployment/deployment-types#multi-cluster
+[ref-cloud-custom-domains]: /admin/deployment/custom-domains
+[ref-cloud-vpc-peering]: /admin/deployment/dedicated
+[ref-support]: /admin/account-billing/support
+[ref-free-tier-support]: /admin/account-billing/support#free
+[ref-starter-tier-support]: /admin/account-billing/support#starter
+[ref-premium-tier-support]: /admin/account-billing/support#premium
+[ref-enterprise-tier-support]: /admin/account-billing/support#enterprise
 [ref-query-history]: /admin/monitoring/query-history
 [ref-performance-insights]: /admin/monitoring/performance
 [ref-audit-log]: /admin/monitoring/audit-log
-[ref-dedicated-infra]: /docs/deployment/cloud/infrastructure#dedicated-infrastructure
-[ref-sso]: /docs/workspace/sso
-[ref-production-cluster]: /docs/deployment/cloud/deployment-types#dedicated
-[ref-development-instance]: /docs/deployment/cloud/deployment-types#shared
+[ref-dedicated-infra]: /admin/deployment/infrastructure#dedicated-infrastructure
+[ref-sso]: /admin/sso
+[ref-production-cluster]: /admin/deployment/deployment-types#dedicated
+[ref-development-instance]: /admin/deployment/deployment-types#shared
 [ref-apis]: /reference
-[ref-mdx-api]: /reference/mdx-api
-[ref-dax-api]: /reference/dax-api
+[ref-mdx-api]: /reference/core-data-apis/mdx-api
 [ref-cube-store-architecture]: /docs/pre-aggregations/running-in-production#architecture
 [ref-data-at-rest-encryption]: /docs/pre-aggregations/running-in-production#data-at-rest-encryption
 [ref-customer-managed-keys]: /admin/deployment/encryption-keys
-[ref-semantic-catalog]: /docs/workspace/semantic-catalog
-[ref-query-history-export]: /admin/deployment/monitoring-integrations#query-history-export
+[ref-query-history-export]: /admin/monitoring/monitoring-integrations#query-history-export

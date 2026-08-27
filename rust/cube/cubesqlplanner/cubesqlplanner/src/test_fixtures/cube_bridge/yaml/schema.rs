@@ -4,6 +4,7 @@ use crate::test_fixtures::cube_bridge::yaml::{
 };
 use crate::test_fixtures::cube_bridge::{
     MockCubeDefinition, MockJoinItemDefinition, MockSchema, MockSchemaBuilder,
+    MockViewFilterDefinition,
 };
 use cubenativeutils::CubeError;
 use serde::Deserialize;
@@ -77,6 +78,18 @@ struct YamlPreAggregationEntry {
 struct YamlView {
     name: String,
     cubes: Vec<YamlViewCube>,
+    #[serde(default)]
+    default_filters: Vec<YamlViewDefaultFilter>,
+}
+
+#[derive(Debug, Deserialize)]
+struct YamlViewDefaultFilter {
+    member: String,
+    operator: String,
+    #[serde(default)]
+    values: Option<Vec<Option<String>>>,
+    #[serde(default)]
+    unless: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -172,6 +185,16 @@ impl YamlSchema {
                     view_builder.include_cube_with_prefix(view_cube.join_path, includes, prefix);
             }
 
+            for filter in view.default_filters {
+                let mock_filter = MockViewFilterDefinition::builder()
+                    .operator(filter.operator)
+                    .member_reference(filter.member)
+                    .values_references(filter.values)
+                    .unless_references(filter.unless)
+                    .build();
+                view_builder = view_builder.add_default_filter(mock_filter);
+            }
+
             builder = view_builder.finish_view();
         }
 
@@ -187,9 +210,8 @@ mod tests {
     use crate::cube_bridge::measure_definition::MeasureDefinition;
     use crate::cube_bridge::member_sql::SqlTemplate;
     use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
-    use crate::test_fixtures::cube_bridge::{MockBaseTools, MockSecurityContext};
+    use crate::test_fixtures::cube_bridge::mock_compiled;
     use indoc::indoc;
-    use std::rc::Rc;
 
     #[test]
     fn test_parse_basic_cube() {
@@ -527,18 +549,9 @@ mod tests {
         assert_eq!(dim_refs.args_names(), &vec!["orders"]);
         assert_eq!(time_dim_ref.args_names(), &vec!["orders"]);
 
-        let base_tools = Rc::new(MockBaseTools::default());
-        let sec_ctx = Rc::new(MockSecurityContext);
-
-        let (measure_template, measure_args) = measure_refs
-            .compile_template_sql(base_tools.clone(), sec_ctx.clone())
-            .unwrap();
-        let (dim_template, dim_args) = dim_refs
-            .compile_template_sql(base_tools.clone(), sec_ctx.clone())
-            .unwrap();
-        let (time_template, time_args) = time_dim_ref
-            .compile_template_sql(base_tools.clone(), sec_ctx.clone())
-            .unwrap();
+        let (measure_template, measure_args) = mock_compiled(measure_refs);
+        let (dim_template, dim_args) = mock_compiled(dim_refs);
+        let (time_template, time_args) = mock_compiled(time_dim_ref);
 
         match measure_template {
             SqlTemplate::StringVec(vec) => {
@@ -628,12 +641,7 @@ mod tests {
         assert_eq!(dim_refs.args_names(), &vec!["orders", "line_items"]);
         assert_eq!(time_dim_ref.args_names(), &vec!["orders"]);
 
-        let base_tools = Rc::new(MockBaseTools::default());
-        let sec_ctx = Rc::new(MockSecurityContext);
-
-        let (dim_template, dim_args) = dim_refs
-            .compile_template_sql(base_tools.clone(), sec_ctx.clone())
-            .unwrap();
+        let (dim_template, dim_args) = mock_compiled(dim_refs);
 
         match dim_template {
             SqlTemplate::StringVec(vec) => {

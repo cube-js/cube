@@ -49,6 +49,19 @@ HAVING status = 'shipped'
 LIMIT 1 OFFSET 1;
 ```
 
+`SELECT DISTINCT ON (expression [, ...])` is also supported, with the same
+semantics as PostgreSQL: for each set of rows with matching values in the
+given expressions, only the first row is kept, using the order specified by
+`ORDER BY` (which must start with the `DISTINCT ON` expressions).
+
+Example:
+
+```sql
+SELECT DISTINCT ON (status) status, city
+FROM orders
+ORDER BY status, id DESC;
+```
+
 ### `EXPLAIN`
 
 Synopsis:
@@ -163,6 +176,90 @@ The `SET` command changes a session variable to a new value.
 
 Use `SET` with the `cube_cache` session variable for [cache control][ref-sql-cache-control].
 
+You can also set the session time zone with `SET TIME ZONE` (or `SET TIMEZONE`):
+
+```sql
+SET TIME ZONE 'Europe/Rome';
+SET TIME ZONE 'UTC';
+```
+
+Use `DEFAULT` to reset the time zone to its default. The `LOCAL` form
+(`SET TIME ZONE LOCAL`) is not supported.
+
+### `CREATE TEMPORARY TABLE`
+
+Synopsis:
+
+```sql
+CREATE TEMPORARY TABLE table_name AS query
+CREATE TEMPORARY TABLE table_name ( column_name data_type [, ...] )
+```
+
+Creates a table that lives for the duration of the session, either filled by a
+query or empty, to be filled by [`COPY`](#copy). Temporary tables can be joined
+with cubes, and are dropped with `DROP TABLE`.
+
+Column types are limited to those `COPY` can load:
+
+- `boolean`
+- `smallint`, `integer`, `bigint`
+- `real`, `double precision`, `numeric` (up to a precision of 38)
+- `varchar`, `text`, and the other variable-width character types (`character
+  varying`, `nvarchar`, `string`), as well as `uuid`, `json` and `jsonb`, all of
+  which are stored as text
+- `date`, `timestamp` (and `datetime`) without a time zone
+
+A `numeric` without a precision holds `numeric(38, 10)`, so values are rounded to
+ten decimal places. Give the precision and scale to keep more of them.
+
+Fixed-width `character`/`char` columns are not accepted: PostgreSQL pads their
+values to the declared width and ignores trailing blanks when comparing them, which
+a text column does not do. Use `varchar` or `text` instead.
+
+The amount of data held is capped per session and per server, by the
+`CUBESQL_TEMP_TABLE_SESSION_MEM` (10 MiB) and `CUBESQL_TEMP_TABLE_TOTAL_MEM`
+(100 MiB) environment variables.
+
+### `COPY`
+
+Synopsis:
+
+```sql
+COPY table_name [ ( column_name [, ...] ) ]
+FROM STDIN
+[ [ WITH ] ( option [, ...] ) ]
+```
+
+Loads data sent by the client into a [temporary
+table](#create-temporary-table). Only `FROM STDIN` is supported: cubes are a
+read-only data source, so a temporary table is the only place data can go, and
+a file or a program target would read on the Cube host rather than on the
+machine running the client.
+
+Columns not listed in the statement are left `NULL`. Repeating the command
+appends more rows to the table.
+
+Supported options: `FORMAT` (`text` or `csv`), `DELIMITER`, `NULL`, `HEADER`,
+`QUOTE`, `ESCAPE`, `FORCE_NOT_NULL`, `FORCE_NULL`, and `ENCODING` (`UTF8`
+only). They behave as [in PostgreSQL][link-postgres-copy], including their
+defaults. The pre-9.0 syntax (e.g. `CSV HEADER`) is supported as well; the
+`BINARY` format is not.
+
+Example, using the `\copy` command of `psql` to load a CSV file:
+
+```sql
+CREATE TEMPORARY TABLE targets (city text, target numeric(10, 2));
+CREATE TABLE
+
+\copy targets FROM 'targets.csv' WITH (FORMAT csv, HEADER)
+COPY 42
+
+SELECT city, SUM(count), MAX(target)
+FROM orders CROSS JOIN targets
+WHERE orders.city = targets.city
+GROUP BY 1;
+```
+
 ## SQL functions and operators
 
 SQL API currently implements a subset of functions and operators [supported by
@@ -231,6 +328,16 @@ of the PostgreSQL documentation.
 | `SIGN` | Sign of the argument (`-1`, `0`, or `+1`) | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `SQRT` | Square root | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `TRUNC` | Truncates to integer (towards zero) | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>❌ Inner (projections)</nobr> |
+| `WIDTH_BUCKET` | Assigns a value to a bucket in an equal-width histogram | ✅ Yes | ❌ No |
+
+<Note>
+
+`WIDTH_BUCKET` pushdown is only available on data sources whose SQL dialect
+supports it. It is not supported with Apache Pinot, BigQuery, CrateDB, Cube Store,
+Dremio, Druid, DuckDB, Firebolt, Hive, ksqlDB, Microsoft SQL Server, MySQL,
+QuestDB, or SQLite.
+
+</Note>
 
 ### Trigonometric functions
 
@@ -340,11 +447,31 @@ of the PostgreSQL documentation.
 | Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
 | --- | --- | --- | --- |
 | `DATE_ADD` | Add an interval to a timestamp with time zone | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
-| `DATE_TRUNC` | Truncate a timestamp to specified precision | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `DATE_TRUNC` | Truncate a timestamp to specified precision. Only [default granularities][ref-default-granularities] are supported, see below | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `DATEDIFF` | From [Redshift](https://docs.aws.amazon.com/redshift/latest/dg/r_DATEDIFF_function.html). Returns the difference between the date parts of two date or time expressions | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `EXTRACT` | Retrieves subfields such as year or hour from date/time values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `LOCALTIMESTAMP` | Returns the current date and time **without** time zone | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `NOW` | Returns the current date and time **with** time zone | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+
+<Warning>
+
+`DATE_TRUNC` only accepts the default granularities: `year`, `quarter`, `month`,
+`week`, `day`, `hour`, `minute`, `second`. [Custom
+granularities][ref-granularities] can't be addressed by name via the SQL API,
+even though they are exposed in the [metadata][ref-meta-api] and can be queried
+via the [REST API][ref-rest-api]. (The [GraphQL API][ref-graphql-api] can't
+address them by name either — its schema only exposes fields for the default
+granularities.) Using a custom granularity name results in an error:
+
+```
+Execution error: Unsupported date_trunc granularity: fiscal_quarter
+```
+
+To query a custom granularity via the SQL API, define a [proxy
+dimension][ref-proxy-granularity] that references it. It is exposed as a regular
+time dimension and can be selected directly.
+
+</Warning>
 
 ### Conditional expressions
 
@@ -383,12 +510,22 @@ of the PostgreSQL documentation.
 | `MIN` | Computes the minimum of the non-`NULL` input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `SUM` | Computes the sum of the non-`NULL` input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `MEASURE` | Works with measures of [any type][ref-sql-api-aggregate-functions] | ✅ Yes | <nobr>❌ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `STRING_AGG` | Concatenates the input values into a string, separated by a delimiter (supports `DISTINCT`) | ✅ Yes | ❌ No |
+| `PERCENTILE_CONT` | Computes a continuous percentile, used with `WITHIN GROUP (ORDER BY ...)` | ✅ Yes | ❌ No |
 
 In projections in inner parts of post-processing queries:
 * `AVG`, `COUNT`, `MAX`, `MIN`, and `SUM` can only be used with measures of
 [compatible types][ref-sql-api-aggregate-functions].
 * If `COUNT(*)` is specified, Cube will query the **first** measure of type `count`
 of the relevant cube.
+
+<Note>
+
+`PERCENTILE_CONT` pushdown is only available on data sources whose SQL dialect
+supports it. It is not supported with BigQuery, ClickHouse, Microsoft SQL Server,
+MySQL, or Presto.
+
+</Note>
 
 ### Aggregate functions for statistics
 
@@ -408,6 +545,29 @@ of the PostgreSQL documentation.
 | `STDDEV_SAMP` | Computes the sample standard deviation of the input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `VAR_POP` | Computes the population variance of the input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `VAR_SAMP` | Computes the sample variance of the input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+
+### Window functions
+
+<Info>
+
+Learn more in the
+[relevant section](https://www.postgresql.org/docs/current/tutorial-window.html)
+of the PostgreSQL documentation.
+
+</Info>
+
+Window functions are supported via [query pushdown][ref-qpd] only; they are not
+available in [query post-processing][ref-qpp]. Two kinds are supported:
+
+- **Aggregate functions used as window functions** — any supported aggregate
+  function (such as `SUM`, `AVG`, `COUNT`, `MIN`, or `MAX`) combined with an
+  `OVER (...)` clause.
+- **The `LAG` and `LEAD` window functions:**
+
+| Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
+| --- | --- | --- | --- |
+| `LAG` | Returns the value from a row at a given offset before the current row within its partition | ✅ Yes | ❌ No |
+| `LEAD` | Returns the value from a row at a given offset after the current row within its partition | ✅ Yes | ❌ No |
 
 ### Row and array comparisons
 
@@ -437,12 +597,19 @@ See the [XIRR recipe](/recipes/data-modeling/xirr) for more details.
 </Note>
 
 
-[ref-qpd]: /reference/sql-api/query-format#query-pushdown
-[ref-qpp]: /reference/sql-api/query-format#query-post-processing
-[ref-sql-api]: /reference/sql-api
-[ref-sql-api-aggregate-functions]: /reference/sql-api/query-format#aggregate-functions
+[ref-qpd]: /reference/core-data-apis/sql-api/query-format#query-pushdown
+[ref-qpp]: /reference/core-data-apis/sql-api/query-format#query-post-processing
+[ref-sql-api]: /reference/core-data-apis/sql-api
+[ref-sql-api-aggregate-functions]: /reference/core-data-apis/sql-api/query-format#aggregate-functions
+[ref-granularities]: /reference/data-modeling/dimensions#granularities
+[ref-default-granularities]: /docs/data-modeling/dimensions#time-dimensions
+[ref-proxy-granularity]: /docs/data-modeling/dimensions#time-dimension-granularity-references
+[ref-meta-api]: /reference/core-data-apis/rest-api/reference#metadata-api
+[ref-rest-api]: /reference/core-data-apis/rest-api
+[ref-graphql-api]: /reference/core-data-apis/graphql-api
 [link-postgres-funcs]: https://www.postgresql.org/docs/current/functions.html
+[link-postgres-copy]: https://www.postgresql.org/docs/current/sql-copy.html
 [link-github-sql-api]: https://github.com/cube-js/cube/issues?q=is%3Aopen+is%3Aissue+label%3Aapi%3Asql
 [link-github-new-sql-api-issue]: https://github.com/cube-js/cube/issues/new?assignees=&labels=&projects=&template=sql_api_query_issue.md&title=
 [link-xirr]: https://support.microsoft.com/en-us/office/xirr-function-de1242ec-6477-445b-b11b-a303ad9adc9d
-[ref-sql-cache-control]: /reference/sql-api#cache-control
+[ref-sql-cache-control]: /reference/core-data-apis/sql-api#cache-control

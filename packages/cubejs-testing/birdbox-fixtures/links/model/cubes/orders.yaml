@@ -1,0 +1,34 @@
+cubes:
+  - name: orders
+    sql: >
+      SELECT 1 as id, 1 as user_id, 'completed' as status
+      UNION ALL
+      SELECT 2, 2, 'pending'
+
+    joins:
+      - name: users
+        sql: "{CUBE}.user_id = {users.id}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: status
+        sql: status
+        type: string
+        links:
+          - name: user_link
+            label: View user
+            dashboard: user_detail
+            params:
+              - key: user_name
+                value: "{users.full_name}"
+              - key: user_city
+                value: "{users.city}"
+
+    measures:
+      - name: count
+        type: count

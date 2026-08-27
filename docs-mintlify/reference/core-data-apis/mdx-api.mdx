@@ -217,16 +217,19 @@ This is going to be harmonized in the future.
 
 ## Authentication and authorization
 
-Authentication and authorization work the same as for the [SQL API](/reference/sql-api/security).
+The MDX API supports Kerberos and NTLM authentication, as well as user name and
+password authentication. Configuration is done on the **Settings → Power BI** page of
+your deployment, which manages the XMLA service account, SPN, and keytab setup.
 
 [ref-excel]: /admin/connect-to-data/visualization-tools/excel
+[ref-time-dimensions]: /docs/data-modeling/dimensions#time-dimensions
 [link-mdx]: https://learn.microsoft.com/en-us/analysis-services/multidimensional-models/mdx/multidimensional-model-data-access-analysis-services-multidimensional-data?view=asallproducts-allversions#bkmk_querylang
 [link-pivottable]: https://support.microsoft.com/en-us/office/create-a-pivottable-to-analyze-worksheet-data-a9a84538-bfe9-40a9-a8e9-f99134456576
 [ref-cube-cloud-for-excel]: /docs/integrations/microsoft-excel
 [ref-hierarchies]: /reference/data-modeling/hierarchies
 [ref-folders]: /reference/data-modeling/view#folders
 [ref-views]: /docs/data-modeling/views
-[ref-deployment]: /docs/deployment/cloud/deployments
+[ref-deployment]: /admin/deployment
 [ref-pre-aggregations]: /docs/pre-aggregations/using-pre-aggregations
 [ref-rollup-only-mode]: /docs/pre-aggregations/using-pre-aggregations#rollup-only-mode
 [ref-measure-format]: /reference/data-modeling/measures#format

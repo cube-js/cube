@@ -10,6 +10,10 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Substitutes a measure with the matching pre-aggregation column
+/// reference (rolled up via the measure's `pre_aggregate_wrap`),
+/// or falls through to `input` when the measure has no
+/// pre-aggregation entry.
 pub struct FinalPreAggregationMeasureSqlNode {
     input: Rc<dyn SqlNode>,
     references: RenderReferences,
@@ -50,13 +54,23 @@ impl SqlNode for FinalPreAggregationMeasureSqlNode {
                                 templates.quote_identifier(&column_name.name())?
                             );
                             match ev.kind().pre_aggregate_wrap() {
+                                // The rollup column holds an HLL state, so it
+                                // must be merged, not recomputed. Keep the
+                                // merged state when this query itself feeds a
+                                // further aggregation; otherwise take its
+                                // cardinality.
+                                AggregateWrap::CountDistinctApproxState => {
+                                    templates.hll_merge(pre_aggregation_measure)?
+                                }
                                 AggregateWrap::CountDistinctApprox => {
-                                    templates.count_distinct_approx(pre_aggregation_measure)?
+                                    templates.hll_cardinality_merge(pre_aggregation_measure)?
                                 }
                                 AggregateWrap::Function(name) => {
                                     format!("{}({})", name, pre_aggregation_measure)
                                 }
-                                _ => format!("sum({})", pre_aggregation_measure),
+                                AggregateWrap::PassThrough | AggregateWrap::CountDistinct => {
+                                    format!("sum({})", pre_aggregation_measure)
+                                }
                             }
                         }
                         RenderReferencesType::LiteralValue(value) => {

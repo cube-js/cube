@@ -14,6 +14,33 @@ fn create_diamond_context() -> TestContext {
 
 const SEED: &str = "integration_joins_tables.sql";
 
+// A multiplied `count` nested inside a calculated measure from another
+// cube must still render as a distinct count. Here `customers` rows are
+// multiplied by the join to `orders`, so the nested `customers.count`
+// inside `orders.customers_count_x2` (= {customers.count} * 2) must use a
+// distinct count — `customers_count_x2` must equal twice `customers.count`
+// for every row.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_count_inside_calculated_measure() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - customers.count
+          - orders.customers_count_x2
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_join_many_to_one() {
     let ctx = create_context();

@@ -30,7 +30,7 @@ impl<C: Context<'static>> Clone for NeonFunction<C> {
 impl<C: Context<'static> + 'static> NativeType<NeonInnerTypes<C>> for NeonFunction<C> {
     fn into_object(self) -> NeonObject<C> {
         let root_holder = RootHolder::from_typed(self.object);
-        NeonObject::form_root(root_holder)
+        NeonObject::from_root(root_holder)
     }
 }
 

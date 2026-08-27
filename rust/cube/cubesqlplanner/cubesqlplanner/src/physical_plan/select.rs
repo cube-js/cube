@@ -55,6 +55,14 @@ impl Select {
         self.schema.clone()
     }
 
+    /// Copy of this select with the given CTE list attached.
+    pub fn with_ctes(&self, ctes: Vec<Rc<Cte>>) -> Self {
+        Self {
+            ctes,
+            ..self.clone()
+        }
+    }
+
     pub fn to_sql(&self, templates: &PlanSqlTemplates) -> Result<String, CubeError> {
         let projection = if !self.projection_columns.is_empty() {
             self.projection_columns
@@ -107,6 +115,10 @@ impl Select {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        // Dialects like MySQL require `WITH RECURSIVE` when any CTE is a
+        // self-referencing recursive CTE (e.g. a generated time series).
+        let recursive = self.ctes.iter().any(|cte| cte.is_recursive());
+
         let order_by = self
             .order_by
             .iter()
@@ -133,6 +145,7 @@ impl Select {
             self.limit,
             self.offset,
             self.is_distinct,
+            recursive,
         )?;
 
         /* let res = format!(

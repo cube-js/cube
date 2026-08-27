@@ -1,6 +1,7 @@
 use super::case_variant::CaseVariant;
 use super::geo_item::{GeoItem, NativeGeoItem};
 use super::member_sql::{MemberSql, NativeMemberSql};
+use super::multi_stage_filter::{MultiStageFilterReferences, NativeMultiStageFilterReferences};
 use crate::cube_bridge::timeshift_definition::{NativeTimeShiftDefinition, TimeShiftDefinition};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
@@ -48,6 +49,9 @@ pub trait DimensionDefinition {
 
     #[nbridge(field, vec, optional)]
     fn time_shift(&self) -> Result<Option<Vec<Rc<dyn TimeShiftDefinition>>>, CubeError>;
+
+    #[nbridge(field, optional)]
+    fn filter(&self) -> Result<Option<Rc<dyn MultiStageFilterReferences>>, CubeError>;
 
     #[nbridge(field, optional)]
     fn mask_sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;

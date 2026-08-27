@@ -8,6 +8,7 @@ import {
   DriverCapabilities,
   DriverInterface,
   isDownloadTableCSVData,
+  QueuePriority,
   SaveCancelFn,
   StreamOptions,
   UnloadOptions
@@ -297,7 +298,7 @@ export class PreAggregationLoader {
         // We don't want to wait for the jobed build query result. So we run the
         // executeInQueue method and immediately return the LoadPreAggregationResult object.
         this
-          .executeInQueue(invalidationKeys, this.priority(10), newVersionEntry)
+          .executeInQueue(invalidationKeys, this.priority(QueuePriority.Interactive), newVersionEntry)
           .catch((e: any) => {
             this.logger('Pre-aggregations build job error', {
               preAggregation: this.preAggregation,
@@ -315,7 +316,7 @@ export class PreAggregationLoader {
           buildRangeEnd: this.preAggregation.buildRangeEnd,
         };
       } else {
-        await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
+        await this.executeInQueue(invalidationKeys, this.priority(QueuePriority.Interactive), newVersionEntry);
         return mostRecentResult();
       }
     }
@@ -328,7 +329,7 @@ export class PreAggregationLoader {
           queryKey: this.preAggregationQueryKey(invalidationKeys),
           newVersionEntry
         });
-        await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
+        await this.executeInQueue(invalidationKeys, this.priority(QueuePriority.Interactive), newVersionEntry);
         return mostRecentResult();
       } else if (versionEntry.content_version !== newVersionEntry.content_version) {
         if (this.waitForRenew) {
@@ -338,7 +339,7 @@ export class PreAggregationLoader {
             queryKey: this.preAggregationQueryKey(invalidationKeys),
             newVersionEntry
           });
-          await this.executeInQueue(invalidationKeys, this.priority(0), newVersionEntry);
+          await this.executeInQueue(invalidationKeys, this.priority(QueuePriority.Background), newVersionEntry);
           return mostRecentResult();
         } else {
           this.scheduleRefresh(invalidationKeys, newVersionEntry);
@@ -351,7 +352,7 @@ export class PreAggregationLoader {
         queryKey: this.preAggregationQueryKey(invalidationKeys),
         newVersionEntry
       });
-      await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
+      await this.executeInQueue(invalidationKeys, this.priority(QueuePriority.Interactive), newVersionEntry);
       return mostRecentResult();
     }
     const targetTableName = this.targetTableName(versionEntry);
@@ -387,14 +388,14 @@ export class PreAggregationLoader {
     return version(versionArray);
   }
 
-  protected priority(defaultValue: number): number {
+  protected priority(defaultValue: QueuePriority): QueuePriority {
     return this.preAggregation.priority != null ? this.preAggregation.priority : defaultValue;
   }
 
   protected getInvalidationKeyValues() {
     return Promise.all(
       (this.preAggregation.invalidateKeyQueries || []).map(
-        (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(10))
+        (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(QueuePriority.Interactive))
       )
     );
   }
@@ -403,7 +404,7 @@ export class PreAggregationLoader {
     if (this.preAggregation.partitionInvalidateKeyQueries) {
       return Promise.all(
         (this.preAggregation.partitionInvalidateKeyQueries || []).map(
-          (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(10))
+          (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(QueuePriority.Interactive))
         )
       );
     } else {
@@ -418,7 +419,7 @@ export class PreAggregationLoader {
       queryKey: this.preAggregationQueryKey(invalidationKeys),
       newVersionEntry
     });
-    this.executeInQueue(invalidationKeys, this.priority(0), newVersionEntry)
+    this.executeInQueue(invalidationKeys, this.priority(QueuePriority.Background), newVersionEntry)
       .catch(e => {
         if (!(e instanceof ContinueWaitError)) {
           this.logger('Error refreshing pre-aggregation', {
@@ -428,7 +429,7 @@ export class PreAggregationLoader {
       });
   }
 
-  protected async executeInQueue(invalidationKeys: InvalidationKeys, priority: number, newVersionEntry: VersionEntry) {
+  protected async executeInQueue(invalidationKeys: InvalidationKeys, priority: QueuePriority, newVersionEntry: VersionEntry) {
     const queue = await this.preAggregations.getQueue(this.preAggregation.dataSource);
     return queue.executeInQueue(
       'query',
@@ -463,8 +464,12 @@ export class PreAggregationLoader {
   }
 
   public refresh(newVersionEntry: VersionEntry, invalidationKeys: InvalidationKeys, client) {
-    this.updateLastTouch(this.targetTableName(newVersionEntry));
+    const targetTableName = this.targetTableName(newVersionEntry);
+    this.updateLastTouch(targetTableName);
+
     let refreshStrategy = this.refreshStoreInSourceStrategy;
+    let dropTableUsedKey = true;
+
     if (this.preAggregation.external) {
       const readOnly =
         this.preAggregation.readOnly ||
@@ -473,17 +478,46 @@ export class PreAggregationLoader {
 
       if (readOnly) {
         refreshStrategy = this.refreshReadOnlyExternalStrategy;
+        dropTableUsedKey = false;
       } else {
         refreshStrategy = this.refreshWriteStrategy;
+        dropTableUsedKey = false;
       }
     }
+
     return cancelCombinator(
-      saveCancelFn => refreshStrategy.bind(this)(
-        client,
-        newVersionEntry,
-        saveCancelFn,
-        invalidationKeys
-      )
+      async saveCancelFn => {
+        try {
+          return await refreshStrategy.bind(this)(
+            client,
+            newVersionEntry,
+            saveCancelFn,
+            invalidationKeys
+          );
+        } catch (e) {
+          // It's required to remove touch keys, because they are unique per run/table, and it causes
+          // a large number of touch keys in the cache store
+          try {
+            await this.preAggregations.removeTableTouched(targetTableName);
+          } catch (ne: any) {
+            this.logger('Error on dropping pre-aggregation touch key after failed build', {
+              error: (ne.stack || ne), preAggregation: this.preAggregation, requestId: this.requestId,
+            });
+          }
+
+          if (dropTableUsedKey) {
+            try {
+              await this.preAggregations.removeTableUsed(targetTableName);
+            } catch (ne: any) {
+              this.logger('Error on dropping pre-aggregation table used key after failed build', {
+                error: (ne.stack || ne), preAggregation: this.preAggregation, requestId: this.requestId,
+              });
+            }
+          }
+
+          throw e;
+        }
+      }
     );
   }
 
@@ -511,14 +545,11 @@ export class PreAggregationLoader {
     saveCancelFn: SaveCancelFn,
     invalidationKeys: InvalidationKeys
   ) {
-    const [loadSql, params] =
-      Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
+    const [loadSql, params] = this.preAggregation.loadSql;
     const targetTableName = this.targetTableName(newVersionEntry);
-    const query = (
-      <string>QueryCache.replacePreAggregationTableNames(
-        loadSql,
-        this.preAggregationsTablesToTempTables,
-      )
+    const query = QueryCache.replacePreAggregationTableNamesInSql(
+      loadSql,
+      this.preAggregationsTablesToTempTables,
     ).replace(
       this.preAggregation.tableName,
       targetTableName
@@ -661,14 +692,11 @@ export class PreAggregationLoader {
     withTempTable: boolean
   ): Promise<QueryOptions> {
     if (withTempTable) {
-      const [loadSql, params] =
-        Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
+      const [loadSql, params] = this.preAggregation.loadSql;
 
-      const query = (
-        <string>QueryCache.replacePreAggregationTableNames(
-          loadSql,
-          this.preAggregationsTablesToTempTables,
-        )
+      const query = QueryCache.replacePreAggregationTableNamesInSql(
+        loadSql,
+        this.preAggregationsTablesToTempTables,
       ).replace(
         this.preAggregation.tableName,
         targetTableName
@@ -688,8 +716,7 @@ export class PreAggregationLoader {
 
       return queryOptions;
     } else {
-      const [sql, params] =
-        Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
+      const [sql, params] = this.preAggregation.sql;
       const queryOptions = this.queryOptions(invalidationKeys, sql, params, targetTableName, newVersionEntry);
       this.logExecutingSql(queryOptions);
       return queryOptions;
@@ -705,8 +732,7 @@ export class PreAggregationLoader {
     saveCancelFn: SaveCancelFn,
     invalidationKeys: InvalidationKeys
   ) {
-    const [sql, params] =
-      Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
+    const [sql, params] = this.preAggregation.sql;
 
     const queryOptions = this.queryOptions(invalidationKeys, sql, params, this.targetTableName(newVersionEntry), newVersionEntry);
     this.logExecutingSql(queryOptions);
@@ -862,8 +888,7 @@ export class PreAggregationLoader {
    * prepares download data when temp table = false
    */
   protected async getTableDataWithoutTempTable(client: DriverInterface, table: string, saveCancelFn: SaveCancelFn, queryOptions: QueryOptions, externalDriverCapabilities: DriverCapabilities) {
-    const [sql, params] =
-      Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
+    const [sql, params] = this.preAggregation.sql;
 
     let tableData: DownloadTableData;
 
@@ -957,7 +982,7 @@ export class PreAggregationLoader {
       };
       this.logger('Creating pre-aggregation index', queryOptions);
       const preAggTableToTempTableNames = this.preAggregationsTablesToTempTables as PreAggTableToTempTableNames[];
-      const resultingSql = QueryCache.replacePreAggregationTableNames(
+      const resultingSql = QueryCache.replacePreAggregationTableNamesInSql(
         query,
         preAggTableToTempTableNames.concat([
           [this.preAggregation.tableName, { targetTableName: this.targetTableName(newVersionEntry) }],

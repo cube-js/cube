@@ -1,8 +1,8 @@
 use super::{
     context::ContextHolder,
     object::{
-        base_types::*, neon_array::NeonArray, neon_function::NeonFunction, neon_struct::NeonStruct,
-        NeonObject,
+        base_types::*, neon_array::NeonArray, neon_function::NeonFunction,
+        neon_rust_box::NeonRustBox, neon_struct::NeonStruct, NeonObject,
     },
 };
 use crate::wrappers::inner_types::InnerTypes;
@@ -30,5 +30,6 @@ impl<C: Context<'static> + 'static> InnerTypes for NeonInnerTypes<C> {
     type Boolean = NeonBoolean<C>;
     type Function = NeonFunction<C>;
     type Number = NeonNumber<C>;
+    type RustBox = NeonRustBox<C>;
     type FunctionIT = NeonInnerTypes<FunctionContext<'static>>;
 }

@@ -44,7 +44,9 @@ environment variable to override it. You can also implement
 If you're using the [SQL API][ref-sql-api], you can enable
 [streaming mode][ref-sql-api-streaming] to bypass the maximum row limit for
 queries with an explicit `LIMIT` clause. Without an explicit `LIMIT`,
-`CUBEJS_DB_QUERY_DEFAULT_LIMIT` still applies even in streaming mode.
+`CUBEJS_DB_QUERY_DEFAULT_LIMIT` still applies even in streaming mode. SQL API
+queries that are not streamed can also be capped separately with
+[`CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`](/reference/configuration/environment-variables#cubesql_non_streaming_query_max_row_limit).
 
 ### Time zone
 
@@ -62,6 +64,10 @@ time zone conversion to dimensions that are not used as time dimensions in a que
 
 Additionally, note that time zones have impact on [pre-aggregation
 matching][ref-matching-preaggs-time-dimensions].
+
+In the Cube cloud platform, queries run from the interface, dashboards, and Analytics Chat
+can resolve a time zone per account, per user, or per dashboard — see
+[Time zones](/admin/time-zones).
 
 ## Query types
 
@@ -383,7 +389,7 @@ Additionally, note that ungrouped queries have additional requirements for
 
 You might encounter the following error when running an [ungrouped query](#ungrouped-query)
 that includes `HAVING COUNT(1) > 0` (or a similar expression) against a cube or a view that
-have no measure called `count`. [Tableau][ref-tableau] is knows to generate such queries.
+have no measure called `count`. Some BI tools are known to generate such queries.
 
 ```text
 Failed to deserialize: invalid type: unit value, expected struct JoinDefinitionStatic
@@ -395,26 +401,25 @@ called `count` to be defined in the cube or view. Please add one to resolve this
 
 [wiki-utc-time-zone]: https://en.wikipedia.org/wiki/Coordinated_Universal_Time
 [ref-data-model]: /docs/data-modeling/overview
-[ref-playground]: /docs/workspace/playground
+[ref-playground]: /docs/explore-analyze/playground
 [ref-apis]: /reference
-[ref-sql-api]: /reference/sql-api
-[ref-sql-api-qpp]: /reference/sql-api/query-format#query-post-processing
-[ref-sql-api-qpd]: /reference/sql-api/query-format#query-pushdown
-[ref-rest-api]: /reference/rest-api
-[ref-rest-api-load]: /reference/rest-api/reference#v1load
-[ref-graphql-api]: /reference/graphql-api
+[ref-sql-api]: /reference/core-data-apis/sql-api
+[ref-sql-api-qpp]: /reference/core-data-apis/sql-api/query-format#query-post-processing
+[ref-sql-api-qpd]: /reference/core-data-apis/sql-api/query-format#query-pushdown
+[ref-rest-api]: /reference/core-data-apis/rest-api
+[ref-rest-api-load]: /reference/core-data-apis/rest-api/reference#v1load
+[ref-graphql-api]: /reference/core-data-apis/graphql-api
 [ref-data-sources]: /admin/connect-to-data/data-sources
-[ref-rest-api-query-format-options]: /reference/rest-api/query-format#query-properties
-[ref-rest-api-query-format-options-tdf]: /reference/rest-api/query-format#time-dimensions-format
-[ref-ref-graphql-api-args]: /reference/graphql-api/reference#cubequeryargs
+[ref-rest-api-query-format-options]: /reference/core-data-apis/rest-api/query-format#query-properties
+[ref-rest-api-query-format-options-tdf]: /reference/core-data-apis/rest-api/query-format#time-dimensions-format
+[ref-ref-graphql-api-args]: /reference/core-data-apis/graphql-api/reference#cubequeryargs
 [ref-sql-utils]: /reference/data-modeling/context-variables#sql_utils
 [ref-matching-preaggs-time-dimensions]: /docs/pre-aggregations/matching-pre-aggregations#matching-time-dimensions
 [ref-matching-preaggs-ungrouped]: /docs/pre-aggregations/matching-pre-aggregations#matching-ungrouped-queries
-[ref-pagination-recipe]: /reference/recipes/pagination
+[ref-pagination-recipe]: /recipes/core-data-api/pagination
 [ref-primary-key]: /reference/data-modeling/dimensions#primary_key
 [ref-conf-allow-ungrouped]: /reference/configuration/config#allow_ungrouped_without_primary_key
 [ref-caching]: /docs/pre-aggregations
 [ref-query-rewrite]: /reference/configuration/config#query_rewrite
 [blog-compare-date-range]: https://cube.dev/blog/comparing-data-over-different-time-periods
-[ref-sql-api-streaming]: /reference/sql-api#streaming
-[ref-tableau]: /admin/connect-to-data/visualization-tools/tableau
+[ref-sql-api-streaming]: /reference/core-data-apis/sql-api#streaming

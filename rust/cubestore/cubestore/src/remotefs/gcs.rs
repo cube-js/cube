@@ -314,32 +314,26 @@ impl GCSRemoteFs {
     async fn list_with_metadata_and_map<T, F>(
         &self,
         remote_prefix: String,
-        f: F,
+        mut f: F,
     ) -> Result<Vec<T>, CubeError>
     where
         F: FnMut(Object) -> T + Copy,
     {
         let prefix = self.gcs_path(&remote_prefix);
         let list = Object::list_prefix(self.bucket.as_str(), prefix.as_str()).await?;
-        let result = list
-            .map(|objects| -> Result<Vec<T>, CubeError> {
-                Ok(objects?.into_iter().map(f).collect())
-            })
-            .collect::<Vec<_>>()
-            .await
-            .into_iter()
-            .flatten()
-            .flatten()
-            .collect::<Vec<_>>();
-        let mut pages_count = result.len() / 1_000;
-        if result.len() % 1_000 > 0 {
+        tokio::pin!(list);
+        let mut result = Vec::new();
+        let mut pages_count: i64 = 0;
+        while let Some(objects) = list.next().await {
+            let objects = objects?;
             pages_count += 1;
+            result.extend(objects.into_iter().map(&mut f));
         }
         if pages_count > 100 {
-            log::warn!("S3 list returned more than 100 pages: {}", pages_count);
+            log::warn!("GCS list returned more than 100 pages: {}", pages_count);
         }
         app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
-            pages_count as i64,
+            pages_count,
             Some(&vec![
                 "operation:list".to_string(),
                 "driver:gcs".to_string(),

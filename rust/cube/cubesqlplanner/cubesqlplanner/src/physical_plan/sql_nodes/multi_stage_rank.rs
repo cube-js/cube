@@ -1,32 +1,27 @@
+use super::window_partition::render_partition_by;
 use super::SqlNode;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::symbols::MeasureKind;
-use crate::planner::MemberSymbol;
+use crate::planner::{MeasureRenderModifier, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Renders a `Rank` measure carrying the `MultiStageRank` render
+/// modifier as a SQL window function partitioned by the modifier's
+/// members. Everything else goes through `else_processor`.
 pub struct MultiStageRankNode {
     else_processor: Rc<dyn SqlNode>,
-    partition: Vec<String>,
 }
 
 impl MultiStageRankNode {
-    pub fn new(else_processor: Rc<dyn SqlNode>, partition: Vec<String>) -> Rc<Self> {
-        Rc::new(Self {
-            else_processor,
-            partition,
-        })
+    pub fn new(else_processor: Rc<dyn SqlNode>) -> Rc<Self> {
+        Rc::new(Self { else_processor })
     }
 
     pub fn else_processor(&self) -> &Rc<dyn SqlNode> {
         &self.else_processor
-    }
-
-    pub fn partition(&self) -> &Vec<String> {
-        &self.partition
     }
 }
 
@@ -41,7 +36,10 @@ impl SqlNode for MultiStageRankNode {
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Measure(m) => {
-                if m.is_multi_stage() && matches!(m.kind(), MeasureKind::Rank) {
+                if let Some(modifier @ MeasureRenderModifier::MultiStageRank { partition }) =
+                    m.render_modifier()
+                {
+                    modifier.ensure_applies_to(m)?;
                     let inner_visitor = visitor.with_arg_needs_paren_safe(false);
                     let order_by = if !m.measure_order_by().is_empty() {
                         let sql = m
@@ -62,11 +60,12 @@ impl SqlNode for MultiStageRankNode {
                     } else {
                         "".to_string()
                     };
-                    let partition_by = if self.partition.is_empty() {
-                        "".to_string()
-                    } else {
-                        format!("PARTITION BY {} ", self.partition.join(", "))
-                    };
+                    let partition_by = render_partition_by(
+                        partition,
+                        &inner_visitor,
+                        node_processor.clone(),
+                        templates,
+                    )?;
                     format!("rank() OVER ({partition_by}{order_by})")
                 } else {
                     self.else_processor.to_sql(

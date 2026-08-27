@@ -27,6 +27,9 @@ indexmap = "2.12"
 
 [features]
 integration-postgres = []
+# Runs queries over external pre-aggregations against a locally built
+# cubestored binary (CUBESTORED_BIN_PATH or rust/cubestore/target/*).
+integration-cubestore = ["integration-postgres"]
 
 [dev-dependencies]
 petgraph = "0.6"
@@ -35,6 +38,7 @@ insta = "1.34"
 testcontainers = "0.23"
 testcontainers-modules = { version = "0.11", features = ["postgres"] }
 tokio-postgres = "0.7"
+mysql_async = { version = "0.34", default-features = false, features = ["minimal"] }
 
 [dependencies.neon]
 version = "=1"

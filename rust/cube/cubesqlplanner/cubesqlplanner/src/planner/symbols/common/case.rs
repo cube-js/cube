@@ -1,13 +1,15 @@
+use super::super::deps::{symbol_deps, DepVisitor, DepVisitorMut, SymbolDeps};
 use crate::planner::filter::FilterItem;
 use crate::{
     cube_bridge::{
         case_switch_definition::CaseSwitchDefinition as NativeCaseSwitchDefinition,
         case_variant::CaseVariant, string_or_sql::StringOrSql,
     },
-    planner::{find_value_restriction, Compiler, CubeRef, MemberSymbol, SqlCall},
+    planner::{symbols::transforms::find_value_restriction, Compiler, MemberSymbol, SqlCall},
 };
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::ops::ControlFlow;
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -16,10 +18,33 @@ pub enum CaseLabel {
     Sql(Rc<SqlCall>),
 }
 
+impl SymbolDeps for CaseLabel {
+    fn visit_deps(&self, visitor: &mut dyn DepVisitor) -> ControlFlow<()> {
+        match self {
+            Self::String(_) => ControlFlow::Continue(()),
+            Self::Sql(sql) => sql.visit_deps(visitor),
+        }
+    }
+
+    fn visit_deps_mut(&mut self, visitor: &mut dyn DepVisitorMut) -> Result<(), CubeError> {
+        match self {
+            Self::String(_) => Ok(()),
+            Self::Sql(sql) => sql.visit_deps_mut(visitor),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct CaseWhenItem {
     pub sql: Rc<SqlCall>,
     pub label: CaseLabel,
+}
+
+symbol_deps! {
+    CaseWhenItem {
+        sql: dep,
+        label: dep,
+    }
 }
 
 #[derive(Clone)]
@@ -28,56 +53,14 @@ pub struct CaseDefinition {
     pub else_label: CaseLabel,
 }
 
+symbol_deps! {
+    CaseDefinition {
+        items: dep,
+        else_label: dep,
+    }
+}
+
 impl CaseDefinition {
-    fn extract_cube_refs(&self, result: &mut Vec<CubeRef>) {
-        for itm in self.items.iter() {
-            itm.sql.extract_cube_refs(result);
-            if let CaseLabel::Sql(sql) = &itm.label {
-                sql.extract_cube_refs(result);
-            }
-        }
-        if let CaseLabel::Sql(sql) = &self.else_label {
-            sql.extract_cube_refs(result);
-        }
-    }
-
-    fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
-        for itm in self.items.iter() {
-            itm.sql.extract_symbol_deps(result);
-            if let CaseLabel::Sql(sql) = &itm.label {
-                sql.extract_symbol_deps(result);
-            }
-        }
-        if let CaseLabel::Sql(sql) = &self.else_label {
-            sql.extract_symbol_deps(result);
-        }
-    }
-    fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Self, CubeError> {
-        let items = self
-            .items
-            .iter()
-            .map(|itm| -> Result<_, CubeError> {
-                let label = match &itm.label {
-                    CaseLabel::String(_) => itm.label.clone(),
-                    CaseLabel::Sql(sql_call) => CaseLabel::Sql(sql_call.apply_recursive(f)?),
-                };
-                Ok(CaseWhenItem {
-                    sql: itm.sql.apply_recursive(f)?,
-                    label,
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let else_label = match &self.else_label {
-            CaseLabel::String(_) => self.else_label.clone(),
-            CaseLabel::Sql(sql_call) => CaseLabel::Sql(sql_call.apply_recursive(f)?),
-        };
-        let res = CaseDefinition { items, else_label };
-        Ok(res)
-    }
-
     fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
         Box::new(self.items.iter().map(|item| &item.sql))
     }
@@ -97,38 +80,36 @@ pub struct CaseSwitchWhenItem {
     pub sql: Rc<SqlCall>,
 }
 
+symbol_deps! {
+    CaseSwitchWhenItem {
+        value: skip,
+        sql: dep,
+    }
+}
+
 #[derive(Clone)]
 pub enum CaseSwitchItem {
     Sql(Rc<SqlCall>),
     Member(Rc<MemberSymbol>),
 }
 
+impl SymbolDeps for CaseSwitchItem {
+    fn visit_deps(&self, visitor: &mut dyn DepVisitor) -> ControlFlow<()> {
+        match self {
+            Self::Sql(sql_call) => sql_call.visit_deps(visitor),
+            Self::Member(member) => visitor.symbol(member),
+        }
+    }
+
+    fn visit_deps_mut(&mut self, visitor: &mut dyn DepVisitorMut) -> Result<(), CubeError> {
+        match self {
+            Self::Sql(sql_call) => sql_call.visit_deps_mut(visitor),
+            Self::Member(member) => visitor.symbol(member),
+        }
+    }
+}
+
 impl CaseSwitchItem {
-    fn extract_cube_refs(&self, result: &mut Vec<CubeRef>) {
-        match self {
-            CaseSwitchItem::Sql(sql_call) => sql_call.extract_cube_refs(result),
-            CaseSwitchItem::Member(_) => {}
-        }
-    }
-
-    fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
-        match self {
-            CaseSwitchItem::Sql(sql_call) => sql_call.extract_symbol_deps(result),
-            CaseSwitchItem::Member(member_symbol) => result.push(member_symbol.clone()),
-        }
-    }
-
-    fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Self, CubeError> {
-        let res = match self {
-            CaseSwitchItem::Sql(sql_call) => CaseSwitchItem::Sql(sql_call.apply_recursive(f)?),
-            CaseSwitchItem::Member(member) => CaseSwitchItem::Member(member.apply_recursive(f)?),
-        };
-        Ok(res)
-    }
-
     fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
         match self {
             CaseSwitchItem::Sql(sql_call) => Box::new(std::iter::once(sql_call)),
@@ -144,17 +125,15 @@ pub struct CaseSwitchDefinition {
     pub else_sql: Option<Rc<SqlCall>>,
 }
 
-impl CaseSwitchDefinition {
-    fn extract_cube_refs(&self, result: &mut Vec<CubeRef>) {
-        self.switch.extract_cube_refs(result);
-        for itm in self.items.iter() {
-            itm.sql.extract_cube_refs(result);
-        }
-        if let Some(else_sql) = &self.else_sql {
-            else_sql.extract_cube_refs(result);
-        }
+symbol_deps! {
+    CaseSwitchDefinition {
+        switch: dep,
+        items: dep,
+        else_sql: dep,
     }
+}
 
+impl CaseSwitchDefinition {
     pub fn try_new(
         cube_name: &String,
         definition: Rc<dyn NativeCaseSwitchDefinition>,
@@ -219,15 +198,6 @@ impl CaseSwitchDefinition {
         owned
     }
 
-    fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
-        self.switch.extract_symbol_deps(result);
-        for itm in self.items.iter() {
-            itm.sql.extract_symbol_deps(result);
-        }
-        if let Some(else_sql) = &self.else_sql {
-            else_sql.extract_symbol_deps(result);
-        }
-    }
     fn get_switch_values(&self) -> Option<Vec<String>> {
         if let CaseSwitchItem::Member(member) = &self.switch {
             if let Ok(switch_dim) = member.as_dimension() {
@@ -293,35 +263,16 @@ impl CaseSwitchDefinition {
         }
         None
     }
-    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Self, CubeError> {
-        let switch = self.switch.apply_to_deps(f)?;
-        let items = self
-            .items
-            .iter()
-            .map(|itm| -> Result<_, CubeError> {
-                Ok(CaseSwitchWhenItem {
-                    sql: itm.sql.apply_recursive(f)?,
-                    value: itm.value.clone(),
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let else_sql = if let Some(else_sql) = &self.else_sql {
-            Some(else_sql.apply_recursive(f)?)
-        } else {
-            None
-        };
-        let res = CaseSwitchDefinition {
-            switch,
-            items,
-            else_sql,
-        };
-        Ok(res)
-    }
 }
 
+/// Body of a case-defined member, mapped from the `case` field of
+/// the data-model definition.
+///
+/// - `Case` — classic `CASE WHEN condition THEN label ELSE label END`.
+/// - `CaseSwitch` — switch-style `CASE switch WHEN value THEN sql
+///   ELSE sql END`. `switch` may resolve to a direct reference to
+///   another dimension (typically a `type: switch` dimension whose
+///   `values` drive the branches).
 #[derive(Clone)]
 pub enum Case {
     Case(CaseDefinition),
@@ -369,19 +320,6 @@ impl Case {
         Ok(res)
     }
 
-    pub fn extract_cube_refs(&self, result: &mut Vec<CubeRef>) {
-        match self {
-            Case::Case(def) => def.extract_cube_refs(result),
-            Case::CaseSwitch(def) => def.extract_cube_refs(result),
-        }
-    }
-
-    pub fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
-        match self {
-            Case::Case(def) => def.extract_symbol_deps(result),
-            Case::CaseSwitch(def) => def.extract_symbol_deps(result),
-        }
-    }
     pub fn case_switch_dimension(&self) -> Option<Rc<MemberSymbol>> {
         if let Case::CaseSwitch(case) = &self {
             if let CaseSwitchItem::Member(member) = &case.switch {
@@ -398,16 +336,6 @@ impl Case {
                 .apply_static_filter(filters)
                 .map(|r| Case::CaseSwitch(r)),
         }
-    }
-    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Self, CubeError> {
-        let res = match self {
-            Case::Case(case) => Case::Case(case.apply_to_deps(f)?),
-            Case::CaseSwitch(case) => Case::CaseSwitch(case.apply_to_deps(f)?),
-        };
-        Ok(res)
     }
     pub fn is_single_value(&self) -> bool {
         match self {
@@ -426,6 +354,22 @@ impl Case {
         match self {
             Case::Case(case) => case.is_owned_by_cube(),
             Case::CaseSwitch(case) => case.is_owned_by_cube(),
+        }
+    }
+}
+
+impl SymbolDeps for Case {
+    fn visit_deps(&self, visitor: &mut dyn DepVisitor) -> ControlFlow<()> {
+        match self {
+            Case::Case(def) => def.visit_deps(visitor),
+            Case::CaseSwitch(def) => def.visit_deps(visitor),
+        }
+    }
+
+    fn visit_deps_mut(&mut self, visitor: &mut dyn DepVisitorMut) -> Result<(), CubeError> {
+        match self {
+            Case::Case(def) => def.visit_deps_mut(visitor),
+            Case::CaseSwitch(def) => def.visit_deps_mut(visitor),
         }
     }
 }

@@ -4,7 +4,6 @@ import {
   QueryKey,
   QueryKeyHash,
   QueueId,
-  ProcessingId,
   QueryDef,
   AddToQueueQuery,
   AddToQueueOptions,
@@ -12,8 +11,9 @@ import {
   QueryKeysTuple,
   GetActiveAndToProcessResponse,
   QueryStageStateResponse,
-  RetrieveForProcessingResponse,
-  QueueDriverOptions
+  RetrieveForProcessingSuccess,
+  QueueDriverOptions,
+  QueuePriority
 } from '@cubejs-backend/base-driver';
 import {
   LocalQueueDriver
@@ -41,10 +41,6 @@ export interface PromiseWithResolve<T = any> extends Promise<T> {
   resolved?: boolean;
 }
 
-export interface ProcessingCounter {
-  counter: number;
-}
-
 export class LocalQueueDriverConnectionState {
   public resultPromises: Record<QueryKeyHash, PromiseWithResolve> = {};
 
@@ -57,10 +53,6 @@ export class LocalQueueDriverConnectionState {
   public active: Record<QueryKeyHash, QueueItem> = {};
 
   public heartBeat: Record<QueryKeyHash, QueueItem> = {};
-
-  public processingCounter: ProcessingCounter = { counter: 1 };
-
-  public processingLocks: Record<QueryKeyHash, any> = {};
 }
 
 export class LocalQueueDriverConnection implements QueueDriverConnectionInterface {
@@ -72,6 +64,8 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
   private concurrency: number;
 
+  private orphanedTimeout: number;
+
   private driver: LocalQueueDriver;
 
   private state: LocalQueueDriverConnectionState;
@@ -81,6 +75,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     this.continueWaitTimeout = options.continueWaitTimeout;
     this.heartBeatTimeout = options.heartBeatTimeout;
     this.concurrency = options.concurrency;
+    this.orphanedTimeout = options.orphanedTimeout;
     this.driver = driver;
     this.state = state;
   }
@@ -161,7 +156,8 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     )(queueObj);
   }
 
-  public async addToQueue(keyScore: number, queryKey: QueryKey, orphanedTime: number, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse> {
+  public async addToQueue(queryKey: QueryKey, queryHandler: string, query: AddToQueueQuery, priority: QueuePriority, options: AddToQueueOptions): Promise<AddToQueueResponse> {
+    const time = new Date().getTime();
     const queryQueueObj: QueryDefObject = {
       queueId: options.queueId,
       queryHandler,
@@ -170,7 +166,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
       stageQueryKey: options.stageQueryKey,
       priority,
       requestId: options.requestId,
-      addedToQueueTime: new Date().getTime()
+      addedToQueueTime: time
     };
 
     const key = this.redisHash(queryKey);
@@ -183,7 +179,8 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
     if (!this.state.toProcess[key] && !this.state.active[key]) {
       this.state.toProcess[key] = {
-        order: keyScore,
+        // Highest priority first, oldest first within a priority
+        order: time + (10000 - priority) * 1E14,
         queueId: options.queueId,
         key
       };
@@ -192,7 +189,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     }
 
     this.state.recent[key] = {
-      order: orphanedTime,
+      order: time + ((options.orphanedTimeout ?? this.orphanedTimeout) * 1000),
       key,
       queueId: options.queueId,
     };
@@ -201,7 +198,9 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
       added,
       queryQueueObj.queueId,
       Object.keys(this.state.toProcess).length,
-      queryQueueObj.addedToQueueTime
+      queryQueueObj.addedToQueueTime,
+      // There is no round-trip to save in memory, the item is left for reconcile to pick up
+      null
     ];
   }
 
@@ -221,7 +220,6 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     delete this.state.toProcess[queryKeyHash];
     delete this.state.recent[queryKeyHash];
     delete this.state.queryDef[queryKeyHash];
-    delete this.state.processingLocks[queryKeyHash];
 
     return [query];
   }
@@ -231,8 +229,8 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     return query;
   }
 
-  public async setResultAndRemoveQuery(queryKeyHash: QueryKeyHash, executionResult: any, processingId: ProcessingId, _queueId?: QueueId | null): Promise<boolean> {
-    if (this.state.processingLocks[queryKeyHash] !== processingId) {
+  public async setResultAndRemoveQuery(queryKeyHash: QueryKeyHash, executionResult: any, queueId: QueueId): Promise<boolean> {
+    if (this.state.active[queryKeyHash]?.queueId !== queueId) {
       return false;
     }
 
@@ -243,7 +241,6 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     delete this.state.toProcess[queryKeyHash];
     delete this.state.recent[queryKeyHash];
     delete this.state.queryDef[queryKeyHash];
-    delete this.state.processingLocks[queryKeyHash];
 
     promise.resolved = true;
     if (promise.resolve) {
@@ -251,11 +248,6 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     }
 
     return true;
-  }
-
-  public async getNextProcessingId(): Promise<ProcessingId> {
-    this.state.processingCounter.counter += 1;
-    return this.state.processingCounter.counter;
   }
 
   public async getOrphanedQueries(): Promise<QueryKeysTuple[]> {
@@ -280,48 +272,34 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     }
   }
 
-  public async retrieveForProcessing(queryKeyHash: QueryKeyHash, processingId: ProcessingId): Promise<RetrieveForProcessingResponse> {
-    let lockAcquired = false;
+  public async retrieveForProcessing(queryKeyHash: QueryKeyHash, queueId: QueueId): Promise<RetrieveForProcessingSuccess | null> {
+    const query = this.state.queryDef[queryKeyHash];
+    const activeKeys = this.queueArray(this.state.active) as QueryKeyHash[];
 
-    if (!this.state.processingLocks[queryKeyHash]) {
-      this.state.processingLocks[queryKeyHash] = processingId;
-      lockAcquired = true;
-    } else {
+    if (
+      !query ||
+      query.queueId !== queueId ||
+      this.state.toProcess[queryKeyHash]?.queueId !== queueId ||
+      this.state.active[queryKeyHash] ||
+      activeKeys.length >= this.concurrency
+    ) {
       return null;
     }
 
-    let added = 0;
+    this.state.active[queryKeyHash] = { key: queryKeyHash, order: Number(queueId), queueId };
+    delete this.state.toProcess[queryKeyHash];
 
-    if (Object.keys(this.state.active).length < this.concurrency && !this.state.active[queryKeyHash]) {
-      this.state.active[queryKeyHash] = { key: queryKeyHash, order: Number(processingId), queueId: Number(processingId) };
-      delete this.state.toProcess[queryKeyHash];
+    this.state.heartBeat[queryKeyHash] = { key: queryKeyHash, order: new Date().getTime(), queueId };
 
-      added = 1;
-    }
-
-    this.state.heartBeat[queryKeyHash] = { key: queryKeyHash, order: new Date().getTime(), queueId: Number(processingId) };
-
-    return [
-      added,
-      this.state.queryDef[queryKeyHash]?.queueId || null,
-      this.queueArray(this.state.active) as QueryKeyHash[],
-      Object.keys(this.state.toProcess).length,
-      this.state.queryDef[queryKeyHash],
-      lockAcquired
-    ];
+    return {
+      active: this.queueArray(this.state.active) as QueryKeyHash[],
+      queueSize: Object.keys(this.state.toProcess).length,
+      def: query,
+    };
   }
 
-  public async freeProcessingLock(queryKeyHash: QueryKeyHash, processingId: ProcessingId, activated: any): Promise<void> {
-    if (this.state.processingLocks[queryKeyHash] === processingId) {
-      delete this.state.processingLocks[queryKeyHash];
-      if (activated) {
-        delete this.state.active[queryKeyHash];
-      }
-    }
-  }
-
-  public async optimisticQueryUpdate(queryKeyHash: QueryKeyHash, toUpdate: any, processingId: ProcessingId, _queueId?: QueueId | null): Promise<boolean> {
-    if (this.state.processingLocks[queryKeyHash] !== processingId) {
+  public async optimisticQueryUpdate(queryKeyHash: QueryKeyHash, toUpdate: any, queueId: QueueId): Promise<boolean> {
+    if (this.state.active[queryKeyHash]?.queueId !== queueId || !this.state.queryDef[queryKeyHash]) {
       return false;
     }
 

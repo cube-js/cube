@@ -55,6 +55,27 @@ To add a reference line:
 
 You can add multiple reference lines to the same axis. Each is configured independently.
 
+### Reference line labels
+
+A reference line with no label renders as a bare rule — the reader has to already know what it
+means. Type text into **Label** to name it, for example `Target 18k`.
+
+Once a label is set, two alignment controls appear next to it:
+
+| Control | Options | Description |
+|---|---|---|
+| **Horizontal** | Start / Middle / End | Where along the line the text sits |
+| **Vertical** | Above / Below | Which side of the line the text sits on |
+
+New labels start at **End** and **Above** — the right end of the line, clear of the bars. The label
+takes the line's color, so it always reads as part of that line. Clearing the label removes the text
+and leaves the line itself untouched.
+
+<Tip>
+A label on a line near the top or bottom edge of the plot flips to the other side of the line
+automatically, so the text stays inside the chart area.
+</Tip>
+
 <Note>
-Reference lines are only available on the left Y axis. For right-axis reference lines, use a [custom Vega-Lite spec](/docs/explore-analyze/charts/chart-types/custom).
+Reference lines are only available on the left Y axis. For right-axis reference lines, use a [custom Vega-Lite spec](/docs/explore-analyze/charts/custom).
 </Note>

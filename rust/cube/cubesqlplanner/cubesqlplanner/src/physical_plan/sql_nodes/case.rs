@@ -8,6 +8,10 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Renders members defined via a `case:` body — both the classic
+/// `CASE WHEN cond THEN label …` and the switch-style
+/// `CASE switch WHEN value THEN sql …`. Members without a case body
+/// pass through to `input`.
 pub struct CaseSqlNode {
     input: Rc<dyn SqlNode>,
 }

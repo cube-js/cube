@@ -1,14 +1,18 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{all_symbols, MultiStageMemberLogicalType, Query, QuerySource};
+use crate::logical_plan::transforms as logical_transforms;
+use crate::logical_plan::{all_symbols, Query, QuerySource};
 use crate::physical_plan::{
-    CalcGroupItem, CalcGroupsJoin, Cte, Expr, From, MemberExpression, ReferencesBuilder, Select,
+    CalcGroupItem, CalcGroupsJoin, Expr, From, MemberExpression, ReferencesBuilder, Select,
     SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::collectors::collect_calc_group_dims_from_nodes;
-use crate::planner::get_filtered_values;
+use crate::planner::symbols::transforms;
+use crate::planner::symbols::transforms::get_filtered_values;
+use crate::planner::{MeasureRenderModifier, MemberSymbol, OrderByItem};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 pub struct QueryProcessor<'a> {
@@ -39,26 +43,6 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let query_tools = self.builder.query_tools();
         let mut context_factory = context.make_sql_nodes_factory()?;
         let mut context = context.clone();
-        let mut ctes = vec![];
-
-        for multi_stage_member in logical_plan.multistage_members().iter() {
-            let query = self
-                .builder
-                .process_node(&multi_stage_member.member_type, &context)?;
-            let alias = multi_stage_member.name.clone();
-            context.add_multi_stage_schema(alias.clone(), query.schema());
-            if let MultiStageMemberLogicalType::DimensionCalculation(dimension_calculation) =
-                &multi_stage_member.member_type
-            {
-                context.add_multi_stage_dimension_schema(
-                    dimension_calculation.resolved_dimensions()?,
-                    alias.clone(),
-                    dimension_calculation.join_dimensions()?,
-                    query.schema(),
-                );
-            }
-            ctes.push(Rc::new(Cte::new(Rc::new(query), alias)));
-        }
 
         context.remove_multi_stage_dimensions();
 
@@ -83,13 +67,31 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         }
 
         let from = self.builder.process_node(logical_plan.source(), &context)?;
-        let filter = logical_plan.filter().all_filters();
-        let having = logical_plan.filter().measures_filter();
+        let mut filter = logical_plan.filter().all_filters();
+        let mut having = logical_plan.filter().measures_filter();
 
-        //TODO pre-aggregations support for calc-groups
-        let from = if let QuerySource::LogicalJoin(_) = logical_plan.source() {
+        // Calc-group dimensions are resolved at query time: a value pinned by
+        // a filter renders as a literal, otherwise the enumeration is
+        // cross-joined as a virtual values table. Over a pre-aggregation this
+        // applies only to calc groups NOT stored in the rollup — stored ones
+        // keep resolving to the rollup column for backward compatibility.
+        let calc_group_stored_dims = match logical_plan.source() {
+            QuerySource::LogicalJoin(_) => Some(HashSet::new()),
+            QuerySource::PreAggregation(pre_aggregation) => Some(
+                pre_aggregation
+                    .all_dimensions_refererences()
+                    .into_keys()
+                    .collect::<HashSet<_>>(),
+            ),
+            QuerySource::FullKeyAggregate(_) => None,
+        };
+        let mut calc_group_value_references: Vec<(String, String)> = Vec::new();
+        let from = if let Some(stored_dims) = calc_group_stored_dims {
             let all_symbols = all_symbols(&logical_plan.schema(), &logical_plan.filter());
-            let calc_group_dims = collect_calc_group_dims_from_nodes(all_symbols.iter())?;
+            let calc_group_dims = collect_calc_group_dims_from_nodes(all_symbols.iter())?
+                .into_iter()
+                .filter(|dim| !stored_dims.contains(&dim.full_name()))
+                .collect_vec();
 
             let calc_groups_items = calc_group_dims.into_iter().map(|dim| {
                 let values = get_filtered_values(&dim, &filter);
@@ -104,6 +106,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             {
                 context_factory
                     .add_render_reference(item.symbol.full_name(), item.values[0].clone());
+                calc_group_value_references.push((item.symbol.full_name(), item.values[0].clone()));
             }
             let calc_groups_to_join = calc_groups_items
                 .filter(|itm| itm.values.len() > 1)
@@ -118,6 +121,8 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             from
         };
 
+        let mut schema = logical_plan.schema().clone();
+
         match logical_plan.source() {
             QuerySource::LogicalJoin(join) => {
                 let references_builder = ReferencesBuilder::new(from.clone());
@@ -128,9 +133,21 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 )?;
             }
             QuerySource::PreAggregation(pre_aggregation) => {
-                for member in logical_plan.schema().time_dimensions.iter() {
-                    context_factory.add_dimensions_with_ignored_timezone(member.full_name());
-                }
+                // A rollup stores time dimensions already timezone-converted,
+                // so every occurrence of them in this select must render
+                // without the conversion.
+                let time_dimension_names = schema
+                    .time_dimensions
+                    .iter()
+                    .map(|d| d.full_name())
+                    .collect::<HashSet<_>>();
+                let mark_tz_converted =
+                    |symbol: &Rc<MemberSymbol>| -> Result<Rc<MemberSymbol>, CubeError> {
+                        transforms::mark_tz_converted_at_source(symbol, &time_dimension_names)
+                    };
+                schema = logical_transforms::mark_tz_converted_at_source_in_schema(&schema)?;
+                filter = transforms::map_filter_symbols(filter, &mark_tz_converted)?;
+                having = transforms::map_filter_symbols(having, &mark_tz_converted)?;
                 context_factory.set_use_local_tz_in_date_range(true);
 
                 for (name, column) in pre_aggregation.all_dimensions_refererences().into_iter() {
@@ -143,15 +160,41 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             QuerySource::FullKeyAggregate(_) => {}
         }
 
+        // An ungrouped select emits row-level measure values: raw ones
+        // under a measure-rendering context (multi-stage leaves), a
+        // not-null indicator form for count-likes otherwise.
+        let measure_modifier = if context.render_measure_for_ungrouped {
+            Some(MeasureRenderModifier::RawValue)
+        } else if logical_plan.modifers().ungrouped {
+            Some(MeasureRenderModifier::UngroupedFinal)
+        } else {
+            None
+        };
+        if let Some(modifier) = &measure_modifier {
+            let stamp = |symbol: &Rc<MemberSymbol>| -> Result<Rc<MemberSymbol>, CubeError> {
+                transforms::measures_render_modifier(symbol, modifier)
+            };
+            schema = logical_transforms::measures_render_modifier_in_schema(&schema, modifier)?;
+            filter = transforms::map_filter_symbols(filter, &stamp)?;
+            having = transforms::map_filter_symbols(having, &stamp)?;
+        }
+
         let is_pre_aggregation = matches!(logical_plan.source(), QuerySource::PreAggregation(_));
 
         let references_builder = ReferencesBuilder::new(from.clone());
 
         let mut select_builder = SelectBuilder::new(from);
-        select_builder.set_ctes(ctes);
-        context_factory.set_ungrouped(logical_plan.modifers().ungrouped);
 
-        for dimension in logical_plan.schema().all_dimensions() {
+        if !logical_plan.modifers().ungrouped {
+            context_factory.set_group_by_members(
+                schema
+                    .all_dimensions()
+                    .map(|symbol| symbol.full_name())
+                    .collect(),
+            );
+        }
+
+        for dimension in schema.all_dimensions() {
             self.builder.process_query_dimension(
                 dimension,
                 &references_builder,
@@ -161,10 +204,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             )?;
         }
 
-        for (measure, exists) in self
-            .builder
-            .measures_for_query(&logical_plan.schema().measures, &context)
-        {
+        for (measure, exists) in self.builder.measures_for_query(&schema.measures, &context) {
             if exists {
                 references_builder.resolve_references_for_member(
                     measure.clone(),
@@ -183,8 +223,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             select_builder.set_filter(having);
         } else {
             if !logical_plan.modifers().ungrouped {
-                let group_by = logical_plan
-                    .schema()
+                let group_by = schema
                     .all_dimensions()
                     .map(|symbol| -> Result<_, CubeError> {
                         Ok(Expr::Member(MemberExpression::new(symbol.clone())))
@@ -199,20 +238,52 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         select_builder.set_limit(logical_plan.modifers().limit);
         select_builder.set_offset(logical_plan.modifers().offset);
 
-        context_factory
-            .set_rendered_as_multiplied_measures(logical_plan.schema().multiplied_measures.clone());
-
         if is_pre_aggregation {
             context_factory.clear_render_references();
-        }
-        if logical_plan.modifers().ungrouped {
-            context_factory.set_ungrouped(true);
+            // Calc-group values are rendered as literals, not resolved from
+            // the rollup, so they must survive the render-reference reset.
+            for (name, value) in calc_group_value_references.into_iter() {
+                context_factory.add_render_reference(name, value);
+            }
         }
 
-        select_builder.set_order_by(
-            self.builder
-                .make_order_by(logical_plan.schema(), &logical_plan.modifers().order_by)?,
-        );
+        // When reading from a pre-aggregation, drop ORDER BY keys on measures that
+        // are not part of the selection. CubeStore cannot ORDER BY an aggregate of a
+        // rollup column that isn't projected.
+        let order_by = if is_pre_aggregation {
+            logical_plan
+                .modifers()
+                .order_by
+                .iter()
+                .filter(|o| {
+                    !(o.member_symbol().is_measure()
+                        && schema.find_member_positions(&o.name()).is_empty())
+                })
+                .cloned()
+                .collect()
+        } else {
+            logical_plan.modifers().order_by.clone()
+        };
+        // Items present in the schema are sorted by their stamped schema
+        // symbol; only a measure absent from the projection carries its
+        // own symbol into the ORDER BY and needs the form here.
+        let order_by = if let Some(modifier) = &measure_modifier {
+            order_by
+                .iter()
+                .map(|o| -> Result<_, CubeError> {
+                    if !schema.find_member_positions(&o.name()).is_empty() {
+                        return Ok(o.clone());
+                    }
+                    Ok(OrderByItem::new(
+                        transforms::measures_render_modifier(&o.member_symbol(), modifier)?,
+                        o.desc(),
+                    ))
+                })
+                .collect::<Result<Vec<_>, _>>()?
+        } else {
+            order_by
+        };
+        select_builder.set_order_by(self.builder.make_order_by(&schema, &order_by)?);
 
         let res = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(res)

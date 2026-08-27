@@ -1,4 +1,5 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
+use crate::logical_plan::transforms as logical_transforms;
 use crate::logical_plan::{AggregateMultipliedSubquery, AggregateMultipliedSubquerySource};
 use crate::physical_plan::ReferencesBuilder;
 use crate::physical_plan::VisitorContext;
@@ -7,8 +8,35 @@ use crate::physical_plan::{
     SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
+use crate::planner::MeasureRenderModifier;
+use crate::planner::{AggregateWrap, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
+
+/// The measure subquery renders measures without their aggregate for the select
+/// above to re-apply. A measure carrying none of its own has nothing to
+/// re-apply and would come out neither aggregated nor grouped.
+///
+/// Member expressions are left out on purpose: the SQL API builds them ad-hoc
+/// and their aggregation is not described by a measure kind.
+fn check_measures_survive_measure_subquery(measures: &[Rc<MemberSymbol>]) -> Result<(), CubeError> {
+    for measure in measures.iter() {
+        let Ok(symbol) = measure.as_measure() else {
+            continue;
+        };
+        if matches!(symbol.kind().aggregate_wrap(), AggregateWrap::PassThrough) {
+            return Err(CubeError::user(format!(
+                "{} has no aggregate of its own, so it cannot be re-aggregated over the \
+                 deduplicated rows this query needs - a measure of its group reaches another \
+                 cube, under a dimension that multiplies its rows. Please drop the multiplying \
+                 dimension, request the measures that reach out separately, or move the \
+                 aggregation into a measure.",
+                measure.full_name()
+            )));
+        }
+    }
+    Ok(())
+}
 
 pub struct AggregateMultipliedSubqueryProcessor<'a> {
     builder: &'a PhysicalPlanBuilder,
@@ -27,6 +55,15 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         aggregate_multiplied_subquery: &AggregateMultipliedSubquery,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
+        // A CTE hoisted out of a multi-stage leaf renders under that
+        // leaf's context (time shifts / measure-rendering flags), as
+        // it would have nested.
+        let mut context = context.clone();
+        if let Some(evaluation_context) = &aggregate_multiplied_subquery.evaluation_context {
+            context.apply_evaluation_context(evaluation_context);
+        }
+        let context = &context;
+
         if let Some(override_query) = &aggregate_multiplied_subquery.pre_aggregation_override {
             return self.builder.process_node(override_query.as_ref(), context);
         }
@@ -109,6 +146,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                 }
             }
             AggregateMultipliedSubquerySource::MeasureSubquery(measure_subquery) => {
+                check_measures_survive_measure_subquery(&measure_subquery.schema.measures)?;
                 let subquery = self
                     .builder
                     .process_node(measure_subquery.as_ref(), context)?;
@@ -157,7 +195,18 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             &mut context_factory,
         )?;
 
-        for member in aggregate_multiplied_subquery.schema.all_dimensions() {
+        // Under a measure-rendering context (a CTE hoisted out of an
+        // ungrouped multi-stage leaf) measures emit raw row-level values.
+        let schema = if context.render_measure_for_ungrouped {
+            logical_transforms::measures_render_modifier_in_schema(
+                &aggregate_multiplied_subquery.schema,
+                &MeasureRenderModifier::RawValue,
+            )?
+        } else {
+            aggregate_multiplied_subquery.schema.clone()
+        };
+
+        for member in schema.all_dimensions() {
             references_builder.resolve_references_for_member(
                 member.clone(),
                 &None,
@@ -167,10 +216,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             group_by.push(Expr::Member(MemberExpression::new(member.clone())));
             select_builder.add_projection_member(&member, alias);
         }
-        for (measure, exists) in self
-            .builder
-            .measures_for_query(&aggregate_multiplied_subquery.schema.measures, &context)
-        {
+        for (measure, exists) in self.builder.measures_for_query(&schema.measures, &context) {
             if exists {
                 if matches!(
                     &aggregate_multiplied_subquery.source,
@@ -188,12 +234,6 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             }
         }
         select_builder.set_group_by(group_by);
-        context_factory.set_rendered_as_multiplied_measures(
-            aggregate_multiplied_subquery
-                .schema
-                .multiplied_measures
-                .clone(),
-        );
         Ok(Rc::new(
             select_builder.build(query_tools.clone(), context_factory),
         ))

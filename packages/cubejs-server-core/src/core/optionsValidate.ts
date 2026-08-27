@@ -1,5 +1,15 @@
 import Joi from 'joi';
+import { canonicalTimezone } from '@cubejs-backend/shared';
 import DriverDependencies from './DriverDependencies';
+
+const timezoneSchema = Joi.string().custom((value, helpers) => {
+  const name = canonicalTimezone(value);
+  if (!name) {
+    return helpers.message({ custom: '{{#label}} must be a valid IANA time zone name, got "{{#tz}}"' }, { tz: value });
+  }
+
+  return name;
+}, 'timezone');
 
 const schemaQueueOptions = Joi.object().strict(true).keys({
   concurrency: Joi.number().min(1).integer(),
@@ -58,12 +68,12 @@ const schemaOptions = Joi.object().keys({
   processSubscriptionsInterval: Joi.number(),
   webSocketsBasePath: Joi.string(),
   // server-core CoreCreateOptions
-  dbType: dbTypes,
   externalDbType: dbTypes,
   schemaPath: Joi.string(),
   basePath: Joi.string(),
   devServer: Joi.boolean(),
   apiSecret: Joi.string(),
+  apiSecrets: Joi.array().items(Joi.string()),
   logger: Joi.func(),
   // source
   dialectFactory: Joi.func(),
@@ -74,7 +84,6 @@ const schemaOptions = Joi.object().keys({
   //
   cacheAndQueueDriver: Joi.string().valid('cubestore', 'memory'),
   contextToAppId: Joi.func(),
-  contextToRoles: Joi.func(),
   contextToGroups: Joi.func(),
   contextToOrchestratorId: Joi.func(),
   contextToCubeStoreRouterId: Joi.func(),
@@ -97,7 +106,7 @@ const schemaOptions = Joi.object().keys({
     Joi.number().min(0).integer()
   ),
   scheduledRefreshTimeZones: Joi.alternatives().try(
-    Joi.array().items(Joi.string()),
+    Joi.array().items(timezoneSchema),
     Joi.func()
   ),
   scheduledRefreshContexts: Joi.func(),
@@ -151,9 +160,11 @@ const schemaOptions = Joi.object().keys({
   fastReload: Joi.boolean(),
 });
 
-export default (options: any) => {
-  const { error } = schemaOptions.validate(options, { abortEarly: false });
+export function validateOptions<T>(options: T): T {
+  const { error, value } = schemaOptions.validate(options, { abortEarly: false });
   if (error) {
     throw new Error(`Invalid cube-server-core options: ${error.message || error.toString()}`);
   }
-};
+
+  return value;
+}

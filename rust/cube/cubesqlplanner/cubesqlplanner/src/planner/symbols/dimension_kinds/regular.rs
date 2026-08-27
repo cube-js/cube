@@ -1,13 +1,21 @@
 use super::super::common::DimensionType;
-use super::super::MemberSymbol;
-use crate::planner::{CubeRef, SqlCall};
-use cubenativeutils::CubeError;
+use super::super::deps::symbol_deps;
+use crate::planner::SqlCall;
 use std::rc::Rc;
 
+/// Plain dimension from the data model — a single `sql` expression
+/// typed by `DimensionType`.
 #[derive(Clone)]
 pub struct RegularDimension {
     dimension_type: DimensionType,
     member_sql: Rc<SqlCall>,
+}
+
+symbol_deps! {
+    RegularDimension {
+        dimension_type: skip,
+        member_sql: dep,
+    }
 }
 
 impl RegularDimension {
@@ -24,26 +32,6 @@ impl RegularDimension {
 
     pub fn member_sql(&self) -> &Rc<SqlCall> {
         &self.member_sql
-    }
-
-    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
-        let mut deps = vec![];
-        self.member_sql.extract_symbol_deps(&mut deps);
-        deps
-    }
-
-    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
-        self.member_sql.get_cube_refs()
-    }
-
-    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Self, CubeError> {
-        Ok(Self {
-            dimension_type: self.dimension_type,
-            member_sql: self.member_sql.apply_recursive(f)?,
-        })
     }
 
     pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {

@@ -52,5 +52,93 @@ Commit the configuration for Vector, it should take effect in a minute. Then,
 navigate to Amazon CloudWatch and watch the logs coming.
 
 
-[ref-monitoring-integrations]: /admin/deployment/monitoring-integrations
-[ref-monitoring-integrations-conf]: /admin/deployment/monitoring-integrations#configuration
+## Keyless authentication
+
+Instead of the access key pair above, Vector can authenticate to CloudWatch with
+the deployment's [OIDC][ref-oidc] identity — no static credentials stored in
+Cube, and nothing to rotate.
+
+The credentials apply to the **whole Vector agent**, not just this sink, so the
+same role also covers the [S3][ref-s3] and [Query History export][ref-query-history-export]
+sinks if you use them.
+
+<Note>
+
+Requires [OIDC][ref-oidc] enabled for your tenant with an `AWS` token config.
+
+</Note>
+
+<Steps>
+  <Step title="Create the IAM role">
+    [Register Cube as an OIDC provider][ref-oidc-aws-provider] in your AWS
+    account — a one-time step per account — then follow
+    [Monitoring integrations][ref-oidc-aws-cloudwatch] to create a role that
+    trusts your deployment and can write to the log group.
+
+    Two things to carry over from that section: the `sub` claim needs the
+    non-default `:component:` **Subject Claim Format**, and
+    `logs:DescribeLogGroups` must be scoped to `"*"` or Vector's healthcheck
+    fails at startup.
+  </Step>
+  <Step title="Set the deployment environment variables">
+    Under **Settings → Environment variables**:
+
+    ```dotenv
+    CUBE_CLOUD_MONITORING_AWS_ROLE_ARN=arn:aws:iam::<aws-account-id>:role/<role-name>
+    ```
+
+    The role ARN is the only required variable — setting it is what turns
+    keyless authentication on.
+
+    The credential exchange also needs a region, which Cube takes from your
+    sink's `region`. Set `CUBE_CLOUD_MONITORING_AWS_REGION` only to override
+    that, for example when the STS region should differ from the sink's.
+  </Step>
+  <Step title="Drop the auth block from vector.toml">
+    Omit `[sinks.*.auth]` entirely so Vector falls back to the AWS SDK's default
+    credential chain, which picks up the OIDC token Cube mounts for it:
+
+    ```toml
+    [sinks.aws_cloudwatch_logs]
+    type = "aws_cloudwatch_logs"
+    # "warmup-job" is omitted deliberately — see the warning below.
+    inputs = [
+      "cubejs-server",
+      "refresh-scheduler",
+      "cubestore"
+    ]
+    region = "us-east-1"
+    group_name = "your-group-name"
+    stream_name = "your-stream-name"
+    # Add create_missing_group = true only if you also grant
+    # logs:CreateLogGroup to the role.
+    create_missing_stream = true
+
+    [sinks.aws_cloudwatch_logs.encoding]
+    codec = "json"
+    ```
+
+    Leaving an `auth` block in place keeps the static keys in use — the two are
+    mutually exclusive.
+  </Step>
+</Steps>
+
+<Warning>
+
+Keyless authentication does not cover the **`warmup-job`** input. The
+[pre-aggregation warm-up][ref-preagg-warmup] runs as a Kubernetes Job that does
+not receive the OIDC token, so its logs will not reach CloudWatch on this path
+while the other inputs succeed. If you need warm-up logs in CloudWatch, keep
+using the access key pair.
+
+</Warning>
+
+
+[ref-monitoring-integrations]: /admin/monitoring/monitoring-integrations
+[ref-monitoring-integrations-conf]: /admin/monitoring/monitoring-integrations#configuration
+[ref-oidc]: /admin/deployment/oidc
+[ref-oidc-aws-cloudwatch]: /admin/deployment/oidc/aws#monitoring-integrations-cloudwatch-s3
+[ref-oidc-aws-provider]: /admin/deployment/oidc/aws#step-1-register-cube-as-an-oidc-provider-in-aws
+[ref-s3]: /admin/monitoring/monitoring-integrations/s3
+[ref-query-history-export]: /admin/monitoring/query-history-export
+[ref-preagg-warmup]: /admin/deployment/warm-up

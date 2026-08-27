@@ -1,8 +1,8 @@
 use super::{
     context::NativeContext,
     object::{
-        NativeArray, NativeBoolean, NativeFunction, NativeNumber, NativeObject, NativeString,
-        NativeStruct,
+        NativeArray, NativeBoolean, NativeFunction, NativeNumber, NativeObject, NativeRustBox,
+        NativeString, NativeStruct,
     },
 };
 pub trait InnerTypes: Clone + 'static {
@@ -13,6 +13,7 @@ pub trait InnerTypes: Clone + 'static {
     type Boolean: NativeBoolean<Self>;
     type Function: NativeFunction<Self>;
     type Number: NativeNumber<Self>;
+    type RustBox: NativeRustBox<Self>;
     type Context: NativeContext<Self>;
     type FunctionIT: InnerTypes;
 }

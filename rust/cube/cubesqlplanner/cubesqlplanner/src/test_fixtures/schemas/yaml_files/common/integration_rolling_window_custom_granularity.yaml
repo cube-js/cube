@@ -21,6 +21,7 @@ cubes:
             origin: "2024-01-01"
           - name: bi_weekly
             interval: "2 weeks"
+            origin: "2024-01-01"
           - name: fiscal_year
             interval: "1 year"
             offset: "3 months"

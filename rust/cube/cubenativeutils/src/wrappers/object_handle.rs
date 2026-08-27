@@ -41,6 +41,12 @@ impl<IT: InnerTypes> NativeObjectHandle<IT> {
     pub fn into_boolean(self) -> Result<IT::Boolean, CubeError> {
         self.object.into_boolean()
     }
+    pub fn into_rust_box(self) -> Result<IT::RustBox, CubeError> {
+        self.object.into_rust_box()
+    }
+    pub fn to_rust_box(&self) -> Result<IT::RustBox, CubeError> {
+        self.object.clone().into_rust_box()
+    }
     pub fn to_struct(&self) -> Result<IT::Struct, CubeError> {
         self.object.clone().into_struct()
     }

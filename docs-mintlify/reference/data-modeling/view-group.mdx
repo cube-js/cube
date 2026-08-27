@@ -79,9 +79,10 @@ view_group(`sales`, {
 
 </CodeGroup>
 
-### `views`
+### `includes`
 
-A list of view names that belong to this group.
+A list of [views][ref-views] that belong to this group. It can also contain
+nested view groups (see [Nesting](#nesting) below).
 
 <CodeGroup>
 
@@ -89,7 +90,7 @@ A list of view names that belong to this group.
 view_groups:
   - name: sales
     title: Sales
-    views:
+    includes:
       - orders_overview
       - revenue
 ```
@@ -97,7 +98,48 @@ view_groups:
 ```javascript title="JavaScript"
 view_group(`sales`, {
   title: `Sales`,
-  views: [`orders_overview`, `revenue`]
+  includes: [`orders_overview`, `revenue`]
+})
+```
+
+</CodeGroup>
+
+#### Nesting
+
+View groups can be nested, similar to [nested folders][ref-view-nesting]. The
+`includes` parameter can contain not only references to views but also other
+view groups, each with its own `title`, `description`, and `includes`.
+
+<CodeGroup>
+
+```yaml title="YAML"
+view_groups:
+  - name: sales
+    title: Sales
+    includes:
+      - orders_overview
+      - revenue
+
+      - name: enterprise_sales
+        title: Enterprise Sales
+        description: Views for the enterprise sales team
+        includes:
+          - enterprise_deals
+```
+
+```javascript title="JavaScript"
+view_group(`sales`, {
+  title: `Sales`,
+  includes: [
+    `orders_overview`,
+    `revenue`,
+    {
+      name: `enterprise_sales`,
+      title: `Enterprise Sales`,
+      description: `Views for the enterprise sales team`,
+      includes: [`enterprise_deals`]
+    }
+  ]
 })
 ```
 
@@ -106,12 +148,12 @@ view_group(`sales`, {
 ## Assigning views to groups
 
 To associate a view with a view group, list its name in the
-[`views`](#views) parameter on the view group.
+[`includes`](#includes) parameter on the view group.
 
 ### Example
 
 The following model defines two view groups. The `sales` group lists
-`orders_overview` and `revenue` in its `views` parameter, while the
+`orders_overview` and `revenue` in its `includes` parameter, while the
 `people` group lists `customers_view`.
 
 <CodeGroup>
@@ -186,14 +228,14 @@ view_groups:
   - name: sales
     title: Sales
     description: Revenue and order views for the sales team
-    views:
+    includes:
       - orders_overview
       - revenue
 
   - name: people
     title: People
     description: Customer and user views
-    views:
+    includes:
       - customers_view
 ```
 
@@ -292,13 +334,13 @@ view(`customers_view`, {
 view_group(`sales`, {
   title: `Sales`,
   description: `Revenue and order views for the sales team`,
-  views: [`orders_overview`, `revenue`]
+  includes: [`orders_overview`, `revenue`]
 })
 
 view_group(`people`, {
   title: `People`,
   description: `Customer and user views`,
-  views: [`customers_view`]
+  includes: [`customers_view`]
 })
 ```
 
@@ -313,18 +355,22 @@ With this model, the `/v1/meta` response includes a `viewGroups` array:
       "name": "sales",
       "title": "Sales",
       "description": "Revenue and order views for the sales team",
-      "views": ["orders_overview", "revenue"]
+      "includes": ["orders_overview", "revenue"]
     },
     {
       "name": "people",
       "title": "People",
       "description": "Customer and user views",
-      "views": ["customers_view"]
+      "includes": ["customers_view"]
     }
   ]
 }
 ```
 
+Each view group carries an `includes` array that preserves the authoring order
+and contains the group's views as well as any nested view groups.
+
 [ref-views]: /docs/data-modeling/views
+[ref-view-nesting]: /reference/data-modeling/view#nesting
 [ref-naming]: /docs/data-modeling/concepts/syntax#naming
 [ref-meta-endpoint]: /reference/core-data-apis/rest-api/reference

@@ -51,6 +51,16 @@ export interface ExtendedCubeSymbolDefinition extends CubeSymbolDefinition {
   aggType?: string;
   keyReference?: string;
   currency?: string;
+  links?: Array<{
+    name: string;
+    label: string;
+    url?: (...args: any[]) => string;
+    dashboard?: string;
+    icon?: string;
+    target?: 'blank' | 'self';
+    params?: Array<{ key: string; value: (...args: any[]) => string }>;
+  }>;
+  synthetic?: boolean;
 }
 
 interface ExtendedCubeDefinition extends CubeDefinitionExtended {
@@ -97,6 +107,16 @@ export type MeasureConfig = {
   public: boolean;
 };
 
+export type LinkConfig = {
+  name: string;
+  label: string;
+  dashboard?: string;
+  icon?: string;
+  target?: 'blank' | 'self';
+  primary?: boolean;
+  params?: string[];
+};
+
 export type DimensionConfig = {
   name: string;
   title: string;
@@ -115,6 +135,8 @@ export type DimensionConfig = {
   granularities?: GranularityDefinition[];
   order?: 'asc' | 'desc';
   key?: string;
+  links?: LinkConfig[];
+  synthetic?: boolean;
 };
 
 export type SegmentConfig = {
@@ -314,6 +336,18 @@ export class CubeToMetaTransformer implements CompilerInterface {
                 : undefined,
             order: extendedDimDef.order,
             key: extendedDimDef.keyReference,
+            ...(extendedDimDef.links ? { links: extendedDimDef.links.map((link: any) => ({
+              name: link.name,
+              label: link.label,
+              ...(link.dashboard ? { dashboard: typeof link.dashboard === 'function' ? link.dashboard() : link.dashboard } : {}),
+              icon: link.icon,
+              ...(link.target ? { target: link.target } : {}),
+              ...(link.primary ? { primary: true } : {}),
+              ...(link.params && Array.isArray(link.params) && link.params.length > 0
+                ? { params: link.params.map((p: any) => (typeof p.key === 'function' ? p.key() : p.key)) }
+                : {}),
+            })) } : {}),
+            ...(extendedDimDef.synthetic ? { synthetic: true } : {}),
           };
         }),
         segments: Object.entries(extendedCube.segments || {}).map((nameToSegment: [string, any]) => {
@@ -439,7 +473,10 @@ export class CubeToMetaTransformer implements CompilerInterface {
   }
 
   private titleize(name: string): string {
-    return inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })));
+    const titleized = inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })));
+    // Capitalize common identifier acronyms so e.g. `userId` reads as "User ID"
+    // rather than "User Id" and an `id` member becomes "ID" instead of "Id".
+    return titleized.replace(/\bId(s?)\b/g, (_match, plural) => `ID${plural}`);
   }
 
   private transformDimensionFormat({ format: formatOrName, type }: ExtendedCubeSymbolDefinition): DimensionFormat | undefined {

@@ -2,12 +2,14 @@ use super::{
     base_types::{NeonBoolean, NeonNumber, NeonString},
     neon_array::NeonArray,
     neon_function::NeonFunction,
+    neon_rust_box::NeonRustBox,
     neon_struct::NeonStruct,
     RootHolder,
 };
 use crate::wrappers::object::NativeObject;
 use crate::wrappers::{
     neon::{context::ContextHolder, inner_types::NeonInnerTypes},
+    rust_handle::NativeRustHandle,
     NativeObjectHandle,
 };
 use crate::CubeError;
@@ -36,7 +38,7 @@ impl<C: Context<'static> + 'static> NeonObject<C> {
         Ok(Self { root_holder })
     }
 
-    pub fn form_root(root: RootHolder<C>) -> Self {
+    pub fn from_root(root: RootHolder<C>) -> Self {
         Self { root_holder: root }
     }
 
@@ -50,6 +52,7 @@ impl<C: Context<'static> + 'static> NeonObject<C> {
             RootHolder::Array(v) => v.map_neon_object(|_cx, obj| Ok(obj.upcast())),
             RootHolder::Function(v) => v.map_neon_object(|_cx, obj| Ok(obj.upcast())),
             RootHolder::Struct(v) => v.map_neon_object(|_cx, obj| Ok(obj.upcast())),
+            RootHolder::RustBox(v) => v.map_neon_object(|_cx, obj| Ok(obj.upcast())),
         }
     }
 
@@ -81,6 +84,12 @@ impl<C: Context<'static> + 'static> NativeObject<NeonInnerTypes<C>> for NeonObje
     fn into_function(self) -> Result<NeonFunction<C>, CubeError> {
         let obj_holder = self.root_holder.into_function()?;
         Ok(NeonFunction::new(obj_holder))
+    }
+    fn into_rust_box(self) -> Result<NeonRustBox<C>, CubeError> {
+        let obj_holder = self.root_holder.into_rust_box()?;
+        let handle: NativeRustHandle =
+            obj_holder.map_neon_object(|_cx, js_box| Ok((**js_box).clone()))?;
+        Ok(NeonRustBox::new(obj_holder, handle))
     }
     fn into_array(self) -> Result<NeonArray<C>, CubeError> {
         let obj_holder = self.root_holder.into_array()?;

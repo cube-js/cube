@@ -7,6 +7,9 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Wraps a measure's rendered SQL in the `measure_filters` declared
+/// on its data-model definition (e.g. `FILTER (WHERE ...)` / CASE
+/// gating depending on the dialect templates).
 pub struct MeasureFilterSqlNode {
     input: Rc<dyn SqlNode>,
 }

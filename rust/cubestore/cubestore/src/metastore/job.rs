@@ -21,6 +21,17 @@ pub enum JobType {
     RepartitionChunk,
     InMemoryChunksCompaction,
     NodeInMemoryChunksCompaction(/*node*/ String),
+    // Repartition an inclusive [start, end] chunk-id range of an inactive parent in
+    // one merge+swap. row_reference carries the start chunk; the end is data only and
+    // is deliberately excluded from the job index key (see key_to_bytes) so a tail
+    // that extends the trailing range dedups on the start instead of spawning a
+    // second job for the same start.
+    RepartitionRange(/*end_chunk_id*/ u64),
+    /// Fallback for job types written by a newer binary that this binary does
+    /// not know about. Lets the read path decode such rows instead of failing
+    /// the whole job scan; the worker ignores `Unknown` jobs.
+    #[serde(other)]
+    Unknown,
 }
 
 fn get_job_type_index(j: &JobType) -> u32 {
@@ -35,6 +46,8 @@ fn get_job_type_index(j: &JobType) -> u32 {
         JobType::RepartitionChunk => 8,
         JobType::InMemoryChunksCompaction => 9,
         JobType::NodeInMemoryChunksCompaction(_) => 10,
+        JobType::Unknown => 11,
+        JobType::RepartitionRange(_) => 12,
     }
 }
 
@@ -49,9 +62,22 @@ fn get_job_type_priority(j: &JobType) -> u32 {
         JobType::MultiPartitionSplit => 1000,
         JobType::FinishMultiSplit => 1000,
         JobType::RepartitionChunk => 1000,
+        JobType::RepartitionRange(_) => 1000,
         JobType::InMemoryChunksCompaction => 10000,
         JobType::NodeInMemoryChunksCompaction(_) => 10000,
+        JobType::Unknown => 0,
     }
+}
+
+/// A job runner pool. Each runner serves exactly one pool and only picks up jobs that
+/// belong to it. `CsvImport` overlaps with `Regular`: non-stream CSV imports stay eligible
+/// for regular runners and additionally get a reserved pool so they progress even when all
+/// regular runners are busy with compaction/repartition.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum JobRunnerPool {
+    Regular,
+    LongTerm,
+    CsvImport,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Hash, Eq, PartialEq)]
@@ -125,6 +151,21 @@ impl Job {
         match &self.job_type {
             JobType::TableImportCSV(location) if Table::is_stream_location(location) => true,
             _ => false,
+        }
+    }
+
+    pub fn is_csv_import(&self) -> bool {
+        matches!(
+            &self.job_type,
+            JobType::TableImportCSV(location) if !Table::is_stream_location(location)
+        )
+    }
+
+    pub fn matches_pool(&self, pool: JobRunnerPool) -> bool {
+        match pool {
+            JobRunnerPool::Regular => !self.is_long_term(),
+            JobRunnerPool::LongTerm => self.is_long_term(),
+            JobRunnerPool::CsvImport => self.is_csv_import(),
         }
     }
 
@@ -213,5 +254,117 @@ impl RocksSecondaryIndex<Job, JobIndexKey> for JobRocksIndex {
 
     fn get_id(&self) -> IndexId {
         *self as IndexId
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Serialize;
+
+    fn job(job_type: JobType) -> Job {
+        Job::new(
+            RowKey::Table(TableId::Tables, 1),
+            job_type,
+            "node".to_string(),
+        )
+    }
+
+    #[test]
+    fn matches_pool_routing() {
+        let file_import = job(JobType::TableImportCSV("file.csv".to_string()));
+        let stream_import = job(JobType::TableImportCSV("stream:topic".to_string()));
+        let compaction = job(JobType::PartitionCompaction);
+
+        // Non-stream CSV import stays eligible for the regular pool and additionally
+        // for the reserved CSV pool, but is never long-term.
+        assert!(file_import.matches_pool(JobRunnerPool::Regular));
+        assert!(file_import.matches_pool(JobRunnerPool::CsvImport));
+        assert!(!file_import.matches_pool(JobRunnerPool::LongTerm));
+
+        // Streaming CSV import is long-term only.
+        assert!(!stream_import.matches_pool(JobRunnerPool::Regular));
+        assert!(!stream_import.matches_pool(JobRunnerPool::CsvImport));
+        assert!(stream_import.matches_pool(JobRunnerPool::LongTerm));
+
+        // Everything else belongs to the regular pool only.
+        assert!(compaction.matches_pool(JobRunnerPool::Regular));
+        assert!(!compaction.matches_pool(JobRunnerPool::CsvImport));
+        assert!(!compaction.matches_pool(JobRunnerPool::LongTerm));
+    }
+
+    /// Mirrors `JobType` as it might look in a newer binary: it carries extra
+    /// variants this binary does not know about (one unit, one data-carrying).
+    /// We serialize with this enum and deserialize with the real `JobType` to
+    /// emulate a forward version skew across `latest`/`release` channels.
+    #[derive(Serialize)]
+    enum NewerJobType {
+        #[allow(dead_code)]
+        WalPartitioning,
+        #[allow(dead_code)]
+        NodeInMemoryChunksCompaction(String),
+        BrandNewUnitVariant,
+        BrandNewDataVariant(String),
+    }
+
+    fn flex_roundtrip<S: Serialize, D: for<'de> Deserialize<'de>>(value: &S) -> Result<D, String> {
+        let mut ser = flexbuffers::FlexbufferSerializer::new();
+        value.serialize(&mut ser).map_err(|e| e.to_string())?;
+        let buffer = ser.take_buffer();
+        let reader = flexbuffers::Reader::get_root(buffer.as_slice()).map_err(|e| e.to_string())?;
+        D::deserialize(reader).map_err(|e| e.to_string())
+    }
+
+    #[test]
+    fn unknown_unit_variant_decodes_to_unknown() {
+        let decoded: JobType =
+            flex_roundtrip(&NewerJobType::BrandNewUnitVariant).expect("unit variant must decode");
+        assert_eq!(decoded, JobType::Unknown);
+    }
+
+    #[test]
+    fn unknown_data_variant_decodes_to_unknown() {
+        // A data-carrying unknown variant. flexbuffers must skip the payload and
+        // land on `Unknown` rather than erroring; if this fails, `#[serde(other)]`
+        // is insufficient for the job read path and Option B is required.
+        let decoded: JobType =
+            flex_roundtrip(&NewerJobType::BrandNewDataVariant("loc".to_string()))
+                .expect("data variant must decode");
+        assert_eq!(decoded, JobType::Unknown);
+    }
+
+    #[test]
+    fn known_variants_still_roundtrip() {
+        for jt in [
+            JobType::WalPartitioning,
+            JobType::TableImportCSV("s3://x".to_string()),
+            JobType::NodeInMemoryChunksCompaction("node-1".to_string()),
+        ] {
+            let decoded: JobType = flex_roundtrip(&jt).expect("known variant must decode");
+            assert_eq!(decoded, jt);
+        }
+    }
+
+    #[test]
+    fn unknown_variant_inside_job_struct_decodes() {
+        // The real read path deserializes the whole `Job` struct, so verify the
+        // fallback also works when the unknown enum is a nested field.
+        #[derive(Serialize)]
+        struct NewerJob {
+            row_reference: RowKey,
+            job_type: NewerJobType,
+            last_heart_beat: DateTime<Utc>,
+            status: JobStatus,
+        }
+
+        let newer = NewerJob {
+            row_reference: RowKey::Table(TableId::Jobs, 1),
+            job_type: NewerJobType::BrandNewDataVariant("payload".to_string()),
+            last_heart_beat: Utc::now(),
+            status: JobStatus::Scheduled("shard-1".to_string()),
+        };
+        let decoded: Job = flex_roundtrip(&newer).expect("job with unknown type must decode");
+        assert_eq!(decoded.job_type(), &JobType::Unknown);
+        assert!(matches!(decoded.status(), JobStatus::Scheduled(s) if s == "shard-1"));
     }
 }

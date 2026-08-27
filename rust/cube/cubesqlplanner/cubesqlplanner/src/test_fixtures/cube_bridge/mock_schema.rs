@@ -2,7 +2,7 @@ use crate::test_fixtures::cube_bridge::yaml::YamlSchema;
 use crate::test_fixtures::cube_bridge::{
     MockBaseTools, MockCubeDefinition, MockCubeEvaluator, MockDimensionDefinition, MockDriverTools,
     MockGranularityDefinition, MockJoinGraph, MockJoinItemDefinition, MockMeasureDefinition,
-    MockPreAggregationDescription, MockSegmentDefinition,
+    MockPreAggregationDescription, MockSegmentDefinition, MockViewFilterDefinition,
 };
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
@@ -340,6 +340,7 @@ impl MockSchemaBuilder {
             measures: HashMap::new(),
             dimensions: HashMap::new(),
             segments: HashMap::new(),
+            default_filters: Vec::new(),
         }
     }
 
@@ -468,6 +469,7 @@ pub struct MockViewBuilder {
     measures: HashMap<String, Rc<MockMeasureDefinition>>,
     dimensions: HashMap<String, Rc<MockDimensionDefinition>>,
     segments: HashMap<String, Rc<MockSegmentDefinition>>,
+    default_filters: Vec<MockViewFilterDefinition>,
 }
 
 impl MockViewBuilder {
@@ -519,6 +521,11 @@ impl MockViewBuilder {
         definition: MockSegmentDefinition,
     ) -> Self {
         self.segments.insert(name.into(), Rc::new(definition));
+        self
+    }
+
+    pub fn add_default_filter(mut self, filter: MockViewFilterDefinition) -> Self {
+        self.default_filters.push(filter);
         self
     }
 
@@ -593,12 +600,19 @@ impl MockViewBuilder {
                             "number" | "string" | "time" | "boolean" => original_type.clone(),
                             _ => "number".to_string(),
                         };
+                        // A view member re-exports the source measure's
+                        // multi_stage flag and order_by, so order_by templates
+                        // are resolved in the view's cube context (where their
+                        // referenced members may be absent), matching how view
+                        // members are materialized in the schema compiler.
                         all_measures.insert(
                             view_name,
                             Rc::new(
                                 MockMeasureDefinition::builder()
                                     .measure_type(view_type)
                                     .sql(view_member_sql)
+                                    .multi_stage(measure.static_data().multi_stage)
+                                    .order_by(measure.raw_order_by())
                                     .build(),
                             ),
                         );
@@ -631,9 +645,39 @@ impl MockViewBuilder {
             }
         }
 
+        // Like the schema compiler, only multi-hop join paths land in the join
+        // map: a direct cube needs no path to be reached. Note this is what makes
+        // a root cube member of a view carry `Vector([cube])` rather than
+        // `Single(cube)` - `collect_join_hints` enriches a hint into the prefix of
+        // the path it sits on - and both forms are distinct join tree cache keys.
+        //
+        // The schema compiler fills the map in `CubeSymbols.prepareIncludes`,
+        // inside the pass over `dimensions`, but it pushes the entry for an
+        // included cube before looking at that cube's includes - so a cube
+        // contributing no dimension still gets one. `customer_overview` includes
+        // only measures from `customers.orders` and is mapped all the same.
+        // Emitting one entry per view cube here matches that. What the compiler
+        // does differently is evaluate the join path as a reference instead of
+        // splitting the raw string, so a fixture would only diverge with a join
+        // path that is not a literal.
+        let join_map = self
+            .view_cubes
+            .iter()
+            .map(|view_cube| {
+                view_cube
+                    .join_path
+                    .split('.')
+                    .map(|part| part.to_string())
+                    .collect::<Vec<_>>()
+            })
+            .filter(|path| path.len() > 1)
+            .collect::<Vec<_>>();
+
         let view_def = MockCubeDefinition::builder()
             .name(self.view_name.clone())
             .is_view(Some(true))
+            .join_map(Some(join_map))
+            .default_filters(self.default_filters)
             .build();
 
         let view_cube = MockCube {
@@ -656,7 +700,8 @@ mod tests {
     use crate::cube_bridge::dimension_definition::DimensionDefinition;
     use crate::cube_bridge::measure_definition::MeasureDefinition;
     use crate::cube_bridge::segment_definition::SegmentDefinition;
-    use crate::test_fixtures::cube_bridge::MockBaseTools;
+
+    use crate::test_fixtures::cube_bridge::mock_compiled;
 
     #[test]
     fn test_basic_schema() {
@@ -1193,9 +1238,6 @@ mod tests {
 
     #[test]
     fn test_view_with_multiple_long_join_paths() {
-        use crate::test_fixtures::cube_bridge::MockSecurityContext;
-        use std::rc::Rc;
-
         let schema = MockSchemaBuilder::new()
             .add_cube("visitors")
             .add_dimension(
@@ -1252,12 +1294,7 @@ mod tests {
         let checkin_id_sql = checkin_id_dim.sql().unwrap().unwrap();
 
         // Compile template and check symbol_paths structure
-        let (_template, args) = checkin_id_sql
-            .compile_template_sql(
-                Rc::new(MockBaseTools::default()),
-                Rc::new(MockSecurityContext),
-            )
-            .unwrap();
+        let (_template, args) = mock_compiled(checkin_id_sql);
 
         // Should have exactly one symbol path
         assert_eq!(
@@ -1278,12 +1315,7 @@ mod tests {
             .unwrap();
         let checkin_count_sql = checkin_count_measure.sql().unwrap().unwrap();
 
-        let (_template, args) = checkin_count_sql
-            .compile_template_sql(
-                Rc::new(MockBaseTools::default()),
-                Rc::new(MockSecurityContext),
-            )
-            .unwrap();
+        let (_template, args) = mock_compiled(checkin_count_sql);
 
         assert_eq!(
             args.symbol_paths.len(),
@@ -1301,12 +1333,7 @@ mod tests {
         let id_dim = schema.get_dimension("multi_path_view", "id").unwrap();
         let id_sql = id_dim.sql().unwrap().unwrap();
 
-        let (_template, args) = id_sql
-            .compile_template_sql(
-                Rc::new(MockBaseTools::default()),
-                Rc::new(MockSecurityContext),
-            )
-            .unwrap();
+        let (_template, args) = mock_compiled(id_sql);
 
         assert_eq!(
             args.symbol_paths.len(),
@@ -1322,12 +1349,7 @@ mod tests {
         let count_measure = schema.get_measure("multi_path_view", "count").unwrap();
         let count_sql = count_measure.sql().unwrap().unwrap();
 
-        let (_template, args) = count_sql
-            .compile_template_sql(
-                Rc::new(MockBaseTools::default()),
-                Rc::new(MockSecurityContext),
-            )
-            .unwrap();
+        let (_template, args) = mock_compiled(count_sql);
 
         assert_eq!(
             args.symbol_paths.len(),

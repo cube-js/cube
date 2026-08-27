@@ -4,12 +4,19 @@ use crate::planner::{
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// One `segments:` entry from the data model — a boolean expression
+/// attached to a cube under a name, materialised as a synthetic
+/// `MemberExpression` so it plugs into the same member machinery as
+/// dimensions and measures.
 #[derive(Clone)]
 pub struct BaseSegment {
     full_name: String,
     member_evaluator: Rc<MemberSymbol>,
     cube_name: String,
     name: String,
+    /// True when this segment is an ad-hoc query-level member expression (no
+    /// registered `segments:` path), as opposed to a named cube segment.
+    is_member_expression: bool,
 }
 
 impl PartialEq for BaseSegment {
@@ -34,6 +41,7 @@ impl BaseSegment {
             None,
             vec![cube_name.clone()],
         )?;
+        let is_member_expression = full_name.is_none();
         let full_name = full_name.unwrap_or(member_expression_symbol.full_name());
         let member_evaluator = MemberSymbol::new_member_expression(member_expression_symbol);
 
@@ -42,8 +50,43 @@ impl BaseSegment {
             member_evaluator,
             cube_name,
             name,
+            is_member_expression,
         }))
     }
+
+    pub fn is_member_expression(&self) -> bool {
+        self.is_member_expression
+    }
+
+    /// Whether `member` names this segment, as a `FILTER_PARAMS` binding or a
+    /// filter-tree target does. A view exposes a segment under its own path
+    /// while a binding in the underlying cube's sql names the cube's, so every
+    /// segment in the reference chain counts, not only the name the query asked
+    /// for. The chain stops at the first non-segment: a segment whose sql is a
+    /// bare reference resolves on to that dimension, whose own binding states a
+    /// column to compare a value against rather than a predicate.
+    pub fn matches_member_name(&self, member: &str) -> bool {
+        if self.is_member_expression {
+            return false;
+        }
+        if self.full_name == member {
+            return true;
+        }
+        let mut current = Some(self.member_evaluator.clone());
+        while let Some(symbol) = current {
+            if symbol.as_member_expression().is_err() {
+                return false;
+            }
+            // A segment symbol lives in the `expr:` namespace, so the path is
+            // reassembled from the cube and member names it was compiled under.
+            if format!("{}.{}", symbol.cube_name(), symbol.name()) == member {
+                return true;
+            }
+            current = symbol.reference_member();
+        }
+        false
+    }
+
     pub fn full_name(&self) -> String {
         self.full_name.clone()
     }

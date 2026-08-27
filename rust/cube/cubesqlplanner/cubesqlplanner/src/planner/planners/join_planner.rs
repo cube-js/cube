@@ -1,14 +1,19 @@
-use super::CommonUtils;
+use super::{CommonUtils, JoinTreeBuilder};
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_item::JoinItem;
 use crate::logical_plan::*;
 use crate::planner::join_hints::JoinHints;
-use crate::planner::query_tools::QueryTools;
+use crate::planner::state::State;
+use crate::planner::JoinTree;
 use crate::planner::MemberSymbol;
 use crate::planner::SqlCall;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Join item with its members resolved to `MemberSymbol`s on both
+/// sides — produced from a `JoinDefinition` by `JoinPlanner` so the
+/// rest of the planner can reason about the actual columns involved
+/// without re-parsing the JS-side ON clause.
 #[derive(Clone, Debug)]
 pub struct ResolvedJoinItem {
     pub original_from: String,
@@ -19,6 +24,8 @@ pub struct ResolvedJoinItem {
 }
 
 impl ResolvedJoinItem {
+    /// Equality on the cube pair and the resolved member sets — used
+    /// to detect duplicates without comparing the compiled `on_sql`.
     pub fn is_same_as(&self, other: &Self) -> bool {
         self.original_from == other.original_from
             && self.original_to == other.original_to
@@ -27,19 +34,24 @@ impl ResolvedJoinItem {
     }
 }
 
+/// Builds `LogicalJoin` trees from `JoinDefinition`s (or join
+/// hints), compiles each item's ON SQL into a `SqlCall`, and exposes
+/// helpers for resolving the members each ON clause references.
 pub struct JoinPlanner {
     utils: CommonUtils,
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
 }
 
 impl JoinPlanner {
-    pub fn new(query_tools: Rc<QueryTools>) -> Self {
+    pub fn new(query_tools: Rc<State>) -> Self {
         Self {
             utils: CommonUtils::new(query_tools.clone()),
             query_tools,
         }
     }
 
+    /// Builds a `LogicalJoin` from join hints, asking the join graph
+    /// to materialise the matching `JoinDefinition`.
     pub fn make_join_logical_plan_with_join_hints(
         &self,
         join_hints: JoinHints,
@@ -49,51 +61,48 @@ impl JoinPlanner {
             .query_tools
             .join_graph()
             .build_join(join_hints.into_items())?;
-        self.make_join_logical_plan(join, dimension_subqueries)
+        let join_tree = JoinTreeBuilder::new(self.query_tools.clone()).build(join)?;
+        Ok(self.make_join_logical_plan(&join_tree, dimension_subqueries))
     }
 
+    /// Empty `LogicalJoin` — used when the query needs no joins
+    /// (e.g. it touches a single cube and pulls nothing extra).
     pub fn make_empty_join_logical_plan(&self) -> Rc<LogicalJoin> {
         Rc::new(LogicalJoin::builder().build())
     }
 
+    /// Assembles a `LogicalJoin` from an already-resolved `JoinTree`,
+    /// reusing its compiled ON SQL and attaching the given sub-query
+    /// dimensions.
     pub fn make_join_logical_plan(
         &self,
-        join: Rc<dyn JoinDefinition>,
+        join_tree: &JoinTree,
         dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
-    ) -> Result<Rc<LogicalJoin>, CubeError> {
-        let root_definition = self.utils.cube_from_path(join.static_data().root.clone())?;
-        let root = Cube::new(root_definition);
-        let joins_definitions = join.joins()?;
-        let mut joins = vec![];
-        for join_definition in joins_definitions.iter() {
-            let cube_definition = self
-                .utils
-                .cube_from_path(join_definition.static_data().original_to.clone())?;
-            let cube = Cube::new(cube_definition);
-            let on_sql = self.compile_join_condition(join_definition.clone())?;
-            joins.push(LogicalJoinItem::builder().cube(cube).on_sql(on_sql).build());
-        }
+    ) -> Rc<LogicalJoin> {
+        let root = Cube::new(join_tree.root().clone());
+        let joins = join_tree
+            .joins()
+            .iter()
+            .map(|item| {
+                LogicalJoinItem::builder()
+                    .cube(Cube::new(item.cube().clone()))
+                    .on_sql(item.on_sql().clone())
+                    .splits_rows(item.splits_rows())
+                    .build()
+            })
+            .collect();
 
-        Ok(Rc::new(
+        Rc::new(
             LogicalJoin::builder()
                 .root(Some(root))
                 .joins(joins)
                 .dimension_subqueries(dimension_subqueries)
                 .build(),
-        ))
+        )
     }
 
-    pub fn compile_join_condition(
-        &self,
-        join_item: Rc<dyn JoinItem>,
-    ) -> Result<Rc<SqlCall>, CubeError> {
-        let definition = join_item.join()?;
-        let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
-        let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-        evaluator_compiler
-            .compile_sql_call(&join_item.static_data().original_from, definition.sql()?)
-    }
-
+    /// Materialises the join from `join_hints` and resolves the
+    /// members each ON clause references.
     pub fn resolve_join_members_by_hints(
         &self,
         join_hints: &JoinHints,
@@ -104,6 +113,8 @@ impl JoinPlanner {
             .build_join(join_hints.items().to_vec())?;
         self.resolve_join_members(join)
     }
+    /// Resolves the members each ON clause references for an
+    /// already-built `JoinDefinition`.
     pub fn resolve_join_members(
         &self,
         join: Rc<dyn JoinDefinition>,
@@ -120,7 +131,7 @@ impl JoinPlanner {
     ) -> Result<ResolvedJoinItem, CubeError> {
         let original_from = join_item.static_data().original_from.clone();
         let original_to = join_item.static_data().original_to.clone();
-        let on_sql = self.compile_join_condition(join_item.clone())?;
+        let on_sql = self.utils.compile_join_condition(join_item.clone())?;
         let mut from_members = vec![];
         let mut to_members = vec![];
         for member in on_sql.get_dependencies().into_iter() {

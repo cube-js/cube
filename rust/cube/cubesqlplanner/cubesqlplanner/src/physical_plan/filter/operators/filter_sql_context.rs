@@ -1,14 +1,22 @@
+use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::{PlanSqlTemplates, TemplateProjectionColumn};
 use crate::planner::QueryDateTimeHelper;
+use crate::utils::sql_expression_scanner::{ends_in_line_comment, is_top_level_compound};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 const FROM_PARTITION_RANGE: &str = "__FROM_PARTITION_RANGE";
 const TO_PARTITION_RANGE: &str = "__TO_PARTITION_RANGE";
 
+#[derive(Clone, Copy)]
+enum DateBound {
+    From,
+    To,
+}
+
 pub struct FilterSqlContext<'a> {
-    pub member_sql: &'a str,
+    member_sql: String,
     pub query_tools: &'a Rc<QueryTools>,
     pub plan_templates: &'a PlanSqlTemplates,
     pub use_db_time_zone: bool,
@@ -16,6 +24,47 @@ pub struct FilterSqlContext<'a> {
 }
 
 impl<'a> FilterSqlContext<'a> {
+    pub fn new(
+        member_sql: &str,
+        query_tools: &'a Rc<QueryTools>,
+        plan_templates: &'a PlanSqlTemplates,
+        use_db_time_zone: bool,
+        use_raw_values: bool,
+    ) -> Self {
+        Self {
+            member_sql: Self::as_operand(member_sql),
+            query_tools,
+            plan_templates,
+            use_db_time_zone,
+            use_raw_values,
+        }
+    }
+
+    /// The member's SQL as a single operand: safe to place next to an operator
+    /// of any precedence.
+    pub fn member_sql(&self) -> &str {
+        &self.member_sql
+    }
+
+    // A member's SQL is an expression of unknown shape. When its own top-level
+    // operator binds weaker than the operator a filter template puts beside it,
+    // the bare splice re-associates and that operator captures only the tail of
+    // the member expression — a syntax error on some dialects, a silently
+    // different predicate on the rest. Parentheses pin the whole expression as
+    // one operand; an atomic expression needs none and keeps its shape.
+    fn as_operand(member_sql: &str) -> String {
+        // An expression ending in a line comment swallows whatever the template
+        // appends on that line, so it needs the wrapping — and a line of its own
+        // for the closing parenthesis — however atomic it otherwise is.
+        if ends_in_line_comment(member_sql) {
+            return format!("({}\n)", member_sql);
+        }
+        if !is_top_level_compound(member_sql) {
+            return member_sql.to_string();
+        }
+        format!("({})", member_sql)
+    }
+
     pub fn allocate_param(&self, value: &str) -> String {
         self.query_tools.allocate_param(value)
     }
@@ -34,6 +83,17 @@ impl<'a> FilterSqlContext<'a> {
 
     pub fn allocate_and_cast(
         &self,
+        value: &FilterValue,
+        member_type: &Option<String>,
+    ) -> Result<String, CubeError> {
+        let value = value.to_param_string().ok_or_else(|| {
+            CubeError::internal("Unexpected null value for a single-value filter".to_string())
+        })?;
+        self.allocate_and_cast_str(&value, member_type)
+    }
+
+    pub fn allocate_and_cast_str(
+        &self,
         value: &str,
         member_type: &Option<String>,
     ) -> Result<String, CubeError> {
@@ -43,12 +103,12 @@ impl<'a> FilterSqlContext<'a> {
 
     pub fn allocate_and_cast_values(
         &self,
-        values: &[Option<String>],
+        values: &[FilterValue],
         member_type: &Option<String>,
     ) -> Result<Vec<String>, CubeError> {
         values
             .iter()
-            .filter_map(|v| v.as_ref())
+            .filter(|v| !v.is_null())
             .map(|v| self.allocate_and_cast(v, member_type))
             .collect()
     }
@@ -62,29 +122,47 @@ impl<'a> FilterSqlContext<'a> {
     }
 
     pub fn format_and_allocate_from_date(&self, value: &str) -> Result<String, CubeError> {
-        if self.use_raw_values {
-            return Ok(value.to_string());
-        }
-        if self.is_partition_range(value) {
-            return self.allocate_timestamp_param(value);
-        }
-        let precision = self.plan_templates.timestamp_precision()?;
-        let formatted = QueryDateTimeHelper::format_from_date(value, precision)?;
-        let with_tz = self.apply_db_time_zone(formatted)?;
-        self.allocate_timestamp_param(&with_tz)
+        self.format_and_allocate_date(value, DateBound::From, true)
     }
 
     pub fn format_and_allocate_to_date(&self, value: &str) -> Result<String, CubeError> {
+        self.format_and_allocate_date(value, DateBound::To, true)
+    }
+
+    pub fn format_and_allocate_from_date_no_cast(&self, value: &str) -> Result<String, CubeError> {
+        self.format_and_allocate_date(value, DateBound::From, false)
+    }
+
+    pub fn format_and_allocate_to_date_no_cast(&self, value: &str) -> Result<String, CubeError> {
+        self.format_and_allocate_date(value, DateBound::To, false)
+    }
+
+    fn format_and_allocate_date(
+        &self,
+        value: &str,
+        bound: DateBound,
+        cast: bool,
+    ) -> Result<String, CubeError> {
+        let allocate = |value: &str| {
+            if cast {
+                self.allocate_timestamp_param(value)
+            } else {
+                Ok(self.query_tools.allocate_param(value))
+            }
+        };
         if self.use_raw_values {
             return Ok(value.to_string());
         }
         if self.is_partition_range(value) {
-            return self.allocate_timestamp_param(value);
+            return allocate(value);
         }
         let precision = self.plan_templates.timestamp_precision()?;
-        let formatted = QueryDateTimeHelper::format_to_date(value, precision)?;
+        let formatted = match bound {
+            DateBound::From => QueryDateTimeHelper::format_from_date(value, precision)?,
+            DateBound::To => QueryDateTimeHelper::format_to_date(value, precision)?,
+        };
         let with_tz = self.apply_db_time_zone(formatted)?;
-        self.allocate_timestamp_param(&with_tz)
+        allocate(&with_tz)
     }
 
     fn is_partition_range(&self, value: &str) -> bool {
@@ -136,6 +214,7 @@ impl<'a> FilterSqlContext<'a> {
             None,
             None,
             false,
+            false,
         )?;
         let to = self.plan_templates.select(
             vec![],
@@ -147,6 +226,7 @@ impl<'a> FilterSqlContext<'a> {
             vec![],
             None,
             None,
+            false,
             false,
         )?;
         Ok((format!("({})", from), format!("({})", to)))
@@ -179,4 +259,41 @@ impl<'a> FilterSqlContext<'a> {
 
 pub trait FilterOperationSql {
     fn to_sql(&self, ctx: &FilterSqlContext) -> Result<String, CubeError>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::FilterSqlContext;
+
+    fn as_operand(member_sql: &str) -> String {
+        FilterSqlContext::as_operand(member_sql)
+    }
+
+    #[test]
+    fn atomic_expression_stays_bare() {
+        assert_eq!(as_operand("amount"), "amount");
+        assert_eq!(as_operand("sum(amount)"), "sum(amount)");
+        assert_eq!(as_operand(""), "");
+    }
+
+    #[test]
+    fn compound_expression_is_wrapped() {
+        assert_eq!(as_operand("amount > 50"), "(amount > 50)");
+        assert_eq!(
+            as_operand("sum(amount) IS NOT NULL"),
+            "(sum(amount) IS NOT NULL)"
+        );
+    }
+
+    // The closing parenthesis, not precedence, is what a trailing line comment
+    // threatens, so the comment decides before atomicity does.
+    #[test]
+    fn trailing_line_comment_wraps_on_its_own_line() {
+        assert_eq!(as_operand("amount -- as is"), "(amount -- as is\n)");
+        assert_eq!(
+            as_operand("amount + 1 -- one more"),
+            "(amount + 1 -- one more\n)"
+        );
+        assert_eq!(as_operand("amount -- note\n + 1"), "(amount -- note\n + 1)");
+    }
 }

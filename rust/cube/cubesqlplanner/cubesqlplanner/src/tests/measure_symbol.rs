@@ -1,6 +1,9 @@
-//! Tests for MeasureSymbol: kind classification, new_patched, and helper methods
+//! Tests for MeasureSymbol: kind classification, the patch_measure transform, and helper methods
 
-use crate::planner::{AggregationType, CalculatedMeasureType, MeasureKind, SqlCall};
+use crate::planner::symbols::transforms::{measures_as_state, patch_measure};
+use crate::planner::{
+    AggregationType, CalculatedMeasureType, MeasureKind, MeasureRenderModifier, SqlCall,
+};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use std::rc::Rc;
@@ -25,10 +28,9 @@ fn measure_count_properties() {
 
     assert!(matches!(measure.kind(), MeasureKind::Count(_)));
     assert!(!measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_rolling_window());
     assert!(!measure.is_cumulative());
-    assert!(measure.is_addictive());
+    assert!(measure.is_additive());
 }
 
 #[test]
@@ -42,10 +44,9 @@ fn measure_sum_properties() {
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Sum
     ));
     assert!(!measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_rolling_window());
     assert!(!measure.is_cumulative());
-    assert!(measure.is_addictive());
+    assert!(measure.is_additive());
 }
 
 #[test]
@@ -59,9 +60,8 @@ fn measure_avg_properties() {
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Avg
     ));
     assert!(!measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
-    assert!(!measure.is_addictive());
+    assert!(!measure.is_additive());
 }
 
 #[test]
@@ -75,9 +75,8 @@ fn measure_min_properties() {
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Min
     ));
     assert!(!measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
-    assert!(measure.is_addictive());
+    assert!(measure.is_additive());
 }
 
 #[test]
@@ -91,9 +90,8 @@ fn measure_max_properties() {
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Max
     ));
     assert!(!measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
-    assert!(measure.is_addictive());
+    assert!(measure.is_additive());
 }
 
 #[test]
@@ -107,9 +105,8 @@ fn measure_count_distinct_properties() {
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::CountDistinct
     ));
     assert!(!measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
-    assert!(!measure.is_addictive());
+    assert!(!measure.is_additive());
 }
 
 #[test]
@@ -123,26 +120,8 @@ fn measure_count_distinct_approx_properties() {
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::CountDistinctApprox
     ));
     assert!(!measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
-    assert!(measure.is_addictive());
-}
-
-#[test]
-fn measure_running_total_properties() {
-    let ctx = ctx();
-    let m = ctx.create_measure("test_measures.running").unwrap();
-    let measure = m.as_measure().unwrap();
-
-    assert!(matches!(
-        measure.kind(),
-        MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::RunningTotal
-    ));
-    assert!(!measure.is_calculated());
-    assert!(measure.is_running_total());
-    assert!(!measure.is_rolling_window());
-    assert!(measure.is_cumulative());
-    assert!(measure.is_addictive());
+    assert!(measure.is_additive());
 }
 
 #[test]
@@ -156,9 +135,8 @@ fn measure_number_agg_properties() {
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::NumberAgg
     ));
     assert!(!measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
-    assert!(!measure.is_addictive());
+    assert!(!measure.is_additive());
 }
 
 #[test]
@@ -172,9 +150,8 @@ fn measure_calculated_number_properties() {
         MeasureKind::Calculated(c) if c.calc_type() == CalculatedMeasureType::Number
     ));
     assert!(measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
-    assert!(!measure.is_addictive());
+    assert!(!measure.is_additive());
 }
 
 #[test]
@@ -185,9 +162,8 @@ fn measure_rank_properties() {
 
     assert!(matches!(measure.kind(), MeasureKind::Rank));
     assert!(!measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
-    assert!(!measure.is_addictive());
+    assert!(!measure.is_additive());
 }
 
 #[test]
@@ -202,13 +178,12 @@ fn measure_rolling_window_properties() {
     ));
     assert!(measure.is_rolling_window());
     assert!(measure.is_cumulative());
-    assert!(!measure.is_running_total());
 }
 
-// ─── new_patched: valid type replacements ───────────────────────────────────
+// ─── patch_measure: valid type replacements ───────────────────────────────────
 
 #[test]
-fn new_patched_sum_to_all_valid_targets() {
+fn patch_sum_to_all_valid_targets() {
     let ctx = ctx();
     let m = ctx.create_measure("test_measures.total").unwrap();
     let measure = m.as_measure().unwrap();
@@ -225,8 +200,7 @@ fn new_patched_sum_to_all_valid_targets() {
         ),
     ];
     for (new_type, expected_agg) in cases {
-        let patched = measure
-            .new_patched(Some(new_type.to_string()), vec![])
+        let patched = patch_measure(&measure, Some(new_type.to_string()), vec![])
             .unwrap_or_else(|e| panic!("sum -> {} should succeed: {}", new_type, e));
         assert!(
             matches!(patched.kind(), MeasureKind::Aggregated(a) if a.agg_type() == expected_agg),
@@ -238,14 +212,10 @@ fn new_patched_sum_to_all_valid_targets() {
 }
 
 #[test]
-fn new_patched_avg_to_sum() {
+fn patch_avg_to_sum() {
     let ctx = ctx();
     let m = ctx.create_measure("test_measures.average").unwrap();
-    let patched = m
-        .as_measure()
-        .unwrap()
-        .new_patched(Some("sum".to_string()), vec![])
-        .unwrap();
+    let patched = patch_measure(&m.as_measure().unwrap(), Some("sum".to_string()), vec![]).unwrap();
     assert!(matches!(
         patched.kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Sum
@@ -253,45 +223,45 @@ fn new_patched_avg_to_sum() {
 }
 
 #[test]
-fn new_patched_count_distinct_family() {
+fn patch_count_distinct_family() {
     let ctx = ctx();
 
     let cd = ctx.create_measure("test_measures.distinct_count").unwrap();
-    let patched = cd
-        .as_measure()
-        .unwrap()
-        .new_patched(Some("count_distinct_approx".to_string()), vec![])
-        .unwrap();
+    let patched = patch_measure(
+        &cd.as_measure().unwrap(),
+        Some("count_distinct_approx".to_string()),
+        vec![],
+    )
+    .unwrap();
     assert!(matches!(
         patched.kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::CountDistinctApprox
     ));
 
     let cda = ctx.create_measure("test_measures.approx_count").unwrap();
-    let patched = cda
-        .as_measure()
-        .unwrap()
-        .new_patched(Some("count_distinct".to_string()), vec![])
-        .unwrap();
+    let patched = patch_measure(
+        &cda.as_measure().unwrap(),
+        Some("count_distinct".to_string()),
+        vec![],
+    )
+    .unwrap();
     assert!(matches!(
         patched.kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::CountDistinct
     ));
 }
 
-// ─── new_patched: invalid type replacements ─────────────────────────────────
+// ─── patch_measure: invalid type replacements ─────────────────────────────────
 
 #[test]
-fn new_patched_sum_invalid_targets() {
+fn patch_sum_invalid_targets() {
     let ctx = ctx();
     let m = ctx.create_measure("test_measures.total").unwrap();
     let measure = m.as_measure().unwrap();
 
-    for invalid in ["number", "count", "runningTotal", "rank", "numberAgg"] {
+    for invalid in ["number", "count", "rank", "numberAgg"] {
         assert!(
-            measure
-                .new_patched(Some(invalid.to_string()), vec![])
-                .is_err(),
+            patch_measure(&measure, Some(invalid.to_string()), vec![]).is_err(),
             "sum -> {} should fail",
             invalid
         );
@@ -299,72 +269,64 @@ fn new_patched_sum_invalid_targets() {
 }
 
 #[test]
-fn new_patched_count_distinct_to_sum_error() {
+fn patch_count_distinct_to_sum_error() {
     let ctx = ctx();
     let m = ctx.create_measure("test_measures.distinct_count").unwrap();
-    assert!(m
-        .as_measure()
-        .unwrap()
-        .new_patched(Some("sum".to_string()), vec![])
-        .is_err());
+    assert!(patch_measure(&m.as_measure().unwrap(), Some("sum".to_string()), vec![]).is_err());
 }
 
 #[test]
-fn new_patched_non_patchable_types() {
+fn patch_non_patchable_types() {
     let ctx = ctx();
 
     let non_patchable = [
         "test_measures.cnt",
         "test_measures.calculated",
         "test_measures.rank_measure",
-        "test_measures.running",
     ];
     for path in non_patchable {
         let m = ctx.create_measure(path).unwrap();
         assert!(
-            m.as_measure()
-                .unwrap()
-                .new_patched(Some("sum".to_string()), vec![])
-                .is_err(),
+            patch_measure(&m.as_measure().unwrap(), Some("sum".to_string()), vec![]).is_err(),
             "{} -> sum should fail",
             path
         );
     }
 }
 
-// ─── new_patched: no type change (None) ─────────────────────────────────────
+// ─── patch_measure: no type change (None) ─────────────────────────────────────
 
 #[test]
-fn new_patched_none_preserves_kind() {
+fn patch_none_preserves_kind() {
     let ctx = ctx();
 
     let m = ctx.create_measure("test_measures.total").unwrap();
-    let patched = m.as_measure().unwrap().new_patched(None, vec![]).unwrap();
+    let patched = patch_measure(&m.as_measure().unwrap(), None, vec![]).unwrap();
     assert!(matches!(
         patched.kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Sum
     ));
 
     let m = ctx.create_measure("test_measures.cnt").unwrap();
-    let patched = m.as_measure().unwrap().new_patched(None, vec![]).unwrap();
+    let patched = patch_measure(&m.as_measure().unwrap(), None, vec![]).unwrap();
     assert!(matches!(patched.kind(), MeasureKind::Count(_)));
 
     let m = ctx.create_measure("test_measures.calculated").unwrap();
-    let patched = m.as_measure().unwrap().new_patched(None, vec![]).unwrap();
+    let patched = patch_measure(&m.as_measure().unwrap(), None, vec![]).unwrap();
     assert!(matches!(
         patched.kind(),
         MeasureKind::Calculated(c) if c.calc_type() == CalculatedMeasureType::Number
     ));
 
     let m = ctx.create_measure("test_measures.rank_measure").unwrap();
-    let patched = m.as_measure().unwrap().new_patched(None, vec![]).unwrap();
+    let patched = patch_measure(&m.as_measure().unwrap(), None, vec![]).unwrap();
     assert!(matches!(patched.kind(), MeasureKind::Rank));
 }
 
-// ─── new_patched: filter addition validation ────────────────────────────────
+// ─── patch_measure: filter addition validation ────────────────────────────────
 
 #[test]
-fn new_patched_filters_accepted_for_aggregatable_types() {
+fn patch_filters_accepted_for_aggregatable_types() {
     let ctx = ctx();
     let filters = get_filter_calls(&ctx);
 
@@ -377,10 +339,7 @@ fn new_patched_filters_accepted_for_aggregatable_types() {
     ];
     for path in accept_filters {
         let m = ctx.create_measure(path).unwrap();
-        let patched = m
-            .as_measure()
-            .unwrap()
-            .new_patched(None, filters.clone())
+        let patched = patch_measure(&m.as_measure().unwrap(), None, filters.clone())
             .unwrap_or_else(|e| panic!("{} + filters should succeed: {}", path, e));
         assert!(
             !patched.measure_filters().is_empty(),
@@ -393,17 +352,14 @@ fn new_patched_filters_accepted_for_aggregatable_types() {
 // Fixed: countDistinct/countDistinctApprox now correctly support filters
 // via MeasureKind::supports_additional_filters() pattern matching.
 #[test]
-fn new_patched_count_distinct_accepts_filters() {
+fn patch_count_distinct_accepts_filters() {
     let ctx = ctx();
     let filters = get_filter_calls(&ctx);
 
     for path in ["test_measures.distinct_count", "test_measures.approx_count"] {
         let m = ctx.create_measure(path).unwrap();
         assert!(
-            m.as_measure()
-                .unwrap()
-                .new_patched(None, filters.clone())
-                .is_ok(),
+            patch_measure(&m.as_measure().unwrap(), None, filters.clone()).is_ok(),
             "{} + filters should be Ok",
             path
         );
@@ -411,42 +367,39 @@ fn new_patched_count_distinct_accepts_filters() {
 }
 
 #[test]
-fn new_patched_filters_rejected_for_non_aggregatable_types() {
+fn patch_filters_rejected_for_non_aggregatable_types() {
     let ctx = ctx();
     let filters = get_filter_calls(&ctx);
 
     let reject_filters = [
         "test_measures.calculated",
-        "test_measures.running",
         "test_measures.rank_measure",
         "test_measures.number_agg",
     ];
     for path in reject_filters {
         let m = ctx.create_measure(path).unwrap();
         assert!(
-            m.as_measure()
-                .unwrap()
-                .new_patched(None, filters.clone())
-                .is_err(),
+            patch_measure(&m.as_measure().unwrap(), None, filters.clone()).is_err(),
             "{} + filters should fail",
             path
         );
     }
 }
 
-// ─── new_patched: combined type change + filters ────────────────────────────
+// ─── patch_measure: combined type change + filters ────────────────────────────
 
 #[test]
-fn new_patched_type_change_with_filters() {
+fn patch_type_change_with_filters() {
     let ctx = ctx();
     let filters = get_filter_calls(&ctx);
 
     let m = ctx.create_measure("test_measures.total").unwrap();
-    let patched = m
-        .as_measure()
-        .unwrap()
-        .new_patched(Some("count_distinct".to_string()), filters)
-        .unwrap();
+    let patched = patch_measure(
+        &m.as_measure().unwrap(),
+        Some("count_distinct".to_string()),
+        filters,
+    )
+    .unwrap();
     assert!(matches!(
         patched.kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::CountDistinct
@@ -455,7 +408,7 @@ fn new_patched_type_change_with_filters() {
 }
 
 #[test]
-fn new_patched_appends_to_existing_filters() {
+fn patch_appends_to_existing_filters() {
     let ctx = ctx();
     let m = ctx.create_measure("test_measures.filtered_total").unwrap();
     let measure = m.as_measure().unwrap();
@@ -463,9 +416,292 @@ fn new_patched_appends_to_existing_filters() {
     assert!(original_count > 0);
 
     let new_filters = get_filter_calls(&ctx);
-    let patched = measure.new_patched(None, new_filters.clone()).unwrap();
+    let patched = patch_measure(&measure, None, new_filters.clone()).unwrap();
     assert_eq!(
         patched.measure_filters().len(),
         original_count + new_filters.len()
     );
+}
+
+// ─── State form ─────────────────────────────────────────────────────────────
+
+// Only an aggregation with a mergeable partial value has a state form,
+// and taking it twice is not possible.
+#[test]
+fn state_form_exists_only_for_count_distinct_approx() {
+    let ctx = ctx();
+    let stateful = ctx.create_measure("test_measures.approx_count").unwrap();
+    let state = stateful.as_measure().unwrap().kind().as_state();
+    assert!(matches!(
+        state,
+        Some(MeasureKind::AggregatedState(ref a)) if a.agg_type() == AggregationType::CountDistinctApprox
+    ));
+    assert!(
+        state.unwrap().as_state().is_none(),
+        "a state form has no state form of its own"
+    );
+
+    for path in [
+        "test_measures.total",
+        "test_measures.cnt",
+        "test_measures.distinct_count",
+        "test_measures.calculated",
+        "test_measures.rank_measure",
+    ] {
+        let m = ctx.create_measure(path).unwrap();
+        assert!(
+            m.as_measure().unwrap().kind().as_state().is_none(),
+            "{path} must have no state form"
+        );
+    }
+}
+
+// A stored state is not a value the query can filter or re-type: it is
+// consumed by a merge, not by an aggregation over rows.
+#[test]
+fn state_form_classification() {
+    let ctx = ctx();
+    let m = ctx.create_measure("test_measures.approx_count").unwrap();
+    let state = measures_as_state(&m).unwrap();
+    let state = state.as_measure().unwrap();
+
+    assert!(matches!(state.kind(), MeasureKind::AggregatedState(_)));
+    assert!(!state.kind().supports_additional_filters());
+    assert!(!state.kind().can_replace_type_with("count_distinct"));
+    assert_eq!(
+        state.measure_type(),
+        m.as_measure().unwrap().measure_type(),
+        "the state form keeps the aggregation it stores"
+    );
+}
+
+// ─── Render modifiers ───────────────────────────────────────────────────────
+
+// `applies_to` is the single authority for which measures may take a
+// form: stamping consults it and the render nodes assert it, so both
+// sides move together and only a test can pin the answers.
+#[test]
+fn render_modifier_row_level_forms_apply_to_every_measure() {
+    let ctx = ctx();
+    for path in [
+        "test_measures.total",
+        "test_measures.cnt",
+        "test_measures.calculated",
+        "test_measures.rank_measure",
+        "test_measures.rolling_sum",
+    ] {
+        let m = ctx.create_measure(path).unwrap();
+        let measure = m.as_measure().unwrap();
+        assert!(MeasureRenderModifier::RawValue.applies_to(&measure));
+        assert!(MeasureRenderModifier::UngroupedFinal.applies_to(&measure));
+    }
+}
+
+#[test]
+fn render_modifier_rolling_merge_requires_a_cumulative_measure() {
+    let ctx = ctx();
+    let rolling = ctx.create_measure("test_measures.rolling_sum").unwrap();
+    let plain = ctx.create_measure("test_measures.total").unwrap();
+
+    assert!(MeasureRenderModifier::RollingMerge.applies_to(&rolling.as_measure().unwrap()));
+    assert!(!MeasureRenderModifier::RollingMerge.applies_to(&plain.as_measure().unwrap()));
+}
+
+#[test]
+fn render_modifier_multi_stage_forms_require_multi_stage_measures() {
+    let ctx = ctx();
+    let rank = MeasureRenderModifier::MultiStageRank { partition: vec![] };
+    let window = MeasureRenderModifier::MultiStageWindow { partition: vec![] };
+
+    let ms_rank = ctx
+        .create_measure("test_measures.multi_stage_rank")
+        .unwrap();
+    let ms_total = ctx
+        .create_measure("test_measures.multi_stage_total")
+        .unwrap();
+    let ms_calculated = ctx
+        .create_measure("test_measures.multi_stage_calculated")
+        .unwrap();
+    let plain_rank = ctx.create_measure("test_measures.rank_measure").unwrap();
+
+    // A rank window ranks a multi-stage rank measure and nothing else.
+    assert!(rank.applies_to(&ms_rank.as_measure().unwrap()));
+    assert!(!rank.applies_to(&ms_total.as_measure().unwrap()));
+    assert!(!rank.applies_to(&plain_rank.as_measure().unwrap()));
+
+    // A value window aggregates over a partition, which a calculated
+    // measure has no aggregation for.
+    assert!(window.applies_to(&ms_total.as_measure().unwrap()));
+    assert!(!window.applies_to(&ms_calculated.as_measure().unwrap()));
+    assert!(!window.applies_to(&plain_rank.as_measure().unwrap()));
+}
+
+#[test]
+fn ensure_applies_to_names_the_rejected_form() {
+    let ctx = ctx();
+    let plain = ctx.create_measure("test_measures.total").unwrap();
+    let measure = plain.as_measure().unwrap();
+
+    assert!(MeasureRenderModifier::RollingMerge
+        .ensure_applies_to(&measure)
+        .is_err());
+    let err = MeasureRenderModifier::RollingMerge
+        .ensure_applies_to(&measure)
+        .unwrap_err();
+    assert!(
+        err.message.contains("RollingMerge") && err.message.contains("test_measures.total"),
+        "unexpected error message: {}",
+        err.message
+    );
+    assert!(MeasureRenderModifier::RawValue
+        .ensure_applies_to(&measure)
+        .is_ok());
+}
+
+// ─── Multi-stage properties + filter directive ──────────────────────────────
+
+mod multi_stage {
+    use super::*;
+    use crate::planner::MultiStageFilterMode;
+
+    fn ctx() -> TestContext {
+        let schema = MockSchema::from_yaml_file("common/multi_stage_filter.yaml");
+        TestContext::new(schema).unwrap()
+    }
+
+    #[test]
+    fn measure_multi_stage_properties_resolved() {
+        let ctx = ctx();
+        let m = ctx.create_measure("orders.revenue_filtered").unwrap();
+        let measure = m.as_measure().unwrap();
+
+        assert!(measure.is_multi_stage());
+        let ms = measure.multi_stage().expect("multi_stage present");
+
+        let exclude = ms.grain.exclude.as_ref().expect("exclude");
+        assert_eq!(exclude.len(), 1);
+        assert_eq!(exclude[0].full_name(), "orders.status");
+
+        let include = ms.grain.include.as_ref().expect("include");
+        assert_eq!(include.len(), 1);
+        assert_eq!(include[0].full_name(), "orders.city");
+
+        assert!(ms.grain.keep_only.is_none());
+    }
+
+    #[test]
+    fn measure_filter_directive_resolved() {
+        let ctx = ctx();
+        let m = ctx.create_measure("orders.revenue_filtered").unwrap();
+        let measure = m.as_measure().unwrap();
+        let ms = measure.multi_stage().expect("multi_stage present");
+        let filter = ms.filter.as_ref().expect("filter present");
+
+        assert_eq!(filter.mode, MultiStageFilterMode::Relative);
+
+        let exclude = filter.exclude.as_ref().expect("exclude");
+        assert_eq!(exclude.len(), 1);
+        assert_eq!(exclude[0].full_name(), "orders.status");
+
+        assert!(filter.keep_only.is_none());
+
+        // Include is split by classification: `revenue gt 0` (measure) +
+        // `or { city = NYC, city = SF }` (dimension OR group).
+        assert_eq!(filter.include_dimension.len(), 1);
+        assert_eq!(filter.include_measure.len(), 1);
+        assert!(filter.include_time_dimension.is_empty());
+    }
+
+    #[test]
+    fn dimension_multi_stage_filter_resolved() {
+        let ctx = ctx();
+        let d = ctx.create_dimension("orders.status_normalized").unwrap();
+        let dim = d.as_dimension().unwrap();
+
+        assert!(dim.is_multi_stage());
+        let ms = dim.multi_stage().expect("multi_stage present");
+
+        let include = ms.grain.include.as_ref().expect("include");
+        assert_eq!(include.len(), 1);
+        assert_eq!(include[0].full_name(), "orders.status");
+
+        let filter = ms.filter.as_ref().expect("filter present");
+        assert_eq!(filter.mode, MultiStageFilterMode::Relative);
+        let keep_only = filter.keep_only.as_ref().expect("keep_only");
+        assert_eq!(keep_only.len(), 1);
+        assert_eq!(keep_only[0].full_name(), "orders.city");
+        assert!(filter.exclude.is_none());
+        assert_eq!(filter.include_dimension.len(), 1);
+        assert!(filter.include_measure.is_empty());
+        assert!(filter.include_time_dimension.is_empty());
+        assert!(ms.grain.exclude.is_none());
+        assert!(ms.grain.keep_only.is_none());
+    }
+
+    #[test]
+    fn non_multi_stage_measure_has_no_multi_stage() {
+        let ctx = ctx();
+        let m = ctx.create_measure("orders.revenue").unwrap();
+        let measure = m.as_measure().unwrap();
+
+        assert!(!measure.is_multi_stage());
+        assert!(measure.multi_stage().is_none());
+    }
+
+    #[test]
+    fn measure_filter_mode_defaults_to_relative_when_omitted() {
+        let ctx = ctx();
+        let m = ctx.create_measure("orders.revenue_default_mode").unwrap();
+        let measure = m.as_measure().unwrap();
+        let ms = measure.multi_stage().expect("multi_stage present");
+        let filter = ms.filter.as_ref().expect("filter present");
+
+        assert_eq!(filter.mode, MultiStageFilterMode::Relative);
+    }
+
+    #[test]
+    fn legacy_fields_populate_grain() {
+        let ctx = ctx();
+        let m = ctx.create_measure("orders.revenue_filtered").unwrap();
+        let measure = m.as_measure().unwrap();
+        let ms = measure.multi_stage().expect("multi_stage present");
+
+        let include = ms.grain.include.as_ref().expect("include");
+        assert_eq!(include[0].full_name(), "orders.city");
+        let exclude = ms.grain.exclude.as_ref().expect("exclude");
+        assert_eq!(exclude[0].full_name(), "orders.status");
+        assert!(ms.grain.keep_only.is_none());
+    }
+
+    #[test]
+    fn grain_directive_overrides_legacy_fields() {
+        let ctx = ctx();
+        let m = ctx.create_measure("orders.revenue_with_grain").unwrap();
+        let measure = m.as_measure().unwrap();
+        let ms = measure.multi_stage().expect("multi_stage present");
+
+        let exclude = ms.grain.exclude.as_ref().expect("exclude");
+        assert_eq!(exclude.len(), 1);
+        assert_eq!(exclude[0].full_name(), "orders.status");
+
+        let include = ms.grain.include.as_ref().expect("include");
+        assert_eq!(include.len(), 1);
+        assert_eq!(include[0].full_name(), "orders.city");
+
+        assert!(ms.grain.keep_only.is_none());
+    }
+
+    #[test]
+    fn measure_filter_keep_only_and_exclude_mutually_exclusive() {
+        let schema = MockSchema::from_yaml_file("common/multi_stage_filter_invalid.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+        let err = ctx
+            .create_measure("orders.revenue_conflicting_filter")
+            .expect_err("expected error for keep_only + exclude combination");
+        assert!(
+            err.message.contains("`exclude` and `keep_only`"),
+            "unexpected error message: {}",
+            err.message
+        );
+    }
 }

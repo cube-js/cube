@@ -1,22 +1,46 @@
 use super::common::CompiledMemberPath;
+use super::deps::{self, symbol_deps};
 use super::MemberSymbol;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::state::State;
 use crate::planner::time_dimension::Granularity;
-use crate::planner::CubeRef;
 use crate::planner::{GranularityHelper, QueryDateTime, QueryDateTimeHelper};
 use chrono::Duration;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// `MemberSymbol::TimeDimension` body: a base time dimension viewed
+/// at a chosen granularity and (optionally) restricted to a date
+/// range. Not declared in the data model — created at query time on
+/// top of an existing time dimension.
 #[derive(Clone)]
 pub struct TimeDimensionSymbol {
-    base_symbol: Rc<MemberSymbol>,
-    compiled_path: CompiledMemberPath,
-    granularity: Option<String>,
-    granularity_obj: Option<Granularity>,
-    date_range: Option<(String, String)>,
-    alias_suffix: String,
+    pub(super) base_symbol: Rc<MemberSymbol>,
+    pub(super) compiled_path: CompiledMemberPath,
+    pub(super) granularity: Option<String>,
+    pub(super) granularity_obj: Option<Granularity>,
+    pub(super) date_range: Option<(String, String)>,
+    pub(super) alias_suffix: String,
+    pub(super) alias_override: Option<String>,
+    /// The value arrives already timezone-converted from the source
+    /// (a pre-aggregation rollup or an input CTE), so rendering must
+    /// not apply the conversion again. Composes with other forms: a
+    /// symbol may carry this together with future derived forms.
+    pub(super) tz_converted_at_source: bool,
+}
+
+symbol_deps! {
+    TimeDimensionSymbol {
+        granularity_obj: dep,
+        base_symbol: dep_transparent,
+        compiled_path: skip,
+        granularity: skip,
+        date_range: skip,
+        alias_suffix: skip,
+        alias_override: skip,
+        tz_converted_at_source: skip,
+    }
 }
 
 impl TimeDimensionSymbol {
@@ -26,13 +50,34 @@ impl TimeDimensionSymbol {
         granularity_obj: Option<Granularity>,
         date_range: Option<(String, String)>,
     ) -> Rc<Self> {
+        Self::new_with_alias(base_symbol, granularity, granularity_obj, date_range, None)
+    }
+
+    /// Like [`Self::new`] but with an explicit alias override (e.g. the SQL
+    /// API's `memberToAlias` entry for the granularized member). When `None`,
+    /// the alias falls back to `{base alias}_{granularity}`.
+    pub fn new_with_alias(
+        base_symbol: Rc<MemberSymbol>,
+        granularity: Option<String>,
+        granularity_obj: Option<Granularity>,
+        date_range: Option<(String, String)>,
+        alias_override: Option<String>,
+    ) -> Rc<Self> {
         let name_suffix = if let Some(granularity) = &granularity {
             granularity.clone()
         } else {
             "day".to_string()
         };
+
+        assert!(!alias_override
+            .as_ref()
+            .map(|a| a.is_empty())
+            .unwrap_or(false));
+        let alias = alias_override
+            .clone()
+            .unwrap_or_else(|| format!("{}_{}", base_symbol.alias(), name_suffix));
         let full_name = format!("{}_{}", base_symbol.full_name(), name_suffix);
-        let alias = format!("{}_{}", base_symbol.alias(), name_suffix);
+
         let compiled_path = CompiledMemberPath::new(
             base_symbol.compiled_path().cube().clone(),
             full_name,
@@ -47,11 +92,17 @@ impl TimeDimensionSymbol {
             granularity_obj,
             date_range,
             alias_suffix: name_suffix,
+            alias_override,
+            tz_converted_at_source: false,
         })
     }
 
     pub fn base_symbol(&self) -> &Rc<MemberSymbol> {
         &self.base_symbol
+    }
+
+    pub fn tz_converted_at_source(&self) -> bool {
+        self.tz_converted_at_source
     }
 
     pub fn granularity(&self) -> &Option<String> {
@@ -75,43 +126,74 @@ impl TimeDimensionSymbol {
         Ok(res)
     }
 
+    /// Returns a copy of the symbol with the granularity replaced;
+    /// the base symbol and date range are preserved.
     pub fn change_granularity(
         &self,
-        query_tools: Rc<QueryTools>,
+        // FIXME: late compilation. `State` is threaded here only to reach the
+        // `Compiler` and (re)compile a granularity during planning. Once
+        // compilation happens in an early phase, this should take the
+        // already-resolved granularity and drop the `State`/`Compiler` dependency.
+        state: Rc<State>,
         new_granularity: Option<String>,
     ) -> Result<Rc<Self>, CubeError> {
-        let evaluator_compiler_cell = query_tools.evaluator_compiler().clone();
+        let evaluator_compiler_cell = state.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
 
         let new_granularity_obj = GranularityHelper::make_granularity_obj(
-            query_tools.cube_evaluator().clone(),
+            state.cube_evaluator().clone(),
             &mut evaluator_compiler,
             &&self.base_symbol.cube_name(),
             &self.base_symbol.name(),
             new_granularity.clone(),
         )?;
         let date_range_tuple = self.date_range.clone();
-        let result = TimeDimensionSymbol::new(
+        Ok(self.derive(
             self.base_symbol.clone(),
             new_granularity.clone(),
             new_granularity_obj.clone(),
             date_range_tuple,
-        );
-        Ok(result)
+            None,
+        ))
+    }
+
+    /// Another form of the same time dimension — a different
+    /// granularity of it, or the member it references. Render marks
+    /// describe where the value comes from, which such a re-wrap does
+    /// not change, so they are carried over.
+    fn derive(
+        &self,
+        base_symbol: Rc<MemberSymbol>,
+        granularity: Option<String>,
+        granularity_obj: Option<Granularity>,
+        date_range: Option<(String, String)>,
+        alias_override: Option<String>,
+    ) -> Rc<Self> {
+        let mut new = (*Self::new_with_alias(
+            base_symbol,
+            granularity,
+            granularity_obj,
+            date_range,
+            alias_override,
+        ))
+        .clone();
+        new.tz_converted_at_source = self.tz_converted_at_source;
+        Rc::new(new)
     }
 
     pub fn compiled_path(&self) -> &CompiledMemberPath {
         &self.compiled_path
     }
 
-    pub fn strip_join_prefix(&mut self) {
-        self.compiled_path = self.compiled_path.strip_join_prefix();
-    }
-
+    /// Full unique identifier of the symbol: cube path, base
+    /// dimension name and the granularity suffix.
     pub fn full_name(&self) -> String {
         self.compiled_path.full_name().clone()
     }
 
+    /// Granularity name appended to the base symbol's alias and full
+    /// name (e.g. `day`, `month`). Defaults to `day` when no
+    /// granularity is set.
     pub fn alias_suffix(&self) -> String {
         self.alias_suffix.clone()
     }
@@ -124,21 +206,30 @@ impl TimeDimensionSymbol {
         self.base_symbol.owned_by_cube()
     }
 
+    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
+        deps::collect_deps(self)
+    }
+
     pub fn date_range_vec(&self) -> Option<Vec<String>> {
         self.date_range.clone().map(|(from, to)| vec![from, to])
     }
 
+    /// Dependencies of this symbol, with any time-dimension dep
+    /// wrapped in a `TimeDimensionSymbol` carrying this symbol's
+    /// granularity and date range. Non-time-dimension deps pass
+    /// through unchanged.
     pub fn get_dependencies_as_time_dimensions(&self) -> Vec<Rc<MemberSymbol>> {
         self.get_dependencies()
             .into_iter()
             .map(|s| match s.as_ref() {
                 MemberSymbol::Dimension(dimension_symbol) => {
                     if dimension_symbol.is_time() {
-                        let result = Self::new(
+                        let result = Self::new_with_alias(
                             s.clone(),
                             self.granularity.clone(),
                             self.granularity_obj.clone(),
                             self.date_range.clone(),
+                            self.alias_override.clone(),
                         );
                         MemberSymbol::new_time_dimension(result)
                     } else {
@@ -148,41 +239,6 @@ impl TimeDimensionSymbol {
                 _ => s.clone(),
             })
             .collect()
-    }
-
-    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let mut result = self.clone();
-        if let Some(granularity_obj) = &self.granularity_obj {
-            result.granularity_obj = Some(granularity_obj.apply_to_deps(f)?);
-        }
-        result.base_symbol = f(&self.base_symbol)?;
-        Ok(MemberSymbol::new_time_dimension(Rc::new(result)))
-    }
-
-    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
-        let mut deps = vec![];
-        if let Some(granularity_obj) = &self.granularity_obj {
-            if let Some(calendar_sql) = granularity_obj.calendar_sql() {
-                calendar_sql.extract_symbol_deps(&mut deps);
-            }
-        }
-
-        deps.append(&mut self.base_symbol.get_dependencies());
-        deps
-    }
-
-    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
-        let mut refs = vec![];
-        if let Some(granularity_obj) = &self.granularity_obj {
-            if let Some(calendar_sql) = granularity_obj.calendar_sql() {
-                calendar_sql.extract_cube_refs(&mut refs);
-            }
-        }
-        refs.append(&mut self.base_symbol.get_cube_refs());
-        refs
     }
 
     pub fn cube_name(&self) -> String {
@@ -201,6 +257,9 @@ impl TimeDimensionSymbol {
         self.base_symbol.is_multi_stage()
     }
 
+    /// False if the granularity defines its own calendar SQL — the
+    /// symbol then materially computes a value rather than forwarding
+    /// to its base. Otherwise delegates to the base symbol.
     pub fn is_reference(&self) -> bool {
         if let Some(granularity_obj) = &self.granularity_obj {
             if granularity_obj.calendar_sql().is_some() {
@@ -211,13 +270,17 @@ impl TimeDimensionSymbol {
         self.base_symbol.is_reference()
     }
 
+    /// The base member this time dimension references, re-wrapped in
+    /// a `TimeDimensionSymbol` with the same granularity and date
+    /// range. `None` if the base is not a reference.
     pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
         if let Some(base_symbol) = self.base_symbol.clone().reference_member() {
-            let new_time_dim = Self::new(
+            let new_time_dim = self.derive(
                 base_symbol,
                 self.granularity.clone(),
                 self.granularity_obj.clone(),
                 self.date_range.clone(),
+                self.alias_override.clone(),
             );
             Some(MemberSymbol::new_time_dimension(new_time_dim))
         } else {
@@ -229,6 +292,8 @@ impl TimeDimensionSymbol {
         self.compiled_path.name().clone()
     }
 
+    /// Minimum granularity implied by the `date_range` bounds — the
+    /// smallest unit that still fully contains both endpoints.
     pub fn date_range_granularity(
         &self,
         query_tools: Rc<QueryTools>,
@@ -248,6 +313,10 @@ impl TimeDimensionSymbol {
         }
     }
 
+    /// Granularity to roll up to when matching this time dimension
+    /// against a pre-aggregation. For predefined granularities or
+    /// custom granularities not aligned with the requested date range,
+    /// returns the minimum granularity needed to cover both.
     pub fn rollup_granularity(
         &self,
         query_tools: Rc<QueryTools>,
@@ -289,6 +358,10 @@ impl TimeDimensionSymbol {
         }
     }
 
+    /// Adjusts `date_range` so the start aligns with the
+    /// granularity's origin when the granularity is custom
+    /// (non-predefined). Predefined granularities and missing ranges
+    /// pass through unchanged.
     pub fn get_range_for_time_series(
         &self,
         date_range: Option<Vec<String>>,

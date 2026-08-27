@@ -3,6 +3,8 @@ use crate::logical_plan::MeasureSubquery;
 use crate::physical_plan::ReferencesBuilder;
 use crate::physical_plan::{Select, SelectBuilder};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
+use crate::planner::symbols::transforms;
+use crate::planner::MeasureRenderModifier;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -30,14 +32,6 @@ impl<'a> LogicalNodeProcessor<'a, MeasureSubquery> for MeasureSubqueryProcessor<
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut select_builder = SelectBuilder::new(from);
 
-        context_factory.set_rendered_as_multiplied_measures(
-            measure_subquery
-                .schema
-                .measures
-                .iter()
-                .map(|m| m.full_name())
-                .collect(),
-        );
         self.builder.resolve_subquery_dimensions_references(
             &measure_subquery.source.dimension_subqueries(),
             &references_builder,
@@ -46,11 +40,13 @@ impl<'a> LogicalNodeProcessor<'a, MeasureSubquery> for MeasureSubqueryProcessor<
         for dim in measure_subquery.schema.dimensions.iter() {
             select_builder.add_projection_member(dim, None);
         }
+        // The subquery emits raw row-level measure values; the enclosing
+        // aggregate select applies the actual aggregation.
         for meas in measure_subquery.schema.measures.iter() {
-            select_builder.add_projection_member(meas, None);
+            let meas =
+                transforms::measures_render_modifier(meas, &MeasureRenderModifier::RawValue)?;
+            select_builder.add_projection_member(&meas, None);
         }
-
-        context_factory.set_ungrouped_measure(true);
 
         let select = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(select)

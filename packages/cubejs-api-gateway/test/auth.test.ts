@@ -280,6 +280,69 @@ describe('test authorization', () => {
     expectSecurityContext(handlerMock.mock.calls[0][0].context.authInfo);
   });
 
+  describe('signedWithPlaygroundAuthSecret requires the dev-token scope', () => {
+    const playgroundAuthSecret = 'playgroundSecret';
+    const loggerMock = jest.fn(() => {
+      //
+    });
+
+    // The playground secret signs every token a Cube Cloud deployment mints,
+    // including ones handed to end users and external BI tools, so the
+    // signature alone must not unlock the developer affordances gated on this
+    // flag (hidden meta members, generated SQL, pre-aggregation debug info).
+    const flagFor = async (payload: Record<string, any>) => {
+      const seen: boolean[] = [];
+      const handlerMock = jest.fn((req, res) => {
+        seen.push(req.context.signedWithPlaygroundAuthSecret);
+        res.status(200).end();
+      });
+
+      const { app } = createApiGateway(handlerMock, loggerMock, { playgroundAuthSecret });
+
+      await request(app)
+        .get('/test-auth-fake')
+        .set('Authorization', `Authorization: ${generateAuthToken(payload, {}, playgroundAuthSecret)}`)
+        .expect(200);
+
+      return seen[0];
+    };
+
+    test('is false for a playground-signed token with no scope at all', async () => {
+      expect(await flagFor({ uid: 5 })).toBe(false);
+    });
+
+    test('is false for a playground-signed token scoped to something else', async () => {
+      expect(await flagFor({ uid: 5, scope: ['sql-runner', 'agents-config'] })).toBe(false);
+    });
+
+    test('is true for a playground-signed token carrying the dev-token scope', async () => {
+      expect(await flagFor({ uid: 5, scope: ['dev-token'] })).toBe(true);
+      // Alongside the service scopes it is minted with in practice.
+      expect(await flagFor({ uid: 5, scope: ['sql-runner', 'dev-token'] })).toBe(true);
+    });
+
+    test('is false when scope is not an array of scope names', async () => {
+      expect(await flagFor({ uid: 5, scope: 'dev-token' })).toBe(false);
+      expect(await flagFor({ uid: 5, scope: { 'dev-token': true } })).toBe(false);
+    });
+
+    test('is false for a token signed with the main api secret, scope or not', async () => {
+      const handlerMock = jest.fn((req, res) => {
+        expect(req.context.signedWithPlaygroundAuthSecret).toBe(false);
+        res.status(200).end();
+      });
+
+      const { app } = createApiGateway(handlerMock, loggerMock, { playgroundAuthSecret });
+
+      await request(app)
+        .get('/test-auth-fake')
+        .set('Authorization', `Authorization: ${generateAuthToken({ uid: 5, scope: ['dev-token'] }, {})}`)
+        .expect(200);
+
+      expect(handlerMock.mock.calls.length).toEqual(1);
+    });
+  });
+
   test('default authorization with JWT token and securityContext in u', async () => {
     const loggerMock = jest.fn(() => {
       //
@@ -638,6 +701,211 @@ describe('test authorization', () => {
         warning: 'Storing security context in the u property within the payload is now deprecated, please migrate: https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#authinfo',
       }
     ]);
+  });
+
+  test('apiSecrets - accepts tokens signed by any secret in the list', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+    const handlerMock = jest.fn((req, res) => {
+      res.status(200).end();
+    });
+
+    const apiSecrets = ['outgoing-secret', 'current-secret', 'incoming-secret'];
+
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      apiSecrets,
+    });
+
+    for (const secret of apiSecrets) {
+      const token = generateAuthToken({ uid: 5 }, {}, secret);
+      // eslint-disable-next-line no-await-in-loop
+      await request(app)
+        .get('/test-auth-fake')
+        .set('Authorization', `Authorization: ${token}`)
+        .expect(200);
+    }
+
+    expect(handlerMock.mock.calls.length).toEqual(apiSecrets.length);
+  });
+
+  test('apiSecrets - rejects tokens not signed by any secret in the list', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+    const handlerMock = jest.fn((req, res) => {
+      res.status(200).end();
+    });
+
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      apiSecrets: ['a', 'b', 'c'],
+    });
+
+    const badToken = generateAuthToken({ uid: 5 }, {}, 'not-in-list');
+
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${badToken}`)
+      .expect(403);
+
+    expect(handlerMock.mock.calls.length).toEqual(0);
+  });
+
+  test('apiSecrets - takes precedence over apiSecret when both are configured', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+    const handlerMock = jest.fn((req, res) => {
+      res.status(200).end();
+    });
+
+    // Base fixture's apiSecret='secret' must be ignored once apiSecrets is set.
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      apiSecrets: ['only-this-one'],
+    });
+
+    const oldSingularToken = generateAuthToken({ uid: 5 }, {}, 'secret');
+
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${oldSingularToken}`)
+      .expect(403);
+
+    const listedToken = generateAuthToken({ uid: 5 }, {}, 'only-this-one');
+
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${listedToken}`)
+      .expect(200);
+
+    expect(handlerMock.mock.calls.length).toEqual(1);
+  });
+
+  test('apiSecrets - empty array falls back to singular apiSecret', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+    const handlerMock = jest.fn((req, res) => {
+      res.status(200).end();
+    });
+
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      apiSecrets: [],
+    });
+
+    const token = generateAuthToken({ uid: 5 }, {}, 'secret');
+
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${token}`)
+      .expect(200);
+
+    expect(handlerMock.mock.calls.length).toEqual(1);
+  });
+
+  test('apiSecrets - expired token signed by a listed secret is rejected', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+    const handlerMock = jest.fn((req, res) => {
+      res.status(200).end();
+    });
+
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      apiSecrets: ['s1', 's2', 's3'],
+    });
+
+    const expiredToken = jwt.sign({ uid: 5 }, 's1', { expiresIn: '-1s' });
+
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${expiredToken}`)
+      .expect(403);
+
+    expect(handlerMock.mock.calls.length).toEqual(0);
+  });
+
+  test('apiSecrets - playground secret path is unaffected', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+    const handlerMock = jest.fn((req, res) => {
+      res.status(200).end();
+    });
+
+    const playgroundAuthSecret = 'playgroundSecret';
+
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      apiSecrets: ['outgoing', 'current'],
+      playgroundAuthSecret,
+    });
+
+    const playgroundToken = generateAuthToken({ uid: 5 }, {}, playgroundAuthSecret);
+
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${playgroundToken}`)
+      .expect(200);
+
+    const apiToken = generateAuthToken({ uid: 5 }, {}, 'current');
+
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${apiToken}`)
+      .expect(200);
+
+    expect(handlerMock.mock.calls.length).toEqual(2);
+  });
+
+  test('apiSecrets - coexists with playgroundAuthSecret (both sources active)', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+    const handlerMock = jest.fn((req, res) => {
+      res.status(200).end();
+    });
+
+    const playgroundAuthSecret = 'playgroundSecret';
+
+    // Base fixture's singular apiSecret='secret' is shadowed by apiSecrets.
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      apiSecrets: ['outgoing', 'current'],
+      playgroundAuthSecret,
+    });
+
+    // A token signed by the playground secret is accepted via the system path.
+    const playgroundToken = generateAuthToken({ uid: 5 }, {}, playgroundAuthSecret);
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${playgroundToken}`)
+      .expect(200);
+
+    // A token signed by any listed secret is accepted via the main path.
+    for (const secret of ['outgoing', 'current']) {
+      const apiToken = generateAuthToken({ uid: 5 }, {}, secret);
+      // eslint-disable-next-line no-await-in-loop
+      await request(app)
+        .get('/test-auth-fake')
+        .set('Authorization', `Authorization: ${apiToken}`)
+        .expect(200);
+    }
+
+    // The singular apiSecret is shadowed by apiSecrets and is not a playground
+    // secret either, so a token signed with it is rejected by both paths.
+    const shadowedSingularToken = generateAuthToken({ uid: 5 }, {}, 'secret');
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${shadowedSingularToken}`)
+      .expect(403);
+
+    // A token signed by neither the playground secret nor any listed secret.
+    const strangerToken = generateAuthToken({ uid: 5 }, {}, 'not-anywhere');
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${strangerToken}`)
+      .expect(403);
+
+    expect(handlerMock.mock.calls.length).toEqual(3);
   });
 
   test('coerceForSqlQuery claimsNamespace', async () => {

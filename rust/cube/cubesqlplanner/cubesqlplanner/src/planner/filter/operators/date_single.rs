@@ -6,6 +6,8 @@ pub enum DateSingleKind {
     AfterOrOn,
 }
 
+/// `DateSingle` filter operation: compares the member's date to a
+/// single boundary (`Before`, `BeforeOrOn`, `After`, `AfterOrOn`).
 #[derive(Clone, Debug)]
 pub struct DateSingleOp {
     pub(crate) kind: DateSingleKind,

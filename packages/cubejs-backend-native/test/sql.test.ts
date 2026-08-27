@@ -270,7 +270,7 @@ describe('SQLInterface', () => {
 
         throw new Error('Error was not passed from transport to the client');
       } catch (e: any) {
-        expect(e.code).toEqual('XX000');
+        expect(e.code).toEqual('58000');
         expect(e.message).toContain(
           'This error should be passed back to PostgreSQL client'
         );
@@ -423,4 +423,348 @@ describe('SQLInterface', () => {
 
     await native.shutdownInterface(instance, 'fast');
   });
+
+  // Both `throwContinueWait` states, because the flag is an opt-in that only
+  // `@cubejs-client/core` sets: with it the client polls and comes back for
+  // another attempt, without it this disconnect is the end of the road. The
+  // reporting is the same either way — the attempt delivered no result and has
+  // to be closed out — so pin both rather than leave the off case incidental.
+  test.each([
+    ['throwContinueWait off', undefined],
+    ['throwContinueWait on', true],
+  ])(
+    'client disconnect ends the /cubesql stream gracefully, not as an error (%s)',
+    async (_name, throwContinueWait) => {
+      // A client that closes the response stream before the result set has
+      // been fully written ends the attempt without delivering anything. It
+      // must not be reported as `Cube SQL Error` — that event feeds error rates
+      // and query history — and no error payload should be pushed into the
+      // stream that is already gone.
+      const loadEvents: string[] = [];
+      const methods = {
+        ...interfaceMethods(),
+        // Return data in both stream and non-stream mode: `CUBESQL_STREAM_MODE`
+        // only picks the streaming branch for limits above
+        // `non_streaming_query_max_row_limit`, and this test must behave the
+        // same either way.
+        sqlApiLoad: jest.fn(async ({ streaming, query }: any) => {
+          if (streaming) {
+            return { stream: new FakeRowStream(query) };
+          }
+          return {
+            results: [
+              {
+                annotation: {
+                  measures: {},
+                  dimensions: {},
+                  segments: {},
+                  timeDimensions: {},
+                },
+                data: {
+                  members: ['KibanaSampleDataEcommerce.order_date'],
+                  columns: [['2024-01-01T00:00:00.000']],
+                },
+              },
+            ],
+          };
+        }),
+        logLoadEvent: ({ event }: { event: string; properties: any }) => {
+          loadEvents.push(event);
+        },
+      };
+
+      const instance = await native.registerInterface({
+        ...methods,
+        canSwitchUserForSession: (_payload: any) => true,
+      });
+
+      const chunks: string[] = [];
+      const cubeSqlStream = new Writable({
+        write(chunk, _enc, callback) {
+          chunks.push(chunk.toString('utf-8'));
+          callback();
+          // Simulate the client going away right after the JSONL schema header.
+          this.destroy();
+        },
+      });
+      // The native side holds a reference to the stream and only learns it is
+      // gone through the `close` event, so the writes already in flight (and the
+      // final `end()`) hit a destroyed stream and emit ERR_STREAM_DESTROYED.
+      // Swallow them: an unhandled 'error' would fail the test.
+      cubeSqlStream.on('error', jest.fn());
+      // `exec_sql` delivers a failure as the *argument* to the stream's `end`,
+      // not through `write`, so the spy has to be in place before `execSql`
+      // roots the function.
+      const endSpy = jest.spyOn(cubeSqlStream, 'end');
+
+      try {
+        await native.execSql(
+          instance,
+          'SELECT order_date FROM KibanaSampleDataEcommerce ORDER BY order_date DESC LIMIT 100000;',
+          cubeSqlStream,
+          null,
+          'stale-if-slow',
+          undefined,
+          throwContinueWait
+        );
+
+        expect(loadEvents).toContain('Load Request');
+        expect(loadEvents).not.toContain('Cube SQL Error');
+        // `Load Request` is logged when the attempt starts, so the disconnect
+        // owes it a terminal event — otherwise the request dangles and query
+        // history cannot account for its running time. `Continue wait` is the
+        // event that closes an attempt which produced no result, which is what
+        // happened here whether or not the client intends to poll again.
+        // Asserting `Load Request Success` is absent also keeps the test honest:
+        // it would pass vacuously had the query simply finished before the
+        // `close` event arrived.
+        expect(loadEvents).toContain('Continue wait');
+        expect(loadEvents).not.toContain('Load Request Success');
+        // The stream is closed with no error payload. This is the half of the
+        // fix that `loadEvents` does not cover, and it has to be asserted on
+        // `end` rather than on the written chunks: `exec_sql` passes the
+        // `{"error": ...}` JSONL line to `end` as an argument.
+        expect(endSpy).toHaveBeenCalled();
+        expect(endSpy.mock.calls[0]).toHaveLength(0);
+        // Only the JSONL schema header made it out — everything after it hit a
+        // stream that was already destroyed.
+        expect(chunks).toHaveLength(1);
+        expect(JSON.parse(chunks[0].trim()).schema).toBeDefined();
+      } finally {
+        await native.shutdownInterface(instance, 'fast');
+      }
+    }
+  );
+
+  test('external flag is surfaced in /cubesql JSONL schema header when set to true', async () => {
+    // End-to-end coverage of the cubesql -> backend-native -> JSONL path:
+    // the non-streaming `load` returns a V1LoadResponseColumnar with
+    // `external: true`, which cubesql deserializes into
+    // `V1LoadResult.external`, propagates into the Arrow schema metadata
+    // as `external = "true"`, and node_export.rs emits it as a top-level
+    // `external: true` field on the JSONL schema header consumed by the
+    // /v1/cubesql HTTP endpoint.
+    //
+    // sqlApiLoad returning a plain object drives the
+    // `ValueFromJs::String` branch in transport.rs (via
+    // `wrapNativeFunctionWithStream`, which JSON.stringifies the response
+    // for us) and exercises `convert_transport_response_columnar`,
+    // avoiding the ResultWrapper construction overhead the production
+    // gateway uses.
+    const methods = {
+      ...interfaceMethods(),
+      sqlApiLoad: jest.fn(async ({ streaming, query }: any) => {
+        if (streaming) {
+          return { stream: new FakeRowStream(query) };
+        }
+        // Plain object — wrapNativeFunctionWithStream JSON.stringifies the
+        // response itself before handing it to the Rust side.
+        return {
+          results: [
+            {
+              annotation: {
+                measures: {},
+                dimensions: {},
+                segments: {},
+                timeDimensions: {},
+              },
+              data: {
+                members: ['KibanaSampleDataEcommerce.order_date'],
+                columns: [['2024-01-01T00:00:00.000']],
+              },
+              lastRefreshTime: '2024-01-01T00:00:00.000Z',
+              external: true,
+            },
+          ],
+        };
+      }),
+    };
+
+    const instance = await native.registerInterface({
+      ...methods,
+      canSwitchUserForSession: (_payload: any) => true,
+    });
+
+    let buf = '';
+    const lines: any[] = [];
+    const write = jest.fn((chunk, _enc, callback) => {
+      const raw = (buf + chunk.toString('utf-8')).split('\n');
+      buf = raw.pop() || '';
+      for (const l of raw) {
+        if (l.trim().length) {
+          lines.push(JSON.parse(l));
+        }
+      }
+      callback();
+    });
+    const cubeSqlStream = new Writable({ write });
+
+    try {
+      await native.execSql(
+        instance,
+        'SELECT order_date FROM KibanaSampleDataEcommerce LIMIT 1;',
+        cubeSqlStream
+      );
+
+      const schemaLine = lines.find((o) => o.schema);
+      expect(schemaLine).toBeDefined();
+      expect(schemaLine.external).toBe(true);
+      // lastRefreshTime should also be passed through unchanged.
+      expect(schemaLine.lastRefreshTime).toBe('2024-01-01T00:00:00.000Z');
+    } finally {
+      await native.shutdownInterface(instance, 'fast');
+    }
+  });
+
+  test('external flag is absent from /cubesql JSONL header when set to false', async () => {
+    const methods = {
+      ...interfaceMethods(),
+      sqlApiLoad: jest.fn(async ({ streaming, query }: any) => {
+        if (streaming) {
+          return { stream: new FakeRowStream(query) };
+        }
+        return {
+          results: [
+            {
+              annotation: {
+                measures: {},
+                dimensions: {},
+                segments: {},
+                timeDimensions: {},
+              },
+              data: {
+                members: ['KibanaSampleDataEcommerce.order_date'],
+                columns: [['2024-01-01T00:00:00.000']],
+              },
+              lastRefreshTime: '2024-01-01T00:00:00.000Z',
+              external: false,
+            },
+          ],
+        };
+      }),
+    };
+
+    const instance = await native.registerInterface({
+      ...methods,
+      canSwitchUserForSession: (_payload: any) => true,
+    });
+
+    let buf = '';
+    const lines: any[] = [];
+    const write = jest.fn((chunk, _enc, callback) => {
+      const raw = (buf + chunk.toString('utf-8')).split('\n');
+      buf = raw.pop() || '';
+      for (const l of raw) {
+        if (l.trim().length) {
+          lines.push(JSON.parse(l));
+        }
+      }
+      callback();
+    });
+    const cubeSqlStream = new Writable({ write });
+
+    try {
+      await native.execSql(
+        instance,
+        'SELECT order_date FROM KibanaSampleDataEcommerce LIMIT 1;',
+        cubeSqlStream
+      );
+
+      const schemaLine = lines.find((o) => o.schema);
+      expect(schemaLine).toBeDefined();
+      // Boolean flag must be omitted (rather than emitted as `false`) when
+      // not served from CubeStore, so the JSONL header stays compact.
+      expect(schemaLine.external).toBeUndefined();
+      expect(schemaLine.lastRefreshTime).toBe('2024-01-01T00:00:00.000Z');
+    } finally {
+      await native.shutdownInterface(instance, 'fast');
+    }
+  });
+
+  // A calculated projection over MEASURE() (a query-level member expression,
+  // e.g. an "average order value" field) leaves the cube scan wrapped in
+  // DataFusion Projection/Sort nodes. Those build their own output schema and
+  // drop the scan's `lastRefreshTime` / `external` metadata, so the JSONL
+  // header used to come back without them while the same base measures queried
+  // plainly did carry them.
+  //
+  // Both queries carry an explicit LIMIT to pin them to the buffered path.
+  // `CubeScanExecutionPlan::execute` switches to `load_stream` when stream mode
+  // is on and the request has no limit, and that branch never runs `load_data`,
+  // so no freshness metadata is recorded at all — a known gap, and this suite
+  // runs under CUBESQL_STREAM_MODE=true in CI.
+  test.each([
+    [
+      'plain measure projection',
+      'SELECT customer_gender, MEASURE(count) AS cnt FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 10;',
+    ],
+    [
+      'calculated projection over MEASURE()',
+      'SELECT customer_gender, ROUND(MEASURE(maxPrice) / MEASURE(count), 2) AS avg_value, MEASURE(count) AS cnt FROM KibanaSampleDataEcommerce GROUP BY 1 ORDER BY 3 DESC LIMIT 10;',
+    ],
+  ])(
+    'lastRefreshTime and external survive in /cubesql JSONL header for a %s',
+    async (_name, sql) => {
+      const methods = {
+        ...interfaceMethods(),
+        sqlApiLoad: jest.fn(async ({ streaming, query }: any) => {
+          if (streaming) {
+            return { stream: new FakeRowStream(query) };
+          }
+          return {
+            results: [
+              {
+                annotation: {
+                  measures: {},
+                  dimensions: {},
+                  segments: {},
+                  timeDimensions: {},
+                },
+                data: {
+                  members: [
+                    'KibanaSampleDataEcommerce.customer_gender',
+                    'KibanaSampleDataEcommerce.maxPrice',
+                    'KibanaSampleDataEcommerce.count',
+                  ],
+                  columns: [['female'], [10], [4]],
+                },
+                lastRefreshTime: '2024-01-01T00:00:00.000Z',
+                external: true,
+              },
+            ],
+          };
+        }),
+      };
+
+      const instance = await native.registerInterface({
+        ...methods,
+        canSwitchUserForSession: (_payload: any) => true,
+      });
+
+      let buf = '';
+      const lines: any[] = [];
+      const write = jest.fn((chunk, _enc, callback) => {
+        const raw = (buf + chunk.toString('utf-8')).split('\n');
+        buf = raw.pop() || '';
+        for (const l of raw) {
+          if (l.trim().length) {
+            lines.push(JSON.parse(l));
+          }
+        }
+        callback();
+      });
+      const cubeSqlStream = new Writable({ write });
+
+      try {
+        await native.execSql(instance, sql, cubeSqlStream);
+
+        const schemaLine = lines.find((o) => o.schema);
+        expect(schemaLine).toBeDefined();
+        expect(schemaLine.lastRefreshTime).toBe('2024-01-01T00:00:00.000Z');
+        expect(schemaLine.external).toBe(true);
+      } finally {
+        await native.shutdownInterface(instance, 'fast');
+      }
+    }
+  );
 });

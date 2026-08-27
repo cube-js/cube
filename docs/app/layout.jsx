@@ -80,7 +80,7 @@ const navbar = (
 const footer = <Footer />
 
 const banner = (
-  <Banner storageKey="legacy-docs-2026">
+  <Banner dismissible={false}>
     <a href="https://docs.cube.dev" target="_blank" rel="noreferrer">
       You're looking at the old Cube documentation. Visit the new docs →
     </a>

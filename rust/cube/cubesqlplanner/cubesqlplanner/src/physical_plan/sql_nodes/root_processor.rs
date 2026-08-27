@@ -7,6 +7,8 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
+/// Dispatches rendering to a kind-specific sub-chain based on the
+/// member's variant: dimension / time dimension / measure / other.
 pub struct RootSqlNode {
     dimension_processor: Rc<dyn SqlNode>,
     time_dimesions_processor: Rc<dyn SqlNode>,

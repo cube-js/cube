@@ -5,10 +5,16 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
+/// One non-root cube of a `LogicalJoin`, with the SQL expression
+/// that joins it to the rest of the tree.
 #[derive(Clone, TypedBuilder)]
 pub struct LogicalJoinItem {
     cube: Rc<Cube>,
     on_sql: Rc<SqlCall>,
+    /// Required, with no default: `false` is the answer that lets a rollup
+    /// collapsing this edge's rows serve a raw-row query, so a construction site
+    /// must not be able to omit it.
+    splits_rows: bool,
 }
 
 impl LogicalJoinItem {
@@ -18,6 +24,12 @@ impl LogicalJoinItem {
 
     pub fn on_sql(&self) -> &Rc<SqlCall> {
         &self.on_sql
+    }
+
+    /// Whether joining this cube in splits a row of its parent into
+    /// several, i.e. it sits on the `one_to_many` side of its edge.
+    pub fn splits_rows(&self) -> bool {
+        self.splits_rows
     }
 }
 
@@ -29,6 +41,32 @@ impl PrettyPrint for LogicalJoinItem {
     }
 }
 
+/// A query-level join against an opaque pre-rendered sub-query, sourced
+/// from the SQL API `subqueryJoins`. `sql` is a complete SELECT emitted
+/// verbatim; `on_sql` is the compiled join condition (it references the
+/// owning cube and the sub-query `alias` as a literal). Unlike
+/// `LogicalJoinItem` there is no joined `Cube` node, so these are carried
+/// as opaque data and never participate in input packing.
+#[derive(Clone)]
+pub struct LogicalSubqueryJoinItem {
+    pub sql: String,
+    pub alias: String,
+    pub join_type: String,
+    pub on_sql: Rc<SqlCall>,
+}
+
+impl PrettyPrint for LogicalSubqueryJoinItem {
+    fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
+        result.println(
+            &format!("SubqueryJoinItem: {} AS {}", self.join_type, self.alias),
+            state,
+        );
+    }
+}
+
+/// Join of cubes that backs a query source: a `root` cube plus
+/// non-root cubes (`joins`), optionally extended by sub-query
+/// dimensions that contribute their own joined-in CTEs.
 #[derive(Clone, TypedBuilder)]
 pub struct LogicalJoin {
     #[builder(default)]
@@ -37,6 +75,8 @@ pub struct LogicalJoin {
     joins: Vec<LogicalJoinItem>,
     #[builder(default)]
     dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
+    #[builder(default)]
+    subquery_joins: Vec<LogicalSubqueryJoinItem>,
 }
 
 impl LogicalJoin {
@@ -50,6 +90,22 @@ impl LogicalJoin {
 
     pub fn dimension_subqueries(&self) -> &Vec<Rc<DimensionSubQuery>> {
         &self.dimension_subqueries
+    }
+
+    pub fn subquery_joins(&self) -> &Vec<LogicalSubqueryJoinItem> {
+        &self.subquery_joins
+    }
+
+    /// Returns a copy of this join with the given query-level sub-query
+    /// joins attached. Used to fold in SQL-API `subqueryJoins` after the
+    /// cube join tree has been built.
+    pub fn with_subquery_joins(&self, subquery_joins: Vec<LogicalSubqueryJoinItem>) -> Rc<Self> {
+        Rc::new(Self {
+            root: self.root.clone(),
+            joins: self.joins.clone(),
+            dimension_subqueries: self.dimension_subqueries.clone(),
+            subquery_joins,
+        })
     }
 }
 
@@ -83,6 +139,7 @@ impl LogicalNode for LogicalJoin {
                 Ok(LogicalJoinItem::builder()
                     .cube(item.clone().into_logical_node()?)
                     .on_sql(self_item.on_sql().clone())
+                    .splits_rows(self_item.splits_rows())
                     .build())
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -96,6 +153,9 @@ impl LogicalNode for LogicalJoin {
                     .map(|itm| itm.clone().into_logical_node())
                     .collect::<Result<Vec<_>, _>>()?,
             )
+            // Sub-query joins are opaque data (no child plan nodes), so they are
+            // not packed/unpacked as inputs; clone them through unchanged.
+            .subquery_joins(self.subquery_joins.clone())
             .build();
 
         Ok(Rc::new(result))
@@ -184,6 +244,13 @@ impl PrettyPrint for LogicalJoin {
                 let details_state = state.new_level();
                 for subquery in self.dimension_subqueries().iter() {
                     subquery.pretty_print(result, &details_state);
+                }
+            }
+            if !self.subquery_joins().is_empty() {
+                result.println("subquery_joins:", &state);
+                let details_state = state.new_level();
+                for subquery_join in self.subquery_joins().iter() {
+                    subquery_join.pretty_print(result, &details_state);
                 }
             }
         } else {

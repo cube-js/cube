@@ -111,11 +111,27 @@ export type DryRunResponse = {
   transformedQueries: TransformedQuery[];
 };
 
+export type MetaMethodOptions = LoadMethodOptions & {
+  /**
+   * Request views only — the response's `cubes` array then contains only entries
+   * whose `type` is `view`. Over HTTP, servers predating the flag ignore it and
+   * return the full model, so callers should not assume the response is filtered;
+   * over `WebSocketTransport` such servers reject the message with a 400.
+   */
+  onlyViews?: boolean;
+};
+
 export type CubeSqlOptions = LoadMethodOptions & {
   /**
    * Query timeout in milliseconds
    */
   timeout?: number;
+  /**
+   * IANA time zone name (e.g. `America/Los_Angeles`) to run the query in,
+   * same as `query.timezone` in the REST API's `/v1/load`. Passed through
+   * verbatim. When omitted, the deployment's default time zone is used.
+   */
+  timezone?: string;
 };
 
 export type CubeSqlSchemaColumn = {
@@ -702,18 +718,31 @@ class CubeApi {
     );
   }
 
-  public meta(options?: LoadMethodOptions): Promise<Meta>;
+  public meta(options?: MetaMethodOptions): Promise<Meta>;
 
-  public meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): UnsubscribeObj;
+  public meta(options?: MetaMethodOptions, callback?: LoadMethodCallback<Meta>): UnsubscribeObj;
 
   /**
    * Get meta description of cubes available for querying.
+   *
+   * Pass `onlyViews: true` to request views only — the response's `cubes` array
+   * then contains only entries whose `type` is `view`.
+   *
+   * ```js
+   * const meta = await cubeApi.meta({ onlyViews: true });
+   * ```
+   *
+   * Compatibility note: over HTTP, servers predating the flag ignore it and return
+   * the full model, so callers should not assume the response is filtered. Over
+   * `WebSocketTransport` such servers reject the message with a 400 instead, since
+   * they validate `meta` params strictly.
    */
-  public meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): Promise<Meta> | UnsubscribeObj {
+  public meta(options?: MetaMethodOptions, callback?: LoadMethodCallback<Meta>): Promise<Meta> | UnsubscribeObj {
     return this.loadMethod(
       () => this.request('meta', {
         signal: options?.signal,
         baseRequestId: options?.baseRequestId,
+        ...(options?.onlyViews ? { onlyViews: true } : {}),
       }),
       (body: MetaResponse) => new Meta(body),
       options,
@@ -764,6 +793,10 @@ class CubeApi {
           cubesqlParams.cache = options.cache;
         }
 
+        if (options?.timezone) {
+          cubesqlParams.timezone = options.timezone;
+        }
+
         const request = this.request('cubesql', cubesqlParams);
 
         return request;
@@ -786,19 +819,53 @@ class CubeApi {
 
         const [schema, ...data] = response.error.split('\n');
 
+        let parsedSchema: any;
         try {
-          const parsedSchema = JSON.parse(schema);
-          return {
-            schema: parsedSchema.schema,
-            data: data
-              .filter((d: string) => d.trim().length)
-              .map((d: string) => JSON.parse(d).data)
-              .reduce((a: any, b: any) => a.concat(b), []),
-            ...(parsedSchema.lastRefreshTime ? { lastRefreshTime: parsedSchema.lastRefreshTime } : {}),
-          };
+          parsedSchema = JSON.parse(schema);
         } catch (err) {
+          // Schema line isn't valid JSON — the whole `error` payload is a real error.
           throw new Error(response.error);
         }
+
+        const rows: any[] = [];
+
+        for (const line of data) {
+          if (line.trim().length) {
+            let parsed: any;
+            try {
+              parsed = JSON.parse(line);
+            } catch (err) {
+              // A non-JSON line after a valid schema means a malformed payload — fall
+              // back to surfacing the raw response rather than dropping rows silently.
+              throw new Error(response.error);
+            }
+
+            // The stream can interleave an error chunk after the schema (e.g. a
+            // post-processing/cast error surfaced mid-result). Such a line has no
+            // `data`, so the previous `JSON.parse(d).data` concat pushed an `undefined`
+            // "phantom" row and silently swallowed the failure. Surface it instead —
+            // matching how `cubeSqlStream` classifies `error` chunks.
+            if (parsed.error) {
+              throw new Error(parsed.error);
+            }
+
+            if (parsed.data) {
+              // Append rows one at a time instead of spreading the whole chunk as
+              // call arguments (`rows.push(...parsed.data)`). A large single-chunk
+              // result (e.g. 130k+ rows) otherwise exceeds V8's argument-count
+              // limit and throws "RangeError: Maximum call stack size exceeded".
+              for (let i = 0; i < parsed.data.length; i++) {
+                rows.push(parsed.data[i]);
+              }
+            }
+          }
+        }
+
+        return {
+          schema: parsedSchema.schema,
+          data: rows,
+          ...(parsedSchema.lastRefreshTime ? { lastRefreshTime: parsedSchema.lastRefreshTime } : {}),
+        };
       },
       options,
       callback
@@ -821,7 +888,8 @@ class CubeApi {
       baseRequestId: uuidv4(),
       params: {
         query: sqlQuery,
-        cache: options?.cache
+        cache: options?.cache,
+        timezone: options?.timezone,
       }
     });
 

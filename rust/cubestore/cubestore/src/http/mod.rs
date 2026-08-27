@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use warp::{Filter, Rejection, Reply};
 
+use crate::cachestore::QUEUE_ITEM_PROCESS_ID_MAX_LEN;
 use crate::metastore::{Column, ColumnType, ImportFormat};
 use crate::mysql::SqlAuthService;
 use crate::sql::{
@@ -13,16 +14,16 @@ use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
 use crate::util::WorkerLoop;
 use crate::{app_metrics, CubeError};
-use async_std::fs::File;
 use cubeshared::codegen::{
     root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
     HttpMessageArgs, HttpParameterValue, HttpQuery, HttpQueryArgs, HttpQueryResult,
-    HttpQueryResultArgs, HttpQueryResultArrow, HttpQueryResultArrowArgs, HttpQueryResultData,
-    HttpResultSet, HttpResultSetArgs, HttpRow, HttpRowArgs, QueryResultFormat,
+    HttpQueryResultArgs, HttpQueryResultArrow, HttpQueryResultArrowArgs, HttpQueryResultCompleted,
+    HttpQueryResultCompletedArgs, HttpQueryResultData, HttpResultSet, HttpResultSetArgs, HttpRow,
+    HttpRowArgs, QueryResultFormat,
 };
 use cubeshared::flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
 use datafusion::cube_ext;
-use futures::{AsyncWriteExt, SinkExt, Stream, StreamExt};
+use futures::{SinkExt, Stream, StreamExt};
 use futures_timer::Delay;
 use hex::ToHex;
 use http_auth_basic::Credentials;
@@ -32,16 +33,92 @@ use log::trace;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::error::Error as StdError;
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
 use tempfile::NamedTempFile;
-use tokio::io::BufReader;
+use tokio::fs::File;
+use tokio::io::{AsyncWriteExt, BufReader};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, Mutex};
+use tokio_tungstenite::tungstenite;
 use tokio_util::sync::CancellationToken;
 use warp::filters::ws::{Message, Ws};
 use warp::http::StatusCode;
 use warp::reject::Reject;
+
+/// Close code the WebSocket protocol reserves for a message a peer refuses to
+/// process because it is too large (RFC 6455 section 7.4.1, "Message Too Big").
+const MESSAGE_TOO_BIG_CLOSE_CODE: u16 = 1009;
+
+/// How much room the transport is given above the configured sizes.
+///
+/// The size limit is enforced here rather than by the transport, so that an
+/// over-limit request can be answered with an error naming the message it
+/// belongs to, on a connection that stays up for everything else multiplexed
+/// over it. That needs the message to arrive whole: `tungstenite` raises its
+/// capacity error as soon as the frame header is parsed, before the payload is
+/// read, which leaves the frame stream desynchronized and the message id
+/// unread. So the transport is configured a factor above the limit, and only
+/// enforces it as a backstop against a peer that would otherwise make the
+/// server buffer without bound. A message in between is what gets the readable
+/// error; past the backstop there is nothing to answer with but a close frame.
+///
+/// The frame limit is given the same headroom, and has to be: a client sends a
+/// query as a single frame, so an exact frame limit would refuse an over-limit
+/// message at the transport before the handler ever saw it, and at the default
+/// configuration — where `CUBESTORE_TRANSPORT_MAX_FRAME_SIZE` and
+/// `CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE` are both `64 << 20` — that is every
+/// over-limit message, leaving the readable error unreachable.
+///
+/// Frame size is not re-checked in the handler, because reassembly happens
+/// below `warp` and individual frames are never visible up here. So with the
+/// two knobs configured apart, `CUBESTORE_TRANSPORT_MAX_FRAME_SIZE` bounds a
+/// single allocation at the headroom multiple of its configured value, and the
+/// message limit is what actually enforces the policy.
+const TRANSPORT_SIZE_HEADROOM: usize = 2;
+
+/// Recognizes the error raised when an incoming message exceeds
+/// `CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE` or `CUBESTORE_TRANSPORT_MAX_FRAME_SIZE`,
+/// and renders it as a close reason. `warp` boxes the underlying `tungstenite`
+/// error, so it has to be recovered through `source()`.
+fn message_too_large_reason(
+    e: &warp::Error,
+    max_message_size: usize,
+    max_frame_size: usize,
+) -> Option<String> {
+    match e.source()?.downcast_ref::<tungstenite::Error>()? {
+        tungstenite::Error::Capacity(tungstenite::error::CapacityError::MessageTooLong {
+            size,
+            max_size,
+        }) => {
+            // `max_size` is the backstop the transport was configured with,
+            // which is the configured limit times the headroom. Report what
+            // the operator actually set, since that is the number they can
+            // change.
+            let configured = max_size / TRANSPORT_SIZE_HEADROOM;
+            // The same error covers both caps and doesn't say which one
+            // fired, so the value has to name the knob: a frame limit
+            // configured below the message limit would otherwise be reported
+            // as a message limit that never refused anything, sending an
+            // operator to the wrong environment variable. When the two are
+            // equal, as they are by default, the number is the same either
+            // way and the message limit is the one to name.
+            let limit = if configured == max_message_size {
+                "message"
+            } else if configured == max_frame_size {
+                "frame"
+            } else {
+                "transport"
+            };
+            Some(format!(
+                "Message of {} bytes exceeds the maximum {} size of {} bytes",
+                size, limit, configured
+            ))
+        }
+        _ => None,
+    }
+}
 
 pub struct HttpServer {
     bind_address: String,
@@ -62,6 +139,7 @@ crate::di_service!(HttpServer, []);
 #[derive(Debug)]
 pub enum CubeRejection {
     NotAuthorized,
+    BadRequest(String),
     Internal(String),
 }
 
@@ -69,6 +147,27 @@ impl From<CubeError> for warp::reject::Rejection {
     fn from(e: CubeError) -> Self {
         warp::reject::custom(CubeRejection::Internal(e.message.to_string()))
     }
+}
+
+/// Rate limit errors are expected under load and are still returned to the client,
+/// so they shouldn't pollute the error log.
+fn is_rate_limit_error(e: &CubeError) -> bool {
+    e.message.to_ascii_lowercase().contains("rate limit")
+}
+
+/// `process_id` is connection scoped and reaches the cachestore as `QueueItem.process_id`,
+/// so it's bounded here, on its only ingress.
+fn check_process_id_header(process_id: &Option<String>) -> Result<(), CubeRejection> {
+    if let Some(id) = process_id {
+        if id.len() > QUEUE_ITEM_PROCESS_ID_MAX_LEN {
+            return Err(CubeRejection::BadRequest(format!(
+                "x-process-id header exceeds maximum allowed length of {} characters",
+                QUEUE_ITEM_PROCESS_ID_MAX_LEN
+            )));
+        }
+    }
+
+    Ok(())
 }
 
 #[derive(Deserialize)]
@@ -117,13 +216,8 @@ impl HttpServer {
                 move |auth_header: Option<String>, process_id: Option<String>| {
                     let auth_service = auth_service.clone();
                     async move {
-                        if let Some(ref id) = process_id {
-                            if id.len() > 64 {
-                                return Err(warp::reject::custom(CubeRejection::Internal(
-                                    "x-process-id header exceeds 64 characters".to_string(),
-                                )));
-                            }
-                        }
+                        check_process_id_header(&process_id).map_err(warp::reject::custom)?;
+
                         let res = HttpServer::authorize(auth_service, auth_header).await;
                         match res {
                             Ok(user) => Ok(SqlQueryContext {
@@ -151,7 +245,7 @@ impl HttpServer {
             .and_then(move |tx: mpsc::Sender<(mpsc::Sender<Arc<HttpMessage>>, SqlQueryContext, HttpMessage)>, sql_query_context: SqlQueryContext, ws: Ws| async move {
                 let tx_to_move = tx.clone();
                 let sql_query_context = sql_query_context.clone();
-                let reply = ws.max_frame_size(max_frame_size).max_message_size(max_message_size).on_upgrade(async move |mut web_socket| {
+                let reply = ws.max_frame_size(max_frame_size.saturating_mul(TRANSPORT_SIZE_HEADROOM)).max_message_size(max_message_size.saturating_mul(TRANSPORT_SIZE_HEADROOM)).on_upgrade(async move |mut web_socket| {
                     let process_id = sql_query_context.process_id.as_deref().unwrap_or("None");
                     trace!("WebSocket connection established (process_id: {})", process_id);
                     let (response_tx, mut response_rx) = mpsc::channel::<Arc<HttpMessage>>(10000);
@@ -171,7 +265,27 @@ impl HttpServer {
                             Some(msg) = web_socket.next() => {
                                 match msg {
                                     Err(e) => {
-                                        error!("Websocket error: {:?}", e);
+                                        // Past the transport backstop the payload is refused
+                                        // before it is read, so the frame stream is left
+                                        // desynchronized and the message id is never seen: the
+                                        // connection can't be reused and the error can't be
+                                        // attributed to a query the way an over-limit request
+                                        // under the backstop is. Answer with the close code
+                                        // reserved for this instead of dropping the connection
+                                        // silently, so the client can report the size rather than
+                                        // a bare disconnect it would otherwise retry.
+                                        match message_too_large_reason(&e, max_message_size, max_frame_size) {
+                                            Some(reason) => {
+                                                error!("Websocket message too large: {}", reason);
+                                                let send_res = web_socket.send(
+                                                    Message::close_with(MESSAGE_TOO_BIG_CLOSE_CODE, reason)
+                                                ).await;
+                                                if let Err(e) = send_res {
+                                                    error!("Websocket close send error: {:?}", e)
+                                                }
+                                            }
+                                            None => error!("Websocket error: {:?}", e),
+                                        }
                                         break;
                                     }
                                     Ok(msg) => {
@@ -187,6 +301,25 @@ impl HttpServer {
 
                                             let message_id = http_message.message_id();
                                             let connection_id = http_message.connection_id().map(|s| s.to_string());
+
+                                            // Refused here rather than by the transport so the
+                                            // answer can name the message it belongs to and the
+                                            // connection survives for everything else in flight
+                                            // on it. See TRANSPORT_SIZE_HEADROOM.
+                                            if message_buffer.len() > max_message_size {
+                                                let error = format!(
+                                                    "Request of {} bytes exceeds the maximum message size of {} bytes. Reduce the size of the query, e.g. by sending fewer or smaller inline tables, or raise CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE.",
+                                                    message_buffer.len(), max_message_size
+                                                );
+                                                error!("Websocket message too large: {}", error);
+                                                let send_res = web_socket.send(
+                                                    Message::binary(HttpMessage { message_id, connection_id, command: HttpCommand::Error { error } }.bytes())
+                                                ).await;
+                                                if let Err(e) = send_res {
+                                                    error!("Websocket message send error: {:?}", e)
+                                                }
+                                                continue;
+                                            }
 
                                             match HttpMessage::read(http_message).await {
                                                 Err(e) => {
@@ -328,8 +461,15 @@ impl HttpServer {
                                     HttpCommand::CloseConnection { error } => format!("HttpCommand::CloseConnection {{ error: {:?} }}", error),
                                     HttpCommand::ResultSet { .. } => format!("HttpCommand::ResultSet {{}}"),
                                     HttpCommand::QueryResultArrow { .. } => format!("HttpCommand::QueryResultArrow {{}}"),
+                                    HttpCommand::QueryResultCompleted => format!("HttpCommand::QueryResultCompleted"),
                                 };
-                                log::error!(
+                                let level = if is_rate_limit_error(&e) {
+                                    log::Level::Warn
+                                } else {
+                                    log::Level::Error
+                                };
+                                log::log!(
+                                    level,
                                     "Error processing HTTP command (connection_id={}): {}\nThe command: {}",
                                     if let Some(c) = connection_id.as_ref() { c.as_str() } else { "(None)" },
                                     e.display_with_backtrace(),
@@ -409,6 +549,7 @@ impl HttpServer {
                             HttpCommand::CloseConnection { error } => format!("HttpCommand::CloseConnection {{ error: {:?} }}", error),
                             HttpCommand::ResultSet { .. } => format!("HttpCommand::ResultSet {{}}"),
                             HttpCommand::QueryResultArrow { .. } => format!("HttpCommand::QueryResultArrow {{}}"),
+                            HttpCommand::QueryResultCompleted => format!("HttpCommand::QueryResultCompleted"),
                         };
                         let res = HttpServer::process_command(
                             sql_service.clone(),
@@ -423,7 +564,13 @@ impl HttpServer {
                                 command,
                             },
                             Err(e) => {
-                                log::error!(
+                                let level = if is_rate_limit_error(&e) {
+                                    log::Level::Warn
+                                } else {
+                                    log::Level::Error
+                                };
+                                log::log!(
+                                    level,
                                     "Error processing HTTP command: {}\nThe command: {}",
                                     e.display_with_backtrace(),
                                     command_text,
@@ -514,6 +661,13 @@ impl HttpServer {
                                 StatusCode::FORBIDDEN,
                             ))
                         }
+                        CubeRejection::BadRequest(e) => {
+                            obj.insert("error".to_string(), e.to_string());
+                            Ok(warp::reply::with_status(
+                                warp::reply::json(&obj),
+                                StatusCode::BAD_REQUEST,
+                            ))
+                        }
                         CubeRejection::Internal(e) => {
                             obj.insert("error".to_string(), e.to_string());
                             Ok(warp::reply::with_status(
@@ -559,9 +713,6 @@ impl HttpServer {
             file.flush()
                 .await
                 .map_err(|e| CubeRejection::Internal(e.to_string()))?;
-            file.close()
-                .await
-                .map_err(|e| CubeRejection::Internal(e.to_string()))?;
         }
 
         sql_service
@@ -599,8 +750,16 @@ impl HttpServer {
                         data_frame: query_result.collect().await?,
                     }),
                     QueryResultFormat::Arrow => {
-                        let data = query_result.to_arrow_ipc_stream().await?;
-                        Ok(HttpCommand::QueryResultArrow { data })
+                        // Commands that complete without a result set (CREATE
+                        // TABLE/INSERT, queue/cache writes) carry zero columns.
+                        // There's no Arrow stream to build for them, so signal
+                        // completion with a dedicated result instead.
+                        if query_result.schema().fields().is_empty() {
+                            Ok(HttpCommand::QueryResultCompleted)
+                        } else {
+                            let data = query_result.to_arrow_ipc_stream().await?;
+                            Ok(HttpCommand::QueryResultArrow { data })
+                        }
                     }
                     other => Err(CubeError::user(format!(
                         "Unsupported response_format: {:?}",
@@ -668,6 +827,10 @@ pub enum HttpCommand {
         /// decode it with a streaming IPC reader.
         data: Vec<u8>,
     },
+    /// Command completed without a result set (zero columns) — e.g. CREATE
+    /// TABLE/INSERT or queue/cache writes. Only produced for Arrow-format
+    /// requests; the legacy path returns an empty `ResultSet` instead.
+    QueryResultCompleted,
     CloseConnection {
         error: String,
     },
@@ -685,7 +848,7 @@ impl HttpMessage {
             command_type: match self.command {
                 HttpCommand::Query { .. } => cubeshared::codegen::HttpCommand::HttpQuery,
                 HttpCommand::ResultSet { .. } => cubeshared::codegen::HttpCommand::HttpResultSet,
-                HttpCommand::QueryResultArrow { .. } => {
+                HttpCommand::QueryResultArrow { .. } | HttpCommand::QueryResultCompleted => {
                     cubeshared::codegen::HttpCommand::HttpQueryResult
                 }
                 HttpCommand::CloseConnection { .. } | HttpCommand::Error { .. } => {
@@ -742,6 +905,22 @@ impl HttpMessage {
                             &HttpQueryResultArgs {
                                 data_type: HttpQueryResultData::HttpQueryResultArrow,
                                 data: Some(arrow_table.as_union_value()),
+                            },
+                        )
+                        .as_union_value(),
+                    )
+                }
+                HttpCommand::QueryResultCompleted => {
+                    let completed_table = HttpQueryResultCompleted::create(
+                        &mut builder,
+                        &HttpQueryResultCompletedArgs {},
+                    );
+                    Some(
+                        HttpQueryResult::create(
+                            &mut builder,
+                            &HttpQueryResultArgs {
+                                data_type: HttpQueryResultData::HttpQueryResultCompleted,
+                                data: Some(completed_table.as_union_value()),
                             },
                         )
                         .as_union_value(),
@@ -1055,9 +1234,135 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
     use tokio::net::TcpStream;
-    use tokio_tungstenite::tungstenite::Message;
+    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+    use tokio_tungstenite::tungstenite::handshake::client::Request;
+    use tokio_tungstenite::tungstenite::http::HeaderValue;
+    use tokio_tungstenite::tungstenite::{Error as WsError, Message};
     use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
     use url::Url;
+
+    /// Minimal SqlService that always replies with a fixed DataFrame, used to
+    /// drive process_command in unit tests.
+    struct StubService(Arc<DataFrame>);
+    crate::di_service!(StubService, [SqlService]);
+    #[async_trait]
+    impl SqlService for StubService {
+        async fn exec_query(&self, _q: &str) -> Result<QueryResult, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn exec_query_with_context(
+            &self,
+            _ctx: SqlQueryContext,
+            _q: &str,
+        ) -> Result<QueryResult, CubeError> {
+            Ok(QueryResult::Frame(self.0.clone()))
+        }
+        async fn plan_query(&self, _q: &str) -> Result<QueryPlans, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn plan_query_with_context(
+            &self,
+            _ctx: SqlQueryContext,
+            _q: &str,
+        ) -> Result<QueryPlans, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn upload_temp_file(
+            &self,
+            _ctx: SqlQueryContext,
+            _name: String,
+            _path: &Path,
+        ) -> Result<(), CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn temp_uploads_dir(&self, _ctx: SqlQueryContext) -> Result<String, CubeError> {
+            unimplemented!("Mock")
+        }
+    }
+
+    /// Records what `upload_temp_file` found on disk, so a test can assert the
+    /// body had fully landed before the path was handed off.
+    struct UploadStubService {
+        dir: std::path::PathBuf,
+        seen: std::sync::Mutex<Option<Vec<u8>>>,
+    }
+    crate::di_service!(UploadStubService, [SqlService]);
+    #[async_trait]
+    impl SqlService for UploadStubService {
+        async fn exec_query(&self, _q: &str) -> Result<QueryResult, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn exec_query_with_context(
+            &self,
+            _ctx: SqlQueryContext,
+            _q: &str,
+        ) -> Result<QueryResult, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn plan_query(&self, _q: &str) -> Result<QueryPlans, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn plan_query_with_context(
+            &self,
+            _ctx: SqlQueryContext,
+            _q: &str,
+        ) -> Result<QueryPlans, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn upload_temp_file(
+            &self,
+            _ctx: SqlQueryContext,
+            _name: String,
+            path: &Path,
+        ) -> Result<(), CubeError> {
+            *self.seen.lock().unwrap() = Some(std::fs::read(path)?);
+            Ok(())
+        }
+        async fn temp_uploads_dir(&self, _ctx: SqlQueryContext) -> Result<String, CubeError> {
+            Ok(self.dir.to_string_lossy().to_string())
+        }
+    }
+
+    #[tokio::test]
+    async fn upload_writes_the_whole_body_before_handing_off_the_path() -> Result<(), CubeError> {
+        let dir = tempfile::tempdir()?;
+        let service = Arc::new(UploadStubService {
+            dir: dir.path().to_path_buf(),
+            seen: std::sync::Mutex::new(None),
+        });
+
+        // Many chunks well past the file's internal buffer: an unflushed tail
+        // would show up here as a short read.
+        let chunks: Vec<Vec<u8>> = (0..8u8).map(|i| vec![b'a' + i; 64 * 1024]).collect();
+        let expected: Vec<u8> = chunks.iter().flatten().copied().collect();
+        let body = futures::stream::iter(
+            chunks
+                .into_iter()
+                .map(|c| Ok::<bytes::Bytes, warp::Error>(bytes::Bytes::from(c))),
+        );
+
+        HttpServer::handle_upload(
+            service.clone(),
+            SqlQueryContext::default(),
+            UploadQuery {
+                name: "upload.csv".to_string(),
+            },
+            body,
+        )
+        .await
+        .map_err(|e| CubeError::internal(format!("{:?}", e)))?;
+
+        let seen = service
+            .seen
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("upload_temp_file was never reached");
+        // Compared without pretty_assertions to keep a failure from dumping 512KB.
+        assert_eq!(seen.len(), expected.len());
+        assert!(seen == expected, "uploaded bytes differ from the body");
+        Ok(())
+    }
 
     fn build_types<'a: 'ma, 'ma>(
         builder: &'ma mut FlatBufferBuilder<'a>,
@@ -1188,7 +1493,7 @@ mod tests {
     #[tokio::test]
     async fn arrow_response_format_round_trip() -> Result<(), CubeError> {
         use crate::queryplanner::query_executor::batches_to_dataframe;
-        use crate::sql::{timestamp_from_string, QueryResult};
+        use crate::sql::timestamp_from_string;
         use crate::util::decimal::{Decimal, Decimal96};
         use crate::util::int96::Int96;
         use cubeshared::codegen::{root_as_http_message, HttpQueryResultData};
@@ -1248,43 +1553,6 @@ mod tests {
         let original_df = Arc::new(DataFrame::new(columns.clone(), rows));
 
         // 2. Drive process_command with response_format = Arrow.
-        struct StubService(Arc<DataFrame>);
-        crate::di_service!(StubService, [SqlService]);
-        #[async_trait]
-        impl SqlService for StubService {
-            async fn exec_query(&self, _q: &str) -> Result<QueryResult, CubeError> {
-                unimplemented!("Mock")
-            }
-            async fn exec_query_with_context(
-                &self,
-                _ctx: SqlQueryContext,
-                _q: &str,
-            ) -> Result<QueryResult, CubeError> {
-                Ok(QueryResult::Frame(self.0.clone()))
-            }
-            async fn plan_query(&self, _q: &str) -> Result<QueryPlans, CubeError> {
-                unimplemented!("Mock")
-            }
-            async fn plan_query_with_context(
-                &self,
-                _ctx: SqlQueryContext,
-                _q: &str,
-            ) -> Result<QueryPlans, CubeError> {
-                unimplemented!("Mock")
-            }
-            async fn upload_temp_file(
-                &self,
-                _ctx: SqlQueryContext,
-                _name: String,
-                _path: &Path,
-            ) -> Result<(), CubeError> {
-                unimplemented!("Mock")
-            }
-            async fn temp_uploads_dir(&self, _ctx: SqlQueryContext) -> Result<String, CubeError> {
-                unimplemented!("Mock")
-            }
-        }
-
         let svc = Arc::new(StubService(original_df.clone()));
         let resp = HttpServer::process_command(
             svc,
@@ -1336,6 +1604,56 @@ mod tests {
         assert_eq!(decoded.get_rows().len(), original_df.get_rows().len());
 
         insta::assert_snapshot!("arrow_response_format_round_trip", decoded.print());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn arrow_response_format_zero_columns_completed() -> Result<(), CubeError> {
+        use cubeshared::codegen::{root_as_http_message, HttpQueryResultData};
+
+        // Write commands (CREATE TABLE/INSERT, queue/cache writes) produce a
+        // result with zero columns. For Arrow-format requests there's no Arrow
+        // stream to build, so the server answers with QueryResultCompleted.
+        let empty_df = Arc::new(DataFrame::new(vec![], vec![]));
+
+        let svc = Arc::new(StubService(empty_df));
+        let resp = HttpServer::process_command(
+            svc,
+            SqlQueryContext::default(),
+            HttpCommand::Query {
+                query: "CREATE TABLE s.t (id int)".to_string(),
+                inline_tables: vec![],
+                trace_obj: None,
+                parameters: None,
+                response_format: QueryResultFormat::Arrow,
+            },
+        )
+        .await?;
+        assert!(
+            matches!(resp, HttpCommand::QueryResultCompleted),
+            "expected QueryResultCompleted, got: {:?}",
+            resp
+        );
+
+        // Round-trip through HttpMessage::bytes() and verify the wire shape.
+        let wire = HttpMessage {
+            message_id: 7,
+            command: HttpCommand::QueryResultCompleted,
+            connection_id: None,
+        }
+        .bytes();
+        let parsed = root_as_http_message(&wire)?;
+        assert_eq!(
+            parsed.command_type(),
+            cubeshared::codegen::HttpCommand::HttpQueryResult
+        );
+        let result = parsed.command_as_http_query_result().unwrap();
+        assert_eq!(
+            result.data_type(),
+            HttpQueryResultData::HttpQueryResultCompleted
+        );
+        assert!(result.data_as_http_query_result_completed().is_some());
 
         Ok(())
     }
@@ -1576,6 +1894,347 @@ mod tests {
 
         let mut socket2 = connect_and_send(3, Some("foo2".to_string())).await;
         assert_message(&mut socket2, "10").await;
+
+        http_server.stop_processing().await;
+        Ok(())
+    }
+
+    #[test]
+    fn check_process_id_header_bounds() {
+        assert!(check_process_id_header(&None).is_ok());
+        assert!(check_process_id_header(&Some("".to_string())).is_ok());
+        assert!(
+            check_process_id_header(&Some("x".repeat(QUEUE_ITEM_PROCESS_ID_MAX_LEN))).is_ok(),
+            "the limit is inclusive"
+        );
+
+        let res = check_process_id_header(&Some("x".repeat(QUEUE_ITEM_PROCESS_ID_MAX_LEN + 1)));
+        match res {
+            Err(CubeRejection::BadRequest(msg)) => assert!(
+                msg.contains("x-process-id header exceeds maximum allowed length"),
+                "unexpected message: {}",
+                msg
+            ),
+            other => panic!("Expected CubeRejection::BadRequest, actual: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn ws_process_id_header_test() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let mut auth = MockSqlAuthService::new();
+        auth.expect_authenticate().return_const(Ok(None));
+
+        let config = Config::test("ws_process_id_header_test").config_obj();
+
+        let http_server = Arc::new(HttpServer::new(
+            "127.0.0.1:53032".to_string(),
+            Arc::new(auth),
+            Arc::new(SqlServiceMock {
+                message_counter: AtomicU64::new(0),
+            }),
+            Duration::from_millis(100),
+            Duration::from_millis(10000),
+            Duration::from_millis(1000),
+            config.transport_max_message_size(),
+            config.transport_max_frame_size(),
+        ));
+        {
+            let http_server = http_server.clone();
+            cube_ext::spawn(async move { http_server.run_server().await });
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        fn connect_request(process_id: &str) -> Request {
+            let mut request = "ws://127.0.0.1:53032/ws".into_client_request().unwrap();
+            request
+                .headers_mut()
+                .insert("x-process-id", HeaderValue::from_str(process_id).unwrap());
+            request
+        }
+
+        let err = connect_async(connect_request(
+            &"x".repeat(QUEUE_ITEM_PROCESS_ID_MAX_LEN + 1),
+        ))
+        .await
+        .err()
+        .expect("expected the handshake to be rejected");
+        match err {
+            WsError::Http(response) => assert_eq!(response.status().as_u16(), 400),
+            other => panic!("Expected an http error, actual: {:?}", other),
+        }
+
+        let (socket, _) =
+            connect_async(connect_request(&"x".repeat(QUEUE_ITEM_PROCESS_ID_MAX_LEN)))
+                .await
+                .expect("a header at the limit should be accepted");
+        drop(socket);
+
+        http_server.stop_processing().await;
+        Ok(())
+    }
+
+    /// An incoming message past the transport backstop is answered with the
+    /// WebSocket "message too big" close code instead of the connection being
+    /// dropped without a word, which the client can only read as a bare
+    /// disconnect and retry.
+    #[tokio::test]
+    async fn ws_message_too_large_test() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let max_message_size = 4 * 1024;
+        let mut auth = MockSqlAuthService::new();
+        auth.expect_authenticate().return_const(Ok(None));
+
+        let http_server = Arc::new(HttpServer::new(
+            "127.0.0.1:53033".to_string(),
+            Arc::new(auth),
+            Arc::new(SqlServiceMock {
+                message_counter: AtomicU64::new(0),
+            }),
+            Duration::from_millis(100),
+            Duration::from_millis(10000),
+            Duration::from_millis(1000),
+            max_message_size,
+            max_message_size,
+        ));
+        {
+            let http_server = http_server.clone();
+            cube_ext::spawn(async move { http_server.run_server().await });
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let (mut socket, _) = connect_async(Url::parse("ws://127.0.0.1:53033/ws").unwrap())
+            .await
+            .unwrap();
+
+        // Clear of the headroom the graceful path is given, so that the server
+        // refuses the frame before it can read the message id back out of it.
+        socket
+            .send(Message::binary(
+                HttpMessage {
+                    message_id: 1,
+                    command: HttpCommand::Query {
+                        query: "s".repeat(max_message_size * TRANSPORT_SIZE_HEADROOM * 2),
+                        inline_tables: vec![],
+                        trace_obj: None,
+                        parameters: None,
+                        response_format: QueryResultFormat::Legacy,
+                    },
+                    connection_id: Some("foo".to_string()),
+                }
+                .bytes(),
+            ))
+            .await
+            .unwrap();
+
+        let msg = socket.next().await.unwrap().unwrap();
+        match msg {
+            Message::Close(Some(frame)) => {
+                assert_eq!(u16::from(frame.code), MESSAGE_TOO_BIG_CLOSE_CODE);
+                // The configured limit, not the backstop the transport is
+                // given: that is the number an operator set and can change.
+                assert!(
+                    frame.reason.contains(&format!(
+                        "exceeds the maximum message size of {} bytes",
+                        max_message_size
+                    )),
+                    "unexpected close reason: {}",
+                    frame.reason
+                );
+            }
+            msg => panic!("Close frame expected, got: {:?}", msg),
+        }
+
+        http_server.stop_processing().await;
+        Ok(())
+    }
+
+    /// The close reason names whichever limit refused the message. The same
+    /// capacity error covers both, so a frame limit configured below the
+    /// message limit would otherwise be reported as a message limit that never
+    /// refused anything.
+    #[tokio::test]
+    async fn ws_message_too_large_names_the_frame_limit_test() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let max_frame_size = 4 * 1024;
+        let max_message_size = max_frame_size * 4;
+        let mut auth = MockSqlAuthService::new();
+        auth.expect_authenticate().return_const(Ok(None));
+
+        let http_server = Arc::new(HttpServer::new(
+            "127.0.0.1:53035".to_string(),
+            Arc::new(auth),
+            Arc::new(SqlServiceMock {
+                message_counter: AtomicU64::new(0),
+            }),
+            Duration::from_millis(100),
+            Duration::from_millis(10000),
+            Duration::from_millis(1000),
+            max_message_size,
+            max_frame_size,
+        ));
+        {
+            let http_server = http_server.clone();
+            cube_ext::spawn(async move { http_server.run_server().await });
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let (mut socket, _) = connect_async(Url::parse("ws://127.0.0.1:53035/ws").unwrap())
+            .await
+            .unwrap();
+
+        // Past the frame backstop but inside the message one, so the frame
+        // limit is what refuses it.
+        socket
+            .send(Message::binary(
+                HttpMessage {
+                    message_id: 1,
+                    command: HttpCommand::Query {
+                        query: "s".repeat(max_frame_size * TRANSPORT_SIZE_HEADROOM * 2),
+                        inline_tables: vec![],
+                        trace_obj: None,
+                        parameters: None,
+                        response_format: QueryResultFormat::Legacy,
+                    },
+                    connection_id: Some("foo".to_string()),
+                }
+                .bytes(),
+            ))
+            .await
+            .unwrap();
+
+        let msg = socket.next().await.unwrap().unwrap();
+        match msg {
+            Message::Close(Some(frame)) => {
+                assert_eq!(u16::from(frame.code), MESSAGE_TOO_BIG_CLOSE_CODE);
+                assert!(
+                    frame.reason.contains(&format!(
+                        "exceeds the maximum frame size of {} bytes",
+                        max_frame_size
+                    )),
+                    "unexpected close reason: {}",
+                    frame.reason
+                );
+            }
+            msg => panic!("Close frame expected, got: {:?}", msg),
+        }
+
+        http_server.stop_processing().await;
+        Ok(())
+    }
+
+    /// An over-limit request that still fits within the transport headroom is
+    /// answered with an error naming the message it belongs to, and the
+    /// connection carries on serving the queries multiplexed over it.
+    #[tokio::test]
+    async fn ws_message_too_large_reports_the_message_test() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let max_message_size = 4 * 1024;
+        let mut auth = MockSqlAuthService::new();
+        auth.expect_authenticate().return_const(Ok(None));
+
+        let http_server = Arc::new(HttpServer::new(
+            "127.0.0.1:53034".to_string(),
+            Arc::new(auth),
+            Arc::new(SqlServiceMock {
+                message_counter: AtomicU64::new(0),
+            }),
+            Duration::from_millis(100),
+            Duration::from_millis(10000),
+            Duration::from_millis(1000),
+            max_message_size,
+            max_message_size,
+        ));
+        {
+            let http_server = http_server.clone();
+            cube_ext::spawn(async move { http_server.run_server().await });
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let (mut socket, _) = connect_async(Url::parse("ws://127.0.0.1:53034/ws").unwrap())
+            .await
+            .unwrap();
+
+        // Over the limit, but inside the headroom the transport is given, so it
+        // arrives whole and can be attributed to message 7.
+        socket
+            .send(Message::binary(
+                HttpMessage {
+                    message_id: 7,
+                    command: HttpCommand::Query {
+                        query: "s".repeat(max_message_size + max_message_size / 2),
+                        inline_tables: vec![],
+                        trace_obj: None,
+                        parameters: None,
+                        response_format: QueryResultFormat::Legacy,
+                    },
+                    connection_id: Some("foo".to_string()),
+                }
+                .bytes(),
+            ))
+            .await
+            .unwrap();
+
+        // Read off the flatbuffer directly: `HttpMessage::read` only decodes the
+        // commands a client sends, and an error is not one of them.
+        let msg = socket.next().await.unwrap().unwrap();
+        let data = msg.into_data();
+        let message = root_as_http_message(&data).unwrap();
+        assert_eq!(message.message_id(), 7);
+        let error = message
+            .command_as_http_error()
+            .expect("an error was expected")
+            .error()
+            .unwrap_or_default();
+        assert!(
+            error.contains(&format!(
+                "exceeds the maximum message size of {} bytes",
+                max_message_size
+            )),
+            "unexpected error: {}",
+            error
+        );
+
+        // The point of answering instead of closing: the connection is still
+        // usable for everything that wasn't oversized.
+        socket
+            .send(Message::binary(
+                HttpMessage {
+                    message_id: 8,
+                    command: HttpCommand::Query {
+                        query: "foo".to_string(),
+                        inline_tables: vec![],
+                        trace_obj: None,
+                        parameters: None,
+                        response_format: QueryResultFormat::Legacy,
+                    },
+                    connection_id: Some("foo".to_string()),
+                }
+                .bytes(),
+            ))
+            .await
+            .unwrap();
+
+        let msg = socket.next().await.unwrap().unwrap();
+        let message = HttpMessage::read(root_as_http_message(&msg.into_data()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(message.message_id, 8);
+        match message.command {
+            HttpCommand::ResultSet { data_frame } => assert_eq!(
+                data_frame.get_rows()[0].values()[0],
+                TableValue::String("0".to_string())
+            ),
+            command => panic!("Result set expected, got: {:?}", command),
+        }
 
         http_server.stop_processing().await;
         Ok(())

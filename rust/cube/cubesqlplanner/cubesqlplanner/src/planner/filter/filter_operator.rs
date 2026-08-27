@@ -1,6 +1,11 @@
 use cubenativeutils::CubeError;
 use std::str::FromStr;
 
+/// Filter operator declared in the data model (`equals`, `in`,
+/// `gt`, `inDateRange`, ...). `RegularRollingWindowDateRange`,
+/// `RollingWindowOffsetDateRange` and `ToDateRollingWindowDateRange`
+/// are synthetic — manufactured by the rolling-window planner, never
+/// coming from a query.
 #[derive(Clone, PartialEq, Debug)]
 pub enum FilterOperator {
     Equal,
@@ -12,6 +17,7 @@ pub enum FilterOperator {
     AfterDate,
     AfterOrOnDate,
     RegularRollingWindowDateRange,
+    RollingWindowOffsetDateRange,
     ToDateRollingWindowDateRange,
     In,
     NotIn,
@@ -77,6 +83,7 @@ impl ToString for FilterOperator {
             FilterOperator::AfterDate => "afterDate",
             FilterOperator::AfterOrOnDate => "afterOrOnDate",
             FilterOperator::RegularRollingWindowDateRange => "inDateRange",
+            FilterOperator::RollingWindowOffsetDateRange => "inDateRange",
             FilterOperator::ToDateRollingWindowDateRange => "inDateRange",
             FilterOperator::In => "in",
             FilterOperator::NotIn => "notIn",

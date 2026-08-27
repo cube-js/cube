@@ -3,7 +3,7 @@ module.exports = {
   plugins: [
     'import'
   ],
-  parser: 'babel-eslint',
+  parser: '@babel/eslint-parser',
   rules: {
     'max-classes-per-file': 0,
     'prefer-object-spread': 0,
