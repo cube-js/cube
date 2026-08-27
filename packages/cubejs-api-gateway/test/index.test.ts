@@ -1236,6 +1236,90 @@ describe('API Gateway', () => {
       expect(orchestrator.getPreAggregationQueueStates).toHaveBeenCalledWith(job.dataSource);
       expect(status).toEqual('processing');
     });
+
+    // https://github.com/cube-js/cube/issues/11615
+    describe('job result status', () => {
+      const jobFor = (overrides: Partial<PreAggJob> = {}): PreAggJob => ({
+        request: 'request-id',
+        context: { securityContext: {} },
+        preagg: 'orders_test.main',
+        table: 'orders_test_main',
+        target: 'orders_test_main_20200101',
+        structure: 'structure-version',
+        content: 'content-version',
+        updated: 1,
+        key: [],
+        status: 'posted',
+        timezone: 'UTC',
+        dataSource: 'test_ds',
+        ...overrides,
+      });
+
+      const compiler = {
+        preAggregations: async () => ([
+          { id: 'orders_dep.main', cube: 'orders_dep', dataSource: 'dep_ds', preAggregation: { external: false } },
+          { id: 'orders_test.main', cube: 'orders_test', dataSource: 'model_ds', preAggregation: { external: true } },
+        ]),
+        preAggregationsSchema: 'stb_pre_aggregations',
+      };
+
+      const resultStatus = async (job: PreAggJob, orchestrator: any) => {
+        const apiGateway = Object.create(ApiGateway.prototype);
+        return (apiGateway as any).getPreAggJobResultStatus(
+          job.request,
+          orchestrator,
+          compiler,
+          job,
+          'job-token',
+        );
+      };
+
+      test('is checked on the data source the job recorded', async () => {
+        const orchestrator = { isPartitionExist: jest.fn(async () => [true, 'done']) };
+        const job = jobFor();
+
+        await expect(resultStatus(job, orchestrator)).resolves.toEqual('done');
+
+        expect(orchestrator.isPartitionExist).toHaveBeenCalledWith(
+          job.request,
+          true,
+          'test_ds',
+          compiler.preAggregationsSchema,
+          job.target,
+          job.key,
+          'job-token',
+        );
+      });
+
+      // Jobs live in the cache for a day, so one posted before the data source was
+      // recorded still has to be pollable.
+      test('falls back to the data source of the pre-aggregation it names', async () => {
+        const orchestrator = { isPartitionExist: jest.fn(async () => [false, 'missing_partition']) };
+        const job = jobFor({ dataSource: undefined as any });
+
+        await expect(resultStatus(job, orchestrator)).resolves.toEqual('missing_partition');
+
+        expect(orchestrator.isPartitionExist).toHaveBeenCalledWith(
+          job.request,
+          true,
+          'model_ds',
+          compiler.preAggregationsSchema,
+          job.target,
+          job.key,
+          'job-token',
+        );
+      });
+
+      test('reports a pre-aggregation the model no longer has', async () => {
+        const orchestrator = { isPartitionExist: jest.fn() };
+
+        await expect(
+          resultStatus(jobFor({ preagg: 'orders_test.dropped' }), orchestrator)
+        ).resolves.toEqual('pre_agg_not_found');
+
+        expect(orchestrator.isPartitionExist).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('healtchecks', () => {

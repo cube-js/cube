@@ -252,7 +252,7 @@ export class QueryOrchestrator {
       // /cubejs-system/v1/pre-aggregations/jobs endpoint).
       if (queryBody.isJob) {
         return preAggregationsTablesToTempTables.map((pa) => ({
-          preAggregation: queryBody.preAggregations[0].preAggregationId,
+          preAggregation: pa[1].preAggregationId || queryBody.preAggregations[0].preAggregationId,
           tableName: pa[0],
           ...pa[1],
         }));

@@ -337,6 +337,34 @@ describe('PreAggregations', () => {
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
       expect(result[0][1].lastUpdatedAt).toEqual(12345000);
     });
+
+    // A jobed build gets back a flat list of entries and has to tell them apart.
+    // https://github.com/cube-js/cube/issues/11615
+    test('each entry carries the identity of the descriptor it was built from', async () => {
+      const { preAggregationsTablesToTempTables: result } = await preAggregations!.loadAllPreAggregationsIfNeeded(
+        createBasicQuery({
+          cacheMode: 'must-revalidate',
+          preAggregations: [{
+            ...basicQuery.preAggregations[0],
+            preAggregationId: 'Orders.numberAndCount',
+            dataSource: 'orders_ds',
+            timezone: 'America/Los_Angeles',
+          }],
+        })
+      );
+
+      expect(result[0][1]).toMatchObject({
+        preAggregationId: 'Orders.numberAndCount',
+        dataSource: 'orders_ds',
+        timezone: 'America/Los_Angeles',
+      });
+    });
+
+    test('an entry built without a named data source falls back to the default one', async () => {
+      const { preAggregationsTablesToTempTables: result } = await preAggregations!.loadAllPreAggregationsIfNeeded(basicQueryWithRenew);
+
+      expect(result[0][1].dataSource).toEqual('default');
+    });
   });
 
   describe('loadAllPreAggregationsIfNeeded with external rollup and writable source', () => {

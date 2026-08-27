@@ -1133,8 +1133,6 @@ class ApiGateway {
       .refreshScheduler()
       .getCachedBuildJobs(context, tokens);
 
-    const metaCache: Map<string, any> = new Map();
-
     const response: PreAggJobStatusItem[] = await Promise.all(
       jobs.map(async ({ job, token }) => {
         if (!job) {
@@ -1180,17 +1178,11 @@ class ApiGateway {
               selector,
             };
           } else {
-            const metaCacheKey = JSON.stringify(ctx);
-            if (!metaCache.has(metaCacheKey)) {
-              metaCache.set(metaCacheKey, await compiler.metaConfigExtended(context, ctx));
-            }
-
             // checking and fetching result status
             const s = await this.getPreAggJobResultStatus(
               ctx.requestId,
               orchestrator,
               compiler,
-              metaCache.get(metaCacheKey),
               job,
               token,
             );
@@ -1264,19 +1256,21 @@ class ApiGateway {
     requestId: string,
     orchestrator: any,
     compiler: any,
-    metadata: any,
     job: PreAggJob,
     token: string,
   ): Promise<string> {
     const preaggs = await compiler.preAggregations();
     const preagg = preaggs.find(pa => pa.id === job.preagg);
     if (preagg) {
-      const cube = metadata.cubeDefinitions[preagg.cube];
+      // The build queued the partition on the data source it recorded, which is what
+      // getPreAggJobQueueStatus looks the queue up by too. Jobs live in the cache for a
+      // day, so one posted before this was recorded falls back to the model.
+      const dataSource = job.dataSource || preagg.dataSource;
       const [, status]: [boolean, string] =
         await orchestrator.isPartitionExist(
           requestId,
           preagg.preAggregation.external,
-          cube.dataSource,
+          dataSource,
           compiler.preAggregationsSchema,
           job.target,
           job.key,

@@ -150,6 +150,10 @@ export type LoadPreAggregationResult = {
   partitionRange?: QueryDateRange;
   isMultiTableUnion?: boolean;
   usageTargetTableNames?: Record<string, string>;
+  type?: 'rollup' | 'originalSql';
+  preAggregationId?: string;
+  dataSource?: string;
+  timezone?: string;
 };
 
 export type PreAggregationTableToTempTable = [string, LoadPreAggregationResult];
@@ -574,6 +578,9 @@ export class PreAggregations {
           const usedPreAggregation = {
             ...loadResult,
             type: p.type,
+            preAggregationId: p.preAggregationId,
+            dataSource: p.dataSource || 'default',
+            timezone: p.timezone,
           };
           if (!usedPreAggregation.isMultiTableUnion) {
             await this.addTableUsed(usedPreAggregation.targetTableName);
