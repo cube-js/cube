@@ -238,6 +238,32 @@ describe('WebSocketConnection', () => {
       expect(server.connections.length).toBe(1);
     }, JEST_TIMEOUT);
 
+    it('gives up on a message Cube Store never answers instead of holding the socket', async () => {
+      // The bound the close waits out. Cube Store keeps answering the pings of a
+      // connection whose query never completes, so without it nothing would ever
+      // close this socket again.
+      process.env.CUBEJS_CUBESTORE_NO_HEART_BEAT_TIMEOUT = '1';
+
+      try {
+        connection = new WebSocketConnection(server.url);
+
+        server.handler = () => undefined;
+
+        const promise = query('SELECT 1');
+        await server.waitForMessages(1);
+
+        connection.close();
+
+        await expect(promise).rejects.toThrow(ConnectionError);
+        await expect(promise).rejects.toThrow('1 message(s) still unanswered');
+
+        await waitUntil(() => closedOnTheServer(0), 'the connection to be closed anyway');
+        expect((connection as any).webSocket).toBeNull();
+      } finally {
+        delete process.env.CUBEJS_CUBESTORE_NO_HEART_BEAT_TIMEOUT;
+      }
+    }, JEST_TIMEOUT);
+
     it('does not re-open when the socket dies while draining', async () => {
       connection = new WebSocketConnection(server.url);
 
