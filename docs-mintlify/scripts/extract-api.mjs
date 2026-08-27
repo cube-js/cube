@@ -171,22 +171,24 @@ const EXCLUDE_OPERATIONS = new Set([
   'GET /api/v1/ai-engineer/settings',
   // Report folders listing — not part of the public docs surface.
   'GET /api/v1/deployments/{deploymentId}/report-folders',
-  // Region/PrivateLink provisioning — Cube-super-admin-only (staff, not tenant
-  // admins); no reader of these docs can call them. `GET /api/v1/regions` (list)
-  // stays, since any tenant can call it.
-  'POST /api/v1/regions',
-  'GET /api/v1/regions/{regionId}',
-  'PUT /api/v1/regions/{regionId}',
-  'DELETE /api/v1/regions/{regionId}',
-  'POST /api/v1/regions/{regionId}/apply',
-  'GET /api/v1/regions/{regionId}/provisioning-status',
-  'GET /api/v1/regions/cloud-provider-catalog',
-  'GET /api/v1/regions/{regionId}/private-links',
-  'POST /api/v1/regions/{regionId}/private-links',
-  'GET /api/v1/regions/{regionId}/private-links/{privateLinkId}',
-  'PUT /api/v1/regions/{regionId}/private-links/{privateLinkId}',
-  'DELETE /api/v1/regions/{regionId}/private-links/{privateLinkId}',
 ]);
+
+// Cube-staff-only operations (provisioning real cloud infrastructure — Regions,
+// PrivateLinks, and anything else gated the same way) are excluded automatically
+// rather than via a hand-maintained EXCLUDE_OPERATIONS list: console-server's
+// `superAdminOnlyDescription()` (packages/console-server/src/api/middlewares/
+// validate-admin-access.ts in cubejs-enterprise) prefixes every such operation's
+// OpenAPI `description` with this exact marker text before ANY other processing
+// touches it, so matching on it here catches staff-only operations that didn't
+// exist yet when this list was last updated — not just the ones someone
+// remembered to add. No reader of these docs can call them (tenant admins are
+// rejected server-side), so nothing customer-facing is lost.
+//
+// Keep this string byte-for-byte in sync with SUPER_ADMIN_ONLY_DOC_MARKER in the
+// cubejs-enterprise repo — this repo can't import it directly (separate repo).
+const SUPER_ADMIN_ONLY_MARKER =
+  '**🔒 Cube super admin only.** Requires Cube staff privileges — a tenant administrator cannot ' +
+  'call this endpoint.';
 
 // Explicit display names for tags whose auto-cleaned form would be unclear or
 // collide. Everything else is cleaned by cleanTag() below.
@@ -282,6 +284,7 @@ const src = yaml.load(fs.readFileSync(SRC, 'utf8'));
 //    operationIds.
 const paths = {};
 const matchedExcludes = new Set();
+let autoExcludedCount = 0;
 for (const [key, val] of Object.entries(src.paths)) {
   if (!INCLUDE_PREFIXES.some((prefix) => key.startsWith(prefix))) continue;
   let newKey = key.length > 1 ? key.replace(/\/$/, '') : key; // drop trailing slash
@@ -292,6 +295,12 @@ for (const [key, val] of Object.entries(src.paths)) {
     const excludeKey = `${m.toUpperCase()} ${newKey}`;
     if (EXCLUDE_OPERATIONS.has(excludeKey)) {
       matchedExcludes.add(excludeKey);
+      delete val[m];
+      continue;
+    }
+    // Drop Cube-staff-only operations automatically — see SUPER_ADMIN_ONLY_MARKER above.
+    if (typeof val[m].description === 'string' && val[m].description.includes(SUPER_ADMIN_ONLY_MARKER)) {
+      autoExcludedCount++;
       delete val[m];
       continue;
     }
@@ -434,6 +443,9 @@ const out = {
 
 writeOrCheck(OUT, yaml.dump(out, { lineWidth: 100, noRefs: true }));
 console.log('paths:', Object.keys(paths).length, '| schemas:', Object.keys(schemas).length, '| tags:', orderedTags.length);
+if (autoExcludedCount) {
+  console.log(`(${autoExcludedCount} Cube-staff-only operation(s) auto-excluded via SUPER_ADMIN_ONLY_MARKER)`);
+}
 
 // 5. Group operations by tag (pages in source order within a tag) and capture,
 //    per tag, its paths + the first operation's summary — used to build both the
