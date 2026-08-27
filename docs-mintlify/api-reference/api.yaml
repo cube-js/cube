@@ -6269,7 +6269,8 @@ components:
         completedAt:
           description: >-
             When the sync finished, as an ISO 8601 timestamp, or `null` while it is still running.
-            Use durationMs to show how long a run took rather than subtracting this from startedAt.
+            Use `durationMs` to show how long a run took rather than subtracting this from
+            `startedAt`.
           oneOf:
             - type: string
             - type: 'null'
