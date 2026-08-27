@@ -366,15 +366,18 @@ if (!autoExcludedCount) {
   process.exit(1);
 }
 // Residual scan: catch staff-only prose that slipped past the exact marker match —
-// worded more loosely than the marker itself (just "super admin", not the full
-// sentence) so it still fires even when SUPER_ADMIN_ONLY_MARKER no longer matches.
-// NB: "super admin" specifically, not the bare 🔒 — the same lock emoji also opens
-// the unrelated (and legitimately public) ADMIN_ONLY_DOC_MARKER ("🔒 Admin only.").
+// worded more loosely than the marker itself (just "super admin"/"super-admin", not
+// the full sentence) so it still fires even when SUPER_ADMIN_ONLY_MARKER no longer
+// matches. Covers a *partial* drift too: if only a newly-added operation is reworded
+// while existing ones keep today's wording, autoExcludedCount stays non-zero and the
+// floor guard above can't catch it — this scan is what does.
+// NB: "super admin"/"super-admin" specifically, not the bare 🔒 — the same lock emoji
+// also opens the unrelated (and legitimately public) ADMIN_ONLY_DOC_MARKER ("🔒 Admin only.").
 const leakedStaffOnly = [];
 for (const [p, ops] of Object.entries(paths)) {
   for (const m of METHODS) {
     const text = ops[m]?.['x-mint']?.content ?? ops[m]?.description ?? '';
-    if (/super admin/i.test(text)) leakedStaffOnly.push(`${m.toUpperCase()} ${p}`);
+    if (/super[-\s]?admins?\b/i.test(text)) leakedStaffOnly.push(`${m.toUpperCase()} ${p}`);
   }
 }
 if (leakedStaffOnly.length) {
