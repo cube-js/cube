@@ -68,6 +68,17 @@ const CONNECTION_EVICTED_CLOSE_CODE: u16 = 1013;
 /// of bytes, so a peer that cannot take them within this long is not going to.
 const EVICTED_CLOSE_TIMEOUT: Duration = Duration::from_secs(2);
 
+/// How long a caller waits for the connection counter's lock before giving up.
+///
+/// Nothing awaits inside the critical section — it is a map lookup and an
+/// insert — so waiting even this long is not reachable by the code as written;
+/// the bound is here so that no reasoning about the callers is needed to know
+/// this cannot stall a connection. It is not shorter because a thread holding
+/// the lock can be descheduled for milliseconds under CPU pressure, and giving
+/// up then would quietly stop counting connections exactly when the cap matters
+/// most. Both timeouts log, so a bound that is ever reached is visible.
+const COUNTER_LOCK_TIMEOUT: Duration = Duration::from_millis(100);
+
 /// How much room the transport is given above the configured sizes.
 ///
 /// The size limit is enforced here rather than by the transport, so that an
@@ -168,21 +179,24 @@ pub struct WsConnectionCounter {
     /// oldest, holding the token that asks the connection task to close.
     ///
     /// Synchronous on purpose, not a `tokio` lock behind `util::lock::acquire_lock`:
-    /// entries are removed from `WsConnectionGuard::drop` and a destructor cannot
+    /// entries are removed from `WsConnectionGuard::drop`, and a destructor cannot
     /// `.await`. Releasing anywhere else would leak the slot on a panic, a cancelled
     /// task, or a connection that dies before the upgrade completes. Nothing awaits
-    /// inside the critical section, which is what makes a sync lock correct here.
-    users: std::sync::Mutex<HashMap<String, BTreeMap<u64, CancellationToken>>>,
+    /// inside the critical section either — `acquire` is not an `async fn`, so one
+    /// cannot be added — which is the shape the `tokio::sync::Mutex` docs point at a
+    /// standard-library lock for. Every caller still takes it with a bound, so the
+    /// property does not rest on that reasoning holding: see COUNTER_LOCK_TIMEOUT.
+    users: parking_lot::Mutex<HashMap<String, BTreeMap<u64, CancellationToken>>>,
     next_id: AtomicU64,
 }
 
-/// Poisoning carries no meaning for a map of live connections, and a poisoned
-/// `unwrap` inside [`WsConnectionGuard::drop`] would abort the process instead
-/// of dropping one connection.
-fn lock_users(
-    users: &std::sync::Mutex<HashMap<String, BTreeMap<u64, CancellationToken>>>,
-) -> std::sync::MutexGuard<'_, HashMap<String, BTreeMap<u64, CancellationToken>>> {
-    users.lock().unwrap_or_else(|e| e.into_inner())
+/// `None` when the lock could not be taken within [`COUNTER_LOCK_TIMEOUT`].
+/// Callers fail open: the cap is a safety net, so a counter that is briefly
+/// unavailable must not be what refuses or stalls a connection.
+fn try_lock_users(
+    users: &parking_lot::Mutex<HashMap<String, BTreeMap<u64, CancellationToken>>>,
+) -> Option<parking_lot::MutexGuard<'_, HashMap<String, BTreeMap<u64, CancellationToken>>>> {
+    users.try_lock_for(COUNTER_LOCK_TIMEOUT)
 }
 
 /// Frees the slot taken by [`WsConnectionCounter::acquire`] when the connection
@@ -198,7 +212,7 @@ impl WsConnectionCounter {
     pub fn new(limit: usize) -> Arc<Self> {
         Arc::new(Self {
             limit,
-            users: std::sync::Mutex::new(HashMap::new()),
+            users: parking_lot::Mutex::new(HashMap::new()),
             next_id: AtomicU64::new(0),
         })
     }
@@ -220,7 +234,21 @@ impl WsConnectionCounter {
 
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         let evicted = {
-            let mut users = lock_users(&self.users);
+            let mut users = match try_lock_users(&self.users) {
+                Some(users) => users,
+                None => {
+                    log::error!(
+                        "Timed out locking the websocket connection counter; admitting an untracked connection (user: {})",
+                        user,
+                    );
+                    return WsConnectionGuard {
+                        counter: self.clone(),
+                        user: None,
+                        id: 0,
+                        cancel,
+                    };
+                }
+            };
             let entries = users.entry(user.to_string()).or_default();
             let evicted = if entries.len() >= self.limit {
                 let oldest = *entries.keys().next().expect("a full map has an entry");
@@ -249,7 +277,9 @@ impl WsConnectionCounter {
     }
 
     pub fn count(&self, user: &str) -> usize {
-        lock_users(&self.users).get(user).map_or(0, BTreeMap::len)
+        try_lock_users(&self.users)
+            .and_then(|users| users.get(user).map(BTreeMap::len))
+            .unwrap_or(0)
     }
 }
 
@@ -266,7 +296,19 @@ impl Drop for WsConnectionGuard {
             Some(user) => user,
             None => return,
         };
-        let mut users = lock_users(&self.counter.users);
+        let mut users = match try_lock_users(&self.counter.users) {
+            Some(users) => users,
+            None => {
+                // The entry stays behind, but it is the oldest one of that user by
+                // construction, so the next admission evicts it: cancelling an
+                // already finished connection's token is a no-op.
+                log::error!(
+                    "Timed out locking the websocket connection counter; leaving a finished connection's slot to be evicted (user: {})",
+                    user,
+                );
+                return;
+            }
+        };
         if let Some(entries) = users.get_mut(user) {
             // Idempotent: an evicting `acquire` may have removed this entry already.
             entries.remove(&self.id);
@@ -1560,7 +1602,9 @@ mod tests {
         drop(counter.acquire(Some("tenant-a")));
         assert_eq!(counter.count("tenant-a"), 0);
         assert!(
-            lock_users(&counter.users).is_empty(),
+            try_lock_users(&counter.users)
+                .expect("uncontended")
+                .is_empty(),
             "a churn of one-off users must not grow the map"
         );
 
@@ -1568,32 +1612,32 @@ mod tests {
         // its own statement and would free the slot it is meant to hold.
         let _b = counter.acquire(Some("tenant-b"));
         let _c = counter.acquire(Some("tenant-c"));
-        assert_eq!(lock_users(&counter.users).len(), 2);
+        assert_eq!(
+            try_lock_users(&counter.users).expect("uncontended").len(),
+            2
+        );
     }
 
     #[test]
-    fn ws_connection_counter_survives_a_poisoned_lock() {
+    fn acquire_gives_up_on_a_stuck_lock_instead_of_waiting_on_it() {
         let counter = WsConnectionCounter::new(1);
-        let held = counter.acquire(Some("tenant-a"));
+        let blocker = counter.users.lock();
 
-        let poisoner = Arc::clone(&counter);
-        let _ = std::thread::spawn(move || {
-            let _users = lock_users(&poisoner.users);
-            panic!("poison the users lock on purpose");
-        })
-        .join();
+        // From another thread: the lock is not reentrant, and the point is that a
+        // caller returns on its own schedule rather than the lock holder's.
+        let probe = Arc::clone(&counter);
+        let guard = std::thread::spawn(move || probe.acquire(Some("tenant-a")))
+            .join()
+            .expect("acquire must return rather than wait for the lock");
 
-        // Releasing a slot must not abort the process: a panicking destructor
-        // during unwinding is not recoverable, and every connection close runs
-        // this path.
-        drop(held);
-        assert_eq!(counter.count("tenant-a"), 0);
-
-        let after = counter.acquire(Some("tenant-a"));
         assert!(
-            !after.cancel.is_cancelled(),
-            "the cap must keep working after the lock was poisoned"
+            guard.user.is_none(),
+            "the cap is a safety net, so an unavailable counter admits the              connection untracked rather than refusing or stalling it"
         );
+        assert!(!guard.cancel.is_cancelled());
+
+        drop(blocker);
+        assert_eq!(counter.count("tenant-a"), 0);
     }
 
     #[test]

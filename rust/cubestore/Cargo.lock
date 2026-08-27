@@ -1508,6 +1508,7 @@ dependencies = [
  "opentelemetry-http",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
+ "parking_lot",
  "parquet-format",
  "parse-size",
  "paste",
