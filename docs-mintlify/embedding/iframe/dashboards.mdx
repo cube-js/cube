@@ -90,15 +90,14 @@ https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?sessi
 When enabled, each chart widget's ⋮ menu shows **Download as CSV**, **Download
 as PNG**, and **Download as PDF** actions. `allowExport` is the single switch
 for all three formats — there is no way to allow one format while blocking
-another. Only the exact literal string `true` opts in; the parameter is
-otherwise opt-out — omit it (the default) to keep every download action
-hidden.
+another. Only the exact literal string `true` opts in: `allowExport=1`,
+`allowExport=TRUE`, a bare `?allowExport`, and omitting the parameter (the
+default) all leave every download action hidden.
 
 The CSV is generated client-side from the data already loaded into the
-widget, so no additional query is issued. Screenshot mode suppresses export
-regardless of the parameter. Inside an embed, `allowExport` — not the
-viewer's own Cube role — is the authority on whether the download actions
-appear.
+widget, so no additional query is issued. Inside an embed, `allowExport` —
+not the viewer's own Cube role — is the authority on whether the download
+actions appear.
 
 ## Show or hide the AI chat
 

@@ -158,9 +158,11 @@ of that exploration's placements in the current document at once; click its
 title to open it and change the query, which applies to every placement.
 
 A placement survives renaming the sheet it's on or the workbook it's in —
-it's tracked by the sheet's and workbook's own stable ids, not by name. It
-does **not** survive rows or columns inserted above its anchor cell; the
-anchor still shifts with the sheet.
+it's tracked by the sheet's and workbook's own stable ids, not by name. A
+placement's anchor is a fixed cell reference, though, so it does **not**
+survive rows or columns inserted above it: the visible data shifts down with
+the insert, but the stored anchor doesn't move with it, so the next refresh
+targets the wrong cell.
 
 <Frame>
   <img src="https://ucarecdn.com/167abe25-635c-4fa6-b4a2-c090aa533f3c/" />
