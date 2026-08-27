@@ -1,4 +1,4 @@
-import type { OrchestratorApi } from '../../src/core/OrchestratorApi';
+import { OrchestratorApi } from '../../src/core/OrchestratorApi';
 import { OrchestratorStorage } from '../../src/core/OrchestratorStorage';
 
 /**
@@ -10,6 +10,31 @@ function createApi(release: () => Promise<unknown> = async () => undefined) {
   const api = { release: jest.fn(release) };
 
   return { api: api as unknown as OrchestratorApi, release: api.release };
+}
+
+/**
+ * A real `OrchestratorApi` with a stubbed `QueryOrchestrator`, for the one case
+ * that is about what the api logs rather than what the storage does with it.
+ */
+function createRealApi(driverError: Error) {
+  const logger = jest.fn();
+  const externalDriver = { release: async () => { throw driverError; } };
+
+  const api = new OrchestratorApi(
+    async () => externalDriver as any,
+    logger,
+    {
+      cacheAndQueueDriver: 'memory',
+      contextToDbType: async () => 'postgres',
+      contextToExternalDbType: () => 'cubestore',
+      externalDriverFactory: async () => externalDriver as any,
+      redisPrefix: 'tenant-1',
+    }
+  );
+
+  (api as any).orchestrator = { cleanup: async () => undefined };
+
+  return { api, logger };
 }
 
 // lru-cache runs `disposeAfter` once the operation that removed the entry has
@@ -96,6 +121,25 @@ describe('OrchestratorStorage', () => {
     expect(ok.release).toHaveBeenCalledTimes(1);
     expect(storage.has('failing')).toBe(false);
     expect(storage.has('ok')).toBe(false);
+  });
+
+  test('a release that fails is logged rather than lost', async () => {
+    const storage = new OrchestratorStorage({ compilerCacheSize: 1 });
+    const { api, logger } = createRealApi(new Error('driver is gone'));
+
+    storage.set('failing', api);
+    storage.set('next', createApi().api);
+    await flush();
+
+    // The storage swallows the rejection so shutdown cannot fail on it, which
+    // leaves the log as the only signal that a connection stayed open.
+    expect(logger).toHaveBeenCalledWith(
+      'Orchestrator Release Error',
+      expect.objectContaining({
+        orchestratorId: 'tenant-1',
+        error: expect.stringContaining('driver is gone'),
+      })
+    );
   });
 
   test('forgets a release once it has finished', async () => {
