@@ -264,6 +264,21 @@ describe('WebSocketConnection', () => {
       }
     }, JEST_TIMEOUT);
 
+    it('rejects a query that is still connecting when the connection is closed', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      // `initWebSocket()` creates the socket synchronously, so this close lands
+      // while it is still CONNECTING -- an eviction while the very first query
+      // of an orchestrator is connecting. `ws` reports closing a CONNECTING
+      // socket as an 'error', and nothing else left would settle the promise
+      // the query is awaiting.
+      const promise = query('SELECT 1');
+      connection.close();
+
+      await expect(promise).rejects.toThrow(ConnectionError);
+      await expect(promise).rejects.toThrow('Cube Store connection is closed');
+    }, JEST_TIMEOUT);
+
     it('does not leave an unhandled rejection when a closed connection errors', async () => {
       const unhandled: unknown[] = [];
       const onUnhandled = (reason: unknown) => { unhandled.push(reason); };

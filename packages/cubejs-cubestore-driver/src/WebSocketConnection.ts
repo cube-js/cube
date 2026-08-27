@@ -214,11 +214,23 @@ export class WebSocketConnection {
           webSocket.teardown();
 
           if (this.closed) {
-            // Nothing to retry towards: `initWebSocket()` refuses once closed,
-            // and whatever was in flight is dealt with by the 'close' handler.
+            // Nothing to retry towards: `initWebSocket()` refuses once closed.
+            // Whatever was written to the socket is rejected by the 'close'
+            // handler, which `ws` emits after an 'error' -- the drain bound
+            // cannot catch it any more, since `teardown()` above has already
+            // stopped the interval that evaluates it.
             if (webSocket === this.webSocket) {
               this.webSocket = null;
             }
+
+            // A no-op once this socket has opened, and the only thing left that
+            // can settle `readyPromise` if it has not: `teardown()` has stopped
+            // the interval, the 'close' handler does not touch it, and the retry
+            // that used to settle it by adoption is skipped just above. A socket
+            // closed while still CONNECTING would otherwise leave the
+            // `sendMessage` awaiting it pending for good -- a request hung on
+            // nothing, which is worse than the failure it replaced.
+            reject(new ConnectionError('Cube Store connection is closed'));
 
             return;
           }
