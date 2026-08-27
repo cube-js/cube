@@ -158,6 +158,23 @@ All current and future content added to the folder will inherit its
 permissions. This makes folders ideal for organizing content by team or
 project, where everyone on the team needs the same level of access.
 
+### Duplicates
+
+Duplicating a workbook or dashboard does not carry its sharing over by
+default — the copy starts visible only to you, plus anyone with access to
+the folder it is created in.
+
+When the original is shared, the duplicate dialog offers **Copy sharing
+and embedding settings**. Selecting it re-grants the original's users,
+groups, and organization-wide access on the copy, and carries over
+[signed embedding][ref-signed-embedding] if it was enabled. Access that
+the original inherits from a folder is not copied — the duplicate derives
+it from the folder it is created in, like any other new content there.
+
+The option requires **Full access** to the original, since copying its
+sharing means granting that access again. With **Can edit** or
+**Can view**, duplicating still works and the copy starts unshared.
+
 ## Sharing explorations for spreadsheet integrations
 
 When you share an exploration with a user, that exploration becomes
@@ -175,3 +192,4 @@ interface.
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-google-sheets]: /docs/integrations/google-sheets
 [ref-excel]: /docs/integrations/microsoft-excel
+[ref-signed-embedding]: /embedding/iframe/auth/signed
