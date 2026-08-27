@@ -71,13 +71,14 @@ const EVICTED_CLOSE_TIMEOUT: Duration = Duration::from_secs(2);
 /// How long a caller waits for the connection counter's lock before giving up.
 ///
 /// Nothing awaits inside the critical section — it is a map lookup and an
-/// insert — so waiting even this long is not reachable by the code as written;
-/// the bound is here so that no reasoning about the callers is needed to know
-/// this cannot stall a connection. It is not shorter because a thread holding
-/// the lock can be descheduled for milliseconds under CPU pressure, and giving
-/// up then would quietly stop counting connections exactly when the cap matters
-/// most. Both timeouts log, so a bound that is ever reached is visible.
-const COUNTER_LOCK_TIMEOUT: Duration = Duration::from_millis(100);
+/// insert — so waiting at all is barely reachable by the code as written; the
+/// bound is here so that knowing this cannot stall a connection needs no
+/// reasoning about the callers. It is deliberately generous rather than tight:
+/// a thread holding the lock can be descheduled for a long time under CPU
+/// pressure, and giving up then would quietly stop counting connections
+/// exactly when the cap matters most. Both callers log when they give up, so a
+/// bound that is ever reached is visible rather than silent.
+const COUNTER_LOCK_TIMEOUT: Duration = Duration::from_secs(1);
 
 /// How much room the transport is given above the configured sizes.
 ///
