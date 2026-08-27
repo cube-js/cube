@@ -850,8 +850,7 @@ mod tests {
             "syncJobId": "abc", "deploymentId": 42, "status": "COMPLETED", "trigger": "api",
             "branchName": "dbt-sync/main-1", "gitRef": "feature/orders",
             "startedAt": "2026-08-24T10:00:00Z", "completedAt": "2026-08-24T10:15:12Z",
-            "durationMs": 912_345, "updatedAt": "2026-08-24T10:15:12Z",
-            "stats": { "cubeCount": 12 }
+            "durationMs": 912_345, "stats": { "cubeCount": 12 }
         });
         assert_eq!(
             history_row(&run),
