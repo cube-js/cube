@@ -1,0 +1,356 @@
+---
+title: Querying across data sources
+description: Append rows from cubes that live in different databases into one result set with a UNION ALL query through the SQL API.
+---
+
+## Use case
+
+Some datasets are spread across more than one database. Product events, for
+example, are often split by age: the last few months stay in a fast analytical
+database that serves live dashboards, while everything older is moved to
+cheaper storage. Both tables describe the same events and carry the same
+columns.
+
+The goal is to report on them together — one result set with the rows of both
+databases appended, plus a dimension that says which database each row came
+from.
+
+This is a *union*: it adds rows. It is a different problem from a
+[`rollup_join`](/reference/data-modeling/pre-aggregations#rollup_join), which
+adds columns by relating entities that live in different databases. It is also
+different from [data blending](/docs/data-modeling/concepts/data-blending),
+which unions cubes inside a single database.
+
+The [SQL API](/reference/core-data-apis/sql-api) can do this at query time,
+against live data and without pre-aggregations. Each cube is queried on its own
+data source, and Cube appends the results.
+
+## Configuration
+
+Define the two connections as [multiple data
+sources](/admin/connect-to-data/multiple-data-sources). The default source needs
+no name; every other source gets one, and the full list goes in
+`CUBEJS_DATASOURCES`:
+
+```dotenv
+CUBEJS_DATASOURCES=default,recent
+
+CUBEJS_DB_TYPE=postgres
+CUBEJS_DB_HOST=archive.example.com
+CUBEJS_DB_NAME=analytics
+# ...
+
+CUBEJS_DS_RECENT_DB_TYPE=clickhouse
+CUBEJS_DS_RECENT_DB_HOST=clickhouse.example.com
+CUBEJS_DS_RECENT_DB_NAME=analytics
+# ...
+```
+
+## Data modeling
+
+Model each table as its own cube, and point one of them at the named data source
+with [`data_source`](/reference/data-modeling/cube#data_source). The cube without
+a `data_source` uses the default one.
+
+Give both cubes a matching set of members, and add a constant dimension that
+identifies the origin of each row. That dimension is what makes the two halves
+of the union distinguishable once they sit in the same result set:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: archived_events
+    sql_table: events
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: created_at
+        sql: created_at
+        type: time
+
+      - name: tier
+        sql: tier
+        type: string
+
+      - name: storage
+        sql: "'archive'"
+        type: string
+
+    measures:
+      - name: event_count
+        type: count
+
+  - name: recent_events
+    sql_table: events
+    data_source: recent
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: created_at
+        sql: created_at
+        type: time
+
+      - name: tier
+        sql: tier
+        type: string
+
+      - name: storage
+        sql: "'recent'"
+        type: string
+
+    measures:
+      - name: event_count
+        type: count
+```
+
+```javascript title="JavaScript"
+cube(`archived_events`, {
+  sql_table: `events`,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    created_at: {
+      sql: `created_at`,
+      type: `time`
+    },
+
+    tier: {
+      sql: `tier`,
+      type: `string`
+    },
+
+    storage: {
+      sql: `'archive'`,
+      type: `string`
+    }
+  },
+
+  measures: {
+    event_count: {
+      type: `count`
+    }
+  }
+})
+
+cube(`recent_events`, {
+  sql_table: `events`,
+  data_source: `recent`,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    created_at: {
+      sql: `created_at`,
+      type: `time`
+    },
+
+    tier: {
+      sql: `tier`,
+      type: `string`
+    },
+
+    storage: {
+      sql: `'recent'`,
+      type: `string`
+    }
+  },
+
+  measures: {
+    event_count: {
+      type: `count`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+## Querying
+
+Connect to the [SQL API](/reference/core-data-apis/sql-api) and append the two
+cubes with `UNION ALL`:
+
+```sql
+SELECT storage, tier, MEASURE(event_count) AS events
+FROM public.archived_events
+GROUP BY 1, 2
+UNION ALL
+SELECT storage, tier, MEASURE(event_count) AS events
+FROM public.recent_events
+GROUP BY 1, 2
+```
+
+```
+ storage |    tier    | events
+---------+------------+--------
+ archive | free       | 412508
+ archive | enterprise |  95012
+ recent  | free       |  38471
+ recent  | enterprise |   9930
+```
+
+Each half of the union is evaluated against its own database, in that database's
+own dialect, and Cube appends the two results. Filters reach the databases
+rather than being applied afterwards, so a `WHERE` clause on either side limits
+what that database scans:
+
+```sql
+SELECT storage, tier, MEASURE(event_count) AS events
+FROM public.archived_events
+WHERE tier = 'enterprise'
+GROUP BY 1, 2
+UNION ALL
+SELECT storage, tier, MEASURE(event_count) AS events
+FROM public.recent_events
+WHERE tier = 'enterprise'
+GROUP BY 1, 2
+```
+
+Add a time dimension to both halves to line the databases up on a common grain:
+
+```sql
+SELECT storage, tier, DATE_TRUNC('day', created_at) AS date, MEASURE(event_count) AS events
+FROM public.archived_events
+GROUP BY 1, 2, 3
+UNION ALL
+SELECT storage, tier, DATE_TRUNC('day', created_at) AS date, MEASURE(event_count) AS events
+FROM public.recent_events
+GROUP BY 1, 2, 3
+ORDER BY 3, 1
+```
+
+<Note>
+
+Qualifying cube names with the `public` schema, as above, is the reliable form.
+An unqualified cube name whose name also matches a table in the underlying
+database fails to resolve.
+
+</Note>
+
+### Aggregating across the union
+
+Wrap the union in a CTE to aggregate over both databases at once. Here the
+per-tier totals combine events from both databases:
+
+```sql
+WITH blended AS (
+  SELECT storage, tier, MEASURE(event_count) AS events
+  FROM public.archived_events
+  GROUP BY 1, 2
+  UNION ALL
+  SELECT storage, tier, MEASURE(event_count) AS events
+  FROM public.recent_events
+  GROUP BY 1, 2
+)
+SELECT tier, SUM(events) AS total, COUNT(DISTINCT storage) AS databases
+FROM blended
+GROUP BY 1
+ORDER BY 2 DESC
+```
+
+```
+    tier    | total  | databases
+------------+--------+-----------
+ free       | 450979 |         2
+ enterprise | 104942 |         2
+```
+
+`UNION` also works where duplicate rows should collapse, as do an outer
+`ORDER BY` and `LIMIT` over the union.
+
+### Inspecting how a query is split
+
+Run `EXPLAIN` on any of these queries to see the plan. It puts a `Union` over one
+`CubeScan` per cube, and each scan carries its own filter — the `WHERE` clause is
+part of the request sent for that cube, not a step applied after the results are
+appended:
+
+```sql
+EXPLAIN SELECT storage, tier, MEASURE(event_count) AS events
+FROM public.archived_events
+WHERE tier = 'enterprise'
+GROUP BY 1, 2
+UNION ALL
+SELECT storage, tier, MEASURE(event_count) AS events
+FROM public.recent_events
+WHERE tier = 'enterprise'
+GROUP BY 1, 2
+```
+
+```
+Union
+  CubeScan: request={
+  "measures": [
+    "archived_events.event_count"
+  ],
+  "dimensions": [
+    "archived_events.storage",
+    "archived_events.tier"
+  ],
+  "segments": [],
+  "order": [],
+  "filters": [
+    {
+      "member": "archived_events.tier",
+      "operator": "equals",
+      "values": [
+        "enterprise"
+      ]
+    }
+  ]
+}
+  CubeScan: request={
+  "measures": [
+    "recent_events.event_count"
+  ],
+  "dimensions": [
+    "recent_events.storage",
+    "recent_events.tier"
+  ],
+  "segments": [],
+  "order": [],
+  "filters": [
+    {
+      "member": "recent_events.tier",
+      "operator": "equals",
+      "values": [
+        "enterprise"
+      ]
+    }
+  ]
+}
+```
+
+The plan identifies each scan by cube, not by data source, so read it together
+with the `data_source` of each cube to see which database serves which half.
+
+## Limitations
+
+Unions combine rows across data sources; joins do not. A query that joins two
+cubes on different data sources is rejected, and relating entities across
+databases needs a
+[`rollup_join`](/reference/data-modeling/pre-aggregations#rollup_join) instead.
+
+Each half of the union is subject to the [maximum row
+limit](/docs/data-modeling/configuration#maximum-row-limit) on its own, and the
+cap applies before the results are appended. Aggregate inside each half of the
+union, as in the examples above, rather than unioning raw rows and aggregating
+afterwards.

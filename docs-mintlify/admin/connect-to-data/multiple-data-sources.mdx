@@ -64,6 +64,10 @@ Cubes that don't set `data_source` use the default source — there's no
 need to write `data_source: default` explicitly, though you can if you
 prefer to be explicit.
 
+A single query can also span sources: see [querying across data
+sources](/recipes/data-modeling/cross-data-source-queries) for appending rows
+from cubes in different databases into one result set.
+
 For multitenancy scenarios where the data source is selected dynamically
 per request, see [`driver_factory`](/reference/configuration/config#driver_factory)
 and the [multitenancy guide][ref-config-multitenancy].
