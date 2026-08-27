@@ -155,25 +155,20 @@ above, where only the literal string `true` opts in.
 <Note>
 These parameters are URL-only — they aren't accepted in the [Generate
 Session](/reference/embed-apis/generate-session#session-settings) `settings`
-object, unlike `showDashboardChat`.
+object, unlike `showDashboardChat`, and they have no account-wide default
+under **Embed → Settings**.
 </Note>
 
 Setting `showDashboardHeader=false` overrides the other four: the whole bar
 disappears regardless of their values. `showDashboardEditButton` can only
 hide the Edit action; it can never show one to a viewer who lacks edit
-permission.
+permission. They apply to the dashboard header only — the workbook header
+(which carries Publish and Share) is unaffected.
 
 These parameters are read from the URL the host loaded the iframe with and
 stay pinned for the life of the embed, so they survive in-app navigation
 (for example, from the home-page dashboard card, or after publishing a
 draft).
-
-<Note>
-These controls apply to the dashboard header only — the workbook header
-(which carries Publish and Share) is unaffected. Unlike [showDashboardChat](#show-or-hide-the-ai-chat),
-there's no account-wide default for these five parameters, and they're not
-exposed under **Embed → Settings**.
-</Note>
 
 ## Set the language
 
