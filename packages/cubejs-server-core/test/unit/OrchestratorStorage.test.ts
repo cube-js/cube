@@ -18,21 +18,24 @@ function createApi(release: () => Promise<unknown> = async () => undefined) {
  */
 function createRealApi(driverError: Error) {
   const logger = jest.fn();
-  const externalDriver = { release: async () => { throw driverError; } };
+  const driver = { release: async () => { throw driverError; } };
 
   const api = new OrchestratorApi(
-    async () => externalDriver as any,
+    async () => driver as any,
     logger,
     {
       cacheAndQueueDriver: 'memory',
       contextToDbType: async () => 'postgres',
       contextToExternalDbType: () => 'cubestore',
-      externalDriverFactory: async () => externalDriver as any,
       redisPrefix: 'tenant-1',
     }
   );
 
   (api as any).orchestrator = { cleanup: async () => undefined };
+
+  // A data source the orchestrator has touched, so the release has a driver to
+  // close -- and this one fails to close.
+  api.addDataSeenSource('default');
 
   return { api, logger };
 }
