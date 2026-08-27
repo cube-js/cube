@@ -3,7 +3,6 @@ import * as stream from 'stream';
 import pt from 'promise-timeout';
 import {
   ContinueWaitError,
-  DriverFactory,
   DriverFactoryByDataSource,
   DriverType,
   QueryBody,
@@ -22,19 +21,6 @@ export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
 export class OrchestratorApi {
   private seenDataSources: Record<string, boolean> = {};
 
-  /**
-   * Whether anything has built the external (Cube Store) driver. The factory
-   * *creates* the connection on first call -- `server.ts` builds the driver and
-   * runs `testConnection()` inside it -- so releasing it unconditionally would
-   * have an orchestrator that never touched Cube Store open a connection on
-   * eviction purely to close it. `seenDataSources` guards the data-source loop
-   * the same way.
-   */
-  private externalDriverCreated: boolean = false;
-
-  /** The factory as provided, before the tracking wrapper below. */
-  private readonly untrackedExternalDriverFactory?: DriverFactory;
-
   protected orchestrator: QueryOrchestrator;
 
   protected readonly continueWaitTimeout: number;
@@ -45,24 +31,6 @@ export class OrchestratorApi {
     protected readonly options: OrchestratorApiOptions
   ) {
     this.continueWaitTimeout = this.options.continueWaitTimeout || 10;
-
-    const { externalDriverFactory } = this.options;
-
-    if (externalDriverFactory) {
-      this.untrackedExternalDriverFactory = externalDriverFactory;
-
-      // Wrapped before `QueryOrchestrator` captures it off `options`, so every
-      // caller that can build the driver goes through the flag, and marked on
-      // fulfilment: `server.ts` releases the driver and clears its memo when
-      // `testConnection()` fails, so a build that threw left nothing open.
-      this.options.externalDriverFactory = async () => {
-        const driver = await externalDriverFactory();
-
-        this.externalDriverCreated = true;
-
-        return driver;
-      };
-    }
 
     this.orchestrator = new QueryOrchestrator(
       options.redisPrefix || 'STANDALONE',
@@ -275,9 +243,7 @@ export class OrchestratorApi {
     try {
       return await Promise.all([
         ...Object.keys(this.seenDataSources).map(ds => this.releaseDriver(this.driverFactory, ds)),
-        // Through the unwrapped factory: closing via the wrapper would set the
-        // flag again on the way out.
-        ...(this.externalDriverCreated ? [this.releaseDriver(this.untrackedExternalDriverFactory)] : []),
+        this.releaseDriver(this.options.externalDriverFactory),
         this.orchestrator.cleanup()
       ]);
     } catch (error) {
