@@ -5,10 +5,6 @@ QueryCacheTest('Local', {
   cacheAndQueueDriver: 'memory',
 });
 
-/**
- * Opens up the protected decision helper and accepts partial fixtures, so the decision
- * table can be covered without seeding a cache driver.
- */
 class QueryCacheOpened extends QueryCache {
   public static decideCacheAction(
     entry: Partial<CacheEntry>,
@@ -46,7 +42,7 @@ describe('QueryCache.decideCacheAction', () => {
       renewedAgo: NOT_EXPIRED,
       options: { renewalThreshold: THRESHOLD, requestId: 'req-1-span-2', waitForRenew: true },
       renewalKey: 'rk',
-      expected: 'serve-cached',
+      expected: CacheAction.ServeCached,
     },
     {
       name: 'expired with renewal key and waitForRenew: blocks on fetch',
@@ -54,7 +50,7 @@ describe('QueryCache.decideCacheAction', () => {
       renewedAgo: EXPIRED,
       options: { renewalThreshold: THRESHOLD, requestId: 'req-2', waitForRenew: true },
       renewalKey: 'rk',
-      expected: 'wait-for-renew',
+      expected: CacheAction.WaitForRenew,
     },
     {
       name: 'expired with renewal key without waitForRenew: refreshes in background',
@@ -62,7 +58,7 @@ describe('QueryCache.decideCacheAction', () => {
       renewedAgo: EXPIRED,
       options: { renewalThreshold: THRESHOLD, requestId: 'req-2', waitForRenew: false },
       renewalKey: 'rk',
-      expected: 'refresh-background',
+      expected: CacheAction.RefreshBackground,
     },
     {
       name: 'renewal key mismatch while not expired and waitForRenew: blocks on fetch',
@@ -70,7 +66,7 @@ describe('QueryCache.decideCacheAction', () => {
       renewedAgo: NOT_EXPIRED,
       options: { renewalThreshold: THRESHOLD, requestId: 'req-2', waitForRenew: true },
       renewalKey: 'new',
-      expected: 'wait-for-renew',
+      expected: CacheAction.WaitForRenew,
     },
     {
       name: 'renewal key mismatch while not expired without waitForRenew: refreshes in background',
@@ -78,7 +74,7 @@ describe('QueryCache.decideCacheAction', () => {
       renewedAgo: NOT_EXPIRED,
       options: { renewalThreshold: THRESHOLD, requestId: 'req-2', waitForRenew: false },
       renewalKey: 'new',
-      expected: 'refresh-background',
+      expected: CacheAction.RefreshBackground,
     },
     {
       name: 'same request (different span) and expired: serves stale, refreshes in background',
@@ -86,7 +82,7 @@ describe('QueryCache.decideCacheAction', () => {
       renewedAgo: EXPIRED,
       options: { renewalThreshold: THRESHOLD, requestId: 'req-1-span-7', waitForRenew: true },
       renewalKey: 'rk',
-      expected: 'refresh-same-request',
+      expected: CacheAction.RefreshSameRequest,
     },
     {
       name: 'same request and renewal key mismatch: serves stale, refreshes in background',
@@ -94,7 +90,7 @@ describe('QueryCache.decideCacheAction', () => {
       renewedAgo: NOT_EXPIRED,
       options: { renewalThreshold: THRESHOLD, requestId: 'req-1-span-7', waitForRenew: true },
       renewalKey: 'new',
-      expected: 'refresh-same-request',
+      expected: CacheAction.RefreshSameRequest,
     },
     {
       name: 'renew cycle never serves stale: expired same request blocks on fetch',
@@ -102,7 +98,7 @@ describe('QueryCache.decideCacheAction', () => {
       renewedAgo: EXPIRED,
       options: { renewalThreshold: THRESHOLD, requestId: 'req-1-span-7', waitForRenew: true, renewCycle: true },
       renewalKey: 'rk',
-      expected: 'wait-for-renew',
+      expected: CacheAction.WaitForRenew,
     },
     {
       name: 'renew cycle never serves stale: key mismatch without waitForRenew refreshes in background',
@@ -110,21 +106,21 @@ describe('QueryCache.decideCacheAction', () => {
       renewedAgo: NOT_EXPIRED,
       options: { renewalThreshold: THRESHOLD, requestId: 'req-1-span-7', waitForRenew: false, renewCycle: true },
       renewalKey: 'new',
-      expected: 'refresh-background',
+      expected: CacheAction.RefreshBackground,
     },
     {
       name: 'expired without a renewal key: keeps serving cache',
       entry: { time: 1, requestId: 'req-1' },
       renewedAgo: EXPIRED,
       options: { renewalThreshold: THRESHOLD, requestId: 'req-2', waitForRenew: true },
-      expected: 'serve-cached',
+      expected: CacheAction.ServeCached,
     },
     {
       name: 'expired without a renewal key but same request: refreshes in background',
       entry: { time: 1, requestId: 'req-1-span-1' },
       renewedAgo: EXPIRED,
       options: { renewalThreshold: THRESHOLD, requestId: 'req-1-span-7', waitForRenew: true },
-      expected: 'refresh-same-request',
+      expected: CacheAction.RefreshSameRequest,
     },
     {
       name: 'missing renewal threshold counts as expired',
@@ -132,7 +128,7 @@ describe('QueryCache.decideCacheAction', () => {
       renewedAgo: 0,
       options: { requestId: 'req-2', waitForRenew: true },
       renewalKey: 'rk',
-      expected: 'wait-for-renew',
+      expected: CacheAction.WaitForRenew,
     },
     {
       name: 'entry without a timestamp counts as expired',
@@ -140,7 +136,7 @@ describe('QueryCache.decideCacheAction', () => {
       renewedAgo: 0,
       options: { renewalThreshold: THRESHOLD, requestId: 'req-2', waitForRenew: false },
       renewalKey: 'rk',
-      expected: 'refresh-background',
+      expected: CacheAction.RefreshBackground,
     },
     {
       name: 'entry without a request id is never treated as the same request',
@@ -148,7 +144,7 @@ describe('QueryCache.decideCacheAction', () => {
       renewedAgo: EXPIRED,
       options: { renewalThreshold: THRESHOLD, requestId: 'req-1', waitForRenew: true },
       renewalKey: 'rk',
-      expected: 'wait-for-renew',
+      expected: CacheAction.WaitForRenew,
     },
   ];
 

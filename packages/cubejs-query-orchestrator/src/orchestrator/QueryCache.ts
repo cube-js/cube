@@ -128,11 +128,12 @@ export type CacheEntry = {
   requestId?: string;
 };
 
-export type CacheAction =
-  | 'serve-cached'
-  | 'refresh-same-request'
-  | 'refresh-background'
-  | 'wait-for-renew';
+export enum CacheAction {
+  ServeCached = 'serve-cached',
+  RefreshSameRequest = 'refresh-same-request',
+  RefreshBackground = 'refresh-background',
+  WaitForRenew = 'wait-for-renew',
+}
 
 type CacheOperationContext = {
   cacheKey: CacheKey;
@@ -922,21 +923,21 @@ export class QueryCache {
     const isKeyMismatch = !!renewalKey && entry.renewalKey !== renewalKey;
 
     if (!isExpired && !isKeyMismatch) {
-      return 'serve-cached';
+      return CacheAction.ServeCached;
     }
 
     const isSameRequest = options.requestId && entry.requestId &&
       QueryCache.extractRequestUUID(entry.requestId) === QueryCache.extractRequestUUID(options.requestId);
 
     if (isSameRequest && !options.renewCycle) {
-      return 'refresh-same-request';
+      return CacheAction.RefreshSameRequest;
     }
 
     if (!renewalKey) {
-      return 'serve-cached';
+      return CacheAction.ServeCached;
     }
 
-    return options.waitForRenew ? 'wait-for-renew' : 'refresh-background';
+    return options.waitForRenew ? CacheAction.WaitForRenew : CacheAction.RefreshBackground;
   }
 
   protected static isMemoryEntryUsable(
@@ -1125,14 +1126,14 @@ export class QueryCache {
     });
 
     switch (QueryCache.decideCacheAction(entry, renewedAgo, options, ctx.renewalKey)) {
-      case 'wait-for-renew':
+      case CacheAction.WaitForRenew:
         ctx.log('Waiting for renew', { renewalThreshold });
         return this.fetchAndCacheQuery(query, values, ctx);
-      case 'refresh-same-request':
+      case CacheAction.RefreshSameRequest:
         ctx.log('Same request cache hit (background refresh)', { renewalThreshold });
         this.fetchAndCacheQueryInBackground(query, values, ctx);
         break;
-      case 'refresh-background':
+      case CacheAction.RefreshBackground:
         ctx.log('Renewing existing key', { renewalThreshold });
         this.fetchAndCacheQueryInBackground(query, values, ctx);
         break;
