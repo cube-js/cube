@@ -811,18 +811,36 @@ export class RefreshScheduler {
 
     const jobedPAs = await jobsPromise;
 
-    return getPreAggsJobsList(
+    // Taken straight from the orchestrator, so the api has to be held by hand
+    // until the writes land -- they outlive this call.
+    const releaseApi = orchestratorApi.acquire();
+    const writes: Promise<unknown>[] = [];
+
+    const keys = getPreAggsJobsList(
       context,
       <JobedPreAggregation[][][][]>jobedPAs,
     ).map((job: PreAggJob) => {
       const key = getPreAggJobToken(job);
-      orchestratorApi
-        .getQueryOrchestrator()
-        .getQueryCache()
-        .getCacheDriver()
-        .set(`PRE_AGG_JOB_${key}`, job, 86400);
+      writes.push(
+        orchestratorApi
+          .getQueryOrchestrator()
+          .getQueryCache()
+          .getCacheDriver()
+          .set(`PRE_AGG_JOB_${key}`, job, 86400)
+      );
       return key;
     });
+
+    Promise.all(writes)
+      .catch((error) => {
+        this.serverCore.logger('Pre-aggregations Jobs Error', {
+          error: (error.stack || error).toString(),
+          requestId: context.requestId,
+        });
+      })
+      .then(releaseApi, releaseApi);
+
+    return keys;
   }
 
   /**

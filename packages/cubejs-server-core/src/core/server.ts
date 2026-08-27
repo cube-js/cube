@@ -963,6 +963,8 @@ export class CubejsServerCore {
       this.apiGatewayInstance.release();
     }
 
-    return this.orchestratorStorage.releaseConnections();
+    // The process is going away and its shutdown is on a timer, so the queries
+    // still running don't get to finish.
+    return this.orchestratorStorage.releaseConnections({ waitForWork: false });
   }
 }

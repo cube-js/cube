@@ -3,6 +3,7 @@ import * as stream from 'stream';
 import pt from 'promise-timeout';
 import {
   ContinueWaitError,
+  DriverFactory,
   DriverFactoryByDataSource,
   DriverType,
   QueryBody,
@@ -25,12 +26,25 @@ export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
  */
 const HOLDERS_TIMEOUT = 10 * 60 * 1000;
 
+/**
+ * How long the count has to stay at zero to mean the work is over. One logical
+ * operation is several calls on the same api, and the count drops back to zero
+ * between them.
+ */
+const HOLDERS_LINGER = 2 * 1000;
+
 export class OrchestratorApi {
   private seenDataSources: Record<string, boolean> = {};
 
   private holders: number = 0;
 
   private drained: (() => void)[] = [];
+
+  protected readonly holdersLinger: number = HOLDERS_LINGER;
+
+  private externalDriverSeen: boolean = false;
+
+  protected readonly externalDriverFactory?: DriverFactory;
 
   protected orchestrator: QueryOrchestrator;
 
@@ -43,11 +57,23 @@ export class OrchestratorApi {
   ) {
     this.continueWaitTimeout = this.options.continueWaitTimeout || 10;
 
+    const { externalDriverFactory } = options;
+
+    // Asking the factory for the driver is what creates it, so this is where the
+    // tenant stops being one without an external connection. Everything that can
+    // reach the external driver goes through this, release() included, so that it
+    // doesn't open a connection just to close it.
+    this.externalDriverFactory = externalDriverFactory && (async () => {
+      this.externalDriverSeen = true;
+
+      return externalDriverFactory();
+    });
+
     this.orchestrator = new QueryOrchestrator(
       options.redisPrefix || 'STANDALONE',
       driverFactory,
       logger,
-      options
+      { ...options, externalDriverFactory: this.externalDriverFactory }
     );
   }
 
@@ -95,27 +121,60 @@ export class OrchestratorApi {
   }
 
   protected async waitForHolders(): Promise<void> {
-    if (!this.holders) {
+    const deadline = Date.now() + HOLDERS_TIMEOUT;
+
+    for (;;) {
+      if (this.holders && !await this.waitForDrain(deadline - Date.now())) {
+        this.logger('Orchestrator api released with work in progress', {
+          warning: `${this.holders} operation(s) did not finish within ${HOLDERS_TIMEOUT / 1000}s, ` +
+            'their connections are being closed anyway',
+        });
+
+        return;
+      }
+
+      await this.sleep(Math.min(this.holdersLinger, Math.max(deadline - Date.now(), 0)));
+
+      if (!this.holders || Date.now() >= deadline) {
+        return;
+      }
+    }
+  }
+
+  /**
+   * Resolves true once nothing is holding the api, false if that didn't happen
+   * within the timeout.
+   */
+  protected async waitForDrain(timeout: number): Promise<boolean> {
+    let onDrained: () => void = () => undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+      return await new Promise<boolean>((resolve) => {
+        onDrained = () => resolve(true);
+        this.drained.push(onDrained);
+
+        timer = setTimeout(() => resolve(false), Math.max(timeout, 0));
+        timer.unref?.();
+      });
+    } finally {
+      // Neither outcome needs the other one anymore, and both of them keep this
+      // api reachable -- the timer from the timer queue, the resolver from the
+      // array a later drain walks.
+      clearTimeout(timer);
+      this.drained = this.drained.filter(resolve => resolve !== onDrained);
+    }
+  }
+
+  protected async sleep(ms: number): Promise<void> {
+    if (!ms) {
       return;
     }
 
-    await Promise.race([
-      new Promise<void>((resolve) => {
-        this.drained.push(resolve);
-      }),
-      new Promise<void>((resolve) => {
-        const timer = setTimeout(() => {
-          this.logger('Orchestrator api released with work in progress', {
-            warning: `${this.holders} operation(s) did not finish within ${HOLDERS_TIMEOUT / 1000}s, ` +
-              'their connections are being closed anyway',
-          });
-
-          resolve();
-        }, HOLDERS_TIMEOUT);
-
-        timer.unref?.();
-      }),
-    ]);
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, ms);
+      timer.unref?.();
+    });
   }
 
   /**
@@ -270,13 +329,13 @@ export class OrchestratorApi {
    */
   public async testConnection() {
     if (this.options.rollupOnlyMode) {
-      return this.testDriverConnection(this.options.externalDriverFactory, DriverType.External);
+      return this.testDriverConnection(this.externalDriverFactory, DriverType.External);
     } else {
       return Promise.all([
         ...Object.keys(this.seenDataSources).map(
           ds => this.testDriverConnection(this.driverFactory, DriverType.Internal, ds),
         ),
-        this.testDriverConnection(this.options.externalDriverFactory, DriverType.External),
+        this.testDriverConnection(this.externalDriverFactory, DriverType.External),
       ]);
     }
   }
@@ -332,15 +391,20 @@ export class OrchestratorApi {
     ));
   }
 
-  public async release() {
+  public async release({ waitForWork = true }: { waitForWork?: boolean } = {}) {
     // Leaving the cache is not the same as being unused: whoever was handed this
     // api keeps it for the whole of their work, so the drivers can only be closed
-    // once that work is done.
-    await this.waitForHolders();
+    // once that work is done. A process that is shutting down is the exception:
+    // there is nothing left to protect, and its own killer gives it seconds.
+    if (waitForWork) {
+      await this.waitForHolders();
+    }
 
     return Promise.all([
       ...Object.keys(this.seenDataSources).map(ds => this.releaseDriver(this.driverFactory, ds)),
-      this.releaseDriver(this.options.externalDriverFactory),
+      // Only if there is something to release: the factory would otherwise open
+      // a connection for a tenant that never had one.
+      this.externalDriverSeen ? this.releaseDriver(this.externalDriverFactory) : undefined,
       this.orchestrator.cleanup()
     ]);
   }

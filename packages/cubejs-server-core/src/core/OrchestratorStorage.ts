@@ -6,6 +6,13 @@ export class OrchestratorStorage {
 
   protected readonly pendingReleases: Set<Promise<void>> = new Set();
 
+  /**
+   * What the release triggered by the next cache removal does about the work an
+   * api is still serving. Read by disposeAfter, which takes no arguments of its
+   * own.
+   */
+  protected releaseWaitsForWork: boolean = true;
+
   public constructor(options: { compilerCacheSize?: number, maxCompilerCacheKeepAlive?: number, updateCompilerCacheKeepAlive?: boolean } = { compilerCacheSize: 100 }) {
     this.storage = new LRUCache<string, OrchestratorApi>({
       max: options.compilerCacheSize,
@@ -25,7 +32,7 @@ export class OrchestratorStorage {
   }
 
   protected release(api: OrchestratorApi) {
-    const pending: Promise<void> = api.release()
+    const pending: Promise<void> = api.release({ waitForWork: this.releaseWaitsForWork })
       .then(() => undefined, (e) => {
         // Swallowed so that releasing a dead tenant can't take the process down
         // with an unhandled rejection, but not silently: connections this failed
@@ -63,9 +70,20 @@ export class OrchestratorStorage {
     return Promise.all([...this.storage.values()].map(api => api.testOrchestratorConnections()));
   }
 
-  public async releaseConnections() {
-    // clear() disposes every entry, which schedules release() for each of them.
-    this.storage.clear();
+  /**
+   * @param waitForWork Whether the apis get to finish what they are serving.
+   * A shutdown can't afford it: its own killer gives it seconds, and being
+   * force killed halfway is worse than cutting the queries off.
+   */
+  public async releaseConnections({ waitForWork = true }: { waitForWork?: boolean } = {}) {
+    this.releaseWaitsForWork = waitForWork;
+
+    try {
+      // clear() disposes every entry, which schedules release() for each of them.
+      this.storage.clear();
+    } finally {
+      this.releaseWaitsForWork = true;
+    }
 
     await Promise.all([...this.pendingReleases]);
   }
