@@ -73,9 +73,14 @@ looks and feels like [Playground][ref-playground].
 
 <Info>
 
-Google Cloud for Sheets works only with [views][ref-views], not cubes.
+Cube Cloud for Sheets works only with [views][ref-views], not cubes.
 
 </Info>
+
+If the view defines [`default_ui_filters`][ref-default-ui-filters], those
+filters are pre-populated as soon as you select the view — the same way they
+are in workbooks. They are a starting point, not enforcement: you can change
+their values, switch operators, or remove them.
 
 Click on members to add them to **Rows** and **Measures**.
 If needed, drag dimensions from **Rows** to **Columns**. Click on
@@ -100,6 +105,31 @@ With every change to your query, Cube Cloud for Sheets will update the report on
 the sheet after a slight delay. If you'd like to minimize it, consider
 implementing [pre-aggregations][ref-pre-aggs].
 
+### Measure position and order
+
+By default, measures nest under each value of the dimension they're paired
+with — every measure for the first column value, then every measure for the
+next. Open the **Display** tab to change **Measure position** to **Before
+columns** to get the opposite layout: each measure spans every column value,
+with all values of one measure together before moving to the next.
+
+For example, with `Forecast Sales Units` and `Forecast Net Sales` on Measures
+and a `season` dimension on Columns:
+
+- **After columns** (default): `Q1: [Sales Units, Net Sales] | Q2: [Sales
+  Units, Net Sales]`
+- **Before columns**: `Sales Units: [Q1, Q2] | Net Sales: [Q1, Q2]`
+
+{/* TODO: screenshot — side-by-side of the two output layouts (After columns vs Before columns) */}
+
+The same choice applies when measures are placed on **Rows** instead (set
+with **Measures on**, in the same tab) — there it's labeled **After rows** /
+**Before rows**.
+
+To change the order measures appear in within their group, drag them within
+the **Measures** pane on the **Pivot** tab. Position and order are saved with
+the report and survive **Refresh**.
+
 When your report is ready, you can optionally move it to [saved reports](#work-with-saved-reports)
 by clicking **Save**.
 
@@ -111,8 +141,18 @@ exploration by name across your whole deployment, not just the current
 folder — results are grouped by type and show each item's folder location,
 and selecting one navigates you straight to it.
 
-Click **Refresh** to manually refresh the data in the report's location.
-Click **Edit** to change the query or the location.
+An exploration can be placed more than once — on different sheets or at
+different anchors in the same spreadsheet, and in more than one document at
+once (a Google Sheets spreadsheet and an Excel workbook simultaneously).
+Hovering a row in this list shows every placement it has in the **current**
+document under **Location** / **Locations**. Click **Refresh** to update all
+of that exploration's placements in the current document at once; click its
+title to open it and change the query, which applies to every placement.
+
+A placement survives renaming the sheet it's on or the spreadsheet it's in —
+it's tracked by the sheet's and spreadsheet's own stable ids, not by name.
+It does **not** survive rows or columns inserted above its anchor cell; the
+anchor still shifts with the sheet.
 
 <Frame>
   <img src="https://ucarecdn.com/c8d490c6-80bf-44fe-9233-45121a7c4088/" />
@@ -133,5 +173,6 @@ in Cube Cloud.
 [ref-playground]: /docs/explore-analyze/playground
 [ref-views]: /docs/data-modeling/views
 [ref-pre-aggs]: /docs/pre-aggregations/using-pre-aggregations
+[ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
 [ref-sql-api-enabled]: /reference/core-data-apis/sql-api#cube-cloud
 [ref-saved-reports]: /docs/workspace/saved-reports
