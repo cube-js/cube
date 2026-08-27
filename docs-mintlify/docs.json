@@ -808,12 +808,14 @@
                 "pages": [
                   "GET /build/api/v1/deployments/{deploymentId}/branches",
                   "POST /build/api/v1/deployments/{deploymentId}/branches",
+                  "DELETE /build/api/v1/deployments/{deploymentId}/branches",
                   "PUT /build/api/v1/deployments/{deploymentId}/branches/staging-environment",
                   "POST /build/api/v1/deployments/{deploymentId}/commit",
                   "GET /build/api/v1/deployments/{deploymentId}/data-model/files",
                   "PUT /build/api/v1/deployments/{deploymentId}/data-model/files",
                   "DELETE /build/api/v1/deployments/{deploymentId}/data-model/files",
                   "POST /build/api/v1/deployments/{deploymentId}/data-model/files/rename",
+                  "GET /build/api/v1/deployments/{deploymentId}/data-model/validate",
                   "POST /build/api/v1/deployments/{deploymentId}/dev-mode",
                   "DELETE /build/api/v1/deployments/{deploymentId}/dev-mode",
                   "POST /build/api/v1/deployments/{deploymentId}/merge",
@@ -852,9 +854,11 @@
                 "group": "dbt Sync",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
+                  "GET /api/v1/deployments/{deploymentId}/dbt-sync",
                   "POST /api/v1/deployments/{deploymentId}/dbt-sync",
                   "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}",
                   "DELETE /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}",
+                  "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/logs",
                   "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/result"
                 ]
               },
@@ -880,6 +884,7 @@
                   "PUT /api/v1/deployments/{deploymentId}/reports/{reportId}",
                   "DELETE /api/v1/deployments/{deploymentId}/reports/{reportId}",
                   "PUT /api/v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook",
+                  "DELETE /api/v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook",
                   "PUT /api/v1/deployments/{deploymentId}/reports/{reportId}/refresh"
                 ]
               },

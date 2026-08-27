@@ -7,6 +7,63 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.js against the platform client CHANGELOG.md. */}
 
+<Update label="2026-08-27" description="v0.4.0" tags={["Added","Changed","Removed"]}>
+  ### Added
+
+  #### dbt Sync — status, results and history
+
+  - `GET /api/v1/deployments/{deploymentId}/dbt-sync` (`DbtSyncPublicController.listDbtSyncs`) — sync run history, filterable by `status`/`trigger`, cursor-paginated. New schemas: `DbtSyncRun`, `DbtSyncRunListResponse`, `DbtSyncRunPhase`, `DbtSyncRunStats`, `DbtSyncRunTriggerContext`, `DbtSyncRunsQueryStatus`, `DbtSyncRunsQueryTrigger`.
+  - `GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}` (`getDbtSyncStatus`) — poll a running sync. New schemas: `DbtSyncStatusResponse`, `DbtSyncProgress`.
+  - `GET .../dbt-sync/{syncJobId}/result` (`getDbtSyncResult`) and `GET .../dbt-sync/{syncJobId}/logs` (`getDbtSyncLogs`). New schemas: `DbtSyncResultResponse`, `DbtSyncGeneratedFile`, `DbtSyncManifestStats`, `DbtSyncLogEntry`, `DbtSyncLogEntriesListResponse`.
+  - `DELETE .../dbt-sync/{syncJobId}` (`cancelDbtSync`) — cancel a running sync. New schema: `DbtSyncCancelResponse`.
+
+  #### Data model — branch cleanup, staging environments and validation
+
+  - `DELETE /build/api/v1/deployments/{deploymentId}/branches` (`DataModelPublicController.removeBranch`, `branchName` as a query param since branch names contain slashes) — deletes a branch and its git ref, re-parenting any children onto the deleted branch's own parent; `removeOnUpstream` additionally deletes the ref on the connected GitHub/GitLab remote. New schema: `DataModelWriteResponse` (shared with the existing file-write endpoints).
+  - `PUT .../branches/staging-environment` (`setBranchStagingEnvironment`) — enable or disable a branch's always-on staging environment (`<deploymentUrl>/dev-mode/{branchName}/cubejs-api/v1`). New schemas: `SetBranchStagingEnvironmentRequest`, `SetBranchStagingEnvironmentResponse`. `BranchResponse` (from `listBranches`) reads the flag back via a new `isStagingEnvironmentEnabled`.
+  - `GET .../data-model/validate` (`validateDataModel`) — compiles the deploy branch, a named branch, or the caller's dev-mode branch and reports compilation errors as a 200 response (`valid: false`), not a request error. New schemas: `DataModelValidationResponse`, `DataModelValidationError`, `DataModelValidationResponseMode`.
+
+  #### Deployment settings, versions and the spec endpoint
+
+  - `GET /api/v1/deployments/{deploymentId}/settings` (`DeploymentsPublicController.getDeploymentSettings`) — every deployment setting in one payload (secrets excluded); writes go through the existing `PUT /:deploymentId`. New schema: `DeploymentSettings` (+ its `cloudProvider`/`creationMethod`/`deployMode`/`releaseChannel`/`repoType`/`template` enums).
+  - `GET /api/v1/deployments/{deploymentId}/versions` (`listDeploymentVersions`) — the Cube versions this deployment can switch to (release-channel heads plus prior versions run before). New schemas: `DeploymentVersion`, `DeploymentVersionsResponse`, `DeploymentVersionReleaseChannel`.
+  - `PUT /api/v1/deployments/{deploymentId}` (`updateDeployment`) / `UpdateDeploymentInput` now accepts `cloudProvider`, `region`, `releaseChannel`, `releaseChannelVersion`, `releaseChannelVersionHold`, `template`, `templateVariables`, `defaultLaunchpadViewGroup`, and `launchpadTabs` — the same settings surface `GET .../settings` now reads back. `releaseChannelVersion` must be one of the versions `GET .../versions` lists for the target channel.
+  - `GET /api/v1/spec` (`OpenApiSpecPublicController.getSpec`) — the full OpenAPI 3.1 document served by the build handling the request, for runtime discovery by clients and agents.
+
+  #### Reports
+
+  - `DELETE /api/v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook` (`ReportsPublicController.disconnectReportFromWorkbook`) — removes a single sheet+anchor placement of a report from a spreadsheet, leaving every other placement (in this workbook and others) alone. Addressed by `placementId`, or by `externalWorkbookId` + `sheetName` + `anchorCell`. New schema: `DisconnectReportFromWorkbookInput`.
+  - `PUT .../reports/{reportId}/refresh` now takes a body: new schema `RefreshReportInput` (`placementId`, or `externalWorkbookId` + `sheetName`/`sheetId`/`anchorCell`), addressing the same way as disconnect.
+  - Report placements are now individually addressable and trackable (new `ConnectReportToWorkbookInputHost` / `CreateReportInputHost` / `UpdateReportInputHost` enums, `"GOOGLE_SHEETS" | "EXCEL"`): `ConnectReportToWorkbookInput` gained `placementId`, `sheetId`, `sheetName`, `anchorCell`, `workbookName` and `host`; `CreateReportInput` gained `host`, `sheetId` and `workbookName`; `UpdateReportInput` gained `host`, `placementId`, `sheetId` and `workbookName`. `ReportPlacement` gained the matching `id`, `host`, `sheetId`, `sheetName`, `anchorCell`, `workbookName`, plus `placedAt`/`placedByUserId` and `refreshedAt`/`refreshedByUserId` (new `ReportPlacementHost` enum). `ReportSnapshot` gained `isSourceReport` and `pythonCode`.
+
+  #### Cursor pagination on previously offset-only or unpaginated lists
+
+  - `first`/`after` → `items` + `pageInfo` cursor pagination added to: deployment env variables (`GET .../env-vars`), GitHub branches/installations/repositories (`GitHubPublicController.*`), user attributes (previously `offset`/`limit`), `GET /api/v1/regions/`, report folders, data-model branches and files (`listBranches`/`listFiles`, `BranchesListResponse`/`SourceTreeResponse`), and deployment logs/pods (`DeploymentLogsResponse`/`DeploymentPodsResponse` gain `pageInfo`). Newly-paginated responses keep the legacy `data`/`count`/`pagination` fields, marked `@deprecated`.
+  - `UserGroupsPublicController.listGroups` and `UsersPublicController.getUsers` already had `first`/`after`; what's new on both is a `search` query param (case-insensitive substring match on group name / first name, username, email).
+  - `DashboardFilterOperator` / `DashboardFilterInputOperator` gained `is_empty` / `is_not_empty`.
+
+  #### Other new fields
+
+  - New `TimezoneSettings` schema, plus `timezoneSettings` on `AppConfigResponse` and `resolvedTimezone` / `deployBranchName` / `timezoneSettings` on `AIEngineerSettings`.
+  - New `CspsConfig` schema (customer-storage-provider config, mirrored on the existing `CspsConfigInput`).
+  - `scopeDeploymentId` added to the agent-space config schemas.
+  - `measuresAxis` / `measuresPosition` added to `PivotItems` / `PivotItemsInput` (new `PivotItemsMeasuresAxis` / `PivotItemsMeasuresPosition` / `PivotItemsInputMeasuresAxis` / `PivotItemsInputMeasuresPosition` enums, `"columns" | "rows"` and `"before" | "after"`).
+  - `name` / `userCount` added to `InheritedGroupPolicyDto` and `ResourceGroupPolicyDto`.
+  - `allowChatWorkspaceAuthoring` added to `EmbedSessionSettings`.
+  - `ref` added to `StartDbtSyncInput`.
+
+  ### Changed
+
+  - **BREAKING (TypeScript):** `DeploymentEnvironmentsListResponse.pagination` and `DeploymentEnvironmentTokensListResponse.pagination` moved from required to `pagination?: DeploymentsPagination | null` now that both responses also carry `items`/`pageInfo`. Code under `strictNullChecks` reading `res.pagination.currentPage` without a null check no longer compiles.
+  - **BREAKING (TypeScript):** `NotificationsPublicController.getRecipients`'s cursor params were narrowed — `first?: number | string | null` → `first?: number | null` and `after?: string | number | null` → `after?: string | null` — cleaning up a hand-declared `@OpenAPI({ parameters })` that had merged positionally with the real cursor-param types. A caller passing a numeric `after` or a stringified `first` (both accepted, if oddly typed, before) no longer compiles.
+  - `DashboardWidgetDtoType` / `DashboardWidgetInputType` no longer advertise `TABS_CONTAINER` in the type — replaced by `PARENT`, `SPACER`, `DIVIDER`, `CONTAINER` (a `CONTAINER` with `config.layout: 'tabs'` is the current shape for a tabbed container). Existing stored or sent `TABS_CONTAINER` values are still healed server-side for backward compatibility (CUB-3634), so this narrows the advertised type rather than breaking existing integrations at runtime — new code should target `CONTAINER` + `layout`.
+  - `PUT /api/v1/deployments/{deploymentId}` (`updateDeployment`) description clarified: writes are a partial merge (omitted fields are left alone, `templateVariables` is merged key-by-key), and `releaseChannelVersion` is validated against `GET .../versions`.
+
+  ### Removed
+
+  - **BREAKING:** `POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread` (`WorkbooksPublicController.updatePublishedDashboardAiWidgetThread`) and its `UpdatePublishedAiWidgetThreadInput` schema (added in `0.2.0`). It persisted an AI-analysis thread id + checksum into the published dashboard config — the mechanism that caused read-only/anonymous viewers to hit `WorkbookEdit`/403s and let one viewer's filter state clobber the shared config (CUB-3898). AI-analysis results are now cached server-side keyed by dashboard state, so no client-facing endpoint replaces it. This is a deliberate breaking removal; SDK consumers referencing the operation or schema should drop those references.
+</Update>
+
 <Update label="2026-07-30" description="v0.3.0" tags={["Added","Changed","Removed"]}>
   > Supersedes `0.2.1`, which never reached npm because its publish job failed.
   > Upgrading from `0.2.0` picks up both releases, so the `0.2.1` entries are

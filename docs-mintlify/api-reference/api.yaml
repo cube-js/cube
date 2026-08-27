@@ -105,19 +105,14 @@ paths:
             type: integer
             minimum: 0
         - in: query
-          name: first
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-          description: Page size for cursor-based pagination
-        - in: query
           name: after
-          required: false
+          schema:
+            type: string
+        - in: query
+          name: first
           schema:
             minimum: 1
-            type: string
-          description: Cursor for fetching the next page
+            type: integer
       responses:
         '200':
           content:
@@ -272,6 +267,45 @@ paths:
       tags:
         - Deployments
   /api/v1/deployments/{deploymentId}/dbt-sync:
+    get:
+      operationId: listDbtSyncs
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: status
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/DbtSyncRunsQueryStatus'
+              - type: 'null'
+        - in: query
+          name: trigger
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/DbtSyncRunsQueryTrigger'
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DbtSyncRunListResponse'
+          description: ''
+      summary: List dbt syncs for a deployment
+      tags:
+        - dbt Sync
     post:
       operationId: startDbtSync
       parameters:
@@ -344,6 +378,30 @@ paths:
       summary: Get the status of a dbt sync
       tags:
         - dbt Sync
+  /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/logs:
+    get:
+      operationId: getDbtSyncLogs
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: syncJobId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DbtSyncLogEntriesListResponse'
+          description: ''
+      summary: Get the log of a dbt sync
+      tags:
+        - dbt Sync
   /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/result:
     get:
       operationId: getDbtSyncResult
@@ -377,6 +435,19 @@ paths:
           required: true
           schema:
             type: integer
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
       responses:
         '200':
           content:
@@ -389,8 +460,9 @@ paths:
         - Env Variables
       x-mint:
         content: >-
-          Lists the deployment environment variables. Values of secret-named variables (containing
-          PASS, SECRET, TOKEN, KEY, or CREDENTIAL) are returned as `[ENCRYPTED]`.
+          Lists the deployment environment variables, cursor-paginated via `first`/`after`. Values
+          of secret-named variables (containing PASS, SECRET, TOKEN, KEY, or CREDENTIAL) are
+          returned as `[ENCRYPTED]`.
     put:
       operationId: setEnvVariables
       parameters:
@@ -464,6 +536,15 @@ paths:
               - type: 'null'
             type: integer
             minimum: 0
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
       responses:
         '200':
           content:
@@ -508,6 +589,15 @@ paths:
               - type: 'null'
             type: integer
             minimum: 0
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
       responses:
         '200':
           content:
@@ -822,6 +912,15 @@ paths:
             oneOf:
               - $ref: '#/components/schemas/DeploymentLogsQueryContainer'
               - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
       responses:
         '200':
           content:
@@ -847,7 +946,6 @@ paths:
           description: Numeric id of the deployment that owns the notification.
         - in: query
           name: dashboardId
-          required: false
           schema:
             oneOf:
               - minimum: 1
@@ -856,14 +954,8 @@ paths:
                   Optional filter: only return notifications for this numeric dashboard id. Provide
                   this OR dashboardPublicId, not both.
               - type: 'null'
-            type: integer
-            minimum: 1
-          description: >-
-            Optional filter: only return notifications for this numeric dashboard id. Provide this
-            OR `dashboardPublicId`, not both.
         - in: query
           name: dashboardPublicId
-          required: false
           schema:
             oneOf:
               - type: string
@@ -871,13 +963,8 @@ paths:
                   Optional filter: only return notifications for this dashboard public id. Provide
                   this OR dashboardId, not both.
               - type: 'null'
-            type: string
-          description: >-
-            Optional filter: only return notifications for this dashboard public id. Provide this OR
-            `dashboardId`, not both.
         - in: query
           name: recipientUserId
-          required: false
           schema:
             oneOf:
               - minimum: 1
@@ -886,14 +973,8 @@ paths:
                   Optional filter: only return notifications received by this user, by user id.
                   Mutually exclusive with recipientEmail and the embed-user filter.
               - type: 'null'
-            type: integer
-            minimum: 1
-          description: >-
-            Optional filter: only return notifications received by this user, by user id. Mutually
-            exclusive with `recipientEmail` and the embed-user filter.
         - in: query
           name: recipientEmail
-          required: false
           schema:
             oneOf:
               - type: string
@@ -901,13 +982,8 @@ paths:
                   Optional filter: only return notifications received by this user, by email.
                   Mutually exclusive with recipientUserId and the embed-user filter.
               - type: 'null'
-            type: string
-          description: >-
-            Optional filter: only return notifications received by this user, by email. Mutually
-            exclusive with `recipientUserId` and the embed-user filter.
         - in: query
           name: recipientEmbedTenantName
-          required: false
           schema:
             oneOf:
               - type: string
@@ -915,13 +991,8 @@ paths:
                   Optional filter: only return notifications received by this embed user. Required
                   together with recipientExternalId; mutually exclusive with the user filters.
               - type: 'null'
-            type: string
-          description: >-
-            Optional filter: only return notifications received by this embed user. Required
-            together with `recipientExternalId`; mutually exclusive with the user filters.
         - in: query
           name: recipientExternalId
-          required: false
           schema:
             oneOf:
               - type: string
@@ -929,25 +1000,15 @@ paths:
                   Optional filter: only return notifications received by this embed user. Required
                   together with recipientEmbedTenantName; mutually exclusive with the user filters.
               - type: 'null'
-            type: string
-          description: >-
-            Optional filter: only return notifications received by this embed user. Required
-            together with `recipientEmbedTenantName`; mutually exclusive with the user filters.
-        - in: query
-          name: first
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 200
-          description: Page size for cursor pagination (default 100, max 200).
         - in: query
           name: after
-          required: false
+          schema:
+            type: string
+        - in: query
+          name: first
           schema:
             minimum: 1
-            type: string
-          description: Opaque cursor for the next page; pass the previous response's `pageInfo.endCursor`.
+            type: integer
       responses:
         '200':
           content:
@@ -1184,26 +1245,18 @@ paths:
             type: integer
           description: Numeric id of the notification (scheduled run).
         - in: query
-          name: first
-          required: false
+          name: after
           schema:
             oneOf:
               - type: string
               - type: 'null'
-            type: integer
-            minimum: 1
-            maximum: 200
-          description: Page size for cursor pagination (default 100, max 200).
         - in: query
-          name: after
-          required: false
+          name: first
           schema:
             oneOf:
               - minimum: 1
                 type: integer
               - type: 'null'
-            type: string
-          description: Opaque cursor for the next page; pass the previous response's `pageInfo.endCursor`.
       responses:
         '200':
           content:
@@ -1283,6 +1336,19 @@ paths:
           required: true
           schema:
             type: integer
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
       responses:
         '200':
           content:
@@ -1597,6 +1663,64 @@ paths:
 
           Requires **edit** access to the report.
   /api/v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook:
+    delete:
+      operationId: disconnectReportFromWorkbook
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisconnectReportFromWorkbookInput'
+        description: DisconnectReportFromWorkbookInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+          description: ''
+      summary: Disconnect a report from one spot in a spreadsheet
+      tags:
+        - Reports
+      x-mint:
+        content: |-
+          Remove a single placement of a report — one sheet + anchor in one
+          spreadsheet — leaving every other placement, in this workbook and in others, alone.
+
+          Address the placement by `placementId`, or (for placements recorded before ids
+          existed) by `externalWorkbookId` plus `sheetName` and `anchorCell` — or a
+          `resultLocation` naming both. Neither the sheet name nor the anchor is optional in
+          that form: matching is by sheet + anchor, and a target missing either addresses
+          nothing.
+
+          `sheetId` is an optional extra, not a substitute for `sheetName`: a placement
+          written before that field existed has only a name, and no id the server could
+          resolve to it, so an id-only address would match nothing while looking correct.
+
+          Send a `sheetId` only when you know it is the one the placement was stored with.
+          It NARROWS the target — a placement recorded under a different id is not matched,
+          even when the sheet name and anchor agree, because the stored name may belong to a
+          tab that has since been renamed and the id is the only stable identity. If your id
+          may have moved on (a tab deleted and recreated under the same name reports a new
+          one), address the placement by `placementId`, or by sheet name with no
+          `sheetId` at all.
+
+          A target that matches no placement succeeds and changes nothing, so retrying is
+          safe.
+
+          Like connecting, this records nothing about the report's definition and so requires
+          only read access: unplacing a report from your own sheet is not an edit to the report.
     put:
       operationId: connectReportToWorkbook
       parameters:
@@ -1650,6 +1774,13 @@ paths:
           required: true
           schema:
             type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshReportInput'
+        description: RefreshReportInput
+        required: false
       responses:
         '200':
           content:
@@ -1793,6 +1924,19 @@ paths:
           required: true
           schema:
             type: integer
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
       responses:
         '200':
           content:
@@ -3163,6 +3307,20 @@ paths:
   /api/v1/github/installations:
     get:
       operationId: installations
+      parameters:
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
       responses:
         '200':
           content:
@@ -3181,7 +3339,20 @@ paths:
           name: installationId
           required: true
           schema:
-            type: number
+            type: integer
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
       responses:
         '200':
           content:
@@ -3196,11 +3367,11 @@ paths:
     get:
       operationId: branches
       parameters:
-        - in: query
-          name: installationId
+        - in: path
+          name: owner
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: repo
           required: true
@@ -3208,9 +3379,22 @@ paths:
             type: string
         - in: query
           name: installationId
-          required: false
+          required: true
           schema:
-            type: number
+            type: integer
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
       responses:
         '200':
           content:
@@ -3425,6 +3609,20 @@ paths:
   /api/v1/regions:
     get:
       operationId: listRegions
+      parameters:
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
       responses:
         '200':
           content:
@@ -3435,6 +3633,11 @@ paths:
       summary: List regions
       tags:
         - Regions
+      x-mint:
+        content: >-
+          Lists the regions available to the account, cursor-paginated via `first`/`after`. The
+          legacy `data` field returns the full, unpaginated list and is deprecated — use `items` +
+          `pageInfo` instead.
   /api/v1/spec:
     get:
       operationId: getSpec
@@ -3555,6 +3758,15 @@ paths:
             oneOf:
               - $ref: '#/components/schemas/GetUserAttributesQueryType'
               - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
       responses:
         '200':
           content:
@@ -3565,6 +3777,11 @@ paths:
       summary: Get user attributes
       tags:
         - User Attributes
+      x-mint:
+        content: >-
+          List user attributes, newest first, cursor-paginated via `first`/`after`. The legacy
+          `offset`/`limit` query params and the `data`/`count` response fields are deprecated — use
+          `items` + `pageInfo` instead.
     post:
       operationId: createUserAttribute
       requestBody:
@@ -3829,6 +4046,53 @@ paths:
           `github`, no starter project is scaffolded — connect a repository afterwards via POST
           /build/api/v1/deployments/:deploymentId/github/connect.
   /build/api/v1/deployments/{deploymentId}/branches:
+    delete:
+      operationId: removeBranch
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: branchName
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: removeOnUpstream
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelWriteResponse'
+          description: ''
+      summary: Delete a branch
+      tags:
+        - Data Model
+      x-mint:
+        content: >-
+          Deletes the branch and its git ref — the API-side counterpart of pruning a branch in Cube
+          Cloud, for callers that create branches per run (a CI job syncing dbt on every pull
+          request, say) and would otherwise accumulate them forever. Child branches are re-parented
+          onto the deleted branch’s own parent, and anyone viewing the branch in dev mode is moved
+          back to the default branch, so a branch that is currently open is deleted rather than
+          refused. The deploy branch cannot be deleted (400) and an unknown branch is a 404.
+
+
+          `removeOnUpstream=true` additionally deletes the branch on the connected git provider
+          (GitHub/GitLab). It defaults to `false`, so by default the branch is removed from Cube
+          Cloud only and the ref on your own remote is left alone — a CI job cleaning up branches it
+          created itself should opt in explicitly.
+
+
+          `branchName` is a query parameter rather than a path segment because branch names contain
+          slashes (`dbt-sync/main-20260817120000-a1b2c3d4`).
     get:
       operationId: listBranches
       parameters:
@@ -3837,6 +4101,19 @@ paths:
           required: true
           schema:
             type: integer
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
       responses:
         '200':
           content:
@@ -4019,6 +4296,19 @@ paths:
           required: false
           schema:
             type: boolean
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
       responses:
         '200':
           content:
@@ -4029,6 +4319,12 @@ paths:
       summary: List the data-model source files for a deployment
       tags:
         - Data Model
+      x-mint:
+        content: >-
+          Returns the data-model file tree. `first`/`after` (from the shared cursor params) paginate
+          the **top-level** tree nodes only — a single node can carry a large subtree, so this
+          bounds the number of roots returned, not the total file count. Omit `first` to get the
+          whole tree.
     put:
       operationId: updateFiles
       parameters:
@@ -4207,6 +4503,43 @@ paths:
       summary: Start a data-model upload transaction
       tags:
         - Data Model Uploads
+  /build/api/v1/deployments/{deploymentId}/data-model/validate:
+    get:
+      operationId: validateDataModel
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: branchName
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: devMode
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelValidationResponse'
+          description: ''
+      summary: Compile a deployment's data model and report compilation errors
+      tags:
+        - Data Model
+      x-mint:
+        content: >-
+          Asks the branch's own Cube runtime for `GET /cubejs-api/v1/meta` — the same call the
+          console makes in dev mode — so the verdict is the one that branch's API would give. With
+          neither parameter it validates the deploy branch (production). `branchName` validates a
+          named branch, and `devMode=true` validates the caller's active dev-mode branch; the two
+          are mutually exclusive. Answers 200 with `valid: false` and the compiler's errors when the
+          model doesn't compile — a broken model is a result, not a request error.
   /build/api/v1/deployments/{deploymentId}/dev-mode:
     delete:
       operationId: stopDevMode
@@ -4491,10 +4824,21 @@ components:
     BranchesListResponse:
       properties:
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/BranchResponse'
           type: array
+        items:
+          items:
+            $ref: '#/components/schemas/BranchResponse'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
+        - items
         - data
       type: object
     BuildStatusResponse:
@@ -4715,18 +5059,47 @@ components:
       type: object
     ConnectReportToWorkbookInput:
       properties:
+        anchorCell:
+          oneOf:
+            - type: string
+            - type: 'null'
         endResultCell:
           oneOf:
             - type: string
             - type: 'null'
         externalWorkbookId:
           type: string
+        host:
+          oneOf:
+            - $ref: '#/components/schemas/ConnectReportToWorkbookInputHost'
+            - type: 'null'
+        placementId:
+          oneOf:
+            - type: string
+            - type: 'null'
         resultLocation:
           type: string
+        sheetId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        sheetName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        workbookName:
+          oneOf:
+            - type: string
+            - type: 'null'
       required:
         - externalWorkbookId
         - resultLocation
       type: object
+    ConnectReportToWorkbookInputHost:
+      enum:
+        - GOOGLE_SHEETS
+        - EXCEL
+      type: string
     ControlThemeBorderSectionInput:
       properties:
         color:
@@ -5076,6 +5449,10 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        host:
+          oneOf:
+            - $ref: '#/components/schemas/CreateReportInputHost'
+            - type: 'null'
         jsonQuery:
           oneOf:
             - type: string
@@ -5104,6 +5481,10 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        sheetId:
+          oneOf:
+            - type: string
+            - type: 'null'
         source:
           oneOf:
             - $ref: '#/components/schemas/CreateReportInputSource'
@@ -5120,7 +5501,16 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        workbookName:
+          oneOf:
+            - type: string
+            - type: 'null'
       type: object
+    CreateReportInputHost:
+      enum:
+        - GOOGLE_SHEETS
+        - EXCEL
+      type: string
     CreateReportInputSource:
       enum:
         - GOOGLE_SHEETS
@@ -5928,6 +6318,7 @@ components:
         - FILTER
         - AI
         - TIME_GRAIN
+        - PARENT
         - SPACER
         - DIVIDER
         - CONTAINER
@@ -5967,6 +6358,7 @@ components:
         - FILTER
         - AI
         - TIME_GRAIN
+        - PARENT
         - SPACER
         - DIVIDER
         - CONTAINER
@@ -6030,6 +6422,47 @@ components:
         - path
         - newPath
       type: object
+    DataModelValidationError:
+      properties:
+        fileName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        message:
+          type: string
+      required:
+        - message
+      type: object
+    DataModelValidationResponse:
+      properties:
+        branchName:
+          type: string
+        cubesCount:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        deploymentId:
+          type: integer
+        errors:
+          items:
+            $ref: '#/components/schemas/DataModelValidationError'
+          type: array
+        mode:
+          $ref: '#/components/schemas/DataModelValidationResponseMode'
+        valid:
+          type: boolean
+      required:
+        - deploymentId
+        - branchName
+        - mode
+        - valid
+        - errors
+      type: object
+    DataModelValidationResponseMode:
+      enum:
+        - production
+        - dev_mode
+      type: string
     DataModelWriteResponse:
       properties:
         success:
@@ -6051,6 +6484,49 @@ components:
           type: string
       required:
         - path
+      type: object
+    DbtSyncLogEntriesListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/DbtSyncLogEntry'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
+    DbtSyncLogEntry:
+      properties:
+        durationMs:
+          oneOf:
+            - type: integer
+              description: For a phase line, how long the phase took, in milliseconds.
+            - type: 'null'
+        level:
+          description: info or error.
+          type: string
+        message:
+          type: string
+        phase:
+          oneOf:
+            - type: string
+              description: The phase this line belongs to, e.g. dbt-compile.
+            - type: 'null'
+        stream:
+          description: >-
+            Always "system" in this version. "stdout" and "stderr" join it once dbt’s own output is
+            captured, so treat this as an open set.
+          type: string
+        timestamp:
+          description: When the line was produced, as an ISO 8601 timestamp.
+          type: string
+      required:
+        - timestamp
+        - level
+        - stream
+        - message
       type: object
     DbtSyncManifestStats:
       properties:
@@ -6125,6 +6601,189 @@ components:
         - completedAt
         - durationMs
       type: object
+    DbtSyncRun:
+      properties:
+        branchName:
+          description: The Cube branch this sync wrote its generated cubes to.
+          type: string
+        completedAt:
+          oneOf:
+            - type: string
+              description: >-
+                When the sync finished, as an ISO 8601 timestamp, or null while it is still running.
+                This is stamped by the process that ran the sync whereas startedAt is stamped by the
+                process that launched it — two different clocks — so for a run that failed moments
+                after starting, completedAt can even precede startedAt. Use durationMs to show how
+                long a run took rather than subtracting these.
+            - type: 'null'
+        deploymentId:
+          type: integer
+        durationMs:
+          oneOf:
+            - type: integer
+              description: >-
+                How long the sync took, in milliseconds, and the value to use when showing a
+                duration. Measured from a single clock, so it is never negative — prefer it over
+                subtracting startedAt from completedAt, which can disagree with it by a small skew.
+            - type: 'null'
+        errorMessage:
+          oneOf:
+            - type: string
+              description: Why the sync stopped. Present only for a failed run.
+            - type: 'null'
+        failedPhase:
+          oneOf:
+            - type: string
+              description: The phase that failed, e.g. dbt-compile.
+            - type: 'null'
+        gitRef:
+          oneOf:
+            - type: string
+              description: The dbt-repository ref this sync was run against, when pinned.
+            - type: 'null'
+        lastStage:
+          oneOf:
+            - type: string
+              description: The pipeline stage the run reached, e.g. COMPILING_DBT.
+            - type: 'null'
+        phases:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DbtSyncRunPhase'
+              type: array
+              description: Per-phase timings, in the order they ran. Absent while the sync is running.
+            - type: 'null'
+        startedAt:
+          description: >-
+            When the sync started, as an ISO 8601 timestamp. See completedAt before comparing the
+            two.
+          type: string
+        stats:
+          oneOf:
+            - $ref: '#/components/schemas/DbtSyncRunStats'
+            - type: 'null'
+        status:
+          description: >-
+            RUNNING, COMPLETED, FAILED, CANCELLED or UNKNOWN. UNKNOWN means the outcome could not be
+            established (the run’s record was lost and the workflow engine no longer knows the
+            workflow) and is deliberately distinct from FAILED. Treat an unrecognized value as
+            non-terminal.
+          type: string
+        syncJobId:
+          type: string
+        trigger:
+          description: >-
+            What started the sync: manual (the Cube Cloud UI), api (this REST API), webhook (a push
+            to the dbt repository), agent (Cube AI), or unknown.
+          type: string
+        triggerContext:
+          oneOf:
+            - $ref: '#/components/schemas/DbtSyncRunTriggerContext'
+            - type: 'null'
+        userId:
+          oneOf:
+            - type: integer
+              description: The Cube user who started the sync, when a user started it.
+            - type: 'null'
+      required:
+        - syncJobId
+        - deploymentId
+        - status
+        - trigger
+        - branchName
+        - startedAt
+      type: object
+    DbtSyncRunListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/DbtSyncRun'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
+    DbtSyncRunPhase:
+      properties:
+        durationMs:
+          description: How long the phase took, in milliseconds.
+          type: integer
+        outcome:
+          description: ok or failed.
+          type: string
+        phase:
+          description: Phase token, e.g. repo-clone, dbt-deps, dbt-compile.
+          type: string
+        startedOffsetMs:
+          description: When the phase began, in milliseconds after the sync started.
+          type: integer
+      required:
+        - phase
+        - startedOffsetMs
+        - durationMs
+        - outcome
+      type: object
+    DbtSyncRunStats:
+      properties:
+        cubeCount:
+          oneOf:
+            - type: integer
+              description: How many cubes the sync generated.
+            - type: 'null'
+        generatedFileCount:
+          oneOf:
+            - type: integer
+              description: How many files the sync wrote to the branch it created.
+            - type: 'null'
+        macros:
+          oneOf:
+            - type: integer
+              description: dbt macros found in the manifest.
+            - type: 'null'
+        models:
+          oneOf:
+            - type: integer
+              description: dbt models found in the manifest.
+            - type: 'null'
+        sources:
+          oneOf:
+            - type: integer
+              description: dbt sources found in the manifest.
+            - type: 'null'
+      type: object
+    DbtSyncRunTriggerContext:
+      properties:
+        headSha:
+          oneOf:
+            - type: string
+            - type: 'null'
+        pushedBranch:
+          oneOf:
+            - type: string
+            - type: 'null'
+        targetBranch:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    DbtSyncRunsQueryStatus:
+      enum:
+        - RUNNING
+        - COMPLETED
+        - FAILED
+        - CANCELLED
+        - UNKNOWN
+      type: string
+    DbtSyncRunsQueryTrigger:
+      enum:
+        - manual
+        - api
+        - webhook
+        - agent
+        - unknown
+      type: string
     DbtSyncStatusResponse:
       properties:
         error:
@@ -6258,14 +6917,28 @@ components:
     DeploymentEnvironmentTokensListResponse:
       properties:
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/DeploymentEnvironmentToken'
           type: array
+        items:
+          items:
+            $ref: '#/components/schemas/DeploymentEnvironmentToken'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
         pagination:
-          $ref: '#/components/schemas/DeploymentsPagination'
+          oneOf:
+            - $ref: '#/components/schemas/DeploymentsPagination'
+              deprecated: true
+              description: 'Deprecated: use `pageInfo` instead. Kept for backward compatibility.'
+            - type: 'null'
       required:
+        - items
         - data
-        - pagination
       type: object
     DeploymentEnvironmentType:
       enum:
@@ -6276,14 +6949,28 @@ components:
     DeploymentEnvironmentsListResponse:
       properties:
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/DeploymentEnvironment'
           type: array
+        items:
+          items:
+            $ref: '#/components/schemas/DeploymentEnvironment'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
         pagination:
-          $ref: '#/components/schemas/DeploymentsPagination'
+          oneOf:
+            - $ref: '#/components/schemas/DeploymentsPagination'
+              deprecated: true
+              description: 'Deprecated: use `pageInfo` instead. Kept for backward compatibility.'
+            - type: 'null'
       required:
+        - items
         - data
-        - pagination
       type: object
     DeploymentLogLine:
       properties:
@@ -6317,6 +7004,10 @@ components:
           items:
             $ref: '#/components/schemas/DeploymentLogLine'
           type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
         - items
       type: object
@@ -6355,6 +7046,10 @@ components:
           items:
             $ref: '#/components/schemas/DeploymentPod'
           type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
         - items
       type: object
@@ -6371,9 +7066,7 @@ components:
             - $ref: '#/components/schemas/DeploymentSettingsCreationMethod'
             - type: 'null'
         creationStep:
-          oneOf:
-            - $ref: '#/components/schemas/CreationStep'
-            - type: 'null'
+          $ref: '#/components/schemas/CreationStep'
         cspsConfig:
           oneOf:
             - $ref: '#/components/schemas/CspsConfig'
@@ -6407,9 +7100,7 @@ components:
         deployProjectRoot:
           type: string
         deploymentUrl:
-          oneOf:
-            - type: string
-            - type: 'null'
+          type: string
         id:
           type: integer
         isCold:
@@ -6466,6 +7157,8 @@ components:
         - name
         - template
         - cloudProvider
+        - creationStep
+        - deploymentUrl
         - releaseChannel
         - deployBranchName
         - deployBranchReadOnly
@@ -6541,12 +7234,16 @@ components:
       type: string
     DeploymentVersionsResponse:
       properties:
-        data:
+        items:
           items:
             $ref: '#/components/schemas/DeploymentVersion'
           type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
-        - data
+        - items
       type: object
     DeploymentsListResponse:
       properties:
@@ -6554,8 +7251,14 @@ components:
           oneOf:
             - minimum: 0
               type: integer
+              deprecated: true
+              description: >-
+                Deprecated: total number of accessible deployments, ignoring pagination. Kept for
+                backward compatibility.
             - type: 'null'
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/Deployment'
           type: array
@@ -6569,14 +7272,18 @@ components:
             - type: 'null'
         pagination:
           $ref: '#/components/schemas/DeploymentsPagination'
+          deprecated: true
+          description: 'Deprecated: use `pageInfo` instead. Kept for backward compatibility.'
         totalCount:
           oneOf:
             - minimum: 0
               type: integer
+              deprecated: true
+              description: 'Deprecated: use `count`. Kept for backward compatibility.'
             - type: 'null'
       required:
-        - data
         - items
+        - data
         - pagination
       type: object
     DeploymentsPagination:
@@ -6609,6 +7316,33 @@ components:
             - type: 'null'
       required:
         - active
+      type: object
+    DisconnectReportFromWorkbookInput:
+      properties:
+        anchorCell:
+          oneOf:
+            - type: string
+            - type: 'null'
+        externalWorkbookId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        placementId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        resultLocation:
+          oneOf:
+            - type: string
+            - type: 'null'
+        sheetId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        sheetName:
+          oneOf:
+            - type: string
+            - type: 'null'
       type: object
     DuplicateWorkbookInput:
       properties:
@@ -6727,6 +7461,20 @@ components:
       type: object
     EmbedSessionSettings:
       properties:
+        allowChatWorkspaceAuthoring:
+          oneOf:
+            - type: boolean
+              description: >-
+                Whether AI Chat authenticated with this session may create or modify persistent Cube
+                Workspace content. Set to `false` for headless chat integrations that render answers
+                in their own UI: ad-hoc data analysis and inline tables/charts remain available, but
+                the agent cannot save or update standalone explorations/reports, create or modify
+                workbooks, create or publish dashboards, or direct users to those Cube UI surfaces.
+                Omit or set to `true` to preserve the session user's role-derived authoring
+                capabilities; `true` never grants access the user does not already have. This
+                setting changes only AI Chat tools and instructions. It does not change user roles
+                or permissions for direct API calls.
+            - type: 'null'
         showDashboardChat:
           oneOf:
             - type: boolean
@@ -6923,10 +7671,21 @@ components:
     EnvVariablesListResponse:
       properties:
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/EnvVariableItem'
           type: array
+        items:
+          items:
+            $ref: '#/components/schemas/EnvVariableItem'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
+        - items
         - data
       type: object
     FileHash:
@@ -7157,9 +7916,9 @@ components:
             - $ref: '#/components/schemas/EmbedSessionSettings'
               type: object
               description: >-
-                Per-session overrides for embed behavior. Each key is tri-state: omit it to inherit
-                the account-wide setting, or set `true`/`false` to force the behavior for every
-                embed viewed with this session, taking precedence over the account-wide setting.
+                Per-session overrides for embed behavior, stored in the signed embed token. Each
+                documented key applies only to this session; omitted keys preserve their existing
+                default behavior.
             - type: 'null'
         tenantGroupDefinitions:
           oneOf:
@@ -7268,10 +8027,21 @@ components:
     GitHubBranchesListResponse:
       properties:
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/GitHubBranchResponse'
           type: array
+        items:
+          items:
+            $ref: '#/components/schemas/GitHubBranchResponse'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
+        - items
         - data
       type: object
     GitHubConnectStatusResponse:
@@ -7306,10 +8076,21 @@ components:
     GitHubInstallationsListResponse:
       properties:
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/GitHubInstallationResponse'
           type: array
+        items:
+          items:
+            $ref: '#/components/schemas/GitHubInstallationResponse'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
+        - items
         - data
       type: object
     GitHubRepoResponse:
@@ -7328,10 +8109,21 @@ components:
     GitHubReposListResponse:
       properties:
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/GitHubRepoResponse'
           type: array
+        items:
+          items:
+            $ref: '#/components/schemas/GitHubRepoResponse'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
+        - items
         - data
       type: object
     GroupDefinition:
@@ -7793,6 +8585,14 @@ components:
           items:
             type: string
           type: array
+        measuresAxis:
+          oneOf:
+            - $ref: '#/components/schemas/PivotItemsMeasuresAxis'
+            - type: 'null'
+        measuresPosition:
+          oneOf:
+            - $ref: '#/components/schemas/PivotItemsMeasuresPosition'
+            - type: 'null'
         rows:
           items:
             type: string
@@ -7817,6 +8617,14 @@ components:
           items:
             type: string
           type: array
+        measuresAxis:
+          oneOf:
+            - $ref: '#/components/schemas/PivotItemsInputMeasuresAxis'
+            - type: 'null'
+        measuresPosition:
+          oneOf:
+            - $ref: '#/components/schemas/PivotItemsInputMeasuresPosition'
+            - type: 'null'
         rows:
           items:
             type: string
@@ -7827,6 +8635,26 @@ components:
         - rows
         - filters
       type: object
+    PivotItemsInputMeasuresAxis:
+      enum:
+        - columns
+        - rows
+      type: string
+    PivotItemsInputMeasuresPosition:
+      enum:
+        - before
+        - after
+      type: string
+    PivotItemsMeasuresAxis:
+      enum:
+        - columns
+        - rows
+      type: string
+    PivotItemsMeasuresPosition:
+      enum:
+        - before
+        - after
+      type: string
     PostTokenBySessionIdInput:
       properties:
         sessionId:
@@ -7899,6 +8727,33 @@ components:
         - stderr
         - inputRowCount
       type: object
+    RefreshReportInput:
+      properties:
+        anchorCell:
+          oneOf:
+            - type: string
+            - type: 'null'
+        externalWorkbookId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        placementId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        resultLocation:
+          oneOf:
+            - type: string
+            - type: 'null'
+        sheetId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        sheetName:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
     RegionResponse:
       properties:
         id:
@@ -7936,10 +8791,21 @@ components:
     RegionsListResponse:
       properties:
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/RegionResponse'
           type: array
+        items:
+          items:
+            $ref: '#/components/schemas/RegionResponse'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
+        - items
         - data
       type: object
     RemoveDataModelFilesInput:
@@ -8151,18 +9017,63 @@ components:
       type: string
     ReportPlacement:
       properties:
+        anchorCell:
+          oneOf:
+            - type: string
+            - type: 'null'
         endResultCell:
           oneOf:
             - type: string
             - type: 'null'
+        host:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementHost'
+            - type: 'null'
+        id:
+          oneOf:
+            - type: string
+            - type: 'null'
+        placedAt:
+          oneOf:
+            - type: string
+            - type: 'null'
+        placedByUserId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        refreshedAt:
+          oneOf:
+            - type: string
+            - type: 'null'
+        refreshedByUserId:
+          oneOf:
+            - type: integer
+            - type: 'null'
         resultLocation:
           type: string
+        sheetId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        sheetName:
+          oneOf:
+            - type: string
+            - type: 'null'
         workbookId:
           type: string
+        workbookName:
+          oneOf:
+            - type: string
+            - type: 'null'
       required:
         - workbookId
         - resultLocation
       type: object
+    ReportPlacementHost:
+      enum:
+        - GOOGLE_SHEETS
+        - EXCEL
+      type: string
     ReportSnapshot:
       properties:
         description:
@@ -8201,6 +9112,10 @@ components:
         preferences:
           oneOf:
             - $ref: '#/components/schemas/ReportSnapshotPreferences'
+            - type: 'null'
+        pythonCode:
+          oneOf:
+            - type: string
             - type: 'null'
         reportId:
           type: integer
@@ -8398,11 +9313,23 @@ components:
     SourceTreeResponse:
       properties:
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             additionalProperties: true
             type: object
           type: array
+        items:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
+        - items
         - data
       type: object
     StartDbtSyncInput:
@@ -8870,6 +9797,10 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        host:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateReportInputHost'
+            - type: 'null'
         jsonQuery:
           oneOf:
             - type: string
@@ -8887,6 +9818,10 @@ components:
           oneOf:
             - $ref: '#/components/schemas/PivotItems'
             - type: 'null'
+        placementId:
+          oneOf:
+            - type: string
+            - type: 'null'
         publicId:
           oneOf:
             - pattern: ^[0-9A-Za-z]+$
@@ -8895,6 +9830,10 @@ components:
               maxLength: 12
             - type: 'null'
         resultLocation:
+          oneOf:
+            - type: string
+            - type: 'null'
+        sheetId:
           oneOf:
             - type: string
             - type: 'null'
@@ -8910,7 +9849,16 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        workbookName:
+          oneOf:
+            - type: string
+            - type: 'null'
       type: object
+    UpdateReportInputHost:
+      enum:
+        - GOOGLE_SHEETS
+        - EXCEL
+      type: string
     UpdateWorkbookInput:
       properties:
         folderId:
@@ -9271,12 +10219,28 @@ components:
     UserAttributesListResponse:
       properties:
         count:
+          deprecated: true
+          description: >-
+            Deprecated: total number of user attributes, ignoring pagination. Kept for backward
+            compatibility.
+          minimum: 0
           type: integer
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/UserAttribute'
           type: array
+        items:
+          items:
+            $ref: '#/components/schemas/UserAttribute'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
+        - items
         - data
         - count
       type: object
@@ -9690,8 +10654,14 @@ components:
           oneOf:
             - minimum: 0
               type: integer
+              deprecated: true
+              description: >-
+                Deprecated: total number of accessible workbooks, ignoring pagination. Kept for
+                backward compatibility.
             - type: 'null'
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/Workbook'
           type: array
