@@ -64,15 +64,22 @@ https://your-tenant.cubecloud.dev/embed/d/{deploymentId}/app?session={sessionId}
 
 | Parameter | Hides |
 | --- | --- |
-| `showDashboardHeader=false` | The entire header bar |
+| `showDashboardHeader=false` | The entire header bar, including all controls below |
 | `showDashboardBackButton=false` | The back button |
 | `showDashboardTitle=false` | The dashboard title |
 | `showDashboardEditButton=false` | The edit button |
 | `showDashboardDuplicateButton=false` | The duplicate button |
 
-Each control is independent — for example, hiding the back button while
-keeping the title is a normal combination. Only the exact value `false` hides
-a control; any other value (or omitting the parameter) leaves it visible.
+`showDashboardHeader=false` hides the whole bar regardless of the other
+parameters. The four individual controls are independent of each other — for
+example, hiding the back button while keeping the title is a normal
+combination. Only the exact value `false` hides a control; any other value
+(or omitting the parameter) leaves it visible.
+
+These are launch-time URL parameters, read from the embed URL itself — unlike
+[`showDashboardChat`](/embedding/iframe/dashboards#show-or-hide-the-ai-chat),
+they are not available as `settings.*` fields on
+[Generate Session][ref-generate-session].
 
 ## Sharing workbooks and dashboards
 
