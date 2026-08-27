@@ -172,6 +172,21 @@ const EXCLUDE_OPERATIONS = new Set([
   'GET /api/v1/ai-engineer/settings',
   // Report folders listing — not part of the public docs surface.
   'GET /api/v1/deployments/{deploymentId}/report-folders',
+  // Region/PrivateLink provisioning — Cube-super-admin-only (staff, not tenant
+  // admins); no reader of these docs can call them. `GET /api/v1/regions` (list)
+  // stays, since any tenant can call it.
+  'POST /api/v1/regions',
+  'GET /api/v1/regions/{regionId}',
+  'PUT /api/v1/regions/{regionId}',
+  'DELETE /api/v1/regions/{regionId}',
+  'POST /api/v1/regions/{regionId}/apply',
+  'GET /api/v1/regions/{regionId}/provisioning-status',
+  'GET /api/v1/regions/cloud-provider-catalog',
+  'GET /api/v1/regions/{regionId}/private-links',
+  'POST /api/v1/regions/{regionId}/private-links',
+  'GET /api/v1/regions/{regionId}/private-links/{privateLinkId}',
+  'PUT /api/v1/regions/{regionId}/private-links/{privateLinkId}',
+  'DELETE /api/v1/regions/{regionId}/private-links/{privateLinkId}',
 ]);
 
 // Explicit display names for tags whose auto-cleaned form would be unclear or
@@ -192,7 +207,6 @@ const TAG_MAP = {
 // docs stay complete even when the upstream spec adds new areas.
 const TAG_ORDER = [
   'Deployments', 'Deployment Creation', 'Environments', 'Env Variables', 'Regions',
-  'Region Private Links',
   'Data Model', 'Data Model Uploads', 'GitHub', 'GitHub Connection', 'dbt Sync',
   'Folders', 'Reports', 'Workbooks', 'Notifications', 'Workspace', 'Agents', 'Metadata',
   'Users', 'Users Admin', 'Groups', 'User Groups',

@@ -799,25 +799,7 @@
                 "group": "Regions",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
-                  "GET /api/v1/regions",
-                  "POST /api/v1/regions",
-                  "GET /api/v1/regions/cloud-provider-catalog",
-                  "GET /api/v1/regions/{regionId}",
-                  "PUT /api/v1/regions/{regionId}",
-                  "DELETE /api/v1/regions/{regionId}",
-                  "POST /api/v1/regions/{regionId}/apply",
-                  "GET /api/v1/regions/{regionId}/provisioning-status"
-                ]
-              },
-              {
-                "group": "Region Private Links",
-                "openapi": "/api-reference/api.yaml",
-                "pages": [
-                  "GET /api/v1/regions/{regionId}/private-links",
-                  "POST /api/v1/regions/{regionId}/private-links",
-                  "GET /api/v1/regions/{regionId}/private-links/{privateLinkId}",
-                  "PUT /api/v1/regions/{regionId}/private-links/{privateLinkId}",
-                  "DELETE /api/v1/regions/{regionId}/private-links/{privateLinkId}"
+                  "GET /api/v1/regions"
                 ]
               },
               {
