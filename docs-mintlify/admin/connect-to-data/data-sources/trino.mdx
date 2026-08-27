@@ -56,6 +56,12 @@ be used in pre-aggregations when using Trino as a source database. To learn more
 about Trino support for approximate aggregate functions, [click
 here][trino-docs-approx-agg-fns].
 
+### Time zones
+
+A `DATE`-typed time dimension converted to a non-UTC time zone is now handled
+correctly. Existing pre-aggregations with a time dimension rebuild once
+automatically on upgrade, since this change affects the generated SQL.
+
 ## Pre-Aggregation Build Strategies
 
 <Info>
