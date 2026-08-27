@@ -1145,12 +1145,15 @@ class ApiGateway {
         const ctx = { ...context, ...job.context };
         const orchestrator = await this.getAdapterApi(ctx);
         const compiler = await this.getCompilerApi(ctx);
+        // TODO(1.8): drop the fallback, no job posted by 1.7 can still be in the cache.
+        const dataSource = job.dataSource || (await compiler.preAggregations())
+          .find(pa => pa.id === job.preagg)?.dataSource;
         const selector: PreAggsSelector = {
           cubes: [job.preagg.split('.')[0]],
           preAggregations: [job.preagg],
           contexts: [job.context],
           timezones: [job.timezone],
-          dataSources: [job.dataSource],
+          dataSources: [dataSource],
         };
         if (
           job.status.indexOf('done') === 0 ||
@@ -1168,6 +1171,7 @@ class ApiGateway {
           const status = await this.getPreAggJobQueueStatus(
             orchestrator,
             job,
+            dataSource,
           );
           if (status) {
             // returning queued status
@@ -1184,6 +1188,7 @@ class ApiGateway {
               orchestrator,
               compiler,
               job,
+              dataSource,
               token,
             );
 
@@ -1217,10 +1222,11 @@ class ApiGateway {
   private async getPreAggJobQueueStatus(
     orchestrator: any,
     job: PreAggJob,
+    dataSource?: string,
   ): Promise<false | string> {
     let inQueue = false;
     let status: string = 'n/a';
-    const queuedList = await orchestrator.getPreAggregationQueueStates(job.dataSource);
+    const queuedList = await orchestrator.getPreAggregationQueueStates(dataSource);
     queuedList.forEach((item) => {
       if (
         item.queryHandler &&
@@ -1257,15 +1263,12 @@ class ApiGateway {
     orchestrator: any,
     compiler: any,
     job: PreAggJob,
+    dataSource: string | undefined,
     token: string,
   ): Promise<string> {
     const preaggs = await compiler.preAggregations();
     const preagg = preaggs.find(pa => pa.id === job.preagg);
     if (preagg) {
-      // The build queued the partition on the data source it recorded, which is what
-      // getPreAggJobQueueStatus looks the queue up by too. Jobs live in the cache for a
-      // day, so one posted before this was recorded falls back to the model.
-      const dataSource = job.dataSource || preagg.dataSource;
       const [, status]: [boolean, string] =
         await orchestrator.isPartitionExist(
           requestId,

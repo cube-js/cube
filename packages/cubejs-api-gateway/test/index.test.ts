@@ -1231,7 +1231,7 @@ describe('API Gateway', () => {
         }),
       };
 
-      const status = await (apiGateway as any).getPreAggJobQueueStatus(orchestrator, job);
+      const status = await (apiGateway as any).getPreAggJobQueueStatus(orchestrator, job, job.dataSource);
 
       expect(orchestrator.getPreAggregationQueueStates).toHaveBeenCalledWith(job.dataSource);
       expect(status).toEqual('processing');
@@ -1270,11 +1270,12 @@ describe('API Gateway', () => {
           orchestrator,
           compiler,
           job,
+          job.dataSource,
           'job-token',
         );
       };
 
-      test('is checked on the data source the job recorded', async () => {
+      test('is checked on the data source resolved for the job', async () => {
         const orchestrator = { isPartitionExist: jest.fn(async () => [true, 'done']) };
         const job = jobFor();
 
@@ -1291,25 +1292,6 @@ describe('API Gateway', () => {
         );
       });
 
-      // Jobs live in the cache for a day, so one posted before the data source was
-      // recorded still has to be pollable.
-      test('falls back to the data source of the pre-aggregation it names', async () => {
-        const orchestrator = { isPartitionExist: jest.fn(async () => [false, 'missing_partition']) };
-        const job = jobFor({ dataSource: undefined as any });
-
-        await expect(resultStatus(job, orchestrator)).resolves.toEqual('missing_partition');
-
-        expect(orchestrator.isPartitionExist).toHaveBeenCalledWith(
-          job.request,
-          true,
-          'model_ds',
-          compiler.preAggregationsSchema,
-          job.target,
-          job.key,
-          'job-token',
-        );
-      });
-
       test('reports a pre-aggregation the model no longer has', async () => {
         const orchestrator = { isPartitionExist: jest.fn() };
 
@@ -1318,6 +1300,41 @@ describe('API Gateway', () => {
         ).resolves.toEqual('pre_agg_not_found');
 
         expect(orchestrator.isPartitionExist).not.toHaveBeenCalled();
+      });
+
+      // Everywhere, because a queue lookup left on the default data source finds nothing
+      // and a build that is still scheduled then reads as a missing partition.
+      // TODO(1.8): goes away with the fallback in preAggregationsJobsGET.
+      test('a job with no recorded data source resolves it from the model everywhere', async () => {
+        const apiGateway = Object.create(ApiGateway.prototype);
+        const job = jobFor({ dataSource: undefined as any, status: 'scheduled' });
+        const orchestrator = {
+          getPreAggregationQueueStates: jest.fn(async () => []),
+          isPartitionExist: jest.fn(async () => [false, 'missing_partition']),
+        };
+        apiGateway.refreshScheduler = () => ({
+          getCachedBuildJobs: async () => [{ job, token: 'job-token' }],
+        });
+        apiGateway.getAdapterApi = async () => orchestrator;
+        apiGateway.getCompilerApi = async () => compiler;
+
+        const [item] = await (apiGateway as any).preAggregationsJobsGET(
+          { requestId: 'request-id' },
+          ['job-token'],
+        );
+
+        expect(item.status).toEqual('missing_partition');
+        expect(item.selector.dataSources).toEqual(['model_ds']);
+        expect(orchestrator.getPreAggregationQueueStates).toHaveBeenCalledWith('model_ds');
+        expect(orchestrator.isPartitionExist).toHaveBeenCalledWith(
+          'request-id',
+          true,
+          'model_ds',
+          compiler.preAggregationsSchema,
+          job.target,
+          job.key,
+          'job-token',
+        );
       });
     });
   });
