@@ -124,7 +124,7 @@ export type CacheKey =
 export type CacheEntry = {
   time: number;
   result: any;
-  renewalKey: string;
+  renewalKey?: string;
   requestId?: string;
 };
 
@@ -907,11 +907,6 @@ export class QueryCache {
     callback: () => MaybeCancelablePromise<T>,
   ) => this.cacheDriver.withLock(`lock:${key}`, callback, ttl, true);
 
-  /**
-   * A client polling through continue-wait re-enters with the same requestId, so rejecting
-   * the result it just wrote would restart the fetch on every poll and never converge while
-   * the refreshKey keeps moving. Background renew opts out: fresh data is all it exists for.
-   */
   protected static decideCacheAction(
     entry: CacheEntry,
     renewedAgo: number,
@@ -929,10 +924,15 @@ export class QueryCache {
     const isSameRequest = options.requestId && entry.requestId &&
       QueryCache.extractRequestUUID(entry.requestId) === QueryCache.extractRequestUUID(options.requestId);
 
+    // A client polling through continue-wait re-enters with the same requestId, so rejecting
+    // the result it just wrote would restart the fetch on every poll and never converge while
+    // the refreshKey keeps moving. Background renew opts out: fresh data is all it exists for.
     if (isSameRequest && !options.renewCycle) {
       return CacheAction.RefreshSameRequest;
     }
 
+    // Without a refreshKey there is nothing to refresh against, so an elapsed threshold alone
+    // never triggers a fetch — the entry keeps being served until it expires out of the cache.
     if (!renewalKey) {
       return CacheAction.ServeCached;
     }
@@ -1082,7 +1082,9 @@ export class QueryCache {
   protected storeInMemoryCache(entry: CacheEntry, renewedAgo: number, ctx: CacheOperationContext): void {
     const { useInMemory, renewalThreshold } = ctx.options;
 
-    if (useInMemory && renewedAgo + QueryCache.IN_MEMORY_CACHE_DISABLE_PERIOD <= renewalThreshold * 1000) {
+    // No threshold means nothing bounds the in-memory window, so it stays off.
+    if (useInMemory && !!renewalThreshold &&
+      renewedAgo + QueryCache.IN_MEMORY_CACHE_DISABLE_PERIOD <= renewalThreshold * 1000) {
       this.memoryCache.set(ctx.redisKey, entry);
     }
   }
