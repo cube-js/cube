@@ -149,3 +149,10 @@ not.
 
 Select a calculated field in the sidebar to open the editor. You can change its
 **name** and **SQL expression**, then choose **Update** to apply.
+
+Fields generated from a column header menu—aggregations, **Calculations**
+(**% of total**, **Running total**, etc.), and filtered measures—are edited
+through a SQL-only editor instead: it shows just the Semantic SQL expression,
+with no name field, since renaming isn't supported for these. Bucketed fields
+(**Edit bins…**, **Edit groups…**) keep their own structured editor, described
+above.
