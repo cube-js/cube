@@ -112,6 +112,10 @@ export class WebSocketConnection {
       });
 
       webSocket.readyPromise = new Promise<CubeStoreWebSocket>((resolve, reject) => {
+        // Whether readyPromise is already settled, i.e. whether a retry still has
+        // somebody to answer.
+        let established = false;
+
         webSocket.lastHeartBeat = new Date();
         const pingInterval = setInterval(() => {
           if (webSocket.readyState === WebSocket.OPEN) {
@@ -145,7 +149,10 @@ export class WebSocketConnection {
             resolveSend();
           });
         });
-        webSocket.on('open', () => resolve(webSocket));
+        webSocket.on('open', () => {
+          established = true;
+          resolve(webSocket);
+        });
         webSocket.on('error', (err) => {
           if ((err as any).code === MAX_PAYLOAD_EXCEEDED_CODE) {
             // Cube Store answered with a message bigger than this connection
@@ -173,6 +180,19 @@ export class WebSocketConnection {
 
           webSocket.teardown();
           webSocket.terminate();
+
+          // Retrying is only useful while somebody is waiting for this socket to
+          // come up. Once it is established, reconnecting here would raise a
+          // connection nobody asked for and keep it alive with its own heartbeat:
+          // what was in flight is re-sent by the 'close' handler, and a later
+          // query establishes a new connection through initWebSocket().
+          if (established) {
+            if (webSocket === this.webSocket) {
+              this.webSocket = null;
+            }
+
+            return;
+          }
 
           if (this.currentConnectionTry < this.maxConnectRetries) {
             setTimeout(async () => {
@@ -267,6 +287,13 @@ export class WebSocketConnection {
 
             setTimeout(async () => {
               try {
+                // Everything this re-send was scheduled for has been settled in
+                // the meantime, so there is nothing left to carry over and a new
+                // connection would just stay open on its heartbeat.
+                if (!Object.keys(webSocket.sentMessages).length) {
+                  return;
+                }
+
                 const nextWebSocket = await this.initWebSocket();
                 const resent = Object.keys(webSocket.sentMessages);
 

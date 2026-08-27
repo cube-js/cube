@@ -152,6 +152,44 @@ describe('WebSocketConnection', () => {
     await expectAnsweredBy(query('SELECT 2'), 1);
   }, JEST_TIMEOUT);
 
+  it('does not reconnect when the connection breaks with nothing in flight', async () => {
+    connection = new WebSocketConnection(server.url);
+
+    await expectAnsweredBy(query('SELECT 1'), 0);
+
+    // Cube Store goes away while the connection sits idle. Nothing is waiting
+    // for it and nothing has to be re-sent, so re-establishing it would only
+    // produce a connection that stays open on its heartbeat until the process
+    // ends.
+    clientSocket().destroy(epipe());
+
+    // Longer than the retry the driver would have scheduled.
+    await new Promise((resolve) => { setTimeout(resolve, 3000); });
+
+    expect(server.connections.length).toBe(1);
+
+    // The next query establishes a new connection instead.
+    await expectAnsweredBy(query('SELECT 2'), 1);
+  }, JEST_TIMEOUT);
+
+  it('does not reconnect when an established connection fails with nothing in flight', async () => {
+    connection = new WebSocketConnection(server.url);
+
+    await expectAnsweredBy(query('SELECT 1'), 0);
+
+    // A malformed frame is the failure `ws` reports as an 'error' on a live
+    // connection, where an ordinary disconnect only reports a 'close'. Retrying
+    // it answers nobody -- the connection is long established -- and leaves a
+    // connection running on its own heartbeat.
+    server.connection(0).socket.write(Buffer.from([0xff, 0xff, 0xff, 0xff]));
+
+    await new Promise((resolve) => { setTimeout(resolve, 3000); });
+
+    expect(server.connections.length).toBe(1);
+
+    await expectAnsweredBy(query('SELECT 2'), 1);
+  }, JEST_TIMEOUT);
+
   it('resends a query when Cube Store closes the connection without answering', async () => {
     connection = new WebSocketConnection(server.url);
 
