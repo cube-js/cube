@@ -97,19 +97,25 @@ and an already derived field cannot be bucketed again.
   />
 </Frame>
 
-**Bins** take their boundaries either as a list (**Custom ranges**) or from a
-**Start**, **Width**, and number of **Ranges** (**Equal width**). Each boundary
-opens a bucket that includes its lower bound and excludes the upper one, and two
-open-ended buckets are added at the edges—so `0, 18, 25` yields `< 0`, `[0, 18)`,
-`[18, 25)`, `>= 25`, and no row is dropped. **Label style** renders a bucket as
-`[10, 20)`, `>= 10 and < 20`, or `10 to 19`; the last is offered only while every
-boundary is a whole number. Rows where the dimension is `NULL` are reported as
-`Unknown`.
+**Bins** take their boundaries either as a typed list (**Boundaries**) or generated
+over a range (**Equal intervals**, from a **Range start** and **Range end**, driven
+by either a **Number of bins** or a fixed **Bin size**—up to 100 generated bins).
+Each boundary opens a bucket that includes its lower bound and excludes the upper
+one, and two open-ended buckets are added at the edges—so `0, 18, 25` yields `< 0`,
+`[0, 18)`, `[18, 25)`, `>= 25`, and no row is dropped. **Label style** renders a
+bucket as `[10, 20)`, `>= 10 and < 20`, or `10 to 19`—the last is offered only while
+every boundary is a whole number—or lets you type a **Custom** label per bucket.
+
+By default, rows where the dimension is `NULL` fall into the last bucket. Turn on
+**Label empty values separately** to give them their own bucket, labeled `Unknown`
+by default (also editable).
 
 **Value groups** collect the dimension's values into named sets: pick values, name
-the group, and choose **Add group**. A value belongs to one group at a time.
-Whatever you did not pick—including empty values—falls under **Everything else**,
-which defaults to `Other`.
+the group, and choose **Add group**; the pencil icon on an existing group lets you
+edit its picked values and name. A value belongs to one group at a time. By
+default, whatever you did not pick—including empty values—falls under **Everything
+else**, which defaults to `Other`; turn off **Group remaining values** to return
+`NULL` for them instead.
 
 Bucket labels carry their position as a prefix (`1.`, `2.`, zero-padded past nine
 buckets) so that sorting the column sorts it by value rather than alphabetically,
@@ -134,7 +140,7 @@ CASE WHEN orders_view.age IS NULL THEN 'Unknown'
 
 <Info>
 
-**Equal width** ranges are resolved into boundaries when the field is created, not
+**Equal intervals** are resolved into boundaries when the field is created, not
 recomputed from the data. Values arriving later outside the range join the first
 and last buckets instead of extending them.
 
@@ -147,5 +153,9 @@ not.
 
 ### Editing a calculated field
 
-Select a calculated field in the sidebar to open the editor. You can change its
-**name** and **SQL expression**, then choose **Update** to apply.
+Open a calculated field's menu—in the **Query fields** sidebar list, or from its
+column header in the results—and choose **Edit**. A field created by the bins or
+value groups panel reopens that panel; every other calculated field opens a SQL
+editor showing its expression. Either way, only the expression can be changed—
+naming happens when the field is created, not afterward. Choose **Update** (or
+**Save**, for a bins/groups field) to apply.

@@ -186,9 +186,9 @@ painted" signal (distinct from `ready`, which fires at mount, before data loads)
 
 #### `cube:event:download` {#cube-event-download}
 
-Emitted when a viewer exports something — a widget's data as CSV, or (in future)
-a dashboard image. Reports _that_ an export happened and its shape — never the
-exported rows themselves.
+Emitted when a viewer exports something — a widget's data as CSV, or a chart
+widget as a PNG or PDF image. Reports _that_ an export happened and its shape
+— never the exported rows themselves.
 
 | Field | Type | Description |
 | --- | --- | --- |
@@ -209,10 +209,10 @@ exported rows themselves.
 ```
 
 <Note>
-  The CSV download action on a dashboard widget only appears when the embed URL
-  includes `allowExport=true` (see [Dashboards → Allow CSV
-  export](/embedding/iframe/dashboards#allow-csv-export)). The event fires when a
-  viewer uses it.
+  The CSV, PNG, and PDF download actions on a dashboard widget only appear
+  when the embed URL includes `allowExport=true` (see [Dashboards → Allow
+  widget export](/embedding/iframe/dashboards#allow-csv-export)). The event
+  fires when a viewer uses one of them.
 </Note>
 
 #### `cube:event:drilldown` {#cube-event-drilldown}
