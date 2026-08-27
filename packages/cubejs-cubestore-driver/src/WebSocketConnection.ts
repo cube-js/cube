@@ -85,6 +85,10 @@ export class WebSocketConnection {
 
   protected webSocket: CubeStoreWebSocket | null = null;
 
+  // Set by close(): the owner of this connection is gone, so a socket must not
+  // be re-established behind its back.
+  protected closed: boolean = false;
+
   private readonly url: string;
 
   private readonly connectionId: string;
@@ -103,6 +107,10 @@ export class WebSocketConnection {
 
   protected async initWebSocket(): Promise<CubeStoreWebSocket> {
     if (!this.webSocket) {
+      // Somebody is asking for a connection, which is the only thing that
+      // revives a closed one.
+      this.closed = false;
+
       const headers: Record<string, string> = {};
       headers['x-process-id'] = getProcessUid();
 
@@ -114,7 +122,7 @@ export class WebSocketConnection {
       webSocket.readyPromise = new Promise<CubeStoreWebSocket>((resolve, reject) => {
         // Whether readyPromise is already settled, i.e. whether a retry still has
         // somebody to answer.
-        let established = false;
+        let settled = false;
 
         webSocket.lastHeartBeat = new Date();
         const pingInterval = setInterval(() => {
@@ -150,7 +158,7 @@ export class WebSocketConnection {
           });
         });
         webSocket.on('open', () => {
-          established = true;
+          settled = true;
           resolve(webSocket);
         });
         webSocket.on('error', (err) => {
@@ -171,28 +179,33 @@ export class WebSocketConnection {
             }
 
             // No-op if the connection was already established.
+            settled = true;
             reject(webSocket.fatalError);
 
             return;
           }
 
-          this.currentConnectionTry += 1;
-
           webSocket.teardown();
           webSocket.terminate();
 
-          // Retrying is only useful while somebody is waiting for this socket to
-          // come up. Once it is established, reconnecting here would raise a
-          // connection nobody asked for and keep it alive with its own heartbeat:
-          // what was in flight is re-sent by the 'close' handler, and a later
-          // query establishes a new connection through initWebSocket().
-          if (established) {
+          // Retrying is only useful while readyPromise can still answer somebody
+          // with the result. Once it is settled -- the socket came up, or its
+          // caller was already given an error -- reconnecting here would raise a
+          // connection nobody asked for and keep it alive with its own
+          // heartbeat: what was in flight is re-sent by the 'close' handler, and
+          // a later query establishes a new connection through initWebSocket().
+          if (settled) {
             if (webSocket === this.webSocket) {
               this.webSocket = null;
             }
 
             return;
           }
+
+          // Counts connection attempts, so it is only bumped for a socket that
+          // never came up.
+          this.currentConnectionTry += 1;
+          settled = true;
 
           if (this.currentConnectionTry < this.maxConnectRetries) {
             setTimeout(async () => {
@@ -219,6 +232,26 @@ export class WebSocketConnection {
           webSocket.teardown();
 
           const pending = Object.keys(webSocket.sentMessages);
+
+          if (this.closed) {
+            // The owner of this connection released it, so a re-send would carry
+            // the messages over to a socket nobody owns, which its own heartbeat
+            // would then keep open for the rest of the process. The drivers this
+            // query needs are being closed anyway, so it is failed here rather
+            // than left to hang.
+            // eslint-disable-next-line no-restricted-syntax
+            for (const key of pending) {
+              const sentMessage = webSocket.sentMessages[key];
+              delete webSocket.sentMessages[key];
+              sentMessage.reject(new ConnectionError('Cube Store connection is closed'));
+            }
+
+            if (webSocket === this.webSocket) {
+              this.webSocket = null;
+            }
+
+            return;
+          }
 
           if (pending.length) {
             // Cube Store names the size and the limit that refused it here,
@@ -566,7 +599,13 @@ export class WebSocketConnection {
   }
 
   public close() {
+    this.closed = true;
+
     if (this.webSocket) {
+      // Not left to the 'close' event: a socket that never reaches it -- one
+      // still connecting, or one whose peer is gone -- would keep the heartbeat
+      // running, and the heartbeat is what keeps the socket itself reachable.
+      this.webSocket.teardown();
       this.webSocket.close();
     }
   }

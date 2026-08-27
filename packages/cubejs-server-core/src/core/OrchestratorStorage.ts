@@ -25,7 +25,12 @@ export class OrchestratorStorage {
 
   protected release(api: OrchestratorApi) {
     const pending: Promise<void> = api.release()
-      .then(() => undefined, () => undefined)
+      .then(() => undefined, (e) => {
+        // Swallowed so that releasing a dead tenant can't take the process down
+        // with an unhandled rejection, but not silently: connections this failed
+        // to close stay open, which is the very thing the release is for.
+        console.error('Failed to release an orchestrator api', e);
+      })
       .then(() => {
         this.pendingReleases.delete(pending);
       });

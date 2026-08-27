@@ -1,7 +1,7 @@
 import { Socket } from 'net';
 
 import { WebSocketConnection } from '../src/WebSocketConnection';
-import { MessageTooLargeError, QueryError } from '../src/errors';
+import { ConnectionError, MessageTooLargeError, QueryError } from '../src/errors';
 import { QueryResultFormat } from '../codegen';
 import {
   answeredBy,
@@ -188,6 +188,31 @@ describe('WebSocketConnection', () => {
     expect(server.connections.length).toBe(1);
 
     await expectAnsweredBy(query('SELECT 2'), 1);
+  }, JEST_TIMEOUT);
+
+  it('does not re-establish the connection when it is closed with queries in flight', async () => {
+    connection = new WebSocketConnection(server.url);
+
+    // Cube Store never answers, so the query stays in flight.
+    server.handler = () => {
+      // noop
+    };
+
+    const promise = query('SELECT 1');
+    await server.waitForMessages(1);
+
+    // What releasing the driver ends up calling. Carrying the query over to a
+    // new connection would leave that connection open on its heartbeat with
+    // nobody owning it, so the query is failed instead.
+    connection!.close();
+
+    await expect(promise).rejects.toThrow(ConnectionError);
+    await expect(promise).rejects.toThrow('Cube Store connection is closed');
+
+    // Longer than the re-send the driver would have scheduled.
+    await new Promise((resolve) => { setTimeout(resolve, 3000); });
+
+    expect(server.connections.length).toBe(1);
   }, JEST_TIMEOUT);
 
   it('resends a query when Cube Store closes the connection without answering', async () => {

@@ -49,15 +49,22 @@ describe('OrchestratorStorage', () => {
     expect(second.release).toHaveBeenCalledTimes(1);
   });
 
-  test('a failing release does not reject releaseConnections', async () => {
+  test('a failing release is reported and does not reject releaseConnections', async () => {
     const storage = new OrchestratorStorage({ compilerCacheSize: 1 });
+    const error = new Error('dead tenant');
     const failing = {
-      release: jest.fn(async () => { throw new Error('dead tenant'); })
+      release: jest.fn(async () => { throw error; })
     } as unknown as OrchestratorApi;
+    const reported = jest.spyOn(console, 'error').mockImplementation(() => undefined);
 
-    storage.set('failing', failing);
-    storage.set('other', mockApi().api);
+    try {
+      storage.set('failing', failing);
+      storage.set('other', mockApi().api);
 
-    await expect(storage.releaseConnections()).resolves.toBeUndefined();
+      await expect(storage.releaseConnections()).resolves.toBeUndefined();
+      expect(reported).toHaveBeenCalledWith(expect.any(String), error);
+    } finally {
+      reported.mockRestore();
+    }
   });
 });
