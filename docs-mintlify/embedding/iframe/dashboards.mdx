@@ -159,11 +159,13 @@ object, unlike `showDashboardChat`, and they have no account-wide default
 under **Embed → Settings**.
 </Note>
 
+These parameters apply to the dashboard header only — the workbook header
+(which carries Publish and Share) is unaffected.
+
 Setting `showDashboardHeader=false` overrides the other four: the whole bar
 disappears regardless of their values. `showDashboardEditButton` can only
 hide the Edit action; it can never show one to a viewer who lacks edit
-permission. They apply to the dashboard header only — the workbook header
-(which carries Publish and Share) is unaffected.
+permission.
 
 These parameters are read from the URL the host loaded the iframe with and
 stay pinned for the life of the embed, so they survive in-app navigation
