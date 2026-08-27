@@ -816,20 +816,29 @@ export class RefreshScheduler {
     const releaseApi = orchestratorApi.acquire();
     const writes: Promise<unknown>[] = [];
 
-    const keys = getPreAggsJobsList(
-      context,
-      <JobedPreAggregation[][][][]>jobedPAs,
-    ).map((job: PreAggJob) => {
-      const key = getPreAggJobToken(job);
-      writes.push(
-        orchestratorApi
-          .getQueryOrchestrator()
-          .getQueryCache()
-          .getCacheDriver()
-          .set(`PRE_AGG_JOB_${key}`, job, 86400)
-      );
-      return key;
-    });
+    let keys: string[];
+
+    try {
+      keys = getPreAggsJobsList(
+        context,
+        <JobedPreAggregation[][][][]>jobedPAs,
+      ).map((job: PreAggJob) => {
+        const key = getPreAggJobToken(job);
+        writes.push(
+          orchestratorApi
+            .getQueryOrchestrator()
+            .getQueryCache()
+            .getCacheDriver()
+            .set(`PRE_AGG_JOB_${key}`, job, 86400)
+        );
+        return key;
+      });
+    } catch (e) {
+      // A hold that is never released costs the next eviction the whole timeout.
+      releaseApi();
+
+      throw e;
+    }
 
     Promise.all(writes)
       .catch((error) => {

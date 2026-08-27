@@ -76,6 +76,11 @@ export class OrchestratorStorage {
    * force killed halfway is worse than cutting the queries off.
    */
   public async releaseConnections({ waitForWork = true }: { waitForWork?: boolean } = {}) {
+    // A release from an earlier removal is waiting out the work its api was
+    // serving, and that wait is exactly what this path can't afford: whatever it
+    // doesn't get to close, the process going away does.
+    const earlier = waitForWork ? new Set<Promise<void>>() : new Set(this.pendingReleases);
+
     this.releaseWaitsForWork = waitForWork;
 
     try {
@@ -85,6 +90,6 @@ export class OrchestratorStorage {
       this.releaseWaitsForWork = true;
     }
 
-    await Promise.all([...this.pendingReleases]);
+    await Promise.all([...this.pendingReleases].filter(release => !earlier.has(release)));
   }
 }

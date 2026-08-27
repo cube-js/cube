@@ -72,4 +72,24 @@ describe('OrchestratorStorage', () => {
       reported.mockRestore();
     }
   });
+
+  test('a shutdown does not wait for a release that started earlier', async () => {
+    const storage = new OrchestratorStorage({ compilerCacheSize: 1 });
+    let finishEarlier: () => void = () => undefined;
+    const earlier = {
+      // Still waiting for the work its api was serving.
+      release: jest.fn(() => new Promise<void>((resolve) => { finishEarlier = resolve; }))
+    } as unknown as OrchestratorApi;
+
+    storage.set('earlier', earlier);
+    storage.set('current', mockApi().api);
+
+    await settle();
+
+    expect(earlier.release).toHaveBeenCalledTimes(1);
+
+    await expect(storage.releaseConnections({ waitForWork: false })).resolves.toBeUndefined();
+
+    finishEarlier();
+  }, 5000);
 });
