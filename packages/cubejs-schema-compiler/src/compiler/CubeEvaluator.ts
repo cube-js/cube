@@ -160,6 +160,7 @@ export type PreAggregationInfo = {
   preAggregationName: string,
   preAggregation: any,
   cube: string,
+  dataSource: string,
   references: PreAggregationReferences,
   refreshKey: unknown,
   indexesReferences: unknown,
@@ -963,6 +964,7 @@ export class CubeEvaluator extends CubeSymbols {
               preAggregationName,
               preAggregation: preAggregations[preAggregationName],
               cube,
+              dataSource: this.evaluatedCubes[cube].dataSource || 'default',
               references: this.evaluatePreAggregationReferences(cube, preAggregations[preAggregationName]),
               refreshKey,
               indexesReferences: indexes && Object.keys(indexes).reduce((obj, indexName) => {

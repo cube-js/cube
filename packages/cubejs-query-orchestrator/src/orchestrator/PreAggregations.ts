@@ -150,6 +150,10 @@ export type LoadPreAggregationResult = {
   partitionRange?: QueryDateRange;
   isMultiTableUnion?: boolean;
   usageTargetTableNames?: Record<string, string>;
+  type?: 'rollup' | 'originalSql';
+  preAggregationId?: string;
+  dataSource?: string;
+  timezone?: string;
 };
 
 export type PreAggregationTableToTempTable = [string, LoadPreAggregationResult];
@@ -468,9 +472,10 @@ export class PreAggregations {
     tables = tables.filter(row => `${schema}.${row.table_name}` === table);
 
     // fetching query result
-    const conn = await this.queue[dataSource].getQueueDriver().createConnection();
+    const queue = await this.getQueue(dataSource);
+    const conn = await queue.getQueueDriver().createConnection();
     const result = await conn.getResult(key);
-    this.queue[dataSource].getQueueDriver().release(conn);
+    queue.getQueueDriver().release(conn);
 
     // calculating status
     let status: string;
@@ -573,6 +578,9 @@ export class PreAggregations {
           const usedPreAggregation = {
             ...loadResult,
             type: p.type,
+            preAggregationId: p.preAggregationId,
+            dataSource: p.dataSource || 'default',
+            timezone: p.timezone,
           };
           if (!usedPreAggregation.isMultiTableUnion) {
             await this.addTableUsed(usedPreAggregation.targetTableName);

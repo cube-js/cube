@@ -683,6 +683,7 @@ describe('Refresh Scheduler', () => {
                 external: false,
               },
               cube: 'Foo',
+              dataSource: 'default',
               references: {
                 dimensions: [],
                 measures: ['Foo.count'],
@@ -902,6 +903,13 @@ describe('Refresh Scheduler', () => {
       const buildJobs = await refreshScheduler.getCachedBuildJobs(ctx, jobs);
       const allTokensExist = jobs.every(token => buildJobs.some(job => job.token === token));
       expect(allTokensExist).toBeTruthy();
+
+      // Not only the first entry: every entry of a posted job is its own poll token.
+      // https://github.com/cube-js/cube/issues/11615
+      buildJobs.forEach(({ job }) => {
+        expect(job?.dataSource).toEqual('default');
+        expect(['UTC', 'America/Los_Angeles']).toContain(job?.timezone);
+      });
     });
 
     test('Only `first` pre-aggregation', async () => {

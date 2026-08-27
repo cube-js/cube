@@ -280,6 +280,38 @@ describe('PreAggregations', () => {
     });
   });
 
+  describe('isPartitionExist', () => {
+    test('initializes a missing data source queue before checking the job result', async () => {
+      const preAggregations = new PreAggregations(
+        'TEST',
+        mockDriverFactory as any,
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
+        queryCache!,
+        {
+          cacheAndQueueDriver: 'memory',
+          queueOptions: async () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
+        },
+      );
+      mockDriver!.tables.push('stb_pre_aggregations.orders_main');
+
+      await expect(
+        preAggregations.isPartitionExist(
+          'request-id',
+          false,
+          'named_data_source',
+          'stb_pre_aggregations',
+          'stb_pre_aggregations.orders_main',
+          ['job-key'],
+          'job-token',
+        )
+      ).resolves.toEqual([true, 'done']);
+    });
+  });
+
   describe('loadAllPreAggregationsIfNeeded', () => {
     let preAggregations: PreAggregations | null = null;
 
@@ -304,6 +336,34 @@ describe('PreAggregations', () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations!.loadAllPreAggregationsIfNeeded(basicQueryWithRenew);
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
       expect(result[0][1].lastUpdatedAt).toEqual(12345000);
+    });
+
+    // A jobed build gets back a flat list of entries and has to tell them apart.
+    // https://github.com/cube-js/cube/issues/11615
+    test('each entry carries the identity of the descriptor it was built from', async () => {
+      const { preAggregationsTablesToTempTables: result } = await preAggregations!.loadAllPreAggregationsIfNeeded(
+        createBasicQuery({
+          cacheMode: 'must-revalidate',
+          preAggregations: [{
+            ...basicQuery.preAggregations[0],
+            preAggregationId: 'Orders.numberAndCount',
+            dataSource: 'orders_ds',
+            timezone: 'America/Los_Angeles',
+          }],
+        })
+      );
+
+      expect(result[0][1]).toMatchObject({
+        preAggregationId: 'Orders.numberAndCount',
+        dataSource: 'orders_ds',
+        timezone: 'America/Los_Angeles',
+      });
+    });
+
+    test('an entry built without a named data source falls back to the default one', async () => {
+      const { preAggregationsTablesToTempTables: result } = await preAggregations!.loadAllPreAggregationsIfNeeded(basicQueryWithRenew);
+
+      expect(result[0][1].dataSource).toEqual('default');
     });
   });
 

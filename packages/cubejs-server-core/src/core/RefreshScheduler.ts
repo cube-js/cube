@@ -790,8 +790,11 @@ export class RefreshScheduler {
                       metadata: queryingOptions.metadata,
                       isJob: true,
                     });
-                    job[0].dataSource = partition.dataSource;
-                    job[0].timezone = partition.timezone;
+                    job.forEach((j: JobedPreAggregation) => {
+                      j.dataSource = j.dataSource || partition.dataSource;
+                      j.timezone = j.timezone || partition.timezone;
+                    });
+
                     return job;
                   }
                 )
