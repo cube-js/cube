@@ -284,9 +284,7 @@ paths:
           name: status
           required: false
           schema:
-            oneOf:
-              - type: string
-              - type: 'null'
+            type: string
             enum:
               - RUNNING
               - COMPLETED
@@ -297,9 +295,7 @@ paths:
           name: trigger
           required: false
           schema:
-            oneOf:
-              - type: string
-              - type: 'null'
+            type: string
             enum:
               - manual
               - api
