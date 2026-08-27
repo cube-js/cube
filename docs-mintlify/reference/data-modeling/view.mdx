@@ -571,7 +571,9 @@ If you'd like to override the [metadata][ref-dim-meta] of a member, you can use 
 The `measures` parameter defines measures on the view itself. A view measure is
 always _derived_: its `sql` may only reference members that the view already
 includes, never columns of a table. Use it for a metric whose parts come from
-different cubes, which therefore has no single cube to live in.
+different cubes. (A cube can own such a metric too, by referencing the other
+cube's member; the [average order value recipe][ref-recipe-aov] compares the two
+placements.)
 
 Reference the included members as `{CUBE.member}` (or `{view_name.member}`); a
 bare `{member}` does not resolve inside a view.
@@ -1112,6 +1114,7 @@ The `access_policy` parameter is used to configure [access policies][ref-ref-dap
 [ref-ref-cubes]: /reference/data-modeling/cube
 [ref-ref-multi-stage]: /reference/data-modeling/measures#multi_stage
 [ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
+[ref-recipe-aov]: /recipes/data-modeling/average-order-value#where-to-put-the-measure
 [ref-ref-hierarchies]: /reference/data-modeling/hierarchies
 [ref-ref-dap]: /reference/data-modeling/data-access-policies
 [ref-rest-query-ops]: /reference/core-data-apis/rest-api/query-format#filters-operators

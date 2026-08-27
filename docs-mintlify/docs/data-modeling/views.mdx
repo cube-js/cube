@@ -285,11 +285,10 @@ straightforward.
 
 ### Define a metric on a view when it spans cubes
 
-The one exception is a metric whose parts live in different cubes, so there is
-no single cube it could belong to. A view can define its own
-[measures][ref-view-measures] and [dimensions][ref-view-dimensions] as long as
-their `sql` only combines members the view already includes — a member that
-reads a column instead is rejected at compile time:
+The exception is a metric whose parts live in different cubes. A view can define
+its own [measures][ref-view-measures] and [dimensions][ref-view-dimensions] as
+long as their `sql` only combines members the view already includes — a member
+that reads a column instead is rejected at compile time:
 
 <CodeGroup>
 
@@ -327,6 +326,11 @@ expression inside one joined scan where a `one_to_many` join between them would
 inflate the numerator. If the cubes don't join to each other at all, see
 [multi-fact views][ref-multi-fact-views]. The full example, with the `cubes`
 block, is on the [view reference][ref-view-measures].
+
+A cube can also own such a metric, by referencing the other cube's member
+directly — that keeps it defined once for every view that includes it, at the
+cost of one cube naming another. The [average order value
+recipe][ref-recipe-aov] compares the two placements.
 
 ### Control visibility
 
@@ -499,6 +503,7 @@ parameters.
 [ref-view-dimensions]: /reference/data-modeling/view#dimensions
 [ref-multi-stage]: /reference/data-modeling/measures#multi_stage
 [ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
+[ref-recipe-aov]: /recipes/data-modeling/average-order-value#where-to-put-the-measure
 [ref-view-folders]: /reference/data-modeling/view#folders
 [ref-access-policies]: /reference/data-modeling/data-access-policies
 [ref-ai-context]: /docs/data-modeling/ai-context
