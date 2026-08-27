@@ -11,7 +11,7 @@ const settle = () => new Promise((resolve) => { setTimeout(resolve, 10); });
 
 describe('OrchestratorStorage', () => {
   test('releases an api evicted from the cache', async () => {
-    const storage = new OrchestratorStorage({ compilerCacheSize: 1, releaseDelay: 0 });
+    const storage = new OrchestratorStorage({ compilerCacheSize: 1 });
     const evicted = mockApi();
 
     storage.set('evicted', evicted.api);
@@ -23,7 +23,7 @@ describe('OrchestratorStorage', () => {
   });
 
   test('releases an api replaced under the same key', async () => {
-    const storage = new OrchestratorStorage({ compilerCacheSize: 10, releaseDelay: 0 });
+    const storage = new OrchestratorStorage({ compilerCacheSize: 10 });
     const replaced = mockApi();
 
     storage.set('id', replaced.api);
@@ -34,26 +34,8 @@ describe('OrchestratorStorage', () => {
     expect(replaced.release).toHaveBeenCalledTimes(1);
   });
 
-  test('keeps an evicted api alive for the release delay', async () => {
-    const storage = new OrchestratorStorage({ compilerCacheSize: 1, releaseDelay: 60 * 1000 });
-    const evicted = mockApi();
-
-    storage.set('evicted', evicted.api);
-    storage.set('kept', mockApi().api);
-
-    // A request that was handed this api before the eviction is still using it.
-    await settle();
-
-    expect(evicted.release).not.toHaveBeenCalled();
-
-    // Shutdown doesn't wait the delay out.
-    await storage.releaseConnections();
-
-    expect(evicted.release).toHaveBeenCalledTimes(1);
-  });
-
   test('releaseConnections releases every api exactly once', async () => {
-    const storage = new OrchestratorStorage({ compilerCacheSize: 10, releaseDelay: 0 });
+    const storage = new OrchestratorStorage({ compilerCacheSize: 10 });
     const first = mockApi();
     const second = mockApi();
 
@@ -70,7 +52,7 @@ describe('OrchestratorStorage', () => {
   });
 
   test('a failing release is reported and does not stop the others', async () => {
-    const storage = new OrchestratorStorage({ compilerCacheSize: 10, releaseDelay: 0 });
+    const storage = new OrchestratorStorage({ compilerCacheSize: 10 });
     const error = new Error('dead tenant');
     const failing = {
       release: jest.fn(async () => { throw error; })
