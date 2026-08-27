@@ -931,8 +931,7 @@ export class QueryCache {
       return CacheAction.RefreshSameRequest;
     }
 
-    // Without a refreshKey there is nothing to refresh against, so an elapsed threshold alone
-    // never triggers a fetch — the entry keeps being served until it expires out of the cache.
+    // Without a refreshKey there is nothing to refresh against, so an elapsed threshold alone never triggers a fetch.
     if (!renewalKey) {
       return CacheAction.ServeCached;
     }
@@ -1082,7 +1081,6 @@ export class QueryCache {
   protected storeInMemoryCache(entry: CacheEntry, renewedAgo: number, ctx: CacheOperationContext): void {
     const { useInMemory, renewalThreshold } = ctx.options;
 
-    // No threshold means nothing bounds the in-memory window, so it stays off.
     if (useInMemory && !!renewalThreshold &&
       renewedAgo + QueryCache.IN_MEMORY_CACHE_DISABLE_PERIOD <= renewalThreshold * 1000) {
       this.memoryCache.set(ctx.redisKey, entry);

@@ -176,7 +176,6 @@ describe('QueryCache.decideCacheAction', () => {
 });
 
 describe('QueryCache.isMemoryEntryUsable', () => {
-  // In-memory window. `expiration` and `renewalThreshold` are seconds, `renewedAgo` is ms.
   const WINDOW = QueryCacheOpened.disablePeriod;
   const HOUR = 3600;
 
