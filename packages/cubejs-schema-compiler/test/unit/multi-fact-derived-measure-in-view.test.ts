@@ -176,6 +176,17 @@ views:
       - name: aov_basket_single_stage
         type: number
         sql: "{retail_analysis.sales_amount} / NULLIF({retail_analysis.transactions_without_returns}, 0)"
+
+  # Exposes the cube-owned ratio without exposing the other fact's measure at
+  # all, which is what the recipe claims a cube-owned metric allows.
+  - name: line_item_analysis
+    cubes:
+      - join_path: sales_line_item
+        includes:
+          - aov_basket
+      - join_path: locations
+        includes:
+          - region
 `;
 
 let compilers: any;
@@ -382,6 +393,18 @@ describe('Multi-fact derived measure defined on a cube', () => {
       dimensions: ['retail_analysis.region'],
     });
 
+    expect(sql).toMatch(RATIO_OVER_AGGREGATES);
+  });
+
+  it('is reachable through a view that does not include the other fact', () => {
+    const sql = buildSql({
+      measures: ['line_item_analysis.aov_basket'],
+      dimensions: ['line_item_analysis.region'],
+    });
+
+    // `line_item_analysis` exposes no measure of item_location_sales, yet the
+    // ratio still reaches it and is divided over the two aggregates.
+    expect(sql).toMatch(SALES_AMOUNT_AGGREGATE);
     expect(sql).toMatch(RATIO_OVER_AGGREGATES);
   });
 

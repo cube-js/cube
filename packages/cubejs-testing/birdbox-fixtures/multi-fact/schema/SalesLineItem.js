@@ -2,8 +2,11 @@
 // between the two. The denominator of AOV counts distinct transactions, so
 // West's three lines on T100 must still count as one.
 //
-// West: T100 (3 lines) + T101 (1 line)          -> 2 transactions
-// East: T200 counts, T201 is an EXCHANGE        -> 1 transaction
+// West: T100 (3 lines) + T101 (1 line)                 -> 2 transactions
+// East: T200 counts, T201 is an EXCHANGE, T202 is ONLINE -> 1 transaction
+//
+// T201 and T202 are excluded by a different one of the measure's two filters,
+// so neither predicate can be dropped without moving East's denominator.
 cube(`SalesLineItem`, {
   sql: `
   select 1 as id, 100 as transaction_id, 1 as location_id, 'SALE' as transaction_type, 'IN_STORE' as fulfillment_channel_group
@@ -17,6 +20,8 @@ cube(`SalesLineItem`, {
   select 5 as id, 200 as transaction_id, 2 as location_id, 'SALE' as transaction_type, 'IN_STORE' as fulfillment_channel_group
   UNION ALL
   select 6 as id, 201 as transaction_id, 2 as location_id, 'EXCHANGE' as transaction_type, 'IN_STORE' as fulfillment_channel_group
+  UNION ALL
+  select 7 as id, 202 as transaction_id, 2 as location_id, 'SALE' as transaction_type, 'ONLINE' as fulfillment_channel_group
   `,
 
   joins: {

@@ -17,12 +17,13 @@ import {
 // The fixture data makes each way of getting it wrong land on a different
 // number, so a failure says which invariant broke:
 //
-//   West  sales 100, transactions 2 (T100 spans three lines) -> 50
-//   East  sales  60, transactions 1 (T201 is an EXCHANGE)    -> 60
+//   West  sales 100, transactions 2 (T100 spans three lines)  -> 50
+//   East  sales  60, transactions 1 (T201 EXCHANGE, T202 ONLINE) -> 60
 //
-//   counting lines instead of transactions -> West 100/4 = 25
-//   letting the join multiply the sum      -> West 400/2 = 200
-//   dropping the cube's measure filters    -> East  60/2 = 30
+//   counting lines instead of transactions  -> West 100/4 = 25
+//   letting the join multiply the sum       -> West 400/2 = 200
+//   dropping the transaction_type filter    -> East  60/2 = 30
+//   dropping the channel filter             -> East  60/2 = 30
 //
 // Multi-fact queries are planned by Tesseract only; the legacy planner cannot
 // build a single join tree over two unrelated facts, so there is nothing to
