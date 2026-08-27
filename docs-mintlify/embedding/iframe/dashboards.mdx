@@ -129,6 +129,49 @@ This applies to embedded published dashboards; it does not affect the standalone
 [Analytics Chat](/embedding/iframe/analytics-chat) surface, where embedding the
 chat is itself the opt-in.
 
+## Show or hide header controls
+
+By default, an embedded dashboard's header shows its title, back button, and
+— when the viewer has permission — the Edit and Duplicate actions. Hide any
+of them individually with URL parameters on the embed iframe `src`:
+
+| Parameter | Hides |
+| --- | --- |
+| `showDashboardHeader=false` | The entire header bar |
+| `showDashboardBackButton=false` | The back button |
+| `showDashboardTitle=false` | The dashboard title |
+| `showDashboardEditButton=false` | The Edit action |
+| `showDashboardDuplicateButton=false` | The Duplicate action |
+
+```text
+https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&showDashboardBackButton=false&showDashboardTitle=false
+```
+
+Every one of these defaults to shown. Only the exact literal string `false`
+hides a control — `=0`, `=False`, `=FALSE`, and a bare `?showDashboardTitle`
+(no value) all leave it visible. Note this is the inverse of `allowExport`
+above, where only the literal string `true` opts in.
+
+<Note>
+These parameters are URL-only — they aren't accepted in the [Generate
+Session](/reference/embed-apis/generate-session#session-settings) `settings`
+object, unlike `showDashboardChat`, and they have no account-wide default
+under **Embed → Settings**.
+</Note>
+
+These parameters apply to the dashboard header only — the workbook header
+(which carries Publish and Share) is unaffected.
+
+Setting `showDashboardHeader=false` overrides the other four: the whole bar
+disappears regardless of their values. `showDashboardEditButton` can only
+hide the Edit action; it can never show one to a viewer who lacks edit
+permission.
+
+These parameters are read from the URL the host loaded the iframe with and
+stay pinned for the life of the embed, so they survive in-app navigation
+(for example, from the home-page dashboard card, or after publishing a
+draft).
+
 ## Set the language
 
 Embedded dashboards render their UI in the account's default language, which you can

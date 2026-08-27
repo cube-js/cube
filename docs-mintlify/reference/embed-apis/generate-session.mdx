@@ -79,6 +79,10 @@ over the account-wide setting.
 |----------|------|----------|-------|
 | `showDashboardChat` | boolean | No | Show or hide the AI chat (agent panel and launcher bubble) on embedded dashboards for this session. Omit to inherit the account-wide **Show dashboard chat** toggle (**Embed → Settings**; shown by default); `false` hides it even if enabled account-wide, `true` shows it even if disabled. Affects embedded **published dashboards** only — not the standalone [embedded chat][ref-analytics-chat] surface. See [Hiding the AI chat][ref-signed-embedding]. |
 
+<Note>
+The dashboard header's title, back button, Edit, and Duplicate controls are hidden with URL parameters on the embed iframe instead — they aren't part of this `settings` object. See [Show or hide header controls](/embedding/iframe/dashboards#show-or-hide-header-controls).
+</Note>
+
 ## User profile
 
 `userProfile` lets you attach a human-readable display name and avatar to an external user so they render with a recognizable identity inside embedded surfaces (workbook owners, dashboard headers, etc.) instead of the raw `externalId`.
