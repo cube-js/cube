@@ -6160,9 +6160,9 @@ components:
     DbtSyncLogEntry:
       properties:
         durationMs:
+          description: For a phase line, how long the phase took, in milliseconds. `null` otherwise.
           oneOf:
             - type: integer
-              description: For a phase line, how long the phase took, in milliseconds.
             - type: 'null'
         level:
           description: info or error.
@@ -6170,9 +6170,9 @@ components:
         message:
           type: string
         phase:
+          description: The phase this line belongs to, e.g. dbt-compile. `null` for a non-phase line.
           oneOf:
             - type: string
-              description: The phase this line belongs to, e.g. dbt-compile.
             - type: 'null'
         stream:
           description: >-
@@ -6267,42 +6267,41 @@ components:
           description: The Cube branch this sync wrote its generated cubes to.
           type: string
         completedAt:
+          description: >-
+            When the sync finished, as an ISO 8601 timestamp, or `null` while it is still running.
+            Use durationMs to show how long a run took rather than subtracting this from startedAt.
           oneOf:
             - type: string
-              description: >-
-                When the sync finished, as an ISO 8601 timestamp, or absent while it is still
-                running. Use durationMs to show how long a run took rather than subtracting this
-                from startedAt.
             - type: 'null'
         deploymentId:
           type: integer
         durationMs:
+          description: How long the sync took, in milliseconds. `null` while the sync is running.
           oneOf:
             - type: integer
-              description: How long the sync took, in milliseconds.
             - type: 'null'
         errorMessage:
+          description: Why the sync stopped. `null` unless the run failed.
           oneOf:
             - type: string
-              description: Why the sync stopped. Present only for a failed run.
             - type: 'null'
         failedPhase:
+          description: The phase that failed, e.g. dbt-compile. `null` unless the run failed.
           oneOf:
             - type: string
-              description: The phase that failed, e.g. dbt-compile.
             - type: 'null'
         gitRef:
+          description: The dbt-repository ref this sync was run against, when pinned. `null` otherwise.
           oneOf:
             - type: string
-              description: The dbt-repository ref this sync was run against, when pinned.
             - type: 'null'
         lastStage:
+          description: The pipeline stage the run reached, e.g. COMPILING_DBT.
           oneOf:
             - type: string
-              description: The pipeline stage the run reached, e.g. COMPILING_DBT.
             - type: 'null'
         phases:
-          description: Per-phase timings, in the order they ran. Absent while the sync is running.
+          description: Per-phase timings, in the order they ran. Omitted while the sync is still running.
           items:
             $ref: '#/components/schemas/DbtSyncRunPhase'
           type: array
@@ -6327,9 +6326,9 @@ components:
         triggerContext:
           $ref: '#/components/schemas/DbtSyncRunTriggerContext'
         userId:
+          description: The Cube user who started the sync, when a user started it. `null` otherwise.
           oneOf:
             - type: integer
-              description: The Cube user who started the sync, when a user started it.
             - type: 'null'
       required:
         - syncJobId
@@ -6374,29 +6373,29 @@ components:
     DbtSyncRunStats:
       properties:
         cubeCount:
+          description: How many cubes the sync generated.
           oneOf:
             - type: integer
-              description: How many cubes the sync generated.
             - type: 'null'
         generatedFileCount:
+          description: How many files the sync wrote to the branch it created.
           oneOf:
             - type: integer
-              description: How many files the sync wrote to the branch it created.
             - type: 'null'
         macros:
+          description: dbt macros found in the manifest.
           oneOf:
             - type: integer
-              description: dbt macros found in the manifest.
             - type: 'null'
         models:
+          description: dbt models found in the manifest.
           oneOf:
             - type: integer
-              description: dbt models found in the manifest.
             - type: 'null'
         sources:
+          description: dbt sources found in the manifest.
           oneOf:
             - type: integer
-              description: dbt sources found in the manifest.
             - type: 'null'
       type: object
     DbtSyncRunTriggerContext:
