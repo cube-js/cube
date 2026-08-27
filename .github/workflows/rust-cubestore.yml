@@ -1,12 +1,6 @@
 name: Rust
 
 on:
-  push:
-    paths:
-      - '.github/workflows/rust-cubestore.yml'
-      - 'rust/cubestore/**'
-    branches-ignore:
-      - master
   pull_request:
     paths:
       - '.github/workflows/rust-cubestore.yml'
