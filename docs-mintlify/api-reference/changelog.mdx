@@ -39,7 +39,7 @@ rss: true
 
   - `DELETE /api/v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook` (`ReportsPublicController.disconnectReportFromWorkbook`) — removes a single sheet+anchor placement of a report from a spreadsheet, leaving every other placement (in this workbook and others) alone. Addressed by `placementId`, or by `externalWorkbookId` + `sheetName` + `anchorCell`. New schema: `DisconnectReportFromWorkbookInput`.
   - `PUT .../reports/{reportId}/refresh` now takes a body: new schema `RefreshReportInput` (`placementId`, or `externalWorkbookId` + `sheetName`/`sheetId`/`anchorCell`), addressing the same way as disconnect.
-  - Report placements are now individually addressable and trackable: `ConnectReportToWorkbookInput`, `CreateReportInput` and `UpdateReportInput` each gained `placementId`, `sheetId`, `sheetName`, `anchorCell`, `workbookName`, and `host` (new `ConnectReportToWorkbookInputHost` / `CreateReportInputHost` / `UpdateReportInputHost` enums, `"GOOGLE_SHEETS" | "EXCEL"`). `ReportPlacement` gained the matching `id`, `host`, `sheetId`, `sheetName`, `anchorCell`, `workbookName`, plus `placedAt`/`placedByUserId` and `refreshedAt`/`refreshedByUserId` (new `ReportPlacementHost` enum). `ReportSnapshot` gained `isSourceReport` and `pythonCode`.
+  - Report placements are now individually addressable and trackable (new `ConnectReportToWorkbookInputHost` / `CreateReportInputHost` / `UpdateReportInputHost` enums, `"GOOGLE_SHEETS" | "EXCEL"`): `ConnectReportToWorkbookInput` gained `placementId`, `sheetId`, `sheetName`, `anchorCell`, `workbookName` and `host`; `CreateReportInput` gained `host`, `sheetId` and `workbookName`; `UpdateReportInput` gained `host`, `placementId`, `sheetId` and `workbookName`. `ReportPlacement` gained the matching `id`, `host`, `sheetId`, `sheetName`, `anchorCell`, `workbookName`, plus `placedAt`/`placedByUserId` and `refreshedAt`/`refreshedByUserId` (new `ReportPlacementHost` enum). `ReportSnapshot` gained `isSourceReport` and `pythonCode`.
 
   #### Cursor pagination on previously offset-only or unpaginated lists
 
@@ -53,7 +53,7 @@ rss: true
   - New `CspsConfig` schema (customer-storage-provider config, mirrored on the existing `CspsConfigInput`).
   - `scopeDeploymentId` added to the agent-space config schemas.
   - `measuresAxis` / `measuresPosition` added to `PivotItems` / `PivotItemsInput` (new `PivotItemsMeasuresAxis` / `PivotItemsMeasuresPosition` / `PivotItemsInputMeasuresAxis` / `PivotItemsInputMeasuresPosition` enums, `"columns" | "rows"` and `"before" | "after"`).
-  - `name` / `userCount` added to `InheritedGroupPolicyDto`.
+  - `name` / `userCount` added to `InheritedGroupPolicyDto` and `ResourceGroupPolicyDto`.
   - `allowChatWorkspaceAuthoring` added to `EmbedSessionSettings`.
   - `ref` added to `StartDbtSyncInput`.
 
