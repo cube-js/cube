@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.29](https://github.com/cube-js/cube/compare/v1.7.28...v1.7.29) (2026-08-27)
+
+### Bug Fixes
+
+- **server-core:** release orchestrators evicted from the LRU ([#11661](https://github.com/cube-js/cube/issues/11661)) ([b82c58a](https://github.com/cube-js/cube/commit/b82c58aa245919a36e3d20f79105b639d0c16863))
+
 ## [1.7.28](https://github.com/cube-js/cube/compare/v1.7.27...v1.7.28) (2026-08-26)
 
 ### Bug Fixes
