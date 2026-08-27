@@ -149,14 +149,17 @@ https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?sessi
 
 Every one of these defaults to shown. Only the exact literal string `false`
 hides a control — `=0`, `=False`, `=FALSE`, and a bare `?showDashboardTitle`
-(no value) all leave it visible. This is the opposite polarity from
-`allowExport` above, which fails closed: these parameters remove a control,
-so a typo must not silently strip the viewer's only way back out of the
-embed.
+(no value) all leave it visible. Note this is the inverse of `allowExport`
+above, where only the literal string `true` opts in.
 
-Hiding controls one at a time collapses the header cleanly — there's no
-empty row or stray border left behind, the same as setting
-`showDashboardHeader=false` directly. `showDashboardEditButton` can only
+<Note>
+These parameters are URL-only — they aren't accepted in the [Generate
+Session](/reference/embed-apis/generate-session#session-settings) `settings`
+object, unlike `showDashboardChat`.
+</Note>
+
+Setting `showDashboardHeader=false` overrides the other four: the whole bar
+disappears regardless of their values. `showDashboardEditButton` can only
 hide the Edit action; it can never show one to a viewer who lacks edit
 permission.
 
@@ -168,8 +171,8 @@ draft).
 <Note>
 These controls apply to the dashboard header only — the workbook header
 (which carries Publish and Share) is unaffected. Unlike [showDashboardChat](#show-or-hide-the-ai-chat),
-there's no account-wide default for these five parameters; they're URL-only,
-and not exposed under **Embed → Settings**.
+there's no account-wide default for these five parameters, and they're not
+exposed under **Embed → Settings**.
 </Note>
 
 ## Set the language
