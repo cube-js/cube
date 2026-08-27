@@ -84,6 +84,7 @@
     "smoke:duckdb": "jest --verbose -i dist/test/smoke-duckdb.test.js",
     "smoke:duckdb:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-duckdb.test.js",
     "smoke:view-groups": "jest --verbose --forceExit -i dist/test/smoke-view-groups.test.js",
+    "smoke:multi-fact": "jest --verbose --forceExit -i dist/test/smoke-multi-fact.test.js",
     "smoke:shared-calc-group": "TZ=UTC jest --verbose -i dist/test/smoke-shared-calc-group.test.js"
   },
   "files": [

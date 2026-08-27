@@ -18,6 +18,10 @@ echo "::group::View Groups"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:view-groups
 echo "::endgroup::"
 
+echo "::group::Multi-fact"
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:multi-fact
+echo "::endgroup::"
+
 echo "::group::Postgres"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:postgres
 echo "::endgroup::"
