@@ -239,10 +239,10 @@ ORDER BY 3, 1
 
 <Note>
 
-A cube whose name starts with `pg_` cannot be referenced by that name alone: the
-SQL API routes such names to `pg_catalog` and reports `Table or CTE with name
-'pg_...' not found`. Qualify it with the schema that holds cubes — `FROM
-public.pg_costs` — or avoid the prefix.
+A cube whose name starts with `pg_` cannot be referenced by that name alone. The
+SQL API routes such a name to `pg_catalog`, where no cube is ever found, and the
+query fails with `Table or CTE with name 'pg_...' not found`. Qualify it with the
+schema that holds cubes, as in `FROM public.pg_costs`, or avoid the prefix.
 
 </Note>
 
