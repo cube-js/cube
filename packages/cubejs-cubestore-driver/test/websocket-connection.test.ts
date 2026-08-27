@@ -75,6 +75,28 @@ describe('WebSocketConnection', () => {
     await expect(promise).rejects.toThrow(answeredBy(connectionIndex));
   };
 
+  /**
+   * Waits until the given number of server-side connections are gone, which is
+   * how a socket the driver was supposed to close shows up from the outside.
+   */
+  const waitForClosedConnections = async (count: number) => {
+    const deadline = Date.now() + 10000;
+
+    for (;;) {
+      const closed = server.connections.filter((c) => c.ws.readyState === c.ws.CLOSED);
+
+      if (closed.length >= count) {
+        return;
+      }
+
+      if (Date.now() > deadline) {
+        throw new Error(`Timed out waiting for ${count} closed connection(s), have ${closed.length}`);
+      }
+
+      await new Promise((resolve) => { setTimeout(resolve, 25); });
+    }
+  };
+
   // The socket the driver is writing to right now.
   const clientSocket = (): Socket => (connection as any).webSocket._socket;
 
@@ -190,28 +212,67 @@ describe('WebSocketConnection', () => {
     await expectAnsweredBy(query('SELECT 2'), 1);
   }, JEST_TIMEOUT);
 
-  it('does not re-establish the connection when it is closed with queries in flight', async () => {
+  it('delivers the queries in flight when it is closed, then closes', async () => {
     connection = new WebSocketConnection(server.url);
 
-    // Cube Store never answers, so the query stays in flight.
-    server.handler = () => {
-      // noop
+    let answer: (() => void) | null = null;
+    server.handler = (message, mockConnection) => {
+      answer = () => mockConnection.ws.send(buildErrorMessage(message.messageId, answeredBy(mockConnection.index)));
     };
 
     const promise = query('SELECT 1');
     await server.waitForMessages(1);
 
-    // What releasing the driver ends up calling. Carrying the query over to a
-    // new connection would leave that connection open on its heartbeat with
-    // nobody owning it, so the query is failed instead.
+    // What releasing the driver ends up calling. The query was already sent, so
+    // it is answered rather than dropped.
     connection!.close();
 
-    await expect(promise).rejects.toThrow(ConnectionError);
-    await expect(promise).rejects.toThrow('Cube Store connection is closed');
+    answer!();
+    await expectAnsweredBy(promise, 0);
 
-    // Longer than the re-send the driver would have scheduled.
-    await new Promise((resolve) => { setTimeout(resolve, 3000); });
+    // And once it is answered, the socket goes.
+    await waitForClosedConnections(1);
 
+    // A released connection takes no new queries either.
+    await expect(query('SELECT 2')).rejects.toThrow('Cube Store connection is closed');
+
+    expect(server.connections.length).toBe(1);
+  }, JEST_TIMEOUT);
+
+  it('re-sends what is in flight when a released connection breaks, then closes', async () => {
+    connection = new WebSocketConnection(server.url);
+
+    server.handler = (message, mockConnection) => {
+      if (mockConnection.index === 0) {
+        // Cube Store went away with the query still in flight.
+        mockConnection.ws.close();
+        return;
+      }
+
+      mockConnection.ws.send(buildErrorMessage(message.messageId, answeredBy(mockConnection.index)));
+    };
+
+    const promise = query('SELECT 1');
+    await server.waitForMessages(1);
+
+    connection!.close();
+
+    // Delivering it is worth a new connection; keeping that connection past the
+    // answer is not.
+    await expectAnsweredBy(promise, 1);
+    await waitForClosedConnections(2);
+  }, JEST_TIMEOUT);
+
+  it('takes no queries once it is closed with nothing in flight', async () => {
+    connection = new WebSocketConnection(server.url);
+
+    await expectAnsweredBy(query('SELECT 1'), 0);
+
+    connection!.close();
+
+    await expect(query('SELECT 2')).rejects.toThrow('Cube Store connection is closed');
+
+    await waitForClosedConnections(1);
     expect(server.connections.length).toBe(1);
   }, JEST_TIMEOUT);
 
