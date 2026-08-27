@@ -318,7 +318,7 @@ export class QueryCache {
     }
 
     if (!this.options.backgroundRenew && queryBody.cacheMode !== 'stale-while-revalidate') {
-      const resultPromise = this.renewQuery(
+      const result = await this.renewQuery(
         query,
         values,
         cacheKeyQueries,
@@ -350,7 +350,7 @@ export class QueryCache {
         }
       );
 
-      return resultPromise;
+      return result;
     }
 
     this.logger('Background fetch', { cacheKey, requestId: queryBody.requestId });

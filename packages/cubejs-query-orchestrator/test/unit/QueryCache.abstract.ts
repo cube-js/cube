@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { createCancelablePromise, pausePromise } from '@cubejs-backend/shared';
 
-import { CacheKey, CacheKeyItem, QueryCache, QueryCacheOptions } from '../../src';
+import { CacheKey, CacheKeyItem, ContinueWaitError, QueryCache, QueryCacheOptions } from '../../src';
 
 export type QueryCacheTestOptions = QueryCacheOptions & {
   beforeAll?: () => Promise<void>,
@@ -384,13 +384,14 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
 
         const mainQueryCalls: string[] = [];
 
-        const spy = jest.spyOn(cache, 'queryWithRetryAndRelease').mockImplementation(async (query) => {
+        const querySpy = jest.spyOn(cache, 'queryWithRetryAndRelease').mockImplementation(async (query) => {
           if (query === mainQuery) {
             mainQueryCalls.push(query as string);
             return [{ result: 'ok' }];
           }
           return [{ refresh_key: '1' }];
         });
+        const renewCycleSpy = jest.spyOn(cache, 'startRenewCycle');
 
         try {
           await cache.cachedQueryResult(
@@ -409,8 +410,34 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           await pausePromise(50);
 
           expect(mainQueryCalls.length).toBe(1);
+          expect(renewCycleSpy).toHaveBeenCalledTimes(1);
         } finally {
-          spy.mockRestore();
+          renewCycleSpy.mockRestore();
+          querySpy.mockRestore();
+        }
+      });
+
+      it('does not start a renew cycle when the foreground renewal continues waiting', async () => {
+        const continueWaitError = new ContinueWaitError();
+        const renewQuerySpy = jest.spyOn(cache, 'renewQuery').mockRejectedValue(continueWaitError);
+        const renewCycleSpy = jest.spyOn(cache, 'startRenewCycle');
+
+        try {
+          await expect(cache.cachedQueryResult(
+            {
+              query: 'SELECT continue-wait-main',
+              values: [],
+              cacheKeyQueries: [['SELECT continue-wait-refresh-key', []]],
+              requestId: 'continue-wait-req',
+              dataSource: 'default',
+            },
+            [],
+          )).rejects.toBe(continueWaitError);
+
+          expect(renewCycleSpy).not.toHaveBeenCalled();
+        } finally {
+          renewCycleSpy.mockRestore();
+          renewQuerySpy.mockRestore();
         }
       });
     });
