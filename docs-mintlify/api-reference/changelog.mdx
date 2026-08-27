@@ -25,7 +25,7 @@ rss: true
   #### Data model — branch cleanup, staging environments and validation
 
   - `DELETE /build/api/v1/deployments/{deploymentId}/branches` (`DataModelPublicController.removeBranch`, `branchName` as a query param since branch names contain slashes) — deletes a branch and its git ref, re-parenting any children onto the deleted branch's own parent; `removeOnUpstream` additionally deletes the ref on the connected GitHub/GitLab remote. New schema: `DataModelWriteResponse` (shared with the existing file-write endpoints).
-  - `PUT .../branches/staging-environment` (`setBranchStagingEnvironment`) — enable or disable a branch's always-on staging environment (`<deploymentUrl>/dev-mode/{branchName}/cubejs-api/v1`). New schemas: `SetBranchStagingEnvironmentRequest`, `SetBranchStagingEnvironmentResponse`.
+  - `PUT .../branches/staging-environment` (`setBranchStagingEnvironment`) — enable or disable a branch's always-on staging environment (`<deploymentUrl>/dev-mode/{branchName}/cubejs-api/v1`). New schemas: `SetBranchStagingEnvironmentRequest`, `SetBranchStagingEnvironmentResponse`. `BranchResponse` (from `listBranches`) reads the flag back via a new `isStagingEnvironmentEnabled`.
   - `GET .../data-model/validate` (`validateDataModel`) — compiles the deploy branch, a named branch, or the caller's dev-mode branch and reports compilation errors as a 200 response (`valid: false`), not a request error. New schemas: `DataModelValidationResponse`, `DataModelValidationError`, `DataModelValidationResponseMode`.
 
   #### Deployment settings, versions and the spec endpoint
