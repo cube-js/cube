@@ -192,6 +192,7 @@ const TAG_MAP = {
 // docs stay complete even when the upstream spec adds new areas.
 const TAG_ORDER = [
   'Deployments', 'Deployment Creation', 'Environments', 'Env Variables', 'Regions',
+  'Region Private Links',
   'Data Model', 'Data Model Uploads', 'GitHub', 'GitHub Connection', 'dbt Sync',
   'Folders', 'Reports', 'Workbooks', 'Notifications', 'Workspace', 'Agents', 'Metadata',
   'Users', 'Users Admin', 'Groups', 'User Groups',
