@@ -14,11 +14,12 @@ import { prepareYamlCompiler } from './PrepareCompiler';
 // measure - they are never restated in a view. `sales_amount` is a plain sum on
 // the day/item/location cube.
 //
-// The ratio of the two is authored as a measure of the view rather than per
-// consumer. The line-item side has to be aggregated to the query grain before
-// it can divide a sum coming from the other fact table, which is the multi-fact
-// path: both facts join to the shared `items`, `locations` and `dates` cubes,
-// but never to each other.
+// The ratio of the two is authored once as a measure rather than per consumer,
+// in both of the places it can live: on the view, and on the line-item cube
+// itself (from where a view can re-expose it). The line-item side has to be
+// aggregated to the query grain before it can divide a sum coming from the
+// other fact table, which is the multi-fact path: both facts join to the
+// shared `items`, `locations` and `dates` cubes, but never to each other.
 const model = `
 cubes:
   - name: items
