@@ -13,7 +13,9 @@ It is a setting on an existing chart, not a chart type of its own: a bar, line, 
 
 The **Small multiples** section appears in the Fields tab for bar, line, area, and scatter charts.
 
-Pick a dimension in **Split by** and the chart is replaced by one panel per value of that dimension. Clearing the picker returns the chart to a single plot.
+Pick a dimension in **Split by** and the chart is replaced by one panel per value of that dimension. The toggle beside the picker switches the split off again and returns the chart to a single plot, taking both split dimensions with it.
+
+Pick a second dimension in **and by** and the panels become a grid: the first dimension runs across the columns, the second down the rows, and each panel is one intersection of the two. Clearing the second picker returns the chart to a single split dimension, keeping everything else configured. Only this picker has a cross: the first one is switched off with the toggle rather than cleared. A dimension already used on one axis is not offered on the other.
 
 Only dimensions are offered. Splitting by a measure is not supported — a measure has no discrete values to make panels from.
 
@@ -23,10 +25,10 @@ These options appear once a **Split by** dimension is chosen.
 
 | Option | What it does |
 |---|---|
-| **Grid** | Columns × rows, up to 5 × 5. Both are preselected from the number of distinct values in the split dimension, so a four-value dimension opens as a 2 × 2 grid. |
+| **Grid** | Columns × rows, up to 5 × 5. With one split dimension the two numbers shape the grid and their product bounds it; with two, each number caps its own axis. Both are preselected from the number of distinct values in the **Split by** dimension, so a four-value dimension opens as a 2 × 2 grid. |
 | **Axis scales** | Whether every panel is drawn against the same scale (**Shared**) or each scales to its own data (**Independent**). |
-| **Sort panels by** | Orders the panels by the dimension's own values (**Value**) or by a measure (**Measure**). |
-| **Sort order** | **Ascending** or **Descending**. |
+| **Sort panels by** | Orders the panels by the dimension's own values (**Value**) or by a measure (**Measure**). With two split dimensions it orders the columns; the rows are always ordered by their own values, ascending. |
+| **Sort order** | **Ascending** or **Descending**. With two split dimensions it applies to the columns only. |
 
 ### Shared vs. independent axis scales
 
@@ -40,9 +42,11 @@ Switch to **Independent** when the question is about the *shape* of each series 
 
 The grid bounds the render: a chart split into 3 × 2 draws at most six panels, so a high-cardinality dimension can never produce hundreds of unreadable ones. The largest grid is 5 × 5, or twenty-five panels.
 
-When a dimension has more values than the grid has tiles, the chart draws the first ones in the current sort order. The underlying query is unaffected, so no data is lost — a bigger grid simply shows more of it.
+With two split dimensions each number caps its own axis, so the bound holds however wide the dimensions are: splitting by a five-value dimension and a forty-value one at 5 × 5 draws twenty-five panels, not two hundred.
 
-Sorting interacts with this: with **Sort panels by** set to a measure and a descending order, the grid keeps the top panels by that measure, which is usually more useful than the first ones alphabetically.
+When a dimension has more values than its axis has room for — the whole grid with one split dimension, that axis's own number with two — the chart draws the first ones in the current sort order. The underlying query is unaffected, so no data is lost — a bigger grid simply shows more of it.
+
+Sorting interacts with this: with **Sort panels by** set to a measure and a descending order, the grid keeps the top panels by that measure, which is usually more useful than the first ones alphabetically. With two split dimensions this applies to the columns; the rows keep their first values in their own ascending order.
 
 ## Interaction with other settings
 
@@ -54,7 +58,7 @@ A legend is shared across the grid rather than repeated per panel. Clicking a le
 
 ## Limitations
 
-- **One split dimension.** One dimension fills the grid, panel by panel. Splitting by two dimensions at once — one down the rows and another across the columns — is not supported.
+- **At most two split dimensions.** One across the columns and one down the rows. A third split axis is not supported.
 - **Cartesian charts only.** Bar, line, area, and scatter. Pie, table, KPI, heatmap, boxplot, map, and HTML charts cannot be split.
 - **Panel labels are not configurable.** Each panel is labeled with its dimension value; the font, size, and color are fixed.
 - **The split is enabled on a single-view chart.** A chart that already carries data labels, a reference line, or a second Y axis series cannot be split — turn the split on first. The order is the only constraint: once a chart is split, data labels and reference lines can be added freely and are drawn in every panel.
