@@ -6320,7 +6320,7 @@ components:
           type: string
         trigger:
           description: >-
-            What started the sync: manual (the Cube Cloud UI), api (this REST API), webhook (a push
+            What started the sync: manual (the Cube UI), api (this REST API), webhook (a push
             to the dbt repository), agent (Cube AI), or unknown.
           type: string
         triggerContext:
