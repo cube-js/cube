@@ -129,6 +129,49 @@ This applies to embedded published dashboards; it does not affect the standalone
 [Analytics Chat](/embedding/iframe/analytics-chat) surface, where embedding the
 chat is itself the opt-in.
 
+## Show or hide header controls
+
+By default, an embedded dashboard's header shows its title, back button, and
+— when the viewer has permission — the Edit and Duplicate actions. Hide any
+of them individually with URL parameters on the embed iframe `src`:
+
+| Parameter | Hides |
+| --- | --- |
+| `showDashboardHeader=false` | The entire header bar |
+| `showDashboardBackButton=false` | The back button |
+| `showDashboardTitle=false` | The dashboard title |
+| `showDashboardEditButton=false` | The Edit action |
+| `showDashboardDuplicateButton=false` | The Duplicate action |
+
+```text
+https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&showDashboardBackButton=false&showDashboardTitle=false
+```
+
+Every one of these defaults to shown. Only the exact literal string `false`
+hides a control — `=0`, `=False`, `=FALSE`, and a bare `?showDashboardTitle`
+(no value) all leave it visible. This is the opposite polarity from
+`allowExport` above, which fails closed: these parameters remove a control,
+so a typo must not silently strip the viewer's only way back out of the
+embed.
+
+Hiding controls one at a time collapses the header cleanly — there's no
+empty row or stray border left behind, the same as setting
+`showDashboardHeader=false` directly. `showDashboardEditButton` can only
+hide the Edit action; it can never show one to a viewer who lacks edit
+permission.
+
+These parameters are read from the URL the host loaded the iframe with and
+stay pinned for the life of the embed, so they survive in-app navigation
+(for example, from the home-page dashboard card, or after publishing a
+draft).
+
+<Note>
+These controls apply to the dashboard header only — the workbook header
+(which carries Publish and Share) is unaffected. Unlike [showDashboardChat](#show-or-hide-the-ai-chat),
+there's no account-wide default for these five parameters; they're URL-only,
+and not exposed under **Embed → Settings**.
+</Note>
+
 ## Set the language
 
 Embedded dashboards render their UI in the account's default language, which you can
