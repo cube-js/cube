@@ -98,9 +98,9 @@ export class WebSocketConnection {
   // keeps it (and the orchestrator holding it) alive for the life of the process.
   private closed: boolean = false;
 
-  // Bounds the drain a close waits out, armed only while a closed connection
-  // still has messages in flight.
-  private closeTimer: NodeJS.Timeout | null = null;
+  // When close() was asked for, so the heartbeat can bound the wait for the
+  // messages that were still in flight at that point.
+  private closedAt: Date | null = null;
 
   public constructor(url: string) {
     this.url = url;
@@ -134,6 +134,25 @@ export class WebSocketConnection {
         const pingInterval = setInterval(() => {
           if (webSocket.readyState === WebSocket.OPEN) {
             webSocket.ping();
+          }
+
+          if (this.closed) {
+            // A closed connection is kept only for the messages already in
+            // flight, and this is where that wait is both re-checked and
+            // bounded. It has to be bounded here rather than by the heartbeat
+            // check below: Cube Store keeps answering the pings of a connection
+            // whose query is simply never completed, so that check never fires
+            // and a single wedged message would keep this socket -- and this
+            // interval, which is what makes it reachable -- for the life of the
+            // process. Pinging continues meanwhile, so a connection that is
+            // draining legitimately is not dropped for inactivity.
+            if (this.closedAt && new Date().getTime() - this.closedAt.getTime() > this.noHeartBeatTimeout * 1000) {
+              this.abandonClose(webSocket);
+            } else {
+              this.closeIfDrained(webSocket);
+            }
+
+            return;
           }
 
           if (new Date().getTime() - webSocket.lastHeartBeat.getTime() > this.noHeartBeatTimeout * 1000) {
@@ -577,47 +596,39 @@ export class WebSocketConnection {
    */
   public close() {
     this.closed = true;
+    this.closedAt = new Date();
 
-    const socket = this.webSocket;
+    // Straight away when there is nothing in flight; otherwise the heartbeat
+    // takes it from here, both to notice the drain finishing and to bound it.
+    this.closeIfDrained(this.webSocket);
+  }
 
-    this.closeIfDrained(socket);
+  /**
+   * Gives up on the messages a closed connection was waiting for, so that one
+   * Cube Store never answers costs a query rather than a permanently open
+   * socket.
+   */
+  private abandonClose(socket: CubeStoreWebSocket) {
+    const unanswered = Object.keys(socket.sentMessages);
 
-    if (!socket || socket !== this.webSocket || this.closeTimer) {
-      return;
+    socket.teardown();
+
+    if (socket === this.webSocket) {
+      this.webSocket = null;
     }
 
-    // Bound the drain. Cube Store keeps answering the 5s pings of a connection
-    // whose query is simply never completed, so `noHeartBeatTimeout` never
-    // fires and nothing else would call `closeIfDrained()` again: a single
-    // wedged message would keep this socket, and the interval that makes it
-    // reachable, for the life of the process -- the very leak being fixed,
-    // behind a narrower door. A stuck message costs one query instead.
-    this.closeTimer = setTimeout(() => {
-      this.closeTimer = null;
+    const error = new ConnectionError(
+      `Cube Store connection was closed with ${unanswered.length} message(s) still unanswered`
+    );
 
-      const unanswered = Object.keys(socket.sentMessages);
+    // eslint-disable-next-line no-restricted-syntax
+    for (const key of unanswered) {
+      const message = socket.sentMessages[key];
+      delete socket.sentMessages[key];
+      message.reject(error);
+    }
 
-      socket.teardown();
-
-      if (socket === this.webSocket) {
-        this.webSocket = null;
-      }
-
-      const error = new ConnectionError(
-        `Cube Store connection was closed with ${unanswered.length} message(s) still unanswered`
-      );
-
-      // eslint-disable-next-line no-restricted-syntax
-      for (const key of unanswered) {
-        const message = socket.sentMessages[key];
-        delete socket.sentMessages[key];
-        message.reject(error);
-      }
-
-      socket.terminate();
-    }, this.noHeartBeatTimeout * 1000);
-
-    this.closeTimer.unref();
+    socket.terminate();
   }
 
   /**
@@ -635,11 +646,6 @@ export class WebSocketConnection {
 
     if (Object.keys(socket.sentMessages).length) {
       return;
-    }
-
-    if (this.closeTimer) {
-      clearTimeout(this.closeTimer);
-      this.closeTimer = null;
     }
 
     // Stop the heartbeat before closing rather than leaving it to the 'close'
