@@ -31,10 +31,11 @@ use log::error;
 use log::info;
 use log::trace;
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::error::Error as StdError;
 use std::net::SocketAddr;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 use tempfile::NamedTempFile;
 use tokio::fs::File;
@@ -50,6 +51,34 @@ use warp::reject::Reject;
 /// Close code the WebSocket protocol reserves for a message a peer refuses to
 /// process because it is too large (RFC 6455 section 7.4.1, "Message Too Big").
 const MESSAGE_TOO_BIG_CLOSE_CODE: u16 = 1009;
+
+/// Close code the WebSocket protocol reserves for a peer that should come back
+/// later (RFC 6455 section 7.4.1, "Try Again Later"). An evicted connection was
+/// recycled to make room for a newer one, not broken, and a client that still
+/// needs it should reconnect rather than report a transport failure.
+const CONNECTION_EVICTED_CLOSE_CODE: u16 = 1013;
+
+/// How long the server waits for an evicted connection's close frame to go out.
+///
+/// The connection's entry leaves the counter when it is evicted, not when its
+/// task ends, so this is also how long its descriptor can outlive the slot it
+/// accounted for: the steady-state overshoot is the eviction rate times this
+/// bound. Sending is what can block — a peer whose receive window is closed
+/// keeps the frame in our buffer indefinitely — and a close frame is a handful
+/// of bytes, so a peer that cannot take them within this long is not going to.
+const EVICTED_CLOSE_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// How long a caller waits for the connection counter's lock before giving up.
+///
+/// Nothing awaits inside the critical section — it is a map lookup and an
+/// insert — so waiting at all is barely reachable by the code as written; the
+/// bound is here so that knowing this cannot stall a connection needs no
+/// reasoning about the callers. It is deliberately generous rather than tight:
+/// a thread holding the lock can be descheduled for a long time under CPU
+/// pressure, and giving up then would quietly stop counting connections
+/// exactly when the cap matters most. Both callers log when they give up, so a
+/// bound that is ever reached is visible rather than silent.
+const COUNTER_LOCK_TIMEOUT: Duration = Duration::from_secs(1);
 
 /// How much room the transport is given above the configured sizes.
 ///
@@ -132,9 +161,165 @@ pub struct HttpServer {
     cancel_token: CancellationToken,
     max_message_size: usize,
     max_frame_size: usize,
+    ws_connections: Arc<WsConnectionCounter>,
 }
 
 crate::di_service!(HttpServer, []);
+
+/// Caps how many concurrent websocket connections one authenticated user may
+/// hold. A client that leaks connections otherwise exhausts the process file
+/// descriptor table for every other user sharing the node.
+///
+/// At the limit the user's oldest connection is closed to admit the new one,
+/// rather than the new one being refused: a client that still needs the closed
+/// connection reconnects, while one that had forgotten about it simply loses it.
+/// A limit of 0 disables the cap.
+pub struct WsConnectionCounter {
+    limit: usize,
+    /// Live connections per user, keyed by a monotonic id so the first entry is the
+    /// oldest, holding the token that asks the connection task to close.
+    ///
+    /// Synchronous on purpose, not a `tokio` lock behind `util::lock::acquire_lock`:
+    /// entries are removed from `WsConnectionGuard::drop`, and a destructor cannot
+    /// `.await`. Releasing anywhere else would leak the slot on a panic, a cancelled
+    /// task, or a connection that dies before the upgrade completes. Nothing awaits
+    /// inside the critical section either — `acquire` is not an `async fn`, so one
+    /// cannot be added — which is the shape the `tokio::sync::Mutex` docs point at a
+    /// standard-library lock for. Every caller still takes it with a bound, so the
+    /// property does not rest on that reasoning holding: see COUNTER_LOCK_TIMEOUT.
+    users: parking_lot::Mutex<HashMap<String, BTreeMap<u64, CancellationToken>>>,
+    next_id: AtomicU64,
+}
+
+/// `None` when the lock could not be taken within [`COUNTER_LOCK_TIMEOUT`].
+/// Callers fail open: the cap is a safety net, so a counter that is briefly
+/// unavailable must not be what refuses or stalls a connection.
+fn try_lock_users(
+    users: &parking_lot::Mutex<HashMap<String, BTreeMap<u64, CancellationToken>>>,
+) -> Option<parking_lot::MutexGuard<'_, HashMap<String, BTreeMap<u64, CancellationToken>>>> {
+    users.try_lock_for(COUNTER_LOCK_TIMEOUT)
+}
+
+/// Frees the slot taken by [`WsConnectionCounter::acquire`] when the connection
+/// task ends, however it ends, and carries the token that task waits on.
+pub struct WsConnectionGuard {
+    counter: Arc<WsConnectionCounter>,
+    user: Option<String>,
+    id: u64,
+    cancel: CancellationToken,
+}
+
+impl WsConnectionCounter {
+    pub fn new(limit: usize) -> Arc<Self> {
+        Arc::new(Self {
+            limit,
+            users: parking_lot::Mutex::new(HashMap::new()),
+            next_id: AtomicU64::new(0),
+        })
+    }
+
+    /// Unauthenticated connections and a disabled cap stay untracked.
+    pub fn acquire(self: &Arc<Self>, user: Option<&str>) -> WsConnectionGuard {
+        let cancel = CancellationToken::new();
+        let user = match user {
+            Some(user) if self.limit > 0 => user,
+            _ => {
+                return WsConnectionGuard {
+                    counter: self.clone(),
+                    user: None,
+                    id: 0,
+                    cancel,
+                }
+            }
+        };
+
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        let evicted = {
+            let mut users = match try_lock_users(&self.users) {
+                Some(users) => users,
+                None => {
+                    log::error!(
+                        "Timed out locking the websocket connection counter; admitting an untracked connection (user: {})",
+                        user,
+                    );
+                    return WsConnectionGuard {
+                        counter: self.clone(),
+                        user: None,
+                        id: 0,
+                        cancel,
+                    };
+                }
+            };
+            let entries = users.entry(user.to_string()).or_default();
+            let evicted = if entries.len() >= self.limit {
+                let oldest = *entries.keys().next().expect("a full map has an entry");
+                // Removed here rather than left to the victim's own `drop`, which
+                // runs later: otherwise this admission would overshoot the limit.
+                entries.remove(&oldest)
+            } else {
+                None
+            };
+            entries.insert(id, cancel.clone());
+            evicted
+        };
+
+        // Outside the lock. Cancelling only wakes the victim's task, so this cannot
+        // deadlock, but there is no reason to hold the lock across it.
+        if let Some(evicted) = evicted {
+            evicted.cancel();
+        }
+
+        WsConnectionGuard {
+            counter: self.clone(),
+            user: Some(user.to_string()),
+            id,
+            cancel,
+        }
+    }
+
+    pub fn count(&self, user: &str) -> usize {
+        try_lock_users(&self.users)
+            .and_then(|users| users.get(user).map(BTreeMap::len))
+            .unwrap_or(0)
+    }
+}
+
+impl WsConnectionGuard {
+    /// Resolves when this connection has been chosen to make room for a newer one.
+    pub async fn evicted(&self) {
+        self.cancel.cancelled().await
+    }
+}
+
+impl Drop for WsConnectionGuard {
+    fn drop(&mut self) {
+        let user = match &self.user {
+            Some(user) => user,
+            None => return,
+        };
+        let mut users = match try_lock_users(&self.counter.users) {
+            Some(users) => users,
+            None => {
+                // The entry stays behind, but it is the oldest one of that user by
+                // construction, so the next admission evicts it: cancelling an
+                // already finished connection's token is a no-op.
+                log::error!(
+                    "Timed out locking the websocket connection counter; leaving a finished connection's slot to be evicted (user: {})",
+                    user,
+                );
+                return;
+            }
+        };
+        if let Some(entries) = users.get_mut(user) {
+            // Idempotent: an evicting `acquire` may have removed this entry already.
+            entries.remove(&self.id);
+            // Dropped when empty so a churn of one-off users can't grow the map.
+            if entries.is_empty() {
+                users.remove(user);
+            }
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum CubeRejection {
@@ -187,6 +372,7 @@ impl HttpServer {
         drop_complete_messages_after: Duration,
         max_message_size: usize,
         max_frame_size: usize,
+        max_ws_connections_per_user: usize,
     ) -> Arc<Self> {
         Arc::new(Self {
             bind_address,
@@ -197,6 +383,7 @@ impl HttpServer {
             drop_complete_messages_after,
             max_message_size,
             max_frame_size,
+            ws_connections: WsConnectionCounter::new(max_ws_connections_per_user),
             worker_loop: WorkerLoop::new("HttpServer message processing"),
             drop_orphaned_messages_loop: WorkerLoop::new("HttpServer drop orphaned messages"),
             cancel_token: CancellationToken::new(),
@@ -238,19 +425,47 @@ impl HttpServer {
         let context_filter_to_move = context_filter.clone();
         let max_frame_size = self.max_frame_size.clone();
         let max_message_size = self.max_message_size.clone();
+        let ws_connections = self.ws_connections.clone();
+        let ws_connections_filter = warp::any().map(move || ws_connections.clone());
 
         let query_route = warp::path!("ws")
             .and(context_filter_to_move)
+            .and(ws_connections_filter)
             .and(warp::ws::ws())
-            .and_then(move |tx: mpsc::Sender<(mpsc::Sender<Arc<HttpMessage>>, SqlQueryContext, HttpMessage)>, sql_query_context: SqlQueryContext, ws: Ws| async move {
+            .and_then(move |tx: mpsc::Sender<(mpsc::Sender<Arc<HttpMessage>>, SqlQueryContext, HttpMessage)>, sql_query_context: SqlQueryContext, ws_connections: Arc<WsConnectionCounter>, ws: Ws| async move {
                 let tx_to_move = tx.clone();
                 let sql_query_context = sql_query_context.clone();
+                let connection_guard = ws_connections.acquire(sql_query_context.user.as_deref());
                 let reply = ws.max_frame_size(max_frame_size.saturating_mul(TRANSPORT_SIZE_HEADROOM)).max_message_size(max_message_size.saturating_mul(TRANSPORT_SIZE_HEADROOM)).on_upgrade(async move |mut web_socket| {
+                    // Lives as long as the connection task; dropping it frees the slot.
+                    let connection_guard = connection_guard;
                     let process_id = sql_query_context.process_id.as_deref().unwrap_or("None");
                     trace!("WebSocket connection established (process_id: {})", process_id);
                     let (response_tx, mut response_rx) = mpsc::channel::<Arc<HttpMessage>>(10000);
                     loop {
                         tokio::select! {
+                            _ = connection_guard.evicted() => {
+                                log::warn!(
+                                    "Closing websocket connection to admit a newer one for the same user (process_id: {})",
+                                    process_id,
+                                );
+                                // A close frame naming the reason rather than a bare drop,
+                                // so the client can tell being recycled from a network
+                                // blip. Bounded, because the descriptor is already
+                                // unaccounted for: see EVICTED_CLOSE_TIMEOUT.
+                                let close = web_socket.send(Message::close_with(
+                                    CONNECTION_EVICTED_CLOSE_CODE,
+                                    "connection evicted to admit a newer one for the same user",
+                                ));
+                                match tokio::time::timeout(EVICTED_CLOSE_TIMEOUT, close).await {
+                                    Ok(Ok(())) => {}
+                                    Ok(Err(e)) => error!("Websocket close send error: {:?}", e),
+                                    Err(_) => log::warn!(
+                                        "Timed out sending the close frame of an evicted websocket connection"
+                                    ),
+                                }
+                                break;
+                            }
                             Some(res) = response_rx.recv() => {
                                 trace!("Sending web socket response (process_id: {})", process_id);
                                 let send_res = web_socket.send(Message::binary(res.bytes())).await;
@@ -1323,6 +1538,131 @@ mod tests {
         }
     }
 
+    #[test]
+    fn acquire_evicts_the_oldest_connection_to_admit_a_new_one() {
+        let counter = WsConnectionCounter::new(2);
+        let oldest = counter.acquire(Some("tenant-a"));
+        let newer = counter.acquire(Some("tenant-a"));
+        assert_eq!(counter.count("tenant-a"), 2);
+
+        let newcomer = counter.acquire(Some("tenant-a"));
+
+        assert!(
+            oldest.cancel.is_cancelled(),
+            "the oldest connection is the one asked to close"
+        );
+        assert!(!newer.cancel.is_cancelled());
+        assert!(!newcomer.cancel.is_cancelled());
+        assert_eq!(
+            counter.count("tenant-a"),
+            2,
+            "the victim leaves before the newcomer is inserted, so the limit never overshoots"
+        );
+
+        // The victim's own drop runs later and must not take another entry with it,
+        // which is why entries are keyed by a monotonic id.
+        drop(oldest);
+        assert_eq!(counter.count("tenant-a"), 2);
+
+        // Eviction keeps following insertion order.
+        let latest = counter.acquire(Some("tenant-a"));
+        assert!(
+            newer.cancel.is_cancelled(),
+            "now the second connection is oldest"
+        );
+        assert!(!newcomer.cancel.is_cancelled());
+        assert!(!latest.cancel.is_cancelled());
+    }
+
+    #[test]
+    fn ws_connection_counter_caps_each_user_independently() {
+        let counter = WsConnectionCounter::new(1);
+        let a = counter.acquire(Some("tenant-a"));
+        let b = counter.acquire(Some("tenant-b"));
+
+        assert!(
+            !a.cancel.is_cancelled() && !b.cancel.is_cancelled(),
+            "one connection each is within the cap"
+        );
+
+        let a_again = counter.acquire(Some("tenant-a"));
+        assert!(a.cancel.is_cancelled(), "tenant-a is at its cap");
+        assert!(
+            !b.cancel.is_cancelled(),
+            "one user at its cap must not affect another"
+        );
+        assert!(!a_again.cancel.is_cancelled());
+        assert_eq!(counter.count("tenant-a"), 1);
+        assert_eq!(counter.count("tenant-b"), 1);
+    }
+
+    #[test]
+    fn ws_connection_counter_forgets_users_that_dropped_to_zero() {
+        let counter = WsConnectionCounter::new(1);
+
+        drop(counter.acquire(Some("tenant-a")));
+        assert_eq!(counter.count("tenant-a"), 0);
+        assert!(
+            try_lock_users(&counter.users)
+                .expect("uncontended")
+                .is_empty(),
+            "a churn of one-off users must not grow the map"
+        );
+
+        // Both guards are bound to names: one left as a temporary dies at the end of
+        // its own statement and would free the slot it is meant to hold.
+        let _b = counter.acquire(Some("tenant-b"));
+        let _c = counter.acquire(Some("tenant-c"));
+        assert_eq!(
+            try_lock_users(&counter.users).expect("uncontended").len(),
+            2
+        );
+    }
+
+    #[test]
+    fn acquire_gives_up_on_a_stuck_lock_instead_of_waiting_on_it() {
+        let counter = WsConnectionCounter::new(1);
+        let blocker = counter.users.lock();
+
+        // From another thread: the lock is not reentrant, and the point is that a
+        // caller returns on its own schedule rather than the lock holder's.
+        let probe = Arc::clone(&counter);
+        let guard = std::thread::spawn(move || probe.acquire(Some("tenant-a")))
+            .join()
+            .expect("acquire must return rather than wait for the lock");
+
+        assert!(
+            guard.user.is_none(),
+            "the cap is a safety net, so an unavailable counter admits the              connection untracked rather than refusing or stalling it"
+        );
+        assert!(!guard.cancel.is_cancelled());
+
+        drop(blocker);
+        assert_eq!(counter.count("tenant-a"), 0);
+    }
+
+    #[test]
+    fn ws_connection_counter_leaves_untracked_what_it_cannot_attribute() {
+        let disabled = WsConnectionCounter::new(0);
+        let mut held = Vec::new();
+        for _ in 0..1000 {
+            held.push(disabled.acquire(Some("tenant-a")));
+        }
+        assert!(
+            held.iter().all(|guard| !guard.cancel.is_cancelled()),
+            "limit 0 disables the cap"
+        );
+        assert_eq!(disabled.count("tenant-a"), 0);
+
+        let counter = WsConnectionCounter::new(1);
+        let first = counter.acquire(None);
+        let second = counter.acquire(None);
+        assert!(
+            !first.cancel.is_cancelled() && !second.cancel.is_cancelled(),
+            "unauthenticated connections are not attributable and stay untracked"
+        );
+    }
+
     #[tokio::test]
     async fn upload_writes_the_whole_body_before_handing_off_the_path() -> Result<(), CubeError> {
         let dir = tempfile::tempdir()?;
@@ -1736,6 +2076,7 @@ mod tests {
             Duration::from_millis(1000),
             config.transport_max_message_size(),
             config.transport_max_frame_size(),
+            config.max_ws_connections_per_user(),
         ));
         {
             let http_server = http_server.clone();
@@ -1939,6 +2280,7 @@ mod tests {
             Duration::from_millis(1000),
             config.transport_max_message_size(),
             config.transport_max_frame_size(),
+            config.max_ws_connections_per_user(),
         ));
         {
             let http_server = http_server.clone();
@@ -1976,6 +2318,84 @@ mod tests {
         Ok(())
     }
 
+    /// An evicted connection is told why it is going away, so a client can tell
+    /// being recycled from a network blip, and the cap actually reaches the
+    /// connection rather than only the counter.
+    #[tokio::test]
+    async fn ws_connection_evicted_test() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let mut auth = MockSqlAuthService::new();
+        auth.expect_authenticate().return_const(Ok(None));
+
+        let http_server = Arc::new(HttpServer::new(
+            "127.0.0.1:53036".to_string(),
+            Arc::new(auth),
+            Arc::new(SqlServiceMock {
+                message_counter: AtomicU64::new(0),
+            }),
+            Duration::from_millis(100),
+            Duration::from_millis(10000),
+            Duration::from_millis(1000),
+            64 * 1024,
+            64 * 1024,
+            // One connection per user, so the second one has to evict the first.
+            1,
+        ));
+        {
+            let http_server = http_server.clone();
+            cube_ext::spawn(async move { http_server.run_server().await });
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        fn connect_request(user: &str) -> Request {
+            let mut request = "ws://127.0.0.1:53036/ws".into_client_request().unwrap();
+            request.headers_mut().insert(
+                "authorization",
+                HeaderValue::from_str(&Credentials::new(user, "").as_http_header()).unwrap(),
+            );
+            request
+        }
+
+        let (mut first, _) = connect_async(connect_request("tenant-a"))
+            .await
+            .expect("the first connection is within the cap");
+        let (second, _) = connect_async(connect_request("tenant-a"))
+            .await
+            .expect("the second connection is admitted by evicting the first");
+
+        // Bounded, so a regression in the eviction path fails this test instead of
+        // hanging it: nothing else would ever wake this read.
+        let msg = tokio::time::timeout(Duration::from_secs(10), first.next())
+            .await
+            .expect("the evicted connection must be closed promptly")
+            .expect("the evicted connection is closed, not left open")
+            .unwrap();
+        match msg {
+            Message::Close(Some(frame)) => {
+                assert_eq!(u16::from(frame.code), CONNECTION_EVICTED_CLOSE_CODE);
+                assert!(
+                    frame.reason.contains("evicted"),
+                    "unexpected close reason: {}",
+                    frame.reason
+                );
+            }
+            msg => panic!("Close frame expected, got: {:?}", msg),
+        }
+
+        // Another user is unaffected by tenant-a having been at its cap.
+        let (other, _) = connect_async(connect_request("tenant-b"))
+            .await
+            .expect("a different user has its own slot");
+
+        drop(other);
+        drop(second);
+
+        http_server.stop_processing().await;
+        Ok(())
+    }
+
     /// An incoming message past the transport backstop is answered with the
     /// WebSocket "message too big" close code instead of the connection being
     /// dropped without a word, which the client can only read as a bare
@@ -1999,6 +2419,7 @@ mod tests {
             Duration::from_millis(1000),
             max_message_size,
             max_message_size,
+            0, // no websocket connection cap
         ));
         {
             let http_server = http_server.clone();
@@ -2077,6 +2498,7 @@ mod tests {
             Duration::from_millis(1000),
             max_message_size,
             max_frame_size,
+            0, // no websocket connection cap
         ));
         {
             let http_server = http_server.clone();
@@ -2151,6 +2573,7 @@ mod tests {
             Duration::from_millis(1000),
             max_message_size,
             max_message_size,
+            0, // no websocket connection cap
         ));
         {
             let http_server = http_server.clone();
