@@ -1,7 +1,6 @@
 import cubejs, { CubeApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, describe, expect, jest, test } from '@jest/globals';
-import { getEnv } from '@cubejs-backend/shared';
 import { BirdBox, getBirdbox } from '../src';
 import {
   DEFAULT_API_TOKEN,
@@ -27,14 +26,12 @@ import {
 //   dropping the channel filter             -> East  60/2 = 30
 //
 // Multi-fact queries are planned by Tesseract only; the legacy planner cannot
-// build a single join tree over two unrelated facts, so there is nothing to
-// assert on that leg of the CI matrix. Read the flag the way the server does,
-// so the skip stays in step with what the birdbox instance actually runs -
-// Tesseract is the default, and `asBool` accepts more than the literal
-// 'false' the CI matrix passes.
-const describeIfTesseract = getEnv('nativeSqlPlanner') ? describe : describe.skip;
-
-describeIfTesseract('multi-fact derived measure', () => {
+// build a single join tree over two unrelated facts. Nothing here is
+// matrix-dependent, so the planner is pinned on in the birdbox env below
+// (birdbox spreads `process.env` first, so the pin wins over whatever
+// CUBEJS_TESSERACT_SQL_PLANNER the CI leg exports) and the suite runs on
+// both legs rather than skipping half of them.
+describe('multi-fact derived measure', () => {
   jest.setTimeout(60 * 5 * 1000);
   let birdbox: BirdBox;
   let client: CubeApi;
@@ -45,6 +42,7 @@ describeIfTesseract('multi-fact derived measure', () => {
       {
         CUBEJS_DB_TYPE: 'duckdb',
         ...DEFAULT_CONFIG,
+        CUBEJS_TESSERACT_SQL_PLANNER: 'true',
       },
       {
         schemaDir: 'multi-fact/schema',
