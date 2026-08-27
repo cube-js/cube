@@ -1,11 +1,11 @@
 ---
 title: Series mapping
-description: Assign query columns to chart channels — X axis, Y axis, color, size, and tooltips.
+description: Assign query columns to chart channels — X axis, Y axis, color, small multiples, and tooltips.
 ---
 
 Series mapping controls which query columns are assigned to which chart channels. This is done in the **Fields** tab of the chart configuration panel.
 
-{/* TODO screenshot: Fields tab open showing drag targets for X, Y, Color, Size, Tooltip (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+{/* TODO screenshot: Fields tab open showing the X, Y, Color, Small multiples and Tooltip channel dropdowns (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ## Chart channels
 
@@ -13,24 +13,32 @@ Series mapping controls which query columns are assigned to which chart channels
 |---|---|---|
 | **X** | The horizontal axis dimension or time field | Bar, line, area, scatter, heatmap, boxplot |
 | **Y** | The vertical axis measure | Bar, line, area, scatter, boxplot |
-| **Color** | Creates one series per unique value; controls stacking behavior | All Vega-based types |
-| **Size** | Scales point radius by a numeric measure | Scatter, map |
-| **Split by** | Repeats the chart once per unique value, as a grid of panels — see [small multiples](/docs/explore-analyze/charts/configuration/small-multiples) | Bar, line, area, scatter |
-| **Tooltip** | Fields shown on hover | All types |
-| **Theta** (pie) | The measure that determines slice size | Pie |
+| **Color** | Creates one series per unique value; controls stacking behavior | All Vega-based types except boxplot |
+| **Small multiples** | Repeats the chart once per unique value, as a grid of panels — see [small multiples](/docs/explore-analyze/charts/configuration/small-multiples). Its dropdown is labelled **Split by** | Bar, line, area, scatter |
+| **Tooltip** | Fields shown on hover | Vega-based types, pie, and map — but not table, KPI, or HTML. Pie and map use a checklist instead of field rows — see [tooltips](/docs/explore-analyze/charts/configuration/tooltips) |
+
+Pie charts do not use the X, Y, or Color channels. Their **Fields** tab is its own panel — **Rings**, **Measure**, and **Tooltips** — described under [rings](/docs/explore-analyze/charts/chart-types/pie).
 
 ## Assigning fields
 
-Drag a field from the **Available fields** list at the bottom of the Fields tab into the target channel slot. You can also drag an already-assigned field between channels.
+Each channel is a dropdown. Open the channel you want to fill and pick a column from the list — the chart updates as soon as you choose. The **Tooltip** channel is the exception: it holds several fields, one dropdown per row — see [tooltips](/docs/explore-analyze/charts/configuration/tooltips).
 
-Fields can appear in more than one channel simultaneously — drag from **Available fields** to add a field to a second channel without removing it from the first. For example, you can assign the same dimension to both the X axis and the tooltip.
+The same column can be used in more than one channel. Picking a dimension for the X axis does not remove it from the tooltip, so you can show a field on both.
 
-{/* TODO screenshot: dragging a field from available fields into the Color channel (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+{/* TODO screenshot: the Color channel dropdown open, showing the available columns (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
-## Multiple measures on Y
+## Multiple measures on one chart
 
-To plot multiple measures as separate series, drag additional measures into the **Y** channel. Each measure renders as its own series, with independent color and style settings in [series configuration](/docs/explore-analyze/charts/configuration/series-configuration).
+Add a second measure to the query and the chart plots each measure as its own series. This is a property of the query rather than a channel you set: the Y dropdown holds one column, so when a second measure arrives the **Fields** tab replaces the Y channel with a **Series** section listing one row per measure.
+
+The other way to plot two measures is to give each its own Y-axis layer with **+ Y Axis**, the button below the Y channel. Each layer has its own copy of the Fields controls and the rule above applies inside each one separately: a layer showing one measure keeps a plain Y channel, and a layer showing several gets its own **Series** section. Layers are also what carry per-series mark types — see [series configuration](/docs/explore-analyze/charts/configuration/series-configuration).
+
+While the chart is in this multi-series mode, the **Color** channel stays pinned to **Series** and cannot be pointed at another column — it reports the mode rather than setting it.
+
+Series colors come from the [color palette](/docs/explore-analyze/charts/configuration/color-and-stacking) by position in the list. The **Series** section itself carries no per-series settings — its rows only name a measure and remove it.
+
+To leave multi-series mode, remove measures with the **×** beside each row in the **Series** section. Once one measure is left the chart is single-series again, and the **Color** channel becomes selectable.
 
 ## Removing a field
 
-Drag a field out of its channel slot back to **Available fields**, or click the **×** on the field token to remove it.
+Clear the channel with the **×** on its dropdown. The chart re-renders without that encoding. In the **Tooltip** channel the **×** removes one row, leaving the other tooltip fields in place.
