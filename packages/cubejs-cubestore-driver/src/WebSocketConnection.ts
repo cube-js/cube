@@ -206,8 +206,6 @@ export class WebSocketConnection {
             return;
           }
 
-          this.currentConnectionTry += 1;
-
           // The socket is done either way, so stop its heartbeat now rather than
           // relying on a 'close' that may not follow: the interval is what keeps
           // the socket, and everything reachable from it, alive.
@@ -234,6 +232,11 @@ export class WebSocketConnection {
 
             return;
           }
+
+          // Counted here rather than above the branch: the closed path does not
+          // attempt a connection, and this counter both paces the retries and
+          // spends the `maxConnectRetries` budget a genuinely cold connect needs.
+          this.currentConnectionTry += 1;
 
           if (this.currentConnectionTry < this.maxConnectRetries) {
             setTimeout(async () => {
@@ -624,8 +627,14 @@ export class WebSocketConnection {
    * none.
    */
   public close() {
-    this.closed = true;
-    this.closedAt = new Date();
+    if (!this.closed) {
+      this.closed = true;
+      // First asked for, not most recently: `release()` closes the data-source
+      // and external drivers separately, which is the same connection twice when
+      // one `CubeStoreDriver` backs both, and re-stamping would restart the bound
+      // each time.
+      this.closedAt = new Date();
+    }
 
     // Straight away when there is nothing in flight; otherwise the heartbeat
     // takes it from here, both to notice the drain finishing and to bound it.
