@@ -67,6 +67,9 @@ interface CubeStoreWebSocket extends WebSocket {
   // A failure that killed this socket and that re-sending can't fix, so the
   // message that caused it is rejected instead of being re-sent.
   fatalError: Error | null;
+  // Stops the heartbeat interval, which otherwise keeps a reference to this socket
+  // (and the socket itself alive) even when nothing else points to the connection.
+  teardown: () => void;
 }
 
 export class WebSocketConnection {
@@ -120,6 +123,8 @@ export class WebSocketConnection {
           }
         }, 5000);
 
+        webSocket.teardown = () => clearInterval(pingInterval);
+
         webSocket.sendAsync = async (message: Uint8Array) => new Promise<void>((resolveSend) => {
           // If socket is closing this message should be resent
           if (webSocket.readyState !== WebSocket.OPEN) {
@@ -166,6 +171,9 @@ export class WebSocketConnection {
 
           this.currentConnectionTry += 1;
 
+          webSocket.teardown();
+          webSocket.terminate();
+
           if (this.currentConnectionTry < this.maxConnectRetries) {
             setTimeout(async () => {
               resolve(this.initWebSocket());
@@ -188,7 +196,7 @@ export class WebSocketConnection {
           webSocket.lastHeartBeat = new Date();
         });
         webSocket.on('close', (code: number, reason: Buffer) => {
-          clearInterval(pingInterval);
+          webSocket.teardown();
 
           const pending = Object.keys(webSocket.sentMessages);
 
