@@ -377,6 +377,44 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       });
     });
 
+    describe('cachedQueryResult cold cache (backgroundRenew: false)', () => {
+      it('executes the main query only once instead of racing two fetches for the same key', async () => {
+        const mainQuery = `SELECT cold-cache-main-${crypto.randomBytes(8).toString('hex')}`;
+        const cacheKeyQuery = `SELECT cold-cache-refresh-key-${crypto.randomBytes(8).toString('hex')}`;
+
+        const mainQueryCalls: string[] = [];
+
+        const spy = jest.spyOn(cache, 'queryWithRetryAndRelease').mockImplementation(async (query) => {
+          if (query === mainQuery) {
+            mainQueryCalls.push(query as string);
+            return [{ result: 'ok' }];
+          }
+          return [{ refresh_key: '1' }];
+        });
+
+        try {
+          await cache.cachedQueryResult(
+            {
+              query: mainQuery,
+              values: [],
+              cacheKeyQueries: [[cacheKeyQuery, []]],
+              requestId: 'cold-cache-req',
+              dataSource: 'default',
+            },
+            [],
+          );
+
+          // Give the fire-and-forget renew cycle a chance to also hit the queue
+          // for the same (still cold) cache key before asserting.
+          await pausePromise(50);
+
+          expect(mainQueryCalls.length).toBe(1);
+        } finally {
+          spy.mockRestore();
+        }
+      });
+    });
+
     it('queryCacheKey format', () => {
       const key1 = QueryCache.queryCacheKey({
         query: 'select data',
