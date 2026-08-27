@@ -67,6 +67,9 @@ interface CubeStoreWebSocket extends WebSocket {
   // A failure that killed this socket and that re-sending can't fix, so the
   // message that caused it is rejected instead of being re-sent.
   fatalError: Error | null;
+  // Stops the heartbeat interval, which otherwise keeps a reference to this socket
+  // (and the socket itself alive) even when nothing else points to the connection.
+  teardown: () => void;
 }
 
 export class WebSocketConnection {
@@ -81,6 +84,10 @@ export class WebSocketConnection {
   protected currentConnectionTry: number;
 
   protected webSocket: CubeStoreWebSocket | null = null;
+
+  // Set by close(): the owner of this connection is gone, so a socket must not
+  // be re-established behind its back.
+  protected closed: boolean = false;
 
   private readonly url: string;
 
@@ -109,6 +116,10 @@ export class WebSocketConnection {
       });
 
       webSocket.readyPromise = new Promise<CubeStoreWebSocket>((resolve, reject) => {
+        // Whether readyPromise is already settled, i.e. whether a retry still has
+        // somebody to answer.
+        let settled = false;
+
         webSocket.lastHeartBeat = new Date();
         const pingInterval = setInterval(() => {
           if (webSocket.readyState === WebSocket.OPEN) {
@@ -119,6 +130,8 @@ export class WebSocketConnection {
             webSocket.close();
           }
         }, 5000);
+
+        webSocket.teardown = () => clearInterval(pingInterval);
 
         webSocket.sendAsync = async (message: Uint8Array) => new Promise<void>((resolveSend) => {
           // If socket is closing this message should be resent
@@ -140,7 +153,10 @@ export class WebSocketConnection {
             resolveSend();
           });
         });
-        webSocket.on('open', () => resolve(webSocket));
+        webSocket.on('open', () => {
+          settled = true;
+          resolve(webSocket);
+        });
         webSocket.on('error', (err) => {
           if ((err as any).code === MAX_PAYLOAD_EXCEEDED_CODE) {
             // Cube Store answered with a message bigger than this connection
@@ -159,12 +175,46 @@ export class WebSocketConnection {
             }
 
             // No-op if the connection was already established.
+            settled = true;
             reject(webSocket.fatalError);
 
             return;
           }
 
+          webSocket.teardown();
+          webSocket.terminate();
+
+          // Retrying is only useful while readyPromise can still answer somebody
+          // with the result. Once it is settled -- the socket came up, or its
+          // caller was already given an error -- reconnecting here would raise a
+          // connection nobody asked for and keep it alive with its own
+          // heartbeat: what was in flight is re-sent by the 'close' handler, and
+          // a later query establishes a new connection through initWebSocket().
+          if (settled) {
+            if (webSocket === this.webSocket) {
+              this.webSocket = null;
+            }
+
+            return;
+          }
+
+          // A released connection reconnects only to deliver what is still in
+          // flight; with nothing left there is nobody to reconnect for.
+          if (this.closed && !Object.keys(webSocket.sentMessages).length) {
+            if (webSocket === this.webSocket) {
+              this.webSocket = null;
+            }
+
+            settled = true;
+            reject(new ConnectionError('Cube Store connection is closed', err));
+
+            return;
+          }
+
+          // Counts connection attempts, so it is only bumped for a socket that
+          // never came up.
           this.currentConnectionTry += 1;
+          settled = true;
 
           if (this.currentConnectionTry < this.maxConnectRetries) {
             setTimeout(async () => {
@@ -188,9 +238,22 @@ export class WebSocketConnection {
           webSocket.lastHeartBeat = new Date();
         });
         webSocket.on('close', (code: number, reason: Buffer) => {
-          clearInterval(pingInterval);
+          webSocket.teardown();
 
           const pending = Object.keys(webSocket.sentMessages);
+
+          if (this.closed && !pending.length) {
+            if (webSocket === this.webSocket) {
+              this.webSocket = null;
+            }
+
+            // Closed before it came up: whoever is waiting on initWebSocket() has
+            // nothing else to settle it.
+            settled = true;
+            reject(new ConnectionError('Cube Store connection is closed'));
+
+            return;
+          }
 
           if (pending.length) {
             // Cube Store names the size and the limit that refused it here,
@@ -259,6 +322,13 @@ export class WebSocketConnection {
 
             setTimeout(async () => {
               try {
+                // Everything this re-send was scheduled for has been settled in
+                // the meantime, so there is nothing left to carry over and a new
+                // connection would just stay open on its heartbeat.
+                if (!Object.keys(webSocket.sentMessages).length) {
+                  return;
+                }
+
                 const nextWebSocket = await this.initWebSocket();
                 const resent = Object.keys(webSocket.sentMessages);
 
@@ -300,6 +370,13 @@ export class WebSocketConnection {
 
           delete webSocket.sentMessages[httpMessage.messageId()];
 
+          // Everything that was in flight when the connection was released has
+          // been answered, so there is nothing left to keep it open for.
+          if (this.closed && !Object.keys(webSocket.sentMessages).length) {
+            webSocket.teardown();
+            webSocket.close();
+          }
+
           if (httpMessage.commandType() === HttpCommand.HttpError) {
             resolver.reject(new QueryError(`${httpMessage.command(new HttpError())?.error()}`));
             return;
@@ -327,6 +404,10 @@ export class WebSocketConnection {
   }
 
   private async sendMessage(messageId: number, buffer: Uint8Array): Promise<any> {
+    if (this.closed) {
+      throw new ConnectionError('Cube Store connection is closed');
+    }
+
     if (buffer.length > this.maxMessageSize) {
       // Cube Store would close the connection on such a message, which shows up
       // as an unrelated `write EPIPE`, so report it before sending anything.
@@ -531,7 +612,15 @@ export class WebSocketConnection {
   }
 
   public close() {
-    if (this.webSocket) {
+    // From here on the connection takes no new queries, and it closes as soon as
+    // the ones already sent have been answered.
+    this.closed = true;
+
+    if (this.webSocket && !Object.keys(this.webSocket.sentMessages).length) {
+      // Not left to the 'close' event: a socket that never reaches it -- one
+      // still connecting, or one whose peer is gone -- would keep the heartbeat
+      // running, and the heartbeat is what keeps the socket itself reachable.
+      this.webSocket.teardown();
       this.webSocket.close();
     }
   }

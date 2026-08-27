@@ -3,6 +3,7 @@ import * as stream from 'stream';
 import pt from 'promise-timeout';
 import {
   ContinueWaitError,
+  DriverFactory,
   DriverFactoryByDataSource,
   DriverType,
   QueryBody,
@@ -18,8 +19,32 @@ export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
   redisPrefix?: string;
 }
 
+/**
+ * How long release() waits for the work that is already in progress. Past it the
+ * connections are closed anyway: work that never finishes must not keep them
+ * open for the rest of the process.
+ */
+const HOLDERS_TIMEOUT = 10 * 60 * 1000;
+
+/**
+ * How long the count has to stay at zero to mean the work is over. One logical
+ * operation is several calls on the same api, and the count drops back to zero
+ * between them.
+ */
+const HOLDERS_LINGER = 2 * 1000;
+
 export class OrchestratorApi {
   private seenDataSources: Record<string, boolean> = {};
+
+  private holders: number = 0;
+
+  private drained: (() => void)[] = [];
+
+  protected readonly holdersLinger: number = HOLDERS_LINGER;
+
+  private externalDriverSeen: boolean = false;
+
+  protected readonly externalDriverFactory?: DriverFactory;
 
   protected orchestrator: QueryOrchestrator;
 
@@ -32,11 +57,23 @@ export class OrchestratorApi {
   ) {
     this.continueWaitTimeout = this.options.continueWaitTimeout || 10;
 
+    const { externalDriverFactory } = options;
+
+    // Asking the factory for the driver is what creates it, so this is where the
+    // tenant stops being one without an external connection. Everything that can
+    // reach the external driver goes through this, release() included, so that it
+    // doesn't open a connection just to close it.
+    this.externalDriverFactory = externalDriverFactory && (async () => {
+      this.externalDriverSeen = true;
+
+      return externalDriverFactory();
+    });
+
     this.orchestrator = new QueryOrchestrator(
       options.redisPrefix || 'STANDALONE',
       driverFactory,
       logger,
-      options
+      { ...options, externalDriverFactory: this.externalDriverFactory }
     );
   }
 
@@ -48,10 +85,103 @@ export class OrchestratorApi {
   }
 
   /**
+   * Marks the api as being used until the returned function is called, which
+   * holds off release(). The methods below do it themselves; a caller that
+   * reaches the drivers through getQueryOrchestrator() has to do it by hand.
+   */
+  public acquire(): () => void {
+    this.holders += 1;
+
+    let released = false;
+
+    return () => {
+      if (released) {
+        return;
+      }
+
+      released = true;
+      this.holders -= 1;
+
+      if (!this.holders) {
+        const { drained } = this;
+        this.drained = [];
+        drained.forEach(resolve => resolve());
+      }
+    };
+  }
+
+  protected async hold<T>(work: () => Promise<T>): Promise<T> {
+    const release = this.acquire();
+
+    try {
+      return await work();
+    } finally {
+      release();
+    }
+  }
+
+  protected async waitForHolders(): Promise<void> {
+    const deadline = Date.now() + HOLDERS_TIMEOUT;
+
+    for (;;) {
+      if (this.holders && !await this.waitForDrain(deadline - Date.now())) {
+        this.logger('Orchestrator api released with work in progress', {
+          warning: `${this.holders} operation(s) did not finish within ${HOLDERS_TIMEOUT / 1000}s, ` +
+            'their connections are being closed anyway',
+        });
+
+        return;
+      }
+
+      await this.sleep(Math.min(this.holdersLinger, Math.max(deadline - Date.now(), 0)));
+
+      if (!this.holders || Date.now() >= deadline) {
+        return;
+      }
+    }
+  }
+
+  /**
+   * Resolves true once nothing is holding the api, false if that didn't happen
+   * within the timeout.
+   */
+  protected async waitForDrain(timeout: number): Promise<boolean> {
+    let onDrained: () => void = () => undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+      return await new Promise<boolean>((resolve) => {
+        onDrained = () => resolve(true);
+        this.drained.push(onDrained);
+
+        timer = setTimeout(() => resolve(false), Math.max(timeout, 0));
+        timer.unref?.();
+      });
+    } finally {
+      // Neither outcome needs the other one anymore, and both of them keep this
+      // api reachable -- the timer from the timer queue, the resolver from the
+      // array a later drain walks.
+      clearTimeout(timer);
+      this.drained = this.drained.filter(resolve => resolve !== onDrained);
+    }
+  }
+
+  protected async sleep(ms: number): Promise<void> {
+    if (!ms) {
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, ms);
+      timer.unref?.();
+    });
+  }
+
+  /**
    * Force reconcile queue logic to be executed.
    */
   public async forceReconcile(datasource = 'default') {
-    await this.orchestrator.forceReconcile(datasource);
+    await this.hold(() => this.orchestrator.forceReconcile(datasource));
   }
 
   /**
@@ -61,8 +191,22 @@ export class OrchestratorApi {
    * @throw Error
    */
   public async streamQuery(query: QueryBody): Promise<stream.Writable> {
-    // TODO merge with fetchQuery
-    return this.orchestrator.streamQuery(query);
+    const release = this.acquire();
+
+    try {
+      // TODO merge with fetchQuery
+      const result = await this.orchestrator.streamQuery(query);
+
+      // The stream outlives this call, so the api stays held until the consumer
+      // is done with it.
+      stream.finished(result, () => release());
+
+      return result;
+    } catch (e) {
+      release();
+
+      throw e;
+    }
   }
 
   /**
@@ -71,6 +215,10 @@ export class OrchestratorApi {
    * error otherwise.
    */
   public async executeQuery(query: QueryBody) {
+    return this.hold(() => this.runQuery(query));
+  }
+
+  protected async runQuery(query: QueryBody) {
     const queryForLog = query.query?.replace(/\s+/g, ' ');
     const startQueryTime = (new Date()).getTime();
 
@@ -172,7 +320,7 @@ export class OrchestratorApi {
   }
 
   public async testOrchestratorConnections() {
-    return this.orchestrator.testConnections();
+    return this.hold(() => this.orchestrator.testConnections());
   }
 
   /**
@@ -181,13 +329,13 @@ export class OrchestratorApi {
    */
   public async testConnection() {
     if (this.options.rollupOnlyMode) {
-      return this.testDriverConnection(this.options.externalDriverFactory, DriverType.External);
+      return this.testDriverConnection(this.externalDriverFactory, DriverType.External);
     } else {
       return Promise.all([
         ...Object.keys(this.seenDataSources).map(
           ds => this.testDriverConnection(this.driverFactory, DriverType.Internal, ds),
         ),
-        this.testDriverConnection(this.options.externalDriverFactory, DriverType.External),
+        this.testDriverConnection(this.externalDriverFactory, DriverType.External),
       ]);
     }
   }
@@ -202,6 +350,8 @@ export class OrchestratorApi {
     dataSource: string = 'default',
   ) {
     if (driverFn) {
+      const release = this.acquire();
+
       try {
         const driver = await driverFn(dataSource);
         await driver.testConnection();
@@ -212,6 +362,8 @@ export class OrchestratorApi {
       } catch (e: any) {
         e.driverType = driverType;
         throw e;
+      } finally {
+        release();
       }
     }
   }
@@ -228,7 +380,7 @@ export class OrchestratorApi {
     key: any,
     token: string,
   ): Promise<[boolean, string]> {
-    return this.orchestrator.isPartitionExist(
+    return this.hold(() => this.orchestrator.isPartitionExist(
       request,
       external,
       dataSource,
@@ -236,13 +388,23 @@ export class OrchestratorApi {
       table,
       key,
       token,
-    );
+    ));
   }
 
-  public async release() {
+  public async release({ waitForWork = true }: { waitForWork?: boolean } = {}) {
+    // Leaving the cache is not the same as being unused: whoever was handed this
+    // api keeps it for the whole of their work, so the drivers can only be closed
+    // once that work is done. A process that is shutting down is the exception:
+    // there is nothing left to protect, and its own killer gives it seconds.
+    if (waitForWork) {
+      await this.waitForHolders();
+    }
+
     return Promise.all([
       ...Object.keys(this.seenDataSources).map(ds => this.releaseDriver(this.driverFactory, ds)),
-      this.releaseDriver(this.options.externalDriverFactory),
+      // Only if there is something to release: the factory would otherwise open
+      // a connection for a tenant that never had one.
+      this.externalDriverSeen ? this.releaseDriver(this.externalDriverFactory) : undefined,
       this.orchestrator.cleanup()
     ]);
   }
@@ -261,20 +423,20 @@ export class OrchestratorApi {
   }
 
   public getPreAggregationVersionEntries(context: RequestContext, preAggregations, preAggregationsSchema): Promise<any> {
-    return this.orchestrator.getPreAggregationVersionEntries(
+    return this.hold(() => this.orchestrator.getPreAggregationVersionEntries(
       preAggregations,
       preAggregationsSchema,
       context.requestId
-    );
+    ));
   }
 
   public getPreAggregationPreview(context: RequestContext, preAggregation) {
-    return this.orchestrator.getPreAggregationPreview(context.requestId, preAggregation);
+    return this.hold(() => this.orchestrator.getPreAggregationPreview(context.requestId, preAggregation));
   }
 
   public async expandPartitionsInPreAggregations(queryBody) {
     try {
-      return await this.orchestrator.expandPartitionsInPreAggregations(queryBody);
+      return await this.hold(() => this.orchestrator.expandPartitionsInPreAggregations(queryBody));
     } catch (err) {
       if (err instanceof ContinueWaitError) {
         throw {
@@ -286,22 +448,22 @@ export class OrchestratorApi {
   }
 
   public async checkPartitionsBuildRangeCache(queryBody) {
-    return this.orchestrator.checkPartitionsBuildRangeCache(queryBody);
+    return this.hold(() => this.orchestrator.checkPartitionsBuildRangeCache(queryBody));
   }
 
   public async getPreAggregationQueueStates(dataSource?: string) {
-    return this.orchestrator.getPreAggregationQueueStates(dataSource);
+    return this.hold(() => this.orchestrator.getPreAggregationQueueStates(dataSource));
   }
 
   public async cancelPreAggregationQueriesFromQueue(queryKeys: string[], dataSource: string) {
-    return this.orchestrator.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource);
+    return this.hold(() => this.orchestrator.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource));
   }
 
   public async cancelQueryByRequestId(requestId: string) {
-    return this.orchestrator.cancelQueryByRequestId(requestId);
+    return this.hold(() => this.orchestrator.cancelQueryByRequestId(requestId));
   }
 
   public async updateRefreshEndReached() {
-    return this.orchestrator.updateRefreshEndReached();
+    return this.hold(() => this.orchestrator.updateRefreshEndReached());
   }
 }

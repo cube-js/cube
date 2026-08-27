@@ -618,48 +618,56 @@ export class RefreshScheduler {
           const currentQuery = await queryIterator.current();
           if (currentQuery && queryIterator.partitionCounter() % concurrency === workerIndex) {
             const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
-            const preAggsInstance = orchestratorApi.getQueryOrchestrator().getPreAggregations();
-            const now = new Date();
+            // Taken straight from the orchestrator, so the api has to be held by
+            // hand for as long as it is used.
+            const releaseApi = orchestratorApi.acquire();
 
-            const backoffChecks = await Promise.all(
-              currentQuery.preAggregations.map(p => preAggsInstance.getPreAggBackoff(p.tableName))
-            );
+            try {
+              const preAggsInstance = orchestratorApi.getQueryOrchestrator().getPreAggregations();
+              const now = new Date();
 
-            // Skip execution if any pre-aggregation is still in backoff window
-            const shouldSkip = backoffChecks.some(backoffData => backoffData && now < backoffData.nextTimestamp);
+              const backoffChecks = await Promise.all(
+                currentQuery.preAggregations.map(p => preAggsInstance.getPreAggBackoff(p.tableName))
+              );
 
-            if (!shouldSkip) {
-              try {
-                await orchestratorApi.executeQuery({ ...currentQuery, preAggregationsLoadCacheByDataSource });
-              } catch (e: any) {
+              // Skip execution if any pre-aggregation is still in backoff window
+              const shouldSkip = backoffChecks.some(backoffData => backoffData && now < backoffData.nextTimestamp);
+
+              if (!shouldSkip) {
+                try {
+                  await orchestratorApi.executeQuery({ ...currentQuery, preAggregationsLoadCacheByDataSource });
+                } catch (e: any) {
                 // Check if this is a "Continue wait" error - these are normal queue signals
                 // For Continue wait errors, re-throw to handle them in the normal flow
-                if (e.error === 'Continue wait') {
-                  throw e;
-                }
-
-                // Real datasource error - apply exponential backoff
-                for (const p of currentQuery.preAggregations) {
-                  let backoffData = await preAggsInstance.getPreAggBackoff(p.tableName);
-
-                  if (backoffData && backoffData.backoffMultiplier > 0) {
-                    const newMultiplier = backoffData.backoffMultiplier * 2;
-                    const delaySeconds = Math.min(newMultiplier, preAggsInstance.getPreAggBackoffMaxTime());
-
-                    backoffData = {
-                      backoffMultiplier: newMultiplier,
-                      nextTimestamp: new Date(now.valueOf() + delaySeconds * 1000),
-                    };
-                  } else {
-                    backoffData = {
-                      backoffMultiplier: 1,
-                      nextTimestamp: new Date(now.valueOf() + 1000),
-                    };
+                  if (e.error === 'Continue wait') {
+                    throw e;
                   }
 
-                  await preAggsInstance.updatePreAggBackoff(p.tableName, backoffData);
+                  // Real datasource error - apply exponential backoff
+                  for (const p of currentQuery.preAggregations) {
+                    let backoffData = await preAggsInstance.getPreAggBackoff(p.tableName);
+
+                    if (backoffData && backoffData.backoffMultiplier > 0) {
+                      const newMultiplier = backoffData.backoffMultiplier * 2;
+                      const delaySeconds = Math.min(newMultiplier, preAggsInstance.getPreAggBackoffMaxTime());
+
+                      backoffData = {
+                        backoffMultiplier: newMultiplier,
+                        nextTimestamp: new Date(now.valueOf() + delaySeconds * 1000),
+                      };
+                    } else {
+                      backoffData = {
+                        backoffMultiplier: 1,
+                        nextTimestamp: new Date(now.valueOf() + 1000),
+                      };
+                    }
+
+                    await preAggsInstance.updatePreAggBackoff(p.tableName, backoffData);
+                  }
                 }
               }
+            } finally {
+              releaseApi();
             }
           }
           const hasNext = await queryIterator.advance();
@@ -806,18 +814,45 @@ export class RefreshScheduler {
 
     const jobedPAs = await jobsPromise;
 
-    return getPreAggsJobsList(
-      context,
-      <JobedPreAggregation[][][][]>jobedPAs,
-    ).map((job: PreAggJob) => {
-      const key = getPreAggJobToken(job);
-      orchestratorApi
-        .getQueryOrchestrator()
-        .getQueryCache()
-        .getCacheDriver()
-        .set(`PRE_AGG_JOB_${key}`, job, 86400);
-      return key;
-    });
+    // Taken straight from the orchestrator, so the api has to be held by hand
+    // until the writes land -- they outlive this call.
+    const releaseApi = orchestratorApi.acquire();
+    const writes: Promise<unknown>[] = [];
+
+    let keys: string[];
+
+    try {
+      keys = getPreAggsJobsList(
+        context,
+        <JobedPreAggregation[][][][]>jobedPAs,
+      ).map((job: PreAggJob) => {
+        const key = getPreAggJobToken(job);
+        writes.push(
+          orchestratorApi
+            .getQueryOrchestrator()
+            .getQueryCache()
+            .getCacheDriver()
+            .set(`PRE_AGG_JOB_${key}`, job, 86400)
+        );
+        return key;
+      });
+    } catch (e) {
+      // A hold that is never released costs the next eviction the whole timeout.
+      releaseApi();
+
+      throw e;
+    }
+
+    Promise.all(writes)
+      .catch((error) => {
+        this.serverCore.logger('Pre-aggregations Jobs Error', {
+          error: (error.stack || error).toString(),
+          requestId: context.requestId,
+        });
+      })
+      .then(releaseApi, releaseApi);
+
+    return keys;
   }
 
   /**
@@ -828,22 +863,27 @@ export class RefreshScheduler {
     tokens: string[],
   ): Promise<{ job: PreAggJob | null, token: string }[]> {
     const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
-    const jobsPromise = Promise.all(
-      tokens.map(async (token) => {
-        const job = await orchestratorApi
-          .getQueryOrchestrator()
-          .getQueryCache()
-          .getCacheDriver()
-          .get<PreAggJob>(`PRE_AGG_JOB_${token}`);
+    // Taken straight from the orchestrator, so the api has to be held by hand
+    // for as long as it is used.
+    const releaseApi = orchestratorApi.acquire();
 
-        return {
-          job,
-          token
-        };
-      })
-    );
+    try {
+      return await Promise.all(
+        tokens.map(async (token) => {
+          const job = await orchestratorApi
+            .getQueryOrchestrator()
+            .getQueryCache()
+            .getCacheDriver()
+            .get<PreAggJob>(`PRE_AGG_JOB_${token}`);
 
-    const jobs = await jobsPromise;
-    return jobs;
+          return {
+            job,
+            token
+          };
+        })
+      );
+    } finally {
+      releaseApi();
+    }
   }
 }
