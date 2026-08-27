@@ -133,8 +133,6 @@ While the parent's settings are open, the children it drives are highlighted on 
 
 A control can be driven by only one parent control at a time. Mapping a child that another parent already drives **moves** it rather than sharing it — the editor warns you before you save, naming the parent that currently owns it.
 
-This is a deliberate restriction: if two parents drove the same child, both would write to it whenever either was used, and the result would depend on which happened to run last.
-
 ### Mapping status on child controls
 
 Once a dashboard has at least one parent control, every filter and time granularity switcher on it shows a small indicator reporting how it's driven:
@@ -147,11 +145,9 @@ Once a dashboard has at least one parent control, every filter and time granular
 
 Click the indicator to jump straight to the **Children** tab of the parent that owns that control, with it already selected. For a control nothing drives yet, the click opens the first parent control on the dashboard — topmost, then leftmost — so you can map it.
 
-The indicator only appears once a parent control exists — on a dashboard that doesn't use them, controls show no mapping status at all.
-
 ### Default option
 
-Set **Default value** to the option that should be selected when the dashboard loads. Choosing a default in the builder also applies that option's values to the children, so their saved defaults line up with the parent's — meaning a published dashboard opens in a consistent state without the parent having to re-apply itself on every load.
+Set **Default value** to the option that should be selected when the dashboard loads. Choosing a default in the builder also applies that option's values to the children, so their saved defaults line up with the parent's and a published dashboard opens in a consistent state.
 
 If you leave **Default value** empty, the parent opens with nothing selected and the children use their own defaults.
 
@@ -169,13 +165,13 @@ Set the visibility from the **Visibility** dropdown when editing the control. **
 
 ## Interaction with charts
 
-This section applies to filters and time granularity switchers. A [parent control](#parent) has no dimension and never applies to a chart itself, so it doesn't appear in any chart's Controls mapping — it acts only through the children it drives, and it's those children that show up here.
+This section applies to filters and time granularity switchers. A [parent control](#parent) has no dimension and never applies to a chart itself, so it doesn't appear in any chart's [Controls mapping](#controls-mapping) — it acts only through the children it drives, and it's those children that show up here.
 
 When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] whose query already uses the same dimension. Charts that don't reference that dimension are left alone, so a dashboard can mix scoped and unscoped views by default. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different dimension.
 
 ### Incompatible controls
 
-If controls of a certain type are incompatible with a particular chart's query, the chart skips all controls of that type and renders the data without them. Controls of the other type still apply — for example, if filters fail but a time granularity switcher works, the chart shows the granularity-adjusted data without filtering, and vice versa.
+If controls of a certain type are incompatible with a particular chart's query, the chart skips all controls of that type and renders the data without them. Filters and time granularity switchers are skipped independently — if filters fail but a time granularity switcher works, the chart shows the granularity-adjusted data without filtering, and vice versa.
 
 The chart displays a warning icon to indicate the problem:
 
