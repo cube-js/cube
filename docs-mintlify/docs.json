@@ -853,9 +853,11 @@
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
                   "POST /api/v1/deployments/{deploymentId}/dbt-sync",
+                  "GET /api/v1/deployments/{deploymentId}/dbt-sync",
                   "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}",
                   "DELETE /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}",
-                  "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/result"
+                  "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/result",
+                  "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/logs"
                 ]
               },
               {

@@ -51,6 +51,29 @@ Keep the following behavior in mind:
 - Embed users can't edit content shared from the main workspace. Opening a shared workbook shows its published dashboard, so a workbook must have a published dashboard for users to open it.
 - Removing the share from the **All embed users** group removes those items from embed users' workspaces immediately.
 
+## Customize the dashboard header
+
+By default, a dashboard opened in Creator Mode shows its full header bar: back
+button, title, edit button, and duplicate button. Since your host application
+already frames the embed in its own chrome, you can hide any of these controls
+individually via launch options on the embed URL, so nothing is duplicated:
+
+```text
+https://your-tenant.cubecloud.dev/embed/d/{deploymentId}/app?session={sessionId}&showDashboardBackButton=false
+```
+
+| Parameter | Hides |
+| --- | --- |
+| `showDashboardHeader=false` | The entire header bar |
+| `showDashboardBackButton=false` | The back button |
+| `showDashboardTitle=false` | The dashboard title |
+| `showDashboardEditButton=false` | The edit button |
+| `showDashboardDuplicateButton=false` | The duplicate button |
+
+Each control is independent — for example, hiding the back button while
+keeping the title is a normal combination. Only the exact value `false` hides
+a control; any other value (or omitting the parameter) leaves it visible.
+
 ## Sharing workbooks and dashboards
 
 Embed users in Creator Mode can share the workbooks and dashboards they build with other users, the same way they would in the full Cube app.

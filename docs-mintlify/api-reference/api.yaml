@@ -272,6 +272,71 @@ paths:
       tags:
         - Deployments
   /api/v1/deployments/{deploymentId}/dbt-sync:
+    get:
+      operationId: listDbtSyncs
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: status
+          required: false
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+            enum:
+              - RUNNING
+              - COMPLETED
+              - FAILED
+              - CANCELLED
+              - UNKNOWN
+        - in: query
+          name: trigger
+          required: false
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+            enum:
+              - manual
+              - api
+              - webhook
+              - agent
+              - unknown
+        - in: query
+          name: after
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: first
+          required: false
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DbtSyncRunListResponse'
+          description: ''
+      summary: List dbt syncs for a deployment
+      tags:
+        - dbt Sync
+      x-mint:
+        content: >-
+          Returns this deployment's dbt sync history, newest first, backed by durable records rather
+          than the live workflow engine — so a run stays listable long after `GET
+          /dbt-sync/{syncJobId}` stops answering for it. Cancelled runs are included; narrow the list
+          with `status` or `trigger`.
+
+
+          Results are paged with cursor pagination: pass `first` for the page size and `after` (the
+          previous response's `pageInfo.endCursor`) for the next page.
     post:
       operationId: startDbtSync
       parameters:
@@ -368,6 +433,35 @@ paths:
       summary: Get the result of a completed dbt sync
       tags:
         - dbt Sync
+  /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/logs:
+    get:
+      operationId: getDbtSyncLogs
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: syncJobId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DbtSyncLogEntriesListResponse'
+          description: ''
+      summary: Get the log of a dbt sync
+      tags:
+        - dbt Sync
+      x-mint:
+        content: >-
+          Returns the sync's log as line records describing each phase's timing and outcome, plus the
+          failure text for a failed phase. This is not dbt's full console output — that is not
+          captured yet. Always returned as a single page (`pageInfo.hasNextPage` is `false`).
   /api/v1/deployments/{deploymentId}/env-vars:
     get:
       operationId: getEnvVariables
@@ -6052,6 +6146,49 @@ components:
       required:
         - path
       type: object
+    DbtSyncLogEntriesListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/DbtSyncLogEntry'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
+    DbtSyncLogEntry:
+      properties:
+        durationMs:
+          oneOf:
+            - type: integer
+              description: For a phase line, how long the phase took, in milliseconds.
+            - type: 'null'
+        level:
+          description: info or error.
+          type: string
+        message:
+          type: string
+        phase:
+          oneOf:
+            - type: string
+              description: The phase this line belongs to, e.g. dbt-compile.
+            - type: 'null'
+        stream:
+          description: >-
+            Always "system" in this version. "stdout" and "stderr" join it once dbt's own output is
+            captured, so treat this as an open set.
+          type: string
+        timestamp:
+          description: When the line was produced, as an ISO 8601 timestamp.
+          type: string
+      required:
+        - timestamp
+        - level
+        - stream
+        - message
+      type: object
     DbtSyncManifestStats:
       properties:
         macros:
@@ -6124,6 +6261,154 @@ components:
         - cubeCount
         - completedAt
         - durationMs
+      type: object
+    DbtSyncRun:
+      properties:
+        branchName:
+          description: The Cube branch this sync wrote its generated cubes to.
+          type: string
+        completedAt:
+          oneOf:
+            - type: string
+              description: >-
+                When the sync finished, as an ISO 8601 timestamp, or absent while it is still
+                running. Use durationMs to show how long a run took rather than subtracting this
+                from startedAt.
+            - type: 'null'
+        deploymentId:
+          type: integer
+        durationMs:
+          oneOf:
+            - type: integer
+              description: How long the sync took, in milliseconds.
+            - type: 'null'
+        errorMessage:
+          oneOf:
+            - type: string
+              description: Why the sync stopped. Present only for a failed run.
+            - type: 'null'
+        failedPhase:
+          oneOf:
+            - type: string
+              description: The phase that failed, e.g. dbt-compile.
+            - type: 'null'
+        gitRef:
+          oneOf:
+            - type: string
+              description: The dbt-repository ref this sync was run against, when pinned.
+            - type: 'null'
+        lastStage:
+          oneOf:
+            - type: string
+              description: The pipeline stage the run reached, e.g. COMPILING_DBT.
+            - type: 'null'
+        phases:
+          description: Per-phase timings, in the order they ran. Absent while the sync is running.
+          items:
+            $ref: '#/components/schemas/DbtSyncRunPhase'
+          type: array
+        startedAt:
+          description: When the sync started, as an ISO 8601 timestamp.
+          type: string
+        stats:
+          $ref: '#/components/schemas/DbtSyncRunStats'
+        status:
+          description: >-
+            RUNNING, COMPLETED, FAILED, CANCELLED or UNKNOWN. UNKNOWN means the outcome could not be
+            established and is deliberately distinct from FAILED. Treat an unrecognized value as
+            non-terminal.
+          type: string
+        syncJobId:
+          type: string
+        trigger:
+          description: >-
+            What started the sync: manual (the Cube Cloud UI), api (this REST API), webhook (a push
+            to the dbt repository), agent (Cube AI), or unknown.
+          type: string
+        triggerContext:
+          $ref: '#/components/schemas/DbtSyncRunTriggerContext'
+        userId:
+          oneOf:
+            - type: integer
+              description: The Cube user who started the sync, when a user started it.
+            - type: 'null'
+      required:
+        - syncJobId
+        - deploymentId
+        - status
+        - trigger
+        - branchName
+        - startedAt
+      type: object
+    DbtSyncRunListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/DbtSyncRun'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
+    DbtSyncRunPhase:
+      properties:
+        durationMs:
+          description: How long the phase took, in milliseconds.
+          type: integer
+        outcome:
+          description: ok or failed.
+          type: string
+        phase:
+          description: Phase token, e.g. repo-clone, dbt-deps, dbt-compile.
+          type: string
+        startedOffsetMs:
+          description: When the phase began, in milliseconds after the sync started.
+          type: integer
+      required:
+        - phase
+        - startedOffsetMs
+        - durationMs
+        - outcome
+      type: object
+    DbtSyncRunStats:
+      properties:
+        cubeCount:
+          oneOf:
+            - type: integer
+              description: How many cubes the sync generated.
+            - type: 'null'
+        generatedFileCount:
+          oneOf:
+            - type: integer
+              description: How many files the sync wrote to the branch it created.
+            - type: 'null'
+        macros:
+          oneOf:
+            - type: integer
+              description: dbt macros found in the manifest.
+            - type: 'null'
+        models:
+          oneOf:
+            - type: integer
+              description: dbt models found in the manifest.
+            - type: 'null'
+        sources:
+          oneOf:
+            - type: integer
+              description: dbt sources found in the manifest.
+            - type: 'null'
+      type: object
+    DbtSyncRunTriggerContext:
+      description: Provenance for a webhook-triggered sync. Refs only — never the pusher.
+      properties:
+        headSha:
+          type: string
+        pushedBranch:
+          type: string
+        targetBranch:
+          type: string
       type: object
     DbtSyncStatusResponse:
       properties:
