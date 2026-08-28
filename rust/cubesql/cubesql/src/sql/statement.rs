@@ -1701,6 +1701,73 @@ impl<'a> Visitor<'a, ConnectionError> for ApproximateCountDistinctVisitor {
     }
 }
 
+/// `NTILE` is the one built-in window function DataFusion types strictly: its signature is
+/// `Exact([UInt64])`, and an integer literal is always planned as `Int64`, which it will not
+/// coerce. `NTILE(4)` therefore fails to plan at all - it does not fall back to post
+/// processing, it fails the query - so cast the argument to the type the signature asks for.
+#[derive(Debug)]
+pub struct NtileArgumentCaster {}
+
+impl NtileArgumentCaster {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
+
+        self.visit_statement(&mut result).unwrap();
+
+        result
+    }
+}
+
+impl<'ast> Visitor<'ast, ConnectionError> for NtileArgumentCaster {
+    fn visit_function(&mut self, fun: &mut Function) -> Result<(), ConnectionError> {
+        // Only a windowed call: NTILE is meaningless without OVER, and a user function
+        // that happens to share the name is not ours to rewrite
+        if fun.over.is_some() && fun.name.to_string().to_lowercase() == "ntile" {
+            if let FunctionArguments::List(list) = &mut fun.args {
+                if let [FunctionArg::Unnamed(FunctionArgExpr::Expr(arg))] = list.args.as_mut_slice()
+                {
+                    if !matches!(
+                        arg,
+                        Expr::Cast {
+                            data_type: ast::DataType::BigIntUnsigned(_),
+                            ..
+                        }
+                    ) {
+                        let expr = std::mem::replace(arg, Expr::Value(Value::Null.into()));
+                        *arg = Expr::Cast {
+                            kind: ast::CastKind::Cast,
+                            expr: Box::new(expr),
+                            // The only SQL type this planner maps to UInt64
+                            data_type: ast::DataType::BigIntUnsigned(None),
+                            array: false,
+                            format: None,
+                        };
+                    }
+                }
+            }
+        }
+
+        self.visit_object_name(&mut fun.name)?;
+        self.visit_function_arguments(&mut fun.parameters)?;
+        self.visit_function_arguments(&mut fun.args)?;
+        if let Some(filter) = &mut fun.filter {
+            self.visit_expr(filter)?;
+        }
+        for order_expr in fun.within_group.iter_mut() {
+            self.visit_expr(&mut order_expr.expr)?;
+        }
+        if let Some(ast::WindowType::WindowSpec(spec)) = &mut fun.over {
+            self.visit_window_spec(spec)?;
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 pub struct SensitiveDataSanitizer {}
 
@@ -1940,6 +2007,36 @@ mod tests {
             r#"SELECT DATEDIFF(day, DATEADD(week, '2009-01-01', '2009-12-31'), "ta_1"."createdAt")"#,
             r#"SELECT DATEDIFF('day', DATEADD('week', '2009-01-01', '2009-12-31'), "ta_1"."createdAt")"#,
         )?;
+
+        Ok(())
+    }
+
+    fn run_ntile_argument_caster(input: &str, output: &str) -> Result<(), CubeError> {
+        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+
+        let replacer = NtileArgumentCaster::new();
+        let res = replacer.replace(stmts[0].clone());
+
+        assert_eq!(res.to_string(), output);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ntile_argument_caster() -> Result<(), CubeError> {
+        run_ntile_argument_caster(
+            r#"SELECT NTILE(4) OVER (ORDER BY "ta_1"."createdAt")"#,
+            r#"SELECT NTILE(CAST(4 AS BIGINT UNSIGNED)) OVER (ORDER BY "ta_1"."createdAt")"#,
+        )?;
+
+        // Idempotent: a second pass must not stack another cast
+        run_ntile_argument_caster(
+            r#"SELECT NTILE(CAST(4 AS BIGINT UNSIGNED)) OVER (ORDER BY "ta_1"."createdAt")"#,
+            r#"SELECT NTILE(CAST(4 AS BIGINT UNSIGNED)) OVER (ORDER BY "ta_1"."createdAt")"#,
+        )?;
+
+        // Without OVER it is not the window function, so it is left alone
+        run_ntile_argument_caster(r#"SELECT NTILE(4)"#, r#"SELECT NTILE(4)"#)?;
 
         Ok(())
     }

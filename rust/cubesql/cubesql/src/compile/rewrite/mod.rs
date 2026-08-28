@@ -1521,6 +1521,20 @@ fn agg_fun_expr(
     distinct: impl Display,
     within_group: impl Display,
 ) -> String {
+    agg_fun_expr_var_arg(
+        fun_name,
+        list_expr("AggregateFunctionExprArgs", args),
+        distinct,
+        within_group,
+    )
+}
+
+fn agg_fun_expr_var_arg(
+    fun_name: impl Display,
+    arg_list: impl Display,
+    distinct: impl Display,
+    within_group: impl Display,
+) -> String {
     let prefix = if fun_name.to_string().starts_with("?") {
         ""
     } else {
@@ -1528,12 +1542,16 @@ fn agg_fun_expr(
     };
     format!(
         "(AggregateFunctionExpr {}{} {} {} {})",
-        prefix,
-        fun_name,
-        list_expr("AggregateFunctionExprArgs", args),
-        distinct,
-        within_group,
+        prefix, fun_name, arg_list, distinct, within_group,
     )
+}
+
+fn agg_fun_expr_args(left: impl Display, right: impl Display) -> String {
+    format!("(AggregateFunctionExprArgs {} {})", left, right)
+}
+
+fn agg_fun_expr_args_empty_tail() -> String {
+    "AggregateFunctionExprArgs".to_string()
 }
 
 fn agg_fun_expr_within_group(left: impl Display, right: impl Display) -> String {

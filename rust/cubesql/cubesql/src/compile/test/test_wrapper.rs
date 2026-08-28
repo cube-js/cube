@@ -15,9 +15,10 @@ use crate::{
         rewrite::rewriter::Rewriter,
         test::{
             convert_select_to_query_plan, convert_select_to_query_plan_customized,
-            convert_select_to_query_plan_with_config, convert_sql_to_cube_query,
-            get_test_session_with_config, get_test_tenant_ctx_with_cube_data_sources,
-            init_testing_logger, member_expression_sql, LogicalPlanTestUtils, TestContext,
+            convert_select_to_query_plan_with_config, convert_sql_to_cube_query, get_test_session,
+            get_test_session_with_config, get_test_tenant_ctx,
+            get_test_tenant_ctx_with_cube_data_sources, init_testing_logger, member_expression_sql,
+            LogicalPlanTestUtils, TestContext,
         },
         DatabaseProtocol,
     },
@@ -3872,8 +3873,7 @@ async fn test_wrapper_built_in_window_functions() {
         ("DENSE_RANK()", "DENSE_RANK()"),
         ("PERCENT_RANK()", "PERCENT_RANK()"),
         ("CUME_DIST()", "CUME_DIST()"),
-        // NTILE is left out: this DataFusion version types its argument as UInt64 and
-        // will not coerce an integer literal to it, so the query never reaches rewriting
+        ("NTILE(4)", "NTILE(4)"),
         ("FIRST_VALUE(notes)", "FIRST_VALUE("),
         ("LAST_VALUE(notes)", "LAST_VALUE("),
         ("NTH_VALUE(notes, 2)", "NTH_VALUE("),
@@ -4054,4 +4054,70 @@ async fn test_wrapper_filter_on_window_over_grouped_join() {
         .wrapped_sql
         .sql;
     assert!(sql.contains("LAG("), "generated SQL: {}", sql);
+}
+
+/// An aggregate can take more than one argument. `APPROX_PERCENTILE_CONT(expr, 0.5)` is the
+/// only way to get a median out of a dialect without an exact percentile aggregate - Presto,
+/// Trino and Athena among them - and it is also what DataFusion rewrites `APPROX_MEDIAN(expr)`
+/// into, so leaving multi-argument aggregates unpushable left those dialects with no median
+/// at all.
+#[tokio::test]
+async fn test_wrapper_multi_arg_aggregate_function() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // Not a base template: only dialects with an approximate percentile define it
+    let approx_percentile = vec![(
+        "functions/APPROXPERCENTILECONT".to_string(),
+        "APPROX_PERCENTILE({{ args_concat }})".to_string(),
+    )];
+
+    for call in [
+        "APPROX_PERCENTILE_CONT(taxful_total_price, 0.5)",
+        "APPROX_MEDIAN(taxful_total_price)",
+    ] {
+        let query_plan = convert_select_to_query_plan_customized(
+            format!("SELECT customer_gender, {call} FROM KibanaSampleDataEcommerce GROUP BY 1"),
+            DatabaseProtocol::PostgreSQL,
+            approx_percentile.clone(),
+        )
+        .await;
+
+        assert_eq!(
+            member_expression_sql(
+                &query_plan
+                    .as_logical_plan()
+                    .find_cube_scan_wrapped_sql()
+                    .request
+                    .measures
+            ),
+            vec!["APPROX_PERCENTILE(${KibanaSampleDataEcommerce.taxful_total_price}, 0.5)"],
+            "{} is not pushed down",
+            call
+        );
+    }
+}
+
+/// Without a template the aggregate stays in DataFusion rather than reaching a dialect that
+/// cannot evaluate it
+#[tokio::test]
+async fn test_wrapper_multi_arg_aggregate_function_without_template() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let plan = convert_sql_to_cube_query(
+        &"SELECT customer_gender, APPROX_PERCENTILE_CONT(taxful_total_price, 0.5) FROM KibanaSampleDataEcommerce GROUP BY 1".to_string(),
+        get_test_tenant_ctx(),
+        get_test_session(DatabaseProtocol::PostgreSQL, get_test_tenant_ctx()).await,
+    )
+    .await;
+
+    assert!(
+        plan.is_err(),
+        "aggregate without a template should not be pushed down"
+    );
 }
