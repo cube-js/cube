@@ -113,7 +113,7 @@ Add the child controls to the dashboard *before* the parent control. The **Child
 
 On the **Options** tab, type a label and click **Add** for each entry you want in the dropdown. Options appear as chips — remove one with its close button. A parent control can hold up to 50 options.
 
-Renaming an option later doesn't disturb the values you've mapped to it, so you can reword a label without redoing the mapping.
+Renaming an option later doesn't disturb the values you've mapped to it, so you can reword a label without redoing the mapping — but if the control has a [user attribute default](#parent-user-attribute-default), that match is by label, so rename the attribute's values with it.
 
 ### Children
 
@@ -190,7 +190,7 @@ If the value matches no option — or is empty, `null`, or unresolvable — the 
 The attribute is resolved for the viewer, not baked into the dashboard. Editing the attribute's value changes what that viewer opens on the next time the dashboard loads; it never rewrites the published dashboard, so the default you picked in the builder stays intact for everyone else.
 </Note>
 
-Viewers can still switch to another option unless the control's [visibility](#visibility) is set to **Disabled**, and their own pick outranks the attribute for the rest of the session. Values passed [in the URL](#sharing-the-current-selection) outrank both. A parent control has no parameter of its own there — a shared link carries its *children's* values, and the dropdown follows those children, so the recipient opens on the arrangement the link names rather than on the one their own attribute would have chosen.
+Viewers can still switch to another option unless the control's [visibility](#visibility) is set to **Disabled**, and their own pick outranks the attribute for the rest of the session. Values passed [in the URL](#sharing-the-current-selection) outrank both — but only what the sharer actually picked travels: a parent control has no parameter of its own, and an untouched, attribute-resolved one puts nothing in the link, so the recipient still opens on their own attribute. When the sharer did pick an option, the link carries that option's *children's* values and the recipient opens on those.
 
 ## Sharing the current selection
 
