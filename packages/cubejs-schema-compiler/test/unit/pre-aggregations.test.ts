@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { FROM_PARTITION_RANGE } from '@cubejs-backend/shared';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createECommerceSchema, createSchemaYaml } from './utils';
 import { PostgresQuery, queryClass, QueryFactory } from '../../src';
@@ -222,6 +223,83 @@ describe('pre-aggregations', () => {
     expect(preAggregationsDescription.length).toEqual(2);
     expect(preAggregationsDescription[0].preAggregationId).toEqual('Orders.simple1');
     expect(preAggregationsDescription[1].preAggregationId).toEqual('Orders.simple2');
+  });
+
+  // @link https://github.com/cube-js/cube/issues/11682
+  it('rollupLambda unionWithSourceData bounds the source query by the requested date range', async () => {
+    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(
+      `
+        cube('Events', {
+          sql: \`SELECT * FROM public.events\`,
+
+          preAggregations: {
+            eventsLambda: {
+              type: \`rollupLambda\`,
+              unionWithSourceData: true,
+              rollups: [CUBE.eventsRollup],
+            },
+            eventsRollup: {
+              measures: [CUBE.count],
+              timeDimension: CUBE.ts,
+              granularity: \`day\`,
+              partitionGranularity: \`month\`,
+              buildRangeStart: {
+                sql: \`SELECT DATE '2024-01-01'\`,
+              },
+              buildRangeEnd: {
+                sql: \`SELECT CURRENT_DATE\`,
+              },
+            },
+          },
+
+          measures: {
+            count: {
+              type: \`count\`,
+            },
+          },
+
+          dimensions: {
+            id: {
+              sql: \`id\`,
+              type: \`number\`,
+              primaryKey: true,
+            },
+            ts: {
+              sql: \`ts\`,
+              type: \`time\`,
+            },
+          },
+        });
+      `
+    );
+
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['Events.count'],
+      timeDimensions: [{
+        dimension: 'Events.ts',
+        dateRange: ['2024-02-01', '2024-02-29'],
+      }],
+      timezone: 'UTC',
+    });
+
+    const lambdaQueries: any = query.buildLambdaQuery();
+    const [lambdaQuery] = Object.values<any>(lambdaQueries);
+    expect(lambdaQuery).toBeDefined();
+
+    const [lambdaSql, lambdaParams] = lambdaQuery.sqlAndParams;
+
+    // The source query is lower-bounded by the end of the last built partition.
+    expect(lambdaParams).toContain(FROM_PARTITION_RANGE);
+
+    // ...and must also be upper-bounded by the end of the requested date range.
+    // Without an upper bound the source query aggregates every row after the last
+    // built partition - all of which the outer query discards - so a request whose
+    // range lies entirely inside already-built partitions still pays for a full
+    // scan of everything that came after it.
+    expect(lambdaParams).toContain('2024-02-29T23:59:59.999');
+    expect(lambdaSql).toMatch(/<=/);
   });
 
   // @link https://github.com/cube-js/cube/issues/6623
