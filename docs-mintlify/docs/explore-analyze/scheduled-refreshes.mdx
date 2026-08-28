@@ -48,7 +48,7 @@ The dashboard must be published before schedules can be created.
 Click **New scheduled refresh** in the sidebar footer. A dialog opens
 with the following configuration options.
 
-### Frequency
+### Schedule {#frequency}
 
 | Option | Description |
 | --- | --- |
@@ -122,20 +122,37 @@ If a schedule sends [email notifications][ref-notifications], anyone who can vie
 the dashboard can subscribe to it themselves — an editor does not have to add
 them as a recipient. Open the scheduled refreshes sidebar from the published
 dashboard and use the toggle on a schedule to subscribe or unsubscribe.
-Subscribing adds you to the schedule's email recipients; unsubscribing removes
-you. The change takes effect on the next run.
+
+The toggle covers **every** way that schedule could reach you, in one click. If
+you were added individually, unsubscribing removes you from its recipients. If
+you are reached through a [user group][ref-user-groups] — or several — it also
+records you as an exception to each of those groups on this schedule, so the
+group keeps notifying everyone else but stops emailing you. Subscribing reverses
+both: it clears those exceptions and adds you back as a recipient in your own
+right. The change takes effect on the next run.
+
+<Note>
+
+Unsubscribing affects only this schedule. It does not remove you from the user
+group, and it does not change any other schedule that group receives.
+
+</Note>
 
 The toggle appears only for schedules that email individual recipients — those
 with notifications enabled and the email delivery channel. A schedule delivers to
 either individual inboxes or a Slack channel, not both, so a schedule that posts
 to Slack (or that has notifications turned off) has nothing to subscribe to. If an
-editor switches a schedule to Slack, its existing subscriptions are cancelled;
-you can subscribe again if it is later switched back to email.
+editor switches a schedule to Slack, its individual subscriptions are cancelled
+and any group exceptions it held are cleared; if it is later switched back to
+email, everyone starts from the group's full membership again and can subscribe
+or unsubscribe afresh.
 
 Every notification email also includes a one-click **Unsubscribe** link in its
 footer, so a recipient can stop receiving a schedule's emails without signing in
-to Cube. This works for any recipient, including those added directly by an
-editor and embed users who have no Cube account of their own.
+to Cube. It behaves exactly like the toggle, covering both a direct recipient row
+and any [user group][ref-user-groups] delivering to you. This works for any
+recipient, including those added directly by an editor and embed users who have
+no Cube account of their own.
 
 ## Run phases
 
@@ -151,3 +168,4 @@ The sidebar shows real-time status updates during execution.
 
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-notifications]: /docs/explore-analyze/notifications
+[ref-user-groups]: /admin/users-and-permissions/user-groups

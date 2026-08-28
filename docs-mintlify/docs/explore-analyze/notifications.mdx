@@ -31,12 +31,11 @@ scratch — the copy carries over the source schedule's notification settings.
 
 ### Delivery channel
 
-Toggle between two delivery channels:
+A schedule delivers to one channel, not both. Pick it with the **Send via**
+radio buttons:
 
-- **Email** — select recipients using a searchable picker with checkboxes. The
-  picker is grouped into **Users** and **User groups** sections, so you can add
-  individual workspace users, entire [user groups][ref-user-groups], or a mix of
-  both.
+- **Email** — sends to the [recipients](#recipients) you choose: individual
+  workspace users, [user groups][ref-user-groups], or a mix of both.
 - **Slack** — select a Slack channel to post to. Requires connecting your Slack
   workspace first (one-time OAuth flow via **Connect to Slack**). Once
   connected, select a channel from a searchable picker.
@@ -75,16 +74,42 @@ from the published dashboard.
 
 ### Recipients
 
-The recipient picker is split into two sections:
+Under the **Recipients** heading there are two separate controls:
 
-- **Users** — individual workspace users.
-- **User groups** — [user groups][ref-user-groups]. A group is expanded to its
-  current members each time the notification is sent, so adding or removing
-  members takes effect on the next run without editing the schedule. The **User
-  groups** section only appears when your workspace has at least one user group.
+- **Users** — a searchable picker for individual workspace users.
+- **User groups** — a dropdown holding an expandable checklist of
+  [user groups][ref-user-groups] and their members. It appears only when your
+  workspace has at least one user group.
+
+A group is expanded to its current members each time the notification is sent,
+so adding or removing members takes effect on the next run without editing the
+schedule. The number beside a group's name is how many members it can currently
+email; a member with no email address is not listed and is never counted.
 
 A recipient who is selected individually and also belongs to a selected group is
 emailed only once.
+
+#### Excluding individual group members
+
+Tick a group to notify everyone in it, then expand it and untick anyone who
+should be skipped. Those people are stored as exceptions to that group on this
+schedule — the group stays selected and keeps picking up new members, but the
+excluded members are left out of every run.
+
+One search box filters both levels at once, so typing a person's name narrows
+the list to the groups that would notify them, with that person shown under
+each.
+
+Exceptions are saved with the rest of the form, not applied as you click. A few
+details worth knowing:
+
+- Unticking a group's **last** remaining member unticks the whole group.
+- Exceptions belong to one schedule and one group. Excluding someone from a
+  group here does not affect the group anywhere else, or any other schedule.
+- An exception is not a block on the person. If they are **also** selected under
+  **Users**, or have [subscribed themselves][ref-subscribe], they still get the
+  email — a direct recipient row and group membership are independent, and
+  either one alone delivers.
 
 ## Slack notifications
 
