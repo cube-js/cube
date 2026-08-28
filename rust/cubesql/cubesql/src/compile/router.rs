@@ -22,9 +22,9 @@ use crate::{
         dataframe,
         postgres::copy::MAX_LENGTH_METADATA,
         statement::{
-            ApproximateCountDistinctVisitor, CastReplacer, NtileArgumentCaster,
-            RedshiftDatePartReplacer, SensitiveDataSanitizer, SqlParser062Normalizer,
-            ToTimestampReplacer, UdfWildcardArgReplacer,
+            ApproximateCountDistinctVisitor, CastReplacer, RedshiftDatePartReplacer,
+            SensitiveDataSanitizer, SqlParser062Normalizer, ToTimestampReplacer,
+            UdfWildcardArgReplacer,
         },
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
@@ -1114,7 +1114,6 @@ pub fn rewrite_statement(stmt: ast::Statement) -> ast::Statement {
     let stmt = UdfWildcardArgReplacer::new().replace(stmt);
     let stmt = RedshiftDatePartReplacer::new().replace(stmt);
     let stmt = ApproximateCountDistinctVisitor::new().replace(stmt);
-    let stmt = NtileArgumentCaster::new().replace(stmt);
 
     stmt
 }

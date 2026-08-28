@@ -4534,6 +4534,10 @@ export class BaseQuery {
         DENSE_RANK: 'DENSE_RANK({{ args_concat }})',
         PERCENT_RANK: 'PERCENT_RANK({{ args_concat }})',
         CUME_DIST: 'CUME_DIST({{ args_concat }})',
+        // Unreachable from the SQL API until CORE-831: DataFusion types NTILE's argument
+        // `Exact([UInt64])` and will not coerce an integer literal to it, so the query
+        // fails to plan. Kept because the template itself is right - once the fork's
+        // signature is relaxed, NTILE pushes down with no change here.
         NTILE: 'NTILE({{ args_concat }})',
         FIRST_VALUE: 'FIRST_VALUE({{ args_concat }})',
         LAST_VALUE: 'LAST_VALUE({{ args_concat }})',
