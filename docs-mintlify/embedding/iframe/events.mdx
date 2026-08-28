@@ -503,13 +503,6 @@ never reach the browser. Each id is single-use and expires 5 minutes after
 minting, so mint it in response to the event rather than caching one ahead of
 time.
 
-<Tip>
-  Already using `@cube-dev/embed-sdk`'s `connectCubeEmbed`? Its
-  `autoRenewSession({ mintSession })` method wires up this exact renewal —
-  including retrying a failed mint once the tab returns to the foreground —
-  so you don't have to hand-roll the listener above.
-</Tip>
-
 ## Surfaces
 
 Events come from one of three customer-facing surfaces, reported in the envelope's
