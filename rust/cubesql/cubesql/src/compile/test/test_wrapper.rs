@@ -3853,3 +3853,205 @@ async fn test_wrapper_union_in_join_push_down() {
         sql
     );
 }
+
+/// A window function is looked up as `functions/<NAME>` like any other function, so a
+/// built-in without a template is never pushed down - and because the window sits under
+/// everything else in the query, that leaves the whole plan above it to post processing.
+/// `LAG` and `LEAD` were once the only built-ins with a template, which left a query as
+/// ordinary as `ROW_NUMBER() OVER (...)` reading a row-capped scan.
+#[tokio::test]
+async fn test_wrapper_built_in_window_functions() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for (call, expected) in [
+        ("ROW_NUMBER()", "ROW_NUMBER()"),
+        ("RANK()", "RANK()"),
+        ("DENSE_RANK()", "DENSE_RANK()"),
+        ("PERCENT_RANK()", "PERCENT_RANK()"),
+        ("CUME_DIST()", "CUME_DIST()"),
+        // NTILE is left out: this DataFusion version types its argument as UInt64 and
+        // will not coerce an integer literal to it, so the query never reaches rewriting
+        ("FIRST_VALUE(notes)", "FIRST_VALUE("),
+        ("LAST_VALUE(notes)", "LAST_VALUE("),
+        ("NTH_VALUE(notes, 2)", "NTH_VALUE("),
+        ("LAG(notes)", "LAG("),
+        ("LEAD(notes)", "LEAD("),
+    ] {
+        let query_plan = convert_select_to_query_plan(
+            format!(
+                r#"
+                SELECT
+                    customer_gender,
+                    {call} OVER (
+                        PARTITION BY customer_gender
+                        ORDER BY notes
+                    ) AS w
+                FROM (
+                    SELECT customer_gender, notes
+                    FROM KibanaSampleDataEcommerce
+                    GROUP BY 1, 2
+                ) t
+                "#
+            ),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(
+            sql.contains(expected),
+            "{} is not pushed down, generated SQL: {}",
+            call,
+            sql
+        );
+    }
+}
+
+/// The reported shape: a CTE that sequences rows with `LAG` and `ROW_NUMBER`, a second CTE
+/// deriving values from them, and an aggregation over the result. Without a `ROW_NUMBER`
+/// template the window blocked the push down of everything above it, and the final
+/// aggregate ran in DataFusion over the capped rows of a raw scan.
+#[tokio::test]
+async fn test_wrapper_window_sequenced_cte_aggregation() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH sequenced AS (
+            SELECT
+                customer_gender,
+                notes,
+                CAST(order_date AS DATE) AS order_date,
+                CAST(taxful_total_price AS DECIMAL(18,2)) AS price,
+                LAG(CAST(order_date AS DATE)) OVER (
+                    PARTITION BY customer_gender
+                    ORDER BY CAST(order_date AS DATE), notes
+                ) AS prev_order_date,
+                ROW_NUMBER() OVER (
+                    PARTITION BY customer_gender
+                    ORDER BY CAST(order_date AS DATE), notes
+                ) AS order_seq
+            FROM KibanaSampleDataEcommerce
+            WHERE customer_gender = 'female'
+        ),
+        gaps AS (
+            SELECT
+                *,
+                DATEDIFF('day', prev_order_date, order_date) AS days_since,
+                CASE
+                    WHEN prev_order_date IS NULL THEN '1. first'
+                    WHEN DATEDIFF('day', prev_order_date, order_date) > 180 THEN '3. gap'
+                    ELSE '2. continuous'
+                END AS category
+            FROM sequenced
+        )
+        SELECT
+            customer_gender,
+            category,
+            COUNT(DISTINCT notes) AS notes_count,
+            ROUND(AVG(days_since), 2) AS avg_gap,
+            SUM(price) AS total_price
+        FROM gaps
+        GROUP BY customer_gender, category
+        ORDER BY customer_gender, notes_count DESC
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    // The whole query reaches the data source: nothing is left above the wrapper
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan
+        .find_cube_scan_wrapped_sql_deep()
+        .wrapped_sql
+        .sql;
+    for expected in [
+        "ROW_NUMBER() OVER",
+        "LAG(",
+        "DATEDIFF(",
+        "COUNT(DISTINCT",
+        "GROUP BY",
+        "ORDER BY",
+    ] {
+        assert!(
+            sql.contains(expected),
+            "no {} in generated SQL: {}",
+            expected,
+            sql
+        );
+    }
+
+    // Only the projection renaming the pushed down columns is left on top of the wrapper:
+    // nothing that would read the row-capped result of an unlimited query
+    let plan = format!("{:?}", logical_plan);
+    for unexpected in ["WindowAggr:", "Aggregate:", "Sort:", "Filter:"] {
+        assert!(
+            !plan.contains(unexpected),
+            "{} left in plan: {}",
+            unexpected,
+            plan
+        );
+    }
+}
+
+/// A window column is referred to by the name DataFusion derived for the window expression,
+/// so the wrapped select has to keep that name when it takes the window over. Flattening a
+/// qualified column inside the expression renames it - `LAG(ta_3.ca_1) OVER (...)` becomes
+/// `LAG(ca_1) OVER (...)` - and a filter above is then left pointing at a field that is not
+/// in the schema, which fails the whole plan rather than falling back to post processing.
+#[tokio::test]
+async fn test_wrapper_filter_on_window_over_grouped_join() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH
+        "qt_0" AS (
+            SELECT
+                "ta_1".content "ca_1",
+                DATE_TRUNC('month', "ta_2".order_date) "ca_2",
+                CASE WHEN sum("ta_2"."sumPrice") IS NOT NULL THEN sum("ta_2"."sumPrice") ELSE 0 END "ca_3"
+            FROM KibanaSampleDataEcommerce "ta_2"
+            JOIN Logs "ta_1" ON "ta_2".__cubeJoinField = "ta_1".__cubeJoinField
+            GROUP BY "ca_1", "ca_2"
+        ),
+        "qt_1" AS (
+            SELECT
+                LAG("ta_3"."ca_1") OVER (
+                    PARTITION BY DATE_TRUNC('month', "ta_3"."ca_2")
+                    ORDER BY DATE_TRUNC('month', "ta_3"."ca_2"), "ta_3"."ca_1"
+                ) "ca_4",
+                DATE_TRUNC('month', "ta_3"."ca_2") "ca_5",
+                "ta_3"."ca_1" "ca_6"
+            FROM "qt_0" "ta_3"
+            GROUP BY "ca_5", "ca_6"
+        )
+        SELECT "ta_4"."ca_5" "ca_7", "ta_4"."ca_6" "ca_8"
+        FROM "qt_1" "ta_4"
+        WHERE "ta_4"."ca_4" <= 'x'
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert!(sql.contains("LAG("), "generated SQL: {}", sql);
+}

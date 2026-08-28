@@ -2323,15 +2323,26 @@ impl LanguageToLogicalPlanConverter {
                     without_window_fields.clone(),
                     HashMap::new(),
                 )?);
+                // The name DataFusion derived for a window expression is what a filter or a
+                // projection above this select refers to it by, and it is built out of the
+                // expression as it was written. Take it before flattening qualified columns:
+                // that rewrite aliases a column back to its unqualified name, which renames
+                // the window column - `LAG(ta_3.ca_1) OVER (...)` becomes `LAG(ca_1) OVER
+                // (...)` - and leaves everything above pointing at a field that is no longer
+                // in the schema.
+                let window_expr_names = window_expr
+                    .iter()
+                    .map(|e| e.name(&without_window_fields_schema))
+                    .collect::<Result<Vec<_>, _>>()?;
                 let window_expr_rebased = replace_qualified_col_with_flat_name_if_missing(
                     window_expr,
                     &without_window_fields_schema,
                     true,
                 )?
-                .iter()
-                .map(|e| {
-                    let original_expr_name = e.name(&without_window_fields_schema)?;
-                    let new_expr = match replace_col_to_expr(e.clone(), &replace_map)? {
+                .into_iter()
+                .zip(window_expr_names)
+                .map(|(e, original_expr_name)| {
+                    let new_expr = match replace_col_to_expr(e, &replace_map)? {
                         Expr::Alias(expr, _) => Expr::Alias(expr, original_expr_name),
                         expr => Expr::Alias(Box::new(expr), original_expr_name),
                     };
