@@ -71,8 +71,11 @@ URL parameters:
 
 The `<semantic_view>` and `<dimension>` must match the internal names (not
 display titles) of the semantic view and dimension configured on the widget. For
-filters, an omitted filter type defaults to `equals`; granularities are lowercase
-(`day`, `week`, `month`, `quarter`, `year`).
+filters, an omitted filter type defaults to `equals`. Granularities are lowercase
+and must be one of the switcher's [allowed
+granularities](/docs/explore-analyze/dashboards/widgets/controls#allowed-granularities) —
+`day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour`
+for time dimensions that expose them.
 
 Example:
 
@@ -80,14 +83,20 @@ Example:
 https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&f_orders_transactions.users_country={"value":"USA"}&tg_orders_transactions.created_at=week
 ```
 
+The filter's JSON value is shown unencoded for readability. Percent-encode it
+before the URL goes anywhere real — pasted as-is into the `src="…"` of the iframe
+snippet above, its raw `"` closes the attribute and truncates the URL.
+
 This works on both regular and published (embedded) dashboards. A parameter is
 applied only if a matching control for that dimension already exists on the
 dashboard, and a granularity outside the switcher's allowed list is ignored.
 
-The reverse direction works too: when a viewer changes a control, the new value
-is written back into the dashboard's own URL, so the state a link carries and the
-state a viewer reaches by clicking are the same format. See [Controls → Sharing the
-current selection](/docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection).
+The reverse direction works on published dashboards: when a viewer changes a
+control there, the new value is written back into the dashboard's own URL, so the
+state a link carries and the state a viewer reaches by clicking are the same
+format. Reading the parameters works anywhere; it's the writing that is
+published-only. See [Controls → Sharing the current
+selection](/docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection).
 
 ## Allow chart export {#allow-csv-export}
 

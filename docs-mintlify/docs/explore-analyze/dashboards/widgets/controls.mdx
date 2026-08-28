@@ -194,10 +194,7 @@ Viewers can still switch to another option unless the control's [visibility](#vi
 
 ## Sharing the current selection
 
-On a published dashboard, the values a viewer picks in the controls are reflected
-in the URL, so the view they are looking at is bookmarkable and shareable. Copy
-the address bar, send it on, and the recipient opens the dashboard with the same
-filters and granularities applied.
+On a published dashboard, the values a viewer picks in the controls are reflected in the URL, so the view they are looking at is bookmarkable and shareable. Copy the address bar, send it on, and the recipient opens the dashboard with the same filters and granularities applied.
 
 Each control type has its own parameter:
 
@@ -206,36 +203,18 @@ Each control type has its own parameter:
 | [Filter](#filter) | `f_<semantic_view>.<dimension>=<JSON>` | `f_orders.status={"value":"shipped"}` |
 | [Time granularity switcher](#time-granularity-switcher) | `tg_<semantic_view>.<dimension>=<granularity>` | `tg_orders.created_at=week` |
 
-The semantic view and dimension are the **internal names** configured on the
-control — not the display titles you see in the picker. A view shown as `Orders`
-is usually `orders` in the parameter. Granularities are lowercase: `day`, `week`,
-`month`, `quarter`, `year`.
+The semantic view and dimension are the **internal names** configured on the control — not the display titles you see in the picker. A view shown as `Orders` is usually `orders` in the parameter. Granularities are lowercase and must be one of the switcher's [allowed granularities](#allowed-granularities) — `day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour` for time dimensions that expose them.
 
-You can also write these parameters by hand to open a dashboard in a particular
-state — see [Pre-set dashboard filters via URL][ref-embed-url-filters] for the
-embedded case, which uses the same format.
+You can also write these parameters by hand to open a dashboard in a particular state — see [Pre-set dashboard filters and granularities via URL][ref-embed-url-filters] for the embedded case, which uses the same format.
 
 What does and doesn't travel in the link:
 
-- **Only what the viewer chose.** Values that came from the control's own
-  configuration — a static default, a [default granularity](#default-granularity)
-  — are not written into the URL. Every viewer already gets those from the
-  dashboard itself, and leaving them out means a link stays correct after the
-  dashboard's defaults change.
-- **Never a personalized default.** A value resolved from a
-  [user attribute](#user-attribute-default) stays out of the link — whether it
-  seeded a filter directly or reached one through a [parent control](#parent)
-  opening on the viewer's own option. Sharing a dashboard never pins your
-  attribute value onto the recipient; they see it through their own attributes.
-- **Filters and granularities together.** Picking both puts both in the link,
-  including when a [parent control](#parent) sets several children at once.
-- **Published dashboards only.** In the dashboard builder the URL is left to
-  the editing session, so editing a control there doesn't rewrite it.
+- **Only what the viewer chose.** Values that came from the control's own configuration — a static default, a [default granularity](#default-granularity) — are not written into the URL. Every viewer already gets those from the dashboard itself, and leaving them out means a link stays correct after the dashboard's defaults change.
+- **Never a personalized default.** A value resolved from a [user attribute](#user-attribute-default) stays out of the link — whether it seeded a filter directly or reached one through a [parent control](#parent) opening on the viewer's own option. Sharing a dashboard never pins your attribute value onto the recipient; they see it through their own attributes.
+- **Filters and granularities together.** Picking both puts both in the link, including when a [parent control](#parent) sets several children at once. A parent control isn't serialized itself — the link carries the values its children ended up with, so the recipient sees the same data while the parent dropdown opens on whatever default it resolves for them, which may not be the option the sharer picked.
+- **Written out on published dashboards only.** Reading these parameters works anywhere, including [embedded][ref-embed-url-filters] dashboards; it's the writing that is published-only. In the dashboard builder the URL is left to the editing session, so changing a control there doesn't rewrite it.
 
-When a dashboard opens with these parameters, they are applied on top of whatever
-defaults the controls carry. A parameter is ignored when nothing on the dashboard
-can honor it — there is no matching control for that dimension, or the requested
-granularity isn't in the switcher's [allowed granularities](#allowed-granularities).
+When a dashboard opens with these parameters, they are applied on top of whatever defaults the controls carry. A parameter is ignored when nothing on the dashboard can honor it — there is no matching control for that dimension, or the requested granularity isn't in the switcher's [allowed granularities](#allowed-granularities).
 
 ## Visibility
 
