@@ -86,10 +86,7 @@ export class PreAggregationPartitionRangeLoader {
 
   private async loadRangeQuery(rangeQuery: QueryWithParams, partitionRange?: QueryDateRange) {
     const [query, values, queryOptions]: QueryWithParams = rangeQuery;
-    const invalidate =
-      this.preAggregation.invalidateKeyQueries?.[0]
-        ? this.preAggregation.invalidateKeyQueries[0].slice(0, 2)
-        : false;
+    const invalidate = QueryCache.buildRangeInvalidateKey(this.preAggregation);
 
     return this.queryCache.cacheQueryResult(
       query,

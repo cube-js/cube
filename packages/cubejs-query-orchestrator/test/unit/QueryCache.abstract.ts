@@ -126,7 +126,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       const renewalKeyNew = QueryCache.queryCacheKey({ query: 'key-new', values: [] });
 
       const seedCache = async (cacheKey: CacheKey, entry: CacheKeyItem) => {
-        const redisKey = cache.queryRedisKey(cacheKey);
+        const redisKey = cache.queryCacheKey(cacheKey);
         await cache.getCacheDriver().set(redisKey, entry, 3600);
       };
 
@@ -141,12 +141,12 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           renewCycle?: boolean;
         }
       ) => {
-        // cacheQueryResult hashes options.renewalKey via queryRedisKey(),
+        // cacheQueryResult hashes options.renewalKey via queryCacheKey(),
         // and fetchNew() stores that hash in the entry. Replicate that for seeding.
         const seededEntry = {
           ...cacheEntry,
           renewalKey: cacheEntry.renewalKey
-            ? cache.queryRedisKey(cacheEntry.renewalKey)
+            ? cache.queryCacheKey(cacheEntry.renewalKey)
             : cacheEntry.renewalKey,
         };
         await seedCache(cacheKey, seededEntry);

@@ -839,17 +839,17 @@ describe('QueryOrchestrator', () => {
     await queryOrchestrator.fetchQuery(query);
     expect(
       queryOrchestrator.queryCache.memoryCache.has(
-        queryOrchestrator.queryCache.queryRedisKey(query.cacheKeyQueries.queries[0].slice(0, 2))
+        queryOrchestrator.queryCache.refreshKeyCacheKey(query.cacheKeyQueries.queries[0], 'default')
       )
     ).toBe(true);
     expect(
       queryOrchestrator.queryCache.memoryCache.has(
-        queryOrchestrator.queryCache.queryRedisKey(query.cacheKeyQueries.queries[1].slice(0, 2))
+        queryOrchestrator.queryCache.refreshKeyCacheKey(query.cacheKeyQueries.queries[1], 'default')
       )
     ).toBe(false);
     expect(
       queryOrchestrator.queryCache.memoryCache.has(
-        queryOrchestrator.queryCache.queryRedisKey(query.preAggregations[0].invalidateKeyQueries[0].slice(0, 2))
+        queryOrchestrator.queryCache.refreshKeyCacheKey(query.preAggregations[0].invalidateKeyQueries[0], 'default')
       )
     ).toBe(true);
   });
@@ -1517,6 +1517,8 @@ describe('QueryOrchestrator', () => {
         queryKey: [
           'SELECT refreshKey in source database',
           [],
+          false,
+          'default',
         ],
         query: 'SELECT refreshKey in source database',
         values: [],
@@ -1534,6 +1536,8 @@ describe('QueryOrchestrator', () => {
         queryKey: [
           'SELECT refreshKey in external database',
           [],
+          true,
+          'default',
         ],
         query: 'SELECT refreshKey in external database',
         values: [],

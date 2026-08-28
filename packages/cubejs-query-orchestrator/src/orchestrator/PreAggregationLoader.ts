@@ -132,14 +132,14 @@ export class PreAggregationLoader {
   public async loadPreAggregation(
     throwOnMissingPartition: boolean,
   ): Promise<null | LoadPreAggregationResult> {
-    const notLoadedKey = (this.preAggregation.invalidateKeyQueries || [])
-      .find(keyQuery => !this.loadCache.hasKeyQueryResult(keyQuery));
+    // A thunk: hashing a cache key per invalidation key is wasted whenever the cheaper terms of
+    // the condition below already decide it.
+    const invalidationKeysLoaded = () => (this.preAggregation.invalidateKeyQueries || [])
+      .every(keyQuery => this.loadCache.hasKeyQueryResult(keyQuery));
 
-    if (this.isJob || !(notLoadedKey && !this.waitForRenew)) {
-      // Case 1: pre-agg build job processing.
-      // Case 2: either we have no data cached for this rollup or waitForRenew
-      // is true, either way, synchronously renew what data is needed so that
-      // the most current data will be returned fo the current request.
+    // Outside of a build job, `externalRefresh` must reach the branch below: it owns the "partition
+    // is not built yet" handling and may not enqueue a build here.
+    if (this.isJob || (!this.externalRefresh && (this.waitForRenew || invalidationKeysLoaded()))) {
       const result = await this.loadPreAggregationWithKeys();
       const refreshKeyValues = await this.getInvalidationKeyValues();
       return {
@@ -154,7 +154,7 @@ export class PreAggregationLoader {
           : undefined,
       };
     } else {
-      // Case 3: pre-agg exists
+      // Serve whatever version already exists rather than making this request wait for a build
       const structureVersion = getStructureVersion(this.preAggregation);
       const getVersionsStarted = new Date();
       const { byStructure } = await this.loadCache.getVersionEntries(this.preAggregation);

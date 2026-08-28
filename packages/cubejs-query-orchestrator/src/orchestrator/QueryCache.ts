@@ -45,6 +45,13 @@ export type CacheQueryResultOptions = {
   renewCycle?: boolean,
 };
 
+/**
+ * Deliberately narrow: the cache key, the renewal key and the renewal threshold are derived inside
+ * `cacheRefreshKeyResult`, so no caller can store an entry under a key it later looks up by another.
+ */
+export type RefreshKeyCacheOptions =
+  Pick<CacheQueryResultOptions, 'priority' | 'requestId' | 'waitForRenew' | 'dataSource'>;
+
 type QueryOptions = {
   external?: boolean;
   renewalThreshold?: number;
@@ -114,7 +121,7 @@ export type PreAggTableToTempTable = [
 
 export type PreAggTableToTempTableNames = [string, { targetTableName: string; }];
 
-export type CacheKeyItem = string | string[] | QueryWithParams | QueryWithParams[] | undefined;
+export type CacheKeyItem = string | string[] | boolean | QueryWithParams | QueryWithParams[] | undefined;
 
 export type CacheKey =
   [CacheKeyItem, CacheKeyItem] |
@@ -417,6 +424,58 @@ export class QueryCache {
     // @ts-ignore
     key.persistent = queryBody.persistent;
     return key;
+  }
+
+  /**
+   * Identity of a refresh key query: the SQL, its params, and where it runs. `external` and
+   * `dataSource` are every dimension `cacheQueryResult` routes on; the rest of the options element
+   * is policy applied to the result rather than part of it, and `replacePartitionSqlAndParams`
+   * recomputes `renewalThreshold` from `new Date()`, so covering it would make the key drift within
+   * a single request.
+   */
+  public static refreshKeyIdentity(
+    sqlQuery: QueryWithParams,
+    dataSource: string,
+  ): [string, string[], boolean, string] {
+    const [query, values, options] = sqlQuery;
+    // Both spellings of each default have to collapse to one key: producers write "source database"
+    // as `false` or as an absent option, and `getQueue` resolves an absent `dataSource` to `default`.
+    return [query, values, !!options?.external, dataSource || 'default'];
+  }
+
+  /**
+   * The `invalidate` discriminator of the partition build range cache, written by
+   * `PreAggregationPartitionRangeLoader.loadRangeQuery` and read by
+   * `PreAggregations.checkPartitionsBuildRangeCache`. Derived here so the two cannot drift apart —
+   * when each spelled it out itself, the read stopped finding what the write had stored.
+   */
+  public static buildRangeInvalidateKey(
+    preAggregation: { invalidateKeyQueries?: QueryWithParams[], dataSource?: string },
+  ): [string, string[], boolean, string] | false {
+    const keyQuery = preAggregation.invalidateKeyQueries?.[0];
+    return keyQuery ? QueryCache.refreshKeyIdentity(keyQuery, preAggregation.dataSource) : false;
+  }
+
+  public async cacheRefreshKeyResult(
+    sqlQuery: QueryWithParams,
+    expiration: number,
+    options: RefreshKeyCacheOptions,
+  ) {
+    const [query, values, queryOptions] = sqlQuery;
+    const cacheKey = QueryCache.refreshKeyIdentity(sqlQuery, options.dataSource);
+
+    return this.cacheQueryResult(query, values, cacheKey, expiration, {
+      ...options,
+      renewalThreshold: this.options.refreshKeyRenewalThreshold
+        || queryOptions?.renewalThreshold || 2 * 60,
+      renewalKey: cacheKey,
+      useInMemory: true,
+      external: cacheKey[2],
+    });
+  }
+
+  public refreshKeyCacheKey(sqlQuery: QueryWithParams, dataSource: string): string {
+    return this.queryCacheKey(QueryCache.refreshKeyIdentity(sqlQuery, dataSource));
   }
 
   public static extractRequestUUID(requestId: string): string {
@@ -841,7 +900,7 @@ export class QueryCache {
               renewalKey: cacheKeyQueryResults && [
                 cacheKeyQueries,
                 cacheKeyQueryResults,
-                this.queryRedisKey([query, values]),
+                this.queryCacheKey([query, values]),
               ],
               waitForRenew: true,
               forceNoCache: options.forceNoCache,
@@ -884,21 +943,13 @@ export class QueryCache {
 
   @AsyncDebounce()
   public async loadRefreshKey(q: QueryWithParams, expireSecs: number, options: LoadRefreshKeyOptions) {
-    const [query, values, queryOptions] = q;
-
-    return this.cacheQueryResult(
-      query,
-      values,
-      [query, values],
+    return this.cacheRefreshKeyResult(
+      q,
       expireSecs,
       {
-        renewalThreshold: this.options.refreshKeyRenewalThreshold || queryOptions?.renewalThreshold || 2 * 60,
-        renewalKey: q,
         waitForRenew: !options.skipRefreshKeyWaitForRenew,
         requestId: options.requestId,
         dataSource: options.dataSource,
-        useInMemory: true,
-        external: queryOptions?.external,
       },
     );
   }
@@ -977,10 +1028,15 @@ export class QueryCache {
       renewCycle: options.renewCycle,
     };
 
+    const redisKey = this.queryCacheKey(cacheKey);
+
     return {
       cacheKey,
-      redisKey: this.queryRedisKey(cacheKey),
-      renewalKey: options.renewalKey && this.queryRedisKey(options.renewalKey),
+      redisKey,
+      // Refresh key entries renew against their own key, so hashing it a second time is wasted work
+      renewalKey: options.renewalKey && (
+        options.renewalKey === cacheKey ? redisKey : this.queryCacheKey(options.renewalKey)
+      ),
       expiration,
       spanId,
       options,
@@ -1150,13 +1206,13 @@ export class QueryCache {
   }
 
   protected async lastRefreshTime(cacheKey) {
-    const cachedValue = await this.cacheDriver.get(this.queryRedisKey(cacheKey));
+    const cachedValue = await this.cacheDriver.get(this.queryCacheKey(cacheKey));
     return cachedValue && new Date(cachedValue.time);
   }
 
   public async resultFromCacheIfExists(queryBody) {
     const cacheKey = QueryCache.queryCacheKey(queryBody);
-    const cachedValue = await this.cacheDriver.get(this.queryRedisKey(cacheKey));
+    const cachedValue = await this.cacheDriver.get(this.queryCacheKey(cacheKey));
     if (cachedValue) {
       return {
         data: cachedValue.result,
@@ -1166,7 +1222,7 @@ export class QueryCache {
     return null;
   }
 
-  public queryRedisKey(cacheKey: CacheKey): string {
+  public queryCacheKey(cacheKey: CacheKey): string {
     return this.getKey('SQL_QUERY_RESULT', getCacheHash(cacheKey) as any);
   }
 
