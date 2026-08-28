@@ -71,14 +71,19 @@ URL parameters:
 
 The `<semantic_view>` and `<dimension>` must match the internal names (not
 display titles) of the semantic view and dimension configured on the widget. For
-filters, an omitted filter type defaults to `equals`; granularities are lowercase
-(`day`, `week`, `month`, `quarter`, `year`).
+filters, an omitted filter type defaults to `equals`. Granularities are lowercase
+and must be one of the switcher's allowed granularities — `day`, `week`, `month`,
+`quarter`, `year`, plus `second`, `minute`, and `hour` for time dimensions that
+expose them.
 
 Example:
 
 ```text
 https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&f_orders_transactions.users_country={"value":"USA"}&tg_orders_transactions.created_at=week
 ```
+
+The filter's JSON value is shown unencoded for readability — percent-encode it
+when constructing the URL programmatically.
 
 This works on both regular and published (embedded) dashboards. A parameter is
 applied only if a matching control for that dimension already exists on the
