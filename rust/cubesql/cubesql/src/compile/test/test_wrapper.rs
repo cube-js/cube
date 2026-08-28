@@ -4100,6 +4100,36 @@ async fn test_wrapper_multi_arg_aggregate_function() {
     }
 }
 
+/// The two functions disagree about a third argument - DataFusion's weighted variant is
+/// `approx_percentile_cont_with_weight(x, w, percentile)` while Presto reads
+/// `approx_percentile(x, w, percentage)` - so a template rendering every argument would
+/// mis-map one against the other. It cannot: `APPROXPERCENTILECONT` is two arguments here
+/// and a third is rejected before rewriting, and the weighted variant is a different
+/// function with a template name of its own, which no dialect defines.
+#[tokio::test]
+async fn test_wrapper_approx_percentile_cont_is_binary() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let error = convert_sql_to_cube_query(
+        &"SELECT customer_gender, APPROX_PERCENTILE_CONT(taxful_total_price, 0.5, 100) FROM KibanaSampleDataEcommerce GROUP BY 1".to_string(),
+        get_test_tenant_ctx(),
+        get_test_session(DatabaseProtocol::PostgreSQL, get_test_tenant_ctx()).await,
+    )
+    .await
+    .expect_err("a third argument should not plan");
+
+    assert!(
+        error
+            .to_string()
+            .contains("does not accept 3 function arguments"),
+        "unexpected error: {}",
+        error
+    );
+}
+
 /// Without a template the aggregate stays in DataFusion rather than reaching a dialect that
 /// cannot evaluate it
 #[tokio::test]
