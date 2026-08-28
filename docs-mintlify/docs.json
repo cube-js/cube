@@ -374,7 +374,6 @@
               "admin/monitoring/audit-log",
               "admin/monitoring/chats-history",
               "admin/monitoring/query-history-export",
-              "admin/monitoring/alerts",
               {
                 "group": "Monitoring Integrations",
                 "root": "admin/monitoring/monitoring-integrations/index",
@@ -386,7 +385,8 @@
                   "admin/monitoring/monitoring-integrations/grafana-cloud",
                   "admin/monitoring/monitoring-integrations/new-relic"
                 ]
-              }
+              },
+              "admin/monitoring/alerts"
             ]
           },
           {
