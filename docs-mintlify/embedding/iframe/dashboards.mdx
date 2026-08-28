@@ -59,23 +59,35 @@ To embed a dashboard for external/customer-facing applications, generate a sessi
 
 See [Signed embedding](/embedding/iframe/auth/signed) for the full session generation flow, API key setup, and a complete working example.
 
-## Pre-set dashboard filters via URL
+## Pre-set dashboard filters and granularities via URL {#pre-set-dashboard-filters-via-url}
 
-You can pre-set dashboard filter values by adding URL parameters in the format
-`?f_<semantic_view>.<dimension>=<JSON>`. The `<semantic_view>` and `<dimension>`
-must match the internal names (not display titles) of the semantic view and
-dimension configured on the filter widget. If the filter type is omitted, it
-defaults to `equals`.
+You can pre-set the values of a dashboard's [controls](/docs/explore-analyze/dashboards/widgets/controls) by adding
+URL parameters:
+
+| Control | Parameter | Example |
+|---|---|---|
+| Filter | `f_<semantic_view>.<dimension>=<JSON>` | `f_orders_transactions.users_country={"value":"USA"}` |
+| Time granularity switcher | `tg_<semantic_view>.<dimension>=<granularity>` | `tg_orders_transactions.created_at=week` |
+
+The `<semantic_view>` and `<dimension>` must match the internal names (not
+display titles) of the semantic view and dimension configured on the widget. For
+filters, an omitted filter type defaults to `equals`; granularities are lowercase
+(`day`, `week`, `month`, `quarter`, `year`).
 
 Example:
 
 ```text
-https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&f_orders_transactions.users_country={"value":"USA"}
+https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&f_orders_transactions.users_country={"value":"USA"}&tg_orders_transactions.created_at=week
 ```
 
-This works on both regular and published (embedded) dashboards. The filter is
-only applied if a matching filter widget for that dimension already exists on the
-dashboard.
+This works on both regular and published (embedded) dashboards. A parameter is
+applied only if a matching control for that dimension already exists on the
+dashboard, and a granularity outside the switcher's allowed list is ignored.
+
+The reverse direction works too: when a viewer changes a control, the new value
+is written back into the dashboard's own URL, so the state a link carries and the
+state a viewer reaches by clicking are the same format. See [Controls → Sharing the
+current selection](/docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection).
 
 ## Allow chart export {#allow-csv-export}
 
