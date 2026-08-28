@@ -132,14 +132,15 @@ export class PreAggregationLoader {
   public async loadPreAggregation(
     throwOnMissingPartition: boolean,
   ): Promise<null | LoadPreAggregationResult> {
-    const invalidationKeysLoaded = (this.preAggregation.invalidateKeyQueries || [])
+    // Hashes a cache key per invalidation key, so it stays a thunk — the branches above it decide
+    // the outcome on their own for every request an `externalRefresh` instance serves.
+    const invalidationKeysLoaded = () => (this.preAggregation.invalidateKeyQueries || [])
       .every(keyQuery => this.loadCache.hasKeyQueryResult(keyQuery));
 
-    // `externalRefresh` must stay on the Case 3 path below: it owns the "partition is not built
-    // yet" handling and must never enqueue a build on this instance.
-    if (this.isJob || this.waitForRenew || (invalidationKeysLoaded && !this.externalRefresh)) {
-      // Renew synchronously so the current request returns the most current data, unlike Case 3
-      // below which serves what already exists and refreshes in the background.
+    // Outside of a build job, `externalRefresh` must reach the branch below: it owns the "partition
+    // is not built yet" handling and may not enqueue a build here.
+    if (this.isJob || (!this.externalRefresh && (this.waitForRenew || invalidationKeysLoaded()))) {
+      // Renew synchronously so the current request returns the most current data.
       const result = await this.loadPreAggregationWithKeys();
       const refreshKeyValues = await this.getInvalidationKeyValues();
       return {
@@ -154,7 +155,7 @@ export class PreAggregationLoader {
           : undefined,
       };
     } else {
-      // Case 3: pre-agg exists
+      // Serve whatever version already exists rather than making this request wait for a build
       const structureVersion = getStructureVersion(this.preAggregation);
       const getVersionsStarted = new Date();
       const { byStructure } = await this.loadCache.getVersionEntries(this.preAggregation);

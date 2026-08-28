@@ -625,11 +625,6 @@ export class PreAggregations {
     return Promise.all(
       preAggregations.map(async (preAggregation) => {
         const { preAggregationStartEndQueries } = preAggregation;
-        // Must stay identical to the write side in PreAggregationPartitionRangeLoader.loadRangeQuery.
-        const invalidate =
-          preAggregation?.invalidateKeyQueries[0]
-            ? QueryCache.refreshKeyIdentity(preAggregation.invalidateKeyQueries[0])
-            : false;
         const isCached = preAggregation.partitionGranularity
           ? (
             await Promise.all(
@@ -637,7 +632,7 @@ export class PreAggregations {
                 this.queryCache.resultFromCacheIfExists({
                   query,
                   values,
-                  invalidate,
+                  invalidate: QueryCache.buildRangeInvalidateKey(preAggregation),
                 })
               ))
             )

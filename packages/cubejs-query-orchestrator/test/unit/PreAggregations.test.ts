@@ -185,6 +185,21 @@ describe('PreAggregations', () => {
     (queryCache.getCacheDriver() as LocalCacheDriver).reset();
   });
 
+  const createPreAggregations = (options: Record<string, any> = {}) => new PreAggregations(
+    'TEST',
+    mockDriverFactory as any,
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    () => {},
+    queryCache!,
+    {
+      queueOptions: async () => ({
+        executionTimeout: 1,
+        concurrency: 2,
+      }),
+      ...options,
+    },
+  );
+
   describe('touch/used cache key cleanup', () => {
     let preAggregations: PreAggregations;
 
@@ -346,19 +361,7 @@ describe('PreAggregations', () => {
     );
 
     beforeEach(() => {
-      preAggregations = new PreAggregations(
-        'TEST',
-        mockDriverFactory as any,
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        () => {},
-        queryCache!,
-        {
-          queueOptions: async () => ({
-            executionTimeout: 1,
-            concurrency: 2,
-          }),
-        },
-      );
+      preAggregations = createPreAggregations();
     });
 
     test('refresh key identity covers sql, params and engine, but not policy', async () => {
@@ -369,11 +372,8 @@ describe('PreAggregations', () => {
       await loadCache.keyQueryResult(defaultCacheKeyQuery, false, 10);
 
       expect(loadCache.hasKeyQueryResult(defaultCacheKeyQuery)).toBe(true);
-      // Policy is not identity: callers legitimately hold differing options objects, because
-      // replacePartitionSqlAndParams rebuilds that element on every call with a clock-dependent
-      // renewalThreshold for incremental keys.
-      expect(loadCache.hasKeyQueryResult([sql, [], { renewalThreshold: 1, external: false }])).toBe(true);
-      // An absent `external` means the same thing as `external: false` and has to collapse to it.
+      // Missing options element, and differing policy with `external` left absent — see
+      // QueryCache.refreshKeyIdentity for why neither may move the key.
       expect(loadCache.hasKeyQueryResult(defaultCacheKeyQuery.slice(0, 2) as any)).toBe(true);
       expect(loadCache.hasKeyQueryResult([sql, [], { renewalThreshold: 1 }])).toBe(true);
       // The engine does change identity — same SQL run against Cube Store is a different query.
@@ -406,9 +406,9 @@ describe('PreAggregations', () => {
       await createLoadCache().keyQueryResult(defaultCacheKeyQuery, false, 10);
       const throughKeyQueryResult = await storedRenewalKey();
 
-      // A cube level cacheKeyQuery and a pre-aggregation invalidateKeyQuery can be the same SQL and
-      // then share this entry. Differing renewal keys make each path look stale to the other, so
-      // they re-fetch on every touch.
+      // The same SQL can arrive as a cube cacheKeyQuery and as a pre-aggregation
+      // invalidateKeyQuery, sharing this entry — disagreeing renewal keys would make each path look
+      // stale to the other and re-fetch on every touch.
       expect(throughLoadRefreshKey).toEqual(throughKeyQueryResult);
     });
 
@@ -426,8 +426,7 @@ describe('PreAggregations', () => {
       const loadCache = createLoadCache();
       await loadCache.keyQueryResult(defaultCacheKeyQuery, false, 10);
 
-      // externalRefresh owns the "partition is not built yet" handling, so it must stay on the
-      // deferred path even when nothing has to be queried to confirm the refresh keys.
+      // Warm refresh keys must not promote an externalRefresh instance onto the building path.
       await expect(createPreAggLoader(loadCache, { externalRefresh: true }).loadPreAggregation(true))
         .rejects.toThrowError(/No pre-aggregation partitions were built yet/);
       expect(mockDriver!.tables).toEqual([]);

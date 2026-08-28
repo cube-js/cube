@@ -1,7 +1,6 @@
 /* globals jest, describe, beforeEach, afterEach, test, expect */
 import { Readable } from 'stream';
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
-import { QueryCache } from '../../src/orchestrator/QueryCache';
 
 class MockDriver {
   constructor({ csvImport, schemaData } = {}) {
@@ -840,17 +839,17 @@ describe('QueryOrchestrator', () => {
     await queryOrchestrator.fetchQuery(query);
     expect(
       queryOrchestrator.queryCache.memoryCache.has(
-        queryOrchestrator.queryCache.queryRedisKey(QueryCache.refreshKeyIdentity(query.cacheKeyQueries.queries[0]))
+        queryOrchestrator.queryCache.refreshKeyCacheKey(query.cacheKeyQueries.queries[0])
       )
     ).toBe(true);
     expect(
       queryOrchestrator.queryCache.memoryCache.has(
-        queryOrchestrator.queryCache.queryRedisKey(QueryCache.refreshKeyIdentity(query.cacheKeyQueries.queries[1]))
+        queryOrchestrator.queryCache.refreshKeyCacheKey(query.cacheKeyQueries.queries[1])
       )
     ).toBe(false);
     expect(
       queryOrchestrator.queryCache.memoryCache.has(
-        queryOrchestrator.queryCache.queryRedisKey(QueryCache.refreshKeyIdentity(query.preAggregations[0].invalidateKeyQueries[0]))
+        queryOrchestrator.queryCache.refreshKeyCacheKey(query.preAggregations[0].invalidateKeyQueries[0])
       )
     ).toBe(true);
   });

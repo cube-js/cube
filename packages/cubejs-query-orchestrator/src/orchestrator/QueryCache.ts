@@ -46,9 +46,9 @@ export type CacheQueryResultOptions = {
 };
 
 /**
- * What a caller of `cacheRefreshKeyResult` is allowed to decide. Everything identifying the entry —
- * the cache key, the renewal key, the renewal threshold — is derived from the query tuple instead,
- * so no caller can store one under a key it will later look up by a different one.
+ * What a caller of `cacheRefreshKeyResult` is allowed to decide — scheduling only. The cache key,
+ * the renewal key and the renewal threshold are all derived from the query tuple instead, so no
+ * caller can store an entry under a key it will later look up by a different one.
  */
 export type RefreshKeyCacheOptions =
   Pick<CacheQueryResultOptions, 'priority' | 'requestId' | 'waitForRenew' | 'dataSource'>;
@@ -441,8 +441,18 @@ export class QueryCache {
   }
 
   /**
-   * Cache the result of a refresh key query, identified by the query tuple itself.
+   * The `invalidate` discriminator both sides of the partition build range cache fold into their
+   * key: the write side in `PreAggregationPartitionRangeLoader.loadRangeQuery` and the read side in
+   * `PreAggregations.checkPartitionsBuildRangeCache`. Deriving it here is what keeps them equal —
+   * when each spelled it out itself, the read stopped finding what the write had stored.
    */
+  public static buildRangeInvalidateKey(
+    preAggregation: { invalidateKeyQueries?: QueryWithParams[] },
+  ): [string, string[], boolean] | false {
+    const keyQuery = preAggregation.invalidateKeyQueries?.[0];
+    return keyQuery ? QueryCache.refreshKeyIdentity(keyQuery) : false;
+  }
+
   public async cacheRefreshKeyResult(
     sqlQuery: QueryWithParams,
     expiration: number,
@@ -457,7 +467,7 @@ export class QueryCache {
         || queryOptions?.renewalThreshold || 2 * 60,
       renewalKey: cacheKey,
       useInMemory: true,
-      external: queryOptions?.external,
+      external: cacheKey[2],
     });
   }
 
@@ -1015,10 +1025,15 @@ export class QueryCache {
       renewCycle: options.renewCycle,
     };
 
+    const redisKey = this.queryRedisKey(cacheKey);
+
     return {
       cacheKey,
-      redisKey: this.queryRedisKey(cacheKey),
-      renewalKey: options.renewalKey && this.queryRedisKey(options.renewalKey),
+      redisKey,
+      // Refresh key entries renew against their own key, so hashing it a second time is wasted work
+      renewalKey: options.renewalKey && (
+        options.renewalKey === cacheKey ? redisKey : this.queryRedisKey(options.renewalKey)
+      ),
       expiration,
       spanId,
       options,
