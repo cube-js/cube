@@ -3873,12 +3873,8 @@ async fn test_wrapper_built_in_window_functions() {
         ("DENSE_RANK()", "DENSE_RANK()"),
         ("PERCENT_RANK()", "PERCENT_RANK()"),
         ("CUME_DIST()", "CUME_DIST()"),
-        // NTILE is the one built-in left out: DataFusion types its argument
-        // `Exact([UInt64])` and will not coerce the Int64 an integer literal plans as, so
-        // `NTILE(4)` fails the query before rewriting ever sees it. Its SQL template is
-        // still correct, so the fix belongs in the DataFusion fork's signature rather than
-        // in a cast bolted on here - CORE-831. Re-add this case once that lands:
-        //     ("NTILE(4)", "NTILE(4)"),
+        // NTILE is left out - see test_wrapper_ntile_does_not_plan, which pins why and
+        // goes red when it can be added back here as ("NTILE(4)", "NTILE(4)")
         ("FIRST_VALUE(notes)", "FIRST_VALUE("),
         ("LAST_VALUE(notes)", "LAST_VALUE("),
         ("NTH_VALUE(notes, 2)", "NTH_VALUE("),
@@ -4103,6 +4099,44 @@ async fn test_wrapper_multi_arg_aggregate_function() {
             call
         );
     }
+}
+
+/// NTILE is the one built-in window function that cannot be pushed down. DataFusion types
+/// its argument `Exact([UInt64])` and will not coerce the `Int64` an integer literal plans
+/// as, so `NTILE(4)` fails the whole query before rewriting ever sees it. Its SQL template
+/// is correct, so the fix belongs in the fork's signature rather than in a cast bolted onto
+/// the statement - CORE-831.
+///
+/// When this test starts failing, that fix has landed: delete it and add
+/// `("NTILE(4)", "NTILE(4)")` to the case list in `test_wrapper_built_in_window_functions`.
+#[tokio::test]
+async fn test_wrapper_ntile_does_not_plan() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let error = convert_sql_to_cube_query(
+        &r#"
+        SELECT customer_gender, NTILE(4) OVER (ORDER BY notes) AS w
+        FROM (
+            SELECT customer_gender, notes
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1, 2
+        ) t
+        "#
+        .to_string(),
+        get_test_tenant_ctx(),
+        get_test_session(DatabaseProtocol::PostgreSQL, get_test_tenant_ctx()).await,
+    )
+    .await
+    .expect_err("NTILE should not plan until CORE-831 lands");
+
+    assert!(
+        error.to_string().contains("Exact([UInt64])"),
+        "unexpected error: {}",
+        error
+    );
 }
 
 /// The two functions disagree about a third argument - DataFusion's weighted variant is
