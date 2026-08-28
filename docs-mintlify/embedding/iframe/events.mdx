@@ -475,24 +475,37 @@ sendAction("cube:action:set-session", { sessionId: newSessionId });
 ```
 
 A rejected id (unknown, already redeemed, or expired) doesn't tear down a
-working embed — it's reported via `cube:event:error` so you can retry.
+working embed. It's reported via `cube:event:error` with `context:
+"session-renewal"` and `name: "EmbedSessionExchangeError"`, so you can filter
+for it and retry.
 
 ## Keeping a signed session alive
 
-A signed embed's token is minted with a 24-hour expiry and can't refresh
+A signed embed's token is usable for about 23 hours (see [Session
+lifecycle](/embedding/iframe/auth/signed#how-it-works)) and can't refresh
 itself — left alone, a tab open that long drops to a "Session expired"
 message. Renew it in place instead, using the events and action above:
 
 ```js
+let renewing = false;
+
 window.addEventListener("message", (event) => {
   if (event.origin !== CUBE_ORIGIN) return;
   const data = event.data;
   if (!data || data.source !== "cube-embed" || data.direction !== "event") return;
 
   if (data.type === "cube:event:session-expiring" || data.type === "cube:event:session-expired") {
+    // Both events can fire for one session — renew only once.
+    if (renewing) return;
+    renewing = true;
+
     fetch("/api/cube-embed-session", { method: "POST" }) // your backend, calling Generate Session
       .then((r) => r.json())
-      .then(({ sessionId }) => sendAction("cube:action:set-session", { sessionId }));
+      .then(({ sessionId }) => sendAction("cube:action:set-session", { sessionId }))
+      .catch((error) => console.error("Session renewal failed", error))
+      .finally(() => {
+        renewing = false;
+      });
   }
 });
 ```

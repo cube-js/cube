@@ -31,7 +31,7 @@ Signed embedding works through a two-step authentication flow:
 
 **Session lifecycle:**
 - **Sessions** are valid for **5 minutes** and must be exchanged within this window
-- **Tokens** are minted with a **24-hour** expiry, but the iframe stops trusting one an hour early so an in-flight request can't expire mid-call — usable life is closer to **23 hours**
+- **Tokens** are usable for about **23 hours** after exchange — they're minted with a 24-hour expiry, but the iframe stops trusting one an hour early so an in-flight request can't lapse mid-call
 - Sessions are single-use and expire after being exchanged
 - A long-lived tab can renew its token **in place**, without reloading the iframe — see [Events & actions → Keeping a signed session alive](/embedding/iframe/events#keeping-a-signed-session-alive)
 
