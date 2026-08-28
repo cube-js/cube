@@ -176,7 +176,7 @@ describe('PreAggregations', () => {
           executionTimeout: 1,
           concurrency: 2,
         }),
-        // Lazily used: only a query carrying `external: true` reaches the external queue.
+        // Only reached by a query carrying `external: true`.
         externalDriverFactory: mockExternalDriverFactory as any,
       },
     );
@@ -403,15 +403,14 @@ describe('PreAggregations', () => {
       await createLoadCache('default').keyQueryResult(defaultCacheKeyQuery, false, 10);
       await createLoadCache('staging').keyQueryResult(defaultCacheKeyQuery, false, 10);
 
-      // `SELECT MAX(updated_at) FROM orders` means something different in each database, and the
-      // cache prefix only separates tenants — without the data source in the key the second load
-      // cache would serve the first one's row.
+      // The cache prefix only separates tenants, so without the data source in the key the second
+      // load cache would serve the first one's row for a different database.
       expect(mockDriver!.executedQueries.filter(q => q === sql).length).toEqual(2);
     });
 
     test('an absent data source hashes as default', () => {
-      // `loadRefreshKeysFromQuery` forwards `query.dataSource` untouched and `getQueue` resolves an
-      // absent one to `default`, so both spellings reach the same driver and must share an entry.
+      // `loadRefreshKeysFromQuery` forwards `query.dataSource` untouched, so an absent one reaches
+      // the same driver as `default` and must share its entry.
       expect(queryCache!.refreshKeyCacheKey(defaultCacheKeyQuery, undefined))
         .toEqual(queryCache!.refreshKeyCacheKey(defaultCacheKeyQuery, 'default'));
     });
@@ -449,7 +448,6 @@ describe('PreAggregations', () => {
       const loadCache = createLoadCache();
       await loadCache.keyQueryResult(defaultCacheKeyQuery, false, 10);
 
-      // Warm refresh keys must not promote an externalRefresh instance onto the building path.
       await expect(createPreAggLoader(loadCache, { externalRefresh: true }).loadPreAggregation(true))
         .rejects.toThrowError(/No pre-aggregation partitions were built yet/);
       expect(mockDriver!.tables).toEqual([]);
@@ -458,9 +456,8 @@ describe('PreAggregations', () => {
     test('a pre-aggregation with no invalidation keys does not let externalRefresh build either', async () => {
       const noKeys = { invalidateKeyQueries: [] };
 
-      // The one combination whose behaviour this guard changes: an empty key list used to leave
-      // `notLoadedKey` undefined, which sent even an externalRefresh instance onto the building
-      // path. It now reports the partition as missing like every other externalRefresh request.
+      // The one combination whose behaviour the guard changes: an empty key list used to leave
+      // `notLoadedKey` undefined, which sent even an externalRefresh instance onto the building path.
       await expect(createPreAggLoader(createLoadCache(), { externalRefresh: true }, noKeys).loadPreAggregation(true))
         .rejects.toThrowError(/No pre-aggregation partitions were built yet/);
       await expect(createPreAggLoader(createLoadCache(), { externalRefresh: true }, noKeys).loadPreAggregation(false))

@@ -46,10 +46,8 @@ export type CacheQueryResultOptions = {
 };
 
 /**
- * What a caller of `cacheRefreshKeyResult` is allowed to decide — scheduling, plus the data source
- * it routes to. The cache key, the renewal key and the renewal threshold are derived from the query
- * tuple and that data source instead, so no caller can store an entry under a key it will later
- * look up by a different one.
+ * Deliberately narrow: the cache key, the renewal key and the renewal threshold are derived inside
+ * `cacheRefreshKeyResult`, so no caller can store an entry under a key it later looks up by another.
  */
 export type RefreshKeyCacheOptions =
   Pick<CacheQueryResultOptions, 'priority' | 'requestId' | 'waitForRenew' | 'dataSource'>;
@@ -429,29 +427,26 @@ export class QueryCache {
   }
 
   /**
-   * Identity of a refresh key query: the SQL, its params, and where it runs — `external` selects the
-   * engine and `dataSource` selects the queue and driver, which is every dimension
-   * `cacheQueryResult` routes on. The rest of the options element is policy applied to the result
-   * rather than part of it, and `replacePartitionSqlAndParams` recomputes `renewalThreshold` from
-   * `new Date()` for incremental keys, so covering it would make the key drift within a single
-   * request.
+   * Identity of a refresh key query: the SQL, its params, and where it runs. `external` and
+   * `dataSource` are every dimension `cacheQueryResult` routes on; the rest of the options element
+   * is policy applied to the result rather than part of it, and `replacePartitionSqlAndParams`
+   * recomputes `renewalThreshold` from `new Date()`, so covering it would make the key drift within
+   * a single request.
    */
   public static refreshKeyIdentity(
     sqlQuery: QueryWithParams,
     dataSource: string,
   ): [string, string[], boolean, string] {
     const [query, values, options] = sqlQuery;
-    // Producers spell "runs against the source database" as both `false` and an absent option, and
-    // JSON.stringify renders the latter as null — they have to collapse to one key. `dataSource` is
-    // normalized for the same reason: `getQueue` resolves an absent one to `default`, so the two
-    // reach the same driver and must reach the same entry.
+    // Both spellings of each default have to collapse to one key: producers write "source database"
+    // as `false` or as an absent option, and `getQueue` resolves an absent `dataSource` to `default`.
     return [query, values, !!options?.external, dataSource || 'default'];
   }
 
   /**
-   * The `invalidate` discriminator both sides of the partition build range cache fold into their
-   * key: the write side in `PreAggregationPartitionRangeLoader.loadRangeQuery` and the read side in
-   * `PreAggregations.checkPartitionsBuildRangeCache`. Deriving it here is what keeps them equal —
+   * The `invalidate` discriminator of the partition build range cache, written by
+   * `PreAggregationPartitionRangeLoader.loadRangeQuery` and read by
+   * `PreAggregations.checkPartitionsBuildRangeCache`. Derived here so the two cannot drift apart —
    * when each spelled it out itself, the read stopped finding what the write had stored.
    */
   public static buildRangeInvalidateKey(

@@ -132,15 +132,14 @@ export class PreAggregationLoader {
   public async loadPreAggregation(
     throwOnMissingPartition: boolean,
   ): Promise<null | LoadPreAggregationResult> {
-    // Hashes a cache key per invalidation key, so it stays a thunk — the branches above it decide
-    // the outcome on their own for every request an `externalRefresh` instance serves.
+    // A thunk: hashing a cache key per invalidation key is wasted whenever the cheaper terms of
+    // the condition below already decide it.
     const invalidationKeysLoaded = () => (this.preAggregation.invalidateKeyQueries || [])
       .every(keyQuery => this.loadCache.hasKeyQueryResult(keyQuery));
 
     // Outside of a build job, `externalRefresh` must reach the branch below: it owns the "partition
     // is not built yet" handling and may not enqueue a build here.
     if (this.isJob || (!this.externalRefresh && (this.waitForRenew || invalidationKeysLoaded()))) {
-      // Renew synchronously so the current request returns the most current data.
       const result = await this.loadPreAggregationWithKeys();
       const refreshKeyValues = await this.getInvalidationKeyValues();
       return {
