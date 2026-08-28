@@ -50,6 +50,8 @@ with the following configuration options.
 
 ### Schedule {#frequency}
 
+Pick how often the refresh runs with the **Schedule** select:
+
 | Option | Description |
 | --- | --- |
 | Hourly | Runs every hour at the specified minute |
@@ -102,11 +104,11 @@ The sidebar lists all existing schedules with the following information:
 
 To create a new schedule based on an existing one — for example, to send the
 same dashboard to another Slack channel or a different set of recipients without
-re-entering the frequency, timezone, and notification settings — you can
+re-entering the **Schedule**, timezone, and notification settings — you can
 duplicate it. There are two ways:
 
 - **From the sidebar** — click the duplicate (copy) icon on a schedule card. The
-  form dialog opens pre-filled with that schedule's frequency, timezone, and
+  form dialog opens pre-filled with its **Schedule**, timezone, and
   notification configuration. Adjust anything you need, then click **Save** to
   create the new schedule.
 - **From the edit dialog** — while editing a schedule, click **Save as copy** in
@@ -131,15 +133,15 @@ group keeps notifying everyone else but stops emailing you. Subscribing reverses
 both: it clears those exceptions and adds you back as a recipient in your own
 right. The change takes effect on the next run.
 
-<Note>
+<Info>
 
 Unsubscribing affects only this schedule. It does not remove you from the user
 group, and it does not change any other schedule that group receives.
 
-</Note>
+</Info>
 
-The toggle appears only for schedules that email individual recipients — those
-with notifications enabled and the email delivery channel. A schedule delivers to
+The toggle appears only for schedules that send email — those with
+notifications enabled and the email delivery channel. A schedule delivers to
 either individual inboxes or a Slack channel, not both, so a schedule that posts
 to Slack (or that has notifications turned off) has nothing to subscribe to. If an
 editor switches a schedule to Slack, its individual subscriptions are cancelled
