@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.30](https://github.com/cube-js/cube/compare/v1.7.29...v1.7.30) (2026-08-28)
+
+### Bug Fixes
+
+- **query-orchestrator:** Dual race in cold-cache renewal path ([#11674](https://github.com/cube-js/cube/issues/11674)) ([b0136b3](https://github.com/cube-js/cube/commit/b0136b3139019ee26ddf8646271c422c4d42fbe1))
+
 ## [1.7.29](https://github.com/cube-js/cube/compare/v1.7.28...v1.7.29) (2026-08-27)
 
 ### Bug Fixes
