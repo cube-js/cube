@@ -36,7 +36,7 @@ You can set a default value that's applied when the dashboard loads. Defaults ar
 There are two ways to set a default:
 
 - **Static default** — pick a value (or values) directly in the filter. Every viewer sees the same default.
-- **User attribute default** — resolve the default from the viewer's [user attribute][ref-user-attributes] at load time, so each viewer sees their own personalized default. [Parent controls](#default-option) support this too.
+- **User attribute default** — resolve the default from the viewer's [user attribute][ref-user-attributes] at load time, so each viewer sees their own personalized default. [Parent controls](#parent-user-attribute-default) support this too.
 
 Static defaults are configured by interacting with the filter in the dashboard builder — the value you select is saved on the widget and applied to every viewer when the dashboard loads.
 
@@ -153,7 +153,7 @@ Picking in the builder also applies that option's values to the children, so the
 
 If you never pick an option, the parent opens with nothing selected and the children use their own defaults. Deleting the option that was serving as the default clears it, and the parent goes back to opening on nothing.
 
-#### User attribute default
+#### User attribute default {#parent-user-attribute-default}
 
 The default above is one arrangement for everyone. To give each viewer their own, turn on **User attribute default** in the parent control's settings and pick a [user attribute][ref-user-attributes]. When the dashboard loads, Cube reads that attribute for the current viewer and opens the control on the option it names — and drives the children with it, exactly as if the viewer had picked that option themselves.
 
@@ -163,17 +163,21 @@ To configure it:
 
 <Steps>
  <Step title="Open the parent control's settings">
-   In the dashboard builder, click **Configure Parent** on the control, or open its settings menu.
+   In the dashboard builder, click **Configure Parent** on the control.
  </Step>
  <Step title="Enable User attribute default">
-   Scroll to the **User attribute default** switch and turn it on.
+   Below the **Options** and **Children** tabs — next to **Visibility** — turn on the **User attribute default** switch.
  </Step>
  <Step title="Pick the attribute">
    Select the [user attribute][ref-user-attributes] to resolve. Only attributes defined in your account appear in the picker.
  </Step>
 </Steps>
 
-The attribute value is matched against the **option labels**, ignoring case and surrounding spaces — an attribute reading `quarter` selects the option labelled `Quarter`. Give the options the labels your attribute already uses, or adjust the attribute values to match; renaming an option later doesn't disturb the child mappings, so labels are safe to align after the fact.
+The attribute value is matched against the **option labels**, ignoring case and surrounding spaces — an attribute reading `quarter` selects the option labelled `Quarter`. Give the options the labels your attribute already uses, or adjust the attribute values to match.
+
+<Warning>
+Renaming an option leaves its child mappings intact, but the attribute match is by label — so a rename that moves a label away from the values your attribute holds silently stops it resolving, with no error. The control falls back to the option you picked as the default. Rename labels and attribute values together.
+</Warning>
 
 | Attribute type | How it's applied |
 |---|---|
@@ -186,7 +190,7 @@ If the value matches no option — or is empty, `null`, or unresolvable — the 
 The attribute is resolved for the viewer, not baked into the dashboard. Editing the attribute's value changes what that viewer opens on the next time the dashboard loads; it never rewrites the published dashboard, so the default you picked in the builder stays intact for everyone else.
 </Note>
 
-Viewers can still switch to another option unless the control's [visibility](#visibility) is set to **Disabled**, and their own pick outranks the attribute for the rest of the session. Values passed [in the URL](#sharing-the-current-selection) outrank both, so a shared link opens on the values it names rather than on the recipient's attribute.
+Viewers can still switch to another option unless the control's [visibility](#visibility) is set to **Disabled**, and their own pick outranks the attribute for the rest of the session. Values passed [in the URL](#sharing-the-current-selection) outrank both. A parent control has no parameter of its own there — a shared link carries its *children's* values, and the dropdown follows those children, so the recipient opens on the arrangement the link names rather than on the one their own attribute would have chosen.
 
 ## Sharing the current selection
 
