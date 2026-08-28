@@ -1,0 +1,79 @@
+---
+title: Alerts
+description: Set up email alerts for API outages, database timeouts, pre-aggregation failures, and build completions in Cube.
+---
+
+Alerts notify you by email when something happens in your account: an API goes
+down, a database stops responding in time, a pre-aggregation build fails, or a
+build finishes.
+
+<Note>
+
+Available on [Premium and above plans](https://cube.dev/pricing).
+
+</Note>
+
+## Manage alerts
+
+Click **Alerts** in the sidebar to see every alert configured on the account. Click
+**New alert** to add one, or use the row menu to edit or delete an existing alert.
+
+Off the [Enterprise plan](https://cube.dev/pricing), only account administrators can
+manage alerts. On the Enterprise plan, access follows the `AlertsCreate`, `AlertsRead`,
+`AlertsUpdate`, and `AlertsDelete` [role actions][ref-custom-roles], which the built-in
+Developer and AIBI Developer roles carry. Administrators always have access. The same
+four actions also govern [budgets](/admin/account-billing/budgets).
+
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
+
+## Event types
+
+Each alert watches a single event type:
+
+| Event type | What it detects | Resolved email |
+| --- | --- | --- |
+| **API outages** | The API stops responding | Yes |
+| **Database response timeouts** | The database takes too long to answer | Yes |
+| **Pre-aggregation build failures** | A [pre-aggregation](/admin/monitoring/pre-aggregations) build fails | Yes |
+| **Build completed** | A build reaches a terminal state | No |
+| **All** | Every event type above | — |
+
+The first three are conditions: Cube emails you when the condition starts, then emails
+you again with a **Resolved —** subject when it clears. While a condition persists, Cube
+does not re-send the same alert for a while — 1 hour for API outages and database
+response timeouts, 3 hours for pre-aggregation build failures.
+
+<Warning>
+
+**Build completed** fires when a build finishes, whether it succeeded or failed. The
+subject line reads `Build finished with status: <status>`. It is a point-in-time event,
+so it has no resolved email.
+
+</Warning>
+
+## Deployments
+
+An alert applies either to **All** deployments in the account, or to a **Specific** set
+you pick. Choosing **Specific** requires at least one deployment.
+
+## Recipients
+
+Under **Send alerts to**, pick either **All users on this account** or **Specific users**.
+Under **Also send to**, add any number of custom email addresses; these are additive, and
+a custom address on its own is a valid set of recipients.
+
+<Note>
+
+**All users on this account** only reaches users who have signed in at least once. Users
+who were invited but never signed in do not receive alerts.
+
+</Note>
+
+## Delivery
+
+Alerts are delivered by email only — there is no Slack, webhook, or PagerDuty delivery.
+[Scheduled refresh notifications](/docs/explore-analyze/notifications), which cover
+dashboard refresh outcomes, are a separate feature with its own delivery channels.
+
+To alert from your own observability stack instead, export telemetry with [monitoring
+integrations](/admin/monitoring/monitoring-integrations/index).
