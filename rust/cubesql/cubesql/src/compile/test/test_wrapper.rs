@@ -4109,6 +4109,13 @@ async fn test_wrapper_multi_arg_aggregate_function() {
 ///
 /// When this test starts failing, that fix has landed: delete it and add
 /// `("NTILE(4)", "NTILE(4)")` to the case list in `test_wrapper_built_in_window_functions`.
+///
+/// One other thing can turn it red. `Exact([UInt64])` is the `Debug` rendering of a
+/// `TypeSignature`, not a stable string, so a DataFusion bump that reformats the coercion
+/// error fails this assertion while NTILE still does not plan. The error text says which
+/// happened: if it no longer mentions a coercion at all, the signature was relaxed and the
+/// case can move back; if it still refuses the argument in different words, only the
+/// assertion needs updating.
 #[tokio::test]
 async fn test_wrapper_ntile_does_not_plan() {
     if !Rewriter::sql_push_down_enabled() {
