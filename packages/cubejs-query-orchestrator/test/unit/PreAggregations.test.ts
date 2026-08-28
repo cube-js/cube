@@ -341,20 +341,24 @@ describe('PreAggregations', () => {
       invalidateKeyQueries: [defaultCacheKeyQuery],
     };
 
-    const createLoadCache = () => new PreAggregationLoadCache(
+    const createLoadCache = (dataSource: string = 'default') => new PreAggregationLoadCache(
       mockDriverFactory as any,
       queryCache!,
       preAggregations,
-      { dataSource: 'default' },
+      { dataSource },
     );
 
-    const createPreAggLoader = (loadCache: PreAggregationLoadCache, options: Record<string, any> = {}) => new PreAggregationLoader(
+    const createPreAggLoader = (
+      loadCache: PreAggregationLoadCache,
+      options: Record<string, any> = {},
+      preAggOverrides: Record<string, any> = {},
+    ) => new PreAggregationLoader(
       mockDriverFactory as any,
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       () => {},
       queryCache!,
       preAggregations,
-      preAggregation,
+      { ...preAggregation, ...preAggOverrides },
       [],
       loadCache,
       { requestId: 'refresh-key-memo', ...options },
@@ -393,8 +397,27 @@ describe('PreAggregations', () => {
       expect(mockExternalDriver!.executedQueries.filter(q => q === sql).length).toEqual(1);
     });
 
+    test('a refresh key resolved against each data source gets its own cache entry', async () => {
+      const [sql] = defaultCacheKeyQuery;
+
+      await createLoadCache('default').keyQueryResult(defaultCacheKeyQuery, false, 10);
+      await createLoadCache('staging').keyQueryResult(defaultCacheKeyQuery, false, 10);
+
+      // `SELECT MAX(updated_at) FROM orders` means something different in each database, and the
+      // cache prefix only separates tenants — without the data source in the key the second load
+      // cache would serve the first one's row.
+      expect(mockDriver!.executedQueries.filter(q => q === sql).length).toEqual(2);
+    });
+
+    test('an absent data source hashes as default', () => {
+      // `loadRefreshKeysFromQuery` forwards `query.dataSource` untouched and `getQueue` resolves an
+      // absent one to `default`, so both spellings reach the same driver and must share an entry.
+      expect(queryCache!.refreshKeyCacheKey(defaultCacheKeyQuery, undefined))
+        .toEqual(queryCache!.refreshKeyCacheKey(defaultCacheKeyQuery, 'default'));
+    });
+
     test('both refresh key paths store the same renewal key', async () => {
-      const cacheKey = queryCache!.refreshKeyCacheKey(defaultCacheKeyQuery);
+      const cacheKey = queryCache!.refreshKeyCacheKey(defaultCacheKeyQuery, 'default');
       const storedRenewalKey = async () => (await queryCache!.getCacheDriver().get(cacheKey)).renewalKey;
 
       await queryCache!.loadRefreshKey(defaultCacheKeyQuery, 3600, { dataSource: 'default', requestId: 'loadRefreshKey' });
@@ -429,6 +452,20 @@ describe('PreAggregations', () => {
       // Warm refresh keys must not promote an externalRefresh instance onto the building path.
       await expect(createPreAggLoader(loadCache, { externalRefresh: true }).loadPreAggregation(true))
         .rejects.toThrowError(/No pre-aggregation partitions were built yet/);
+      expect(mockDriver!.tables).toEqual([]);
+    });
+
+    test('a pre-aggregation with no invalidation keys does not let externalRefresh build either', async () => {
+      const noKeys = { invalidateKeyQueries: [] };
+
+      // The one combination whose behaviour this guard changes: an empty key list used to leave
+      // `notLoadedKey` undefined, which sent even an externalRefresh instance onto the building
+      // path. It now reports the partition as missing like every other externalRefresh request.
+      await expect(createPreAggLoader(createLoadCache(), { externalRefresh: true }, noKeys).loadPreAggregation(true))
+        .rejects.toThrowError(/No pre-aggregation partitions were built yet/);
+      await expect(createPreAggLoader(createLoadCache(), { externalRefresh: true }, noKeys).loadPreAggregation(false))
+        .resolves.toBeNull();
+
       expect(mockDriver!.tables).toEqual([]);
     });
   });

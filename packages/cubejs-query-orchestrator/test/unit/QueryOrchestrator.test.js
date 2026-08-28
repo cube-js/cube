@@ -839,17 +839,17 @@ describe('QueryOrchestrator', () => {
     await queryOrchestrator.fetchQuery(query);
     expect(
       queryOrchestrator.queryCache.memoryCache.has(
-        queryOrchestrator.queryCache.refreshKeyCacheKey(query.cacheKeyQueries.queries[0])
+        queryOrchestrator.queryCache.refreshKeyCacheKey(query.cacheKeyQueries.queries[0], 'default')
       )
     ).toBe(true);
     expect(
       queryOrchestrator.queryCache.memoryCache.has(
-        queryOrchestrator.queryCache.refreshKeyCacheKey(query.cacheKeyQueries.queries[1])
+        queryOrchestrator.queryCache.refreshKeyCacheKey(query.cacheKeyQueries.queries[1], 'default')
       )
     ).toBe(false);
     expect(
       queryOrchestrator.queryCache.memoryCache.has(
-        queryOrchestrator.queryCache.refreshKeyCacheKey(query.preAggregations[0].invalidateKeyQueries[0])
+        queryOrchestrator.queryCache.refreshKeyCacheKey(query.preAggregations[0].invalidateKeyQueries[0], 'default')
       )
     ).toBe(true);
   });
@@ -1518,6 +1518,7 @@ describe('QueryOrchestrator', () => {
           'SELECT refreshKey in source database',
           [],
           false,
+          'default',
         ],
         query: 'SELECT refreshKey in source database',
         values: [],
@@ -1536,6 +1537,7 @@ describe('QueryOrchestrator', () => {
           'SELECT refreshKey in external database',
           [],
           true,
+          'default',
         ],
         query: 'SELECT refreshKey in external database',
         values: [],

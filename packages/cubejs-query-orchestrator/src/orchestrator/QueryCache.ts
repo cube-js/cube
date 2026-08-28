@@ -46,9 +46,10 @@ export type CacheQueryResultOptions = {
 };
 
 /**
- * What a caller of `cacheRefreshKeyResult` is allowed to decide — scheduling only. The cache key,
- * the renewal key and the renewal threshold are all derived from the query tuple instead, so no
- * caller can store an entry under a key it will later look up by a different one.
+ * What a caller of `cacheRefreshKeyResult` is allowed to decide — scheduling, plus the data source
+ * it routes to. The cache key, the renewal key and the renewal threshold are derived from the query
+ * tuple and that data source instead, so no caller can store an entry under a key it will later
+ * look up by a different one.
  */
 export type RefreshKeyCacheOptions =
   Pick<CacheQueryResultOptions, 'priority' | 'requestId' | 'waitForRenew' | 'dataSource'>;
@@ -428,16 +429,23 @@ export class QueryCache {
   }
 
   /**
-   * Identity of a refresh key query: the SQL, its params, and the engine it runs against. The rest
-   * of the options element is policy applied to the result rather than part of it, and
-   * `replacePartitionSqlAndParams` recomputes `renewalThreshold` from `new Date()` for incremental
-   * keys, so covering it would make the key drift within a single request.
+   * Identity of a refresh key query: the SQL, its params, and where it runs — `external` selects the
+   * engine and `dataSource` selects the queue and driver, which is every dimension
+   * `cacheQueryResult` routes on. The rest of the options element is policy applied to the result
+   * rather than part of it, and `replacePartitionSqlAndParams` recomputes `renewalThreshold` from
+   * `new Date()` for incremental keys, so covering it would make the key drift within a single
+   * request.
    */
-  public static refreshKeyIdentity(sqlQuery: QueryWithParams): [string, string[], boolean] {
+  public static refreshKeyIdentity(
+    sqlQuery: QueryWithParams,
+    dataSource: string,
+  ): [string, string[], boolean, string] {
     const [query, values, options] = sqlQuery;
     // Producers spell "runs against the source database" as both `false` and an absent option, and
-    // JSON.stringify renders the latter as null — they have to collapse to one key.
-    return [query, values, !!options?.external];
+    // JSON.stringify renders the latter as null — they have to collapse to one key. `dataSource` is
+    // normalized for the same reason: `getQueue` resolves an absent one to `default`, so the two
+    // reach the same driver and must reach the same entry.
+    return [query, values, !!options?.external, dataSource || 'default'];
   }
 
   /**
@@ -447,10 +455,10 @@ export class QueryCache {
    * when each spelled it out itself, the read stopped finding what the write had stored.
    */
   public static buildRangeInvalidateKey(
-    preAggregation: { invalidateKeyQueries?: QueryWithParams[] },
-  ): [string, string[], boolean] | false {
+    preAggregation: { invalidateKeyQueries?: QueryWithParams[], dataSource?: string },
+  ): [string, string[], boolean, string] | false {
     const keyQuery = preAggregation.invalidateKeyQueries?.[0];
-    return keyQuery ? QueryCache.refreshKeyIdentity(keyQuery) : false;
+    return keyQuery ? QueryCache.refreshKeyIdentity(keyQuery, preAggregation.dataSource) : false;
   }
 
   public async cacheRefreshKeyResult(
@@ -459,7 +467,7 @@ export class QueryCache {
     options: RefreshKeyCacheOptions,
   ) {
     const [query, values, queryOptions] = sqlQuery;
-    const cacheKey = QueryCache.refreshKeyIdentity(sqlQuery);
+    const cacheKey = QueryCache.refreshKeyIdentity(sqlQuery, options.dataSource);
 
     return this.cacheQueryResult(query, values, cacheKey, expiration, {
       ...options,
@@ -471,8 +479,8 @@ export class QueryCache {
     });
   }
 
-  public refreshKeyCacheKey(sqlQuery: QueryWithParams): string {
-    return this.queryRedisKey(QueryCache.refreshKeyIdentity(sqlQuery));
+  public refreshKeyCacheKey(sqlQuery: QueryWithParams, dataSource: string): string {
+    return this.queryRedisKey(QueryCache.refreshKeyIdentity(sqlQuery, dataSource));
   }
 
   public static extractRequestUUID(requestId: string): string {

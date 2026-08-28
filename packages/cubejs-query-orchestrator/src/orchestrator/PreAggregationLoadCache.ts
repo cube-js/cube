@@ -191,7 +191,7 @@ export class PreAggregationLoadCache {
   }
 
   public async keyQueryResult(sqlQuery: QueryWithParams, waitForRenew: boolean, priority: QueuePriority) {
-    const memoKey = this.queryCache.refreshKeyCacheKey(sqlQuery);
+    const memoKey = this.queryCache.refreshKeyCacheKey(sqlQuery, this.dataSource);
 
     if (!this.queryResults[memoKey]) {
       this.queryResults[memoKey] = await this.queryCache.cacheRefreshKeyResult(
@@ -209,7 +209,7 @@ export class PreAggregationLoadCache {
   }
 
   public hasKeyQueryResult(keyQuery: QueryWithParams) {
-    return !!this.queryResults[this.queryCache.refreshKeyCacheKey(keyQuery)];
+    return !!this.queryResults[this.queryCache.refreshKeyCacheKey(keyQuery, this.dataSource)];
   }
 
   public async getQueryStage(stageQueryKey) {
