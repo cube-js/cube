@@ -4130,8 +4130,11 @@ async fn test_wrapper_approx_percentile_cont_is_binary() {
     );
 }
 
-/// Without a template the aggregate stays in DataFusion rather than reaching a dialect that
-/// cannot evaluate it
+/// A dialect without the template does not get the aggregate. It does not fall back either:
+/// nothing rewrites the expression, and an approximate percentile over a dimension is not a
+/// Cube measure, so the query ends up with no plan at all. That hard failure - rather than
+/// post processing - is what a user on such a dialect hits, so pin the error it fails with
+/// instead of accepting any failure at all.
 #[tokio::test]
 async fn test_wrapper_multi_arg_aggregate_function_without_template() {
     if !Rewriter::sql_push_down_enabled() {
@@ -4139,15 +4142,17 @@ async fn test_wrapper_multi_arg_aggregate_function_without_template() {
     }
     init_testing_logger();
 
-    let plan = convert_sql_to_cube_query(
+    let error = convert_sql_to_cube_query(
         &"SELECT customer_gender, APPROX_PERCENTILE_CONT(taxful_total_price, 0.5) FROM KibanaSampleDataEcommerce GROUP BY 1".to_string(),
         get_test_tenant_ctx(),
         get_test_session(DatabaseProtocol::PostgreSQL, get_test_tenant_ctx()).await,
     )
-    .await;
+    .await
+    .expect_err("aggregate without a template should not be pushed down");
 
     assert!(
-        plan.is_err(),
-        "aggregate without a template should not be pushed down"
+        error.to_string().contains("Can't detect Cube query"),
+        "unexpected error: {}",
+        error
     );
 }
