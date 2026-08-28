@@ -15,7 +15,7 @@ Notifications let you send email or Slack messages with a screenshot of a
 dashboard after each [scheduled refresh][ref-scheduled-refreshes]. This is useful
 for distributing regular updates to stakeholders without requiring them to log in.
 They can optionally carry a short [AI-generated summary](#ai-summary) of what
-changed since the last one.
+changed since the previous notification.
 
 ## Creating a notification
 
@@ -54,7 +54,6 @@ Select the format using the **Attach screenshot as** option. The same
 formats are available for ad-hoc [downloads from the dashboard
 header][ref-download].
 
-[ref-download]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
 
 ### AI summary
 
@@ -66,7 +65,7 @@ short — an opening line naming the most important change, then two to four
 bullets, each with a real number and its movement. It is meant to be read in a
 few seconds to decide whether to open the dashboard at all:
 
-```
+```text
 WHAT CHANGED
 Order growth accelerated this week, driven mainly by a surge in returns
 outpacing overall gains.
@@ -151,6 +150,7 @@ Before you can send Slack notifications, connect your Slack workspace:
 This is a one-time setup. Once connected, you can select any channel your Slack
 workspace has access to.
 
+[ref-download]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
 [ref-duplicate]: /docs/explore-analyze/scheduled-refreshes#duplicating-a-schedule
