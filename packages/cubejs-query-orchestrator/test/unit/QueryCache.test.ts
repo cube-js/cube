@@ -3,6 +3,7 @@ import { QueryCacheTest } from './QueryCache.abstract';
 
 QueryCacheTest('Local', {
   cacheAndQueueDriver: 'memory',
+  backgroundRenew: false,
 });
 
 class QueryCacheOpened extends QueryCache {

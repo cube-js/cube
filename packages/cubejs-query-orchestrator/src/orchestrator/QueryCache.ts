@@ -318,7 +318,7 @@ export class QueryCache {
     }
 
     if (!this.options.backgroundRenew && queryBody.cacheMode !== 'stale-while-revalidate') {
-      const resultPromise = this.renewQuery(
+      const result = await this.renewQuery(
         query,
         values,
         cacheKeyQueries,
@@ -335,6 +335,8 @@ export class QueryCache {
         }
       );
 
+      // Keep the cycle after the foreground renewal: concurrent passes race on a cold cache.
+      // It remains necessary when skipRefreshKeyWaitForRenew serves a stale key from a warm cache.
       this.startRenewCycle(
         query,
         values,
@@ -350,7 +352,7 @@ export class QueryCache {
         }
       );
 
-      return resultPromise;
+      return result;
     }
 
     this.logger('Background fetch', { cacheKey, requestId: queryBody.requestId });

@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { createCancelablePromise, pausePromise } from '@cubejs-backend/shared';
 
-import { CacheKey, CacheKeyItem, QueryCache, QueryCacheOptions } from '../../src';
+import { CacheKey, CacheKeyItem, ContinueWaitError, QueryCache, QueryCacheOptions } from '../../src';
 
 export type QueryCacheTestOptions = QueryCacheOptions & {
   beforeAll?: () => Promise<void>,
@@ -374,6 +374,99 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(blocked).toBe(false);
         expect(cache.logger.mock.calls.map(c => c[0])).not.toContain('Waiting for renew');
         expect(cache.logger.mock.calls.map(c => c[0])).not.toContain('Renewing existing key');
+      });
+    });
+
+    describe('cachedQueryResult cold cache (backgroundRenew: false)', () => {
+      beforeAll(() => {
+        expect(cache.options.backgroundRenew).toBe(false);
+      });
+
+      it('executes the main query only once instead of racing two fetches for the same key', async () => {
+        const mainQuery = `SELECT cold-cache-main-${crypto.randomBytes(8).toString('hex')}`;
+        const cacheKeyQuery = `SELECT cold-cache-refresh-key-${crypto.randomBytes(8).toString('hex')}`;
+
+        // Mock below QueryCache and above QueryQueue so duplicate cache submissions remain observable.
+        const querySpy = jest.spyOn(cache, 'queryWithRetryAndRelease').mockImplementation(async (query) => {
+          if (query === mainQuery) {
+            return [{ result: 'ok' }];
+          }
+
+          if (query === cacheKeyQuery) {
+            return [{ refresh_key: '1' }];
+          }
+
+          throw new Error(`Unexpected query: ${JSON.stringify(query)}`);
+        });
+        const queryCallCount = (targetQuery: string) => querySpy.mock.calls
+          .filter(([query]) => query === targetQuery).length;
+        const renewQuerySpy = jest.spyOn(cache, 'renewQuery');
+        const startRenewCycle = cache.startRenewCycle.bind(cache);
+        let mainQueryCallsAtRenewCycleStart: number | undefined;
+        const renewCycleSpy = jest.spyOn(cache, 'startRenewCycle').mockImplementation((...args) => {
+          mainQueryCallsAtRenewCycleStart = queryCallCount(mainQuery);
+          return startRenewCycle(...args);
+        });
+        let renewCyclePromise: Promise<unknown> | undefined;
+
+        try {
+          const result = await cache.cachedQueryResult(
+            {
+              query: mainQuery,
+              values: [],
+              cacheKeyQueries: [[cacheKeyQuery, []]],
+              requestId: 'cold-cache-req',
+              dataSource: 'default',
+            },
+            [],
+          );
+
+          const renewCycleCallIndex = renewQuerySpy.mock.calls.findIndex(
+            ([, , , , , , renewOptions]) => renewOptions.renewCycle
+          );
+          if (renewCycleCallIndex !== -1) {
+            renewCyclePromise = renewQuerySpy.mock.results[renewCycleCallIndex].value;
+            await renewCyclePromise;
+          }
+
+          expect(renewCycleCallIndex).not.toBe(-1);
+          expect(result.data).toEqual([{ result: 'ok' }]);
+          expect(mainQueryCallsAtRenewCycleStart).toBe(1);
+          expect(queryCallCount(cacheKeyQuery)).toBe(1);
+          expect(queryCallCount(mainQuery)).toBe(1);
+          expect(renewCycleSpy).toHaveBeenCalledTimes(1);
+        } finally {
+          await renewCyclePromise?.catch(() => undefined);
+          renewCycleSpy.mockRestore();
+          renewQuerySpy.mockRestore();
+          querySpy.mockRestore();
+        }
+      });
+
+      it.each([
+        { type: 'ContinueWaitError', error: new ContinueWaitError() },
+        { type: 'a generic error', error: new Error('driver failed') },
+      ])('does not start a renew cycle when the foreground renewal fails with $type', async ({ error }) => {
+        const renewQuerySpy = jest.spyOn(cache, 'renewQuery').mockRejectedValue(error);
+        const renewCycleSpy = jest.spyOn(cache, 'startRenewCycle');
+
+        try {
+          await expect(cache.cachedQueryResult(
+            {
+              query: 'SELECT continue-wait-main',
+              values: [],
+              cacheKeyQueries: [['SELECT continue-wait-refresh-key', []]],
+              requestId: 'continue-wait-req',
+              dataSource: 'default',
+            },
+            [],
+          )).rejects.toBe(error);
+
+          expect(renewCycleSpy).not.toHaveBeenCalled();
+        } finally {
+          renewCycleSpy.mockRestore();
+          renewQuerySpy.mockRestore();
+        }
       });
     });
 
