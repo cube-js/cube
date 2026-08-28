@@ -475,7 +475,7 @@ export class QueryCache {
   }
 
   public refreshKeyCacheKey(sqlQuery: QueryWithParams, dataSource: string): string {
-    return this.queryRedisKey(QueryCache.refreshKeyIdentity(sqlQuery, dataSource));
+    return this.queryCacheKey(QueryCache.refreshKeyIdentity(sqlQuery, dataSource));
   }
 
   public static extractRequestUUID(requestId: string): string {
@@ -900,7 +900,7 @@ export class QueryCache {
               renewalKey: cacheKeyQueryResults && [
                 cacheKeyQueries,
                 cacheKeyQueryResults,
-                this.queryRedisKey([query, values]),
+                this.queryCacheKey([query, values]),
               ],
               waitForRenew: true,
               forceNoCache: options.forceNoCache,
@@ -1028,14 +1028,14 @@ export class QueryCache {
       renewCycle: options.renewCycle,
     };
 
-    const redisKey = this.queryRedisKey(cacheKey);
+    const redisKey = this.queryCacheKey(cacheKey);
 
     return {
       cacheKey,
       redisKey,
       // Refresh key entries renew against their own key, so hashing it a second time is wasted work
       renewalKey: options.renewalKey && (
-        options.renewalKey === cacheKey ? redisKey : this.queryRedisKey(options.renewalKey)
+        options.renewalKey === cacheKey ? redisKey : this.queryCacheKey(options.renewalKey)
       ),
       expiration,
       spanId,
@@ -1206,13 +1206,13 @@ export class QueryCache {
   }
 
   protected async lastRefreshTime(cacheKey) {
-    const cachedValue = await this.cacheDriver.get(this.queryRedisKey(cacheKey));
+    const cachedValue = await this.cacheDriver.get(this.queryCacheKey(cacheKey));
     return cachedValue && new Date(cachedValue.time);
   }
 
   public async resultFromCacheIfExists(queryBody) {
     const cacheKey = QueryCache.queryCacheKey(queryBody);
-    const cachedValue = await this.cacheDriver.get(this.queryRedisKey(cacheKey));
+    const cachedValue = await this.cacheDriver.get(this.queryCacheKey(cacheKey));
     if (cachedValue) {
       return {
         data: cachedValue.result,
@@ -1222,7 +1222,7 @@ export class QueryCache {
     return null;
   }
 
-  public queryRedisKey(cacheKey: CacheKey): string {
+  public queryCacheKey(cacheKey: CacheKey): string {
     return this.getKey('SQL_QUERY_RESULT', getCacheHash(cacheKey) as any);
   }
 
