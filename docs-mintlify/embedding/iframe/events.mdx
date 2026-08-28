@@ -97,6 +97,8 @@ window.addEventListener("message", (event) => {
 | [`cube:event:download`](#cube-event-download) | The viewer exports data or an image | dashboard |
 | [`cube:event:drilldown`](#cube-event-drilldown) | The viewer drills into a measure | dashboard |
 | [`cube:event:ai-query`](#cube-event-ai-query) | The viewer runs an AI / natural-language query | all |
+| [`cube:event:session-expiring`](#cube-event-session-expiring) | A signed session is close to expiring (~30 min out) | all |
+| [`cube:event:session-expired`](#cube-event-session-expired) | A signed session has expired | all |
 | [`cube:event:error`](#cube-event-error) | The embed surfaces an error | all |
 
 <Note>
@@ -255,6 +257,48 @@ surface, the dashboard agent, and the embedded app.
 }
 ```
 
+#### `cube:event:session-expiring` {#cube-event-session-expiring}
+
+Emitted once per [signed embedding](/embedding/iframe/auth/signed) session, ~30
+minutes before it stops working. This is the moment to mint a replacement
+session and push it in with `cube:action:set-session` — see [Keeping a signed
+session alive](#keeping-a-signed-session-alive) below.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `expiresAt` | `number` | Epoch ms when the session actually stops working — earlier than the token's nominal 24-hour expiry, see [Session lifecycle](/embedding/iframe/auth/signed#how-it-works). |
+| `expiresInMs` | `number` | Milliseconds from this event to `expiresAt`. `0` if already past it. |
+
+```json
+{
+  "expiresAt": 1735689600000,
+  "expiresInMs": 1800000
+}
+```
+
+<Note>
+  Only fires for signed embedding sessions — a private-embedding iframe has no
+  expiring session to renew. It's a best-effort timer inside the iframe: a
+  hidden or suspended tab can throttle it, so it may arrive late (immediately
+  on wake) or after `cube:event:session-expired`.
+</Note>
+
+#### `cube:event:session-expired` {#cube-event-session-expired}
+
+Emitted when a signed session has actually lapsed. The embed can't recover on
+its own — there's no refresh token or re-exchange endpoint — so nothing happens
+until you push a fresh session in with `cube:action:set-session`.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `expiredAt` | `number` | Epoch ms when the session was observed to have lapsed. |
+
+```json
+{
+  "expiredAt": 1735689600000
+}
+```
+
 #### `cube:event:error` {#cube-event-error}
 
 Emitted when the embed surfaces an error (a render error, a query failure, an
@@ -265,7 +309,7 @@ down from a recoverable one.
 | --- | --- | --- |
 | `message` | `string` | Human-readable message. |
 | `name` | `string` _(optional)_ | Error name/class, e.g. `"TypeError"`. |
-| `context` | `string` _(optional)_ | Where it originated, e.g. `"embed-render"`. |
+| `context` | `string` _(optional)_ | Where it originated, e.g. `"embed-render"`, `"session-renewal"`. |
 | `fatal` | `boolean` _(optional)_ | `true` when the error took down the whole surface. |
 
 ```json
@@ -318,6 +362,7 @@ sendAction("cube:action:refresh");
 | [`cube:action:set-filter`](#cube-action-set-filter) | Push a filter into a dashboard | `{ filterUrlParameter }` |
 | [`cube:action:navigate`](#cube-action-navigate) | Navigate the embed to a path | `{ path }` |
 | [`cube:action:refresh`](#cube-action-refresh) | Re-run the embed's queries | _none_ |
+| [`cube:action:set-session`](#cube-action-set-session) | Swap in a fresh signed session, in place (no iframe reload) | `{ sessionId }` |
 
 #### `cube:action:set-color-scheme` {#cube-action-set-color-scheme}
 
@@ -410,6 +455,66 @@ Re-run the embed's queries and refresh its data. No payload.
 ```js
 sendAction("cube:action:refresh");
 ```
+
+#### `cube:action:set-session` {#cube-action-set-session}
+
+Hand the embed a fresh [signed embedding](/embedding/iframe/auth/signed)
+session id, replacing the one it's running on **without reloading the
+iframe**. Sent before the current session lapses, the swap is invisible —
+nothing unmounts, so the viewer keeps their place, filters, and any unsaved
+editing state. Sent after it has already lapsed, it still recovers the embed
+without a reload, but the surface has been torn down by then and transient
+state is gone.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `sessionId` | `string` | A single-use session id from the [Generate Session API](/reference/embed-apis/generate-session). Expires 5 minutes after it's minted, so mint it at the moment you send it rather than ahead of time. |
+
+```js
+sendAction("cube:action:set-session", { sessionId: newSessionId });
+```
+
+A rejected id (unknown, already redeemed, or expired) doesn't tear down a
+working embed. It's reported via `cube:event:error` with `context:
+"session-renewal"` and `name: "EmbedSessionExchangeError"`, so you can filter
+for it and retry.
+
+## Keeping a signed session alive
+
+A signed embed's token is usable for about 23 hours (see [Session
+lifecycle](/embedding/iframe/auth/signed#how-it-works)) and can't refresh
+itself — left alone, a tab open that long drops to a "Session expired"
+message. Renew it in place instead, using the events and action above:
+
+```js
+let renewing = false;
+
+window.addEventListener("message", (event) => {
+  if (event.origin !== CUBE_ORIGIN) return;
+  const data = event.data;
+  if (!data || data.source !== "cube-embed" || data.direction !== "event") return;
+
+  if (data.type === "cube:event:session-expiring" || data.type === "cube:event:session-expired") {
+    // Both events can fire for one session — renew only once.
+    if (renewing) return;
+    renewing = true;
+
+    fetch("/api/cube-embed-session", { method: "POST" }) // your backend, calling Generate Session
+      .then((r) => r.json())
+      .then(({ sessionId }) => sendAction("cube:action:set-session", { sessionId }))
+      .catch((error) => console.error("Session renewal failed", error))
+      .finally(() => {
+        renewing = false;
+      });
+  }
+});
+```
+
+Mint the replacement session on your own backend — [Generate
+Session](/reference/embed-apis/generate-session) needs an API key that must
+never reach the browser. Each id is single-use and expires 5 minutes after
+minting, so mint it in response to the event rather than caching one ahead of
+time.
 
 ## Surfaces
 
