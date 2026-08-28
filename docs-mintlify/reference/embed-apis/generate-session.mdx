@@ -281,6 +281,37 @@ DELETE /api/v1/embed-tenants/{embedTenantName}/user-attributes/{id}
 
 These endpoints use the same `Api-Key` authentication as Generate Session and require admin access. List endpoints return cursor-paginated results (`?first=`, `?after=`).
 
+### Provisioning users
+
+An embed user otherwise only exists in Cube once they generate their first
+session, which means a workbook or dashboard can't be shared with a teammate
+who hasn't opened the embed yet. To provision a user ahead of time — from
+your own user directory, before their first session — use:
+
+```text
+POST /api/v1/embed-tenants/{embedTenantName}/user
+POST /api/v1/embed-tenants/{embedTenantName}/users
+```
+
+The single-user endpoint takes one body with the same fields `generate-session`
+accepts for an external user — `externalId`, `email`, `userProfile`, `groups`,
+`tenantGroups` — so an integration uses one vocabulary whether it pushes its
+directory ahead of time or lets a session provision the user. Session-only
+fields (`userAttributes`, `securityContext`) aren't accepted here: a later
+session re-applies them anyway, so provisioning can't be a second source of
+truth for row-level security. `groups` and `tenantGroups` follow the same
+replace-when-supplied, clear-with-`[]`, preserve-when-omitted rules as
+[Groups](#groups).
+
+The bulk endpoint takes `{ "users": [...] }` (up to the account's bulk-action
+limit) and is partially successful: it always returns `200`, with each entry
+reported in `succeeded` or `failed` (with an `error.status`/`error.message`),
+in the order requested.
+
+Provisioning is idempotent — an existing `externalId` is updated, not
+rejected — and the embed tenant itself is created on demand if it doesn't
+exist yet.
+
 ### Response
 
 The API returns a session object:
