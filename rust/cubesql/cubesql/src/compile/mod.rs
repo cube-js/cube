@@ -9110,23 +9110,27 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
+        // QuickSight's $RANK_1 is a window function over an unlimited query, so the whole
+        // statement is pushed to the data source rather than ranking a row-capped result
+        let request = logical_plan.find_cube_scan_wrapped_sql().request;
         assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                segments: Some(vec![]),
-                order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("startsWith".to_string()),
-                    values: Some(vec!["f".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
-                ..Default::default()
-            }
-        )
+            member_expression_sql(&request.measures),
+            vec![
+                "${KibanaSampleDataEcommerce.count}",
+                "DENSE_RANK() OVER (ORDER BY ${KibanaSampleDataEcommerce.customer_gender} DESC)",
+            ]
+        );
+        assert_eq!(
+            member_expression_sql(&request.dimensions),
+            vec!["${KibanaSampleDataEcommerce.customer_gender}"]
+        );
+        // LEFT(...) = 'f' is only recognised as a `startsWith` filter on the member query
+        // path; pushed down it stays the expression QuickSight wrote
+        assert_eq!(
+            member_expression_sql(&request.segments),
+            vec!["(LEFT(${KibanaSampleDataEcommerce.customer_gender}, 1) = $0$)"]
+        );
+        assert_eq!(request.filters, None);
     }
 
     #[tokio::test]
@@ -9149,23 +9153,25 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
+        // QuickSight's $RANK_1 is a window function over an unlimited query, so the whole
+        // statement is pushed to the data source rather than ranking a row-capped result
+        let request = logical_plan.find_cube_scan_wrapped_sql().request;
         assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                segments: Some(vec![]),
-                order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("endsWith".to_string()),
-                    values: Some(vec!["le".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
-                ..Default::default()
-            }
-        )
+            member_expression_sql(&request.measures),
+            vec![
+                "${KibanaSampleDataEcommerce.count}",
+                "DENSE_RANK() OVER (ORDER BY ${KibanaSampleDataEcommerce.customer_gender} DESC)",
+            ]
+        );
+        assert_eq!(
+            member_expression_sql(&request.dimensions),
+            vec!["${KibanaSampleDataEcommerce.customer_gender}"]
+        );
+        assert_eq!(
+            member_expression_sql(&request.segments),
+            vec!["(RIGHT(${KibanaSampleDataEcommerce.customer_gender}, 2) = $0$)"]
+        );
+        assert_eq!(request.filters, None);
     }
 
     #[tokio::test]
@@ -9192,23 +9198,36 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
+        // QuickSight's $RANK_1 is a window function over an unlimited query, so the whole
+        // statement is pushed to the data source rather than ranking a row-capped result
+        let request = logical_plan.find_cube_scan_wrapped_sql().request;
         assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                segments: Some(vec![]),
-                order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("contains".to_string()),
-                    values: Some(vec!["al".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
-                ..Default::default()
-            }
-        )
+            member_expression_sql(&request.measures),
+            vec![
+                "${KibanaSampleDataEcommerce.count}",
+                "DENSE_RANK() OVER (ORDER BY ${KibanaSampleDataEcommerce.customer_gender} DESC)",
+            ]
+        );
+        assert_eq!(
+            member_expression_sql(&request.dimensions),
+            vec!["${KibanaSampleDataEcommerce.customer_gender}"]
+        );
+        // The strpos(...) shape is still recognised as a member filter, so it survives the
+        // push down as one
+        assert_eq!(
+            member_expression_sql(&request.segments),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            request.filters,
+            Some(vec![V1LoadRequestQueryFilterItem {
+                member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                operator: Some("contains".to_string()),
+                values: Some(vec!["al".to_string()]),
+                or: None,
+                and: None,
+            }])
+        );
     }
 
     #[tokio::test]
@@ -9236,32 +9255,43 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
+        // QuickSight's $RANK_1 is a window function over an unlimited query, so the whole
+        // statement is pushed to the data source rather than ranking a row-capped result
+        let request = logical_plan.find_cube_scan_wrapped_sql().request;
         assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                segments: Some(vec![]),
-                order: Some(vec![]),
-                filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("notContains".to_string()),
-                        values: Some(vec!["al".to_string()]),
-                        or: None,
-                        and: None,
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("set".to_string()),
-                        values: None,
-                        or: None,
-                        and: None,
-                    },
-                ]),
-                ..Default::default()
-            }
-        )
+            member_expression_sql(&request.measures),
+            vec![
+                "${KibanaSampleDataEcommerce.count}",
+                "DENSE_RANK() OVER (ORDER BY ${KibanaSampleDataEcommerce.customer_gender} DESC)",
+            ]
+        );
+        assert_eq!(
+            member_expression_sql(&request.dimensions),
+            vec!["${KibanaSampleDataEcommerce.customer_gender}"]
+        );
+        assert_eq!(
+            member_expression_sql(&request.segments),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            request.filters,
+            Some(vec![
+                V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("notContains".to_string()),
+                    values: Some(vec!["al".to_string()]),
+                    or: None,
+                    and: None,
+                },
+                V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("set".to_string()),
+                    values: None,
+                    or: None,
+                    and: None,
+                },
+            ])
+        );
     }
 
     #[tokio::test]
@@ -19133,12 +19163,14 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
             ])
         );
-        // The dedupe must be present in the plan; previously DISTINCT ON was
-        // silently dropped
+        // The dedupe must be present; previously DISTINCT ON was silently dropped. The
+        // ranking window is pushed to the data source, so it shows up in the generated
+        // SQL rather than as a DataFusion node
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(
-            format!("{:?}", logical_plan).contains("ROW_NUMBER() PARTITION BY"),
-            "plan must contain the DISTINCT ON window: {:?}",
-            logical_plan
+            sql.contains("ROW_NUMBER() OVER (PARTITION BY"),
+            "generated SQL must contain the DISTINCT ON window: {}",
+            sql
         );
     }
 

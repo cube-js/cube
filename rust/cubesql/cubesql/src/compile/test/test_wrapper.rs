@@ -15,9 +15,10 @@ use crate::{
         rewrite::rewriter::Rewriter,
         test::{
             convert_select_to_query_plan, convert_select_to_query_plan_customized,
-            convert_select_to_query_plan_with_config, convert_sql_to_cube_query,
-            get_test_session_with_config, get_test_tenant_ctx_with_cube_data_sources,
-            init_testing_logger, member_expression_sql, LogicalPlanTestUtils, TestContext,
+            convert_select_to_query_plan_with_config, convert_sql_to_cube_query, get_test_session,
+            get_test_session_with_config, get_test_tenant_ctx,
+            get_test_tenant_ctx_with_cube_data_sources, init_testing_logger, member_expression_sql,
+            LogicalPlanTestUtils, TestContext,
         },
         DatabaseProtocol,
     },
@@ -3851,5 +3852,353 @@ async fn test_wrapper_union_in_join_push_down() {
         sql.contains("KibanaSampleDataEcommerce.customer_gender") && sql.contains("Logs.content"),
         "both queries of the union are in the pushed down SQL: {}",
         sql
+    );
+}
+
+/// A window function is looked up as `functions/<NAME>` like any other function, so a
+/// built-in without a template is never pushed down - and because the window sits under
+/// everything else in the query, that leaves the whole plan above it to post processing.
+/// `LAG` and `LEAD` were once the only built-ins with a template, which left a query as
+/// ordinary as `ROW_NUMBER() OVER (...)` reading a row-capped scan.
+#[tokio::test]
+async fn test_wrapper_built_in_window_functions() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for (call, expected) in [
+        ("ROW_NUMBER()", "ROW_NUMBER()"),
+        ("RANK()", "RANK()"),
+        ("DENSE_RANK()", "DENSE_RANK()"),
+        ("PERCENT_RANK()", "PERCENT_RANK()"),
+        ("CUME_DIST()", "CUME_DIST()"),
+        // NTILE is left out - see test_wrapper_ntile_does_not_plan, which pins why and
+        // goes red when it can be added back here as ("NTILE(4)", "NTILE(4)")
+        ("FIRST_VALUE(notes)", "FIRST_VALUE("),
+        ("LAST_VALUE(notes)", "LAST_VALUE("),
+        ("NTH_VALUE(notes, 2)", "NTH_VALUE("),
+        ("LAG(notes)", "LAG("),
+        ("LEAD(notes)", "LEAD("),
+    ] {
+        let query_plan = convert_select_to_query_plan(
+            format!(
+                r#"
+                SELECT
+                    customer_gender,
+                    {call} OVER (
+                        PARTITION BY customer_gender
+                        ORDER BY notes
+                    ) AS w
+                FROM (
+                    SELECT customer_gender, notes
+                    FROM KibanaSampleDataEcommerce
+                    GROUP BY 1, 2
+                ) t
+                "#
+            ),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(
+            sql.contains(expected),
+            "{} is not pushed down, generated SQL: {}",
+            call,
+            sql
+        );
+    }
+}
+
+/// The reported shape: a CTE that sequences rows with `LAG` and `ROW_NUMBER`, a second CTE
+/// deriving values from them, and an aggregation over the result. Without a `ROW_NUMBER`
+/// template the window blocked the push down of everything above it, and the final
+/// aggregate ran in DataFusion over the capped rows of a raw scan.
+#[tokio::test]
+async fn test_wrapper_window_sequenced_cte_aggregation() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH sequenced AS (
+            SELECT
+                customer_gender,
+                notes,
+                CAST(order_date AS DATE) AS order_date,
+                CAST(taxful_total_price AS DECIMAL(18,2)) AS price,
+                LAG(CAST(order_date AS DATE)) OVER (
+                    PARTITION BY customer_gender
+                    ORDER BY CAST(order_date AS DATE), notes
+                ) AS prev_order_date,
+                ROW_NUMBER() OVER (
+                    PARTITION BY customer_gender
+                    ORDER BY CAST(order_date AS DATE), notes
+                ) AS order_seq
+            FROM KibanaSampleDataEcommerce
+            WHERE customer_gender = 'female'
+        ),
+        gaps AS (
+            SELECT
+                *,
+                DATEDIFF('day', prev_order_date, order_date) AS days_since,
+                CASE
+                    WHEN prev_order_date IS NULL THEN '1. first'
+                    WHEN DATEDIFF('day', prev_order_date, order_date) > 180 THEN '3. gap'
+                    ELSE '2. continuous'
+                END AS category
+            FROM sequenced
+        )
+        SELECT
+            customer_gender,
+            category,
+            COUNT(DISTINCT notes) AS notes_count,
+            ROUND(AVG(days_since), 2) AS avg_gap,
+            SUM(price) AS total_price
+        FROM gaps
+        GROUP BY customer_gender, category
+        ORDER BY customer_gender, notes_count DESC
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    // The whole query reaches the data source: nothing is left above the wrapper
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan
+        .find_cube_scan_wrapped_sql_deep()
+        .wrapped_sql
+        .sql;
+    for expected in [
+        "ROW_NUMBER() OVER",
+        "LAG(",
+        "DATEDIFF(",
+        "COUNT(DISTINCT",
+        "GROUP BY",
+        "ORDER BY",
+    ] {
+        assert!(
+            sql.contains(expected),
+            "no {} in generated SQL: {}",
+            expected,
+            sql
+        );
+    }
+
+    // Only the projection renaming the pushed down columns is left on top of the wrapper:
+    // nothing that would read the row-capped result of an unlimited query
+    let plan = format!("{:?}", logical_plan);
+    for unexpected in ["WindowAggr:", "Aggregate:", "Sort:", "Filter:"] {
+        assert!(
+            !plan.contains(unexpected),
+            "{} left in plan: {}",
+            unexpected,
+            plan
+        );
+    }
+}
+
+/// A window column is referred to by the name DataFusion derived for the window expression,
+/// so the wrapped select has to keep that name when it takes the window over. Flattening a
+/// qualified column inside the expression renames it - `LAG(ta_3.ca_1) OVER (...)` becomes
+/// `LAG(ca_1) OVER (...)` - and a filter above is then left pointing at a field that is not
+/// in the schema, which fails the whole plan rather than falling back to post processing.
+#[tokio::test]
+async fn test_wrapper_filter_on_window_over_grouped_join() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH
+        "qt_0" AS (
+            SELECT
+                "ta_1".content "ca_1",
+                DATE_TRUNC('month', "ta_2".order_date) "ca_2",
+                CASE WHEN sum("ta_2"."sumPrice") IS NOT NULL THEN sum("ta_2"."sumPrice") ELSE 0 END "ca_3"
+            FROM KibanaSampleDataEcommerce "ta_2"
+            JOIN Logs "ta_1" ON "ta_2".__cubeJoinField = "ta_1".__cubeJoinField
+            GROUP BY "ca_1", "ca_2"
+        ),
+        "qt_1" AS (
+            SELECT
+                LAG("ta_3"."ca_1") OVER (
+                    PARTITION BY DATE_TRUNC('month', "ta_3"."ca_2")
+                    ORDER BY DATE_TRUNC('month', "ta_3"."ca_2"), "ta_3"."ca_1"
+                ) "ca_4",
+                DATE_TRUNC('month', "ta_3"."ca_2") "ca_5",
+                "ta_3"."ca_1" "ca_6"
+            FROM "qt_0" "ta_3"
+            GROUP BY "ca_5", "ca_6"
+        )
+        SELECT "ta_4"."ca_5" "ca_7", "ta_4"."ca_6" "ca_8"
+        FROM "qt_1" "ta_4"
+        WHERE "ta_4"."ca_4" <= 'x'
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert!(sql.contains("LAG("), "generated SQL: {}", sql);
+}
+
+/// An aggregate can take more than one argument. `APPROX_PERCENTILE_CONT(expr, 0.5)` is the
+/// only way to get a median out of a dialect without an exact percentile aggregate - Presto,
+/// Trino and Athena among them - and it is also what DataFusion rewrites `APPROX_MEDIAN(expr)`
+/// into, so leaving multi-argument aggregates unpushable left those dialects with no median
+/// at all.
+#[tokio::test]
+async fn test_wrapper_multi_arg_aggregate_function() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // Not a base template: only dialects with an approximate percentile define it
+    let approx_percentile = vec![(
+        "functions/APPROXPERCENTILECONT".to_string(),
+        "APPROX_PERCENTILE({{ args_concat }})".to_string(),
+    )];
+
+    for call in [
+        "APPROX_PERCENTILE_CONT(taxful_total_price, 0.5)",
+        "APPROX_MEDIAN(taxful_total_price)",
+    ] {
+        let query_plan = convert_select_to_query_plan_customized(
+            format!("SELECT customer_gender, {call} FROM KibanaSampleDataEcommerce GROUP BY 1"),
+            DatabaseProtocol::PostgreSQL,
+            approx_percentile.clone(),
+        )
+        .await;
+
+        assert_eq!(
+            member_expression_sql(
+                &query_plan
+                    .as_logical_plan()
+                    .find_cube_scan_wrapped_sql()
+                    .request
+                    .measures
+            ),
+            vec!["APPROX_PERCENTILE(${KibanaSampleDataEcommerce.taxful_total_price}, 0.5)"],
+            "{} is not pushed down",
+            call
+        );
+    }
+}
+
+/// NTILE is the one built-in window function that cannot be pushed down. DataFusion types
+/// its argument `Exact([UInt64])` and will not coerce the `Int64` an integer literal plans
+/// as, so `NTILE(4)` fails the whole query before rewriting ever sees it. Its SQL template
+/// is correct, so the fix belongs in the fork's signature rather than in a cast bolted onto
+/// the statement - CORE-831.
+///
+/// When this test starts failing, that fix has landed: delete it and add
+/// `("NTILE(4)", "NTILE(4)")` to the case list in `test_wrapper_built_in_window_functions`.
+///
+/// One other thing can turn it red. `Exact([UInt64])` is the `Debug` rendering of a
+/// `TypeSignature`, not a stable string, so a DataFusion bump that reformats the coercion
+/// error fails this assertion while NTILE still does not plan. The error text says which
+/// happened: if it no longer mentions a coercion at all, the signature was relaxed and the
+/// case can move back; if it still refuses the argument in different words, only the
+/// assertion needs updating.
+#[tokio::test]
+async fn test_wrapper_ntile_does_not_plan() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let error = convert_sql_to_cube_query(
+        &r#"
+        SELECT customer_gender, NTILE(4) OVER (ORDER BY notes) AS w
+        FROM (
+            SELECT customer_gender, notes
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1, 2
+        ) t
+        "#
+        .to_string(),
+        get_test_tenant_ctx(),
+        get_test_session(DatabaseProtocol::PostgreSQL, get_test_tenant_ctx()).await,
+    )
+    .await
+    .expect_err("NTILE should not plan until CORE-831 lands");
+
+    assert!(
+        error.to_string().contains("Exact([UInt64])"),
+        "unexpected error: {}",
+        error
+    );
+}
+
+/// The two functions disagree about a third argument - DataFusion's weighted variant is
+/// `approx_percentile_cont_with_weight(x, w, percentile)` while Presto reads
+/// `approx_percentile(x, w, percentage)` - so a template rendering every argument would
+/// mis-map one against the other. It cannot: `APPROXPERCENTILECONT` is two arguments here
+/// and a third is rejected before rewriting, and the weighted variant is a different
+/// function with a template name of its own, which no dialect defines.
+#[tokio::test]
+async fn test_wrapper_approx_percentile_cont_is_binary() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let error = convert_sql_to_cube_query(
+        &"SELECT customer_gender, APPROX_PERCENTILE_CONT(taxful_total_price, 0.5, 100) FROM KibanaSampleDataEcommerce GROUP BY 1".to_string(),
+        get_test_tenant_ctx(),
+        get_test_session(DatabaseProtocol::PostgreSQL, get_test_tenant_ctx()).await,
+    )
+    .await
+    .expect_err("a third argument should not plan");
+
+    assert!(
+        error
+            .to_string()
+            .contains("does not accept 3 function arguments"),
+        "unexpected error: {}",
+        error
+    );
+}
+
+/// A dialect without the template does not get the aggregate. It does not fall back either:
+/// nothing rewrites the expression, and an approximate percentile over a dimension is not a
+/// Cube measure, so the query ends up with no plan at all. That hard failure - rather than
+/// post processing - is what a user on such a dialect hits, so pin the error it fails with
+/// instead of accepting any failure at all.
+#[tokio::test]
+async fn test_wrapper_multi_arg_aggregate_function_without_template() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let error = convert_sql_to_cube_query(
+        &"SELECT customer_gender, APPROX_PERCENTILE_CONT(taxful_total_price, 0.5) FROM KibanaSampleDataEcommerce GROUP BY 1".to_string(),
+        get_test_tenant_ctx(),
+        get_test_session(DatabaseProtocol::PostgreSQL, get_test_tenant_ctx()).await,
+    )
+    .await
+    .expect_err("aggregate without a template should not be pushed down");
+
+    assert!(
+        error.to_string().contains("Can't detect Cube query"),
+        "unexpected error: {}",
+        error
     );
 }

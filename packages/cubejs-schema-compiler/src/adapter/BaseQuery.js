@@ -4521,8 +4521,27 @@ export class BaseQuery {
         FLOOR: 'FLOOR({{ args_concat }})',
         CEIL: 'CEIL({{ args_concat }})',
         TRUNC: 'TRUNC({{ args_concat }})',
+        // Window functions. The SQL API resolves a window function to `functions/<NAME>`
+        // just like any other function, so a built-in without an entry here is never
+        // pushed down: the window, and everything computed on top of it, is left to
+        // post processing over a row-capped result. These are the SQL:2003 window
+        // functions, supported by every dialect that supports windowing at all, so they
+        // live in the base and a dialect missing one deletes it.
         LAG: 'LAG({{ args_concat }})',
         LEAD: 'LEAD({{ args_concat }})',
+        ROW_NUMBER: 'ROW_NUMBER({{ args_concat }})',
+        RANK: 'RANK({{ args_concat }})',
+        DENSE_RANK: 'DENSE_RANK({{ args_concat }})',
+        PERCENT_RANK: 'PERCENT_RANK({{ args_concat }})',
+        CUME_DIST: 'CUME_DIST({{ args_concat }})',
+        // Unreachable from the SQL API until CORE-831: DataFusion types NTILE's argument
+        // `Exact([UInt64])` and will not coerce an integer literal to it, so the query
+        // fails to plan. Kept because the template itself is right - once the fork's
+        // signature is relaxed, NTILE pushes down with no change here.
+        NTILE: 'NTILE({{ args_concat }})',
+        FIRST_VALUE: 'FIRST_VALUE({{ args_concat }})',
+        LAST_VALUE: 'LAST_VALUE({{ args_concat }})',
+        NTH_VALUE: 'NTH_VALUE({{ args_concat }})',
 
         // There is a difference in behaviour of these function processing in different DBs and DWHs.
         // The SQL standard requires greatest and least to return null in case one argument is null.
