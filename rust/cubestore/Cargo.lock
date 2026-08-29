@@ -1445,7 +1445,7 @@ dependencies = [
 
 [[package]]
 name = "cubestore"
-version = "1.7.28"
+version = "1.7.30"
 dependencies = [
  "actix-rt",
  "anyhow",
@@ -1508,6 +1508,7 @@ dependencies = [
  "opentelemetry-http",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
+ "parking_lot",
  "parquet-format",
  "parse-size",
  "paste",

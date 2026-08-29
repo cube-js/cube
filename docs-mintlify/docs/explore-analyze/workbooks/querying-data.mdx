@@ -105,7 +105,9 @@ above cannot express.
 ### Default filters
 
 A data model author can define default workbook filters on a semantic view with
-the [`meta.default_ui_filters`][ref-default-ui-filters] parameter:
+the [`meta.default_ui_filters`][ref-default-ui-filters] parameter. The same
+defaults are also seeded when a query on that view is started in the Google
+Sheets / Excel add-in.
 
 ```yaml
 views:

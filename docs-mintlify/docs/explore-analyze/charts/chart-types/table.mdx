@@ -49,6 +49,8 @@ with the header showing the dimension's value once instead of on every row under
 Turning it on also adds a **Row grouping** section to the **Style** tab, with:
 
 - **Expand all groups** / **Collapse all groups** — set every group's expand state at once.
+- **Subtotals** (Σ) — show an aggregated value for every measure on each group header row.
+  See [Per-group subtotals](#per-group-subtotals).
 - Text color, background color, and text formatting for the group header rows.
 
 Each group-level column's card in the **Columns** section gets a **Default state**
@@ -57,6 +59,31 @@ open or closed. It only sets the default — a viewer's own expand/collapse of a
 individual group isn't affected by changing it afterwards.
 
 {/* TODO screenshot: table with collapsed row groups and the Style tab's Row grouping section */}
+
+### Per-group subtotals
+
+With grouping on, the **Subtotals** (Σ) toggle in the **Row grouping** section adds an
+aggregated value for every measure to each group header row, at every nesting level. Not
+to be confused with [pivot subtotals](#subtotals), which add a **Total for ‹value›**
+column per pivot group rather than a value per group header row.
+
+Each subtotal is queried at its own group's grain rather than summed from the rows below
+it. That distinction matters for any measure that doesn't add up: an `avg` shows the true
+average over the group instead of an average of averages, and a `count_distinct` counts a
+value once even when it appears in several child groups. As a result a subtotal can
+legitimately differ from the sum of the rows beneath it — for a distinct count it is
+usually smaller.
+
+It also means the value stays correct on a collapsed group, where there are no visible
+rows to add up at all.
+
+Measures built on window functions (`RUNNING_TOTAL`, `OFFSET`, or a SQL `OVER` clause)
+can't be recomputed at another grain, so their cells stay empty on group rows — the same
+exclusion that [row, column, and pivot
+totals](/docs/explore-analyze/workbooks/querying-data#subtotals) make. Period-comparison
+columns are also left empty. The toggle is disabled unless grouping is active and the
+values are placed in columns, since the values-as-rows layout has no per-measure column
+for a subtotal to sit under.
 
 ## Column field options
 
@@ -486,7 +513,7 @@ For the computed anchors (Minimum, Maximum, Midpoint, Average, Median), the drop
 
 Use **Reverse color scale** to swap the Start and End colors. **Treat nulls as zero** is on by default, coloring null/blank cells as zero; turn it off to leave them uncolored.
 
-The scale is normalized **per column** — each targeted column uses its own value range, taken from the column's data cells only. With [totals](#totals) enabled, the row totals and subtotal columns are still colored by the scale of the measure they aggregate, but they don't widen its range: a total past the column's highest stop is clamped to that stop's color. Cells in the column totals row are never colored by a scale, since totals rows don't take formatting rules.
+The scale is normalized **per column** — each targeted column uses its own value range, taken from the column's data cells only. With [totals](#totals) enabled, the row totals and [pivot subtotal](#subtotals) columns are still colored by the scale of the measure they aggregate, but they don't widen its range: a total past the column's highest stop is clamped to that stop's color. Cells in the column totals row are never colored by a scale, since totals rows don't take formatting rules.
 
 {/* TODO screenshot: table with a color scale applied to a numeric column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -496,4 +523,4 @@ Enable column totals and row totals from the **Totals** section of the **Style**
 
 ### Subtotals
 
-When the table is pivoted by two or more dimensions, you can also enable **subtotals** — a bold **Total for ‹value›** column appended after each pivot group's columns, at every nesting level. Subtotals combine freely with column and row totals, work in workbooks and on dashboards, and — like the other totals — carry over from the results table when you switch the chart type to Table. See [Subtotals](/docs/explore-analyze/workbooks/querying-data#subtotals) for details and limitations.
+When the table is pivoted by two or more dimensions, you can also enable **subtotals** — a bold **Total for ‹value›** column appended after each pivot group's columns, at every nesting level. Not to be confused with [per-group subtotals](#per-group-subtotals), which add a value to each row group's header row rather than a column per pivot group. Subtotals combine freely with column and row totals, work in workbooks and on dashboards, and — like the other totals — carry over from the results table when you switch the chart type to Table. See [Subtotals](/docs/explore-analyze/workbooks/querying-data#subtotals) for details and limitations.

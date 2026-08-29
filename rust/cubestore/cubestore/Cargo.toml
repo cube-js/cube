@@ -1,6 +1,6 @@
 [package]
 name = "cubestore"
-version = "1.7.28"
+version = "1.7.30"
 authors = ["Cube Dev, Inc."]
 edition = "2021"
 license = "Apache-2.0"
@@ -94,6 +94,8 @@ opentelemetry-otlp = { version = "0.26.0", default-features = false, features = 
 opentelemetry-http = { version = "0.26.0", features = ["reqwest"] }
 lru = "0.18.2"
 moka = { version = "0.10.1", features = ["future"] }
+# Already in the tree transitively at this version; used for a timed lock.
+parking_lot = "0.12"
 ctor = "0.1.20"
 json = "0.12.4"
 futures-util = "0.3.17"

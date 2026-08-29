@@ -168,11 +168,26 @@ const EXCLUDE_OPERATIONS = new Set([
   'PUT /api/v1/resource-policies/group',
   'PUT /api/v1/resource-policies/user',
   'GET /api/v1/app-theme',
-  'GET /api/v1/ai-engineer/active-region',
   'GET /api/v1/ai-engineer/settings',
   // Report folders listing — not part of the public docs surface.
   'GET /api/v1/deployments/{deploymentId}/report-folders',
 ]);
+
+// Cube-staff-only operations (provisioning real cloud infrastructure — Regions,
+// PrivateLinks, and anything else gated the same way) are excluded automatically
+// rather than via a hand-maintained EXCLUDE_OPERATIONS list: console-server's
+// `superAdminOnlyDescription()` (packages/console-server/src/api/middlewares/
+// validate-admin-access.ts in cubejs-enterprise) prefixes every such operation's
+// OpenAPI `description` with this exact marker text before ANY other processing
+// touches it, so matching on it here catches staff-only operations that didn't
+// exist yet when this list was last updated — not just the ones someone
+// remembered to add. No reader of these docs can call them (tenant admins are
+// rejected server-side), so nothing customer-facing is lost.
+//
+// A short, stable anchor rather than the full marker sentence — less brittle against
+// upstream rewrapping/rewording, and the residual scan below (which matches even more
+// loosely) is the real safety net if this ever stops matching.
+const SUPER_ADMIN_ONLY_MARKER = 'Cube super admin only';
 
 // Explicit display names for tags whose auto-cleaned form would be unclear or
 // collide. Everything else is cleaned by cleanTag() below.
@@ -267,6 +282,8 @@ const src = yaml.load(fs.readFileSync(SRC, 'utf8'));
 //    trailing slash — a trailing slash breaks Mintlify dev), and clean tags +
 //    operationIds.
 const paths = {};
+const matchedExcludes = new Set();
+let autoExcludedCount = 0;
 for (const [key, val] of Object.entries(src.paths)) {
   if (!INCLUDE_PREFIXES.some((prefix) => key.startsWith(prefix))) continue;
   let newKey = key.length > 1 ? key.replace(/\/$/, '') : key; // drop trailing slash
@@ -274,7 +291,15 @@ for (const [key, val] of Object.entries(src.paths)) {
   for (const m of METHODS) {
     if (!val[m]) continue;
     // Drop explicitly hidden operations before they reach the spec or nav.
-    if (EXCLUDE_OPERATIONS.has(`${m.toUpperCase()} ${newKey}`)) {
+    const excludeKey = `${m.toUpperCase()} ${newKey}`;
+    if (EXCLUDE_OPERATIONS.has(excludeKey)) {
+      matchedExcludes.add(excludeKey);
+      delete val[m];
+      continue;
+    }
+    // Drop Cube-staff-only operations automatically — see SUPER_ADMIN_ONLY_MARKER above.
+    if (typeof val[m].description === 'string' && val[m].description.includes(SUPER_ADMIN_ONLY_MARKER)) {
+      autoExcludedCount++;
       delete val[m];
       continue;
     }
@@ -307,6 +332,59 @@ for (const [key, val] of Object.entries(src.paths)) {
 
 if (!Object.keys(paths).length) {
   console.error(`Aborting: no paths matched ${INCLUDE_PREFIXES.join(' / ')}. Check the source spec.`);
+  process.exit(1);
+}
+
+// An EXCLUDE_OPERATIONS entry that matches nothing was likely renamed or moved
+// upstream — silently letting it through would re-publish whatever it was meant
+// to hide (some entries there exist specifically to keep staff-only operations
+// out of the public docs), and `--check` can't catch this: both the committed
+// and freshly generated output would contain the leak.
+const unmatchedExcludes = [...EXCLUDE_OPERATIONS].filter((op) => !matchedExcludes.has(op));
+if (unmatchedExcludes.length) {
+  console.error(
+    'Aborting: EXCLUDE_OPERATIONS entries matched nothing (renamed upstream?):\n  ' +
+      unmatchedExcludes.join('\n  ')
+  );
+  process.exit(1);
+}
+
+// The SUPER_ADMIN_ONLY_MARKER auto-detection above is an exact-substring match against
+// text authored in a different repo — it fails OPEN, not closed, if that text drifts
+// (rewording, a dropped 🔒, a punctuation change). Two guards restore a fail-closed
+// default without depending on the marker staying exact:
+//
+// Floor: the marker matched nothing at all. Today's spec always has staff-only
+// operations, so zero is almost certainly "the marker stopped matching," not "there
+// are none" — and if that ever becomes a real, deliberate zero, dropping this guard
+// is a one-line edit made by a human looking at exactly this message.
+if (!autoExcludedCount) {
+  console.error(
+    'Aborting: SUPER_ADMIN_ONLY_MARKER matched no operation. Did the marker text change upstream ' +
+      '(packages/console-server/src/api/middlewares/validate-admin-access.ts in cubejs-enterprise)?'
+  );
+  process.exit(1);
+}
+// Residual scan: catch staff-only prose that slipped past the exact marker match —
+// worded more loosely than the marker itself (just "super admin"/"super-admin", not
+// the full sentence) so it still fires even when SUPER_ADMIN_ONLY_MARKER no longer
+// matches. Covers a *partial* drift too: if only a newly-added operation is reworded
+// while existing ones keep today's wording, autoExcludedCount stays non-zero and the
+// floor guard above can't catch it — this scan is what does.
+// NB: "super admin"/"super-admin" specifically, not the bare 🔒 — the same lock emoji
+// also opens the unrelated (and legitimately public) ADMIN_ONLY_DOC_MARKER ("🔒 Admin only.").
+const leakedStaffOnly = [];
+for (const [p, ops] of Object.entries(paths)) {
+  for (const m of METHODS) {
+    const text = ops[m]?.['x-mint']?.content ?? ops[m]?.description ?? '';
+    if (/super[-\s]?admins?\b/i.test(text)) leakedStaffOnly.push(`${m.toUpperCase()} ${p}`);
+  }
+}
+if (leakedStaffOnly.length) {
+  console.error(
+    'Aborting: staff-only prose survived exclusion (SUPER_ADMIN_ONLY_MARKER stopped matching?):\n  ' +
+      leakedStaffOnly.join('\n  ')
+  );
   process.exit(1);
 }
 
@@ -403,6 +481,9 @@ const out = {
 
 writeOrCheck(OUT, yaml.dump(out, { lineWidth: 100, noRefs: true }));
 console.log('paths:', Object.keys(paths).length, '| schemas:', Object.keys(schemas).length, '| tags:', orderedTags.length);
+if (autoExcludedCount) {
+  console.log(`(${autoExcludedCount} Cube-staff-only operation(s) auto-excluded via SUPER_ADMIN_ONLY_MARKER)`);
+}
 
 // 5. Group operations by tag (pages in source order within a tag) and capture,
 //    per tag, its paths + the first operation's summary — used to build both the

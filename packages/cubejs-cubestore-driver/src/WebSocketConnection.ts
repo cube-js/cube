@@ -67,6 +67,9 @@ interface CubeStoreWebSocket extends WebSocket {
   // A failure that killed this socket and that re-sending can't fix, so the
   // message that caused it is rejected instead of being re-sent.
   fatalError: Error | null;
+  // Stops the heartbeat interval, which otherwise keeps a reference to this socket
+  // (and the socket itself alive) even when nothing else points to the connection.
+  teardown: () => void;
 }
 
 export class WebSocketConnection {
@@ -88,6 +91,17 @@ export class WebSocketConnection {
 
   private cubeStoreVersion: string | null = null;
 
+  // Set by close(), and never unset: a closed connection stays open only for the
+  // messages already in flight and never establishes another socket. Without it
+  // close() does not actually close anything -- the 'close' handler re-sends
+  // whatever was pending over a fresh connection, and the heartbeat on that one
+  // keeps it (and the orchestrator holding it) alive for the life of the process.
+  private closed: boolean = false;
+
+  // When close() was asked for, so the heartbeat can bound the wait for the
+  // messages that were still in flight at that point.
+  private closedAt: Date | null = null;
+
   public constructor(url: string) {
     this.url = url;
     this.messageCounter = 1;
@@ -99,6 +113,13 @@ export class WebSocketConnection {
   }
 
   protected async initWebSocket(): Promise<CubeStoreWebSocket> {
+    if (this.closed) {
+      // Refusing here is what makes close() terminal: it covers a query issued
+      // after the release as well as the re-send path, whose `catch` then
+      // rejects the messages that were in flight instead of re-opening for them.
+      throw new ConnectionError('Cube Store connection is closed');
+    }
+
     if (!this.webSocket) {
       const headers: Record<string, string> = {};
       headers['x-process-id'] = getProcessUid();
@@ -115,10 +136,31 @@ export class WebSocketConnection {
             webSocket.ping();
           }
 
+          if (this.closed) {
+            // A closed connection is kept only for the messages already in
+            // flight, and this is where that wait is both re-checked and
+            // bounded. It has to be bounded here rather than by the heartbeat
+            // check below: Cube Store keeps answering the pings of a connection
+            // whose query is simply never completed, so that check never fires
+            // and a single wedged message would keep this socket -- and this
+            // interval, which is what makes it reachable -- for the life of the
+            // process. Pinging continues meanwhile, so a connection that is
+            // draining legitimately is not dropped for inactivity.
+            if (this.closedAt && new Date().getTime() - this.closedAt.getTime() > this.noHeartBeatTimeout * 1000) {
+              this.abandonClose(webSocket);
+            } else {
+              this.closeIfDrained(webSocket);
+            }
+
+            return;
+          }
+
           if (new Date().getTime() - webSocket.lastHeartBeat.getTime() > this.noHeartBeatTimeout * 1000) {
             webSocket.close();
           }
         }, 5000);
+
+        webSocket.teardown = () => clearInterval(pingInterval);
 
         webSocket.sendAsync = async (message: Uint8Array) => new Promise<void>((resolveSend) => {
           // If socket is closing this message should be resent
@@ -164,11 +206,48 @@ export class WebSocketConnection {
             return;
           }
 
+          // The socket is done either way, so stop its heartbeat now rather than
+          // relying on a 'close' that may not follow: the interval is what keeps
+          // the socket, and everything reachable from it, alive.
+          webSocket.teardown();
+
+          if (this.closed) {
+            // Nothing to retry towards: `initWebSocket()` refuses once closed.
+            // Whatever was written to the socket is rejected by the 'close'
+            // handler, which `ws` emits after an 'error' -- the drain bound
+            // cannot catch it any more, since `teardown()` above has already
+            // stopped the interval that evaluates it.
+            if (webSocket === this.webSocket) {
+              this.webSocket = null;
+            }
+
+            // A no-op once this socket has opened, and the only thing left that
+            // can settle `readyPromise` if it has not: `teardown()` has stopped
+            // the interval, the 'close' handler does not touch it, and the retry
+            // that used to settle it by adoption is skipped just above. A socket
+            // closed while still CONNECTING would otherwise leave the
+            // `sendMessage` awaiting it pending for good -- a request hung on
+            // nothing, which is worse than the failure it replaced.
+            reject(new ConnectionError('Cube Store connection is closed'));
+
+            return;
+          }
+
+          // Counted here rather than above the branch: the closed path does not
+          // attempt a connection, and this counter both paces the retries and
+          // spends the `maxConnectRetries` budget a genuinely cold connect needs.
           this.currentConnectionTry += 1;
 
           if (this.currentConnectionTry < this.maxConnectRetries) {
             setTimeout(async () => {
-              resolve(this.initWebSocket());
+              // `.then(resolve, reject)` rather than `resolve(promise)`: once
+              // this socket's `readyPromise` has settled, `resolve` returns
+              // without adopting -- so a rejection handed to it is never
+              // observed, and an unhandled rejection is fatal under Node's
+              // default. The retry above cannot reject for `closed` any more,
+              // but a close landing between this timer being armed and firing
+              // still can, as can anything else `initWebSocket()` throws.
+              this.initWebSocket().then(resolve, reject);
             }, this.retryWaitTime());
           } else {
             reject(new ConnectionError(
@@ -188,7 +267,7 @@ export class WebSocketConnection {
           webSocket.lastHeartBeat = new Date();
         });
         webSocket.on('close', (code: number, reason: Buffer) => {
-          clearInterval(pingInterval);
+          webSocket.teardown();
 
           const pending = Object.keys(webSocket.sentMessages);
 
@@ -259,6 +338,13 @@ export class WebSocketConnection {
 
             setTimeout(async () => {
               try {
+                // Everything this re-send was scheduled for has been settled in
+                // the meantime, so there is nothing left to carry over and a new
+                // connection would just stay open on its heartbeat.
+                if (!Object.keys(webSocket.sentMessages).length) {
+                  return;
+                }
+
                 const nextWebSocket = await this.initWebSocket();
                 const resent = Object.keys(webSocket.sentMessages);
 
@@ -302,6 +388,7 @@ export class WebSocketConnection {
 
           if (httpMessage.commandType() === HttpCommand.HttpError) {
             resolver.reject(new QueryError(`${httpMessage.command(new HttpError())?.error()}`));
+            this.closeIfDrained(webSocket);
             return;
           }
 
@@ -311,6 +398,8 @@ export class WebSocketConnection {
           } catch (e) {
             resolver.reject(e);
           }
+
+          this.closeIfDrained(webSocket);
         });
       });
 
@@ -530,9 +619,78 @@ export class WebSocketConnection {
     return this.cubeStoreVersion ?? '0.0.0';
   }
 
+  /**
+   * Closes the connection for good. Messages already in flight are given the
+   * chance to be answered -- an eviction can happen mid-query, and failing one
+   * that Cube Store is already working on would fail the request -- so the
+   * socket goes away once the last of them settles, or right away if there are
+   * none.
+   */
   public close() {
-    if (this.webSocket) {
-      this.webSocket.close();
+    if (!this.closed) {
+      this.closed = true;
+      // First asked for, not most recently: `release()` closes the data-source
+      // and external drivers separately, which is the same connection twice when
+      // one `CubeStoreDriver` backs both, and re-stamping would restart the bound
+      // each time.
+      this.closedAt = new Date();
     }
+
+    // Straight away when there is nothing in flight; otherwise the heartbeat
+    // takes it from here, both to notice the drain finishing and to bound it.
+    this.closeIfDrained(this.webSocket);
+  }
+
+  /**
+   * Gives up on the messages a closed connection was waiting for, so that one
+   * Cube Store never answers costs a query rather than a permanently open
+   * socket.
+   */
+  private abandonClose(socket: CubeStoreWebSocket) {
+    const unanswered = Object.keys(socket.sentMessages);
+
+    socket.teardown();
+
+    if (socket === this.webSocket) {
+      this.webSocket = null;
+    }
+
+    const error = new ConnectionError(
+      `Cube Store connection was closed with ${unanswered.length} message(s) still unanswered`
+    );
+
+    // eslint-disable-next-line no-restricted-syntax
+    for (const key of unanswered) {
+      const message = socket.sentMessages[key];
+      delete socket.sentMessages[key];
+      message.reject(error);
+    }
+
+    socket.terminate();
+  }
+
+  /**
+   * Closes `socket` once nothing is in flight on it. A no-op until close() has
+   * been called, so an ordinary idle connection is left alone.
+   *
+   * Takes the socket rather than reading `this.webSocket`: a late answer can
+   * arrive on a socket the re-send path has already superseded, and that must
+   * not be read as the current connection having drained.
+   */
+  private closeIfDrained(socket: CubeStoreWebSocket | null) {
+    if (!this.closed || !socket || socket !== this.webSocket) {
+      return;
+    }
+
+    if (Object.keys(socket.sentMessages).length) {
+      return;
+    }
+
+    // Stop the heartbeat before closing rather than leaving it to the 'close'
+    // handler: it is the timer, not the socket, that keeps this whole graph
+    // reachable, so it should not outlive the decision to close by even a tick.
+    socket.teardown();
+    this.webSocket = null;
+    socket.close();
   }
 }

@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.30](https://github.com/cube-js/cube/compare/v1.7.29...v1.7.30) (2026-08-28)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.29](https://github.com/cube-js/cube/compare/v1.7.28...v1.7.29) (2026-08-27)
+
+### Features
+
+- **cubestore:** cap concurrent websocket connections per user ([#11667](https://github.com/cube-js/cube/issues/11667)) ([111eb3e](https://github.com/cube-js/cube/commit/111eb3ec049b9be1fa2f31186a7f83f58b5a0291))
+
 ## [1.7.28](https://github.com/cube-js/cube/compare/v1.7.27...v1.7.28) (2026-08-26)
 
 ### Bug Fixes

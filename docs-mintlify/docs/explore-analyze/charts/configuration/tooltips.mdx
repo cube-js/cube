@@ -9,7 +9,9 @@ Tooltips appear when a user hovers over a data point in a chart. By default, Cub
 
 ## Default behavior
 
-When a chart is first created, all fields assigned to the chart (X, Y, color, size) are included in the tooltip automatically. The tooltip is enabled by default on all Vega-based chart types (bar, line, area, scatter, heatmap, boxplot) and on map charts.
+When a chart is first created, all fields assigned to the chart (X, Y, color, size) are included in the tooltip automatically. The tooltip is enabled by default on all Vega-based chart types (bar, line, area, scatter, heatmap, boxplot), on map charts, and on sankey charts.
+
+[Sankey](/docs/explore-analyze/charts/chart-types/sankey) is the exception to the first rule: it seeds the tooltip with every column *except* the source, target and value it already draws.
 
 ## Configuring tooltip fields
 

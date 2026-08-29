@@ -36,7 +36,7 @@ You can set a default value that's applied when the dashboard loads. Defaults ar
 There are two ways to set a default:
 
 - **Static default** — pick a value (or values) directly in the filter. Every viewer sees the same default.
-- **User attribute default** — resolve the default from the viewer's [user attribute][ref-user-attributes] at load time, so each viewer sees their own personalized default.
+- **User attribute default** — resolve the default from the viewer's [user attribute][ref-user-attributes] at load time, so each viewer sees their own personalized default. [Parent controls](#parent-user-attribute-default) support this too.
 
 Static defaults are configured by interacting with the filter in the dashboard builder — the value you select is saved on the widget and applied to every viewer when the dashboard loads.
 
@@ -113,7 +113,7 @@ Add the child controls to the dashboard *before* the parent control. The **Child
 
 On the **Options** tab, type a label and click **Add** for each entry you want in the dropdown. Options appear as chips — remove one with its close button. A parent control can hold up to 50 options.
 
-Renaming an option later doesn't disturb the values you've mapped to it, so you can reword a label without redoing the mapping.
+Renaming an option later doesn't disturb the values you've mapped to it, so you can reword a label without redoing the mapping — but if the control has a [user attribute default](#parent-user-attribute-default), that match is by label, so rename the attribute's values with it.
 
 ### Children
 
@@ -147,9 +147,74 @@ Click the indicator to jump straight to the **Children** tab of the parent that 
 
 ### Default option
 
-Set **Default value** to the option that should be selected when the dashboard loads. Choosing a default in the builder also applies that option's values to the children, so their saved defaults line up with the parent's and a published dashboard opens in a consistent state.
+A parent control's default is set the same way a filter's static default is — by interacting with the control in the dashboard builder. The option you select is saved on the widget and applied to every viewer when the dashboard loads; there's no static default field in the parent's settings.
 
-If you leave **Default value** empty, the parent opens with nothing selected and the children use their own defaults.
+Picking in the builder also applies that option's values to the children, so their saved defaults line up with the parent's and a published dashboard opens in a consistent state.
+
+If you never pick an option, the parent opens with nothing selected and the children use their own defaults. Deleting the option that was serving as the default clears it, and the parent goes back to opening on nothing.
+
+#### User attribute default {#parent-user-attribute-default}
+
+The default above is one arrangement for everyone. To give each viewer their own, turn on **User attribute default** in the parent control's settings and pick a [user attribute][ref-user-attributes]. When the dashboard loads, Cube reads that attribute for the current viewer and opens the control on the option it names — and drives the children with it, exactly as if the viewer had picked that option themselves.
+
+This is how you ship one dashboard that opens differently per audience: a **Reporting period** parent whose options are `Month` and `Quarter`, opening on whichever one the viewer's `reporting_period` attribute says, with every filter and time granularity switcher behind it already set to match.
+
+To configure it:
+
+<Steps>
+ <Step title="Open the parent control's settings">
+   In the dashboard builder, click **Configure Parent** on the control.
+ </Step>
+ <Step title="Enable User attribute default">
+   Below the **Options** and **Children** tabs — next to **Visibility** — turn on the **User attribute default** switch.
+ </Step>
+ <Step title="Pick the attribute">
+   Select the [user attribute][ref-user-attributes] to resolve. Only attributes defined in your account appear in the picker.
+ </Step>
+</Steps>
+
+The attribute value is matched against the **option labels**, ignoring case and surrounding spaces — an attribute reading `quarter` selects the option labelled `Quarter`. Give the options the labels your attribute already uses, or adjust the attribute values to match.
+
+<Warning>
+Renaming an option leaves its child mappings intact, but the attribute match is by label — so a rename that moves a label away from the values your attribute holds silently stops it resolving, with no error. The control falls back to the option you picked as the default. Rename labels and attribute values together.
+</Warning>
+
+| Attribute type | How it's applied |
+|---|---|
+| **String**, **Number** | Matched against the option labels as a single value. |
+| **String array**, **Number array** | The first entry that names an option wins. A parent control is single-select, so the rest are ignored. |
+
+If the value matches no option — or is empty, `null`, or unresolvable — the control falls back to the [default option](#default-option) you picked, and the children keep the arrangement that goes with it.
+
+<Note>
+The attribute is resolved for the viewer, not baked into the dashboard. Editing the attribute's value changes what that viewer opens on the next time the dashboard loads; it never rewrites the published dashboard, so the default you picked in the builder stays intact for everyone else.
+</Note>
+
+Viewers can still switch to another option unless the control's [visibility](#visibility) is set to **Disabled**, and their own pick outranks the attribute for the rest of the session. Values passed [in the URL](#sharing-the-current-selection) outrank both — but only what the sharer actually picked travels: a parent control has no parameter of its own, and an untouched, attribute-resolved one puts nothing in the link, so the recipient still opens on their own attribute. When the sharer did pick an option, the link carries that option's *children's* values and the recipient opens on those.
+
+## Sharing the current selection
+
+On a published dashboard, the values a viewer picks in the controls are reflected in the URL, so the view they are looking at is bookmarkable and shareable. Copy the address bar, send it on, and the recipient opens the dashboard with the same filters and granularities applied.
+
+Each control type has its own parameter:
+
+| Control | Parameter | Example |
+|---|---|---|
+| [Filter](#filter) | `f_<semantic_view>.<dimension>=<JSON>` | `f_orders.status={"value":"shipped"}` |
+| [Time granularity switcher](#time-granularity-switcher) | `tg_<semantic_view>.<dimension>=<granularity>` | `tg_orders.created_at=week` |
+
+The semantic view and dimension are the **internal names** configured on the control — not the display titles you see in the picker. A view shown as `Orders` is usually `orders` in the parameter. Granularities are lowercase and must be one of the switcher's [allowed granularities](#allowed-granularities) — `day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour` for time dimensions that expose them.
+
+You can also write these parameters by hand to open a dashboard in a particular state — see [Pre-set dashboard filters and granularities via URL][ref-embed-url-filters] for the embedded case, which uses the same format.
+
+What does and doesn't travel in the link:
+
+- **Only what the viewer chose.** Values that came from the control's own configuration — a static default, a [default granularity](#default-granularity) — are not written into the URL. Every viewer already gets those from the dashboard itself, and leaving them out means a link stays correct after the dashboard's defaults change.
+- **Never a personalized default.** A value resolved from a [user attribute](#user-attribute-default) stays out of the link — whether it seeded a filter directly or reached one through a [parent control](#parent) opening on the viewer's own option. Sharing a dashboard never pins your attribute value onto the recipient; they see it through their own attributes.
+- **Filters and granularities together.** Picking both puts both in the link, including when a [parent control](#parent) sets several children at once. A parent control isn't serialized itself — the link carries the values its children ended up with, so the recipient sees the same data while the parent dropdown opens on whatever default it resolves for them, which may not be the option the sharer picked.
+- **Written out on published dashboards only.** Reading these parameters works anywhere, including [embedded][ref-embed-url-filters] dashboards; it's the writing that is published-only. In the dashboard builder the URL is left to the editing session, so changing a control there doesn't rewrite it.
+
+When a dashboard opens with these parameters, they are applied on top of whatever defaults the controls carry. A parameter is ignored when nothing on the dashboard can honor it — there is no matching control for that dimension, or the requested granularity isn't in the switcher's [allowed granularities](#allowed-granularities).
 
 ## Visibility
 
@@ -204,6 +269,7 @@ For [time granularity switchers][ref-time-grain], the dimension picker is restri
 Mappings are also configurable by AI agents when they build or edit a dashboard, so an agent can wire controls across charts that use different semantic views without you needing to revisit each chart manually.
 
 [ref-time-grain]: #time-granularity-switcher
+[ref-embed-url-filters]: /embedding/iframe/dashboards#pre-set-dashboard-filters-via-url
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-charts]: /docs/explore-analyze/dashboards/widgets/charts

@@ -15,6 +15,13 @@ To enable it, pass `creatorMode: true` to the [Generate Session API][ref-generat
   Creator Mode requires [Signed embedding](/embedding/iframe/auth/signed). Private embedding is not supported.
 </Note>
 
+## Dashboard header controls
+
+When a user opens a dashboard inside Creator Mode, its header renders the
+same as in a standalone dashboard embed. To hide any of its controls (title,
+back button, Edit, Duplicate) for your embed, see
+[Show or hide header controls](/embedding/iframe/dashboards#show-or-hide-header-controls).
+
 ## Embed tenant scoping
 
 In Creator Mode, content (workbooks, dashboards) and the groups/user attributes referenced by the session are scoped to an **embed tenant**. Pass `embedTenantName` to isolate content per customer; omit it to use the current tenant.

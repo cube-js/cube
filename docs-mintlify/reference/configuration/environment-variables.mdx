@@ -1975,6 +1975,23 @@ The logging level for Cube Store.
 
 See also [`CUBEJS_LOG_LEVEL`](/reference/configuration/environment-variables#cubejs_log_level).
 
+## `CUBESTORE_MAX_WS_CONNECTIONS_PER_USER`
+
+The maximum number of concurrent WebSocket connections a single authenticated
+user may hold. At the limit, that user's oldest connection is closed to admit the
+new one: a client that still needs it reconnects, while one that had forgotten
+about it simply loses it. The limit is counted per Cube Store node, so a user
+connecting to several nodes may hold up to this many on each.
+
+Use it to keep one client that leaks connections from exhausting the node's file
+descriptors for everyone else. Set it comfortably above the number of connections
+a client legitimately keeps open at once, or working connections will be recycled.
+`0` disables the limit.
+
+| Possible Values           | Default in Development | Default in Production |
+| ------------------------- | ---------------------- | --------------------- |
+| A non-negative integer    | `0`                    | `0`                   |
+
 ## `CUBESTORE_META_ADDR`
 
 The address/port pair for the Cube Store **router** node in the cluster.
