@@ -562,8 +562,8 @@ of the PostgreSQL documentation.
 </Info>
 
 Window functions are supported via [query pushdown][ref-qpd] only; they are not
-available in [query post-processing][ref-qpp]. Two kinds are supported, including
-over a grouped subquery, CTE, or join:
+available in [query post-processing][ref-qpp]. The window can be evaluated over a grouped
+subquery, a CTE, or a join. Two kinds are supported:
 
 - **Aggregate functions used as window functions** — any supported aggregate
   function (such as `SUM`, `AVG`, `COUNT`, `MIN`, or `MAX`) combined with an

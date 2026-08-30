@@ -205,8 +205,9 @@ Please refer to the [SQL API reference][ref-ref-sql-api] for the list of support
 Support varies based on the target database.
 
 A `UNION` or `UNION ALL` of queries that all target the same data source is pushed
-down as a single statement, so the [row limit][ref-query-default-limit] applies once,
-to the combined result, rather than separately to each branch. A union whose branches
+down as a single statement, so the [maximum row
+limit](/docs/data-modeling/configuration#maximum-row-limit) applies once, to the
+combined result, rather than separately to each branch. A union whose branches
 reach different data sources still evaluates each branch on its own; see [querying
 across data sources][ref-cross-data-source-queries] for that case.
 

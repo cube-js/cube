@@ -75,7 +75,7 @@ own.
 ## Default deployment
 
 If your account has more than one deployment, pick which one you land on when you open
-Cube without a deployment in the URL. Leaving it as **Account default** follows the
-deployment your admin pinned (see [Default deployment](/admin/deployment#default-deployment)),
-or the most recently created deployment if nothing is pinned. The control is hidden on
-single-deployment accounts.
+Cube without a deployment in the URL. Leaving it as **Account default** falls back to the
+rest of the [resolution order](/admin/deployment#default-deployment) — the deployment you
+last switched to, then the deployment your admin pinned, then the most recently created
+one. The control is hidden on single-deployment accounts.
