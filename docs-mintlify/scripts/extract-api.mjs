@@ -213,7 +213,7 @@ const TAG_ORDER = [
   'User Attributes', 'User Attribute Values', 'Resource Policies', 'Tenant Settings',
   'OAuth Integrations', 'User OAuth Tokens', 'OIDC Token Configs',
   'App Theme', 'AI Engineer', 'Embed', 'Embed Tenants', 'Dashboard Embed Access',
-  'OpenAPI Spec',
+  'Usage Analytics', 'OpenAPI Spec',
 ];
 
 // Mintlify renders the OpenAPI operation `description` as a plain-text node — it

@@ -44,6 +44,7 @@ tags:
   - name: Embed
   - name: Embed Tenants
   - name: Dashboard Embed Access
+  - name: Usage Analytics
   - name: OpenAPI Spec
 paths:
   /api/v1/app-config:
@@ -3044,6 +3045,56 @@ paths:
           groups — including the account-wide `groups` that drive data-model access — are left
           untouched. Idempotent: the response buckets every requested member into `addedMembers` or
           `unchangedMembers`.
+  /api/v1/embed-tenants/{embedTenantName}/user:
+    post:
+      operationId: provisionEmbedUser
+      parameters:
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+          description: Name of the embed tenant (the `embedTenantName` used to generate embed sessions).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProvisionEmbedUserInput'
+        description: ProvisionEmbedUserInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedUser'
+          description: ''
+      summary: Provision an embed user
+      tags:
+        - Embed Tenants
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Creates or updates one embed user from the identity your own system knows. An embed user
+          is otherwise created the first time they generate a session, so this is how an integration
+          puts its own directory into Cube up front: a user provisioned here is immediately
+          addressable — listable, searchable, assignable to groups, and selectable wherever the
+          product offers a choice of users — before they have ever opened the embed.
+
+
+          Idempotent, and the body is the desired state: provisioning an `externalId` that already
+          exists updates it rather than failing. `email`, `userProfile.displayName` and
+          `userProfile.picture` are overwritten when supplied and preserved when omitted; each group
+          lane is REPLACED when supplied, preserved when omitted, and cleared by `[]`. The embed
+          tenant itself is created on demand, so it need not exist yet.
+
+
+          Everything set here is exactly what `generate-session` would have set, and a later session
+          for the same `externalId` re-applies whatever it carries — so provisioning changes when a
+          user exists, never what their session grants them.
   /api/v1/embed-tenants/{embedTenantName}/users:
     get:
       operationId: listEmbedUsers
@@ -3093,6 +3144,57 @@ paths:
           though they stay addressable by it everywhere it is accepted as input. Use `search` to
           match a substring of the email or external id, or a complete external id, which resolves a
           user even when the response cannot echo it back.
+    post:
+      operationId: provisionEmbedUsers
+      parameters:
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+          description: Name of the embed tenant (the `embedTenantName` used to generate embed sessions).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProvisionEmbedUsersInput'
+        description: ProvisionEmbedUsersInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisionEmbedUsersResponse'
+          description: ''
+      summary: Provision embed users in bulk
+      tags:
+        - Embed Tenants
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Provisions up to 100 embed users in one request, each exactly as `POST
+          /embed-tenants/{embedTenantName}/user` would. Use it to load a user directory into an
+          embed tenant, and send further requests to cover a directory larger than one batch.
+
+
+          **This endpoint is partially successful.** It returns `200` whenever the request itself is
+          well formed, and reports each user separately:
+
+          - `succeeded` — the users that were provisioned, in the order requested.
+
+          - `failed` — the entries that were not, each with the `externalId` and an `error` carrying
+          the `status` and `message` the single-user endpoint would have returned (`400` for a group
+          name that does not exist, `429` once the tenant is at its embed-user limit).
+
+
+          Users are applied one at a time in the order given, and earlier ones are not rolled back
+          when a later one fails. Since provisioning is idempotent, resending the whole batch after
+          fixing the failures is safe. A repeated `externalId` within one batch is applied once per
+          entry, so the last one wins.
   /api/v1/embed/dashboard/{publicId}:
     get:
       operationId: getDashboard
@@ -3689,6 +3791,42 @@ paths:
       summary: Update tenant settings
       tags:
         - Tenant Settings
+  /api/v1/usage-analytics/token:
+    post:
+      operationId: createToken
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageAnalyticsTokenResponse'
+          description: ''
+      summary: Issue a Cube API token for Usage Analytics
+      tags:
+        - Usage Analytics
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Issues a short-lived Cube API token for Cube's internal **Usage Analytics** deployment —
+          the data shown on **Admin → Usage Analytics** — so you can query your own usage and
+          billing data programmatically (REST API, BI tools, scripts) instead of only through the
+          embedded page.
+
+
+          The token is scoped to your account: it carries the same server-resolved security context
+          as the embedded Usage Analytics page, so queries only ever see your own data. Send it as
+          `Authorization: Bearer <token>` on requests to the returned `apiUrl` (the deployment's
+          [Cube REST API](https://cube.dev/docs/product/apis-integrations/rest-api)).
+
+
+          Tokens expire after ~24 hours (see `expiresAt`). Issue a fresh one per session or
+          scheduled refresh — issuing is idempotent and cheap.
+
+
+          Requires Usage Analytics to be enabled for the account, otherwise `404` is returned.
   /api/v1/user-attribute-values:
     post:
       operationId: upsertUserAttributeValue
@@ -5325,6 +5463,13 @@ components:
           oneOf:
             - type: integer
               description: Minute of the hour (0-59)
+            - type: 'null'
+        notificationAiSummary:
+          oneOf:
+            - type: boolean
+              description: >-
+                Include an AI-generated "what changed" summary in the notification body. Off by
+                default.
             - type: 'null'
         notificationEnabled:
           oneOf:
@@ -7488,6 +7633,10 @@ components:
       type: object
     EmbedSettings:
       properties:
+        enableDashboardComments:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         locale:
           oneOf:
             - type: string
@@ -8239,6 +8388,9 @@ components:
           type: integer
         isEnabled:
           type: boolean
+        notificationAiSummary:
+          description: Whether this notification carries an AI-generated "what changed" summary in its body.
+          type: boolean
         notificationEnabled:
           type: boolean
         notificationFormat:
@@ -8262,6 +8414,7 @@ components:
         - humanReadableSchedule
         - notificationEnabled
         - notificationFormat
+        - notificationAiSummary
       type: object
     NotificationRecipient:
       properties:
@@ -8661,6 +8814,98 @@ components:
           type: string
       required:
         - sessionId
+      type: object
+    ProvisionEmbedUserFailure:
+      properties:
+        error:
+          $ref: '#/components/schemas/BulkActionError'
+        externalId:
+          description: The `externalId` of the entry that failed, normalized the same way a successful one is.
+          type: string
+      required:
+        - externalId
+        - error
+      type: object
+    ProvisionEmbedUserInput:
+      properties:
+        email:
+          oneOf:
+            - format: email
+              type: string
+              description: >-
+                Email address, shown wherever the user is listed and searchable through `GET
+                /embed-tenants/{embedTenantName}/users`. Must be a valid address, and is stored
+                lowercased. Omit it and Cube derives a synthetic `{externalId}@cubecloud.dev`
+                placeholder instead, which is what makes a user hard to recognise in a list.
+                Supplying it again later updates the stored address.
+            - type: 'null'
+        externalId:
+          description: >-
+            The id your own system knows this user by — the same `externalId` you will pass to
+            `generate-session`. Trimmed and lowercased before it is stored, so casing never produces
+            a second user.
+          minLength: 1
+          type: string
+        groups:
+          oneOf:
+            - items:
+                type: string
+              type: array
+              description: >-
+                Global, account-wide groups (the `groups` field of `generate-session`) that gate
+                data-model access. They must already exist. Supplying the field REPLACES the user’s
+                global groups; omit it to leave them untouched, pass `[]` to clear them.
+            - type: 'null'
+        tenantGroups:
+          oneOf:
+            - items:
+                type: string
+              type: array
+              description: >-
+                Groups belonging to this embed tenant (the `tenantGroups` field of
+                `generate-session`), which scope content sharing and organization within the tenant.
+                Create them first via `POST /embed-tenants/{embedTenantName}/groups`. Supplying the
+                field REPLACES the user’s tenant groups; omit it to leave them untouched, pass `[]`
+                to clear them.
+            - type: 'null'
+        userProfile:
+          oneOf:
+            - $ref: '#/components/schemas/EmbedUserProfile'
+              type: object
+              description: >-
+                Display name and avatar. `displayName` is the name shown wherever the user appears,
+                including on content they author. Omitted fields keep their current value.
+            - type: 'null'
+      required:
+        - externalId
+      type: object
+    ProvisionEmbedUsersInput:
+      properties:
+        users:
+          description: Embed users to provision (1–100 per request).
+          items:
+            $ref: '#/components/schemas/ProvisionEmbedUserInput'
+          maxItems: 100
+          minItems: 1
+          type: array
+      required:
+        - users
+      type: object
+    ProvisionEmbedUsersResponse:
+      properties:
+        failed:
+          description: The entries that were not applied, each with the reason.
+          items:
+            $ref: '#/components/schemas/ProvisionEmbedUserFailure'
+          type: array
+        succeeded:
+          description: The users that were provisioned, in the order they were requested.
+          items:
+            $ref: '#/components/schemas/EmbedUser'
+          type: array
+      required:
+        - succeeded
+        - failed
       type: object
     PublishDashboardInput:
       properties:
@@ -9147,6 +9392,7 @@ components:
         - kpi
         - html
         - map
+        - sankey
       type: string
     ReportSnapshotPreferences:
       properties:
@@ -9676,6 +9922,13 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        notificationAiSummary:
+          oneOf:
+            - type: boolean
+              description: >-
+                Include an AI-generated "what changed" summary in the notification body. Off by
+                default.
+            - type: 'null'
         notificationEnabled:
           oneOf:
             - type: boolean
@@ -9899,6 +10152,33 @@ components:
           type: string
       required:
         - id
+      type: object
+    UsageAnalyticsTokenResponse:
+      properties:
+        apiUrl:
+          description: >-
+            Base URL of the Usage Analytics deployment’s Cube REST API (e.g.
+            `https://<host>/cubejs-api/v1`). Query it with the returned token.
+          type: string
+        deploymentId:
+          description: Id of the Usage Analytics deployment the token was issued for.
+          type: integer
+        expiresAt:
+          oneOf:
+            - type: string
+              description: >-
+                When the token expires, as an ISO-8601 timestamp. Request a new token before this
+                moment — issuing one is idempotent and cheap.
+            - type: 'null'
+        token:
+          description: >-
+            A short-lived JWT for the Usage Analytics deployment, carrying this tenant’s security
+            context. Send it as `Authorization: Bearer <token>` on requests to `apiUrl`.
+          type: string
+      required:
+        - token
+        - apiUrl
+        - deploymentId
       type: object
     User:
       properties:
@@ -10278,6 +10558,11 @@ components:
           oneOf:
             - {}
             - type: 'null'
+        settings:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
         username:
           type: string
       required:
@@ -10392,6 +10677,10 @@ components:
         alternatingRowColors:
           oneOf:
             - type: boolean
+            - type: 'null'
+        defaultDeploymentId:
+          oneOf:
+            - type: integer
             - type: 'null'
         lastSeenChangelogId:
           oneOf:

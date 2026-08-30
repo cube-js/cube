@@ -7,6 +7,17 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.js against the platform client CHANGELOG.md. */}
 
+<Update label="2026-08-30" description="v0.5.0" tags={["Added"]}>
+  ### Added
+
+  - `POST /api/v1/usage-analytics/token` (`UsageAnalyticsPublicController.createToken`) — issues a short-lived Cube API token scoped to your account, for querying your own Usage Analytics (usage/billing) data programmatically instead of only through the embedded Admin page. New schema: `UsageAnalyticsTokenResponse`. Admin-only.
+  - `CreateNotificationInput` / `UpdateNotificationInput` gained `notificationAiSummary` — include an AI-generated "what changed" summary in the notification body. Read back as `notificationAiSummary` on the corresponding notification response schema.
+  - `EmbedSettings` gained `enableDashboardComments` — controls whether embedded published dashboards allow comments.
+  - `UserSettingsInput` gained `defaultDeploymentId` — a personal override for the deployment a user lands on when opening the workspace without one specified in the URL; `null`/unset inherits the account-wide default. It is readable via the existing `settings` object on the `User` schema.
+  - `UserCreateInput` gained `settings` — seed a new user's personal settings (the `UserSettingsInput` fields, e.g. `locale`, `theme`, `defaultDeploymentId`) at creation time instead of a follow-up update. Typed as a free-form object in the spec.
+  - `ReportSnapshotDtoKind` gained a new `"sankey"` enum value.
+</Update>
+
 <Update label="2026-08-27" description="v0.4.0" tags={["Added","Changed","Removed"]}>
   ### Added
 
