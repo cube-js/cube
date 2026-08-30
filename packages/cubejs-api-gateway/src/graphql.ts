@@ -377,8 +377,11 @@ export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: 
 
   if (orderBy) {
     Object.entries<any>(orderBy).forEach(([cubeName, members]) => {
+      const cubeExists = metaConfig.find((cube) => cube.config.name === cubeName);
+      const normalizedCubeName = cubeExists ? cubeName : capitalize(cubeName);
+
       Object.entries<any>(members).forEach(([member, value]) => {
-        order.push([`${capitalize(cubeName)}.${member}`, value]);
+        order.push([`${normalizedCubeName}.${member}`, value]);
       });
     });
   }

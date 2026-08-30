@@ -269,6 +269,109 @@ describe('GraphQL Schema', () => {
     });
   });
 
+  describe('root orderBy', () => {
+    // Two cubes that differ only in the case of the first letter of their name.
+    // GraphQL exposes both as lowercase-first fields, so the cube name coming
+    // back from the `orderBy` argument has to be resolved against the meta
+    // config rather than blindly capitalized.
+    const metaConfigMixedCase = [
+      {
+        config: {
+          name: 'lowercaseOrders',
+          measures: [{ name: 'lowercaseOrders.count', isVisible: true }],
+          dimensions: [
+            { name: 'lowercaseOrders.id', isVisible: true },
+            { name: 'lowercaseOrders.status', type: 'string', isVisible: true },
+          ],
+        },
+      },
+      {
+        config: {
+          name: 'UppercaseOrders',
+          measures: [{ name: 'UppercaseOrders.count', isVisible: true }],
+          dimensions: [
+            { name: 'UppercaseOrders.id', isVisible: true },
+            { name: 'UppercaseOrders.status', type: 'string', isVisible: true },
+          ],
+        },
+      },
+    ];
+
+    let loadedQuery: any;
+
+    const app = express();
+
+    app.use('/graphql', jsonParser, (req, res) => {
+      const schema = makeSchema(metaConfigMixedCase);
+
+      return graphqlHTTP({
+        schema,
+        context: {
+          req,
+          res,
+          apiGateway: {
+            async load({ query, res: response }) {
+              loadedQuery = query;
+              response({ query, annotation: {}, data: [] });
+            },
+          },
+        },
+      })(req, res);
+    });
+
+    async function loadQueryFor(query: string) {
+      loadedQuery = undefined;
+
+      const res = await request(app)
+        .post('/graphql')
+        .set('Content-Type', 'application/json')
+        .send(gqlQuery(query));
+
+      expect(res.body.errors).toBeUndefined();
+
+      return loadedQuery;
+    }
+
+    test('should keep the cube name as declared when it starts with a lowercase letter', async () => {
+      const query = await loadQueryFor(`query CubeQuery {
+        cube(orderBy: { lowercaseOrders: { count: desc } }, limit: 5) {
+          lowercaseOrders { count }
+        }
+      }`);
+
+      expect(query.measures).toEqual(['lowercaseOrders.count']);
+      expect(query.order).toEqual([['lowercaseOrders.count', 'desc']]);
+    });
+
+    test('should capitalize the cube name when it is only declared capitalized', async () => {
+      const query = await loadQueryFor(`query CubeQuery {
+        cube(orderBy: { uppercaseOrders: { count: desc } }, limit: 5) {
+          uppercaseOrders { count }
+        }
+      }`);
+
+      expect(query.measures).toEqual(['UppercaseOrders.count']);
+      expect(query.order).toEqual([['UppercaseOrders.count', 'desc']]);
+    });
+
+    test('should resolve every cube in a multi-cube root orderBy', async () => {
+      const query = await loadQueryFor(`query CubeQuery {
+        cube(
+          orderBy: { lowercaseOrders: { count: desc }, uppercaseOrders: { status: asc } }
+          limit: 5
+        ) {
+          lowercaseOrders { count }
+          uppercaseOrders { status }
+        }
+      }`);
+
+      expect(query.order).toEqual([
+        ['lowercaseOrders.count', 'desc'],
+        ['UppercaseOrders.status', 'asc'],
+      ]);
+    });
+  });
+
   describe('extensions', () => {
     const mockAnnotation = {
       measures: {
