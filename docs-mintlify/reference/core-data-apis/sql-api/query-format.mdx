@@ -204,6 +204,12 @@ If direct conversion is not possible, different SQL transformation rewrite rules
 Please refer to the [SQL API reference][ref-ref-sql-api] for the list of supported SQL functions and clauses.
 Support varies based on the target database.
 
+A `UNION` or `UNION ALL` of queries that all target the same data source is pushed
+down as a single statement, so the [row limit][ref-query-default-limit] applies once,
+to the combined result, rather than separately to each branch. A union whose branches
+reach different data sources still evaluates each branch on its own; see [querying
+across data sources][ref-cross-data-source-queries] for that case.
+
 ## Top-down and bottom-up evaluation
 
 Fundamentally, every SQL operation results in a tabular data set.
@@ -447,6 +453,7 @@ If a query of yours has that shape, you can:
 [ref-query-default-limit]: /reference/core-data-apis/queries#row-limit
 [ref-env-db-query-limit]: /reference/configuration/environment-variables#cubejs_db_query_limit
 [ref-env-cubesql-stream-mode]: /reference/configuration/environment-variables#cubesql_stream_mode
+[ref-cross-data-source-queries]: /recipes/data-modeling/cross-data-source-queries
 [ref-env-non-streaming-limit]: /reference/configuration/environment-variables#cubesql_non_streaming_query_max_row_limit
 [ref-ref-sql-api]: /reference/core-data-apis/sql-api/reference
 [link-postgres-boolean]: https://www.postgresql.org/docs/current/datatype-boolean.html
