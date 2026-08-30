@@ -513,8 +513,10 @@ of the PostgreSQL documentation.
 | `STRING_AGG` | Concatenates the input values into a string, separated by a delimiter (supports `DISTINCT`) | ✅ Yes | ❌ No |
 | `PERCENTILE_CONT` | Computes a continuous percentile, used with `WITHIN GROUP (ORDER BY ...)` | ✅ Yes | ❌ No |
 
-Aggregate functions that take more than one argument (for example, `PERCENTILE_CONT`
-combined with other arguments in the same call) are supported in pushdown.
+An aggregate function that takes more than one argument (for example,
+`APPROX_PERCENTILE_CONT(expr, 0.5)`) is no longer excluded from pushdown by its argument
+count; whether it can be pushed down still depends on the target data source supporting
+that function.
 
 In projections in inner parts of post-processing queries:
 * `AVG`, `COUNT`, `MAX`, `MIN`, and `SUM` can only be used with measures of
