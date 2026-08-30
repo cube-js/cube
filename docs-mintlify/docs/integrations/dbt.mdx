@@ -612,7 +612,7 @@ credential can write to the repository — a `git-receive-pack` probe for a PAT,
 | --- | --- |
 | **Models path** | Directory in the dbt project where generated model files are written. Defaults to `models/marts/cube/`. |
 | **Validation level** | The dbt check a pushed model must pass before Cube opens the change. **Parse only** just parses the project. **Compile (recommended)** — the default — opens the warehouse connection but doesn't materialize anything. **Build in a validation schema** (**Build**) actually builds the model in a schema you provide, catching errors the other two levels can't. |
-| **Validation schema** | Required by the form whenever **Validation level** is **Build**, on every adapter. An existing schema you create and grant access to yourself — Cube only creates and drops the temporary validation relation inside it, never the schema. |
+| **Validation schema** | Required whenever **Validation level** is **Build**, including on adapters that fall back to **Parse only** (see below). An existing schema you create and grant access to yourself — Cube only creates and drops the temporary validation relation inside it, never the schema. |
 | **Delivery mode** | **Open a pull request** (default) pushes to a `cube/dbt-push/*` branch and opens a PR/MR. **Commit directly to a branch** commits straight to a branch you name — validation still runs. |
 
 Then **Save dbt settings**.
