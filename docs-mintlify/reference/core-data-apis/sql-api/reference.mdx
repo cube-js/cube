@@ -514,9 +514,8 @@ of the PostgreSQL documentation.
 | `PERCENTILE_CONT` | Computes a continuous percentile, used with `WITHIN GROUP (ORDER BY ...)` | ✅ Yes | ❌ No |
 
 An aggregate function that takes more than one argument (for example,
-`APPROX_PERCENTILE_CONT(expr, 0.5)`) is no longer excluded from pushdown by its argument
-count; whether it can be pushed down still depends on the target data source supporting
-that function.
+`APPROX_PERCENTILE_CONT(expr, 0.5)`) can be pushed down, provided the target data source
+supports that function.
 
 In projections in inner parts of post-processing queries:
 * `AVG`, `COUNT`, `MAX`, `MIN`, and `SUM` can only be used with measures of
