@@ -59,9 +59,10 @@ update both sides of the integration.
 2. In the **Basic SAML Configuration** section, enter the following:
    - **Entity ID** — Use the **Single Sign-On URL** value from Cube.
    - **Reply URL** — Use the **Single Sign-On URL** value from Cube.
-3. Go to **Attributes & Claims → Edit → Advanced settings** and
-   set the audience claim override to the **Audience (SP Entity ID)** value
-   from Cube. It must match exactly.
+3. If the **Audience (SP Entity ID)** value from Cube differs from the
+   **Entity ID** configured in the previous step, go to **Attributes & Claims
+   → Edit → Advanced settings** and set the audience claim override to the
+   Cube value. If the values match, no audience claim override is required.
 4. Go to **SAML Certificates → Edit** and select **Sign SAML
    response and assertion** for the **Signing Option**.
 5. Download the **Federation Metadata XML** file — you'll need it
