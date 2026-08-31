@@ -62,6 +62,36 @@ FROM orders
 ORDER BY status, id DESC;
 ```
 
+### `UNION`
+
+Synopsis:
+
+```sql
+query UNION [ ALL ] query
+```
+
+`UNION` combines the result sets of two or more `SELECT` statements. `UNION ALL`
+keeps duplicate rows in the combined result; plain `UNION` removes them.
+
+When every unioned query targets the same [data source][ref-data-sources],
+`UNION`/`UNION ALL` is pushed down as a single query to that data source. A
+`UNION`/`UNION ALL` spanning multiple data sources still runs as
+[post-processing][ref-qpp] on top of the individual queries.
+
+Example:
+
+```sql
+SELECT status, COUNT(*) AS count
+FROM orders
+WHERE created_at >= '2024-01-01'
+GROUP BY 1
+UNION ALL
+SELECT status, COUNT(*) AS count
+FROM orders
+WHERE created_at < '2024-01-01'
+GROUP BY 1;
+```
+
 ### `EXPLAIN`
 
 Synopsis:
@@ -512,6 +542,7 @@ of the PostgreSQL documentation.
 | `MEASURE` | Works with measures of [any type][ref-sql-api-aggregate-functions] | ✅ Yes | <nobr>❌ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `STRING_AGG` | Concatenates the input values into a string, separated by a delimiter (supports `DISTINCT`) | ✅ Yes | ❌ No |
 | `PERCENTILE_CONT` | Computes a continuous percentile, used with `WITHIN GROUP (ORDER BY ...)` | ✅ Yes | ❌ No |
+| `APPROX_PERCENTILE_CONT` | Computes an approximate continuous percentile, used with `WITHIN GROUP (ORDER BY ...)`. Also how `APPROX_MEDIAN` is expressed (as `APPROX_PERCENTILE_CONT(expr, 0.5)`), which is useful for computing a median on data sources with no exact median function, such as Athena, Trino, and Presto | ✅ Yes | ❌ No |
 
 In projections in inner parts of post-processing queries:
 * `AVG`, `COUNT`, `MAX`, `MIN`, and `SUM` can only be used with measures of
@@ -557,17 +588,26 @@ of the PostgreSQL documentation.
 </Info>
 
 Window functions are supported via [query pushdown][ref-qpd] only; they are not
-available in [query post-processing][ref-qpp]. Two kinds are supported:
+available in [query post-processing][ref-qpp]. Three kinds are supported:
 
 - **Aggregate functions used as window functions** — any supported aggregate
   function (such as `SUM`, `AVG`, `COUNT`, `MIN`, or `MAX`) combined with an
   `OVER (...)` clause.
-- **The `LAG` and `LEAD` window functions:**
+- **The `LAG` and `LEAD` window functions.**
+- **Ranking and value window functions:**
 
 | Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
 | --- | --- | --- | --- |
 | `LAG` | Returns the value from a row at a given offset before the current row within its partition | ✅ Yes | ❌ No |
 | `LEAD` | Returns the value from a row at a given offset after the current row within its partition | ✅ Yes | ❌ No |
+| `ROW_NUMBER` | Returns the number of the current row within its partition, counting from 1 | ✅ Yes | ❌ No |
+| `RANK` | Returns the rank of the current row within its partition, with gaps after ties | ✅ Yes | ❌ No |
+| `DENSE_RANK` | Returns the rank of the current row within its partition, without gaps after ties | ✅ Yes | ❌ No |
+| `PERCENT_RANK` | Returns the relative rank of the current row: `(rank - 1) / (total rows - 1)` | ✅ Yes | ❌ No |
+| `CUME_DIST` | Returns the cumulative distribution: the number of partition rows preceding or peer with the current row, divided by total rows in the partition | ✅ Yes | ❌ No |
+| `FIRST_VALUE` | Returns the value evaluated at the first row of the window frame | ✅ Yes | ❌ No |
+| `LAST_VALUE` | Returns the value evaluated at the last row of the window frame | ✅ Yes | ❌ No |
+| `NTH_VALUE` | Returns the value evaluated at the `n`-th row of the window frame, counting from 1 | ✅ Yes | ❌ No |
 
 ### Row and array comparisons
 
@@ -607,6 +647,7 @@ See the [XIRR recipe](/recipes/data-modeling/xirr) for more details.
 [ref-meta-api]: /reference/core-data-apis/rest-api/reference#metadata-api
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-graphql-api]: /reference/core-data-apis/graphql-api
+[ref-data-sources]: /admin/connect-to-data/data-sources
 [link-postgres-funcs]: https://www.postgresql.org/docs/current/functions.html
 [link-postgres-copy]: https://www.postgresql.org/docs/current/sql-copy.html
 [link-github-sql-api]: https://github.com/cube-js/cube/issues?q=is%3Aopen+is%3Aissue+label%3Aapi%3Asql
