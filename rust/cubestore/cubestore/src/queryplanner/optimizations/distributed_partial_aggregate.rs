@@ -436,13 +436,13 @@ fn resort_worker_subtree(
     // the trim bounds the worker exactly as before, not leaving it unbounded.
     if partial.as_any().is::<AggregateExec>() && group_by_limit_factor > 0 {
         // CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION decides where the worker's hash table lives:
-        //  - off (default): coalesce the aggregate's input to a single partition, so the worker
-        //    builds ONE hash table over the merged partitions ("over merge"). Peak memory ~k, no
-        //    intra-worker parallelism on the aggregation.
-        //  - on: keep the raw multi-partition input, so the aggregate runs once per partition
-        //    ("under merge"): N parallel hash tables -- more parallelism, peak ~N*k. The trim keeps
-        //    each per-partition output to ~factor*k, and the global top-k argument (full group key)
-        //    guarantees a surviving group stays within every partition's local top-k.
+        //  - on (default): keep the raw multi-partition input, so the aggregate runs once per
+        //    partition ("under merge"): N parallel hash tables -- more parallelism, peak ~N*k. The
+        //    trim keeps each per-partition output to ~factor*k, and the global top-k argument (full
+        //    group key) guarantees a surviving group stays within every partition's local top-k.
+        //  - off: coalesce the aggregate's input to a single partition, so the worker builds ONE
+        //    hash table over the merged partitions ("over merge"). Peak memory ~k, no intra-worker
+        //    parallelism on the aggregation.
         let partial = if group_by_limit_per_partition {
             partial
         } else {
