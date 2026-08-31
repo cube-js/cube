@@ -313,20 +313,24 @@ export class PreAggregations {
     return [];
   }
 
-  private preAggregationDescriptionFor(cube: string, foundPreAggregation: PreAggregationForQuery): FullPreAggregationDescription {
-    const { preAggregationName, preAggregation, references } = foundPreAggregation;
+  /**
+   * Requested time dimension range this pre-aggregation was matched by, as local
+   * (timezone naked) ISO strings, e.g. ['2024-02-01T00:00:00.000', '2024-02-29T23:59:59.999'].
+   * Drives partition selection, and bounds the rollupLambda source query so both halves of
+   * the union agree.
+   */
+  public matchedTimeDimensionDateRangeFor(foundPreAggregation: PreAggregationForQuery): [string, string] | undefined {
+    const { preAggregation } = foundPreAggregation;
 
-    const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
-    const invalidateKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation, preAggregationName);
-    const queryForSqlEvaluation = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
-    // Atm this is only defined in KsqlQuery but without it partitions are recreated on every refresh
-    const partitionInvalidateKeyQueries = queryForSqlEvaluation.partitionInvalidateKeyQueries?.(cube, preAggregation);
+    if (!preAggregation.partitionGranularity) {
+      return undefined;
+    }
 
     const allBackAliasMembers = this.query.allBackAliasMembers();
 
     let matchedTimeDimension: BaseTimeDimension | undefined;
 
-    if (preAggregation.partitionGranularity && !this.hasCumulativeMeasures()) {
+    if (!this.hasCumulativeMeasures()) {
       matchedTimeDimension = this.query.timeDimensions.find(td => {
         if (!td.dateRange) {
           return false;
@@ -349,23 +353,76 @@ export class PreAggregations {
       });
     }
 
-    let filters: BaseFilter[] | undefined;
-
-    if (preAggregation.partitionGranularity) {
-      filters = this.query.filters?.filter((td): td is BaseFilter => {
-        // TODO support all date operators
-        if (td.isDateOperator() && 'camelizeOperator' in td && td.camelizeOperator === 'inDateRange') {
-          if (td.dimension === foundPreAggregation.references.timeDimensions[0].dimension) {
-            return true;
-          }
-
-          // Handling for views
-          return td.dimension === allBackAliasMembers[foundPreAggregation.references.timeDimensions[0].dimension];
+    const filters = this.query.filters?.filter((td): td is BaseFilter => {
+      // TODO support all date operators
+      if (td.isDateOperator() && 'camelizeOperator' in td && td.camelizeOperator === 'inDateRange') {
+        if (td.dimension === foundPreAggregation.references.timeDimensions[0].dimension) {
+          return true;
         }
 
-        return false;
-      });
+        // Handling for views
+        return td.dimension === allBackAliasMembers[foundPreAggregation.references.timeDimensions[0].dimension];
+      }
+
+      return false;
+    });
+
+    return matchedTimeDimension?.boundaryDateRangeFormatted() ||
+      filters?.[0]?.formattedDateRange() || // TODO intersect all date ranges
+      undefined;
+  }
+
+  /**
+   * Mirrors the merge done in preAggregationDescriptionsForUsageInfos(), otherwise a forward
+   * shifted usage would be bounded tighter than the partitions it unions with and lose
+   * source rows.
+   */
+  public lambdaSourceDateRange(
+    lambdaPreAggregation: PreAggregationForQuery,
+    rollupLambda: PreAggregationForQuery
+  ): [string, string] | undefined {
+    const matchedDateRange = this.matchedTimeDimensionDateRangeFor(lambdaPreAggregation);
+
+    if (!matchedDateRange) {
+      return undefined;
     }
+
+    const usageInfos = (this.preAggregationUsageInfos || []).filter(
+      usageInfo => usageInfo.cubeName === rollupLambda.cube &&
+        usageInfo.preAggregationName === rollupLambda.preAggregationName
+    );
+
+    if (usageInfos.length === 0) {
+      return matchedDateRange;
+    }
+
+    let merged: [string, string] | undefined;
+
+    for (const usageInfo of usageInfos) {
+      const usageDateRange = PreAggregations.mergeUsageDateRanges(usageInfo.usages);
+      if (!usageDateRange) {
+        // An unknown usage range may need anything, so bound nothing.
+        return undefined;
+      }
+      merged = merged
+        ? [
+          usageDateRange[0] < merged[0] ? usageDateRange[0] : merged[0],
+          usageDateRange[1] > merged[1] ? usageDateRange[1] : merged[1],
+        ]
+        : usageDateRange;
+    }
+
+    return merged;
+  }
+
+  private preAggregationDescriptionFor(cube: string, foundPreAggregation: PreAggregationForQuery): FullPreAggregationDescription {
+    const { preAggregationName, preAggregation, references } = foundPreAggregation;
+
+    const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
+    const invalidateKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation, preAggregationName);
+    const queryForSqlEvaluation = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
+    // Atm this is only defined in KsqlQuery but without it partitions are recreated on every refresh
+    const partitionInvalidateKeyQueries = queryForSqlEvaluation.partitionInvalidateKeyQueries?.(cube, preAggregation);
 
     const uniqueKeyColumnsDefault = () => null;
     const uniqueKeyColumns = ({
@@ -403,11 +460,7 @@ export class PreAggregations {
       preAggregationStartEndQueries:
         (preAggregation.partitionGranularity || references.timeDimensions[0]?.granularity) &&
         this.refreshRangeQuery(cube).preAggregationStartEndQueries(cube, preAggregation),
-      matchedTimeDimensionDateRange:
-        preAggregation.partitionGranularity && (
-          matchedTimeDimension?.boundaryDateRangeFormatted() ||
-          filters?.[0]?.formattedDateRange() // TODO intersect all date ranges
-        ),
+      matchedTimeDimensionDateRange: this.matchedTimeDimensionDateRangeFor(foundPreAggregation),
       indexesSql: Object.keys(preAggregation.indexes || {})
         .map(
           index => {

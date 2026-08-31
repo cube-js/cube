@@ -342,6 +342,52 @@ describe('lambda', () => {
     );
   });
 
+  // @link https://github.com/cube-js/cube/issues/11682
+  test('query with a date range fully inside the build range', async () => {
+    const response = await client.load({
+      measures: ['Orders.count'],
+      dimensions: ['Orders.status', 'Orders.userId'],
+      timeDimensions: [
+        {
+          dimension: 'Orders.completedAt',
+          // ordersByCompletedAtAndUserId is built for 2020-02-07 .. 2020-12-01
+          dateRange: ['2020-03-01', '2020-06-30'],
+          granularity: 'day'
+        }
+      ],
+      filters: [
+        {
+          member: 'Orders.status',
+          operator: 'equals',
+          values: ['shipped']
+        }
+      ],
+      order: {
+        'Orders.completedAt': 'desc',
+        'Orders.userId': 'asc',
+      },
+      limit: 3
+    });
+
+    // @ts-ignore
+    const { usedPreAggregations } = response.loadResponse.results[0];
+    expect(Object.keys(usedPreAggregations)).toEqual([
+      'dev_pre_aggregations.orders_orders_by_completed_at_and_user_id'
+    ]);
+    expect(
+      usedPreAggregations['dev_pre_aggregations.orders_orders_by_completed_at_and_user_id'].targetTableName
+    ).not.toMatch(/lambda_/);
+
+    const rows = response.rawData();
+    expect(rows.length).toBeGreaterThan(0);
+    rows.forEach(row => {
+      const completedAt = row['Orders.completedAt'] as string;
+      expect(row['Orders.status']).toEqual('shipped');
+      expect(completedAt >= '2020-03-01').toBe(true);
+      expect(completedAt <= '2020-06-30T23:59:59.999').toBe(true);
+    });
+  });
+
   it('Pre-aggregations API', async () => {
     const preAggs = await fetch(`${birdbox.configuration.playgroundUrl}/cubejs-system/v1/pre-aggregations`, {
       method: 'GET',

@@ -165,6 +165,11 @@ export type LambdaOptions = {
 export type LambdaQuery = {
   sqlAndParams: QueryWithParams,
   cacheKeyQueries: any[],
+  /**
+   * Limit actually rendered into `sqlAndParams`. Undefined for SQL that instead carries the
+   * MAX_SOURCE_ROW_LIMIT placeholder as a param.
+   */
+  maxSourceRowLimit?: number,
 };
 
 export type PreAggregationDescription = {

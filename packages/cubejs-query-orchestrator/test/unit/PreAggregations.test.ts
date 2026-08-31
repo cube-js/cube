@@ -796,6 +796,111 @@ describe('PreAggregations', () => {
     });
   });
 
+  // @link https://github.com/cube-js/cube/issues/11682
+  describe('lambda source query loading', () => {
+    const buildRangeEnd = '2024-01-02T23:59:59.999';
+
+    // The PreAggregationLoader.prototype spy below would otherwise leak into later tests.
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    const createLambdaLoader = (matchedTimeDimensionDateRange?: [string, string]) => {
+      const loader = new PreAggregationPartitionRangeLoader(
+        {} as any, // driverFactory
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {}, // logger
+        { options: {} } as any, // queryCache
+        {} as any, // preAggregations
+        mockPreAggregation({
+          preAggregationId: 'Orders.d',
+          rollupLambdaId: 'Orders.d_lambda',
+          lastRollupLambda: true,
+          unionWithSourceData: true,
+          matchedTimeDimensionDateRange,
+        }) as any,
+        [], // preAggregationsTablesToTempTables
+        { getTableColumnTypes: jest.fn().mockResolvedValue([{ name: 'ts', type: 'timestamp' }]) } as any,
+        {
+          lambdaQuery: {
+            sqlAndParams: ['SELECT * FROM public.orders WHERE ts > ?', [FROM_PARTITION_RANGE]],
+            cacheKeyQueries: [],
+          },
+        } as any,
+      );
+
+      jest.spyOn(loader as any, 'partitionRanges').mockResolvedValue({
+        buildRange: ['2024-01-01T00:00:00.000', buildRangeEnd],
+        partitionRanges: [['2024-01-02T00:00:00.000', buildRangeEnd]],
+      });
+      jest.spyOn(PreAggregationLoader.prototype, 'loadPreAggregation').mockResolvedValue({
+        targetTableName: 'stb_pre_aggregations.orders_d20240102_abc_def',
+        refreshKeyValues: [],
+        lastUpdatedAt: 1,
+        buildRangeEnd,
+      } as any);
+      const downloadLambdaTable = jest.spyOn(loader as any, 'downloadLambdaTable').mockResolvedValue({
+        name: 'lambda_stb_pre_aggregations_orders_d',
+        columns: [],
+        csvRows: '',
+      });
+
+      return { loader, downloadLambdaTable };
+    };
+
+    test('skips the source query when the requested range is inside the built range', async () => {
+      const { loader, downloadLambdaTable } = createLambdaLoader(['2024-01-01T00:00:00.000', buildRangeEnd]);
+
+      const result: any = await loader.loadPreAggregations();
+
+      expect(downloadLambdaTable).not.toHaveBeenCalled();
+      expect(result.lambdaTable).toBeUndefined();
+      expect(result.targetTableName).toEqual('stb_pre_aggregations.orders_d20240102_abc_def');
+    });
+
+    test('runs the source query when the requested range extends past the built range', async () => {
+      const { loader, downloadLambdaTable } = createLambdaLoader(['2024-01-01T00:00:00.000', '2024-01-05T23:59:59.999']);
+
+      const result: any = await loader.loadPreAggregations();
+
+      expect(downloadLambdaTable).toHaveBeenCalledWith(buildRangeEnd, [{ name: 'ts', type: 'timestamp' }]);
+      expect(result.lambdaTable?.name).toEqual('lambda_stb_pre_aggregations_orders_d');
+      expect(result.targetTableName).toMatch(/UNION ALL SELECT \* FROM lambda_stb_pre_aggregations_orders_d/);
+    });
+
+    test('runs the source query when no date range was requested', async () => {
+      const { loader, downloadLambdaTable } = createLambdaLoader(undefined);
+
+      await loader.loadPreAggregations();
+
+      expect(downloadLambdaTable).toHaveBeenCalled();
+    });
+  });
+
+  describe('lambdaSourceDataCovered', () => {
+    const covered = (matchedTimeDimensionDateRange: any, buildRangeEnd: any) => (
+      createLoader({ matchedTimeDimensionDateRange }) as any
+    ).lambdaSourceDataCovered(buildRangeEnd);
+
+    test('covered when the requested range ends within the built range', () => {
+      expect(covered(['2024-01-01T00:00:00.000', '2024-01-02T23:59:59.999'], '2024-01-02T23:59:59.999')).toBe(true);
+      expect(covered(['2024-01-01T00:00:00.000', '2024-01-02T23:59:59.999'], '2024-01-03T23:59:59.999')).toBe(true);
+    });
+
+    test('not covered when the requested range extends past the built range', () => {
+      expect(covered(['2024-01-01T00:00:00.000', '2024-01-05T23:59:59.999'], '2024-01-03T23:59:59.999')).toBe(false);
+    });
+
+    test('normalizes a buildRangeEnd read back from the DB with a Z suffix', () => {
+      expect(covered(['2024-01-01T00:00:00.000', '2024-01-02T23:59:59.999'], '2024-01-02T23:59:59.999Z')).toBe(true);
+    });
+
+    test('keeps the source query when either bound is unknown', () => {
+      expect(covered(undefined, '2024-01-02T23:59:59.999')).toBe(false);
+      expect(covered(['2024-01-01T00:00:00.000', '2024-01-02T23:59:59.999'], undefined)).toBe(false);
+    });
+  });
+
   describe('partitionTableName', () => {
     test('should generate correct table names for different granularities', () => {
       const testDateRange: [string, string] = ['2024-01-05T12:34:56.789', '2024-01-05T23:59:59.999'];
