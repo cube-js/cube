@@ -277,6 +277,7 @@ export class ClickHouseQuery extends BaseQuery {
     templates.quotes.escape = '\\`';
     templates.types.boolean = 'BOOL';
     templates.types.timestamp = 'DATETIME';
+    templates.types.string = 'String';
     delete templates.types.time;
     // ClickHouse intervals have a distinct type for each granularity
     delete templates.types.interval;
