@@ -24,9 +24,13 @@ impl TraversalVisitor for HasExpressionOrCalculatedMembersCollector {
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
         match node.as_ref() {
-            MemberSymbol::MemberExpression(_) => self.found = true,
+            MemberSymbol::MemberExpression(s) => {
+                if !s.is_reference() {
+                    self.found = true;
+                }
+            }
             MemberSymbol::Measure(s) => {
-                if s.is_calculated() {
+                if s.is_calculated() && !s.is_reference() {
                     self.found = true;
                 }
             }
@@ -40,11 +44,14 @@ impl TraversalVisitor for HasExpressionOrCalculatedMembersCollector {
     }
 }
 
-/// Whether the dependency tree of `node` contains a member whose own body
-/// writes SQL around the members it references - a member expression or a
-/// measure of a calculated kind. What such a body computes is not a function
-/// of the members it references: an aggregate written in it is not a member of
+/// Whether the dependency tree of `node` contains a member that writes SQL of
+/// its own around the members it references - a member expression or a measure
+/// of a calculated kind. What such a body computes is not a function of the
+/// members it references: an aggregate written in it is not a member of
 /// anything and appears nowhere in the tree.
+///
+/// A bare reference writes nothing of its own - every measure of a view is one
+/// - so it is followed into the member it references instead.
 pub fn has_expression_or_calculated_members(node: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
     let mut visitor = HasExpressionOrCalculatedMembersCollector::new();
     visitor.apply(node, &())?;

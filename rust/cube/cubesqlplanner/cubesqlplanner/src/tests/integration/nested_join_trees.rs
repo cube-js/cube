@@ -245,6 +245,50 @@ async fn test_nested_trees_expression_around_distinct_measure_alone() {
     }
 }
 
+/// Every measure of a view is a bare reference to the cube measure, so the same
+/// two nested trees fold into one scan when the query is written on the view -
+/// and answer what the cube paths answer.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_nested_trees_view_measures_share_one_base_scan() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - funnel.unique_msid
+          - funnel.checkouts_unique_msid
+        dimensions:
+          - funnel.country
+        order:
+          - id: funnel.country
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(base_scan_count(&sql), 1, "sql: {sql}");
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+/// A calculated measure that writes a raw aggregate of its own around a
+/// reference keeps its tree: the referenced distinct count is the only leaf, and
+/// the count beside it would read the fanned-out rows.
+#[test]
+fn test_nested_trees_calculated_measure_keeps_its_own_scan() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - carts.repeated_msid
+          - checkouts.unique_msid
+        dimensions:
+          - sites.country
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(base_scan_count(&sql), 2, "sql: {sql}");
+}
+
 /// Each cube has its own rollup keyed by the shared dimension. Folding the
 /// groups leaves one query that no single rollup covers, so the merge has to
 /// stand down where per-leg rollups are available.

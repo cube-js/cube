@@ -460,9 +460,11 @@ impl MultiFactJoinGroups {
     /// elsewhere.
     ///
     /// Multi-stage measures plan through their own CTE pipeline, not as a leaf
-    /// of this join. Member expressions and calculated measures write SQL around
-    /// their references, so an aggregate written there is a member of nothing
-    /// and no leaf accounts for it.
+    /// of this join. A member expression or a calculated measure that writes SQL
+    /// of its own around its references is out too: an aggregate written there
+    /// is a member of nothing, so no leaf accounts for it. A bare reference -
+    /// every measure of a view is one - writes nothing, and is followed into the
+    /// member it references.
     fn group_survives_join(
         measures: &[Rc<MemberSymbol>],
         join: &Rc<JoinTree>,
@@ -1148,6 +1150,37 @@ mod tests {
             nested_trees_groups_of(&ctx, vec![expression, checkouts_unique], true);
 
         assert_eq!(num_groups, 2);
+    }
+
+    #[test]
+    fn test_nested_trees_calculated_measure_does_not_merge() {
+        // The measure writes its own `COUNT(*)` around the reference, and that
+        // count is a member of nothing - the referenced distinct count is the
+        // only leaf, and it says nothing about the count beside it.
+        let (num_groups, _) =
+            nested_trees_groups(&["carts.repeated_msid", "checkouts.unique_msid"], true);
+
+        assert_eq!(num_groups, 2);
+    }
+
+    #[test]
+    fn test_nested_trees_view_measures_merge() {
+        // A measure of a view is a bare reference to the cube measure, so the
+        // referenced distinct counts are what decides - the same merge the cube
+        // paths get.
+        let (num_groups, measures) = nested_trees_groups(
+            &["funnel.unique_msid", "funnel.checkouts_unique_msid"],
+            true,
+        );
+
+        assert_eq!(num_groups, 1);
+        assert_eq!(
+            measures,
+            vec![vec![
+                "funnel.checkouts_unique_msid".to_string(),
+                "funnel.unique_msid".to_string()
+            ]]
+        );
     }
 
     #[test]
