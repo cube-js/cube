@@ -38,9 +38,37 @@ CUBEJS_DB_PASS=**********
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
+
+## Pre-Aggregation Build Strategies
+
+<Info>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</Info>
+
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Batching      |             ✅             |     ✅      |
+| Export Bucket |             -              |      -      |
+
+By default, Druid uses [batching][self-preaggs-batching] to build
+pre-aggregations.
+
+### Batching
+
+No extra configuration is required to configure batching for Druid.
+
+### Export Bucket
+
+Druid does not support export buckets.
+
 ## SSL
 
 Cube does not require any additional configuration to enable SSL as Druid
 connections are made over HTTPS.
 
 [druid]: https://druid.apache.org/
+[ref-caching-using-preaggs-build-strats]: /docs/pre-aggregations/using-pre-aggregations#pre-aggregation-build-strategies
+[self-preaggs-batching]: #batching
