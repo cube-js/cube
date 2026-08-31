@@ -64,6 +64,22 @@ The API Requests view includes the security context behind each request, so
 embedded analytics customers can slice usage by tenant — for example, to find
 the heaviest tenants or compare per-tenant latency and cache efficiency.
 
+## Querying usage data from your own tools
+
+To pull your account's usage and billing data into an external BI tool instead
+of (or in addition to) using the console, request a scoped Cube API token:
+
+```bash
+curl -X POST https://your-account.cubecloud.dev/api/v1/usage-analytics/token \
+  -H "Authorization: Api-Key ${API_KEY}"
+```
+
+The returned token is scoped to your account's Usage Analytics views (the same
+ones described in [Build your own dashboards](#build-your-own-dashboards)) and
+can be used to authenticate [Core Data API][ref-core-data-apis] requests
+against those views from tools like Power BI. Only account administrators can
+request this token.
+
 ## Data freshness and isolation
 
 Usage Analytics data is available on a slight delay compared to live activity.
@@ -73,3 +89,5 @@ For real-time inspection of individual queries, use
 Usage Analytics content is isolated from your own deployments' content: the
 views and dashboards described above don't appear in your data model, and your
 end users can't access them.
+
+[ref-core-data-apis]: /reference/core-data-apis
