@@ -452,24 +452,17 @@ impl MultiFactJoinGroups {
     /// Whether every measure of a group computes the same value, by the same
     /// SQL, when evaluated over `join` instead of its own tree.
     ///
-    /// Only a measure built entirely out of plain aggregated measures qualifies,
-    /// and then one leaf at a time: a leaf whose cube `join` does not multiply
-    /// reads exactly its own rows, and a multiplied one has to be immune to
-    /// replication. A key-based count is deliberately not accepted, because
-    /// staying correct would mean switching it to the distinct
-    /// `MultipliedCount` form, and the render form a measure is classified into
-    /// is decided from its own join tree elsewhere.
+    /// Only measures built out of plain aggregated measures qualify, leaf by
+    /// leaf: a leaf whose cube `join` does not multiply reads its own rows
+    /// anyway, a multiplied one has to be immune to replication. A key-based
+    /// count is not accepted - staying correct would mean switching it to the
+    /// distinct `MultipliedCount` form, decided from the measure's own tree
+    /// elsewhere.
     ///
-    /// Multi-stage measures are planned through their own CTE pipeline rather
-    /// than as a leaf of this join, so they are never moved. Neither are member
-    /// expressions and calculated measures: their bodies write SQL around the
-    /// members they reference, and an aggregate written there is a member of
-    /// nothing, so no leaf accounts for it. Reading the leaves of
-    /// `COUNT(*) - {cube.unique_id}` says the value cannot move while the
-    /// `COUNT(*)` beside it counts whatever rows the join it lands on produces.
-    /// Groups carrying such a measure keep their own tree whatever their leaves
-    /// say, which gives up the merge for every composite and expression-based
-    /// measure - the shapes whose value the leaves do not determine.
+    /// Multi-stage measures plan through their own CTE pipeline, not as a leaf
+    /// of this join. Member expressions and calculated measures write SQL around
+    /// their references, so an aggregate written there is a member of nothing
+    /// and no leaf accounts for it.
     fn group_survives_join(
         measures: &[Rc<MemberSymbol>],
         join: &Rc<JoinTree>,
