@@ -4,6 +4,7 @@ import R from 'ramda';
 import {
   AccessPolicyDefinition,
   CubeDefinitionExtended,
+  CubeRefreshKey,
   CubeSymbols,
   Folder,
   FolderInclude,
@@ -199,6 +200,7 @@ export type EvaluatedCube = {
   isView?: boolean;
   includedMembers?: ViewIncludedMember[];
   defaultFilters?: ViewDefaultValueFilter[];
+  refreshKey?: CubeRefreshKey;
 };
 
 export class CubeEvaluator extends CubeSymbols {

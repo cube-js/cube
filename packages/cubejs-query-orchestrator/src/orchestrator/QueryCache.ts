@@ -25,7 +25,12 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
-import { getCacheHash, extractRequestUUID } from './utils';
+import {
+  getCacheHash,
+  extractRequestUUID,
+  evaluateLocalRefreshKey,
+  isValidLocalRefreshKey,
+} from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
 
 export type CacheQueryResultOptions = {
@@ -52,12 +57,24 @@ export type CacheQueryResultOptions = {
 export type RefreshKeyCacheOptions =
   Pick<CacheQueryResultOptions, 'priority' | 'requestId' | 'waitForRenew' | 'dataSource'>;
 
+/**
+ * Everything needed to evaluate an `every` based refreshKey without touching a
+ * database: `FLOOR((utcOffset + unixTimestamp - dayOffset) / interval)`.
+ */
+export type LocalRefreshKeyDescriptor = {
+  interval: number;
+  utcOffset: number;
+  dayOffset: number;
+  cron?: boolean;
+};
+
 type QueryOptions = {
   external?: boolean;
   renewalThreshold?: number;
   updateWindowSeconds?: number;
   renewalThresholdOutsideUpdateWindow?: number;
   incremental?: boolean;
+  localRefreshKey?: LocalRefreshKeyDescriptor;
 };
 
 export type QueryWithParams = [
@@ -154,6 +171,7 @@ type CacheOperationContext = {
 
 export interface QueryCacheOptions {
   refreshKeyRenewalThreshold?: number;
+  localRefreshKey?: boolean;
   externalQueueOptions?: any;
   externalDriverFactory?: DriverFactory;
   backgroundRenew?: Boolean;
@@ -182,6 +200,8 @@ export class QueryCache {
 
   protected static readonly IN_MEMORY_CACHE_DISABLE_PERIOD = 5 * 60 * 1000;
 
+  protected readonly localRefreshKeyEnabled: boolean;
+
   public constructor(
     protected readonly cachePrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
@@ -208,6 +228,33 @@ export class QueryCache {
     this.memoryCache = new LRUCache<string, CacheEntry>({
       max: options.maxInMemoryCacheEntries || 10000
     });
+    this.localRefreshKeyEnabled = options.localRefreshKey ?? false;
+  }
+
+  /**
+   * Whether interval based refresh keys are answered from this instance clock instead of being
+   * run as queries and cached.
+   */
+  public isLocalRefreshKeyActive(): boolean {
+    return this.localRefreshKeyEnabled && !this.options.refreshKeyRenewalThreshold;
+  }
+
+  public localRefreshKeyResult(queryOptions?: QueryOptions): [{ refresh_key: string }] | null {
+    if (!this.localRefreshKeyEnabled || !isValidLocalRefreshKey(queryOptions?.localRefreshKey)) {
+      return null;
+    }
+
+    // `refreshKeyRenewalThreshold` throttles how often the SQL result is re-read, and that is
+    // also what bounds how often the key advances: a value cached for a day advances daily,
+    // whatever `every` says. A locally evaluated key has no cache entry to age out, so the only
+    // way to keep honouring the override is to leave these keys on the SQL path.
+    // TODO: support the two together by snapping the local value to the threshold instead of
+    // falling back to a query.
+    if (!this.isLocalRefreshKeyActive()) {
+      return null;
+    }
+
+    return evaluateLocalRefreshKey(<LocalRefreshKeyDescriptor>queryOptions?.localRefreshKey);
   }
 
   public getCacheDriver(): CacheDriverInterface {
@@ -462,6 +509,12 @@ export class QueryCache {
     options: RefreshKeyCacheOptions,
   ) {
     const [query, values, queryOptions] = sqlQuery;
+
+    const local = this.localRefreshKeyResult(queryOptions);
+    if (local) {
+      return local;
+    }
+
     const cacheKey = QueryCache.refreshKeyIdentity(sqlQuery, options.dataSource);
 
     return this.cacheQueryResult(query, values, cacheKey, expiration, {

@@ -343,6 +343,12 @@ export class RefreshScheduler {
     const compilers = await compilerApi.getCompilers();
     const queryForEvaluation = await compilerApi.createQueryByDataSource(compilers, {});
 
+    const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
+    const localRefreshKey = orchestratorApi
+      .getQueryOrchestrator()
+      .getQueryCache()
+      .isLocalRefreshKeyActive();
+
     await Promise.all(queryForEvaluation.cubeEvaluator.cubeNames().map(async cube => {
       const cubeFromPath = queryForEvaluation.cubeEvaluator.cubeFromPath(cube);
       const measuresCount = Object.keys(cubeFromPath.measures || {}).length;
@@ -350,6 +356,16 @@ export class RefreshScheduler {
       if (measuresCount === 0 && dimensionsCount === 0) {
         return;
       }
+
+      // This method exists only to warm the shared refresh key cache, and a locally evaluated
+      // key has no cache entry to warm — the getSql plus executeQuery per timezone below would
+      // be spent on a result that is thrown away. A `sql` key still hits the data source, and
+      // so do interval keys whenever the cache declines to evaluate them locally.
+      const sqlRefreshKey = !!cubeFromPath.refreshKey && 'sql' in cubeFromPath.refreshKey;
+      if (localRefreshKey && !sqlRefreshKey) {
+        return;
+      }
+
       await Promise.all(queryingOptions.timezones.map(async timezone => {
         const query = {
           ...queryingOptions,
@@ -364,7 +380,6 @@ export class RefreshScheduler {
           timezone
         };
         const sqlQuery = await compilerApi.getSql(query);
-        const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
         await orchestratorApi.executeQuery({
           ...sqlQuery,
           sql: null,

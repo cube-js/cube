@@ -470,6 +470,195 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       });
     });
 
+    describe('local refresh key', () => {
+      const REFRESH_KEY_SQL = 'SELECT FLOOR((UNIX_TIMESTAMP()) / 600) as refresh_key';
+      const descriptor = { interval: 600, utcOffset: 0, dayOffset: 0, cron: false };
+
+      const newCache = (additionalOptions: Partial<QueryCacheOptions> = {}) => (
+        new QueryCacheOpened(
+          crypto.randomBytes(16).toString('hex'),
+          () => {
+            throw new Error('driverFactory is not implemented, mock should be used...');
+          },
+          jest.fn(),
+          { ...options, ...additionalOptions },
+        )
+      );
+
+      const loadRefreshKey = async (
+        queryOptions: any,
+        additionalOptions: Partial<QueryCacheOptions> = {},
+      ) => {
+        const localCache = newCache(additionalOptions);
+        const spy = jest.spyOn(localCache, 'queryWithRetryAndRelease')
+          .mockImplementation(async () => [{ refresh_key: 12345 }]);
+
+        try {
+          const [result] = await Promise.all(
+            localCache.loadRefreshKeys(
+              [[REFRESH_KEY_SQL, [], queryOptions]],
+              60,
+              { dataSource: 'default' },
+            )
+          );
+
+          return { result, executed: spy.mock.calls.length, logged: localCache.logger.mock.calls };
+        } finally {
+          spy.mockRestore();
+          await localCache.cleanup();
+        }
+      };
+
+      it('evaluates locally without touching the driver', async () => {
+        const { result, executed } = await loadRefreshKey(
+          { external: true, renewalThreshold: 60, localRefreshKey: descriptor },
+          { localRefreshKey: true },
+        );
+
+        expect(executed).toBe(0);
+        expect(result).toEqual([{ refresh_key: String(Math.floor(Date.now() / 1000 / 600)) }]);
+      });
+
+      it('runs the query when the flag is off', async () => {
+        const { result, executed } = await loadRefreshKey(
+          { external: true, renewalThreshold: 60, localRefreshKey: descriptor },
+          { localRefreshKey: false },
+        );
+
+        expect(executed).toBe(1);
+        expect(result).toEqual([{ refresh_key: 12345 }]);
+      });
+
+      it('runs the query when there is no descriptor', async () => {
+        const { executed } = await loadRefreshKey(
+          { external: false, renewalThreshold: 10 },
+          { localRefreshKey: true },
+        );
+
+        expect(executed).toBe(1);
+      });
+
+      it('runs the query when the descriptor is malformed', async () => {
+        const { executed } = await loadRefreshKey(
+          { external: true, renewalThreshold: 60, localRefreshKey: { ...descriptor, interval: 0 } },
+          { localRefreshKey: true },
+        );
+
+        expect(executed).toBe(1);
+      });
+
+      // Local evaluation would advance the key on every interval boundary, ignoring the
+      // throttle a deployment asked for and multiplying pre-aggregation rebuilds.
+      it('runs the query when refreshKeyRenewalThreshold is configured', async () => {
+        const { result, executed } = await loadRefreshKey(
+          { external: true, renewalThreshold: 60, localRefreshKey: descriptor },
+          { localRefreshKey: true, refreshKeyRenewalThreshold: 24 * 60 * 60 },
+        );
+
+        expect(executed).toBe(1);
+        expect(result).toEqual([{ refresh_key: 12345 }]);
+      });
+
+      // The refresh scheduler reads this to decide whether warming a refresh key is pointless,
+      // so it has to agree with the branches above.
+      it('reports whether local evaluation is in effect', async () => {
+        const enabled = newCache({ localRefreshKey: true });
+        const disabled = newCache({ localRefreshKey: false });
+        const throttled = newCache({ localRefreshKey: true, refreshKeyRenewalThreshold: 24 * 60 * 60 });
+
+        try {
+          expect(enabled.isLocalRefreshKeyActive()).toBe(true);
+          expect(disabled.isLocalRefreshKeyActive()).toBe(false);
+          expect(throttled.isLocalRefreshKeyActive()).toBe(false);
+        } finally {
+          await Promise.all([enabled.cleanup(), disabled.cleanup(), throttled.cleanup()]);
+        }
+      });
+
+      it('runs the query when the flag is unset', async () => {
+        const { result, executed } = await loadRefreshKey({
+          external: true,
+          renewalThreshold: 60,
+          localRefreshKey: descriptor,
+        });
+
+        expect(executed).toBe(1);
+        expect(result).toEqual([{ refresh_key: 12345 }]);
+      });
+
+      // Falling back to the SQL path is intended for every declined branch, so nothing reports
+      // it; the ordinary cache messages are still expected.
+      it.each([
+        { name: 'the flag is off', additionalOptions: { localRefreshKey: false } },
+        { name: 'the flag is unset', additionalOptions: {} },
+        {
+          name: 'refreshKeyRenewalThreshold is configured',
+          additionalOptions: { localRefreshKey: true, refreshKeyRenewalThreshold: 24 * 60 * 60 },
+        },
+      ])('does not report the declined local evaluation when $name', async ({ additionalOptions }) => {
+        const { logged } = await loadRefreshKey(
+          { external: true, renewalThreshold: 60, localRefreshKey: descriptor },
+          additionalOptions,
+        );
+
+        expect(logged.map(([message]) => message).filter(m => /local/i.test(m))).toEqual([]);
+      });
+
+      describe('localRefreshKeyResult', () => {
+        const withCache = async (
+          additionalOptions: Partial<QueryCacheOptions>,
+          fn: (localCache: QueryCacheOpened) => void,
+        ) => {
+          const localCache = newCache(additionalOptions);
+
+          try {
+            fn(localCache);
+            expect(localCache.logger).not.toHaveBeenCalled();
+          } finally {
+            await localCache.cleanup();
+          }
+        };
+
+        const queryOptions = (localRefreshKey?: unknown) => <any>{ localRefreshKey };
+
+        it('evaluates a valid descriptor', () => withCache({ localRefreshKey: true }, localCache => {
+          expect(localCache.localRefreshKeyResult(queryOptions(descriptor)))
+            .toEqual([{ refresh_key: String(Math.floor(Date.now() / 1000 / 600)) }]);
+        }));
+
+        // Cube Store returns every column as a string, so a locally evaluated key has to be
+        // a string too or flipping the flag invalidates every pre-aggregation once.
+        it('returns the key as a string', () => withCache({ localRefreshKey: true }, localCache => {
+          const [{ refresh_key: value }] = localCache
+            .localRefreshKeyResult(queryOptions(descriptor))!;
+
+          expect(typeof value).toBe('string');
+        }));
+
+        it('declines when the flag is off', () => withCache({ localRefreshKey: false }, localCache => {
+          expect(localCache.localRefreshKeyResult(queryOptions(descriptor))).toBeNull();
+        }));
+
+        it('declines without a descriptor', () => withCache({ localRefreshKey: true }, localCache => {
+          expect(localCache.localRefreshKeyResult()).toBeNull();
+          expect(localCache.localRefreshKeyResult(queryOptions())).toBeNull();
+        }));
+
+        it('declines a malformed descriptor', () => withCache({ localRefreshKey: true }, localCache => {
+          expect(localCache.localRefreshKeyResult(
+            queryOptions({ ...descriptor, interval: 0 }),
+          )).toBeNull();
+        }));
+
+        it('declines when refreshKeyRenewalThreshold is configured', () => withCache(
+          { localRefreshKey: true, refreshKeyRenewalThreshold: 24 * 60 * 60 },
+          localCache => {
+            expect(localCache.localRefreshKeyResult(queryOptions(descriptor))).toBeNull();
+          },
+        ));
+      });
+    });
+
     it('queryCacheKey format', () => {
       const key1 = QueryCache.queryCacheKey({
         query: 'select data',

@@ -1417,6 +1417,36 @@ this variable.
 | ------------------------- | ---------------------- | --------------------- |
 | A valid number in seconds | `600`                  | `600`                 |
 
+## `CUBEJS_REFRESH_KEY_LOCAL_TIME`
+
+To check an `every`-based [`refresh_key`](/reference/data-modeling/cube#refresh_key), Cube
+asks the database what time it is. If `true`, it uses its own clock instead and those
+queries stop entirely, including the ones scheduled refresh issues to warm them.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
+Cube already caches each result for a fraction of the interval, so this is not one query
+saved per request — it is one per refresh key per renewal window, multiplied by every cube,
+tenant, and timezone in the deployment.
+
+Refresh keys written with `sql` or marked
+[`incremental`](/reference/data-modeling/pre-aggregations#incremental) keep querying the
+database, since their values depend on your data and not just on the time. So do all
+refresh keys if you have set
+[`queryCacheOptions.refreshKeyRenewalThreshold`][ref-config-query-cache-options], which
+works by caching the query result.
+
+<Warning>
+
+Cube now trusts each machine's clock, so they all have to agree. Set this variable to the
+same value on **every** API instance and refresh worker and keep them synchronized with
+NTP. Instances on opposite sides of an interval boundary compute different refresh keys,
+which can build the same pre-aggregation twice.
+
+</Warning>
+
 ## `CUBEJS_REFRESH_WORKER`
 
 If `true`, this instance of Cube will **only** refresh pre-aggregations.
@@ -2307,6 +2337,7 @@ The port for a Cube deployment to listen to API connections on.
   https://motherduck.com/docs/authenticating-to-motherduck/#authentication-using-a-service-token
 [ref-config-db]: /admin/connect-to-data/data-sources
 [ref-config-driver-factory]: /reference/configuration/config#driver_factory
+[ref-config-query-cache-options]: /reference/configuration/config#orchestrator_options
 [ref-config-multiple-ds-cloud]: /admin/connect-to-data/multiple-data-sources
 [ref-config-multiple-ds-decorating-env]: /admin/connect-to-data/multiple-data-sources#under-the-hood
 [ref-preagg-data-source]: /docs/pre-aggregations/refreshing-pre-aggregations#pre-aggregation-data-source
