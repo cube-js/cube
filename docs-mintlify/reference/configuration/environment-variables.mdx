@@ -1419,34 +1419,27 @@ this variable.
 
 ## `CUBEJS_REFRESH_KEY_LOCAL_TIME`
 
-When a [`refresh_key`](/reference/data-modeling/cube#refresh_key) is defined with `every`,
-Cube normally asks the database what time it is — it sends a small
-`SELECT FLOOR(...) as refresh_key` query and rounds the answer down to the current
-interval. The answer is just arithmetic on a timestamp, so Cube can work it out itself.
-
-If `true`, Cube computes those values from its own clock and skips the query. With the
-default 10 second refresh key, that saves a database round trip on nearly every request.
+To check an `every`-based [`refresh_key`](/reference/data-modeling/cube#refresh_key), Cube
+asks the database what time it is. If `true`, it uses its own clock instead, saving a round
+trip on nearly every request.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |
 
-This only applies to `every`-based refresh keys, including cron expressions. Refresh keys
-written with `sql`, and those marked
-[`incremental`](/reference/data-modeling/pre-aggregations#incremental), keep querying the
-database — their values depend on your data, not just on the time.
-
-Refresh keys also stay on the database path if you have set
-[`queryCacheOptions.refreshKeyRenewalThreshold`][ref-config-query-cache-options], since
-that setting works by caching the query result and there is no query left to cache.
+Refresh keys written with `sql` or marked
+[`incremental`](/reference/data-modeling/pre-aggregations#incremental) keep querying the
+database, since their values depend on your data and not just on the time. So do all
+refresh keys if you have set
+[`queryCacheOptions.refreshKeyRenewalThreshold`][ref-config-query-cache-options], which
+works by caching the query result.
 
 <Warning>
 
-Cube is now trusting the machine's clock instead of a single shared source of time, so all
-the clocks have to agree. Set this variable to the same value on **every** API instance
-and refresh worker, and keep them synchronized with NTP. If two instances sit on opposite
-sides of an interval boundary they will disagree about the current refresh key, and the
-same pre-aggregation can end up being built twice.
+Cube now trusts each machine's clock, so they all have to agree. Set this variable to the
+same value on **every** API instance and refresh worker and keep them synchronized with
+NTP. Instances on opposite sides of an interval boundary compute different refresh keys,
+which can build the same pre-aggregation twice.
 
 </Warning>
 
