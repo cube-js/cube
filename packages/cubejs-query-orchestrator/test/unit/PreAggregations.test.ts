@@ -565,11 +565,10 @@ describe('PreAggregations', () => {
       expect(mockDriver!.executedQueries).toEqual([incrementalSql]);
     });
 
-    // The per-request memo must pin the value for the life of one load. A single
-    // load reads the invalidation keys several times (contentVersion, the returned
-    // refreshKeyValues, the refresh queue key); if the clock were re-read, a load
-    // crossing an interval boundary would look a table up under one content version
-    // and enqueue it under another.
+    // A single load reads the invalidation keys several times (contentVersion, the returned
+    // refreshKeyValues, the refresh queue key). If the clock were re-read, a load crossing an
+    // interval boundary would look a table up under one content version and enqueue it under
+    // another.
     test('keyQueryResult is stable across an interval boundary within one load cache', async () => {
       const loadCache = newLoadCache(true);
       const key: [string, any[], Record<string, any>] =

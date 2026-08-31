@@ -4860,7 +4860,6 @@ export class BaseQuery {
   }
 
   /**
-   * The interval arithmetic behind an `every` based refreshKey, with no SQL in it.
    * Both the rendered SQL and the descriptor handed to the orchestrator for local
    * evaluation derive from this, so they cannot disagree on the formula.
    *
@@ -4886,7 +4885,6 @@ export class BaseQuery {
    * @protected
    * @param {Object} refreshKey
    * @param {BaseQuery} [query] the instance that rendered the SQL, when it differs from `this`
-   * @return {Object}
    */
   localRefreshKeyOptions(refreshKey, query) {
     return this.localRefreshKey
@@ -5098,9 +5096,8 @@ export class BaseQuery {
 
           if (preAggregation.refreshKey.every || preAggregation.refreshKey.incremental) {
             // An incremental key is wrapped into `CASE WHEN NOW() < <dateTo + updateWindow>`
-            // against an allocated partition range param, and its options drive the
-            // renewalThresholdOutsideUpdateWindow shortening — neither is reproducible
-            // from a time interval alone.
+            // against an allocated partition range param, so it is not reproducible from
+            // a time interval alone.
             const localRefreshKeyOptions = preAggregation.refreshKey.incremental
               ? {}
               : this.localRefreshKeyOptions(preAggregation.refreshKey, refreshKeyQuery);

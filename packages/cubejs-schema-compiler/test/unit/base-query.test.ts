@@ -1407,8 +1407,8 @@ describe('SQL Generation', () => {
         timezone,
       });
 
-      // Evaluates the emitted FLOOR(...) expression as JS with the clock pinned to `t`,
-      // which is what the orchestrator now computes from the descriptor instead.
+      // Pins the clock to `t` so the emitted SQL can be compared against what the
+      // orchestrator now computes from the descriptor instead.
       const evalSql = (sql: string, t: number) => {
         const asJs = sql
           .split('EXTRACT(EPOCH FROM NOW())').join(String(t))

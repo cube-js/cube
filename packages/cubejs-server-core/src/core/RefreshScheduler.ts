@@ -352,10 +352,9 @@ export class RefreshScheduler {
       if (measuresCount === 0 && dimensionsCount === 0) {
         return;
       }
-      // This method exists only to warm the shared refresh key cache. An interval based key is
-      // evaluated from the local clock instead, so there is nothing to warm and the getSql plus
-      // executeQuery per timezone would be spent on a result that is thrown away. A `sql` key
-      // still runs against the data source, so those cubes keep being warmed.
+      // This method exists only to warm the shared refresh key cache, and an interval based
+      // key has no cache entry to warm — the getSql plus executeQuery per timezone below would
+      // be spent on a result that is thrown away. A `sql` key still hits the data source.
       const sqlRefreshKey = !!cubeFromPath.refreshKey && 'sql' in cubeFromPath.refreshKey;
       if (localRefreshKey && !sqlRefreshKey) {
         return;

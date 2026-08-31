@@ -47,10 +47,6 @@ export function evaluateLocalRefreshKey(
   return [{ refresh_key: Math.floor((utcOffset + nowMs / 1000 - dayOffset) / interval) }];
 }
 
-/**
- * A malformed descriptor must fall back to the SQL path rather than produce a
- * garbage refresh key, which would silently invalidate everything downstream.
- */
 export function isValidLocalRefreshKey(descriptor?: LocalRefreshKeyDescriptor): boolean {
   return !!descriptor &&
     Number.isFinite(descriptor.interval) && descriptor.interval > 0 &&

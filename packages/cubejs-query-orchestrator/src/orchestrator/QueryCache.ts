@@ -531,9 +531,7 @@ export class QueryCache {
   ) {
     const [query, values, queryOptions] = sqlQuery;
 
-    // A locally evaluated key is free: nothing to cache, no queue to wait on. Short-circuiting
-    // here rather than in each caller leaves the identity work below as the single owner of the
-    // cache key, and keeps `PreAggregationLoadCache`'s per-request memo wrapping this call.
+    // A locally evaluated key is free: nothing to cache, no queue to wait on.
     const local = this.localRefreshKeyResult(queryOptions);
     if (local) {
       return local;
