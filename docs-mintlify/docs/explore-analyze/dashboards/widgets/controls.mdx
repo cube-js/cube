@@ -116,7 +116,7 @@ A field switcher works on one member kind at a time — set **Field Type** to ei
 
 Alternatives come from the control's own semantic view, and must be the same kind as the replaced member — a dimension switcher offers dimensions, a measure switcher offers measures.
 
-### Default option
+### Default option {#field-switcher-default-option}
 
 The member a viewer starts on is set the same way a filter's static default is: by picking it in the control while you're in the dashboard builder. The selection is saved on the widget and applied to every viewer when the dashboard loads. If you never pick one, the dashboard opens on the replaced member.
 
@@ -138,7 +138,7 @@ Like [filters](#user-attribute-default) and [parent controls](#parent-user-attri
 
 This is how one dashboard opens on the breakdown each audience cares about — a **Breakdown** switcher opening on `region` for one team and `channel` for another, from a single published dashboard.
 
-The attribute seeds the *selection*, exactly as the [default option](#default-option) does, and loses to a pick the viewer has already made. A value that isn't among the **Alternatives** is ignored rather than forced: the attribute is set per user and the options are set per dashboard, so the two can drift apart without anyone editing either, and the safe reading of an unusable value is "no opinion" — the control falls back to the default option.
+The attribute seeds the *selection*, exactly as the [default option](#field-switcher-default-option) does, and loses to a pick the viewer has already made. A value that isn't among the **Alternatives** is ignored rather than forced: the attribute is set per user and the options are set per dashboard, so the two can drift apart without anyone editing either, and the safe reading of an unusable value is "no opinion" — the control falls back to the default option.
 
 ### What the swap preserves
 
@@ -265,7 +265,6 @@ Each control type has its own parameter:
 |---|---|---|
 | [Filter](#filter) | `f_<semantic_view>.<dimension>=<JSON>` | `f_orders.status={"value":"shipped"}` |
 | [Time granularity switcher](#time-granularity-switcher) | `tg_<semantic_view>.<dimension>=<granularity>` | `tg_orders.created_at=week` |
-| [Field switcher](#field-switcher) | *(none yet)* | — |
 
 The semantic view and dimension are the **internal names** configured on the control — not the display titles you see in the picker. A view shown as `Orders` is usually `orders` in the parameter. Granularities are lowercase and must be one of the switcher's [allowed granularities](#allowed-granularities) — `day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour` for time dimensions that expose them.
 
@@ -276,7 +275,7 @@ What does and doesn't travel in the link:
 - **Only what the viewer chose.** Values that came from the control's own configuration — a static default, a [default granularity](#default-granularity) — are not written into the URL. Every viewer already gets those from the dashboard itself, and leaving them out means a link stays correct after the dashboard's defaults change.
 - **Never a personalized default.** A value resolved from a [user attribute](#user-attribute-default) stays out of the link — whether it seeded a filter directly or reached one through a [parent control](#parent) opening on the viewer's own option. Sharing a dashboard never pins your attribute value onto the recipient; they see it through their own attributes.
 - **Filters and granularities together.** Picking both puts both in the link, including when a [parent control](#parent) sets several children at once. A parent control isn't serialized itself — the link carries the values its children ended up with, so the recipient sees the same data while the parent dropdown opens on whatever default it resolves for them, which may not be the option the sharer picked.
-- **Not the field switcher, yet.** A [field switcher](#field-switcher) has no parameter of its own, so a viewer's member choice doesn't travel in the link. The recipient opens on the control's [default option](#default-option), or on their own [user attribute](#field-switcher-user-attribute-default) where one is set — and on the charts the sharer was looking at, built on a different member than the sharer saw.
+- **Not the field switcher, yet.** A [field switcher](#field-switcher) has no parameter of its own, so a viewer's member choice doesn't travel in the link. The recipient opens on the control's [default option](#field-switcher-default-option), or on their own [user attribute](#field-switcher-user-attribute-default) where one is set — and on the charts the sharer was looking at, built on a different member than the sharer saw.
 - **Written out on published dashboards only.** Reading these parameters works anywhere, including [embedded][ref-embed-url-filters] dashboards; it's the writing that is published-only. In the dashboard builder the URL is left to the editing session, so changing a control there doesn't rewrite it.
 
 When a dashboard opens with these parameters, they are applied on top of whatever defaults the controls carry. A parameter is ignored when nothing on the dashboard can honor it — there is no matching control for that dimension, or the requested granularity isn't in the switcher's [allowed granularities](#allowed-granularities).
@@ -295,9 +294,9 @@ Set the visibility from the **Visibility** dropdown when editing the control. **
 
 ## Interaction with charts
 
-This section applies to filters, time granularity switchers and field switchers. A [parent control](#parent) has no dimension and never applies to a chart itself, so it doesn't appear in any chart's [Controls mapping](#controls-mapping) — it acts only through the children it drives, and it's those children that show up here.
+This section applies to filters, time granularity switchers and field switchers. A [parent control](#parent) has no member of its own and never applies to a chart itself, so it doesn't appear in any chart's [Controls mapping](#controls-mapping) — it acts only through the children it drives, and it's those children that show up here.
 
-When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] whose query already uses the same dimension. Charts that don't reference that dimension are left alone, so a dashboard can mix scoped and unscoped views by default. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different dimension.
+When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] whose query already uses the same member. Charts that don't reference that member are left alone, so a dashboard can mix scoped and unscoped views by default. Filters and time granularity switchers always target a dimension; a [field switcher](#field-switcher) targets a dimension or a measure depending on its **Field Type**, and scopes on whichever it is set to. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different member.
 
 ### Incompatible controls
 
