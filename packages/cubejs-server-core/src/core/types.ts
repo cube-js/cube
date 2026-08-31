@@ -128,7 +128,8 @@ export type DatabaseType =
   | 'duckdb'
   | 'ksql'
   | 'vertica'
-  | 'databricks-jdbc';
+  | 'databricks-jdbc'
+  | 'doris';
 
 export type ContextToAppIdFn = (context: RequestContext) => string | Promise<string>;
 export type ContextToGroupsFn = (context: RequestContext) => string[] | Promise<string[]>;
