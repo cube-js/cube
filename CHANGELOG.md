@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.31](https://github.com/cube-js/cube/compare/v1.7.30...v1.7.31) (2026-08-31)
+
+### Bug Fixes
+
+- **cubesql:** push down window functions and multi-argument aggregates ([#11684](https://github.com/cube-js/cube/issues/11684)) ([4567c07](https://github.com/cube-js/cube/commit/4567c074fe4a2d13d278c3dd4c6c71217094bc4a))
+- **query-orchestrator:** key refresh key cache entries consistently ([#11607](https://github.com/cube-js/cube/issues/11607)) ([5bc6308](https://github.com/cube-js/cube/commit/5bc6308326500e847feb23eb2ed56f81ad904cab))
+- **tesseract:** fold nested multi-fact join legs into one scan ([#11643](https://github.com/cube-js/cube/issues/11643)) ([92d1595](https://github.com/cube-js/cube/commit/92d159529b6c8282d91d0b0bae92b707c6c2d537))
+- **tesseract:** keep expression measures out of nested group merging ([#11707](https://github.com/cube-js/cube/issues/11707)) ([6046c7c](https://github.com/cube-js/cube/commit/6046c7cdb3cd37a75d2f29db8dbe866500ebd7fa))
+
+### Features
+
+- Support local computeing for interval refresh keys (behind flag) ([#11614](https://github.com/cube-js/cube/issues/11614)) ([d2b43a4](https://github.com/cube-js/cube/commit/d2b43a4accd2c5d116342f9ad5be648920197a7e))
+
+### Performance Improvements
+
+- **cubestore:** turn on the performance toggles by default ([#11600](https://github.com/cube-js/cube/issues/11600)) ([33dc677](https://github.com/cube-js/cube/commit/33dc677fb65cdd34765832920f6ceb68c52370d1))
+
 ## [1.7.30](https://github.com/cube-js/cube/compare/v1.7.29...v1.7.30) (2026-08-28)
 
 ### Bug Fixes

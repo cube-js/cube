@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.31](https://github.com/cube-js/cube/compare/v1.7.30...v1.7.31) (2026-08-31)
+
+### Performance Improvements
+
+- **cubestore:** turn on the performance toggles by default ([#11600](https://github.com/cube-js/cube/issues/11600)) ([33dc677](https://github.com/cube-js/cube/commit/33dc677fb65cdd34765832920f6ceb68c52370d1))
+
 ## [1.7.30](https://github.com/cube-js/cube/compare/v1.7.29...v1.7.30) (2026-08-28)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore
