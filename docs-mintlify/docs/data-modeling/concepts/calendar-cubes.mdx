@@ -342,16 +342,6 @@ Calendar cubes allow you to define custom SQL expressions for each granularity.
 In the following example, the `fiscal_calendar` cube overrides the default `month`
 granularity to the to a pre-calculated `mid_month` column:
 
-<Note>
-
-A granularity defined with `sql` must be named after one of the default granularities:
-`second`, `minute`, `hour`, `day`, `week`, `month`, `quarter`, or `year`. So, a 4-5-4
-retail month is defined as an override of `month` rather than under a name of its own.
-[Custom granularities][ref-granularities] with names of their own are defined with
-`interval` instead.
-
-</Note>
-
 <CodeGroup>
 
 ```yaml title="YAML"
