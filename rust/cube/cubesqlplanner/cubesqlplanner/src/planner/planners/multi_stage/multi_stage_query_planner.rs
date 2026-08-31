@@ -884,6 +884,12 @@ impl MultiStageQueryPlanner {
                     }
                 }
 
+                let grain = measure
+                    .multi_stage()
+                    .map(|ms| ms.grain.clone())
+                    .unwrap_or_default();
+                let grain_include = grain.include.clone().unwrap_or_default();
+
                 let ungrouped = measure.is_rolling_window() && !measure.is_additive();
 
                 let mut time_dimensions = self
@@ -913,8 +919,14 @@ impl MultiStageQueryPlanner {
                             scope,
                         )?
                     } else {
+                        // Without a time dimension there is no series to walk,
+                        // so the window collapses to a single bucket: no frame
+                        // to build, and no outer stage to carry the aggregation.
+                        // What is left is the measure's own multi-stage
+                        // definition — aggregation and grain included — over the
+                        // base state prepared above.
                         self.make_queries_descriptions(
-                            base_member,
+                            MemberSymbol::new_measure(transforms::strip_rolling_window(&measure)),
                             base_state,
                             descriptions,
                             resolved_multi_stage_dimensions,
@@ -938,11 +950,58 @@ impl MultiStageQueryPlanner {
                     GranularityHelper::find_dimension_with_min_granularity(&time_dimensions)?;
                 let time_dimension = MemberSymbol::new_time_dimension(time_dimension);
 
+                // Of the grain keys only `include` reaches the window assembly.
+                // It extends the grain the values inside a bucket are computed
+                // at, which the base CTE carries anyway. `exclude` and
+                // `keep_only` narrow the grain the value is *reported* at, and a
+                // narrowed value has to be broadcast back onto the query grid;
+                // the rolling window node has no side enumerating that grid, so
+                // there is nothing to broadcast from.
+                //
+                // What is rejected is the narrowing actually happening, not the
+                // keys being declared: `exclude` of a member this grain does not
+                // carry subtracts nothing, and `keep_only` listing everything the
+                // query groups by intersects to the same list. Such a key costs
+                // the query nothing, and the value is the one the measure would
+                // have without it. `partition_filter` only ever removes, so a
+                // shorter list is exactly the case that has no answer here.
+                //
+                // The check sits below the branch above on purpose. Without a
+                // time dimension the window has no frame and the measure is
+                // planned through the ordinary multi-stage path, which narrows
+                // the grain and broadcasts it back the usual way.
+                let narrows = Self::partition_filter(state.dimensions(), &grain).len()
+                    != state.dimensions().len()
+                    || Self::partition_filter(state.time_dimensions(), &grain).len()
+                        != state.time_dimensions().len();
+                if narrows {
+                    return Err(CubeError::user(format!(
+                        "Measure {} narrows the grain of this query through `grain.exclude` / \
+                         `reduce_by` or `grain.keep_only` / `group_by` while also declaring a \
+                         `rolling_window` over {}, which is not supported. Drop the narrowing \
+                         keys, drop the window, or query the measure without a time dimension.",
+                        member.full_name(),
+                        time_dimension.full_name(),
+                    )));
+                }
+
                 let (base_rolling_state, base_time_dimension) = self.make_rolling_base_state(
                     time_dimension.clone(),
                     &rolling_window,
                     state.clone(),
                 )?;
+
+                // `grain.include` extends the grain the values inside the window
+                // are computed at. The frame still keys off the base time
+                // dimension, so the extension only splits rows the outer
+                // aggregation merges back together.
+                let base_rolling_state = if grain_include.is_empty() {
+                    base_rolling_state
+                } else {
+                    let mut extended = base_rolling_state.as_ref().clone();
+                    extended.add_dimensions(grain_include);
+                    Rc::new(extended)
+                };
 
                 let time_series =
                     self.add_time_series(time_dimension.clone(), state.clone(), descriptions)?;
