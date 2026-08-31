@@ -57,10 +57,17 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
                 })
                 .collect::<Result<Vec<_>, CubeError>>()?;
 
-            let range = if let Some(date_range) = time_dimension_symbol
-                .get_range_for_time_series(date_range, query_tools.timezone())?
-            {
-                TimeSeriesDateRange::Filter(date_range.0.clone(), date_range.1.clone())
+            // Taken raw: the aligned range snaps its start to the granularity's
+            // interval, which for a calendar period means an arbitrary point
+            // inside the period the range opens in.
+            let range = if let Some(date_range) = &date_range {
+                if date_range.len() != 2 {
+                    return Err(CubeError::user(format!(
+                        "Invalid date range: {:?}",
+                        date_range
+                    )));
+                }
+                TimeSeriesDateRange::Filter(date_range[0].clone(), date_range[1].clone())
             } else if let Some(date_range_cte) = time_series.get_date_range_multistage_ref() {
                 TimeSeriesDateRange::Generated(date_range_cte.clone())
             } else {

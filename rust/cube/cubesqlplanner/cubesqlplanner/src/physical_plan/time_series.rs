@@ -172,13 +172,10 @@ impl TimeSeries {
         let bounds = self.calendar_period_bounds_to_sql(calendar, templates, &bounds_alias)?;
 
         let date_from = templates.column_reference(&Some(bounds_alias.clone()), "date_from")?;
+        let date_to = templates.column_reference(&Some(bounds_alias.clone()), "date_to")?;
         let mut columns = vec![
             Self::projection_column(templates, &date_from, "date_from")?,
-            Self::projection_column(
-                templates,
-                &templates.column_reference(&Some(bounds_alias.clone()), "date_to")?,
-                "date_to",
-            )?,
+            Self::projection_column(templates, &date_to, "date_to")?,
         ];
         for (granularity, _) in calendar.period_aliases.iter() {
             let name = Self::period_start_column(granularity);
@@ -201,8 +198,10 @@ impl TimeSeries {
             vec![],
             &templates.query_aliased(&format!("({})", bounds), &bounds_alias)?,
             columns,
+            // Kept by overlap rather than by where it starts: the period a range
+            // opens inside of opens before the range does.
             Some(format!(
-                "{date_from} >= {range_from} AND {date_from} <= {range_to}"
+                "{date_to} >= {range_from} AND {date_from} <= {range_to}"
             )),
             vec![],
             None,

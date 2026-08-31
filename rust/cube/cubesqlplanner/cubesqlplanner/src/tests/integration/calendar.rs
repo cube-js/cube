@@ -347,7 +347,7 @@ async fn test_to_date_retail_week_by_day() {
             granularity: day
             dateRange:
               - "2024-02-08"
-              - "2024-02-14"
+              - "2024-02-18"
         order:
           - id: custom_calendar.date_val
     "#};
@@ -371,7 +371,7 @@ async fn test_to_date_retail_month_by_day() {
             granularity: day
             dateRange:
               - "2024-02-29"
-              - "2024-03-06"
+              - "2024-03-09"
         order:
           - id: custom_calendar.date_val
     "#};
@@ -426,6 +426,32 @@ async fn test_to_date_range_ending_on_a_period_end() {
             dateRange:
               - "2024-03-03"
               - "2024-04-06"
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+/// A range opening mid-period still has to see the period it opens inside.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_to_date_range_opening_mid_period() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - calendar_orders.count_month_to_date
+          - calendar_orders.count
+        time_dimensions:
+          - dimension: custom_calendar.date_val
+            granularity: month
+            dateRange:
+              - "2024-04-01"
+              - "2024-04-20"
+        order:
+          - id: custom_calendar.date_val
     "#};
 
     ctx.build_sql(query).unwrap();
