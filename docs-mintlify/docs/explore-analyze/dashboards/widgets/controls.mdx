@@ -313,26 +313,32 @@ Hover over the icon for details. Click it to open the chart's [Controls mapping]
 
 ### Controls mapping
 
-Each chart decides which controls apply to it through its **Controls mapping**. The mapping is resolved automatically in most cases and only needs manual attention when a control targets a dimension the chart doesn't have.
+Each chart decides which controls apply to it through its **Controls mapping**. The mapping is resolved automatically in most cases and only needs manual attention when a control targets a member the chart doesn't have.
 
 Open **Controls mapping** from a chart's settings menu to inspect or override the mapping for that chart. For each control on the dashboard you can:
 
 - **Toggle the control on or off** for the chart, even when a mapping exists
-- **Pick a different dimension** from the chart's semantic view to remap the control to
+- **Pick a different member** from the chart's semantic view to remap the control to
 
 Three states show up in the mapping sidebar:
 
 | Status | What it means |
 |---|---|
-| **Mapped automatically** | The control's dimension exists on the chart's semantic view, so it's wired up without configuration. |
-| **Manually mapped** | You (or an AI agent) picked a specific dimension for this chart. **Reset** restores the automatic mapping. |
-| **Can't map automatically** | The control targets a dimension that doesn't exist on the chart's semantic view. The chart is unaffected by the control until you map it manually. |
+| **Mapped automatically** | The control's member exists on the chart's semantic view, so it's wired up without configuration. |
+| **Manually mapped** | You (or an AI agent) picked a specific member for this chart. **Reset** restores the automatic mapping. |
+| **Can't map automatically** | The control targets a member that doesn't exist on the chart's semantic view. The chart is unaffected by the control until you map it manually. |
 
-For [time granularity switchers][ref-time-grain], the dimension picker is restricted to time-typed dimensions on the chart's semantic view, since other dimension types can't be resolved by the time granularity pipeline.
+Each control's picker offers only the members it can actually be resolved against, so a mapping you can stage is a mapping that will work:
 
-Mappings are also configurable by AI agents when they build or edit a dashboard, so an agent can wire controls across charts that use different semantic views without you needing to revisit each chart manually.
+| Control | What the picker offers |
+|---|---|
+| [Filter](#filter) | Dimensions on the chart's semantic view. |
+| [Time granularity switcher](#time-granularity-switcher) | Time-typed dimensions only — other types can't be resolved by the time granularity pipeline. |
+| [Field switcher](#field-switcher) set to **Dimension** | Dimensions. |
+| [Field switcher](#field-switcher) set to **Measure** | Measures, since the control replaces a measure. |
 
-[ref-time-grain]: #time-granularity-switcher
+Filter and time granularity mappings are also configurable by AI agents when they build or edit a dashboard, so an agent can wire those controls across charts that use different semantic views without you needing to revisit each chart manually. Field switchers are outside what agents author, so their mappings are yours to set.
+
 [ref-embed-url-filters]: /embedding/iframe/dashboards#pre-set-dashboard-filters-via-url
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
