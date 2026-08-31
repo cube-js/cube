@@ -1,0 +1,60 @@
+# A rollupJoin whose leg rollup omits the dimension its own join is on, so the hop cannot be
+# resolved. The rejection message is what tells the author which rollup to fix.
+cubes:
+  - name: mk_orders
+    sql: "SELECT 1 as id, 1 as customer_id, 10 as amount"
+
+    joins:
+      - name: mk_customers
+        relationship: many_to_one
+        sql: "{CUBE.customer_id} = {mk_customers.customer_id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: customer_id
+        type: number
+        sql: customer_id
+    measures:
+      - name: total_amount
+        type: sum
+        sql: amount
+    pre_aggregations:
+      - name: mk_orders_rollup
+        type: rollup
+        measures:
+          - total_amount
+        dimensions:
+          - customer_id
+      - name: mk_rollup_join
+        type: rollupJoin
+        measures:
+          - total_amount
+        dimensions:
+          - mk_customers.customer_name
+        rollups:
+          - mk_orders.mk_orders_rollup
+          - mk_customers.mk_customers_rollup
+
+  - name: mk_customers
+    sql: "SELECT 1 as customer_id, 'Acme' as customer_name"
+
+    dimensions:
+      - name: customer_id
+        type: number
+        sql: customer_id
+        primary_key: true
+      - name: customer_name
+        type: string
+        sql: customer_name
+    measures:
+      - name: count
+        type: count
+        sql: "COUNT(*)"
+    pre_aggregations:
+      # Omits customer_id, the mk_orders -> mk_customers join key.
+      - name: mk_customers_rollup
+        type: rollup
+        dimensions:
+          - customer_name

@@ -1089,8 +1089,11 @@ export class PreAggregations {
     join: JoinEdgeWithMembers,
     rollupJoinPreAggName: string,
   ): PreAggregationForQuery {
+    // A join key may be declared as the rollup's time dimension rather than a plain dimension,
+    // and `references.dimensions` doesn't include those.
     const fromPreAggObj = preAggObjsToJoin
-      .filter(p => joinMembers.every(m => !!p.references.dimensions.find(d => m === d)));
+      .filter(p => joinMembers.every(m => !!p.references.dimensions.find(d => m === d) ||
+        !!p.references.timeDimensions.find(td => m === td.dimension)));
     if (!fromPreAggObj.length) {
       const msg = `No rollups found that can be used for a rollup join from "${
         join.from}" (fromMembers: ${JSON.stringify(join.fromMembers)}) to "${join.to}" (toMembers: ${
@@ -1139,7 +1142,9 @@ export class PreAggregations {
   private cubesHintsFromPreAggregation(preAggObj: PreAggregationForQuery): string[][] {
     return R.uniq(
       preAggObj.references.measures.concat(
-        preAggObj.references.dimensions
+        preAggObj.references.dimensions,
+        // A cube may be reached only through the rollup's time dimension.
+        preAggObj.references.timeDimensions.map(td => td.dimension),
       ).map(p => p.split('.').slice(0, -1))
     );
   }
