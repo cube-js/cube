@@ -186,6 +186,109 @@ async fn test_nested_trees_count_star_expression_keeps_its_own_scan() {
     }
 }
 
+/// The `COUNT(*)` of an expression is a member of nothing, so the reference
+/// beside it is the only leaf the fan-out check can read - and a distinct count
+/// answering "cannot move" says nothing about the raw count next to it.
+///
+/// Only the grouping is asserted: a raw aggregate written inside an expression
+/// that also references a member is rendered above the per-group CTEs, where it
+/// has no rows of the join left to read, so the split query is not executable.
+#[test]
+fn test_nested_trees_expression_around_distinct_measure_keeps_its_own_scan() {
+    let ctx = create_context();
+
+    let net_carts = make_measure_expression("net_carts", "carts", "COUNT(*) - {carts.unique_msid}");
+    let mut measures = vec![net_carts];
+    measures.extend(members_from_strings(vec!["checkouts.unique_msid"]));
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .measures(Some(measures))
+            .dimensions(Some(members_from_strings(vec!["sites.country"])))
+            .build(),
+    );
+
+    let sql = ctx.build_sql_from_options(options).unwrap();
+    assert_eq!(base_scan_count(&sql), 2, "sql: {sql}");
+}
+
+/// The same expression on its own, over the `carts` tree it belongs to: one
+/// repeated cart in the US, none in DE. The `checkouts` tree carries four US
+/// rows for the same three carts, so evaluating the expression there would
+/// answer 2 instead.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_nested_trees_expression_around_distinct_measure_alone() {
+    let ctx = create_context();
+
+    let net_carts = make_measure_expression("net_carts", "carts", "COUNT(*) - {carts.unique_msid}");
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .measures(Some(vec![net_carts]))
+            .dimensions(Some(members_from_strings(vec!["sites.country"])))
+            .build(),
+    );
+
+    let sql = ctx.build_sql_from_options(options.clone()).unwrap();
+    assert_eq!(base_scan_count(&sql), 1, "sql: {sql}");
+
+    if let Some(result) = ctx.try_execute_pg_from_options(options, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+/// Every measure of a view is a bare reference to the cube measure, so the same
+/// two nested trees fold into one scan when the query is written on the view -
+/// and answer what the cube paths answer.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_nested_trees_view_measures_share_one_base_scan() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - funnel.unique_msid
+          - funnel.checkouts_unique_msid
+        dimensions:
+          - funnel.country
+        order:
+          - id: funnel.country
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(base_scan_count(&sql), 1, "sql: {sql}");
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+/// A calculated measure that writes a raw aggregate of its own around a
+/// reference keeps its tree: the referenced distinct count is the only leaf, and
+/// the count beside it would read the fanned-out rows.
+#[test]
+fn test_nested_trees_calculated_measure_keeps_its_own_scan() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - carts.repeated_msid
+          - checkouts.unique_msid
+        dimensions:
+          - sites.country
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(base_scan_count(&sql), 2, "sql: {sql}");
+}
+
 /// Each cube has its own rollup keyed by the shared dimension. Folding the
 /// groups leaves one query that no single rollup covers, so the merge has to
 /// stand down where per-leg rollups are available.

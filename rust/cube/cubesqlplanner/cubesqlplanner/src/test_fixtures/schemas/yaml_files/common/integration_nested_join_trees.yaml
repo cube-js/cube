@@ -52,6 +52,9 @@ cubes:
       - name: avg_value
         type: avg
         sql: value
+      - name: repeated_msid
+        type: number
+        sql: "COUNT(*) - {carts.unique_msid}"
 
   - name: checkouts
     sql: "SELECT * FROM checkouts"
@@ -73,3 +76,18 @@ cubes:
       - name: total_amount
         type: sum
         sql: amount
+
+views:
+  - name: funnel
+    cubes:
+      - join_path: sites
+        includes:
+          - country
+      - join_path: sites.carts
+        includes:
+          - unique_msid
+          - min_value
+      - join_path: sites.carts.checkouts
+        includes:
+          - unique_msid
+        prefix: true

@@ -1,6 +1,7 @@
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::planner::collectors::{
-    collect_join_hints, collect_multiplied_measures, has_multi_stage_members,
+    collect_join_hints, collect_multiplied_measures, has_expression_or_calculated_members,
+    has_multi_stage_members,
 };
 use crate::planner::filter::FilterItem;
 use crate::planner::join_hints::JoinHints;
@@ -451,24 +452,27 @@ impl MultiFactJoinGroups {
     /// Whether every measure of a group computes the same value, by the same
     /// SQL, when evaluated over `join` instead of its own tree.
     ///
-    /// A measure whose cube `join` does not multiply reads exactly its own
-    /// rows, so nothing changes. A multiplied one only qualifies if its value
-    /// is immune to replication; a key-based count is deliberately not
-    /// accepted, because staying correct would mean switching it to the
-    /// distinct `MultipliedCount` form, and the render form a measure is
-    /// classified into is decided from its own join tree elsewhere.
+    /// Only measures built out of plain aggregated measures qualify, leaf by
+    /// leaf: a leaf whose cube `join` does not multiply reads its own rows
+    /// anyway, a multiplied one has to be immune to replication. A key-based
+    /// count is not accepted - staying correct would mean switching it to the
+    /// distinct `MultipliedCount` form, decided from the measure's own tree
+    /// elsewhere.
     ///
-    /// Multi-stage measures are planned through their own CTE pipeline rather
-    /// than as a leaf of this join, so they are never moved. Neither is a
-    /// member expression: it names no member to anchor it to a cube, so what it
-    /// reads is whatever rows the join it lands on produces - `COUNT(*)` over a
-    /// wider tree counts the fanned-out rows and answers a different question.
+    /// Multi-stage measures plan through their own CTE pipeline, not as a leaf
+    /// of this join. A member expression or a calculated measure that writes SQL
+    /// of its own around its references is out too: an aggregate written there
+    /// is a member of nothing, so no leaf accounts for it. A bare reference -
+    /// every measure of a view is one - writes nothing, and is followed into the
+    /// member it references.
     fn group_survives_join(
         measures: &[Rc<MemberSymbol>],
         join: &Rc<JoinTree>,
     ) -> Result<bool, CubeError> {
         for measure in measures.iter() {
-            if has_multi_stage_members(measure, false)? {
+            if has_multi_stage_members(measure, false)?
+                || has_expression_or_calculated_members(measure)?
+            {
                 return Ok(false);
             }
             // `join` is only a candidate here, not the tree the query will
@@ -749,7 +753,8 @@ impl MultiFactJoinGroups {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_fixtures::cube_bridge::MockSchema;
+    use crate::planner::{MemberExpressionExpression, MemberExpressionSymbol};
+    use crate::test_fixtures::cube_bridge::{MockMemberSql, MockSchema};
     use crate::test_fixtures::test_utils::TestContext;
 
     #[test]
@@ -1024,18 +1029,30 @@ mod tests {
         assert!(groups.resolve_join_path_for_measure(&unknown).is_none());
     }
 
+    fn nested_trees_context() -> TestContext {
+        let schema = MockSchema::from_yaml_file("common/integration_nested_join_trees.yaml");
+        TestContext::new(schema).unwrap()
+    }
+
     fn nested_trees_groups(
         measure_paths: &[&str],
         merge_nested: bool,
     ) -> (usize, Vec<Vec<String>>) {
-        let schema = MockSchema::from_yaml_file("common/integration_nested_join_trees.yaml");
-        let ctx = TestContext::new(schema).unwrap();
-
-        let country = ctx.create_symbol("sites.country").unwrap();
+        let ctx = nested_trees_context();
         let measures = measure_paths
             .iter()
             .map(|path| ctx.create_symbol(path).unwrap())
             .collect_vec();
+
+        nested_trees_groups_of(&ctx, measures, merge_nested)
+    }
+
+    fn nested_trees_groups_of(
+        ctx: &TestContext,
+        measures: Vec<Rc<MemberSymbol>>,
+        merge_nested: bool,
+    ) -> (usize, Vec<Vec<String>>) {
+        let country = ctx.create_symbol("sites.country").unwrap();
 
         let hints = MeasuresJoinHints::builder(&JoinHints::new())
             .add_dimensions(&[country])
@@ -1090,6 +1107,80 @@ mod tests {
         let (num_groups, _) = nested_trees_groups(&["carts.count", "checkouts.unique_msid"], true);
 
         assert_eq!(num_groups, 2);
+    }
+
+    fn make_expression_measure(
+        ctx: &TestContext,
+        name: &str,
+        cube_name: &str,
+        sql: &str,
+    ) -> Rc<MemberSymbol> {
+        let member_sql = Rc::new(MockMemberSql::new(sql).unwrap());
+        let mut compiler = ctx.query_tools().compiler().borrow_mut();
+        let sql_call = compiler
+            .compile_sql_call(&cube_name.to_string(), member_sql)
+            .unwrap();
+        let cube_symbol = compiler
+            .add_cube_table_evaluator(cube_name.to_string(), vec![])
+            .unwrap();
+        drop(compiler);
+        let symbol = MemberExpressionSymbol::try_new(
+            cube_symbol,
+            name.to_string(),
+            MemberExpressionExpression::SqlCall(sql_call),
+            None,
+            None,
+            vec![cube_name.to_string()],
+        )
+        .unwrap();
+        MemberSymbol::new_member_expression(symbol)
+    }
+
+    #[test]
+    fn test_nested_trees_expression_around_distinct_measure_does_not_merge() {
+        // The `COUNT(*)` written in the expression is a member of nothing, so
+        // the distinct count beside it is the only leaf there is to check - and
+        // it says nothing about the count that would read the fanned-out rows.
+        let ctx = nested_trees_context();
+        let expression =
+            make_expression_measure(&ctx, "net_carts", "carts", "COUNT(*) - {carts.unique_msid}");
+        let checkouts_unique = ctx.create_symbol("checkouts.unique_msid").unwrap();
+
+        let (num_groups, _) =
+            nested_trees_groups_of(&ctx, vec![expression, checkouts_unique], true);
+
+        assert_eq!(num_groups, 2);
+    }
+
+    #[test]
+    fn test_nested_trees_calculated_measure_does_not_merge() {
+        // The measure writes its own `COUNT(*)` around the reference, and that
+        // count is a member of nothing - the referenced distinct count is the
+        // only leaf, and it says nothing about the count beside it.
+        let (num_groups, _) =
+            nested_trees_groups(&["carts.repeated_msid", "checkouts.unique_msid"], true);
+
+        assert_eq!(num_groups, 2);
+    }
+
+    #[test]
+    fn test_nested_trees_view_measures_merge() {
+        // A measure of a view is a bare reference to the cube measure, so the
+        // referenced distinct counts are what decides - the same merge the cube
+        // paths get.
+        let (num_groups, measures) = nested_trees_groups(
+            &["funnel.unique_msid", "funnel.checkouts_unique_msid"],
+            true,
+        );
+
+        assert_eq!(num_groups, 1);
+        assert_eq!(
+            measures,
+            vec![vec![
+                "funnel.checkouts_unique_msid".to_string(),
+                "funnel.unique_msid".to_string()
+            ]]
+        );
     }
 
     #[test]
