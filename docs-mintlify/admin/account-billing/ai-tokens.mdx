@@ -71,16 +71,25 @@ Contact your account executive for details on purchasing token packages.
 ## Free tier
 
 Each user on a free plan receives an individual monthly token allowance. This
-allowance resets at the start of each calendar month.
+allowance resets at the start of each calendar month, and usage is tracked
+against it in real time — once a user's spend for the month reaches the
+allowance, further AI requests are blocked until the next reset (see
+[When limits are reached](#when-limits-are-reached)).
+
+If an account downgrades to the free plan mid-month, that month's already
+recorded spend is drawn against the new free allowance immediately, rather
+than resetting.
 
 ## Tracking usage
 
-Administrators can monitor token consumption through the **AI Tokens Usage**
-tab in the billing settings page. The dashboard shows:
+Administrators can monitor token consumption through the **AI** tab in the
+billing settings page, split into two views:
 
-- Total token usage over time
-- Remaining allocation from per-seat grants and token packages
-- Breakdown by usage dimension
+- **AI Usage** — aggregate token consumption over time, remaining allocation
+  from per-seat grants and token packages, and a breakdown by user, role, and
+  usage dimension.
+- **AI Requests** — a raw, per-request log (with a live tail) for inspecting
+  individual AI calls as they happen.
 
 ## When limits are reached
 
