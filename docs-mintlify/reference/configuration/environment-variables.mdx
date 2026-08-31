@@ -1420,12 +1420,16 @@ this variable.
 ## `CUBEJS_REFRESH_KEY_LOCAL_TIME`
 
 To check an `every`-based [`refresh_key`](/reference/data-modeling/cube#refresh_key), Cube
-asks the database what time it is. If `true`, it uses its own clock instead, saving a round
-trip on nearly every request.
+asks the database what time it is. If `true`, it uses its own clock instead and those
+queries stop entirely, including the ones scheduled refresh issues to warm them.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |
+
+Cube already caches each result for a fraction of the interval, so this is not one query
+saved per request — it is one per refresh key per renewal window, multiplied by every cube,
+tenant, and timezone in the deployment.
 
 Refresh keys written with `sql` or marked
 [`incremental`](/reference/data-modeling/pre-aggregations#incremental) keep querying the
