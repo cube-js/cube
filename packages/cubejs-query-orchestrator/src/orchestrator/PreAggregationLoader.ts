@@ -21,6 +21,7 @@ import {
   getStructureVersion,
   InvalidationKeys,
   LoadPreAggregationResult,
+  PreAggregationBuildStatus,
   PreAggregations,
   PreAggregationTableToTempTable,
   tablesToVersionEntries,
@@ -100,6 +101,8 @@ export class PreAggregationLoader {
   private readonly structureVersionPersistTime: any;
 
   private readonly externalRefresh: boolean;
+
+  private buildLanded: boolean = false;
 
   public constructor(
     private readonly driverFactory: DriverFactory,
@@ -487,6 +490,11 @@ export class PreAggregationLoader {
 
     return cancelCombinator(
       async saveCancelFn => {
+        await this.reportBuildStatus(targetTableName, {
+          status: 'building',
+          startedAt: new Date().getTime(),
+        });
+
         try {
           return await refreshStrategy.bind(this)(
             client,
@@ -494,7 +502,17 @@ export class PreAggregationLoader {
             saveCancelFn,
             invalidationKeys
           );
-        } catch (e) {
+        } catch (e: any) {
+          // Post-build cleanup runs after the rows have landed and can fail on
+          // its own. The partition is complete either way, so it keeps the
+          // outcome the strategy already reported.
+          if (!this.buildLanded) {
+            await this.reportBuildStatus(targetTableName, {
+              status: 'failure',
+              error: (e.message || e).toString(),
+            });
+          }
+
           // It's required to remove touch keys, because they are unique per run/table, and it causes
           // a large number of touch keys in the cache store
           try {
@@ -519,6 +537,40 @@ export class PreAggregationLoader {
         }
       }
     );
+  }
+
+  /**
+   * Marks the rows as landed in the partition table. From here on the table
+   * speaks for itself, so the record that a build is in flight goes away and
+   * nothing but a live build is left behind in the cache store.
+   */
+  protected async reportBuildLanded(targetTableName: string): Promise<void> {
+    this.buildLanded = true;
+
+    try {
+      await this.preAggregations.removePreAggregationBuildStatus(targetTableName);
+    } catch (e: any) {
+      this.logger('Error on dropping pre-aggregation build status', {
+        error: (e.stack || e), preAggregation: this.preAggregation, requestId: this.requestId,
+      });
+    }
+  }
+
+  /**
+   * Persists that a build is running or has failed, so the jobs API can tell an
+   * unfinished build from a versioned table that merely exists. Recorded for
+   * every build, not just for the ones a job started: the queue de-duplicates
+   * on the query key, so a job regularly ends up waiting on a build some other
+   * request enqueued.
+   */
+  private async reportBuildStatus(targetTableName: string, status: PreAggregationBuildStatus): Promise<void> {
+    try {
+      await this.preAggregations.setPreAggregationBuildStatus(targetTableName, status);
+    } catch (e: any) {
+      this.logger('Error on saving pre-aggregation build status', {
+        error: (e.stack || e), preAggregation: this.preAggregation, requestId: this.requestId,
+      });
+    }
   }
 
   protected logExecutingSql(payload) {
@@ -571,6 +623,7 @@ export class PreAggregationLoader {
       ));
 
       await this.createIndexes(client, newVersionEntry, saveCancelFn, queryOptions);
+      await this.reportBuildLanded(targetTableName);
       await this.loadCache.fetchTables(this.preAggregation);
     } finally {
       // We must clean orphaned in any cases: success or exception
@@ -949,17 +1002,37 @@ export class PreAggregationLoader {
           sealAt: this.preAggregation.sealAt
         }
       )
-    ).catch((error: any) => {
+    ).catch(async (error: any) => {
       this.logger('Uploading external pre-aggregation error', {
         ...queryOptions,
         error: error?.stack || error?.message
       });
+      // A half-built table is the newest version of the partition, so it shadows
+      // the previous correct one and orphaned tables cleanup always keeps it.
+      await this.dropPartiallyBuiltTable(externalDriver, table, queryOptions);
       throw error;
     });
     this.logger('Uploading external pre-aggregation completed', queryOptions);
+    await this.reportBuildLanded(table);
 
     await this.loadCache.fetchTables(this.preAggregation);
     await this.dropOrphanedTables(externalDriver, table, saveCancelFn, true, queryOptions);
+  }
+
+  private async dropPartiallyBuiltTable(driver: DriverInterface, table: string, queryOptions: QueryOptions) {
+    this.logger('Dropping partially built external pre-aggregation', queryOptions);
+
+    try {
+      // Dropped without checking that it is there: `CREATE TABLE` carries no
+      // `IF NOT EXISTS`, so a leftover table fails every later attempt at this
+      // version until it is gone
+      await driver.dropTable(table);
+    } catch (e: any) {
+      this.logger('Dropping partially built external pre-aggregation error', {
+        ...queryOptions,
+        error: e?.stack || e?.message
+      });
+    }
   }
 
   protected async createIndexes(driver: DriverInterface, newVersionEntry: VersionEntry, saveCancelFn: SaveCancelFn, queryOptions: QueryOptions) {

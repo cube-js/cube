@@ -544,6 +544,15 @@ To trigger pre-aggregation builds, send a `POST` request with a payload
 including `post` as the `action` and `selector` properties. The response will
 contain an array of `tokens` (identifiers) of triggered jobs.
 
+<Note>
+
+Builds run in the process that receives the request, even on an instance that
+never builds pre-aggregations while serving queries. Restarting that instance
+interrupts any build it is running; such a build is reported as `failure`, so
+re-trigger the job for those partitions.
+
+</Note>
+
 Example request triggering builds of all pre-aggregations defined in all cubes
 using an empty security context and a `UTC` timezone:
 
@@ -649,8 +658,19 @@ In the `status` property of the payload, you can get the following statuses:
 | --- | --- |
 | `scheduled` | The job hasn't run yet |
 | `processing` | The job is currently running |
-| `missing_partition` | The job has failed |
-| `done` | The job has successfully completed |
+| `done` | The build has completed and its data has landed in the pre-aggregation storage |
+| `failure: <error>` | The build has failed; the error message is appended to the status. `failure: the build has not completed` means the instance running the build stopped before it finished, for example because it was restarted mid-build |
+| `missing_partition` | No table exists for this partition and no build outcome is recorded for it. Trigger the job again |
+| `not_found` | The token is unknown, or the job record has expired. Job records are kept for 24 hours |
+| `pre_agg_not_found` | The pre-aggregation the job was triggered for is no longer defined in the data model |
+
+<Note>
+
+`done` means the build itself has finished successfully. It doesn't mean the
+partition has any rows: a partition with no matching source data is built and
+reported as `done` with zero rows.
+
+</Note>
 
 Example request:
 

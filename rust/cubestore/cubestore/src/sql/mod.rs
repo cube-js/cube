@@ -2568,6 +2568,104 @@ mod tests {
         Ok(())
     }
 
+    /// A table imported from a location is published only after the import
+    /// succeeds, so a failed import can't leave a queryable empty table behind
+    /// that would shadow the previous version of a pre-aggregation partition.
+    #[tokio::test]
+    async fn failed_location_import_leaves_no_table() -> Result<(), CubeError> {
+        Config::test("failed_location_import_leaves_no_table")
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                let path = env::temp_dir().join("failed_location_import.csv.gz");
+                // Not a gzip stream, so the import job fails while reading it
+                fs::write(&path, b"this is not a gzip stream").unwrap();
+
+                service
+                    .exec_query("CREATE SCHEMA foo")
+                    .await?
+                    .collect()
+                    .await?;
+
+                let res = service
+                    .exec_query(&format!(
+                        "CREATE TABLE foo.orders (id int, amount int) LOCATION '{}'",
+                        path.to_string_lossy()
+                    ))
+                    .await;
+                assert!(res.is_err(), "Expected import to fail, got {:?}", res.err());
+
+                let tables = service
+                    .exec_query(
+                        "SELECT table_name FROM information_schema.tables \
+                         WHERE table_schema = 'foo'",
+                    )
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(tables.get_rows(), &Vec::<Row>::new());
+
+                // Not published and not left behind in any state
+                let all_tables = services.meta_store.get_tables_with_path(true).await?;
+                assert!(
+                    all_tables.is_empty(),
+                    "Expected no tables left after a failed import, got {:?}",
+                    all_tables
+                );
+
+                fs::remove_file(&path).unwrap();
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
+    /// A table created without a location becomes queryable right away, before
+    /// any rows are inserted into it. Anything that treats table existence as
+    /// proof of a finished import has to account for this window.
+    #[tokio::test]
+    async fn table_without_location_is_visible_while_empty() -> Result<(), CubeError> {
+        Config::test("table_without_location_is_visible_while_empty")
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                service
+                    .exec_query("CREATE SCHEMA foo")
+                    .await?
+                    .collect()
+                    .await?;
+                service
+                    .exec_query("CREATE TABLE foo.orders (id int, amount int)")
+                    .await?
+                    .collect()
+                    .await?;
+
+                let tables = service
+                    .exec_query(
+                        "SELECT table_name FROM information_schema.tables \
+                         WHERE table_schema = 'foo'",
+                    )
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    tables.get_rows(),
+                    &vec![Row::new(vec![TableValue::String("orders".to_string())])]
+                );
+
+                let count = service
+                    .exec_query("SELECT count(*) FROM foo.orders")
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(count.get_rows(), &vec![Row::new(vec![TableValue::Int(0)])]);
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
     #[tokio::test]
     async fn decimal() -> Result<(), CubeError> {
         Config::test("decimal").update_config(|mut c| {
