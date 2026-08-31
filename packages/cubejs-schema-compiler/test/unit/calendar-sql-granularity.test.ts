@@ -54,6 +54,11 @@ ${granularity}
     );
   });
 
+  it('accepts a sql override whose predefined name differs in case', async () => {
+    // Predefined names resolve case-insensitively, so this one resolves today.
+    await expect(compile(sqlOverride('Week'))).resolves.toBeDefined();
+  });
+
   describe.each([
     ['legacy planner', false],
     ['native planner', true],

@@ -192,10 +192,11 @@ impl MultiStageMemberQueryPlanner {
             }
         }
 
+        // Left unfiltered on purpose: the series restricts itself to the query
+        // range only after it has read each period's end off the next point.
         let cte_query_properties = QueryProperties::builder()
             .query_tools(self.query_tools.clone())
             .time_dimensions(time_dimensions)
-            .time_dimensions_filters(self.description.state().time_dimensions_filters().clone())
             .ignore_cumulative(true)
             .disable_external_pre_aggregations(
                 self.query_properties.disable_external_pre_aggregations(),

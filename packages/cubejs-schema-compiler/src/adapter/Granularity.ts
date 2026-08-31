@@ -49,7 +49,10 @@ export class Granularity {
       }
 
       if (!customGranularity.interval) {
-        throw new UserError(`Granularity "${this.granularity}" of dimension ${timeDimension.dimension} is defined with 'sql', which is only supported for predefined granularities`);
+        const cause = customGranularity.sql
+          ? 'is defined with \'sql\', which is only supported for predefined granularities'
+          : 'has no interval';
+        throw new UserError(`Granularity "${this.granularity}" of dimension ${timeDimension.dimension} ${cause}`);
       }
 
       this.granularityInterval = customGranularity.interval;

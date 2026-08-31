@@ -46,14 +46,28 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
                 .period_dimensions()
                 .iter()
                 .map(|dimension| {
-                    let granularity = dimension
-                        .as_time_dimension()?
-                        .granularity()
-                        .clone()
-                        .unwrap_or_default();
+                    let Some(granularity) = dimension.as_time_dimension()?.granularity().clone()
+                    else {
+                        return Err(CubeError::internal(format!(
+                            "Calendar period dimension '{}' must have a granularity",
+                            dimension.full_name()
+                        )));
+                    };
                     Ok((granularity, schema.resolve_member_alias(dimension)))
                 })
                 .collect::<Result<Vec<_>, CubeError>>()?;
+
+            let range = if let Some(date_range) = time_dimension_symbol
+                .get_range_for_time_series(date_range, query_tools.timezone())?
+            {
+                TimeSeriesDateRange::Filter(date_range.0.clone(), date_range.1.clone())
+            } else if let Some(date_range_cte) = time_series.get_date_range_multistage_ref() {
+                TimeSeriesDateRange::Generated(date_range_cte.clone())
+            } else {
+                return Err(CubeError::internal(
+                    "Date range cte is required for time series without date range".to_string(),
+                ));
+            };
 
             let time_series = TimeSeries::new(
                 &time_dimension,
@@ -61,7 +75,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
                     Rc::new(QueryPlan::Select(source)),
                     date_from_alias,
                     period_aliases,
-                    time_series.get_date_range_multistage_ref().clone(),
+                    range,
                 )),
                 granularity_obj,
             );

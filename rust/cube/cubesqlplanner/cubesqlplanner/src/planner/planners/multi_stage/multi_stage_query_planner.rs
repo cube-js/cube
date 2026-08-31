@@ -136,6 +136,9 @@ impl MultiStageQueryPlanner {
             }
         }
 
+        // Planning only after every description exists is load-bearing: a
+        // description may still be collecting requirements from its siblings,
+        // as a time series does from the rolling windows it drives.
         for descr in descriptions.into_iter() {
             let planner = MultiStageMemberQueryPlanner::new(
                 self.query_tools.clone(),

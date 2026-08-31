@@ -160,6 +160,20 @@ cubes:
     { fiscal_calendar__date_day: '2023-12-25T00:00:00.000Z', sales__trailing_amount: '30', sales__mtd_amount: '90' },
   ]));
 
+  it('ends the last period in range on the calendar too', async () => runQueryTest({
+    measures: ['sales.mtd_amount'],
+    timeDimensions: [{
+      dimension: 'fiscal_calendar.date',
+      granularity: 'month',
+      dateRange: ['2024-01-14', '2024-02-17'],
+    }],
+  }, [
+    // The range ends exactly where this 35-day period does, so the period that
+    // bounds it is outside the range: reading the end off the next series point
+    // only works if the series looks past its own restriction.
+    { fiscal_calendar__date_month: '2024-01-14T00:00:00.000Z', sales__mtd_amount: '350' },
+  ]));
+
   it('resolves the series range at query time when none is given', async () => runQueryTest({
     measures: ['sales.wtd_amount'],
     timeDimensions: [{
@@ -168,7 +182,7 @@ cubes:
     }],
     order: [{ id: 'fiscal_calendar.date' }],
   }, Array.from({ length: 13 }, (_, i) => ({
-    fiscal_calendar__date_week: new Date(Date.UTC(2023, 11, 17 + i * 7)).toISOString().replace('Z', 'Z'),
+    fiscal_calendar__date_week: new Date(Date.UTC(2023, 11, 17 + i * 7)).toISOString(),
     sales__wtd_amount: '70',
   }))));
 });

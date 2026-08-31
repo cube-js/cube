@@ -1923,7 +1923,9 @@ export class BaseQuery {
                 // interval to derive a hierarchy from. Such a granularity can only be
                 // matched by a rollup declaring it by name, which is what a missing
                 // hierarchy entry already means.
-                if (granularity?.interval) {
+                // An unresolvable granularity is a different matter and keeps
+                // reporting itself from the constructor below.
+                if (!granularity || granularity.interval) {
                   const grObj = new Granularity(this, { dimension: dimensionKey, granularity: granularityName });
                   hierarchies[`${dimensionKey}.${granularityName}`] = [
                     granularityName,

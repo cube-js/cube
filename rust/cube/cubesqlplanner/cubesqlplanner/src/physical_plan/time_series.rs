@@ -1,4 +1,5 @@
 use super::{QueryPlan, Schema, SchemaColumn};
+use crate::planner::sql_templates::TemplateProjectionColumn;
 use crate::planner::{sql_templates::PlanSqlTemplates, Granularity, MemberSymbol, QueryTimeSeries};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -24,9 +25,10 @@ pub struct CalendarPeriodSource {
     date_from_alias: String,
     /// Granularity name paired with the column `source` projects it as.
     period_aliases: Vec<(String, String)>,
-    /// Name of the cte resolving the range at query time. `None` when the
-    /// query states a date range, which bounds `source` on its own.
-    range_cte: Option<String>,
+    /// The range the series is restricted to. Applied outside the select that
+    /// derives the period bounds, so that select still sees the period
+    /// following the last one in range.
+    range: TimeSeriesDateRange,
 }
 
 impl CalendarPeriodSource {
@@ -34,13 +36,13 @@ impl CalendarPeriodSource {
         source: Rc<QueryPlan>,
         date_from_alias: String,
         period_aliases: Vec<(String, String)>,
-        range_cte: Option<String>,
+        range: TimeSeriesDateRange,
     ) -> Self {
         Self {
             source,
             date_from_alias,
             period_aliases,
-            range_cte,
+            range,
         }
     }
 }
@@ -166,6 +168,62 @@ impl TimeSeries {
         calendar: &CalendarPeriodSource,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
+        let bounds_alias = "calendar_series".to_string();
+        let bounds = self.calendar_period_bounds_to_sql(calendar, templates, &bounds_alias)?;
+
+        let date_from = templates.column_reference(&Some(bounds_alias.clone()), "date_from")?;
+        let mut columns = vec![
+            Self::projection_column(templates, &date_from, "date_from")?,
+            Self::projection_column(
+                templates,
+                &templates.column_reference(&Some(bounds_alias.clone()), "date_to")?,
+                "date_to",
+            )?,
+        ];
+        for (granularity, _) in calendar.period_aliases.iter() {
+            let name = Self::period_start_column(granularity);
+            let column = templates.column_reference(&Some(bounds_alias.clone()), &name)?;
+            columns.push(Self::projection_column(templates, &column, &name)?);
+        }
+
+        let (range_from, range_to) = match &calendar.range {
+            TimeSeriesDateRange::Filter(from_date, to_date) => (
+                templates.time_stamp_cast(templates.quote_string(from_date)?)?,
+                templates.time_stamp_cast(templates.quote_string(to_date)?)?,
+            ),
+            TimeSeriesDateRange::Generated(range_cte) => (
+                Self::range_cte_bound(templates, range_cte, "min_date")?,
+                Self::range_cte_bound(templates, range_cte, "max_date")?,
+            ),
+        };
+
+        templates.select(
+            vec![],
+            &templates.query_aliased(&format!("({})", bounds), &bounds_alias)?,
+            columns,
+            Some(format!(
+                "{date_from} >= {range_from} AND {date_from} <= {range_to}"
+            )),
+            vec![],
+            None,
+            vec![],
+            None,
+            None,
+            false,
+            false,
+        )
+    }
+
+    /// Pairs every point of the calendar with the end of the period it opens.
+    /// Deliberately unrestricted by the query range: a period ends where the
+    /// next one starts, so the point past the range is what bounds the last one
+    /// inside it.
+    fn calendar_period_bounds_to_sql(
+        &self,
+        calendar: &CalendarPeriodSource,
+        templates: &PlanSqlTemplates,
+        outer_alias: &str,
+    ) -> Result<String, CubeError> {
         let interval_description = templates
             .interval_and_minimal_time_unit(self.granularity.granularity_interval().to_sql())?;
         if interval_description.len() != 2 {
@@ -175,58 +233,68 @@ impl TimeSeries {
         }
         let interval = interval_description[0].clone();
 
-        let source_alias = "calendar_series".to_string();
+        let source_alias = format!("{}_source", outer_alias);
         let date_from =
             templates.column_reference(&Some(source_alias.clone()), &calendar.date_from_alias)?;
         let date_from = templates.time_stamp_cast(date_from)?;
-        let next_start = format!("({})", templates.add_interval(date_from.clone(), interval)?);
-        let next_start = if self.granularity.calendar_sql().is_some() {
-            // A calendar period ends where the next one starts, and how far off
-            // that is only the calendar knows — a 4-5-4 month runs 28 or 35 days
-            // against a nominal `1 month`. Only the last point of the series has
-            // no next row to read it from.
-            let lead = templates.window_function(
+
+        let nominal_end = format!("({})", templates.add_interval(date_from.clone(), interval)?);
+        // Only the genuine last point of the calendar has no next period to end
+        // on, and a nominal interval is all that is left to bound it by.
+        let period_end = if self.granularity.calendar_sql().is_some() {
+            let next_start = templates.window_function(
                 &format!("LEAD({})", date_from),
                 "",
                 &format!("{} ASC", date_from),
                 "",
             )?;
-            format!("COALESCE({}, {})", lead, next_start)
+            format!("COALESCE({}, {})", next_start, nominal_end)
         } else {
-            next_start
+            nominal_end
         };
-        let date_to = templates.subtract_interval(next_start, "1 millisecond".to_string())?;
+        let date_to = templates.subtract_interval(period_end, "1 millisecond".to_string())?;
 
         let mut columns = vec![
-            templates.column_aliased(&date_from, "date_from")?,
-            templates.column_aliased(&date_to, "date_to")?,
+            Self::projection_column(templates, &date_from, "date_from")?,
+            Self::projection_column(templates, &date_to, "date_to")?,
         ];
         for (granularity, alias) in calendar.period_aliases.iter() {
             let column = templates.column_reference(&Some(source_alias.clone()), alias)?;
-            columns
-                .push(templates.column_aliased(&column, &Self::period_start_column(granularity))?);
+            columns.push(Self::projection_column(
+                templates,
+                &column,
+                &Self::period_start_column(granularity),
+            )?);
         }
 
-        let where_clause = match &calendar.range_cte {
-            Some(range_cte) => {
-                let min = Self::range_cte_bound(templates, range_cte, "min_date")?;
-                let max = Self::range_cte_bound(templates, range_cte, "max_date")?;
-                format!(" \nWHERE {date_from} >= {min} AND {date_from} <= {max}")
-            }
-            None => String::new(),
-        };
+        templates.select(
+            vec![],
+            &templates.query_aliased(
+                &format!("({})", calendar.source.to_sql(templates)?),
+                &source_alias,
+            )?,
+            columns,
+            None,
+            vec![],
+            None,
+            vec![],
+            None,
+            None,
+            false,
+            false,
+        )
+    }
 
-        let source = templates.query_aliased(
-            &format!("({})", calendar.source.to_sql(templates)?),
-            &source_alias,
-        )?;
-
-        Ok(format!(
-            "SELECT {}\nFROM {}{}",
-            columns.join(", "),
-            source,
-            where_clause
-        ))
+    fn projection_column(
+        templates: &PlanSqlTemplates,
+        expr: &str,
+        alias: &str,
+    ) -> Result<TemplateProjectionColumn, CubeError> {
+        Ok(TemplateProjectionColumn {
+            expr: expr.to_string(),
+            alias: alias.to_string(),
+            aliased: templates.column_aliased(expr, alias)?,
+        })
     }
 
     fn range_cte_bound(
