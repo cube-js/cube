@@ -37,14 +37,22 @@ export function getCacheHash(queryKey: QueryKey | CacheKey, processUid?: string)
  * `f` in [0, 1) and `interval >= 1`, floor((x + f) / interval) === floor(x / interval),
  * which is also why the fractional seconds of `EXTRACT(EPOCH FROM NOW())` never
  * mattered on the SQL path.
+ *
+ * The number is formatted as a string to stay byte-identical to the row the SQL path
+ * returned. Both `contentVersion` and the query cache `renewalKey` hash these values
+ * through `JSON.stringify`, so `2980310` and `"2980310"` are different keys and every
+ * pre-aggregation would rebuild the first time the flag is switched on. String is what
+ * the SQL path yields: an `every` refresh key runs against Cube Store whenever an
+ * external store is configured, and Cube Store's protocol carries every column as a
+ * string.
  */
 export function evaluateLocalRefreshKey(
   descriptor: LocalRefreshKeyDescriptor,
   nowMs: number = Date.now(),
-): [{ refresh_key: number }] {
+): [{ refresh_key: string }] {
   const { utcOffset, interval, dayOffset } = descriptor;
 
-  return [{ refresh_key: Math.floor((utcOffset + nowMs / 1000 - dayOffset) / interval) }];
+  return [{ refresh_key: String(Math.floor((utcOffset + nowMs / 1000 - dayOffset) / interval)) }];
 }
 
 export function isValidLocalRefreshKey(descriptor?: LocalRefreshKeyDescriptor): boolean {

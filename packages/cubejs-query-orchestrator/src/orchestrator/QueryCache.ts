@@ -244,7 +244,7 @@ export class QueryCache {
     return this.localRefreshKeyEnabled && !this.options.refreshKeyRenewalThreshold;
   }
 
-  public localRefreshKeyResult(queryOptions?: QueryOptions): [{ refresh_key: number }] | null {
+  public localRefreshKeyResult(queryOptions?: QueryOptions): [{ refresh_key: string }] | null {
     if (!this.localRefreshKeyEnabled || !isValidLocalRefreshKey(queryOptions?.localRefreshKey)) {
       return null;
     }

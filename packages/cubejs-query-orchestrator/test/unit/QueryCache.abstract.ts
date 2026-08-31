@@ -535,7 +535,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         });
 
         expect(executed).toBe(0);
-        expect(result).toEqual([{ refresh_key: Math.floor(Date.now() / 1000 / 600) }]);
+        expect(result).toEqual([{ refresh_key: String(Math.floor(Date.now() / 1000 / 600)) }]);
       });
 
       it('runs the query when the flag is off', async () => {

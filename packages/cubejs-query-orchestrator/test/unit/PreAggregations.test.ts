@@ -531,7 +531,7 @@ describe('PreAggregations', () => {
         10,
       );
 
-      expect(result).toEqual([{ refresh_key: Math.floor(Date.now() / 1000 / descriptor.interval) }]);
+      expect(result).toEqual([{ refresh_key: String(Math.floor(Date.now() / 1000 / descriptor.interval)) }]);
       expect(mockDriver!.executedQueries).toEqual([]);
     });
 
@@ -577,7 +577,7 @@ describe('PreAggregations', () => {
       const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(600_000);
       try {
         const first = await loadCache.keyQueryResult(key, false, 10);
-        expect(first).toEqual([{ refresh_key: 1 }]);
+        expect(first).toEqual([{ refresh_key: '1' }]);
 
         nowSpy.mockReturnValue(1_200_000);
         const second = await loadCache.keyQueryResult(key, false, 10);
