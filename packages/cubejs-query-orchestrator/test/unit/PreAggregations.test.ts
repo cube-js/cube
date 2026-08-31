@@ -93,14 +93,18 @@ const mockPreAggregation = (overrides: Record<string, any> = {}) => ({
   ...overrides,
 });
 
-const createLoader = (overrides: Record<string, any> = {}, options: Record<string, any> = {}) => {
+const createLoader = (
+  overrides: Record<string, any> = {},
+  options: Record<string, any> = {},
+  preAggregationsTablesToTempTables: any[] = [],
+) => {
   const loader = new PreAggregationPartitionRangeLoader(
     {} as any, // driverFactory
     {} as any, // logger
     { options: {} } as any, // queryCache
     {} as any, // preAggregations
     mockPreAggregation(overrides) as any,
-    [], // preAggregationsTablesToTempTables
+    preAggregationsTablesToTempTables,
     {} as any, // loadCache
     options as any,
   );
@@ -793,6 +797,103 @@ describe('PreAggregations', () => {
         ['2024-01-01T00:00:00', '2024-01-31T23:59:59.999'], // incorrect format
         ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999']
       )).toThrow('Date range expected to be in YYYY-MM-DDTHH:mm:ss.SSS format');
+    });
+  });
+
+  describe('rollupLambda partition filtering', () => {
+    let loadPreAggregationMock: jest.SpyInstance;
+
+    beforeEach(() => {
+      loadPreAggregationMock = jest.spyOn(PreAggregationLoader.prototype, 'loadPreAggregation').mockResolvedValue({
+        targetTableName: 'hot_partition',
+        refreshKeyValues: [],
+        lastUpdatedAt: 1,
+        buildRangeEnd: '2024-02-01T23:59:59.999',
+      });
+    });
+
+    afterEach(() => {
+      loadPreAggregationMock.mockRestore();
+    });
+
+    test('should return an empty result for an out-of-range last rollupLambda partition', async () => {
+      const loader = createLoader({
+        rollupLambdaId: 'orders.lambda',
+        lastRollupLambda: true,
+        matchedTimeDimensionDateRange: ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999'],
+      });
+      jest.spyOn(loader as any, 'partitionRanges').mockResolvedValue({
+        buildRange: ['2024-02-01T00:00:00.000', '2024-02-01T23:59:59.999'],
+        partitionRanges: [['2024-02-01T00:00:00.000', '2024-02-01T23:59:59.999']],
+      });
+
+      const result = await loader.loadPreAggregations();
+
+      expect(result.targetTableName).toBe('(SELECT * FROM hot_partition WHERE 1 = 0)');
+      expect(result.buildRangeEnd).toBeFalsy();
+    });
+
+    test('should retain a last rollupLambda partition that overlaps the requested range', async () => {
+      const loader = createLoader(
+        {
+          rollupLambdaId: 'orders.lambda',
+          lastRollupLambda: true,
+          matchedTimeDimensionDateRange: ['2024-01-30T12:00:00.000', '2024-01-31T23:59:59.999'],
+        },
+        {},
+        [[
+          'batch_rollup',
+          {
+            targetTableName: 'batch_partition',
+            refreshKeyValues: [],
+            lastUpdatedAt: 1,
+            buildRangeEnd: '2024-01-30T23:59:59.999',
+            rollupLambdaId: 'orders.lambda',
+          },
+        ]],
+      );
+      jest.spyOn(loader as any, 'partitionRanges').mockResolvedValue({
+        buildRange: ['2024-01-31T00:00:00.000', '2024-02-01T23:59:59.999'],
+        partitionRanges: [['2024-01-31T00:00:00.000', '2024-02-01T23:59:59.999']],
+      });
+
+      const result = await loader.loadPreAggregations();
+
+      expect(result.targetTableName).toBe('hot_partition');
+      expect(result.buildRangeEnd).toBe('2024-02-01T23:59:59.999');
+    });
+
+    test('should retain existing rollupLambda filtering without a matched range', async () => {
+      const loader = createLoader({
+        rollupLambdaId: 'orders.lambda',
+        lastRollupLambda: true,
+      });
+      jest.spyOn(loader as any, 'partitionRanges').mockResolvedValue({
+        buildRange: ['2024-02-01T00:00:00.000', '2024-02-01T23:59:59.999'],
+        partitionRanges: [['2024-02-01T00:00:00.000', '2024-02-01T23:59:59.999']],
+      });
+
+      const result = await loader.loadPreAggregations();
+
+      expect(result.targetTableName).toBe('hot_partition');
+      expect(result.buildRangeEnd).toBe('2024-02-01T23:59:59.999');
+    });
+
+    test('should retain a rollupLambda partition that touches the requested range boundary', async () => {
+      const loader = createLoader({
+        rollupLambdaId: 'orders.lambda',
+        lastRollupLambda: true,
+        matchedTimeDimensionDateRange: ['2024-01-31T00:00:00.000', '2024-02-01T00:00:00.000'],
+      });
+      jest.spyOn(loader as any, 'partitionRanges').mockResolvedValue({
+        buildRange: ['2024-02-01T00:00:00.000', '2024-02-01T23:59:59.999'],
+        partitionRanges: [['2024-02-01T00:00:00.000', '2024-02-01T23:59:59.999']],
+      });
+
+      const result = await loader.loadPreAggregations();
+
+      expect(result.targetTableName).toBe('hot_partition');
+      expect(result.buildRangeEnd).toBe('2024-02-01T23:59:59.999');
     });
   });
 
