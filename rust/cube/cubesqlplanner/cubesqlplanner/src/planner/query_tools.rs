@@ -22,6 +22,20 @@ pub struct JoinKey {
     joins: Vec<JoinItemStatic>,
 }
 
+impl JoinKey {
+    /// Whether all of this key's joins appear in `other`, which walks from the
+    /// same root and holds strictly more of them.
+    ///
+    /// Containment of the edge set, not of a path: `other` may extend this key
+    /// along a sibling branch rather than along the same walk. That is still a
+    /// tree this key's rows survive in, which is all the caller needs.
+    pub fn is_nested_in(&self, other: &JoinKey) -> bool {
+        self.root == other.root
+            && self.joins.len() < other.joins.len()
+            && self.joins.iter().all(|item| other.joins.contains(item))
+    }
+}
+
 pub struct QueryTools {
     cube_evaluator: Rc<dyn CubeEvaluator>,
     base_tools: Rc<dyn BaseTools>,
