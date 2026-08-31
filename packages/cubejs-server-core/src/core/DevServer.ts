@@ -138,7 +138,7 @@ export class DevServer {
         requestId: getRequestIdFromRequest(req),
       });
 
-      const tablesSchema = await driver.tablesSchema();
+      const tablesSchema = await driver.tablesSchemaV2();
 
       this.cubejsServer.event('Dev Server DB Schema Load Success');
       if (Object.keys(tablesSchema || {}).length === 0) {
@@ -176,7 +176,7 @@ export class DevServer {
         securityContext: null,
         requestId: getRequestIdFromRequest(req),
       });
-      const tablesSchema = req.body.tablesSchema || (await driver.tablesSchema());
+      const tablesSchema = req.body.tablesSchema || (await driver.tablesSchemaV2());
 
       if (!Object.values(SchemaFormat).includes(req.body.format)) {
         throw new Error(`Unknown schema format. Must be one of ${Object.values(SchemaFormat)}`);
