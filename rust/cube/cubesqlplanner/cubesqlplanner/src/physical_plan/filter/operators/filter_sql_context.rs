@@ -182,31 +182,33 @@ impl<'a> FilterSqlContext<'a> {
     }
 
     pub fn date_range_from_time_series(&self) -> Result<(String, String), CubeError> {
-        let from_expr = format!(
-            "min({})",
-            self.plan_templates.quote_identifier("date_from")?
+        Ok((
+            self.time_series_bound("min", "date_from")?,
+            self.time_series_bound("max", "date_to")?,
+        ))
+    }
+
+    /// Scalar sub-select of `aggregate(column)` over the time series driving
+    /// this rolling window.
+    pub fn time_series_bound(&self, aggregate: &str, column: &str) -> Result<String, CubeError> {
+        let expr = format!(
+            "{}({})",
+            aggregate,
+            self.plan_templates.quote_identifier(column)?
         );
-        let to_expr = format!("max({})", self.plan_templates.quote_identifier("date_to")?);
-        let from_expr = self.plan_templates.series_bounds_cast(&from_expr)?;
-        let to_expr = self.plan_templates.series_bounds_cast(&to_expr)?;
+        let expr = self.plan_templates.series_bounds_cast(&expr)?;
         let alias = "value".to_string();
-        let time_series_cte_name = "time_series".to_string();
 
-        let from_column = TemplateProjectionColumn {
-            expr: from_expr.clone(),
+        let projection = TemplateProjectionColumn {
+            expr: expr.clone(),
             alias: alias.clone(),
-            aliased: self.plan_templates.column_aliased(&from_expr, &alias)?,
-        };
-        let to_column = TemplateProjectionColumn {
-            expr: to_expr.clone(),
-            alias: alias.clone(),
-            aliased: self.plan_templates.column_aliased(&to_expr, &alias)?,
+            aliased: self.plan_templates.column_aliased(&expr, &alias)?,
         };
 
-        let from = self.plan_templates.select(
+        let select = self.plan_templates.select(
             vec![],
-            &time_series_cte_name,
-            vec![from_column],
+            "time_series",
+            vec![projection],
             None,
             vec![],
             None,
@@ -216,20 +218,7 @@ impl<'a> FilterSqlContext<'a> {
             false,
             false,
         )?;
-        let to = self.plan_templates.select(
-            vec![],
-            &time_series_cte_name,
-            vec![to_column],
-            None,
-            vec![],
-            None,
-            vec![],
-            None,
-            None,
-            false,
-            false,
-        )?;
-        Ok((format!("({})", from), format!("({})", to)))
+        Ok(format!("({})", select))
     }
 
     pub fn extend_date_range_bound(

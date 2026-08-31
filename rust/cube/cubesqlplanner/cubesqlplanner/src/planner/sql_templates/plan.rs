@@ -243,6 +243,24 @@ impl PlanSqlTemplates {
         )
     }
 
+    pub fn window_function(
+        &self,
+        fun_call: &str,
+        partition_by_concat: &str,
+        order_by_concat: &str,
+        window_frame: &str,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            "expressions/window_function",
+            context! {
+                fun_call => fun_call,
+                partition_by_concat => partition_by_concat,
+                order_by_concat => order_by_concat,
+                window_frame => window_frame,
+            },
+        )
+    }
+
     pub fn query_aliased(&self, query: &str, alias: &str) -> Result<String, CubeError> {
         let quoted_alias = self.quote_identifier(alias)?;
         self.render.render_template(

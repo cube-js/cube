@@ -30,6 +30,7 @@ use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use indexmap::IndexMap;
 use itertools::Itertools;
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -1003,8 +1004,15 @@ impl MultiStageQueryPlanner {
                     Rc::new(extended)
                 };
 
-                let time_series =
-                    self.add_time_series(time_dimension.clone(), state.clone(), descriptions)?;
+                let calendar_period_granularity =
+                    self.calendar_to_date_granularity(&rolling_window, &time_dimension)?;
+
+                let time_series = self.add_time_series(
+                    time_dimension.clone(),
+                    calendar_period_granularity,
+                    state.clone(),
+                    descriptions,
+                )?;
 
                 let rolling_base = if !measure.is_multi_stage() {
                     self.add_rolling_window_base(
@@ -1116,12 +1124,22 @@ impl MultiStageQueryPlanner {
     fn add_time_series(
         &self,
         time_dimension: Rc<MemberSymbol>,
+        calendar_period_granularity: Option<String>,
         state: Rc<QueryProperties>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
         let description = if let Some(description) =
             descriptions.iter().find(|d| d.alias() == "time_series")
         {
+            // Rolling windows share one series, so a window joining an existing
+            // one has to register its own boundary column on it.
+            if let Some(granularity) = &calendar_period_granularity {
+                let granularities = Self::time_series_calendar_granularities(description)?;
+                let mut granularities = granularities.borrow_mut();
+                if !granularities.contains(granularity) {
+                    granularities.push(granularity.clone());
+                }
+            }
             description.clone()
         } else {
             let get_range_query_description = if time_dimension
@@ -1143,6 +1161,9 @@ impl MultiStageQueryPlanner {
                         TimeSeriesDescription {
                             time_dimension: time_dimension.clone(),
                             date_range_cte: get_range_query_description.map(|d| d.alias().clone()),
+                            calendar_period_granularities: Rc::new(RefCell::new(
+                                calendar_period_granularity.into_iter().collect(),
+                            )),
                         },
                     ))),
                     time_dimension.clone(),
@@ -1187,6 +1208,47 @@ impl MultiStageQueryPlanner {
         );
         descriptions.push(description.clone());
         Ok(description)
+    }
+
+    /// The granularity of a `to_date` rolling window whose period boundary is
+    /// defined by a calendar column. `None` for a boundary that interval math
+    /// can compute on its own.
+    fn calendar_to_date_granularity(
+        &self,
+        rolling_window: &RollingWindow,
+        time_dimension: &Rc<MemberSymbol>,
+    ) -> Result<Option<String>, CubeError> {
+        let Some(granularity) = self.get_to_date_rolling_granularity(rolling_window)? else {
+            return Ok(None);
+        };
+        let time_dimension = time_dimension.as_time_dimension()?;
+
+        let compiler_cell = self.query_tools.compiler().clone();
+        let mut compiler = compiler_cell.borrow_mut();
+        let granularity_obj = GranularityHelper::make_granularity_obj(
+            self.query_tools.cube_evaluator().clone(),
+            &mut compiler,
+            &time_dimension.cube_name(),
+            &time_dimension.name(),
+            Some(granularity.clone()),
+        )?;
+
+        Ok(granularity_obj
+            .filter(|obj| obj.calendar_sql().is_some())
+            .map(|_| granularity))
+    }
+
+    fn time_series_calendar_granularities(
+        description: &Rc<MultiStageQueryDescription>,
+    ) -> Result<Rc<RefCell<Vec<String>>>, CubeError> {
+        match description.member().member_type() {
+            MultiStageMemberType::Leaf(MultiStageLeafMemberType::TimeSeries(time_series)) => {
+                Ok(time_series.calendar_period_granularities.clone())
+            }
+            _ => Err(CubeError::internal(
+                "Time series description expected for the `time_series` cte".to_string(),
+            )),
+        }
     }
 
     /// Returns the granularity of a `to_date` rolling window. Errors
