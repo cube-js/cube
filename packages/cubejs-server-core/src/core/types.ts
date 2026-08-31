@@ -60,6 +60,7 @@ export interface QueueInitedOptions {
 
 export interface QueryInitedOptions {
   queueOptions: (dataSource: string) => Promise<QueueInitedOptions>;
+  localRefreshKey: boolean;
   refreshKeyRenewalThreshold?: number;
   backgroundRenew?: boolean;
   externalQueueOptions?: QueueOptions;

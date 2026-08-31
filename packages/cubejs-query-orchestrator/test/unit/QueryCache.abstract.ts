@@ -575,8 +575,6 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         }
       });
 
-      // An unset flag falls back to CUBEJS_REFRESH_KEY_LOCAL_TIME, unset under test, so this
-      // stands for a deployment that never set it.
       it('runs the query when the flag is unset', async () => {
         const { result, executed } = await loadRefreshKey({
           external: true,

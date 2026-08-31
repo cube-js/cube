@@ -228,7 +228,7 @@ export class QueryCache {
     this.memoryCache = new LRUCache<string, CacheEntry>({
       max: options.maxInMemoryCacheEntries || 10000
     });
-    this.localRefreshKeyEnabled = options.localRefreshKey ?? getEnv('refreshKeyLocalTime');
+    this.localRefreshKeyEnabled = options.localRefreshKey ?? false;
   }
 
   /**
