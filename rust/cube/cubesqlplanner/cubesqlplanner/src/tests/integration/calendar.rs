@@ -327,3 +327,137 @@ async fn test_two_named_shifts() {
         insta::assert_snapshot!(result);
     }
 }
+
+// --- to_date windows bounded by the calendar ---
+//
+// The retail calendar starts 2024-02-04 with 7-day weeks and 4-5-4 months, so
+// month 1 runs 2024-02-04..2024-03-02, month 2 2024-03-03..2024-04-06 (35 days)
+// and month 3 2024-04-07..2024-05-04. None of those lengths is reachable from a
+// nominal interval anchored anywhere.
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_to_date_retail_week_by_day() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - calendar_orders.count_week_to_date
+        time_dimensions:
+          - dimension: custom_calendar.date_val
+            granularity: day
+            dateRange:
+              - "2024-02-08"
+              - "2024-02-14"
+        order:
+          - id: custom_calendar.date_val
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_to_date_retail_month_by_day() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - calendar_orders.count_month_to_date
+        time_dimensions:
+          - dimension: custom_calendar.date_val
+            granularity: day
+            dateRange:
+              - "2024-02-29"
+              - "2024-03-06"
+        order:
+          - id: custom_calendar.date_val
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+/// A 5-week retail month grouped by itself: a nominal `1 month` upper bound
+/// reaches past its end and folds the next month in.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_to_date_retail_month_by_retail_month() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - calendar_orders.count_month_to_date
+          - calendar_orders.count
+        time_dimensions:
+          - dimension: custom_calendar.date_val
+            granularity: month
+            dateRange:
+              - "2024-02-04"
+              - "2024-05-04"
+        order:
+          - id: custom_calendar.date_val
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+/// The range ends exactly where the 5-week month does, so the point that bounds
+/// it lies outside the range.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_to_date_range_ending_on_a_period_end() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - calendar_orders.count_month_to_date
+          - calendar_orders.count
+        time_dimensions:
+          - dimension: custom_calendar.date_val
+            granularity: month
+            dateRange:
+              - "2024-03-03"
+              - "2024-04-06"
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+/// Both windows are driven by the same series, each by its own period: the
+/// weekly one restarts on 2024-03-10 while the monthly one keeps accumulating.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_to_date_week_and_month_together() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - calendar_orders.count_week_to_date
+          - calendar_orders.count_month_to_date
+        time_dimensions:
+          - dimension: custom_calendar.date_val
+            granularity: day
+            dateRange:
+              - "2024-03-08"
+              - "2024-03-16"
+        order:
+          - id: custom_calendar.date_val
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
