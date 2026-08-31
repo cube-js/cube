@@ -236,6 +236,14 @@ export class QueryCache {
     this.localRefreshKeyEnabled = getEnv('refreshKeyLocalTime');
   }
 
+  /**
+   * Whether interval based refresh keys are answered from this instance clock instead of being
+   * run as queries and cached.
+   */
+  public isLocalRefreshKeyActive(): boolean {
+    return this.localRefreshKeyEnabled && !this.options.refreshKeyRenewalThreshold;
+  }
+
   public localRefreshKeyResult(queryOptions?: QueryOptions): [{ refresh_key: number }] | null {
     if (!this.localRefreshKeyEnabled || !isValidLocalRefreshKey(queryOptions?.localRefreshKey)) {
       return null;
@@ -245,7 +253,7 @@ export class QueryCache {
     // also what bounds how often the key advances: a value cached for a day advances daily,
     // whatever `every` says. A locally evaluated key has no cache entry to age out, so the only
     // way to keep honouring the override is to leave these keys on the SQL path.
-    if (this.options.refreshKeyRenewalThreshold) {
+    if (!this.isLocalRefreshKeyActive()) {
       this.logLocalRefreshKeyOnce('Local refresh key evaluation skipped', {
         warning: 'refreshKeyRenewalThreshold is set, which throttles refresh key advancement. ' +
           'Interval based refresh keys keep running as queries. Unset it to evaluate them locally.',
@@ -254,11 +262,6 @@ export class QueryCache {
 
       return null;
     }
-
-    this.logLocalRefreshKeyOnce('Local refresh key evaluation enabled', {
-      warning: 'Interval based refresh keys are evaluated from this instance clock. ' +
-        'Clocks must be in sync across all API instances and refresh workers.',
-    });
 
     return evaluateLocalRefreshKey(<LocalRefreshKeyDescriptor>queryOptions?.localRefreshKey);
   }

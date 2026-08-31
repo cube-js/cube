@@ -580,6 +580,22 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(executed).toBe(1);
         expect(result).toEqual([{ refresh_key: 12345 }]);
       });
+
+      // The refresh scheduler reads this to decide whether warming a refresh key is pointless,
+      // so it has to agree with the branches above.
+      it('reports whether local evaluation is in effect', async () => {
+        const enabled = newCache(true);
+        const disabled = newCache(false);
+        const throttled = newCache(true, { refreshKeyRenewalThreshold: 24 * 60 * 60 });
+
+        try {
+          expect(enabled.isLocalRefreshKeyActive()).toBe(true);
+          expect(disabled.isLocalRefreshKeyActive()).toBe(false);
+          expect(throttled.isLocalRefreshKeyActive()).toBe(false);
+        } finally {
+          await Promise.all([enabled.cleanup(), disabled.cleanup(), throttled.cleanup()]);
+        }
+      });
     });
 
     it('queryCacheKey format', () => {
