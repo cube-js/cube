@@ -4,4 +4,9 @@ const base = require('../../jest.base.config');
 module.exports = {
   ...base,
   rootDir: '.',
+  // Suites run from the compiled output — the sources under test/ have no
+  // transform and cannot execute.
+  testMatch: [
+    '<rootDir>/dist/test/**/*.{test,spec}.{ts,js}'
+  ],
 };
