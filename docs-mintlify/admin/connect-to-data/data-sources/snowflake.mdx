@@ -226,6 +226,16 @@ module.exports = {
 The tag is set once per connection, not per query — all queries issued over
 that connection carry the same tag.
 
+### Query cancellation
+
+When Cube cancels a query against Snowflake — for example, an orphaned or
+timed-out query, or a request cancelled through the
+[`/v1/running-query/{requestId}`][ref-rest-api-cancel] REST (JSON) API
+endpoint — the Snowflake driver also cancels the underlying statement, so the
+warehouse stops running (and billing for) it instead of continuing in the
+background.
+
+[ref-rest-api-cancel]: /reference/core-data-apis/rest-api/reference#base_path/v1/running-query/requestid
 [ref-dedicated-infra]: /admin/deployment/infrastructure#dedicated-infrastructure
 [ref-cloud-conf-vpc]: /admin/deployment/dedicated
 ## Environment Variables
