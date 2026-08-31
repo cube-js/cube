@@ -474,25 +474,22 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       const REFRESH_KEY_SQL = 'SELECT FLOOR((UNIX_TIMESTAMP()) / 600) as refresh_key';
       const descriptor = { interval: 600, utcOffset: 0, dayOffset: 0, cron: false };
 
-      const newCache = (localRefreshKey?: boolean, cacheOptions: Partial<QueryCacheOptions> = {}) => (
+      const newCache = (additionalOptions: Partial<QueryCacheOptions> = {}) => (
         new QueryCacheOpened(
           crypto.randomBytes(16).toString('hex'),
           () => {
             throw new Error('driverFactory is not implemented, mock should be used...');
           },
           jest.fn(),
-          // `localRefreshKey` left undefined falls back to CUBEJS_REFRESH_KEY_LOCAL_TIME, which is
-          // unset under test, so it stands for a deployment that never set the flag.
-          { ...options, localRefreshKey, ...cacheOptions },
+          { ...options, ...additionalOptions },
         )
       );
 
       const loadRefreshKey = async (
-        localRefreshKey: boolean | undefined,
         queryOptions: any,
-        cacheOptions: Partial<QueryCacheOptions> = {},
+        additionalOptions: Partial<QueryCacheOptions> = {},
       ) => {
-        const localCache = newCache(localRefreshKey, cacheOptions);
+        const localCache = newCache(additionalOptions);
         const spy = jest.spyOn(localCache, 'queryWithRetryAndRelease')
           .mockImplementation(async () => [{ refresh_key: 12345 }]);
 
@@ -513,42 +510,39 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       };
 
       it('evaluates locally without touching the driver', async () => {
-        const { result, executed } = await loadRefreshKey(true, {
-          external: true,
-          renewalThreshold: 60,
-          localRefreshKey: descriptor,
-        });
+        const { result, executed } = await loadRefreshKey(
+          { external: true, renewalThreshold: 60, localRefreshKey: descriptor },
+          { localRefreshKey: true },
+        );
 
         expect(executed).toBe(0);
         expect(result).toEqual([{ refresh_key: String(Math.floor(Date.now() / 1000 / 600)) }]);
       });
 
       it('runs the query when the flag is off', async () => {
-        const { result, executed } = await loadRefreshKey(false, {
-          external: true,
-          renewalThreshold: 60,
-          localRefreshKey: descriptor,
-        });
+        const { result, executed } = await loadRefreshKey(
+          { external: true, renewalThreshold: 60, localRefreshKey: descriptor },
+          { localRefreshKey: false },
+        );
 
         expect(executed).toBe(1);
         expect(result).toEqual([{ refresh_key: 12345 }]);
       });
 
       it('runs the query when there is no descriptor', async () => {
-        const { executed } = await loadRefreshKey(true, {
-          external: false,
-          renewalThreshold: 10,
-        });
+        const { executed } = await loadRefreshKey(
+          { external: false, renewalThreshold: 10 },
+          { localRefreshKey: true },
+        );
 
         expect(executed).toBe(1);
       });
 
       it('runs the query when the descriptor is malformed', async () => {
-        const { executed } = await loadRefreshKey(true, {
-          external: true,
-          renewalThreshold: 60,
-          localRefreshKey: { ...descriptor, interval: 0 },
-        });
+        const { executed } = await loadRefreshKey(
+          { external: true, renewalThreshold: 60, localRefreshKey: { ...descriptor, interval: 0 } },
+          { localRefreshKey: true },
+        );
 
         expect(executed).toBe(1);
       });
@@ -557,9 +551,8 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       // throttle a deployment asked for and multiplying pre-aggregation rebuilds.
       it('runs the query when refreshKeyRenewalThreshold is configured', async () => {
         const { result, executed } = await loadRefreshKey(
-          true,
           { external: true, renewalThreshold: 60, localRefreshKey: descriptor },
-          { refreshKeyRenewalThreshold: 24 * 60 * 60 },
+          { localRefreshKey: true, refreshKeyRenewalThreshold: 24 * 60 * 60 },
         );
 
         expect(executed).toBe(1);
@@ -569,9 +562,9 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       // The refresh scheduler reads this to decide whether warming a refresh key is pointless,
       // so it has to agree with the branches above.
       it('reports whether local evaluation is in effect', async () => {
-        const enabled = newCache(true);
-        const disabled = newCache(false);
-        const throttled = newCache(true, { refreshKeyRenewalThreshold: 24 * 60 * 60 });
+        const enabled = newCache({ localRefreshKey: true });
+        const disabled = newCache({ localRefreshKey: false });
+        const throttled = newCache({ localRefreshKey: true, refreshKeyRenewalThreshold: 24 * 60 * 60 });
 
         try {
           expect(enabled.isLocalRefreshKeyActive()).toBe(true);
@@ -582,8 +575,10 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         }
       });
 
+      // An unset flag falls back to CUBEJS_REFRESH_KEY_LOCAL_TIME, unset under test, so this
+      // stands for a deployment that never set it.
       it('runs the query when the flag is unset', async () => {
-        const { result, executed } = await loadRefreshKey(undefined, {
+        const { result, executed } = await loadRefreshKey({
           external: true,
           renewalThreshold: 60,
           localRefreshKey: descriptor,
@@ -596,18 +591,16 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       // Falling back to the SQL path is intended for every declined branch, so nothing reports
       // it; the ordinary cache messages are still expected.
       it.each([
-        { name: 'the flag is off', flag: false, cacheOptions: {} },
-        { name: 'the flag is unset', flag: undefined, cacheOptions: {} },
+        { name: 'the flag is off', additionalOptions: { localRefreshKey: false } },
+        { name: 'the flag is unset', additionalOptions: {} },
         {
           name: 'refreshKeyRenewalThreshold is configured',
-          flag: true,
-          cacheOptions: { refreshKeyRenewalThreshold: 24 * 60 * 60 },
+          additionalOptions: { localRefreshKey: true, refreshKeyRenewalThreshold: 24 * 60 * 60 },
         },
-      ])('does not report the declined local evaluation when $name', async ({ flag, cacheOptions }) => {
+      ])('does not report the declined local evaluation when $name', async ({ additionalOptions }) => {
         const { logged } = await loadRefreshKey(
-          flag,
           { external: true, renewalThreshold: 60, localRefreshKey: descriptor },
-          cacheOptions,
+          additionalOptions,
         );
 
         expect(logged.map(([message]) => message).filter(m => /local/i.test(m))).toEqual([]);
@@ -615,11 +608,10 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
 
       describe('localRefreshKeyResult', () => {
         const withCache = async (
-          flag: boolean | undefined,
-          cacheOptions: Partial<QueryCacheOptions>,
+          additionalOptions: Partial<QueryCacheOptions>,
           fn: (localCache: QueryCacheOpened) => void,
         ) => {
-          const localCache = newCache(flag, cacheOptions);
+          const localCache = newCache(additionalOptions);
 
           try {
             fn(localCache);
@@ -631,38 +623,37 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
 
         const queryOptions = (localRefreshKey?: unknown) => <any>{ localRefreshKey };
 
-        it('evaluates a valid descriptor', () => withCache(true, {}, localCache => {
+        it('evaluates a valid descriptor', () => withCache({ localRefreshKey: true }, localCache => {
           expect(localCache.localRefreshKeyResult(queryOptions(descriptor)))
             .toEqual([{ refresh_key: String(Math.floor(Date.now() / 1000 / 600)) }]);
         }));
 
         // Cube Store returns every column as a string, so a locally evaluated key has to be
         // a string too or flipping the flag invalidates every pre-aggregation once.
-        it('returns the key as a string', () => withCache(true, {}, localCache => {
+        it('returns the key as a string', () => withCache({ localRefreshKey: true }, localCache => {
           const [{ refresh_key: value }] = localCache
             .localRefreshKeyResult(queryOptions(descriptor))!;
 
           expect(typeof value).toBe('string');
         }));
 
-        it('declines when the flag is off', () => withCache(false, {}, localCache => {
+        it('declines when the flag is off', () => withCache({ localRefreshKey: false }, localCache => {
           expect(localCache.localRefreshKeyResult(queryOptions(descriptor))).toBeNull();
         }));
 
-        it('declines without a descriptor', () => withCache(true, {}, localCache => {
+        it('declines without a descriptor', () => withCache({ localRefreshKey: true }, localCache => {
           expect(localCache.localRefreshKeyResult()).toBeNull();
           expect(localCache.localRefreshKeyResult(queryOptions())).toBeNull();
         }));
 
-        it('declines a malformed descriptor', () => withCache(true, {}, localCache => {
+        it('declines a malformed descriptor', () => withCache({ localRefreshKey: true }, localCache => {
           expect(localCache.localRefreshKeyResult(
             queryOptions({ ...descriptor, interval: 0 }),
           )).toBeNull();
         }));
 
         it('declines when refreshKeyRenewalThreshold is configured', () => withCache(
-          true,
-          { refreshKeyRenewalThreshold: 24 * 60 * 60 },
+          { localRefreshKey: true, refreshKeyRenewalThreshold: 24 * 60 * 60 },
           localCache => {
             expect(localCache.localRefreshKeyResult(queryOptions(descriptor))).toBeNull();
           },
