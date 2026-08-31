@@ -510,7 +510,6 @@ export class QueryCache {
   ) {
     const [query, values, queryOptions] = sqlQuery;
 
-    // A locally evaluated key is free: nothing to cache, no queue to wait on.
     const local = this.localRefreshKeyResult(queryOptions);
     if (local) {
       return local;

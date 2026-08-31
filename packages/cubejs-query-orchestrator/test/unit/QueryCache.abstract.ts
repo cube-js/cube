@@ -481,13 +481,9 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
             throw new Error('driverFactory is not implemented, mock should be used...');
           },
           jest.fn(),
-          {
-            ...options,
-            // `localRefreshKey` left undefined falls back to CUBEJS_REFRESH_KEY_LOCAL_TIME, which is
-            // unset under test, so it stands for a deployment that never set the flag.
-            localRefreshKey: undefined,
-            ...cacheOptions
-          },
+          // `localRefreshKey` left undefined falls back to CUBEJS_REFRESH_KEY_LOCAL_TIME, which is
+          // unset under test, so it stands for a deployment that never set the flag.
+          { ...options, localRefreshKey, ...cacheOptions },
         )
       );
 
@@ -597,8 +593,8 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(result).toEqual([{ refresh_key: 12345 }]);
       });
 
-      // Falling back to the SQL path is the intended behaviour for every declined branch, not an
-      // anomaly worth a log line on the hot path: only the ordinary cache messages are expected.
+      // Falling back to the SQL path is intended for every declined branch, so nothing reports
+      // it; the ordinary cache messages are still expected.
       it.each([
         { name: 'the flag is off', flag: false, cacheOptions: {} },
         { name: 'the flag is unset', flag: undefined, cacheOptions: {} },

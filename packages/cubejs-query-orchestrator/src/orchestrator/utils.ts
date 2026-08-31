@@ -33,18 +33,15 @@ export function getCacheHash(queryKey: QueryKey | CacheKey, processUid?: string)
 }
 
 /**
- * `nowMs` is not floored to whole seconds first: for integer `x`, fractional
- * `f` in [0, 1) and `interval >= 1`, floor((x + f) / interval) === floor(x / interval),
- * which is also why the fractional seconds of `EXTRACT(EPOCH FROM NOW())` never
- * mattered on the SQL path.
+ * `nowMs` is not floored to whole seconds first: for an integer `interval >= 1` the
+ * fractional part cannot cross a boundary, which is also why the fractional seconds of
+ * `EXTRACT(EPOCH FROM NOW())` never mattered on the SQL path.
  *
- * The number is formatted as a string to stay byte-identical to the row the SQL path
- * returned. Both `contentVersion` and the query cache `renewalKey` hash these values
- * through `JSON.stringify`, so `2980310` and `"2980310"` are different keys and every
- * pre-aggregation would rebuild the first time the flag is switched on. String is what
- * the SQL path yields: an `every` refresh key runs against Cube Store whenever an
- * external store is configured, and Cube Store's protocol carries every column as a
- * string.
+ * The key is a string because `contentVersion` and the query cache `renewalKey` hash it
+ * through `JSON.stringify`: `2980310` and `"2980310"` are different keys, so a number here
+ * would rebuild every pre-aggregation the first time the flag is switched on. A string is
+ * also what the SQL path yields — an `every` key runs against Cube Store whenever an
+ * external store is configured, and Cube Store carries every column as a string.
  */
 export function evaluateLocalRefreshKey(
   descriptor: LocalRefreshKeyDescriptor,

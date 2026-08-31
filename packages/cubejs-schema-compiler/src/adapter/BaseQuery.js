@@ -4863,7 +4863,6 @@ export class BaseQuery {
    * Both the rendered SQL and the descriptor handed to the orchestrator for local
    * evaluation derive from this, so they cannot disagree on the formula.
    *
-   * @param {Object} refreshKey
    * @return {{ utcOffset: number, interval: number, dayOffset: number, cron: boolean }}
    */
   everyRefreshKeyParts(refreshKey) {
@@ -4883,7 +4882,6 @@ export class BaseQuery {
 
   /**
    * @protected
-   * @param {Object} refreshKey
    * @param {BaseQuery} [query] the instance that rendered the SQL, when it differs from `this`
    */
   localRefreshKeyOptions(refreshKey, query) {
