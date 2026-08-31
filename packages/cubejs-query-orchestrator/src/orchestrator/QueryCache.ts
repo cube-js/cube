@@ -171,6 +171,7 @@ type CacheOperationContext = {
 
 export interface QueryCacheOptions {
   refreshKeyRenewalThreshold?: number;
+  localRefreshKey?: boolean;
   externalQueueOptions?: any;
   externalDriverFactory?: DriverFactory;
   backgroundRenew?: Boolean;
@@ -201,8 +202,6 @@ export class QueryCache {
 
   protected readonly localRefreshKeyEnabled: boolean;
 
-  protected localRefreshKeyLogged: boolean = false;
-
   public constructor(
     protected readonly cachePrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
@@ -229,11 +228,7 @@ export class QueryCache {
     this.memoryCache = new LRUCache<string, CacheEntry>({
       max: options.maxInMemoryCacheEntries || 10000
     });
-
-    // Read from the environment rather than an option: the emitting half in the schema
-    // compiler is wired straight from the same variable, and an option here could be set
-    // on its own, turning the feature into a no-op where no descriptor is ever emitted.
-    this.localRefreshKeyEnabled = getEnv('refreshKeyLocalTime');
+    this.localRefreshKeyEnabled = options.localRefreshKey ?? getEnv('refreshKeyLocalTime');
   }
 
   /**
@@ -253,28 +248,13 @@ export class QueryCache {
     // also what bounds how often the key advances: a value cached for a day advances daily,
     // whatever `every` says. A locally evaluated key has no cache entry to age out, so the only
     // way to keep honouring the override is to leave these keys on the SQL path.
+    // TODO: support the two together by snapping the local value to the threshold instead of
+    // falling back to a query.
     if (!this.isLocalRefreshKeyActive()) {
-      this.logLocalRefreshKeyOnce('Local refresh key evaluation skipped', {
-        warning: 'refreshKeyRenewalThreshold is set, which throttles refresh key advancement. ' +
-          'Interval based refresh keys keep running as queries. Unset it to evaluate them locally.',
-        refreshKeyRenewalThreshold: this.options.refreshKeyRenewalThreshold,
-      });
-
       return null;
     }
 
     return evaluateLocalRefreshKey(<LocalRefreshKeyDescriptor>queryOptions?.localRefreshKey);
-  }
-
-  // Logged on first use rather than from the constructor, where subclass field
-  // initialization has not run yet and `this.logger` may not be usable.
-  private logLocalRefreshKeyOnce(message: string, meta: Record<string, unknown>) {
-    if (this.localRefreshKeyLogged) {
-      return;
-    }
-
-    this.localRefreshKeyLogged = true;
-    this.logger(message, meta);
   }
 
   public getCacheDriver(): CacheDriverInterface {

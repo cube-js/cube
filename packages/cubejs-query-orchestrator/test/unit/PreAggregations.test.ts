@@ -471,35 +471,17 @@ describe('PreAggregations', () => {
     const REFRESH_KEY_SQL = 'SELECT FLOOR((UNIX_TIMESTAMP()) / 600) as refresh_key';
     const descriptor = { interval: 600, utcOffset: 0, dayOffset: 0, cron: false };
 
-    // The flag is read from the environment in the constructor, so it has to be toggled
-    // around construction rather than passed in as an option.
-    const newQueryCache = (localRefreshKey?: boolean) => {
-      const previous = process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME;
-      if (localRefreshKey === undefined) {
-        delete process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME;
-      } else {
-        process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME = String(localRefreshKey);
-      }
-
-      try {
-        return new QueryCache(
-          'TEST',
-          mockDriverFactory as any,
-          // eslint-disable-next-line @typescript-eslint/no-empty-function
-          () => {},
-          {
-            cacheAndQueueDriver: 'memory',
-            queueOptions: async () => ({ executionTimeout: 1, concurrency: 2 }),
-          },
-        );
-      } finally {
-        if (previous === undefined) {
-          delete process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME;
-        } else {
-          process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME = previous;
-        }
-      }
-    };
+    const newQueryCache = (localRefreshKey?: boolean) => new QueryCache(
+      'TEST',
+      mockDriverFactory as any,
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      () => {},
+      {
+        cacheAndQueueDriver: 'memory',
+        localRefreshKey,
+        queueOptions: async () => ({ executionTimeout: 1, concurrency: 2 }),
+      },
+    );
 
     const newLoadCache = (localRefreshKey?: boolean) => {
       const cache = newQueryCache(localRefreshKey);
