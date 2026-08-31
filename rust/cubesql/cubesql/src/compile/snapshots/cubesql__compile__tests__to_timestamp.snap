@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 16263
+expression: "execute_query(query.to_string(), DatabaseProtocol::PostgreSQL).await?"
+---
++-------------------------+
+| result                  |
++-------------------------+
+| 2021-04-15T01:15:31.000 |
+| 2021-08-31T11:05:10.400 |
++-------------------------+
