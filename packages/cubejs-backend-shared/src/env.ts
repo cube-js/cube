@@ -368,6 +368,9 @@ const variables: Record<string, (...args: any) => any> = {
   preciseDecimalInCubestore: () => get('CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE')
     .default('false')
     .asBoolStrict(),
+  refreshKeyLocalTime: () => get('CUBEJS_REFRESH_KEY_LOCAL_TIME')
+    .default('false')
+    .asBoolStrict(),
 
   /** ****************************************************************
    * Common db options                                               *

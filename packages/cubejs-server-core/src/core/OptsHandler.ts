@@ -602,8 +602,10 @@ export class OptsHandler {
       ? clone.rollupOnlyMode
       : getEnv('rollupOnlyMode');
 
-    // query queue options
     clone.queryCacheOptions = clone.queryCacheOptions || {};
+    clone.queryCacheOptions.localRefreshKey = getEnv('refreshKeyLocalTime');
+
+    // query queue options
     clone.queryCacheOptions.queueOptions = this.queueOptionsWrapper(
       context,
       clone.queryCacheOptions.queueOptions,

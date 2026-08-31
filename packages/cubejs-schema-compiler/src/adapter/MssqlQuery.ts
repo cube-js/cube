@@ -278,6 +278,8 @@ export class MssqlQuery extends BaseQuery {
     // PERCENTILE_CONT works but requires PARTITION BY
     delete templates.functions.PERCENTILECONT;
     delete templates.functions.WIDTH_BUCKET;
+    // T-SQL has every other SQL:2003 window function, but no NTH_VALUE
+    delete templates.functions.NTH_VALUE;
     templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     delete templates.expressions.ilike;
     // MSSQL uses + for string concatenation instead of ||

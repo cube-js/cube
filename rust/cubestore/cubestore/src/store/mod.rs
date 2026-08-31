@@ -1616,12 +1616,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn partition_data_with_batch_rpc() {
-        // Exercises the CUBESTORE_METASTORE_BATCH_RPC path: build_index_chunks fetches active
-        // partitions for all indexes in one get_active_partitions_for_indexes call and routes
-        // them per index. The produced chunks must still cover every input row.
-        let config = Config::test("partition_data_with_batch_rpc").update_config(|mut c| {
-            c.metastore_batch_rpc = true;
+    async fn partition_data_without_batch_rpc() {
+        // Batched metastore RPC is the default, so this covers the fallback: build_index_chunks
+        // fetching active partitions per index instead of in one
+        // get_active_partitions_for_indexes call. The produced chunks must still cover every
+        // input row.
+        let config = Config::test("partition_data_without_batch_rpc").update_config(|mut c| {
+            c.metastore_batch_rpc = false;
             c
         });
         let path = "/tmp/test_partition_data_batch";
@@ -2054,12 +2055,12 @@ mod tests {
     async fn repartition_chunk_range_merges_only_range() {
         // repartition_chunk_range must merge only the active persisted chunks within
         // [start, end], leaving the rest active, and conserve rows into the children.
-        // Run with batched metastore RPC on so the batched insert_chunks path in
-        // merge_chunk_group_into_children is exercised (per-item path covered by the other
-        // repartition tests, which default the flag off).
+        // Run with batched metastore RPC off so the per-item insert_chunks path in
+        // merge_chunk_group_into_children is exercised (the batched path is the default and is
+        // covered by the other repartition tests).
         let config =
             Config::test("repartition_chunk_range_merges_only_range").update_config(|mut c| {
-                c.metastore_batch_rpc = true;
+                c.metastore_batch_rpc = false;
                 c
             });
         let path = "/tmp/test_repartition_range";

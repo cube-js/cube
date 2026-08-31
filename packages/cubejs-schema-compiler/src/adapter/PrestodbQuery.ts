@@ -169,7 +169,12 @@ export class PrestodbQuery extends BaseQuery {
     templates.functions.UTCTIMESTAMP = 'CAST(NOW() AT TIME ZONE \'UTC\' AS TIMESTAMP)';
     templates.functions.TRUNC = 'TRUNCATE({{ args_concat }})';
     templates.functions.STRING_AGG = 'ARRAY_JOIN(ARRAY_AGG({% if distinct %}DISTINCT {% endif %}{{ args[0] }}), COALESCE({{ args[1] }}, \'\'))';
+    // Presto has no exact percentile aggregate, so PERCENTILE_CONT cannot be pushed
+    // down. APPROX_PERCENTILE is the approximate one it does have, and it is the only
+    // way to evaluate a median here - including the one DataFusion rewrites
+    // APPROX_MEDIAN(expr) into, APPROXPERCENTILECONT(expr, 0.5).
     delete templates.functions.PERCENTILECONT;
+    templates.functions.APPROXPERCENTILECONT = 'APPROX_PERCENTILE({{ args_concat }})';
     templates.statements.select = '{% if ctes %} WITH \n' +
           '{{ ctes | join(\',\n\') }}\n' +
           '{% endif %}' +

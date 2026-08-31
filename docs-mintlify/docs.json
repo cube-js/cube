@@ -1030,7 +1030,9 @@
                   "GET /api/v1/embed-tenants/{embedTenantName}/groups/{id}/users",
                   "POST /api/v1/embed-tenants/{embedTenantName}/groups/{id}/users",
                   "DELETE /api/v1/embed-tenants/{embedTenantName}/groups/{id}/users",
-                  "GET /api/v1/embed-tenants/{embedTenantName}/users"
+                  "POST /api/v1/embed-tenants/{embedTenantName}/user",
+                  "GET /api/v1/embed-tenants/{embedTenantName}/users",
+                  "POST /api/v1/embed-tenants/{embedTenantName}/users"
                 ]
               },
               {
@@ -1039,6 +1041,13 @@
                 "pages": [
                   "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/embed-access",
                   "PUT /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/embed-access"
+                ]
+              },
+              {
+                "group": "Usage Analytics",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /api/v1/usage-analytics/token"
                 ]
               },
               {

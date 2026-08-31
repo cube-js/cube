@@ -287,6 +287,7 @@ export class BaseQuery {
       memberToAlias: this.options.memberToAlias,
       expressionParams: this.options.expressionParams,
       convertTzForRawTimeDimension: this.options.convertTzForRawTimeDimension,
+      localRefreshKey: this.options.localRefreshKey,
       from: this.options.from,
       multiStageQuery: this.options.multiStageQuery,
       multiStageDimensions: this.options.multiStageDimensions,
@@ -362,6 +363,9 @@ export class BaseQuery {
     // toggled independently. The neverUseSqlPlannerPreaggregation() guard still opts
     // specific query types (e.g. CubeStoreQuery) out for correctness.
     this.canUseNativeSqlPlannerPreAggregation = this.useNativeSqlPlanner && !this.neverUseSqlPlannerPreaggregation();
+    // Gated at emit time so that with the flag off the refresh key tuples stay
+    // byte-identical and nothing downstream re-hashes to a new cache key.
+    this.localRefreshKey = this.options.localRefreshKey ?? getEnv('refreshKeyLocalTime');
     this.queryLevelJoinHints = this.options.joinHints ?? [];
     this.prebuildJoin();
 
@@ -4227,6 +4231,7 @@ export class BaseQuery {
       externalQueryClass: this.options.externalQueryClass,
       queryFactory: this.options.queryFactory,
       useNativeSqlPlanner: this.options.useNativeSqlPlanner,
+      localRefreshKey: this.options.localRefreshKey,
       ...options,
     };
   }
@@ -4265,19 +4270,22 @@ export class BaseQuery {
             this.refreshKeySelect(sql),
             {
               external,
-              renewalThreshold: this.refreshKeyRenewalThresholdForInterval(cubeFromPath.refreshKey)
+              renewalThreshold: this.refreshKeyRenewalThresholdForInterval(cubeFromPath.refreshKey),
+              ...this.localRefreshKeyOptions(cubeFromPath.refreshKey, query)
             },
             query
           ];
         }
       }
 
-      const [sql, external, query] = this.everyRefreshKeySql(this.defaultEveryRefreshKey());
+      const defaultEveryRefreshKey = this.defaultEveryRefreshKey();
+      const [sql, external, query] = this.everyRefreshKeySql(defaultEveryRefreshKey);
       return [
         this.refreshKeySelect(sql),
         {
           external,
-          renewalThreshold: this.defaultRefreshKeyRenewalThreshold()
+          renewalThreshold: this.defaultRefreshKeyRenewalThreshold(),
+          ...this.localRefreshKeyOptions(defaultEveryRefreshKey, query)
         },
         query
       ];
@@ -4521,8 +4529,27 @@ export class BaseQuery {
         FLOOR: 'FLOOR({{ args_concat }})',
         CEIL: 'CEIL({{ args_concat }})',
         TRUNC: 'TRUNC({{ args_concat }})',
+        // Window functions. The SQL API resolves a window function to `functions/<NAME>`
+        // just like any other function, so a built-in without an entry here is never
+        // pushed down: the window, and everything computed on top of it, is left to
+        // post processing over a row-capped result. These are the SQL:2003 window
+        // functions, supported by every dialect that supports windowing at all, so they
+        // live in the base and a dialect missing one deletes it.
         LAG: 'LAG({{ args_concat }})',
         LEAD: 'LEAD({{ args_concat }})',
+        ROW_NUMBER: 'ROW_NUMBER({{ args_concat }})',
+        RANK: 'RANK({{ args_concat }})',
+        DENSE_RANK: 'DENSE_RANK({{ args_concat }})',
+        PERCENT_RANK: 'PERCENT_RANK({{ args_concat }})',
+        CUME_DIST: 'CUME_DIST({{ args_concat }})',
+        // Unreachable from the SQL API until CORE-831: DataFusion types NTILE's argument
+        // `Exact([UInt64])` and will not coerce an integer literal to it, so the query
+        // fails to plan. Kept because the template itself is right - once the fork's
+        // signature is relaxed, NTILE pushes down with no change here.
+        NTILE: 'NTILE({{ args_concat }})',
+        FIRST_VALUE: 'FIRST_VALUE({{ args_concat }})',
+        LAST_VALUE: 'LAST_VALUE({{ args_concat }})',
+        NTH_VALUE: 'NTH_VALUE({{ args_concat }})',
 
         // There is a difference in behaviour of these function processing in different DBs and DWHs.
         // The SQL standard requires greatest and least to return null in case one argument is null.
@@ -4832,20 +4859,48 @@ export class BaseQuery {
     };
   }
 
+  /**
+   * Both the rendered SQL and the descriptor handed to the orchestrator for local
+   * evaluation derive from this, so they cannot disagree on the formula.
+   *
+   * @return {{ utcOffset: number, interval: number, dayOffset: number, cron: boolean }}
+   */
+  everyRefreshKeyParts(refreshKey) {
+    const every = refreshKey.every || '1 hour';
+
+    if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
+      return {
+        utcOffset: this.timezone ? moment.tz(this.timezone).utcOffset() * 60 : 0,
+        interval: this.parseSecondDuration(every),
+        dayOffset: 0,
+        cron: false,
+      };
+    }
+
+    return { ...this.calcIntervalForCronString(refreshKey), cron: true };
+  }
+
+  /**
+   * @protected
+   * @param {BaseQuery} [query] the instance that rendered the SQL, when it differs from `this`
+   */
+  localRefreshKeyOptions(refreshKey, query) {
+    return this.localRefreshKey
+      ? { localRefreshKey: (query || this).everyRefreshKeyParts(refreshKey) }
+      : {};
+  }
+
   everyRefreshKeySql(refreshKey, external = false) {
     if (this.externalQueryClass) {
       return this.externalQuery().everyRefreshKeySql(refreshKey, true);
     }
 
-    const every = refreshKey.every || '1 hour';
+    const { utcOffset, interval, dayOffset, cron } = this.everyRefreshKeyParts(refreshKey);
 
-    if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
-      const utcOffset = this.timezone ? moment.tz(this.timezone).utcOffset() * 60 : 0;
+    if (!cron) {
       const utcOffsetPrefix = utcOffset ? `${utcOffset} + ` : '';
-      return [this.floorSql(`(${utcOffsetPrefix}${this.unixTimestampSql()}) / ${this.parseSecondDuration(every)}`), external, this];
+      return [this.floorSql(`(${utcOffsetPrefix}${this.unixTimestampSql()}) / ${interval}`), external, this];
     }
-
-    const { dayOffset, utcOffset, interval } = this.calcIntervalForCronString(refreshKey);
 
     /**
      * Small explanation how it works for every `0 8 * * *`
@@ -5038,6 +5093,13 @@ export class BaseQuery {
           }
 
           if (preAggregation.refreshKey.every || preAggregation.refreshKey.incremental) {
+            // An incremental key is wrapped into `CASE WHEN NOW() < <dateTo + updateWindow>`
+            // against an allocated partition range param, so it is not reproducible from
+            // a time interval alone.
+            const localRefreshKeyOptions = preAggregation.refreshKey.incremental
+              ? {}
+              : this.localRefreshKeyOptions(preAggregation.refreshKey, refreshKeyQuery);
+
             return [
               refreshKeyQuery.paramAllocator.buildSqlAndParams(this.refreshKeySelect(refreshKey)).concat({
                 external: refreshKeyExternal,
@@ -5046,7 +5108,8 @@ export class BaseQuery {
                 updateWindowSeconds: preAggregation.refreshKey.updateWindow &&
                   this.parseSecondDuration(preAggregation.refreshKey.updateWindow),
                 renewalThresholdOutsideUpdateWindow: preAggregation.refreshKey.incremental &&
-                  24 * 60 * 60
+                  24 * 60 * 60,
+                ...localRefreshKeyOptions
               })
             ];
           }
@@ -5070,15 +5133,15 @@ export class BaseQuery {
             () => preAggregationQueryForSql.cacheKeyQueries(
               (refreshKeyCube, [refreshKeySQL, refreshKeyQueryOptions, refreshKeyQuery]) => {
                 if (!cubeFromPath.refreshKey) {
-                  const [sql, external, query] = this.everyRefreshKeySql({
-                    every: '1 hour'
-                  });
+                  const hourlyRefreshKey = { every: '1 hour' };
+                  const [sql, external, query] = this.everyRefreshKeySql(hourlyRefreshKey);
 
                   return [
                     this.refreshKeySelect(sql),
                     {
                       external,
                       renewalThreshold: this.defaultRefreshKeyRenewalThreshold(),
+                      ...this.localRefreshKeyOptions(hourlyRefreshKey, query)
                     },
                     query
                   ];

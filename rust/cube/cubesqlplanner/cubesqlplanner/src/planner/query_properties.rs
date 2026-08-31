@@ -322,7 +322,19 @@ impl QueryProperties {
             .add_filters(&self.dimensions_filters)
             .add_filters(&self.segments)
             .build(&self.all_used_measures()?)?;
-        MultiFactJoinGroups::try_new(self.query_tools.clone(), measures_join_hints)
+        // An ungrouped query returns raw rows rather than aggregates, so the
+        // replication the wider join tree introduces would reach the result
+        // directly. A pre-aggregation query describes the rollup to build, and
+        // matching compares its groups against the query's, so both sides have
+        // to be grouped the same way.
+        if self.ungrouped || self.pre_aggregation_query {
+            MultiFactJoinGroups::try_new(self.query_tools.clone(), measures_join_hints)
+        } else {
+            MultiFactJoinGroups::try_new_merging_nested(
+                self.query_tools.clone(),
+                measures_join_hints,
+            )
+        }
     }
 
     fn multi_fact_join_groups(&self) -> Result<&MultiFactJoinGroups, CubeError> {
@@ -711,13 +723,24 @@ impl QueryProperties {
     }
 
     /// Append `dimensions` to the existing list, deduplicating by
-    /// reference-chain-resolved full name.
+    /// reference-chain-resolved full name. A dimension the grain already
+    /// carries as a time dimension is dropped rather than appended: a time
+    /// dimension's full name pins its granularity, so an entry that matches
+    /// one would render the very same column under the very same alias.
     pub fn add_dimensions(&mut self, dimensions: Vec<Rc<MemberSymbol>>) {
+        let time_dimension_names = self
+            .time_dimensions
+            .iter()
+            .map(|d| d.clone().resolve_reference_chain().full_name())
+            .collect::<HashSet<_>>();
+        let added = dimensions.into_iter().filter(|d| {
+            !time_dimension_names.contains(&d.clone().resolve_reference_chain().full_name())
+        });
         self.dimensions = self
             .dimensions
             .iter()
             .cloned()
-            .chain(dimensions.into_iter())
+            .chain(added)
             .unique_by(|d| d.clone().resolve_reference_chain().full_name())
             .collect_vec();
         self.invalidate_join_groups_cache();
