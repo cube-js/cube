@@ -60,10 +60,6 @@ export type RefreshKeyCacheOptions =
 /**
  * Everything needed to evaluate an `every` based refreshKey without touching a
  * database: `FLOOR((utcOffset + unixTimestamp - dayOffset) / interval)`.
- *
- * `utcOffset` is frozen at compile time, exactly as it already is when baked into
- * the emitted SQL string — the orchestrator must never recompute it, or the local
- * and SQL paths would stop agreeing across a DST transition.
  */
 export type LocalRefreshKeyDescriptor = {
   interval: number;
