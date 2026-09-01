@@ -95,19 +95,22 @@ deployment is currently suspended, without opening it.
 
 <Warning>
 
-Opening a deployment in Cube Cloud resumes it, so browsing to a deployment is
-not a way to check whether it was suspended. The Deployments page reads stored
-state and leaves the deployment alone.
+Opening a deployment in Cube resumes it, so browsing to a deployment is not a
+way to check whether it was suspended. The Deployments page reads stored state
+and leaves the deployment alone.
 
 </Warning>
 
-[Multi-cluster deployments][ref-prod-multi-cluster] show **Always on**, because
-auto-suspension does not apply to them.
+A deployment shows **Always on** when it never auto-suspends: a
+[Multi-cluster deployment][ref-prod-multi-cluster], or a
+[Dedicated deployment][ref-deployment-prod-cluster] with auto-suspension turned
+off.
 
 To find deployments that are unused, rather than merely suspended right now, go
-to **Billing → Cost and Usage Explorer** and group by deployment: for a Shared
-deployment, CCU corresponds to the hours it was allocated. Like the Deployments
-page, this reads stored data and resumes nothing.
+to **Billing → Cost and Usage** and group by deployment: for a
+[Shared deployment][ref-deployment-dev-instance],
+[CCU][ref-deployment-pricing] corresponds to the hours it was allocated. Like
+the Deployments page, this reads stored data and resumes nothing.
 
 ## Resuming a suspended deployment
 
