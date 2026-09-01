@@ -208,11 +208,17 @@ impl CubeError {
     /// the `Rewrite` arm of `Display` renders
     /// `Rewrite Error: {}. Please check logs for additional information`, where
     /// every other arm is `<Label>: {}`. A continue wait never carries that
-    /// cause: `CubeError::rewrite` is minted only inside the rewrite engine with
-    /// its own messages, while a continue wait comes from `transport.load` at
-    /// execution time, after rewriting. `every_cause_renders_a_matchable_continue_wait`
-    /// pins both halves, so a new appending wrapper - or an existing arm taught to
-    /// append - fails there rather than silently swallowing the signal.
+    /// cause, and the reason is not that the cause is only minted locally - it is
+    /// stamped onto *foreign* errors too (`query_engine.rs` re-labels whatever
+    /// `compiler_cache.rewrite` and `find_best_plan` return; `converter.rs` wraps
+    /// a `MemberError` with it). What makes it safe is one level down: the rewrite
+    /// phase never calls the transport. It works against an already-fetched
+    /// `MetaContext` / `CompilerCacheEntry`, and `compile/rewrite/` contains no
+    /// `transport.` call at all, so no continue wait can arise there to be
+    /// re-labelled - a continue wait comes from `transport.load` at execution
+    /// time, after rewriting. `every_cause_renders_a_matchable_continue_wait` pins
+    /// the `Display` half, so a new appending wrapper - or an existing arm taught
+    /// to append - fails there rather than silently swallowing the signal.
     pub fn is_continue_wait_message(message: &str) -> bool {
         message
             .split(['\n', ':'])
@@ -716,9 +722,9 @@ mod tests {
     /// The `Rewrite` arm is the one that also *appends*
     /// (`. Please check logs for additional information`), so it is the one that
     /// does not survive the round trip - and it is unreachable for a continue
-    /// wait, because `CubeError::rewrite` is minted only inside the rewrite engine
-    /// with its own messages, while a continue wait comes from `transport.load`
-    /// at execution time, after rewriting.
+    /// wait, because the rewrite phase never calls the transport (see
+    /// `is_continue_wait_message`; the cause itself is stamped onto foreign
+    /// errors, so it is the phase, not the constructor, that rules this out).
     ///
     /// The inner match is exhaustive on purpose: a new cause variant, or an
     /// existing one taught to append, stops compiling here rather than silently
