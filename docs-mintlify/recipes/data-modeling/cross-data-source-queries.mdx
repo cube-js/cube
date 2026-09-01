@@ -365,4 +365,7 @@ Each half of the union is subject to the [maximum row
 limit](/docs/data-modeling/configuration#maximum-row-limit) on its own, and the
 cap applies before the results are appended. Aggregate inside each half of the
 union, as in the examples above, rather than unioning raw rows and aggregating
-afterwards.
+afterwards. This per-half limit applies specifically because the two halves reach
+different data sources; a union whose branches share one data source is pushed
+down as a single statement and the limit applies once, to the combined result (see
+[query pushdown](/reference/core-data-apis/sql-api/query-format#query-pushdown)).

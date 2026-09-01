@@ -17,6 +17,7 @@ account, apply across all devices, and don't affect other users in the account.
 | Code editor | Switch to the new CodeMirror-based code editor for data models | Off |
 | New message scrolling | Automatically scroll to new messages in chat | On |
 | Alternating row colors | Highlight alternating rows in data tables | Off |
+| Default deployment | Choose which deployment you land on when you open Cube without one in the URL | Account default |
 
 ## Language
 
@@ -70,3 +71,11 @@ everyone queries in the account-wide zone.
 
 See [Time zones](/admin/time-zones) for what a zone changes and how dashboards carry their
 own.
+
+## Default deployment
+
+If your account has more than one deployment, pick which one you land on when you open
+Cube without a deployment in the URL. Leaving it as **Account default** falls back to the
+rest of the [resolution order](/admin/deployment#default-deployment) — the deployment you
+last switched to, then the deployment your admin pinned, then the most recently created
+one. The control is hidden on single-deployment accounts.

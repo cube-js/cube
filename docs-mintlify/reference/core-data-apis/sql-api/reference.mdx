@@ -513,6 +513,10 @@ of the PostgreSQL documentation.
 | `STRING_AGG` | Concatenates the input values into a string, separated by a delimiter (supports `DISTINCT`) | ✅ Yes | ❌ No |
 | `PERCENTILE_CONT` | Computes a continuous percentile, used with `WITHIN GROUP (ORDER BY ...)` | ✅ Yes | ❌ No |
 
+An aggregate function that takes more than one argument (for example,
+`APPROX_PERCENTILE_CONT(expr, 0.5)`) can be pushed down, provided the target data source
+supports that function.
+
 In projections in inner parts of post-processing queries:
 * `AVG`, `COUNT`, `MAX`, `MIN`, and `SUM` can only be used with measures of
 [compatible types][ref-sql-api-aggregate-functions].
@@ -557,7 +561,8 @@ of the PostgreSQL documentation.
 </Info>
 
 Window functions are supported via [query pushdown][ref-qpd] only; they are not
-available in [query post-processing][ref-qpp]. Two kinds are supported:
+available in [query post-processing][ref-qpp]. The window can be evaluated over a grouped
+subquery, a CTE, or a join. Two kinds are supported:
 
 - **Aggregate functions used as window functions** — any supported aggregate
   function (such as `SUM`, `AVG`, `COUNT`, `MIN`, or `MAX`) combined with an

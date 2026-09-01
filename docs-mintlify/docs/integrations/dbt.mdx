@@ -611,9 +611,24 @@ credential can write to the repository — a `git-receive-pack` probe for a PAT,
 | Setting | Description |
 | --- | --- |
 | **Models path** | Directory in the dbt project where generated model files are written. Defaults to `models/marts/cube/`. |
+| **Validation level** | The dbt check a pushed model must pass before Cube opens the change. **Parse only** just parses the project. **Compile (recommended)** — the default — opens the warehouse connection but doesn't materialize anything. **Build in a validation schema** (**Build**) actually builds the model in a schema you provide, catching errors the other two levels can't. |
+| **Validation schema** | Required whenever **Validation level** is **Build**, including on adapters that fall back to **Parse only** (see below). An existing schema you create and grant access to yourself — Cube only creates and drops the temporary validation relation inside it, never the schema. |
 | **Delivery mode** | **Open a pull request** (default) pushes to a `cube/dbt-push/*` branch and opens a PR/MR. **Commit directly to a branch** commits straight to a branch you name — validation still runs. |
 
 Then **Save dbt settings**.
+
+<Note>
+
+**Build** needs a warehouse principal that can create and drop relations in the
+validation schema, in addition to its existing read access to production so dbt can
+resolve `ref()` calls. Grant `CREATE`/`DROP` (or the warehouse's equivalent, e.g. BigQuery
+Data Editor) on that one schema only, and keep the principal read-only everywhere else.
+BigQuery, Databricks, and Athena don't yet support **Compile** or **Build** and fall
+back to **Parse only** regardless of what's selected — you can still pick **Build** and
+fill in a schema there, since the form requires one, but the run itself only parses and
+the schema goes unused.
+
+</Note>
 
 </Step>
 
@@ -650,10 +665,11 @@ to.
 <Step title="Push">
 
 Confirm. Cube clones the repo, writes the files (**create-only** — it never overwrites an
-existing model and never force-pushes), and runs `dbt deps` + `dbt parse`. If parse fails,
-the push stops with dbt's own output and **no pull request is opened**. On success, a
-progress toast ends with a link to the pull request — or, for SSH or non-GitHub/GitLab
-hosts, a prefilled compare link to open it yourself.
+existing model and never force-pushes), and runs `dbt deps` followed by the check your
+**Validation level** selects. If validation fails, the push stops with dbt's own output
+and **no pull request is opened**. On success, a progress toast ends with a link to the
+pull request — or, for SSH or non-GitHub/GitLab hosts, a prefilled compare link to open it
+yourself.
 
 </Step>
 
