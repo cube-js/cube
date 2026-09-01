@@ -17,12 +17,6 @@ use tokio::{sync::mpsc::error::SendError, time::error::Elapsed};
 /// also what a `ContinueWait` error normalizes back to.
 pub const CONTINUE_WAIT_MESSAGE: &str = "Continue wait";
 
-/// `CONTINUE_WAIT_MESSAGE` lowercased. A constant rather than
-/// `CONTINUE_WAIT_MESSAGE.to_lowercase()` so the substring test does not allocate
-/// a copy of it on every call; `the_lowercased_needle_tracks_the_message` keeps
-/// the two in step.
-const CONTINUE_WAIT_MESSAGE_LOWER: &str = "continue wait";
-
 #[derive(thiserror::Error, Debug)]
 pub struct CubeError {
     pub message: String,
@@ -182,16 +176,19 @@ impl CubeError {
     /// `is_continue_wait` for a bare message, when no cause is available - a
     /// message carried over the JS bridge, or one already flattened to a string.
     ///
-    /// A lowercased substring test, matching what `NodeBridgeTransport` has done
-    /// since 2024. It has to tolerate arbitrary wrapping on both sides: a prefix
-    /// from whichever layer re-wrapped the error (`Execution error: `,
-    /// `Database Execution Error: `, and these compound), and a suffix when the
-    /// message arrived over the JS bridge with a stack appended (`errorString` in
-    /// `js/index.ts` falls back to `err.stack`). Anything narrower has to enumerate
-    /// those shapes, and the shape is exactly what keeps changing.
+    /// These messages have a structure, and the check follows it rather than
+    /// scanning for the phrase anywhere in the text. Each wrapping layer prepends
+    /// its own label and a colon (`Execution error: `, `Database Execution Error: `,
+    /// and these compound), and a message that arrived over the JS bridge can have
+    /// a stack appended, which puts the message on the first line and the frames
+    /// after it (`errorString` in `js/index.ts` falls back to `err.stack`). So the
+    /// phrase always lands as a whole `:`- or newline-delimited part, however many
+    /// layers wrapped it - and splitting on both separators matches every one of
+    /// those shapes without enumerating them.
     ///
+    /// Matching parts rather than a substring is what keeps a real failure intact.
     /// A false positive is expensive here, more so than at the original site where
-    /// it only meant one more retry. Two consumers are new to a loose predicate.
+    /// it only meant one more retry. Two consumers are new to this predicate.
     /// `normalize_continue_wait` runs on every DataFusion and Arrow conversion and
     /// *replaces* the message, so the original text is gone before anything
     /// downstream sees it. And `load_data` (`scan.rs`) held an equality check
@@ -199,25 +196,20 @@ impl CubeError {
     /// `ContinueWait` cause locally, so - unlike a genuine continue wait, which
     /// the transport retries and never surfaces on the Postgres path - nothing
     /// re-classifies it, and `sql/postgres/error.rs` answers the client
-    /// `SqlStatementNotYetComplete` (`03000`) instead of their failure.
+    /// `SqlStatementNotYetComplete` (`03000`) instead of their failure. These
+    /// messages interpolate user-controlled SQL, so the phrase turns up inside
+    /// one as an identifier or a literal (`No field named 'continue wait'`,
+    /// `status = Utf8("continue wait")`); as part of a larger part it is not the
+    /// signal, and a substring test could not tell the two apart.
     ///
-    /// Hence the one exception to the substring test: a match immediately
-    /// preceded by a quote is a quoted identifier or literal, not the queue's
-    /// signal. These messages interpolate user-controlled SQL, so
-    /// `No field named 'continue wait'` is the realistic false positive, and it is
-    /// always quoted. That is one character of context, not an enumeration of
-    /// wrapper shapes - prefixes and appended stacks still match.
+    /// The trade runs the other way for a layer that appends instead of prepends:
+    /// `Continue wait.` or `Continue wait (retrying)` is one part and does not
+    /// match. No layer produces those today - the phrase is a wire constant that
+    /// gets wrapped, not edited - and a new one would have to be taught here.
     pub fn is_continue_wait_message(message: &str) -> bool {
-        let message = message.to_lowercase();
-
         message
-            .match_indices(CONTINUE_WAIT_MESSAGE_LOWER)
-            .any(|(at, _)| {
-                !matches!(
-                    message[..at].chars().next_back(),
-                    Some('\'') | Some('"') | Some('`')
-                )
-            })
+            .split(['\n', ':'])
+            .any(|part| part.trim().eq_ignore_ascii_case(CONTINUE_WAIT_MESSAGE))
     }
 
     /// Restores the `ContinueWait` cause on an error that reached us as a
@@ -679,8 +671,8 @@ mod tests {
     }
 
     /// A message that does not carry the phrase at all, including shapes that
-    /// have tripped up narrower implementations: shorter than the needle, and
-    /// non-ASCII.
+    /// have tripped up earlier implementations: empty, shorter than the phrase,
+    /// and non-ASCII.
     #[test]
     fn a_message_without_the_phrase_is_not_a_continue_wait() {
         for message in ["", "wait", "Ошибка: продолжить ожидание"] {
@@ -692,21 +684,23 @@ mod tests {
         }
     }
 
+    /// The phrase is matched as a whole part, so it still resolves however many
+    /// layers wrapped it and wherever the split lands it - including a part that
+    /// a stack frame's own colons cut out of the first line.
     #[test]
-    fn the_lowercased_needle_tracks_the_message() {
-        assert_eq!(
-            CONTINUE_WAIT_MESSAGE.to_lowercase(),
-            CONTINUE_WAIT_MESSAGE_LOWER
-        );
-    }
-
-    /// The quote exception is per occurrence, not per message: a message that
-    /// quotes the phrase *and* carries it unquoted is still a continue wait.
-    #[test]
-    fn an_unquoted_occurrence_still_counts() {
-        assert!(CubeError::is_continue_wait_message(
-            "Execution error: No field named 'continue wait'. Continue wait"
-        ));
+    fn the_phrase_is_matched_as_a_whole_part() {
+        for message in [
+            CONTINUE_WAIT_MESSAGE,
+            "Execution error: Continue wait",
+            "Post-Processing Error: Execution error: Continue wait",
+            "Error: Continue wait\n    at load (/app/js/index.js:12:34)",
+        ] {
+            assert!(
+                CubeError::is_continue_wait_message(message),
+                "not detected: {}",
+                message
+            );
+        }
     }
 
     #[test]
@@ -714,12 +708,14 @@ mod tests {
         for message in [
             "Table 'orders' not found",
             "Database Execution Error: syntax error at or near \"SELCT\"",
-            // Quoted, so it is the user's identifier or literal rather than the
-            // queue's signal - and its text has to survive, because
-            // `normalize_continue_wait` would otherwise replace it.
+            // The phrase is the user's identifier or literal, carried inside a
+            // larger part rather than being one - and its text has to survive,
+            // because `normalize_continue_wait` would otherwise replace it.
             "No field named 'continue wait' in table 'orders'",
             "Unsupported filter: status = Utf8(\"Continue wait\")",
             "Can't find column `continue wait` in projection",
+            "Execution error: No field named 'continue wait'",
+            "Execution error: continue wait is not a column\n    at plan (/app/js/index.js:1:2)",
         ] {
             let err = CubeError::from(repartitioned(message));
 
