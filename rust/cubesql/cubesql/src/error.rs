@@ -17,6 +17,12 @@ use tokio::{sync::mpsc::error::SendError, time::error::Elapsed};
 /// also what a `ContinueWait` error normalizes back to.
 pub const CONTINUE_WAIT_MESSAGE: &str = "Continue wait";
 
+/// `CONTINUE_WAIT_MESSAGE` lowercased. A constant rather than
+/// `CONTINUE_WAIT_MESSAGE.to_lowercase()` so the substring test does not allocate
+/// a copy of it on every call; `the_lowercased_needle_tracks_the_message` keeps
+/// the two in step.
+const CONTINUE_WAIT_MESSAGE_LOWER: &str = "continue wait";
+
 #[derive(thiserror::Error, Debug)]
 pub struct CubeError {
     pub message: String,
@@ -185,11 +191,15 @@ impl CubeError {
     /// those shapes, and the shape is exactly what keeps changing.
     ///
     /// A false positive is expensive here, more so than at the original site where
-    /// it only meant one more retry: this feeds `normalize_continue_wait`, which
-    /// runs on every DataFusion and Arrow conversion and *replaces* the message.
-    /// An error that merely quotes the phrase would lose its text entirely, and
-    /// the caller would see a query that appears to poll forever rather than the
-    /// error naming their mistake.
+    /// it only meant one more retry. Two consumers are new to a loose predicate.
+    /// `normalize_continue_wait` runs on every DataFusion and Arrow conversion and
+    /// *replaces* the message, so the original text is gone before anything
+    /// downstream sees it. And `load_data` (`scan.rs`) held an equality check
+    /// until this change: a real database error misread here is minted with the
+    /// `ContinueWait` cause locally, so - unlike a genuine continue wait, which
+    /// the transport retries and never surfaces on the Postgres path - nothing
+    /// re-classifies it, and `sql/postgres/error.rs` answers the client
+    /// `SqlStatementNotYetComplete` (`03000`) instead of their failure.
     ///
     /// Hence the one exception to the substring test: a match immediately
     /// preceded by a quote is a quoted identifier or literal, not the queue's
@@ -199,14 +209,15 @@ impl CubeError {
     /// wrapper shapes - prefixes and appended stacks still match.
     pub fn is_continue_wait_message(message: &str) -> bool {
         let message = message.to_lowercase();
-        let needle = CONTINUE_WAIT_MESSAGE.to_lowercase();
 
-        message.match_indices(&needle).any(|(at, _)| {
-            !matches!(
-                message[..at].chars().next_back(),
-                Some('\'') | Some('"') | Some('`')
-            )
-        })
+        message
+            .match_indices(CONTINUE_WAIT_MESSAGE_LOWER)
+            .any(|(at, _)| {
+                !matches!(
+                    message[..at].chars().next_back(),
+                    Some('\'') | Some('"') | Some('`')
+                )
+            })
     }
 
     /// Restores the `ContinueWait` cause on an error that reached us as a
@@ -679,6 +690,14 @@ mod tests {
                 message
             );
         }
+    }
+
+    #[test]
+    fn the_lowercased_needle_tracks_the_message() {
+        assert_eq!(
+            CONTINUE_WAIT_MESSAGE.to_lowercase(),
+            CONTINUE_WAIT_MESSAGE_LOWER
+        );
     }
 
     /// The quote exception is per occurrence, not per message: a message that
