@@ -161,3 +161,15 @@ describe('cubeSqlRequestSchema', () => {
     expect(cubeSqlRequestSchema.validate({ ...baseBody, timezone: tz }).error).toBeDefined();
   });
 });
+
+describe('limit normalization', () => {
+  test('keeps an explicit limit of 0 instead of applying the default limit', () => {
+    const result = normalizeQuery({ ...baseQuery, limit: 0 }, false);
+    expect(result.limit).toBe(0);
+  });
+
+  test('applies the default limit when no limit is given', () => {
+    const result = normalizeQuery({ ...baseQuery }, false);
+    expect(result.limit).toBeGreaterThan(0);
+  });
+});
