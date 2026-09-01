@@ -1953,7 +1953,6 @@ class ApiGateway {
           context.signedWithPlaygroundAuthSecret
           ? {
             refreshKeyValues: response.refreshKeyValues,
-            usedPreAggregations: response.usedPreAggregations,
             transformedQuery: sqlQuery.canUseTransformedQuery,
             requestId: context.requestId,
           }
@@ -1966,6 +1965,7 @@ class ApiGateway {
       external: response.external,
       slowQuery: Boolean(response.slowQuery),
       total: normalizedQuery.total ? response.total : null,
+      usedPreAggregations: response.usedPreAggregations,
     };
 
     resultWrapper.setTransformData(transformDataParams);
