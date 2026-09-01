@@ -22,6 +22,15 @@ same as in a standalone dashboard embed. To hide any of its controls (title,
 back button, Edit, Duplicate) for your embed, see
 [Show or hide header controls](/embedding/iframe/dashboards#show-or-hide-header-controls).
 
+## Workbook header controls
+
+When a user opens a workbook (rather than a published dashboard) inside Creator
+Mode, its header offers the same actions menu as the console: **Rename**,
+**Duplicate**, **View all**, **New workbook**, and **Delete**. Rename and Delete
+require the embed user's **Manage** permission on the workbook; Duplicate
+requires **Manage** or **Edit**. Double-clicking the workbook name also renames
+it, the same as in the full Cube app.
+
 ## Embed tenant scoping
 
 In Creator Mode, content (workbooks, dashboards) and the groups/user attributes referenced by the session are scoped to an **embed tenant**. Pass `embedTenantName` to isolate content per customer; omit it to use the current tenant.

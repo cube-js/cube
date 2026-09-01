@@ -612,6 +612,16 @@ credential can write to the repository — a `git-receive-pack` probe for a PAT,
 | --- | --- |
 | **Models path** | Directory in the dbt project where generated model files are written. Defaults to `models/marts/cube/`. |
 | **Delivery mode** | **Open a pull request** (default) pushes to a `cube/dbt-push/*` branch and opens a PR/MR. **Commit directly to a branch** commits straight to a branch you name — validation still runs. |
+| **Validation level** | How thoroughly a model is checked before it's committed: **Parse** only confirms the project still parses; **Compile** also compiles the generated SQL; **Build** additionally runs the model (and its tests) against your warehouse, in the **validation schema** below, so a broken model is caught before the PR opens. |
+| **Validation schema** | Schema in your warehouse Cube builds into when validation level is **Build**. You own this schema — Cube never creates or drops it, and only the temporary relation created for that one validation run is cleaned up afterward. Required when validation level is **Build**. |
+
+<Note>
+
+**Build** currently runs on Snowflake, Amazon Redshift, PostgreSQL, and ClickHouse. On
+Google BigQuery, Databricks, and Amazon Athena it falls back to **Parse** until
+connection support for those warehouses is added.
+
+</Note>
 
 Then **Save dbt settings**.
 
@@ -658,6 +668,17 @@ hosts, a prefilled compare link to open it yourself.
 </Step>
 
 </Steps>
+
+### Author models from Analytics Chat
+
+You can also drive the whole push loop from [the agent](/docs/explore-analyze/analytics-chat)
+instead of the dialog above — for example, "turn this into a dbt model and open a PR." The
+agent opens a live sandbox on your dbt project, drafts the model's `.sql` and `.yml`, and
+runs the same validation configured above (parse, compile, or a full build against your
+validation schema). It reports what it found and asks you to confirm before committing or
+opening the pull request, using the delivery mode configured on the integration. Because the
+sandbox stays open across the conversation, you can ask it to adjust the draft and
+re-validate before you confirm.
 
 ### What gets pushed
 
