@@ -21,6 +21,17 @@ If some controls are incompatible with a chart's query, the chart skips them and
 
 Charts on a published dashboard reflect the most recent published version of the workbook. To change the query, switch the chart type, or restyle the visualization, edit the underlying report in the workbook and publish a new version of the dashboard.
 
+**Edit in Workbook** in the chart's settings menu opens that report directly, on its own workbook tab.
+
+### Filters carried into the workbook
+
+The dashboard's [filters][ref-controls] come along, so the report opens showing the same slice of data the chart was showing rather than re-running over everything. They appear above the report's own filters, marked **From dashboard**, and behave differently from filters you add in the workbook:
+
+- they apply to the results on screen, and are **not** saved to the report — publishing the workbook again will not pin them onto the chart for everyone;
+- they are read-only. Remove one with its **×** to see the report without it for the rest of the session; reopening the chart from the dashboard brings the current values back.
+
+To change what a viewer can filter by, edit the [filter control][ref-controls] on the dashboard, not the report.
+
 ## Title
 
 Each chart shows the name of the underlying workbook tab as its title. To rename it, open the tab in the workbook, rename the tab, and republish the dashboard — the new name flows through to every chart backed by that tab.
