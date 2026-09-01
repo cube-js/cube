@@ -201,3 +201,62 @@ async fn test_view_ungrouped() {
         insta::assert_snapshot!(result);
     }
 }
+
+fn tz_conversions_count(sql: &str) -> usize {
+    sql.matches("AT TIME ZONE").count()
+}
+
+fn build_raw_time_dimension_sql(members_yaml: &str) -> String {
+    let ctx = create_context();
+    let query = format!(
+        indoc! {"
+            {}timezone: \"America/Chicago\"
+            convert_tz_for_raw_time_dimension: true
+        "},
+        members_yaml
+    );
+
+    ctx.build_sql(&query).unwrap()
+}
+
+// A `type: time` dimension asked for without a granularity is converted into the
+// query timezone once. A view re-exposing such a dimension is not a second
+// conversion site: the value is read, and converted, on the owning cube.
+#[test]
+fn test_cube_raw_time_dimension_converted_once() {
+    let sql = build_raw_time_dimension_sql(indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.created_at
+    "});
+
+    assert_eq!(tz_conversions_count(&sql), 1, "got: {sql}");
+}
+
+#[test]
+fn test_view_raw_time_dimension_converted_once() {
+    let sql = build_raw_time_dimension_sql(indoc! {"
+        measures:
+          - orders_with_customers.count
+        dimensions:
+          - orders_with_customers.created_at
+    "});
+
+    assert_eq!(tz_conversions_count(&sql), 1, "got: {sql}");
+}
+
+#[test]
+fn test_view_raw_and_granular_time_dimension_converted_once_each() {
+    let sql = build_raw_time_dimension_sql(indoc! {"
+        measures:
+          - orders_with_customers.count
+        dimensions:
+          - orders_with_customers.created_at
+        time_dimensions:
+          - dimension: orders_with_customers.created_at
+            granularity: day
+    "});
+
+    assert_eq!(tz_conversions_count(&sql), 2, "got: {sql}");
+}
