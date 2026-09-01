@@ -393,6 +393,7 @@ export class PreAggregationPartitionRangeLoader {
       {
         requestId: this.requestId,
         skipRefreshKeyWaitForRenew: false,
+        priority: this.priority(QueuePriority.Interactive),
         dataSource: this.dataSource,
         external: false,
         useCsvQuery: true,

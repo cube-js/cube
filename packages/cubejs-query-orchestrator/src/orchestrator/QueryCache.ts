@@ -86,6 +86,8 @@ export type QueryWithParams = [
 export type LoadRefreshKeyOptions = {
   requestId?: string;
   skipRefreshKeyWaitForRenew?: boolean;
+  /** Inherited from the query the keys are refreshed for: a blocked request waits on them too */
+  priority?: QueuePriority;
   dataSource: string
 };
 
@@ -340,6 +342,7 @@ export class QueryCache {
             values,
             {
               cacheKey: [query, values],
+              priority: queuePriority,
               external: queryBody.external,
               requestId: queryBody.requestId,
               dataSource: queryBody.dataSource,
@@ -362,6 +365,7 @@ export class QueryCache {
         renewalThreshold,
         {
           forceNoCache,
+          priority: queuePriority,
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
@@ -381,6 +385,7 @@ export class QueryCache {
         renewalThreshold,
         {
           forceNoCache,
+          priority: queuePriority,
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
@@ -921,6 +926,7 @@ export class QueryCache {
     options: {
       requestId?: string,
       skipRefreshKeyWaitForRenew?: boolean,
+      priority?: QueuePriority,
       external?: boolean,
       forceNoCache?: boolean,
       dataSource: string,
@@ -957,6 +963,7 @@ export class QueryCache {
               ],
               waitForRenew: true,
               forceNoCache: options.forceNoCache,
+              priority: options.priority,
               external: options.external,
               requestId: options.requestId,
               dataSource: options.dataSource,
@@ -1001,6 +1008,7 @@ export class QueryCache {
       expireSecs,
       {
         waitForRenew: !options.skipRefreshKeyWaitForRenew,
+        priority: options.priority,
         requestId: options.requestId,
         dataSource: options.dataSource,
       },
