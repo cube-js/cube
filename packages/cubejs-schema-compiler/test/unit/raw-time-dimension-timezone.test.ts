@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax */
 import { BigqueryQuery } from '../../src/adapter/BigqueryQuery';
 import { prepareJsCompiler } from './PrepareCompiler';
 
@@ -165,9 +164,12 @@ const DAY_START = '2026-08-04T05:00:00.000000Z';
 const DAY_END = '2026-08-05T04:59:59.999999Z';
 
 // Which boundary of the day a single-date operator binds. The two planners
-// disagree on `afterDate` and `beforeOrOnDate`: one treats the date as an
-// instant, the other as the closed interval of the whole day. Both are pinned
-// so that a change on either side shows up here.
+// disagree on `afterDate` and `beforeOrOnDate`. The native planner reads a bare
+// date as the whole day — the reading `inDateRange` gives the same value, and
+// the one the `OrOn` naming implies. The legacy planner reads it as the instant
+// of midnight, which leaves `beforeOrOnDate` differing from `beforeDate` by that
+// single instant. Both are pinned so a change on either side shows up here; a
+// value carrying an explicit time is unaffected and agrees on both.
 const SINGLE_DATE_BOUNDS: Record<string, { legacy: string, native: string }> = {
   beforeDate: { legacy: DAY_START, native: DAY_START },
   beforeOrOnDate: { legacy: DAY_START, native: DAY_END },

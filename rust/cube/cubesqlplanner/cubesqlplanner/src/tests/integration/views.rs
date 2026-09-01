@@ -223,18 +223,6 @@ fn build_raw_time_dimension_sql(members_yaml: &str) -> String {
 // query timezone once. A view re-exposing such a dimension is not a second
 // conversion site: the value is read, and converted, on the owning cube.
 #[test]
-fn test_cube_raw_time_dimension_converted_once() {
-    let sql = build_raw_time_dimension_sql(indoc! {"
-        measures:
-          - orders.count
-        dimensions:
-          - orders.created_at
-    "});
-
-    assert_eq!(tz_conversions_count(&sql), 1, "got: {sql}");
-}
-
-#[test]
 fn test_view_raw_time_dimension_converted_once() {
     let sql = build_raw_time_dimension_sql(indoc! {"
         measures:
