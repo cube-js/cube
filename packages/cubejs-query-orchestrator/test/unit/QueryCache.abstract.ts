@@ -1,5 +1,6 @@
 import crypto from 'crypto';
-import { createCancelablePromise, pausePromise } from '@cubejs-backend/shared';
+import { CacheMode, createCancelablePromise, pausePromise } from '@cubejs-backend/shared';
+import { QueuePriority } from '@cubejs-backend/base-driver';
 
 import { CacheKey, CacheKeyItem, ContinueWaitError, QueryCache, QueryCacheOptions } from '../../src';
 
@@ -466,6 +467,90 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         } finally {
           renewCycleSpy.mockRestore();
           renewQuerySpy.mockRestore();
+        }
+      });
+
+      // The queue fast track only engages at `QueuePriority.Interactive`, so a request-blocked
+      // query that loses its priority on the way down silently falls back to the slow path.
+      it.each<{ type: string, cacheMode?: CacheMode, queuePriority?: number, expected: number }>([
+        { type: 'the default', cacheMode: undefined, queuePriority: undefined, expected: QueuePriority.Interactive },
+        { type: 'an explicit queuePriority', cacheMode: undefined, queuePriority: 42, expected: 42 },
+        { type: 'must-revalidate', cacheMode: 'must-revalidate', queuePriority: undefined, expected: QueuePriority.Interactive },
+      ])('submits the main query and its refresh key with $type priority', async ({ cacheMode, queuePriority, expected }) => {
+        const suffix = crypto.randomBytes(8).toString('hex');
+        const mainQuery = `SELECT priority-main-${suffix}`;
+        const cacheKeyQuery = `SELECT priority-refresh-key-${suffix}`;
+
+        const querySpy = jest.spyOn(cache, 'queryWithRetryAndRelease').mockImplementation(async (query) => {
+          if (query === mainQuery) {
+            return [{ result: 'ok' }];
+          }
+
+          return [{ refresh_key: suffix }];
+        });
+        const renewCycleSpy = jest.spyOn(cache, 'startRenewCycle').mockImplementation(() => undefined);
+
+        try {
+          await cache.cachedQueryResult(
+            {
+              query: mainQuery,
+              values: [],
+              cacheMode,
+              queuePriority,
+              cacheKeyQueries: [[cacheKeyQuery, []]],
+              requestId: `priority-req-${suffix}`,
+              dataSource: 'default',
+            },
+            [],
+          );
+
+          const priorityOf = (targetQuery: string) => querySpy.mock.calls
+            .filter(([query]) => query === targetQuery)
+            .map(([, , queryOptions]) => queryOptions.priority);
+
+          expect(priorityOf(mainQuery)).toEqual([expected]);
+          expect(priorityOf(cacheKeyQuery)).toEqual([expected]);
+        } finally {
+          renewCycleSpy.mockRestore();
+          querySpy.mockRestore();
+        }
+      });
+
+      // The branch that bypasses the cache: `cacheKeyQueriesFrom` always returns an array, so
+      // an empty `cacheKeyQueries` still renews — only these two query shapes reach it.
+      it.each([
+        { type: 'an external query that skips the cache and queue', queryBody: { external: true } },
+        { type: 'a persistent query', queryBody: { persistent: true } },
+      ])('submits $type with Interactive priority', async ({ queryBody }) => {
+        const localCache = new QueryCacheOpened(
+          crypto.randomBytes(16).toString('hex'),
+          () => {
+            throw new Error('driverFactory is not implemented, mock should be used...');
+          },
+          jest.fn(),
+          { ...options, skipExternalCacheAndQueue: true },
+        );
+        const querySpy = jest.spyOn(localCache, 'queryWithRetryAndRelease')
+          .mockImplementation(async () => [{ result: 'ok' }]);
+
+        try {
+          await localCache.cachedQueryResult(
+            {
+              ...queryBody,
+              query: 'SELECT skip-cache-main',
+              values: [],
+              cacheKeyQueries: [],
+              requestId: 'skip-cache-req',
+              dataSource: 'default',
+            },
+            [],
+          );
+
+          expect(querySpy.mock.calls.map(([, , queryOptions]) => queryOptions.priority))
+            .toEqual([QueuePriority.Interactive]);
+        } finally {
+          querySpy.mockRestore();
+          await localCache.cleanup();
         }
       });
     });

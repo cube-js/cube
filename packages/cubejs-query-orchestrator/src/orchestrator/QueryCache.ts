@@ -86,6 +86,8 @@ export type QueryWithParams = [
 export type LoadRefreshKeyOptions = {
   requestId?: string;
   skipRefreshKeyWaitForRenew?: boolean;
+  /** Inherited from the query the keys are refreshed for: a blocked request waits on them too */
+  priority?: number;
   dataSource: string
 };
 
@@ -340,6 +342,7 @@ export class QueryCache {
             values,
             {
               cacheKey: [query, values],
+              priority: queuePriority,
               external: queryBody.external,
               requestId: queryBody.requestId,
               dataSource: queryBody.dataSource,
@@ -362,6 +365,7 @@ export class QueryCache {
         renewalThreshold,
         {
           forceNoCache,
+          priority: queuePriority,
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
@@ -381,6 +385,7 @@ export class QueryCache {
         renewalThreshold,
         {
           forceNoCache,
+          priority: queuePriority,
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
@@ -391,6 +396,8 @@ export class QueryCache {
 
       // Keep the cycle after the foreground renewal: concurrent passes race on a cold cache.
       // It remains necessary when skipRefreshKeyWaitForRenew serves a stale key from a warm cache.
+      // It re-runs the same query at Background while the renewal above ran at the request's own
+      // priority, because the request is no longer blocked on the result by the time it fires.
       this.startRenewCycle(
         query,
         values,
@@ -921,6 +928,7 @@ export class QueryCache {
     options: {
       requestId?: string,
       skipRefreshKeyWaitForRenew?: boolean,
+      priority?: number,
       external?: boolean,
       forceNoCache?: boolean,
       dataSource: string,
@@ -957,6 +965,7 @@ export class QueryCache {
               ],
               waitForRenew: true,
               forceNoCache: options.forceNoCache,
+              priority: options.priority,
               external: options.external,
               requestId: options.requestId,
               dataSource: options.dataSource,
@@ -1001,6 +1010,7 @@ export class QueryCache {
       expireSecs,
       {
         waitForRenew: !options.skipRefreshKeyWaitForRenew,
+        priority: options.priority,
         requestId: options.requestId,
         dataSource: options.dataSource,
       },
