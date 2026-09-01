@@ -155,14 +155,14 @@ A chart whose query doesn't use the replaced member at all is a different case: 
 A chart with a [period comparison][ref-charts] is a narrower case: the comparison can't follow a member switch, so the chart applies the switch and drops the comparison, saying so in its own notice rather than silently showing a comparison that no longer matches the data.
 
 <Note>
-A field switcher can't be a [parent control's](#parent) child, and a viewer's choice in one isn't carried in the [shared URL](#sharing-the-current-selection). Both are current limitations rather than deliberate design.
+A viewer's choice travels in a [shared link](#sharing-the-current-selection), but not in a scheduled export or a screenshot: those URLs are rebuilt server-side from an allowlist that has no field-switcher parameter, so both render the control's default member.
 </Note>
 
 ## Parent
 
 A parent control is a dropdown of options you define. Picking one re-points a whole row of other controls at once — so a viewer makes a single choice instead of adjusting three or four filters by hand.
 
-Unlike the other control types, a parent control targets no member and never touches a chart query directly. It applies values to the controls it *drives* — its **children** — and those children then apply themselves to charts exactly as if the viewer had operated each one. Filters and time granularity switchers can both be children; a [field switcher](#field-switcher) cannot yet, and a parent control cannot be a child of another parent control.
+Unlike the other control types, a parent control targets no member and never touches a chart query directly. It applies values to the controls it *drives* — its **children** — and those children then apply themselves to charts exactly as if the viewer had operated each one. Filters, time granularity switchers and [field switchers](#field-switcher) can all be children; a parent control cannot be a child of another parent control.
 
 For example, an **Analysis** parent with the options `Retail`, `Wholesale` and `Promo` can set a **Channel** filter, a **Minimum order value** filter, and a **Date range** filter to a different combination for each option. Viewers see one dropdown; you can [hide](#visibility) the children if the individual values aren't worth showing.
 
@@ -180,14 +180,14 @@ Renaming an option later doesn't disturb the values you've mapped to it, so you 
 
 ### Children
 
-On the **Children** tab, pick a control from **Child control**, then give each of the parent's options a value for it. Each row renders *that child's own control* — a time granularity switcher's row shows its granularity picker, limited to the granularities that switcher allows; a filter's row shows that filter's operator and value inputs. So the values you can offer are exactly the ones a viewer could pick in the child itself.
+On the **Children** tab, pick a control from **Child control**, then give each of the parent's options a value for it. Each row renders *that child's own control* — a time granularity switcher's row shows its granularity picker, limited to the granularities that switcher allows; a filter's row shows that filter's operator and value inputs; a field switcher's row shows its member picker, limited to that switcher's **Alternatives**. So the values you can offer are exactly the ones a viewer could pick in the child itself.
 
 Repeat for each control you want the parent to drive. Every option/child pair can be in one of three states:
 
 | State | What happens when the viewer picks that option |
 |---|---|
 | **A value** | The child is set to that value. |
-| **Reset to default** | The child is cleared back to its own default. For a filter that means no filtering on that dimension. Turn on the row's **Reset to default** switch. |
+| **Reset to default** | The child is put back to its own default. For a filter that means no filtering on that dimension; for a time granularity switcher, its default granularity; for a field switcher, the member it opens on. Turn on the row's **Reset to default** switch. |
 | **Left empty** | The child is left alone — it keeps whatever value the viewer already had. Use this deliberately when an option shouldn't have an opinion about a particular child. |
 
 While the parent's settings are open, the children it drives are highlighted on the canvas, so you can see the scope of the mapping at a glance.
@@ -198,7 +198,7 @@ A control can be driven by only one parent control at a time. Mapping a child th
 
 ### Mapping status on child controls
 
-Once a dashboard has at least one parent control, every filter and time granularity switcher on it shows a small indicator reporting how it's driven. [Field switchers](#field-switcher) don't, since a parent can't drive one:
+Once a dashboard has at least one parent control, every filter, time granularity switcher and [field switcher](#field-switcher) on it shows a small indicator reporting how it's driven:
 
 | Status | Meaning |
 |---|---|
@@ -265,6 +265,7 @@ Each control type has its own parameter:
 |---|---|---|
 | [Filter](#filter) | `f_<semantic_view>.<dimension>=<JSON>` | `f_orders.status={"value":"shipped"}` |
 | [Time granularity switcher](#time-granularity-switcher) | `tg_<semantic_view>.<dimension>=<granularity>` | `tg_orders.created_at=week` |
+| [Field switcher](#field-switcher) | `ms_<semantic_view>.<replaced_member>=<selected_member>` | `ms_orders.status=users_city` |
 
 The semantic view and dimension are the **internal names** configured on the control — not the display titles you see in the picker. A view shown as `Orders` is usually `orders` in the parameter. Granularities are lowercase and must be one of the switcher's [allowed granularities](#allowed-granularities) — `day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour` for time dimensions that expose them.
 
