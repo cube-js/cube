@@ -176,49 +176,22 @@ impl CubeError {
     /// `is_continue_wait` for a bare message, when no cause is available - a
     /// message carried over the JS bridge, or one already flattened to a string.
     ///
-    /// Matched on the tail of the first line, because a wrapping layer prepends
-    /// its label and leaves the original message last, and a message carried over
-    /// the JS bridge can have a stack appended to it (`errorString` in
-    /// `js/index.ts` falls back to `err.stack`, which renders as
-    /// `Error: Continue wait\n    at ...`). Taking the first line covers that
-    /// without reaching into the frames.
+    /// A lowercased substring test, matching what `NodeBridgeTransport` has done
+    /// since 2024. It has to tolerate arbitrary wrapping on both sides: a prefix
+    /// from whichever layer re-wrapped the error (`Execution error: `,
+    /// `Database Execution Error: `, and these compound), and a suffix when the
+    /// message arrived over the JS bridge with a stack appended (`errorString` in
+    /// `js/index.ts` falls back to `err.stack`). Anything narrower has to enumerate
+    /// those shapes, and the shape is exactly what keeps changing.
     ///
-    /// Deliberately not a substring test: an error message can quote the query it
-    /// failed on, and a real failure over a column or literal named
-    /// `continue wait` has to keep being reported. That is narrower than the
-    /// `contains` check `NodeBridgeTransport` used from 2024, and the difference
-    /// only shows on a message that buries the phrase mid-line, which no
-    /// continue wait does - the orchestrator raises it as `{ error: 'Continue
-    /// wait' }`, and `errorString` reads `err.error` / `err.message` before the
-    /// stack.
-    ///
-    /// Compared as ASCII bytes rather than by lowercasing: the needle is pure
-    /// ASCII, and these messages can quote the whole failing query, so
-    /// `to_lowercase` would allocate a copy of it on every call.
+    /// The cost is that a real failure quoting the phrase - an error naming a
+    /// column called `continue wait` - would be read as the queue's signal and go
+    /// unreported. Accepted: no such message is known, and the opposite mistake is
+    /// the one that has actually bitten us twice.
     pub fn is_continue_wait_message(message: &str) -> bool {
-        let first_line = message.lines().next().unwrap_or_default().trim();
-
-        let Some(at) = first_line.len().checked_sub(CONTINUE_WAIT_MESSAGE.len()) else {
-            return false;
-        };
-        // `get` yields `None` when the split is not on a char boundary, so a
-        // multi-byte character straddling it cannot panic here - and once it has
-        // returned `Some`, `at` is a boundary and the head can be indexed.
-        let Some(tail) = first_line.get(at..) else {
-            return false;
-        };
-        if !tail.eq_ignore_ascii_case(CONTINUE_WAIT_MESSAGE) {
-            return false;
-        }
-
-        // The phrase has to start a word, so a first line ending in a longer word
-        // - `discontinue wait` - is not read as the queue's signal. Every real
-        // prefix ends in a separator (`Execution error: `), and an unprefixed
-        // message has no preceding character at all.
-        first_line[..at]
-            .chars()
-            .next_back()
-            .is_none_or(|c| !c.is_alphanumeric())
+        message
+            .to_lowercase()
+            .contains(&CONTINUE_WAIT_MESSAGE.to_lowercase())
     }
 
     /// Restores the `ContinueWait` cause on an error that reached us as a
@@ -679,17 +652,12 @@ mod tests {
         assert_eq!(err.message, CONTINUE_WAIT_MESSAGE);
     }
 
-    /// The tail compare slices by byte offset, so it has to survive a message
-    /// shorter than the needle and one whose split lands inside a multi-byte
-    /// character.
+    /// A message that does not carry the phrase at all, including shapes that
+    /// have tripped up narrower implementations: shorter than the needle, and
+    /// non-ASCII.
     #[test]
-    fn the_tail_compare_handles_awkward_messages() {
-        for message in [
-            "",
-            "wait",
-            // The byte at `len - "Continue wait".len()` is mid-character here.
-            "Ошибка: продолжить ожидание",
-        ] {
+    fn a_message_without_the_phrase_is_not_a_continue_wait() {
+        for message in ["", "wait", "Ошибка: продолжить ожидание"] {
             assert!(
                 !CubeError::is_continue_wait_message(message),
                 "wrongly detected: {}",
@@ -702,11 +670,7 @@ mod tests {
     fn a_real_failure_is_left_alone() {
         for message in [
             "Table 'orders' not found",
-            // A failure that merely quotes the phrase is still a failure, which
-            // is why the message test is on the tail rather than a substring.
-            "No field named 'continue wait' in table 'orders'",
-            // The phrase has to start a word, not just end the line.
-            "Treatment plan set to discontinue wait",
+            "Database Execution Error: syntax error at or near \"SELCT\"",
         ] {
             let err = CubeError::from(repartitioned(message));
 
