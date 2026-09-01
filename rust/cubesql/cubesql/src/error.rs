@@ -202,10 +202,17 @@ impl CubeError {
     /// `status = Utf8("continue wait")`); as part of a larger part it is not the
     /// signal, and a substring test could not tell the two apart.
     ///
-    /// The trade runs the other way for a layer that appends instead of prepends:
-    /// `Continue wait.` or `Continue wait (retrying)` is one part and does not
-    /// match. No layer produces those today - the phrase is a wire constant that
-    /// gets wrapped, not edited - and a new one would have to be taught here.
+    /// The trade runs the other way for a wrapper that appends instead of
+    /// prepending: `Continue wait.` or `Continue wait (retrying)` is one part and
+    /// does not match. Exactly one such wrapper exists, and it is in this file -
+    /// the `Rewrite` arm of `Display` renders
+    /// `Rewrite Error: {}. Please check logs for additional information`, where
+    /// every other arm is `<Label>: {}`. A continue wait never carries that
+    /// cause: `CubeError::rewrite` is minted only inside the rewrite engine with
+    /// its own messages, while a continue wait comes from `transport.load` at
+    /// execution time, after rewriting. `every_cause_renders_a_matchable_continue_wait`
+    /// pins both halves, so a new appending wrapper - or an existing arm taught to
+    /// append - fails there rather than silently swallowing the signal.
     pub fn is_continue_wait_message(message: &str) -> bool {
         message
             .split(['\n', ':'])
@@ -699,6 +706,57 @@ mod tests {
                 CubeError::is_continue_wait_message(message),
                 "not detected: {}",
                 message
+            );
+        }
+    }
+
+    /// `RepartitionExec` flattens through `Display`, so every cause's rendering
+    /// of a continue wait has to stay matchable by the predicate.
+    ///
+    /// The `Rewrite` arm is the one that also *appends*
+    /// (`. Please check logs for additional information`), so it is the one that
+    /// does not survive the round trip - and it is unreachable for a continue
+    /// wait, because `CubeError::rewrite` is minted only inside the rewrite engine
+    /// with its own messages, while a continue wait comes from `transport.load`
+    /// at execution time, after rewriting.
+    ///
+    /// The inner match is exhaustive on purpose: a new cause variant, or an
+    /// existing one taught to append, stops compiling here rather than silently
+    /// swallowing the queue's signal.
+    #[test]
+    fn every_cause_renders_a_matchable_continue_wait() {
+        use CubeErrorCauseType::*;
+
+        for cause in [
+            User(None),
+            Internal(None),
+            RestApi(None),
+            SqlParser(None),
+            Unsupported(None),
+            Planning(None),
+            PostProcessing(None),
+            Rewrite(None),
+            DatabaseExecution(None),
+            ContinueWait,
+        ] {
+            let appends = match &cause {
+                Rewrite(_) => true,
+                User(_) | Internal(_) | RestApi(_) | SqlParser(_) | Unsupported(_)
+                | Planning(_) | PostProcessing(_) | DatabaseExecution(_) | ContinueWait => false,
+            };
+
+            let rendered = CubeError {
+                message: CONTINUE_WAIT_MESSAGE.to_string(),
+                cause,
+                backtrace: None,
+            }
+            .to_string();
+
+            assert_eq!(
+                CubeError::is_continue_wait_message(&rendered),
+                !appends,
+                "unexpected verdict for: {}",
+                rendered
             );
         }
     }
