@@ -692,7 +692,15 @@ impl CubeScanMemoryStream {
                 } else {
                     err.message
                 };
-                if !err.message.eq_ignore_ascii_case("continue wait") {
+                // A continue wait also gets the `ContinueWait` cause here, the way
+                // `load_data` sets it below, so consumers can match on the cause
+                // rather than on the message. The other branch still only
+                // prefixes the message: unlike `load_data` this path leaves the
+                // incoming cause alone, and re-classifying it would change which
+                // Postgres error code a streaming failure reports.
+                if err.is_continue_wait() {
+                    err.cause = CubeErrorCauseType::ContinueWait;
+                } else {
                     err.message = format!("Database Execution Error: {}", err.message);
                 }
                 Some(Err(ArrowError::ExternalError(Box::new(err))))
@@ -895,7 +903,7 @@ async fn load_data(
                     err.message
                 };
 
-                if err.message.eq_ignore_ascii_case("continue wait") {
+                if err.is_continue_wait() {
                     err.cause = CubeErrorCauseType::ContinueWait;
                 } else {
                     err.cause = CubeErrorCauseType::DatabaseExecution(err.cause.meta().cloned());

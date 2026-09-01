@@ -628,7 +628,13 @@ async fn handle_sql_query(
                 // the promise it was awaiting is abandoned rather than
                 // cancelled, and only reports if it later rejects - which is
                 // why that one does log.
-                if !err.message.eq_ignore_ascii_case("continue wait") {
+                // Matched on the error's cause, with a substring fallback on the
+                // message: a continue wait that came back through a
+                // `RepartitionExec` has been flattened to a string and reads
+                // `Execution error: Continue wait`, so the equality check this
+                // replaces let it through and reported the queue signal as a
+                // failed request in query history.
+                if !err.is_continue_wait() {
                     session_clone
                         .session_manager
                         .server

@@ -12,6 +12,11 @@ use std::{
 };
 use tokio::{sync::mpsc::error::SendError, time::error::Elapsed};
 
+/// Canonical spelling of the queue's "not finished yet" signal. It is the wire
+/// value the api-gateway sends and the event name query history reads, so it is
+/// also what a `ContinueWait` error normalizes back to.
+pub const CONTINUE_WAIT_MESSAGE: &str = "Continue wait";
+
 #[derive(thiserror::Error, Debug)]
 pub struct CubeError {
     pub message: String,
@@ -127,7 +132,7 @@ impl CubeError {
 
     pub fn continue_wait() -> Self {
         Self {
-            message: "Continue wait".to_string(),
+            message: CONTINUE_WAIT_MESSAGE.to_string(),
             cause: CubeErrorCauseType::ContinueWait,
             backtrace: None,
         }
@@ -149,6 +154,62 @@ impl CubeError {
 }
 
 impl CubeError {
+    /// Whether this error is the queue's `Continue wait` signal rather than a
+    /// failure. Nothing user-visible may be reported for it - see
+    /// `handle_sql_query` in `cubejs-backend-native`, which must not log a
+    /// `Cube SQL Error` load event for one.
+    ///
+    /// The cause is the reliable half; the message check is the fallback for an
+    /// error that lost its cause on the way here. That happens: DataFusion's
+    /// `RepartitionExec` has to hand one error to every output partition and a
+    /// boxed error is not `Clone`, so `wait_for_task` flattens it to its
+    /// `Display` string and re-wraps it as `DataFusionError::Execution`. The
+    /// typed `CubeError` is gone at that point and the message has grown a
+    /// prefix (`Execution error: Continue wait`), which is why the message check
+    /// is not an equality one - and why every prefix would otherwise compound
+    /// through the next wrapping layer.
+    pub fn is_continue_wait(&self) -> bool {
+        matches!(self.cause, CubeErrorCauseType::ContinueWait)
+            || Self::is_continue_wait_message(&self.message)
+    }
+
+    /// `is_continue_wait` for a bare message, when no cause is available - a
+    /// message carried over the JS bridge, or one already flattened to a string.
+    ///
+    /// Matched on the tail, because a wrapping layer prepends its label and
+    /// leaves the original message last. Deliberately not a substring test: an
+    /// error message can quote the query it failed on, and a real failure over a
+    /// column or literal named `continue wait` has to keep being reported. That
+    /// is narrower than the `contains` check `NodeBridgeTransport` has used since
+    /// 2024, which is safe here - the JS bridge builds the message from
+    /// `err.error` (`Continue wait` verbatim, from the orchestrator) before it
+    /// ever falls back to a stack.
+    pub fn is_continue_wait_message(message: &str) -> bool {
+        message
+            .trim()
+            .to_lowercase()
+            .ends_with(&CONTINUE_WAIT_MESSAGE.to_lowercase())
+    }
+
+    /// Restores the `ContinueWait` cause on an error that reached us as a
+    /// stringified continue wait (see `is_continue_wait` for how the cause gets
+    /// lost), and resets the message to its canonical spelling so the accumulated
+    /// prefixes do not travel any further.
+    ///
+    /// Applied at the DataFusion and Arrow conversion boundaries, which is where
+    /// the flattening happens, so consumers downstream of them can match on the
+    /// cause.
+    fn normalize_continue_wait(mut self) -> Self {
+        if !matches!(self.cause, CubeErrorCauseType::ContinueWait)
+            && Self::is_continue_wait_message(&self.message)
+        {
+            self.message = CONTINUE_WAIT_MESSAGE.to_string();
+            self.cause = CubeErrorCauseType::ContinueWait;
+        }
+
+        self
+    }
+
     pub fn backtrace(&self) -> Option<&Backtrace> {
         self.backtrace.as_ref()
     }
@@ -351,7 +412,7 @@ impl From<tokio::sync::broadcast::error::RecvError> for CubeError {
 
 impl From<datafusion::error::DataFusionError> for CubeError {
     fn from(v: datafusion::error::DataFusionError) -> Self {
-        match v {
+        let converted = match v {
             datafusion::error::DataFusionError::ArrowError(e) => CubeError::from(e),
             datafusion::error::DataFusionError::SQL(e) => CubeError::from(e),
             datafusion::error::DataFusionError::NotImplemented(e) => CubeError::unsupported(e),
@@ -362,17 +423,27 @@ impl From<datafusion::error::DataFusionError> for CubeError {
                 Ok(e) => *e,
                 Err(e) => match e.downcast::<arrow::error::ArrowError>() {
                     Ok(e) => CubeError::from(*e),
-                    Err(e) => CubeError::internal(e.to_string()),
+                    // `From<ArrowError>` tries `DataFusionError` here as well,
+                    // and a `DataFusionError` does end up boxed inside
+                    // `External` - `From<DataFusionError> for ArrowError` in the
+                    // fork boxes anything it cannot map. Without this arm such
+                    // an error only ever reached us as its `Display` string.
+                    Err(e) => match e.downcast::<datafusion::error::DataFusionError>() {
+                        Ok(e) => CubeError::from(*e),
+                        Err(e) => CubeError::internal(e.to_string()),
+                    },
                 },
             },
             _ => CubeError::internal(v.to_string()),
-        }
+        };
+
+        converted.normalize_continue_wait()
     }
 }
 
 impl From<arrow::error::ArrowError> for CubeError {
     fn from(v: arrow::error::ArrowError) -> Self {
-        match v {
+        let converted = match v {
             arrow::error::ArrowError::NotYetImplemented(e) => CubeError::unsupported(e),
             arrow::error::ArrowError::ExternalError(e) => match e.downcast::<CubeError>() {
                 Ok(e) => *e,
@@ -388,7 +459,9 @@ impl From<arrow::error::ArrowError> for CubeError {
                 CubeError::post_processing(v.to_string())
             }
             _ => CubeError::internal(v.to_string()),
-        }
+        };
+
+        converted.normalize_continue_wait()
     }
 }
 
@@ -460,5 +533,99 @@ impl From<base64::DecodeError> for CubeError {
 impl From<tokio::sync::AcquireError> for CubeError {
     fn from(v: tokio::sync::AcquireError) -> Self {
         CubeError::internal(v.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use datafusion::error::DataFusionError;
+
+    /// The shape a continue wait actually arrives in once DataFusion has
+    /// parallelized the plan. `RepartitionExec::wait_for_task` has to deliver one
+    /// error to every output partition, and a boxed error is not `Clone`, so it
+    /// flattens ours to its `Display` string and re-wraps it as
+    /// `DataFusionError::Execution` - then `From<DataFusionError> for ArrowError`
+    /// boxes that into `ExternalError` on the way back into the record batch
+    /// stream. `target_partitions` defaults to `num_cpus::get()` and
+    /// `repartition_aggregations` / `repartition_windows` default to true, so any
+    /// GROUP BY or window function over a `CubeScan` takes this path.
+    fn repartitioned(message: &str) -> arrow::error::ArrowError {
+        arrow::error::ArrowError::ExternalError(Box::new(DataFusionError::Execution(
+            message.to_string(),
+        )))
+    }
+
+    #[test]
+    fn continue_wait_survives_repartition_flattening() {
+        let err = CubeError::from(repartitioned(CONTINUE_WAIT_MESSAGE));
+
+        assert!(err.is_continue_wait());
+        assert!(matches!(err.cause, CubeErrorCauseType::ContinueWait));
+        // Normalized, so the prefix cannot compound if it is wrapped again.
+        assert_eq!(err.message, CONTINUE_WAIT_MESSAGE);
+        assert_eq!(err.to_string(), CONTINUE_WAIT_MESSAGE);
+    }
+
+    /// The regression this guards: the flattened error's `Display` already
+    /// carries DataFusion's `Execution error: ` prefix, so a second wrapping
+    /// layer produces a doubly-prefixed message. An equality check against
+    /// `"continue wait"` matches neither, which is how the queue signal reached
+    /// query history as a failed request.
+    #[test]
+    fn continue_wait_survives_a_prefixed_message() {
+        for message in [
+            "Execution error: Continue wait",
+            "Execution error: Execution error: Continue wait",
+            "Database Execution Error: Continue wait",
+            "CONTINUE WAIT",
+        ] {
+            let err = CubeError::from(repartitioned(message));
+
+            assert!(err.is_continue_wait(), "not detected: {}", message);
+            assert!(matches!(err.cause, CubeErrorCauseType::ContinueWait));
+            assert_eq!(err.message, CONTINUE_WAIT_MESSAGE);
+        }
+    }
+
+    #[test]
+    fn continue_wait_survives_as_a_typed_external_error() {
+        let err = CubeError::from(arrow::error::ArrowError::ExternalError(Box::new(
+            CubeError::continue_wait(),
+        )));
+
+        assert!(err.is_continue_wait());
+        assert!(matches!(err.cause, CubeErrorCauseType::ContinueWait));
+    }
+
+    /// `DataFusionError::External` can hold a `DataFusionError` - the fork's
+    /// `From<DataFusionError> for ArrowError` boxes anything it cannot map, and
+    /// the round trip back lands here. Only `From<ArrowError>` used to try that
+    /// downcast, so this direction reported the inner error as its `Display`
+    /// string and lost the cause with it.
+    #[test]
+    fn nested_datafusion_error_keeps_its_cause() {
+        let err = CubeError::from(DataFusionError::External(Box::new(
+            DataFusionError::Execution(CONTINUE_WAIT_MESSAGE.to_string()),
+        )));
+
+        assert!(err.is_continue_wait());
+        assert!(matches!(err.cause, CubeErrorCauseType::ContinueWait));
+    }
+
+    #[test]
+    fn a_real_failure_is_left_alone() {
+        for message in [
+            "Table 'orders' not found",
+            // A failure that merely quotes the phrase is still a failure, which
+            // is why the message test is on the tail rather than a substring.
+            "No field named 'continue wait' in table 'orders'",
+        ] {
+            let err = CubeError::from(repartitioned(message));
+
+            assert!(!err.is_continue_wait(), "wrongly swallowed: {}", message);
+            assert!(matches!(err.cause, CubeErrorCauseType::PostProcessing(_)));
+            assert_eq!(err.message, message);
+        }
     }
 }
