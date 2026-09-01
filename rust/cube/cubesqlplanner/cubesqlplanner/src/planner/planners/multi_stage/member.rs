@@ -1,4 +1,5 @@
 use crate::planner::{MeasureTimeShifts, MemberSymbol, MultiStageGrain};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 /// Description of the time-series CTE driving a rolling-window
@@ -8,6 +9,16 @@ use std::rc::Rc;
 pub struct TimeSeriesDescription {
     pub time_dimension: Rc<MemberSymbol>,
     pub date_range_cte: Option<String>,
+    /// Granularities of the `to_date` rolling windows driven by this series
+    /// whose period boundary is a calendar column rather than interval math.
+    /// The series carries one boundary column per granularity, and the list
+    /// grows as further rolling windows attach to the same series.
+    ///
+    /// Load-bearing: every description is built before any is planned, so a
+    /// window registering here is always visible to the series. Planning a
+    /// description as soon as it is built would drop the boundary columns of
+    /// every window registered after it.
+    pub calendar_period_granularities: Rc<RefCell<Vec<String>>>,
 }
 
 /// Kind of leaf CTE in a multi-stage chain: a base measure query,

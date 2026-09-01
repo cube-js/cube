@@ -1,5 +1,6 @@
 import Joi from 'joi';
 import cronParser from 'cron-parser';
+import { isPredefinedGranularity, TIME_SERIES } from '@cubejs-backend/shared';
 
 import { CubeSymbols, CubeDefinition, ToString } from './CubeSymbols';
 import type { ErrorReporter } from './ErrorReporter';
@@ -108,6 +109,8 @@ const everyCronTimeZone = Joi.string().custom((value, helper) => {
     return helper.message({ custom: `(${formatStatePath(helper.state)} = ${value}) unknown timezone. Take a look here https://cube.dev/docs/schema/reference/cube#supported-timezones to get available time zones` });
   }
 });
+
+const PREDEFINED_GRANULARITY_NAMES = Object.keys(TIME_SERIES).sort();
 
 const GranularityInterval = Joi.string().pattern(/^\d+\s+(second|minute|hour|day|week|month|quarter|year)s?(\s\d+\s+(second|minute|hour|day|week|month|quarter|year)s?){0,7}$/, 'granularity interval');
 // Do not allow negative intervals for granularities, while offsets could be negative
@@ -1417,18 +1420,46 @@ export class CubeValidator implements CompilerInterface {
     };
     const result = cube.isView ? viewSchema.validate(cube, options) : cubeSchema.validate(cube, options);
 
+    let valid = result.error == null;
+
     if (cube.isView) {
       // We need to verify that leaf cubes in view are present only once
       this.validateUniqueLeafCubes(cube.name, cube.cubes, errorReporter);
+    } else if (!this.validateGranularitySql(cube, errorReporter)) {
+      valid = false;
     }
 
     if (result.error != null) {
       errorReporter.error(formatErrorMessage(result.error));
-    } else {
+    }
+
+    if (valid) {
       this.validCubes.set(cube.name, true);
     }
 
     return result;
+  }
+
+  // Reported outside the cube schema so the message stands on its own: a
+  // granularity rejected by the schema is listed among the reasons every other
+  // dimension alternative failed, which buries it.
+  private validateGranularitySql(cube, errorReporter: ErrorReporter): boolean {
+    let valid = true;
+
+    for (const [dimensionName, dimension] of Object.entries<any>(cube.dimensions || {})) {
+      for (const [name, granularity] of Object.entries<any>(dimension?.granularities || {})) {
+        // Predefined names are resolved case-insensitively, so `Week` names a
+        // granularity that resolves and must keep doing so.
+        if (granularity?.sql && !isPredefinedGranularity(name.toLowerCase())) {
+          errorReporter.error(
+            `dimensions.${dimensionName}.granularities.${name}: a granularity defined with 'sql' must be named after one of the predefined granularities (${PREDEFINED_GRANULARITY_NAMES.join(', ')}). Define '${name}' with 'interval' instead`
+          );
+          valid = false;
+        }
+      }
+    }
+
+    return valid;
   }
 
   public validateViewGroup(viewGroup, errorReporter: ErrorReporter) {

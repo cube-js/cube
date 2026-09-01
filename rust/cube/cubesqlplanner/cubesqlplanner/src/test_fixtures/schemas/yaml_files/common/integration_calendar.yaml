@@ -90,6 +90,10 @@ cubes:
           - name: year
             sql: "{CUBE.retail_year_begin_date}"
 
+          # 4 or 5 weeks long, so no interval can reproduce it
+          - name: month
+            sql: "{CUBE}.retail_month_begin_date"
+
           - name: week
             sql: "{CUBE.retail_week_begin_date}"
 
@@ -223,3 +227,15 @@ cubes:
         sql: "{count}"
         time_shift:
           - name: one_year_common_interval
+
+      - name: count_week_to_date
+        type: count
+        rolling_window:
+          type: to_date
+          granularity: week
+
+      - name: count_month_to_date
+        type: count
+        rolling_window:
+          type: to_date
+          granularity: month
