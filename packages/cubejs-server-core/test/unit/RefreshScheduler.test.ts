@@ -1319,12 +1319,14 @@ describe('Refresh Scheduler', () => {
       expect(sqlKeyQueries.length).toBeGreaterThan(0);
     });
 
-    test('keeps warming interval keys when refreshKeyRenewalThreshold vetoes local evaluation', async () => {
+    // The threshold is applied by snapping the locally computed value, so there is still no
+    // refresh key cache entry to warm.
+    test('skips interval keys when refreshKeyRenewalThreshold is set', async () => {
       process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME = 'true';
 
       const { intervalKeyQueries, sqlKeyQueries } = await runRefresh(120);
 
-      expect(intervalKeyQueries.length).toBeGreaterThan(0);
+      expect(intervalKeyQueries).toEqual([]);
       expect(sqlKeyQueries.length).toBeGreaterThan(0);
     });
   });
