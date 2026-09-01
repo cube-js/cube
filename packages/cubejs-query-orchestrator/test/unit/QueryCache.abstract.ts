@@ -513,6 +513,44 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           querySpy.mockRestore();
         }
       });
+
+      // The branch that bypasses the cache: `cacheKeyQueriesFrom` always returns an array, so
+      // an empty `cacheKeyQueries` still renews — only these two query shapes reach it.
+      it.each([
+        { type: 'an external query that skips the cache and queue', queryBody: { external: true } },
+        { type: 'a persistent query', queryBody: { persistent: true } },
+      ])('submits $type with Interactive priority', async ({ queryBody }) => {
+        const localCache = new QueryCacheOpened(
+          crypto.randomBytes(16).toString('hex'),
+          () => {
+            throw new Error('driverFactory is not implemented, mock should be used...');
+          },
+          jest.fn(),
+          { ...options, skipExternalCacheAndQueue: true },
+        );
+        const querySpy = jest.spyOn(localCache, 'queryWithRetryAndRelease')
+          .mockImplementation(async () => [{ result: 'ok' }]);
+
+        try {
+          await localCache.cachedQueryResult(
+            {
+              ...queryBody,
+              query: 'SELECT skip-cache-main',
+              values: [],
+              cacheKeyQueries: [],
+              requestId: 'skip-cache-req',
+              dataSource: 'default',
+            },
+            [],
+          );
+
+          expect(querySpy.mock.calls.map(([, , queryOptions]) => queryOptions.priority))
+            .toEqual([QueuePriority.Interactive]);
+        } finally {
+          querySpy.mockRestore();
+          await localCache.cleanup();
+        }
+      });
     });
 
     describe('local refresh key', () => {

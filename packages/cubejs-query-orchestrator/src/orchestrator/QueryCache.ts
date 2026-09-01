@@ -396,6 +396,8 @@ export class QueryCache {
 
       // Keep the cycle after the foreground renewal: concurrent passes race on a cold cache.
       // It remains necessary when skipRefreshKeyWaitForRenew serves a stale key from a warm cache.
+      // It re-runs the same query at Background while the renewal above ran at the request's own
+      // priority, because the request is no longer blocked on the result by the time it fires.
       this.startRenewCycle(
         query,
         values,
