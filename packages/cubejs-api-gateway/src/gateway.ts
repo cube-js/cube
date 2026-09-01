@@ -133,6 +133,65 @@ function systemAsyncHandler(handler: (req: Request & { context: ExtendedRequestC
 
 const DEV_TOKEN_SCOPE = 'dev-token';
 
+/**
+ * A query that hit no pre-aggregation reports nothing rather than an empty
+ * object, so the key is simply absent from the response. Applied to the dev
+ * mode object as well, otherwise `'usedPreAggregations' in response` would
+ * answer differently in dev mode and in production. The Rust side normalizes
+ * the same way in `is_reportable_used_pre_aggregations`.
+ */
+function nonEmptyUsedPreAggregations(
+  usedPreAggregations: Record<string, any> | undefined
+): Record<string, any> | undefined {
+  return usedPreAggregations && Object.keys(usedPreAggregations).length > 0
+    ? usedPreAggregations
+    : undefined;
+}
+
+/**
+ * Fields of `usedPreAggregations` that are safe to report to any client: the
+ * identity of the pre-aggregation a result was served from, so the client can
+ * match the result to a build it is watching.
+ *
+ * `refreshKeyValues` is deliberately left out. Those are raw rows of the
+ * refresh key queries - typically aggregates such as `MAX(updated_at)` or
+ * `COUNT(*)` - and a `refreshKey.sql` is often written without the security
+ * context filtering that the cube itself applies, so the values can describe
+ * data the caller cannot otherwise reach.
+ *
+ * `targetTableName` is left out too. It names the physical table of one
+ * specific build, down to the content and structure version hashes, which a
+ * data API consumer cannot query anyway; `preAggregationId` plus the entry key
+ * identify the pre-aggregation and `lastUpdatedAt` dates the build.
+ *
+ * The full object, including both, is still returned in dev mode and to the
+ * Playground.
+ */
+function publicUsedPreAggregations(
+  usedPreAggregations: Record<string, any> | undefined
+): Record<string, any> | undefined {
+  const used = nonEmptyUsedPreAggregations(usedPreAggregations);
+  if (!used) {
+    return undefined;
+  }
+
+  const publicFields = ['preAggregationId', 'lastUpdatedAt', 'type'];
+
+  return Object.fromEntries(
+    Object.entries(used).map(([tableName, usage]) => [
+      tableName,
+      // Undefined fields are dropped rather than kept: the native result
+      // pipeline deserializes a JS `undefined` into a JSON `null`, so leaving
+      // them in would put `"preAggregationId": null` on the wire.
+      Object.fromEntries(
+        publicFields
+          .filter((field) => usage?.[field] !== undefined)
+          .map((field) => [field, usage[field]])
+      ),
+    ])
+  );
+}
+
 function hasDevTokenScope(securityContext: unknown): boolean {
   if (typeof securityContext !== 'object' || securityContext === null) {
     return false;
@@ -1948,12 +2007,16 @@ class ApiGateway {
     const resObj = {
       query: normalizedQuery,
       lastRefreshTime: response.lastRefreshTime?.toISOString(),
+      // Identity of the pre-aggregations behind this result, so a client can
+      // join it to the build it is waiting on. The dev-mode block below
+      // replaces it with the unredacted object.
+      usedPreAggregations: publicUsedPreAggregations(response.usedPreAggregations),
       ...(
         getEnv('devMode') ||
           context.signedWithPlaygroundAuthSecret
           ? {
             refreshKeyValues: response.refreshKeyValues,
-            usedPreAggregations: response.usedPreAggregations,
+            usedPreAggregations: nonEmptyUsedPreAggregations(response.usedPreAggregations),
             transformedQuery: sqlQuery.canUseTransformedQuery,
             requestId: context.requestId,
           }
@@ -2245,6 +2308,16 @@ class ApiGateway {
             // otherwise the SQL API reports "unknown" for every query cubesql
             // hands over as pre-generated SQL.
             lastRefreshTime: response.lastRefreshTime?.toISOString(),
+            // Same reason as `lastRefreshTime` above: the pre-aggregation
+            // identity has to travel with the pushed-down result too, or a
+            // cubesql query that goes through pre-generated SQL can never tell
+            // the client which pre-aggregation it read.
+            //
+            // Always the redacted projection, with no dev mode override unlike
+            // `prepareResultTransformData`: this branch serves the SQL API,
+            // which is not a Playground path, and its result object carries
+            // none of the other dev-only fields either.
+            usedPreAggregations: publicUsedPreAggregations(response.usedPreAggregations),
             // Always false: this branch builds its sqlQuery with
             // `disableExternalPreAggregations` set (above), which makes
             // `externalPreAggregationQuery()` return false, and the

@@ -87,6 +87,7 @@ pub struct SpanId {
     is_data_query: RWLockAsync<bool>,
     last_refresh_time: RWLockAsync<Option<DateTime<Utc>>>,
     external: RWLockAsync<Option<bool>>,
+    used_pre_aggregations: RWLockAsync<serde_json::Map<String, serde_json::Value>>,
 }
 
 impl SpanId {
@@ -98,6 +99,7 @@ impl SpanId {
             is_data_query: tokio::sync::RwLock::new(false),
             last_refresh_time: tokio::sync::RwLock::new(None),
             external: tokio::sync::RwLock::new(None),
+            used_pre_aggregations: tokio::sync::RwLock::new(serde_json::Map::new()),
         }
     }
 
@@ -147,6 +149,35 @@ impl SpanId {
     /// is silent from one that deliberately folded to `false`.
     pub async fn external(&self) -> Option<bool> {
         *self.external.read().await
+    }
+
+    /// Records the pre-aggregations a load result contributing to this span was
+    /// served from. A span may cover several load requests (e.g. a join of cube
+    /// scans), and the entries are keyed by pre-aggregation table name, so they
+    /// merge: the span reports the union of every pre-aggregation read. Two
+    /// loads reporting the same table report the same identity for it, so a
+    /// later entry overwriting an earlier one is a no-op.
+    ///
+    /// Anything but a JSON object is ignored - the value is passed through from
+    /// the API gateway, and only an object can be merged.
+    pub async fn merge_used_pre_aggregations(&self, used_pre_aggregations: serde_json::Value) {
+        if let serde_json::Value::Object(entries) = used_pre_aggregations {
+            let mut write = self.used_pre_aggregations.write().await;
+            for (table_name, usage) in entries {
+                write.insert(table_name, usage);
+            }
+        }
+    }
+
+    /// `None` when no load has reported a pre-aggregation, so callers can fall
+    /// back to another source instead of reporting an empty object.
+    pub async fn used_pre_aggregations(&self) -> Option<serde_json::Value> {
+        let read = self.used_pre_aggregations.read().await;
+        if read.is_empty() {
+            None
+        } else {
+            Some(serde_json::Value::Object(read.clone()))
+        }
     }
 
     pub fn duration(&self) -> u64 {
@@ -1164,5 +1195,46 @@ mod tests {
 
         span_id.set_external(false).await;
         assert_eq!(span_id.external().await, Some(false));
+    }
+
+    #[tokio::test]
+    async fn span_id_used_pre_aggregations_merge_across_loads() {
+        // Silent span — consumers fall back to the stream schema, so an empty
+        // union must not be reported as an empty object
+        let span_id = SpanId::new("test".to_string(), serde_json::json!({}));
+        assert_eq!(span_id.used_pre_aggregations().await, None);
+
+        span_id
+            .merge_used_pre_aggregations(serde_json::json!({
+                "schema.orders_main": { "preAggregationId": "Orders.main" }
+            }))
+            .await;
+        span_id
+            .merge_used_pre_aggregations(serde_json::json!({
+                "schema.users_main": { "preAggregationId": "Users.main" }
+            }))
+            .await;
+
+        // A join of two cube scans reports both pre-aggregations, not the last
+        // one to arrive
+        assert_eq!(
+            span_id.used_pre_aggregations().await,
+            Some(serde_json::json!({
+                "schema.orders_main": { "preAggregationId": "Orders.main" },
+                "schema.users_main": { "preAggregationId": "Users.main" }
+            }))
+        );
+
+        // Anything but an object has nothing mergeable in it and is dropped
+        span_id
+            .merge_used_pre_aggregations(serde_json::json!("nonsense"))
+            .await;
+        assert_eq!(
+            span_id
+                .used_pre_aggregations()
+                .await
+                .and_then(|v| v.as_object().map(|o| o.len())),
+            Some(2)
+        );
     }
 }

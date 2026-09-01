@@ -139,11 +139,28 @@ type PreAggJob = {
   dataSource: string,
 };
 
+/**
+ * Types a pre-aggregation description can have by the time it reaches the
+ * orchestrator. Narrower than the same-named type in `@cubejs-backend/client-core`,
+ * which also lists `rollupJoin` and `rollupLambda`: the schema compiler expands
+ * those into the rollups they reference (`preAggregationDescriptionsFor`), so no
+ * description with either type is ever built or reported here.
+ */
+export type PreAggregationType = 'rollup' | 'originalSql';
+
 export type LoadPreAggregationResult = {
   targetTableName: string;
   refreshKeyValues: any[];
   lastUpdatedAt: number;
   buildRangeEnd: string;
+  /**
+   * Identity of the pre-aggregation this table belongs to, stamped by
+   * `loadAllPreAggregationsIfNeeded` from the query's pre-aggregation
+   * description rather than by the loaders. Reported to clients as part of
+   * `usedPreAggregations` so they can match a result to a build.
+   */
+  preAggregationId?: string;
+  type?: PreAggregationType;
   lambdaTable?: InlineTable;
   queryKey?: any[];
   rollupLambdaId?: string;
@@ -169,7 +186,7 @@ export type LambdaQuery = {
 
 export type PreAggregationDescription = {
   preAggregationsSchema: string;
-  type: 'rollup' | 'originalSql';
+  type: PreAggregationType;
   preAggregationId: string;
   priority: number;
   dataSource: string;
@@ -577,6 +594,7 @@ export class PreAggregations {
           const loadResult = await loader.loadPreAggregations();
           const usedPreAggregation = {
             ...loadResult,
+            preAggregationId: p.preAggregationId,
             type: p.type,
             preAggregationId: p.preAggregationId,
             dataSource: p.dataSource || 'default',

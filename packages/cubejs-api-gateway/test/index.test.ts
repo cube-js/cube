@@ -1609,7 +1609,7 @@ describe('API Gateway', () => {
   describe('external pre-aggregation indicator', () => {
     // Helper mock that lets a test pretend the query orchestrator served
     // the result from an external (CubeStore) pre-aggregation, optionally
-    // with the dev-only `usedPreAggregations` object as well.
+    // with the `usedPreAggregations` object as well.
     class AdapterApiMockWithFlags extends AdapterApiMock {
       public constructor(
         private readonly external: boolean | undefined,
@@ -1637,16 +1637,25 @@ describe('API Gateway', () => {
         .expect(200);
 
       expect(res.body.external).toBe(false);
-      // Full pre-agg object stays dev/playground-only.
+      // No pre-aggregation was used, so there is nothing to name.
       expect(res.body.usedPreAggregations).toBeUndefined();
     });
 
-    test('external=true when query was served from an external pre-aggregation (no leak of names)', async () => {
+    // Pre-aggregation identity is reported to every API consumer so a client
+    // can match a result to the build it is waiting on. Refresh key values and
+    // the physical table name of the build are not: the former are rows of the
+    // refresh key queries, which are often written without the security context
+    // filtering the cube itself applies, and the latter describes storage
+    // layout a data API consumer cannot query anyway.
+    test('external=true exposes pre-aggregation identity only', async () => {
       const { app } = await createApiGateway(
         new AdapterApiMockWithFlags(true, {
           'Foo.fooMain': {
+            preAggregationId: 'Foo.fooMain',
             targetTableName: 'stb_pre_aggs.foo_foo_main',
+            lastUpdatedAt: 1712000000000,
             type: 'rollup',
+            refreshKeyValues: [[{ max_updated_at: '2024-01-01T00:00:00.000Z' }]],
           },
         }),
       );
@@ -1657,16 +1666,23 @@ describe('API Gateway', () => {
         .expect(200);
 
       expect(res.body.external).toBe(true);
-      // Pre-aggregation names / table names must NOT be exposed to ordinary
-      // API consumers — only the boolean flag is safe.
-      expect(res.body.usedPreAggregations).toBeUndefined();
+      expect(res.body.usedPreAggregations).toEqual({
+        'Foo.fooMain': {
+          preAggregationId: 'Foo.fooMain',
+          lastUpdatedAt: 1712000000000,
+          type: 'rollup',
+        },
+      });
     });
 
-    test('usedPreAggregations is exposed under playground auth alongside external', async () => {
+    test('the full pre-aggregation object is exposed under playground auth', async () => {
       const usedPreAggregations = {
         'Foo.fooMain': {
+          preAggregationId: 'Foo.fooMain',
           targetTableName: 'stb_pre_aggs.foo_foo_main',
+          lastUpdatedAt: 1712000000000,
           type: 'rollup',
+          refreshKeyValues: [[{ max_updated_at: '2024-01-01T00:00:00.000Z' }]],
         },
       };
       const { app } = await createApiGateway(

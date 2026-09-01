@@ -36,6 +36,17 @@ pub struct V1LoadResult<D = models::V1LoadResultDataRow> {
     /// pre-aggregations hit the source DB and rely on its own caching.
     #[serde(rename = "external", skip_serializing_if = "Option::is_none")]
     pub external: Option<bool>,
+    /// Pre-aggregations this result was served from, keyed by pre-aggregation
+    /// table name, as sent by the API gateway. Carries identity only
+    /// (`preAggregationId`, `lastUpdatedAt`, `type`, plus `targetTableName` and
+    /// `refreshKeyValues` in dev mode and for the Playground) so a client can
+    /// match the result to a build it is watching. Kept as raw JSON: cubesql
+    /// passes it through without reading into it.
+    #[serde(
+        rename = "usedPreAggregations",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub used_pre_aggregations: Option<serde_json::Value>,
 }
 
 impl<D: Default> Default for V1LoadResult<D> {
@@ -47,6 +58,7 @@ impl<D: Default> Default for V1LoadResult<D> {
             refresh_key_values: None,
             last_refresh_time: None,
             external: None,
+            used_pre_aggregations: None,
         }
     }
 }
@@ -60,6 +72,7 @@ impl<D> V1LoadResult<D> {
             refresh_key_values: None,
             last_refresh_time: None,
             external: None,
+            used_pre_aggregations: None,
         }
     }
 }
