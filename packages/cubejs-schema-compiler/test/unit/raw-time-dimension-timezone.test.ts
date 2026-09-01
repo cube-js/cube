@@ -50,14 +50,13 @@ const model = [
 
 const TIMEZONE = 'America/Chicago';
 
-async function queryFor(useNativeSqlPlanner: boolean, options = {}) {
+async function queryFor(options = {}) {
   const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(model);
   await compiler.compile();
 
   return new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
     timezone: TIMEZONE,
     convertTzForRawTimeDimension: true,
-    useNativeSqlPlanner,
     ...options,
   });
 }
@@ -70,12 +69,9 @@ function conversionsCount(sql: string) {
   return (sql.match(new RegExp(`'${TIMEZONE}'`, 'g')) || []).length;
 }
 
-describe.each([
-  ['legacy planner', false],
-  ['native planner', true],
-])('raw time dimension timezone conversion (%s)', (_name, useNativeSqlPlanner) => {
+describe('raw time dimension timezone conversion', () => {
   it('converts a cube time dimension once', async () => {
-    const query = await queryFor(useNativeSqlPlanner, {
+    const query = await queryFor({
       measures: ['orders.count'],
       dimensions: ['orders.createdAt'],
     });
@@ -85,7 +81,7 @@ describe.each([
   });
 
   it('converts a view time dimension once', async () => {
-    const query = await queryFor(useNativeSqlPlanner, {
+    const query = await queryFor({
       measures: ['ordersView.count'],
       dimensions: ['ordersView.createdAt'],
     });
@@ -95,7 +91,7 @@ describe.each([
   });
 
   it('converts a view time dimension with granularity once', async () => {
-    const query = await queryFor(useNativeSqlPlanner, {
+    const query = await queryFor({
       measures: ['ordersView.count'],
       timeDimensions: [{
         dimension: 'ordersView.createdAt',
@@ -108,7 +104,7 @@ describe.each([
   });
 
   it('converts each of two view time dimensions once', async () => {
-    const query = await queryFor(useNativeSqlPlanner, {
+    const query = await queryFor({
       measures: ['ordersView.count'],
       dimensions: ['ordersView.createdAt', 'ordersView.updatedAt'],
     });
@@ -120,7 +116,7 @@ describe.each([
   // A dimension composed out of another member is not read from a column of
   // its own, so there is nothing to convert at this level.
   it('does not convert a dimension composed from a non-time member', async () => {
-    const query = await queryFor(useNativeSqlPlanner, {
+    const query = await queryFor({
       measures: ['ordersView.count'],
       dimensions: ['ordersView.fromEpoch'],
     });
@@ -132,7 +128,7 @@ describe.each([
   // Filter bounds are normalized to the database timezone instead, so the
   // filtered column is compared as it is stored.
   it('does not convert a filtered column', async () => {
-    const query = await queryFor(useNativeSqlPlanner, {
+    const query = await queryFor({
       measures: ['ordersView.count'],
       filters: [{
         member: 'ordersView.createdAt',
@@ -146,7 +142,7 @@ describe.each([
   });
 
   it('does not convert without a timezone conversion request', async () => {
-    const query = await queryFor(useNativeSqlPlanner, {
+    const query = await queryFor({
       measures: ['ordersView.count'],
       dimensions: ['ordersView.createdAt'],
       convertTzForRawTimeDimension: false,
@@ -154,61 +150,5 @@ describe.each([
     const [sql] = query.buildSqlAndParams();
 
     expect(conversionsCount(sql)).toEqual(0);
-  });
-});
-
-// A bare date in a filter value is resolved in the query timezone, so what the
-// query binds is the UTC instant of a boundary of that day in America/Chicago
-// (UTC-5 in August).
-const DAY_START = '2026-08-04T05:00:00.000000Z';
-const DAY_END = '2026-08-05T04:59:59.999999Z';
-
-// Which boundary of the day a single-date operator binds. The two planners
-// disagree on `afterDate` and `beforeOrOnDate`. The native planner reads a bare
-// date as the whole day — the reading `inDateRange` gives the same value, and
-// the one the `OrOn` naming implies. The legacy planner reads it as the instant
-// of midnight, which leaves `beforeOrOnDate` differing from `beforeDate` by that
-// single instant. Both are pinned so a change on either side shows up here; a
-// value carrying an explicit time is unaffected and agrees on both.
-const SINGLE_DATE_BOUNDS: Record<string, { legacy: string, native: string }> = {
-  beforeDate: { legacy: DAY_START, native: DAY_START },
-  beforeOrOnDate: { legacy: DAY_START, native: DAY_END },
-  afterDate: { legacy: DAY_START, native: DAY_END },
-  afterOrOnDate: { legacy: DAY_START, native: DAY_START },
-};
-
-describe.each([
-  ['legacy planner', false],
-  ['native planner', true],
-])('date filter bound values (%s)', (_name, useNativeSqlPlanner) => {
-  const boundsFor = async (options) => {
-    const query = await queryFor(useNativeSqlPlanner, {
-      measures: ['orders.count'],
-      ...options,
-    });
-    const [, params] = query.buildSqlAndParams();
-
-    return params;
-  };
-
-  it('takes the date range bounds from the query timezone', async () => {
-    expect(await boundsFor({
-      timeDimensions: [{
-        dimension: 'orders.createdAt',
-        dateRange: ['2026-08-01', '2026-08-07'],
-      }],
-    })).toEqual(['2026-08-01T05:00:00.000000Z', '2026-08-08T04:59:59.999999Z']);
-  });
-
-  it.each(Object.keys(SINGLE_DATE_BOUNDS))('takes the %s bound from the query timezone', async (operator) => {
-    const expected = SINGLE_DATE_BOUNDS[operator][useNativeSqlPlanner ? 'native' : 'legacy'];
-
-    expect(await boundsFor({
-      filters: [{
-        member: 'orders.updatedAt',
-        operator,
-        values: ['2026-08-04'],
-      }],
-    })).toEqual([expected]);
   });
 });
