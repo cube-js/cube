@@ -473,9 +473,10 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       // The queue fast track only engages at `QueuePriority.Interactive`, so a request-blocked
       // query that loses its priority on the way down silently falls back to the slow path.
       it.each([
-        { type: 'the default', queuePriority: undefined, expected: QueuePriority.Interactive },
-        { type: 'an explicit queuePriority', queuePriority: 42, expected: 42 },
-      ])('submits the main query and its refresh key with $type priority', async ({ queuePriority, expected }) => {
+        { type: 'the default', cacheMode: undefined, queuePriority: undefined, expected: QueuePriority.Interactive },
+        { type: 'an explicit queuePriority', cacheMode: undefined, queuePriority: 42, expected: 42 },
+        { type: 'must-revalidate', cacheMode: 'must-revalidate', queuePriority: undefined, expected: QueuePriority.Interactive },
+      ])('submits the main query and its refresh key with $type priority', async ({ cacheMode, queuePriority, expected }) => {
         const suffix = crypto.randomBytes(8).toString('hex');
         const mainQuery = `SELECT priority-main-${suffix}`;
         const cacheKeyQuery = `SELECT priority-refresh-key-${suffix}`;
@@ -494,6 +495,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
             {
               query: mainQuery,
               values: [],
+              cacheMode,
               queuePriority,
               cacheKeyQueries: [[cacheKeyQuery, []]],
               requestId: `priority-req-${suffix}`,
