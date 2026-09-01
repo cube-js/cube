@@ -268,6 +268,21 @@ const session = await fetch(
 
 A second call with the same body produces the same end state: the group and attribute already exist, descriptions/display names are reconciled if they changed, and the user's memberships and values are re-applied.
 
+## Provisioning users ahead of their first session
+
+An embed user is normally created only when they generate their first session — so you cannot add them to a group or share a workbook or dashboard with them until they have opened the embed at least once. To make a user addressable immediately, provision them directly:
+
+```text
+POST /api/v1/embed-tenants/{embedTenantName}/user
+POST /api/v1/embed-tenants/{embedTenantName}/users
+```
+
+The singular endpoint provisions one user; the plural endpoint provisions up to 100 in a single request and is partially successful — it returns `succeeded` and `failed` arrays instead of failing the whole batch for one bad entry, with each failure keyed by `externalId`.
+
+Each user takes the same fields as `generate-session` above — `externalId`, `email`, `userProfile`, `groups`, `tenantGroups` — except `userAttributes` and `securityContext`, which every session re-applies and so are not accepted here. Provisioning is idempotent: an existing `externalId` is updated rather than rejected, `email` and `userProfile` are overwritten only when supplied, and each group field is replaced when supplied, left untouched when omitted, and cleared with `[]`. Omit `email` and Cube derives a placeholder address instead, which makes the user harder to recognize in a list.
+
+These endpoints use the same `Api-Key` authentication as Generate Session and require admin access.
+
 ## Embed-tenant admin API
 
 To list or delete the groups and attributes that have been bootstrapped into an embed tenant, use the admin endpoints scoped to that tenant:

@@ -147,5 +147,10 @@ not.
 
 ### Editing a calculated field
 
-Select a calculated field in the sidebar to open the editor. You can change its
-**name** and **SQL expression**, then choose **Update** to apply.
+Select a calculated field in the sidebar to open its editor. A field created by
+the **bins** or **groups** panel reopens that same structured editor, letting you
+change its **name** and **SQL expression**. Any other calculated field — a `CASE`
+expression, a calculation like **% of total**, or a field saved to the workbook —
+opens a SQL-only editor showing just its expression, since the field has no
+structured form to round-trip. Edit the SQL and choose **Update** to apply; this
+editor doesn't offer renaming.
