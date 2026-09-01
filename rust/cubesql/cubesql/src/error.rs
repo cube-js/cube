@@ -198,13 +198,27 @@ impl CubeError {
     pub fn is_continue_wait_message(message: &str) -> bool {
         let first_line = message.lines().next().unwrap_or_default().trim();
 
-        first_line
-            .len()
-            .checked_sub(CONTINUE_WAIT_MESSAGE.len())
-            // `get` yields `None` when the split is not on a char boundary, so a
-            // multi-byte character straddling it cannot panic here.
-            .and_then(|at| first_line.get(at..))
-            .is_some_and(|tail| tail.eq_ignore_ascii_case(CONTINUE_WAIT_MESSAGE))
+        let Some(at) = first_line.len().checked_sub(CONTINUE_WAIT_MESSAGE.len()) else {
+            return false;
+        };
+        // `get` yields `None` when the split is not on a char boundary, so a
+        // multi-byte character straddling it cannot panic here - and once it has
+        // returned `Some`, `at` is a boundary and the head can be indexed.
+        let Some(tail) = first_line.get(at..) else {
+            return false;
+        };
+        if !tail.eq_ignore_ascii_case(CONTINUE_WAIT_MESSAGE) {
+            return false;
+        }
+
+        // The phrase has to start a word, so a first line ending in a longer word
+        // - `discontinue wait` - is not read as the queue's signal. Every real
+        // prefix ends in a separator (`Execution error: `), and an unprefixed
+        // message has no preceding character at all.
+        first_line[..at]
+            .chars()
+            .next_back()
+            .is_none_or(|c| !c.is_alphanumeric())
     }
 
     /// Restores the `ContinueWait` cause on an error that reached us as a
@@ -691,6 +705,8 @@ mod tests {
             // A failure that merely quotes the phrase is still a failure, which
             // is why the message test is on the tail rather than a substring.
             "No field named 'continue wait' in table 'orders'",
+            // The phrase has to start a word, not just end the line.
+            "Treatment plan set to discontinue wait",
         ] {
             let err = CubeError::from(repartitioned(message));
 
