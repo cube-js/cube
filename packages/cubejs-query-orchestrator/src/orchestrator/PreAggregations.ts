@@ -167,8 +167,6 @@ export type LoadPreAggregationResult = {
   partitionRange?: QueryDateRange;
   isMultiTableUnion?: boolean;
   usageTargetTableNames?: Record<string, string>;
-  type?: 'rollup' | 'originalSql';
-  preAggregationId?: string;
   dataSource?: string;
   timezone?: string;
 };
@@ -596,7 +594,6 @@ export class PreAggregations {
             ...loadResult,
             preAggregationId: p.preAggregationId,
             type: p.type,
-            preAggregationId: p.preAggregationId,
             dataSource: p.dataSource || 'default',
             timezone: p.timezone,
           };
