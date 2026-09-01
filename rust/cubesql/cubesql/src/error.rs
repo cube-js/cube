@@ -184,14 +184,29 @@ impl CubeError {
     /// `js/index.ts` falls back to `err.stack`). Anything narrower has to enumerate
     /// those shapes, and the shape is exactly what keeps changing.
     ///
-    /// The cost is that a real failure quoting the phrase - an error naming a
-    /// column called `continue wait` - would be read as the queue's signal and go
-    /// unreported. Accepted: no such message is known, and the opposite mistake is
-    /// the one that has actually bitten us twice.
+    /// A false positive is expensive here, more so than at the original site where
+    /// it only meant one more retry: this feeds `normalize_continue_wait`, which
+    /// runs on every DataFusion and Arrow conversion and *replaces* the message.
+    /// An error that merely quotes the phrase would lose its text entirely, and
+    /// the caller would see a query that appears to poll forever rather than the
+    /// error naming their mistake.
+    ///
+    /// Hence the one exception to the substring test: a match immediately
+    /// preceded by a quote is a quoted identifier or literal, not the queue's
+    /// signal. These messages interpolate user-controlled SQL, so
+    /// `No field named 'continue wait'` is the realistic false positive, and it is
+    /// always quoted. That is one character of context, not an enumeration of
+    /// wrapper shapes - prefixes and appended stacks still match.
     pub fn is_continue_wait_message(message: &str) -> bool {
-        message
-            .to_lowercase()
-            .contains(&CONTINUE_WAIT_MESSAGE.to_lowercase())
+        let message = message.to_lowercase();
+        let needle = CONTINUE_WAIT_MESSAGE.to_lowercase();
+
+        message.match_indices(&needle).any(|(at, _)| {
+            !matches!(
+                message[..at].chars().next_back(),
+                Some('\'') | Some('"') | Some('`')
+            )
+        })
     }
 
     /// Restores the `ContinueWait` cause on an error that reached us as a
@@ -666,11 +681,26 @@ mod tests {
         }
     }
 
+    /// The quote exception is per occurrence, not per message: a message that
+    /// quotes the phrase *and* carries it unquoted is still a continue wait.
+    #[test]
+    fn an_unquoted_occurrence_still_counts() {
+        assert!(CubeError::is_continue_wait_message(
+            "Execution error: No field named 'continue wait'. Continue wait"
+        ));
+    }
+
     #[test]
     fn a_real_failure_is_left_alone() {
         for message in [
             "Table 'orders' not found",
             "Database Execution Error: syntax error at or near \"SELCT\"",
+            // Quoted, so it is the user's identifier or literal rather than the
+            // queue's signal - and its text has to survive, because
+            // `normalize_continue_wait` would otherwise replace it.
+            "No field named 'continue wait' in table 'orders'",
+            "Unsupported filter: status = Utf8(\"Continue wait\")",
+            "Can't find column `continue wait` in projection",
         ] {
             let err = CubeError::from(repartitioned(message));
 
