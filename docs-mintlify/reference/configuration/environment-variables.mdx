@@ -1433,10 +1433,11 @@ tenant, and timezone in the deployment.
 
 Refresh keys written with `sql` or marked
 [`incremental`](/reference/data-modeling/pre-aggregations#incremental) keep querying the
-database, since their values depend on your data and not just on the time. So do all
-refresh keys if you have set
-[`queryCacheOptions.refreshKeyRenewalThreshold`][ref-config-query-cache-options], which
-works by caching the query result.
+database, since their values depend on your data and not just on the time.
+
+[`queryCacheOptions.refreshKeyRenewalThreshold`][ref-config-query-cache-options] is still
+honoured: an `every`-based key computed locally advances at most once per threshold window,
+the same bound that caching the query result used to provide.
 
 <Warning>
 

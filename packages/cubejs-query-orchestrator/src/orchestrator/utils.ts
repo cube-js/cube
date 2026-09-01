@@ -52,6 +52,23 @@ export function evaluateLocalRefreshKey(
   return [{ refresh_key: String(Math.floor((utcOffset + nowMs / 1000 - dayOffset) / interval)) }];
 }
 
+/**
+ * `refreshKeyRenewalThreshold` caches the refresh key query result, and that cache is also what
+ * bounds how often the key can advance: a value re-read once a day advances once a day, whatever
+ * `every` says. Sampling the clock at the same granularity reproduces that bound without a query,
+ * and reproduces it identically on every instance, where the SQL path's phase depended on when
+ * each cache entry happened to be written.
+ */
+export function snapToRenewalThreshold(nowMs: number, thresholdSeconds?: number): number {
+  if (!Number.isFinite(thresholdSeconds) || <number>thresholdSeconds <= 0) {
+    return nowMs;
+  }
+
+  const thresholdMs = <number>thresholdSeconds * 1000;
+
+  return Math.floor(nowMs / thresholdMs) * thresholdMs;
+}
+
 export function isValidLocalRefreshKey(descriptor?: LocalRefreshKeyDescriptor): boolean {
   return !!descriptor &&
     Number.isFinite(descriptor.interval) && descriptor.interval > 0 &&
