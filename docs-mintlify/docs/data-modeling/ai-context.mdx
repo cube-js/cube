@@ -91,6 +91,9 @@ consumed by the AI agent**.
 
 </Note>
 
+Each `ai_context` value is limited to 2,000 characters; anything longer is
+silently truncated before it reaches the agent.
+
 Use `ai_context` on [views][ref-view-meta] to provide high-level guidance,
 and on individual members for member-specific instructions:
 
@@ -269,27 +272,6 @@ view(`sales_overview`, {
 
 </CodeGroup>
 
-## Length limit
-
-Each `ai_context` value is limited to **2,000 characters**, measured on its
-serialized JSON representation. The limit applies independently to every view
-and every member, so a model with many annotated members carries far more than
-2,000 characters of context in total.
-
-<Warning>
-
-Exceeding the limit is not an error. Your data model compiles successfully and
-the AI agent silently receives a shortened copy of the context — everything past
-2,000 characters is dropped. If you generate `ai_context` in bulk, validate the
-length before publishing.
-
-</Warning>
-
-The `description` parameter has no length limit, but that does not make it a
-place to put overflow. Descriptions reach the AI agent in full, so long ones
-consume the agent's context window and crowd out other parts of your model.
-Keep both concise.
-
 ## Descriptions vs. AI context
 
 | | `description` | `meta.ai_context` |
@@ -364,8 +346,6 @@ cube(`order_items`, {
   itself or on individual measures and dimensions.
 - **Be specific.** Vague context like "important metric" is less helpful than
   "use this measure when users ask about monthly recurring revenue."
-- **Keep AI context under 2,000 characters.** Longer values are silently
-  truncated — see [Length limit](#length-limit).
 - **Document relationships.** Use AI context to explain how cubes relate to each
   other and which views to prefer for common questions.
 - **Keep it up to date.** As your data model evolves, update descriptions and AI
