@@ -176,19 +176,35 @@ impl CubeError {
     /// `is_continue_wait` for a bare message, when no cause is available - a
     /// message carried over the JS bridge, or one already flattened to a string.
     ///
-    /// Matched on the tail, because a wrapping layer prepends its label and
-    /// leaves the original message last. Deliberately not a substring test: an
-    /// error message can quote the query it failed on, and a real failure over a
-    /// column or literal named `continue wait` has to keep being reported. That
-    /// is narrower than the `contains` check `NodeBridgeTransport` has used since
-    /// 2024, which is safe here - the JS bridge builds the message from
-    /// `err.error` (`Continue wait` verbatim, from the orchestrator) before it
-    /// ever falls back to a stack.
+    /// Matched on the tail of the first line, because a wrapping layer prepends
+    /// its label and leaves the original message last, and a message carried over
+    /// the JS bridge can have a stack appended to it (`errorString` in
+    /// `js/index.ts` falls back to `err.stack`, which renders as
+    /// `Error: Continue wait\n    at ...`). Taking the first line covers that
+    /// without reaching into the frames.
+    ///
+    /// Deliberately not a substring test: an error message can quote the query it
+    /// failed on, and a real failure over a column or literal named
+    /// `continue wait` has to keep being reported. That is narrower than the
+    /// `contains` check `NodeBridgeTransport` used from 2024, and the difference
+    /// only shows on a message that buries the phrase mid-line, which no
+    /// continue wait does - the orchestrator raises it as `{ error: 'Continue
+    /// wait' }`, and `errorString` reads `err.error` / `err.message` before the
+    /// stack.
+    ///
+    /// Compared as ASCII bytes rather than by lowercasing: the needle is pure
+    /// ASCII, and these messages can quote the whole failing query, so
+    /// `to_lowercase` would allocate a copy of it on every call.
     pub fn is_continue_wait_message(message: &str) -> bool {
-        message
-            .trim()
-            .to_lowercase()
-            .ends_with(&CONTINUE_WAIT_MESSAGE.to_lowercase())
+        let first_line = message.lines().next().unwrap_or_default().trim();
+
+        first_line
+            .len()
+            .checked_sub(CONTINUE_WAIT_MESSAGE.len())
+            // `get` yields `None` when the split is not on a char boundary, so a
+            // multi-byte character straddling it cannot panic here.
+            .and_then(|at| first_line.get(at..))
+            .is_some_and(|tail| tail.eq_ignore_ascii_case(CONTINUE_WAIT_MESSAGE))
     }
 
     /// Restores the `ContinueWait` cause on an error that reached us as a
@@ -199,10 +215,15 @@ impl CubeError {
     /// Applied at the DataFusion and Arrow conversion boundaries, which is where
     /// the flattening happens, so consumers downstream of them can match on the
     /// cause.
+    ///
+    /// Both halves are normalized, not just the cause-less one: an error can
+    /// arrive carrying the cause *and* a prefixed message - `CubeScanMemoryStream`
+    /// sets the cause without rewriting the message, and the `CubeError` downcast
+    /// arm hands that straight back here - and the message still has to be
+    /// canonical, because JS matches it exactly in places (`gateway.ts`'s
+    /// `err.message === 'Continue wait'`).
     fn normalize_continue_wait(mut self) -> Self {
-        if !matches!(self.cause, CubeErrorCauseType::ContinueWait)
-            && Self::is_continue_wait_message(&self.message)
-        {
+        if self.is_continue_wait() {
             self.message = CONTINUE_WAIT_MESSAGE.to_string();
             self.cause = CubeErrorCauseType::ContinueWait;
         }
@@ -611,6 +632,56 @@ mod tests {
 
         assert!(err.is_continue_wait());
         assert!(matches!(err.cause, CubeErrorCauseType::ContinueWait));
+    }
+
+    /// An error can arrive with the cause already set *and* a prefixed message:
+    /// `CubeScanMemoryStream` sets the cause without rewriting the message, and
+    /// the `CubeError` downcast arm returns it unchanged. The message still has to
+    /// end up canonical, because JS compares it exactly (`gateway.ts`'s
+    /// `err.message === 'Continue wait'`).
+    #[test]
+    fn a_typed_continue_wait_still_gets_a_canonical_message() {
+        let mut err = CubeError::continue_wait();
+        err.message = "Database Execution Error: Continue wait".to_string();
+
+        let err = CubeError::from(arrow::error::ArrowError::ExternalError(Box::new(err)));
+
+        assert!(err.is_continue_wait());
+        assert!(matches!(err.cause, CubeErrorCauseType::ContinueWait));
+        assert_eq!(err.message, CONTINUE_WAIT_MESSAGE);
+    }
+
+    /// A message carried over the JS bridge can have a stack appended:
+    /// `errorString` falls back to `err.stack`, which renders the message on the
+    /// first line and the frames after it.
+    #[test]
+    fn continue_wait_survives_an_appended_stack() {
+        let err = CubeError::from(repartitioned(
+            "Error: Continue wait\n    at load (/app/js/index.js:12:34)",
+        ));
+
+        assert!(err.is_continue_wait());
+        assert!(matches!(err.cause, CubeErrorCauseType::ContinueWait));
+        assert_eq!(err.message, CONTINUE_WAIT_MESSAGE);
+    }
+
+    /// The tail compare slices by byte offset, so it has to survive a message
+    /// shorter than the needle and one whose split lands inside a multi-byte
+    /// character.
+    #[test]
+    fn the_tail_compare_handles_awkward_messages() {
+        for message in [
+            "",
+            "wait",
+            // The byte at `len - "Continue wait".len()` is mid-character here.
+            "Ошибка: продолжить ожидание",
+        ] {
+            assert!(
+                !CubeError::is_continue_wait_message(message),
+                "wrongly detected: {}",
+                message
+            );
+        }
     }
 
     #[test]
