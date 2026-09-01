@@ -201,3 +201,66 @@ async fn test_view_ungrouped() {
         insta::assert_snapshot!(result);
     }
 }
+
+fn tz_conversions_count(sql: &str) -> usize {
+    sql.matches("AT TIME ZONE").count()
+}
+
+fn raw_time_dimension_query(members_yaml: &str) -> String {
+    format!(
+        indoc! {"
+            {}timezone: \"America/Chicago\"
+            convert_tz_for_raw_time_dimension: true
+        "},
+        members_yaml
+    )
+}
+
+// A `type: time` dimension asked for without a granularity is converted into the
+// query timezone once. A view re-exposing such a dimension is not a second
+// conversion site: the value is read, and converted, on the owning cube.
+//
+// The count pins how many conversions the query applies; the result pins that
+// they land on the column, with the offset going the right way.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_raw_time_dimension_converted_once() {
+    let ctx = create_context();
+    let query = raw_time_dimension_query(indoc! {"
+        measures:
+          - orders_with_customers.count
+        dimensions:
+          - orders_with_customers.created_at
+        order:
+          - id: orders_with_customers.created_at
+    "});
+
+    let sql = ctx.build_sql(&query).unwrap();
+    assert_eq!(tz_conversions_count(&sql), 1, "got: {sql}");
+
+    if let Some(result) = ctx.try_execute_pg(&query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_raw_and_granular_time_dimension_converted_once_each() {
+    let ctx = create_context();
+    let query = raw_time_dimension_query(indoc! {"
+        measures:
+          - orders_with_customers.count
+        dimensions:
+          - orders_with_customers.created_at
+        time_dimensions:
+          - dimension: orders_with_customers.created_at
+            granularity: day
+        order:
+          - id: orders_with_customers.created_at
+    "});
+
+    let sql = ctx.build_sql(&query).unwrap();
+    assert_eq!(tz_conversions_count(&sql), 2, "got: {sql}");
+
+    if let Some(result) = ctx.try_execute_pg(&query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

@@ -71,9 +71,15 @@ impl SqlNode for TimeDimensionNode {
                 }
             }
             MemberSymbol::Dimension(ev) => {
+                // Only the cube owning the column reads it from the database, so
+                // only there is a conversion needed. A dimension that merely
+                // references another one renders through the owning symbol,
+                // which converts on its own; converting here as well would
+                // shift the value twice.
                 let wraps_convert_tz = !visitor.ignore_tz_convert()
                     && query_tools.convert_tz_for_raw_time_dimension()
-                    && ev.dimension_type() == "time";
+                    && ev.dimension_type() == "time"
+                    && ev.owned_by_cube();
                 if wraps_convert_tz {
                     let inner_visitor = visitor.with_arg_needs_paren_safe(false);
                     let input_sql = self.input.to_sql(
