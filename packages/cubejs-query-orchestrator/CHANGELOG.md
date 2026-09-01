@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.32](https://github.com/cube-js/cube/compare/v1.7.31...v1.7.32) (2026-09-01)
+
+### Bug Fixes
+
+- **query-orchestrator:** keep Interactive priority on user query paths ([#11715](https://github.com/cube-js/cube/issues/11715)) ([39d3b20](https://github.com/cube-js/cube/commit/39d3b20d114d6003562e0cdad0e98389056bb3a5))
+
 ## [1.7.31](https://github.com/cube-js/cube/compare/v1.7.30...v1.7.31) (2026-08-31)
 
 ### Bug Fixes

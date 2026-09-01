@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.32](https://github.com/cube-js/cube/compare/v1.7.31...v1.7.32) (2026-09-01)
+
+### Bug Fixes
+
+- **query-orchestrator:** keep Interactive priority on user query paths ([#11715](https://github.com/cube-js/cube/issues/11715)) ([39d3b20](https://github.com/cube-js/cube/commit/39d3b20d114d6003562e0cdad0e98389056bb3a5))
+- **tesseract:** calendar sql granularities crash every query; to_date ignores the calendar ([#11709](https://github.com/cube-js/cube/issues/11709)) ([4029495](https://github.com/cube-js/cube/commit/4029495feb0cadfee20c56f565d94430852f5b27))
+- **tesseract:** compose grain.include with rolling_window ([#11639](https://github.com/cube-js/cube/issues/11639)) ([9d3dd45](https://github.com/cube-js/cube/commit/9d3dd45814a7fec41b6c4e23233f38bd7a1af1c2))
+- **tesseract:** convert a view's raw time dimension timezone only once ([#11712](https://github.com/cube-js/cube/issues/11712)) ([1ae6452](https://github.com/cube-js/cube/commit/1ae6452a139d227935e3b68d9c8cc9283d982d3d))
+
 ## [1.7.31](https://github.com/cube-js/cube/compare/v1.7.30...v1.7.31) (2026-08-31)
 
 ### Bug Fixes
