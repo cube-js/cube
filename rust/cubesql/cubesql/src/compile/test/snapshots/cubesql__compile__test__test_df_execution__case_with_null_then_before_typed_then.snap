@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/test/test_df_execution.rs
+expression: "execute_query(r#\"\n                SELECT\n                    i,\n                    CASE WHEN i > 1 THEN NULL WHEN i > 0 THEN i END AS c\n                FROM (\n                    SELECT 0::int4 AS i\n                    UNION ALL\n                    SELECT 1::int4 AS i\n                    UNION ALL\n                    SELECT 2::int4 AS i\n                ) AS t\n                ORDER BY i\n                \"#.to_string(),\nDatabaseProtocol::PostgreSQL,).await.unwrap()"
+---
++---+------+
+| i | c    |
++---+------+
+| 0 | NULL |
+| 1 | 1    |
+| 2 | NULL |
++---+------+

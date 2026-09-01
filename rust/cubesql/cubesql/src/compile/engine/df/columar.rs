@@ -10,26 +10,38 @@ use std::sync::Arc;
 macro_rules! if_then_else {
     ($BUILDER_TYPE:ty, $ARRAY_TYPE:ty, $BOOLS:expr, $TRUE:expr, $FALSE:expr) => {{
         let true_values = if $TRUE.data_type() == &DataType::Null {
-            Arc::new(<$ARRAY_TYPE>::from(vec![None; $TRUE.len()]))
+            Arc::new(<$ARRAY_TYPE>::from(vec![None; $TRUE.len()])) as ArrayRef
         } else {
             $TRUE
         };
-        let true_values = true_values
-            .as_ref()
+        let true_values_ref = true_values.as_ref();
+        let true_values = true_values_ref
             .as_any()
             .downcast_ref::<$ARRAY_TYPE>()
-            .expect("true_values downcast failed");
+            .ok_or_else(|| {
+                DataFusionError::Internal(format!(
+                    "true values of type {:?} can not be read as {}",
+                    true_values_ref.data_type(),
+                    stringify!($ARRAY_TYPE)
+                ))
+            })?;
 
         let false_values = if $FALSE.data_type() == &DataType::Null {
-            Arc::new(<$ARRAY_TYPE>::from(vec![None; $FALSE.len()]))
+            Arc::new(<$ARRAY_TYPE>::from(vec![None; $FALSE.len()])) as ArrayRef
         } else {
             $FALSE
         };
-        let false_values = false_values
-            .as_ref()
+        let false_values_ref = false_values.as_ref();
+        let false_values = false_values_ref
             .as_any()
             .downcast_ref::<$ARRAY_TYPE>()
-            .expect("false_values downcast failed");
+            .ok_or_else(|| {
+                DataFusionError::Internal(format!(
+                    "false values of type {:?} can not be read as {}",
+                    false_values_ref.data_type(),
+                    stringify!($ARRAY_TYPE)
+                ))
+            })?;
 
         let mut builder = <$BUILDER_TYPE>::new($BOOLS.len());
         for i in 0..$BOOLS.len() {
