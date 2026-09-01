@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { createCancelablePromise, pausePromise } from '@cubejs-backend/shared';
+import { CacheMode, createCancelablePromise, pausePromise } from '@cubejs-backend/shared';
 import { QueuePriority } from '@cubejs-backend/base-driver';
 
 import { CacheKey, CacheKeyItem, ContinueWaitError, QueryCache, QueryCacheOptions } from '../../src';
@@ -472,7 +472,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
 
       // The queue fast track only engages at `QueuePriority.Interactive`, so a request-blocked
       // query that loses its priority on the way down silently falls back to the slow path.
-      it.each([
+      it.each<{ type: string, cacheMode?: CacheMode, queuePriority?: number, expected: number }>([
         { type: 'the default', cacheMode: undefined, queuePriority: undefined, expected: QueuePriority.Interactive },
         { type: 'an explicit queuePriority', cacheMode: undefined, queuePriority: 42, expected: 42 },
         { type: 'must-revalidate', cacheMode: 'must-revalidate', queuePriority: undefined, expected: QueuePriority.Interactive },
