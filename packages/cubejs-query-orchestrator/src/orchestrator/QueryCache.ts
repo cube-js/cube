@@ -87,7 +87,7 @@ export type LoadRefreshKeyOptions = {
   requestId?: string;
   skipRefreshKeyWaitForRenew?: boolean;
   /** Inherited from the query the keys are refreshed for: a blocked request waits on them too */
-  priority?: QueuePriority;
+  priority?: number;
   dataSource: string
 };
 
@@ -926,7 +926,7 @@ export class QueryCache {
     options: {
       requestId?: string,
       skipRefreshKeyWaitForRenew?: boolean,
-      priority?: QueuePriority,
+      priority?: number,
       external?: boolean,
       forceNoCache?: boolean,
       dataSource: string,
