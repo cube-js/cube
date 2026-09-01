@@ -78,7 +78,10 @@ filters, an omitted filter type defaults to `equals`. Granularities are lowercas
 and must be one of the switcher's [allowed
 granularities](/docs/explore-analyze/dashboards/widgets/controls#allowed-granularities) —
 `day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour`
-for time dimensions that expose them.
+for time dimensions that expose them. A field switcher's parameter names
+the member it *replaces* on the left and the member to show in its place on the
+right; the right-hand side is a bare member name, without the view prefix, and
+must be one of the switcher's configured options.
 
 Example:
 
