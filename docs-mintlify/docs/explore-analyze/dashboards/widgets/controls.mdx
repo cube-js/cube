@@ -37,7 +37,7 @@ You can set a default value that's applied when the dashboard loads. Defaults ar
 There are two ways to set a default:
 
 - **Static default** — pick a value (or values) directly in the filter. Every viewer sees the same default.
-- **User attribute default** — resolve the default from the viewer's [user attribute][ref-user-attributes] at load time, so each viewer sees their own personalized default. [Parent controls](#parent-user-attribute-default) support this too.
+- **User attribute default** — resolve the default from the viewer's [user attribute][ref-user-attributes] at load time, so each viewer sees their own personalized default. [Time granularity switchers](#time-granularity-user-attribute-default), [field switchers](#field-switcher-user-attribute-default) and [parent controls](#parent-user-attribute-default) support this too.
 
 Static defaults are configured by interacting with the filter in the dashboard builder — the value you select is saved on the widget and applied to every viewer when the dashboard loads.
 
@@ -96,6 +96,41 @@ Custom granularities defined in the [data model][ref-granularities] aren't offer
 
 You can configure a default granularity that's applied when the dashboard loads. If no default is set, charts use the granularity that was saved on the underlying report — viewers can still switch granularities, but the dashboard opens with each chart at its original granularity.
 
+#### User attribute default {#time-granularity-user-attribute-default}
+
+The default above is one granularity for everyone. To give each viewer their own, turn on **User attribute default** in the switcher's settings and pick a [user attribute][ref-user-attributes]. When the dashboard loads, Cube reads that attribute for the current viewer and opens the control on the granularity it names.
+
+This is how one dashboard opens at the interval each audience works in — daily for the operations team, monthly for the executives who read the same charts — from a single published dashboard.
+
+To configure it:
+
+<Steps>
+ <Step title="Open the switcher's settings">
+   In the dashboard builder, open the widget's settings menu and choose **Edit Control**.
+ </Step>
+ <Step title="Enable User attribute default">
+   Below **Visibility**, turn on the **User attribute default** switch.
+ </Step>
+ <Step title="Pick the attribute">
+   Select the [user attribute][ref-user-attributes] to resolve. Only attributes defined in your account appear in the picker.
+ </Step>
+</Steps>
+
+The attribute value is matched against the **granularity names** the switcher [allows](#allowed-granularities) — `day`, `week`, `month`, `quarter`, `year`, and `second`, `minute`, `hour` where the dimension exposes them — ignoring case and surrounding spaces, so an attribute reading `Week` resolves to `week`. The names are matched, not the labels the control displays, so one attribute works the same for viewers in every language.
+
+| Attribute type | How it's applied |
+|---|---|
+| **String**, **Number** | Matched against the granularity names as a single value. |
+| **String array**, **Number array** | The first entry that names an allowed granularity wins. The switcher is single-select, so the rest are ignored. |
+
+A value that isn't one of the switcher's [allowed granularities](#allowed-granularities) — or is empty, `null`, or unresolvable — is ignored rather than forced, and the control falls back to the [default granularity](#default-granularity). Attributes are set per user and the allowed list per dashboard, so the two can drift apart without anyone editing either; the safe reading of an unusable value is "no opinion".
+
+<Note>
+The attribute is resolved for the viewer, not baked into the dashboard. Editing the attribute's value changes what that viewer opens on the next time the dashboard loads; it never rewrites the published dashboard, so the default granularity you set in the builder stays intact for everyone else.
+</Note>
+
+Viewers can still switch granularities unless the control's [visibility](#visibility) is set to **Disabled**, and their own pick outranks the attribute for the rest of the session. A granularity passed [in the URL](#sharing-the-current-selection) outranks both, so deep links continue to work. If a [parent control](#parent) drives this switcher and the option the viewer is on maps a granularity to it, that mapping decides the granularity — a mapping the author made for that arrangement is more specific than a per-viewer starting point. An option that [leaves the switcher empty](#children) has no opinion, so the attribute still seeds it; one set to **Reset to default** sends the switcher to the [default granularity](#default-granularity) saved on it rather than re-resolving the attribute, and leaves the switcher untouched when no default granularity was saved.
+
 ## Field switcher
 
 A field switcher lets viewers change *which* dimension or measure the charts are built on — swapping a revenue chart's breakdown from **Status** to **City**, or its measure from **Order count** to **Total revenue** — without leaving the dashboard or opening the report.
@@ -134,7 +169,7 @@ If the dashboard also has a [time granularity switcher](#time-granularity-switch
 
 ### User attribute default {#field-switcher-user-attribute-default}
 
-Like [filters](#user-attribute-default) and [parent controls](#parent-user-attribute-default), a field switcher can start each viewer on their own member. Turn on **User attribute default** in the control's settings and pick a [user attribute][ref-user-attributes]; when the dashboard loads, Cube reads that attribute for the current viewer and opens the control on the member it names.
+Like [filters](#user-attribute-default), [time granularity switchers](#time-granularity-user-attribute-default) and [parent controls](#parent-user-attribute-default), a field switcher can start each viewer on their own member. Turn on **User attribute default** in the control's settings and pick a [user attribute][ref-user-attributes]; when the dashboard loads, Cube reads that attribute for the current viewer and opens the control on the member it names.
 
 This is how one dashboard opens on the breakdown each audience cares about — a **Breakdown** switcher opening on `region` for one team and `channel` for another, from a single published dashboard.
 
@@ -273,7 +308,7 @@ You can also write these parameters by hand to open a dashboard in a particular 
 What does and doesn't travel in the link:
 
 - **Only what the viewer chose.** Values that came from the control's own configuration — a static default, a [default granularity](#default-granularity) — are not written into the URL. Every viewer already gets those from the dashboard itself, and leaving them out means a link stays correct after the dashboard's defaults change.
-- **Never a personalized default.** A value resolved from a [user attribute](#user-attribute-default) stays out of the link — whether it seeded a filter directly or reached one through a [parent control](#parent) opening on the viewer's own option. Sharing a dashboard never pins your attribute value onto the recipient; they see it through their own attributes.
+- **Never a personalized default.** A value resolved from a [user attribute](#user-attribute-default) stays out of the link — whether it seeded a filter or a [time granularity switcher](#time-granularity-user-attribute-default) directly, or reached one through a [parent control](#parent) opening on the viewer's own option. Sharing a dashboard never pins your attribute value onto the recipient; they see it through their own attributes.
 - **Filters and granularities together.** Picking both puts both in the link, including when a [parent control](#parent) sets several children at once. A parent control isn't serialized itself — the link carries the values its children ended up with, so the recipient sees the same data while the parent dropdown opens on whatever default it resolves for them, which may not be the option the sharer picked.
 - **Not the field switcher, yet.** A [field switcher](#field-switcher) has no parameter of its own, so a viewer's member choice doesn't travel in the link. The recipient opens on the control's [default option](#field-switcher-default-option), or on their own [user attribute](#field-switcher-user-attribute-default) where one is set — and on the charts the sharer was looking at, built on a different member than the sharer saw.
 - **Written out on published dashboards only.** Reading these parameters works anywhere, including [embedded][ref-embed-url-filters] dashboards; it's the writing that is published-only. In the dashboard builder the URL is left to the editing session, so changing a control there doesn't rewrite it.
