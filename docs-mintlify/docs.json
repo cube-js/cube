@@ -1065,7 +1065,7 @@
                 ]
               },
               {
-                "group": "Users",
+                "group": "Users (SCIM)",
                 "openapi": "/api-reference/scim.yaml",
                 "pages": [
                   "GET /scim/v2/Users",
@@ -1077,7 +1077,7 @@
                 ]
               },
               {
-                "group": "Groups",
+                "group": "Groups (SCIM)",
                 "openapi": "/api-reference/scim.yaml",
                 "pages": [
                   "GET /scim/v2/Groups",

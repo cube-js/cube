@@ -425,6 +425,37 @@ if (missing.length) {
   process.exit(1);
 }
 
+// 2b. Hoist `description`/`deprecated` out of a nullable field's `oneOf` branch.
+// class-validator-jsonschema represents a nullable field as `oneOf: [{ type: X,
+// description, deprecated }, { type: 'null' }]`, putting the metadata on the
+// non-null branch. Renderers (Mintlify included) read deprecation/description off
+// the property schema itself, not a oneOf branch, so a nullable field's docs
+// silently fail to render otherwise — caught by review on the 0.6.0 release
+// (`UserSettingsInput.lastSeenChangelogId`, `CreateDeploymentTokenInput.expiresIn`,
+// `User.userPolicies`). Only hoists when the parent doesn't already carry the key,
+// so a non-nullable field's property-level metadata (e.g. `AppTheme.light`) is
+// untouched.
+function hoistNullableMeta(node) {
+  if (Array.isArray(node)) { node.forEach(hoistNullableMeta); return; }
+  if (!node || typeof node !== 'object') return;
+  if (Array.isArray(node.oneOf)) {
+    for (const branch of node.oneOf) {
+      if (!branch || typeof branch !== 'object' || branch.type === 'null') continue;
+      if (branch.description !== undefined && node.description === undefined) {
+        node.description = branch.description;
+        delete branch.description;
+      }
+      if (branch.deprecated !== undefined && node.deprecated === undefined) {
+        node.deprecated = branch.deprecated;
+        delete branch.deprecated;
+      }
+    }
+  }
+  for (const v of Object.values(node)) hoistNullableMeta(v);
+}
+hoistNullableMeta(paths);
+hoistNullableMeta(schemas);
+
 // 3. Determine tag set + order (preferred order first, then any extras A–Z).
 const presentTags = new Set();
 for (const val of Object.values(paths)) {
