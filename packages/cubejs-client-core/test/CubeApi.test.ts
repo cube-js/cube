@@ -418,6 +418,27 @@ describe('CubeApi cubeSql', () => {
     JSON.stringify({ data: [['Shipped', '45102']] }),
   ].join('\n');
 
+  // The SQL API reports the pre-aggregations behind a result next to
+  // `lastRefreshTime` on the schema line, so a client can match the result to the
+  // build behind it (CORE-664).
+  const cubeSqlResponseBodyWithPreAggregations = [
+    JSON.stringify({
+      schema: [
+        { name: 'status', column_type: 'String' },
+      ],
+      lastRefreshTime: '2026-02-24T00:34:01.594Z',
+      external: true,
+      usedPreAggregations: {
+        'dev_pre_aggregations.orders_main': {
+          preAggregationId: 'Orders.main',
+          lastUpdatedAt: 1771893241594,
+          type: 'rollup',
+        },
+      },
+    }),
+    JSON.stringify({ data: [['Active']] }),
+  ].join('\n');
+
   const cubeSqlResponseBodyNoRefreshTime = [
     JSON.stringify({
       schema: [
@@ -615,6 +636,109 @@ describe('CubeApi cubeSql', () => {
     // `undefined` is dropped both by JSON.stringify (POST body) and by
     // requestStream's query-string builder, so it never reaches the wire.
     expect(requestStreamSpy.mock.calls[0]?.[1]?.params?.timezone).toBeUndefined();
+  });
+
+  test('should parse usedPreAggregations from response', async () => {
+    vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify({ error: cubeSqlResponseBodyWithPreAggregations })),
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const res = await cubeApi.cubeSql('SELECT status FROM orders');
+    expect(res.usedPreAggregations).toEqual({
+      'dev_pre_aggregations.orders_main': {
+        preAggregationId: 'Orders.main',
+        lastUpdatedAt: 1771893241594,
+        type: 'rollup',
+      },
+    });
+    // The metadata fields are independent: reading one must not drop the others.
+    expect(res.lastRefreshTime).toBe('2026-02-24T00:34:01.594Z');
+    expect(res.external).toBe(true);
+    expect(res.data).toEqual([['Active']]);
+  });
+
+  test('should omit usedPreAggregations when the query hit no pre-aggregation', async () => {
+    vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify({ error: cubeSqlResponseBodyNoRefreshTime })),
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const res = await cubeApi.cubeSql('SELECT status FROM users');
+    expect(res.usedPreAggregations).toBeUndefined();
+    expect(res.external).toBeUndefined();
+    // Absent must stay ABSENT, not become an explicit `undefined` key.
+    expect('usedPreAggregations' in res).toBe(false);
+    expect('external' in res).toBe(false);
+  });
+
+  test('should emit usedPreAggregations on the stream schema chunk', async () => {
+    vi.spyOn(HttpTransport.prototype, 'requestStream').mockImplementation(() => ({
+      stream: async () => (async function* generate() {
+        yield new TextEncoder().encode(`${cubeSqlResponseBodyWithPreAggregations}\n`);
+      }()),
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const chunks: any[] = [];
+    for await (const chunk of cubeApi.cubeSqlStream('SELECT status FROM orders')) {
+      chunks.push(chunk);
+    }
+
+    const schemaChunk = chunks.find((chunk) => chunk.type === 'schema');
+    expect(schemaChunk?.usedPreAggregations).toEqual({
+      'dev_pre_aggregations.orders_main': {
+        preAggregationId: 'Orders.main',
+        lastUpdatedAt: 1771893241594,
+        type: 'rollup',
+      },
+    });
+    expect(schemaChunk?.lastRefreshTime).toBe('2026-02-24T00:34:01.594Z');
+  });
+
+  test('should emit usedPreAggregations when the schema arrives in the trailing buffer', async () => {
+    // No newline after the schema line, so it is only flushed by the
+    // end-of-stream drain — a second, easily-forgotten copy of the same spread.
+    vi.spyOn(HttpTransport.prototype, 'requestStream').mockImplementation(() => ({
+      stream: async () => (async function* generate() {
+        yield new TextEncoder().encode(cubeSqlResponseBodyWithPreAggregations.split('\n')[0]);
+      }()),
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const chunks: any[] = [];
+    for await (const chunk of cubeApi.cubeSqlStream('SELECT status FROM orders')) {
+      chunks.push(chunk);
+    }
+
+    const schemaChunk = chunks.find((chunk) => chunk.type === 'schema');
+    expect(schemaChunk?.usedPreAggregations).toEqual({
+      'dev_pre_aggregations.orders_main': {
+        preAggregationId: 'Orders.main',
+        lastUpdatedAt: 1771893241594,
+        type: 'rollup',
+      },
+    });
   });
 });
 
