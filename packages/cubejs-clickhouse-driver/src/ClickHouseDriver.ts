@@ -199,9 +199,6 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       headers: config.headers ?? {},
     };
 
-    // server-core passes `maxPoolSize` explicitly (2 * queue concurrency); this fallback only
-    // covers a driver built straight from `driver_factory`, where a pool below the concurrency
-    // would leave statements waiting on sockets.
     const maxPoolSize = config.maxPoolSize ??
       getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ??
       ClickHouseDriver.getDefaultConcurrency();
