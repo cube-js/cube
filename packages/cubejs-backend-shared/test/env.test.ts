@@ -301,13 +301,18 @@ describe('getEnv(compilerCacheSize)', () => {
     expect(getEnv('compilerCacheSize')).toBe(1000);
   });
 
-  test('throws on a non positive integer', () => {
-    process.env.CUBEJS_COMPILER_CACHE_SIZE = '0';
+  test('throws on a negative or non-integer value', () => {
+    process.env.CUBEJS_COMPILER_CACHE_SIZE = '-1';
     expect(() => getEnv('compilerCacheSize')).toThrowError(
       /CUBEJS_COMPILER_CACHE_SIZE/
     );
 
     process.env.CUBEJS_COMPILER_CACHE_SIZE = 'abc';
+    expect(() => getEnv('compilerCacheSize')).toThrowError(
+      /CUBEJS_COMPILER_CACHE_SIZE/
+    );
+
+    process.env.CUBEJS_COMPILER_CACHE_SIZE = '1.5';
     expect(() => getEnv('compilerCacheSize')).toThrowError(
       /CUBEJS_COMPILER_CACHE_SIZE/
     );

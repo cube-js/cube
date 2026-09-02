@@ -1287,7 +1287,7 @@ describe('OptsHandler compilerCacheSize', () => {
     expect(core.options.compilerCacheSize).toBe(7);
   });
 
-  test('must throw at construction if CUBEJS_COMPILER_CACHE_SIZE is not a positive integer', () => {
+  test('must throw at construction if CUBEJS_COMPILER_CACHE_SIZE is not a valid size', () => {
     process.env.CUBEJS_COMPILER_CACHE_SIZE = 'abc';
 
     expect(() => new CubejsServerCoreExposed(conf))
