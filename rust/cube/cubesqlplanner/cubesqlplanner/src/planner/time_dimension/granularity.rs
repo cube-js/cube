@@ -184,8 +184,9 @@ impl Granularity {
 
     /// An explicit origin on a single-unit interval is a natural boundary plus a constant shift,
     /// which is exactly what `offset` expresses — and the offset rendering
-    /// (`DATE_TRUNC(unit, x - offset) + offset`) is exact on every dialect. Returns that shift, or
-    /// `None` when the origin needs none or cannot be expressed as one.
+    /// (`DATE_TRUNC(unit, x - offset) + offset`) asks nothing of the dialect beyond truncation and
+    /// interval arithmetic. Returns that shift, or `None` when the origin needs none or cannot be
+    /// expressed as one.
     fn origin_as_offset(
         origin: &QueryDateTime,
         interval: &SqlInterval,
