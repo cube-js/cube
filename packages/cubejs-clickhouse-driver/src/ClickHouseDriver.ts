@@ -37,8 +37,6 @@ import { transformRow, transformStreamRow } from './HydrationStream';
 
 const SUPPORTED_BUCKET_TYPES = ['s3'];
 
-const MAX_QUERY_ID_PREFIX_LENGTH = 64;
-
 const ClickhouseTypeToGeneric: Record<string, string> = {
   enum: 'text',
   string: 'text',
@@ -208,11 +206,13 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   private buildQueryId(requestId?: string): string {
-    const prefix = requestId
-      ? extractRequestUUID(requestId).slice(0, MAX_QUERY_ID_PREFIX_LENGTH)
-      : '';
+    if (!requestId) {
+      return uuidv4();
+    }
 
-    return prefix ? `${prefix}-${uuidv4()}` : uuidv4();
+    const prefix = extractRequestUUID(requestId).slice(0, 63);
+
+    return `${prefix}-${uuidv4()}`;
   }
 
   protected withCancel<T>(
