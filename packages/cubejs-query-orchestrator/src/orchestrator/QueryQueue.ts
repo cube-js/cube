@@ -209,8 +209,7 @@ export class QueryQueue {
     };
 
     if (options.requestId) {
-      const idx = options.requestId.lastIndexOf('-span-');
-      options.externalId = idx !== -1 ? options.requestId.substring(0, idx) : options.requestId;
+      options.externalId = extractRequestUUID(options.requestId);
     }
 
     if (this.skipQueue) {

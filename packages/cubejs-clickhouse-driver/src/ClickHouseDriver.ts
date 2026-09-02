@@ -7,6 +7,7 @@
 import {
   getEnv,
   assertDataSource,
+  extractRequestUUID,
 } from '@cubejs-backend/shared';
 import {
   BaseDriver,
@@ -204,8 +205,15 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     this.client = this.createClient(maxPoolSize);
   }
 
-  protected withCancel<T>(fn: (con: ClickHouseClient, queryId: string, signal: AbortSignal) => Promise<T>): Promise<T> {
-    const queryId = uuidv4();
+  protected withCancel<T>(
+    fn: (con: ClickHouseClient, queryId: string, signal: AbortSignal) => Promise<T>,
+    options?: QueryOptions,
+  ): Promise<T> {
+    // ClickHouse echoes query_id into system.query_log, so prefixing it with the Cube query
+    // id makes every statement traceable to a query in Query History. The uuid suffix keeps
+    // it unique: ClickHouse rejects a query whose query_id is already running, and one Cube
+    // request can run several statements concurrently.
+    const queryId = options?.requestId ? `${extractRequestUUID(options.requestId)}-${uuidv4()}` : uuidv4();
 
     const abortController = new AbortController();
     const { signal } = abortController;
@@ -234,7 +242,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       const killClient = this.createClient(1);
       try {
         await killClient.command({
-          query: `KILL QUERY WHERE query_id = '${queryId}'`,
+          query: `KILL QUERY WHERE query_id = ${sqlstring.escape(queryId)}`,
         });
       } finally {
         await killClient.close();
@@ -268,12 +276,12 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       true;
   }
 
-  public async query<R = unknown>(query: string, values: unknown[]): Promise<R[]> {
-    const response = await this.queryResponse(query, values);
+  public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
+    const response = await this.queryResponse(query, values, options);
     return this.normaliseResponse(response);
   }
 
-  protected queryResponse(query: string, values: unknown[]): Promise<ResponseJSON<Record<string, unknown>>> {
+  protected queryResponse(query: string, values: unknown[], options?: QueryOptions): Promise<ResponseJSON<Record<string, unknown>>> {
     const formattedQuery = sqlstring.format(query, values);
 
     return this.withCancel(async (connection, queryId, signal) => {
@@ -301,7 +309,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         // TODO replace string formatting with proper cause
         throw new Error(`Query failed: ${e}; query id: ${queryId}`);
       }
-    });
+    }, options);
   }
 
   protected normaliseResponse<R = unknown>(res: ResponseJSON<Record<string, unknown>>): Array<R> {
@@ -372,11 +380,11 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     query: string,
     values: unknown[],
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    { highWaterMark }: StreamOptions
+    { highWaterMark, requestId }: StreamOptions
   ): Promise<StreamTableDataWithTypes> {
     // Use separate client for this long-living query
     const client = this.createClient(1);
-    const queryId = uuidv4();
+    const queryId = requestId ? `${extractRequestUUID(requestId)}-${uuidv4()}` : uuidv4();
 
     try {
       const formattedQuery = sqlstring.format(query, values);
@@ -461,7 +469,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       return this.stream(query, values, options);
     }
 
-    const response = await this.queryResponse(query, values);
+    const response = await this.queryResponse(query, values, options);
 
     return {
       rows: this.normaliseResponse(response),
@@ -513,8 +521,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     return this.query('SELECT name as table_name FROM system.tables WHERE database = ?', [schemaName]);
   }
 
-  public override async dropTable(tableName: string, _options?: QueryOptions): Promise<void> {
-    await this.command(`DROP TABLE ${tableName}`);
+  public override async dropTable(tableName: string, options?: QueryOptions): Promise<void> {
+    await this.command(`DROP TABLE ${tableName}`, options);
   }
 
   protected getExportBucket(
@@ -566,7 +574,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns an array of queried fields meta info.
    */
-  public async queryColumnTypes(sql: string, params: unknown[]): Promise<TableStructure> {
+  public async queryColumnTypes(sql: string, params: unknown[], options?: QueryOptions): Promise<TableStructure> {
     // For DESCRIBE we expect that each row would have special structure
     // See https://clickhouse.com/docs/en/sql-reference/statements/describe-table
     // TODO complete this type
@@ -574,7 +582,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       name: string,
       type: string
     };
-    const columns = await this.query<DescribeRow>(`DESCRIBE ${sql}`, params);
+    const columns = await this.query<DescribeRow>(`DESCRIBE ${sql}`, params, options);
     if (!columns) {
       throw new Error('Unable to describe table');
     }
@@ -615,12 +623,12 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     );
   }
 
-  public async unloadFromQuery(sql: string, params: unknown[], _options: UnloadOptions): Promise<DownloadTableCSVData> {
+  public async unloadFromQuery(sql: string, params: unknown[], options: UnloadOptions): Promise<DownloadTableCSVData> {
     if (!this.config.exportBucket) {
       throw new Error('Unload is not configured');
     }
 
-    const types = await this.queryColumnTypes(`(${sql})`, params);
+    const types = await this.queryColumnTypes(`(${sql})`, params, { requestId: options?.requestId });
     const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket.bucketName);
     const exportPrefix = path ? `${path}/${uuidv4()}` : uuidv4();
 
@@ -635,7 +643,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       ${sql}
     `, params);
 
-    await this.command(formattedQuery);
+    await this.command(formattedQuery, { requestId: options?.requestId });
 
     const csvFile = await this.extractUnloadedFilesFromS3(
       {
@@ -666,18 +674,18 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   // This is not part of a driver interface, and marked public only for testing
-  public async command(query: string): Promise<void> {
+  public async command(query: string, options?: QueryOptions): Promise<void> {
     await this.withCancel(async (connection, queryId, signal) => {
       await connection.command({
         query,
         query_id: queryId,
         abort_signal: signal,
       });
-    });
+    }, options);
   }
 
   // This is not part of a driver interface, and marked public only for testing
-  public async insert(table: string, values: Array<Array<unknown>>): Promise<void> {
+  public async insert(table: string, values: Array<Array<unknown>>, options?: QueryOptions): Promise<void> {
     await this.withCancel(async (connection, queryId, signal) => {
       await connection.insert({
         table,
@@ -686,6 +694,6 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         query_id: queryId,
         abort_signal: signal,
       });
-    });
+    }, options);
   }
 }
