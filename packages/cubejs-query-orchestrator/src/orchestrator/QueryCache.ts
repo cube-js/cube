@@ -9,6 +9,7 @@ import {
   streamToArray,
   CacheMode,
   LoggerFn,
+  extractRequestUUID,
 } from '@cubejs-backend/shared';
 import { CubeStoreCacheDriver, CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
@@ -27,7 +28,6 @@ import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
 import {
   getCacheHash,
-  extractRequestUUID,
   evaluateLocalRefreshKey,
   isValidLocalRefreshKey,
 } from './utils';

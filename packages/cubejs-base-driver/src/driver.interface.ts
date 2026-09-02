@@ -167,10 +167,12 @@ type UnloadQuery = {
 export type UnloadOptions = {
   maxFileSize: number,
   query?: UnloadQuery;
+  requestId?: string;
 };
 
 export type QueryOptions = {
   inlineTables?: InlineTables,
+  requestId?: string,
   [key: string]: any
 };
 
@@ -250,7 +252,7 @@ export interface DriverInterface {
   query<R = unknown>(query: string, params: unknown[], options?: QueryOptions): Promise<R[]>;
   //
   tableColumnTypes: (table: string) => Promise<TableStructure>;
-  queryColumnTypes: (sql: string, params: unknown[]) => Promise<{ name: any; type: string; }[]>;
+  queryColumnTypes: (sql: string, params: unknown[], options?: QueryOptions) => Promise<{ name: any; type: string; }[]>;
   //
   getSchemas: () => Promise<QuerySchemasResult[]>;
   tablesSchema: () => Promise<any>;

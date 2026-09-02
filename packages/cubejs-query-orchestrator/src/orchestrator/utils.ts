@@ -58,11 +58,3 @@ export function isValidLocalRefreshKey(descriptor?: LocalRefreshKeyDescriptor): 
     Number.isFinite(descriptor.utcOffset) &&
     Number.isFinite(descriptor.dayOffset);
 }
-
-/**
- * Extracts the UUID prefix from a request ID by stripping the `-span-N` suffix.
- */
-export function extractRequestUUID(requestId: string): string {
-  const idx = requestId.lastIndexOf('-span-');
-  return idx !== -1 ? requestId.substring(0, idx) : requestId;
-}

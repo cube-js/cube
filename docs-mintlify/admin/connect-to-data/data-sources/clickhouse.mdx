@@ -196,6 +196,20 @@ module.exports = {
 
 </CodeGroup>
 
+## Query attribution
+
+Cube sets the ClickHouse [`query_id`](https://clickhouse.com/docs/operations/system-tables/query_log)
+of every statement it runs to `<cube-query-id>-<uuid>`, where `<cube-query-id>` is the
+identifier shown for the query in Query History and `<uuid>` is generated per statement, so
+one Cube query matches as many rows as it ran statements. Use it to trace a Cube query to the
+statements it produced in ClickHouse:
+
+```sql
+SELECT query_id, query, event_time
+FROM system.query_log
+WHERE query_id LIKE '<cube-query-id>%'
+```
+
 ## Additional Configuration
 
 You can connect to a ClickHouse database when your user's permissions are
