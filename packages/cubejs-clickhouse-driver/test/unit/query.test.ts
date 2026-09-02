@@ -57,21 +57,44 @@ describe('ClickHouseDriver statement path', () => {
   });
 
   it('reports the reason of a failed query in the message', async () => {
-    client.query.mockRejectedValue(new AggregateError(
+    const cause = new AggregateError(
       [new Error('connect ECONNREFUSED ::1:8123'), new Error('connect ECONNREFUSED 127.0.0.1:8123')],
       'All promises were rejected',
-    ));
+    );
+    client.query.mockRejectedValue(cause);
 
-    await expect(createDriver().query('SELECT 1', [])).rejects.toThrow(
+    const { rejects } = expect(createDriver().query('SELECT 1', []));
+    await rejects.toThrow(
       /Query failed: Aggregate error: All promises were rejected; errors: Error: connect ECONNREFUSED ::1:8123; Error: connect ECONNREFUSED 127\.0\.0\.1:8123; query id: /
     );
+    await rejects.toMatchObject({ cause });
   });
 
   it('reports the reason of a failed command in the message', async () => {
-    client.command.mockRejectedValue(new Error('Timeout error.'));
+    const cause = new Error('Timeout error.');
+    client.command.mockRejectedValue(cause);
 
-    await expect(createDriver().command('DROP TABLE test.t')).rejects.toThrow(
-      /Command failed: Error: Timeout error\.; query id: /
+    const { rejects } = expect(createDriver().command('DROP TABLE test.t'));
+    await rejects.toThrow(/Command failed: Error: Timeout error\.; query id: /);
+    await rejects.toMatchObject({ cause });
+  });
+
+  it('reports the reason of a failed insert in the message', async () => {
+    const cause = new Error('Timeout error.');
+    client.insert.mockRejectedValue(cause);
+
+    const { rejects } = expect(createDriver().insert('test.t', [[1]]));
+    await rejects.toThrow(/Insert failed: Error: Timeout error\.; query id: /);
+    await rejects.toMatchObject({ cause });
+  });
+
+  it('names the table when a create table fails', async () => {
+    client.command.mockRejectedValue(new Error('Unknown data type family'));
+
+    await expect(
+      createDriver().createTable('test.t', [{ name: 'a', type: 'int' }])
+    ).rejects.toThrow(
+      /Create table test\.t failed: Error: Command failed: Error: Unknown data type family; query id: /
     );
   });
 });

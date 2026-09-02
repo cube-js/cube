@@ -230,10 +230,6 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const { signal } = abortController;
 
     const promise = (async () => {
-      // No health probe before the statement: `client.ping()` cost an extra HTTP round trip and a
-      // socket from the same `max_open_connections` pool as the statement itself, while `GET /ping`
-      // verifies neither credentials nor database. Stale keep-alive sockets are already recycled by
-      // the client (`keep_alive.idle_socket_ttl`), and an unreachable host fails at connect anyway.
       signal.throwIfAborted();
       // Queries sent by `fn` can hit a timeout error, would _not_ get killed, and continue running in ClickHouse
       // TODO should we kill those as well?
@@ -603,7 +599,11 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
 
   public override async createTable(quotedTableName: string, columns: TableColumn[]) {
     const createTableSql = this.createTableSql(quotedTableName, columns);
-    await this.command(createTableSql);
+    try {
+      await this.command(createTableSql);
+    } catch (e) {
+      throw new Error(`Create table ${quotedTableName} failed: ${formatError(e)}`, { cause: e });
+    }
   }
 
   /**

@@ -9,13 +9,19 @@ jest.mock('@clickhouse/client', () => ({
 const createClientMock = createClient as unknown as jest.Mock;
 
 describe('ClickHouseDriver pool size', () => {
+  const originalMaxPool = process.env.CUBEJS_DB_MAX_POOL;
+
   beforeEach(() => {
     createClientMock.mockClear();
     delete process.env.CUBEJS_DB_MAX_POOL;
   });
 
   afterAll(() => {
-    delete process.env.CUBEJS_DB_MAX_POOL;
+    if (originalMaxPool === undefined) {
+      delete process.env.CUBEJS_DB_MAX_POOL;
+    } else {
+      process.env.CUBEJS_DB_MAX_POOL = originalMaxPool;
+    }
   });
 
   const createDriver = (options = {}) => new ClickHouseDriver({
