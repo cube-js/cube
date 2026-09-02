@@ -91,6 +91,9 @@ consumed by the AI agent**.
 
 </Note>
 
+Each `ai_context` value is limited to 2,000 characters; anything longer is
+silently truncated before it reaches the agent.
+
 Use `ai_context` on [views][ref-view-meta] to provide high-level guidance,
 and on individual members for member-specific instructions:
 
@@ -276,6 +279,7 @@ view(`sales_overview`, {
 | Visible in the UI | Yes | No |
 | Used by the AI agent | Yes | Yes |
 | Supported on | Cubes, views, measures, dimensions, segments | Views, measures, dimensions |
+| Length limit | None | 2,000 characters |
 
 Use `description` when the context is useful to both end users and the AI
 agent. Use `ai_context` when you want to provide additional instructions or
