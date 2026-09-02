@@ -70,18 +70,18 @@ URL parameters:
 | Time granularity switcher | `tg_<semantic_view>.<dimension>=<granularity>` | `tg_orders_transactions.created_at=week` |
 | Field switcher | `ms_<semantic_view>.<replaced_member>=<selected_member>` | `ms_orders_transactions.status=users_city` |
 
-The `<semantic_view>` and `<dimension>` must match the internal names (not
-display titles) of the semantic view and member configured on the widget — as
-must the member on the right-hand side of `ms_`, which is a measure rather than
-a dimension when the field switcher's type is **Measure**. For
-filters, an omitted filter type defaults to `equals`. Granularities are lowercase
-and must be one of the switcher's [allowed
+The `<semantic_view>` and the member that follows it must match the internal
+names (not display titles) configured on the widget — as must the member on the
+right-hand side of `ms_`, which is a measure rather than a dimension when the
+field switcher's type is **Measure**. For filters, an omitted filter type
+defaults to `equals`. Granularities are lowercase and must be one of the
+switcher's [allowed
 granularities](/docs/explore-analyze/dashboards/widgets/controls#allowed-granularities) —
 `day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour`
-for time dimensions that expose them. A field switcher's parameter names
-the member it *replaces* on the left and the member to show in its place on the
-right; the right-hand side is a bare member name, without the view prefix, and
-must be one of the switcher's configured options.
+for time dimensions that expose them. In `ms_`, only the key carries the view
+prefix: the replacement is named on its own, so it is always read from the same
+semantic view as the member it replaces, and must be one of that control's
+configured **Alternatives**.
 
 Example:
 
@@ -94,8 +94,9 @@ before the URL goes anywhere real — pasted as-is into the `src="…"` of the i
 snippet above, its raw `"` closes the attribute and truncates the URL.
 
 This works on both regular and published (embedded) dashboards. A parameter is
-applied only if a matching control for that dimension already exists on the
-dashboard, and a granularity outside the switcher's allowed list is ignored.
+applied only if a matching control for that member already exists on the
+dashboard; a granularity outside the switcher's allowed list is ignored, and so
+is an `ms_` value that isn't one of the field switcher's **Alternatives**.
 
 The reverse direction works on published dashboards: when a viewer changes a
 control there, the new value is written back into the dashboard's own URL, so the

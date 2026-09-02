@@ -155,7 +155,11 @@ A chart whose query doesn't use the replaced member at all is a different case: 
 A chart with a [period comparison][ref-charts] is a narrower case: the comparison can't follow a member switch, so the chart applies the switch and drops the comparison, saying so in its own notice rather than silently showing a comparison that no longer matches the data.
 
 <Note>
-A field switcher's selection travels wherever the other controls' values do. A [shared link](#sharing-the-current-selection) and an exported PNG or PDF both carry the member the viewer was looking at, so the image matches the screen it came from. A scheduled export has no live viewer, so it renders the member stored on the schedule — set it through the `memberSwitchers` field on the notification, alongside `filters` and `timeGrains`.
+A viewer's choice reaches a **PNG or PDF export** as well as a [shared link](#sharing-the-current-selection), so the exported image shows the member that was on screen rather than the control's default.
+
+The two are not written on the same terms, and the difference is what makes the image reliable. A link carries only what the viewer *chose*, so a member resolved from a [user attribute](#field-switcher-user-attribute-default) stays out of it and the recipient re-resolves their own. An export carries **every** switcher, that one included, and a member named in the parameters outranks any attribute when the page loads — so the server-rendered copy shows what the person who asked for it was looking at, whoever the render itself runs as.
+
+A **scheduled export** has no live viewer, so it renders the member stored on the schedule. Set it with `memberSwitchers` on the notification, alongside `filters` and `timeGrains` — see the [notifications endpoints](/api-reference/management-api) in the management API.
 </Note>
 
 ## Parent
@@ -257,7 +261,7 @@ Viewers can still switch to another option unless the control's [visibility](#vi
 
 ## Sharing the current selection
 
-On a published dashboard, the values a viewer picks in the controls are reflected in the URL, so the view they are looking at is bookmarkable and shareable. Copy the address bar, send it on, and the recipient opens the dashboard with the same filters and granularities applied.
+On a published dashboard, the values a viewer picks in the controls are reflected in the URL, so the view they are looking at is bookmarkable and shareable. Copy the address bar, send it on, and the recipient opens the dashboard on the same filters, granularities and members.
 
 Each control type has its own parameter:
 
@@ -278,7 +282,7 @@ What does and doesn't travel in the link:
 - **Every control's pick, together.** Picking in several controls puts them all in the link, including when a [parent control](#parent) sets several children at once — filters, time granularity switchers and [field switchers](#field-switcher) alike. A parent control isn't serialized itself — the link carries the values its children ended up with, so the recipient sees the same data while the parent dropdown opens on whatever default it resolves for them, which may not be the option the sharer picked.
 - **Written out on published dashboards only.** Reading these parameters works anywhere, including [embedded][ref-embed-url-filters] dashboards; it's the writing that is published-only. In the dashboard builder the URL is left to the editing session, so changing a control there doesn't rewrite it.
 
-When a dashboard opens with these parameters, they are applied on top of whatever defaults the controls carry. A parameter is ignored when nothing on the dashboard can honor it — there is no matching control for that dimension, or the requested granularity isn't in the switcher's [allowed granularities](#allowed-granularities).
+When a dashboard opens with these parameters, they are applied on top of whatever defaults the controls carry. A parameter is ignored when nothing on the dashboard can honor it — there is no matching control for that member, the requested granularity isn't in the switcher's [allowed granularities](#allowed-granularities), or a field switcher's value isn't one of its configured [Alternatives](#choosing-what-it-switches).
 
 ## Visibility
 
