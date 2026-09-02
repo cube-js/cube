@@ -1,7 +1,9 @@
 {
   "name": "@cubejs-client/core",
   "version": "1.7.32",
-  "engines": {},
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "type": "module",
   "repository": {
     "type": "git",
@@ -34,7 +36,6 @@
   },
   "dependencies": {
     "core-js": "^3.6.5",
-    "cross-fetch": "^3.0.2",
     "d3-format": "^3.1.0",
     "d3-time-format": "^4.1.0",
     "dayjs": "^1.10.4",

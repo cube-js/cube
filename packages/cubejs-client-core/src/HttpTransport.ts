@@ -1,4 +1,3 @@
-import fetch from 'cross-fetch';
 import 'url-search-params-polyfill';
 import { responseChunks } from './streaming.js';
 
