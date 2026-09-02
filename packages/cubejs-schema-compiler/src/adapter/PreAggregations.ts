@@ -1106,13 +1106,9 @@ export class PreAggregations {
   }
 
   /**
-   * Rollups that can stand on one side of a hop.
-   *
-   * A join key may be declared as a rollup's time dimension, which `references.dimensions`
-   * doesn't cover. Such a key lives in a granularity-suffixed column, which only the native
-   * planner renders — this side resolves it just to describe the rollups to build, so the
-   * wider reading is limited to the queries that planner serves. A rollup declaring the key
-   * plainly is preferred, so a hop that already resolved keeps resolving to the same rollup.
+   * Rollups that can stand on one side of a hop. The wider reading — a key declared as a
+   * rollup's time dimension — is limited to the native planner, the only one that renders the
+   * granularity-suffixed column such a key lives in.
    */
   private rollupsCarryingJoinMembers(
     preAggObjsToJoin: PreAggregationForQuery[],

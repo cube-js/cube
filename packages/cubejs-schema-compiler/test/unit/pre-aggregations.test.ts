@@ -1295,7 +1295,11 @@ describe('pre-aggregations', () => {
         useNativeSqlPlanner: true,
       } as any);
 
-      for (const expected of [/td_dates\.day \(month\)/, /td_facts\.day \(day\)/, /td_rollup_join/]) {
+      for (const expected of [
+        /td_dates\.td_dates_rollup stores td_dates\.day truncated to month/,
+        /td_facts\.td_facts_rollup stores td_facts\.day truncated to day/,
+        /td_rollup_join/,
+      ]) {
         expect(() => query.preAggregations?.preAggregationsDescription()).toThrow(expected);
       }
     });

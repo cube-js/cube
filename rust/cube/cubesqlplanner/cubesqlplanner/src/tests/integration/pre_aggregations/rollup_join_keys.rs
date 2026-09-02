@@ -108,9 +108,11 @@ fn test_rollup_join_rejects_time_dimension_key_granularity_mismatch() -> Result<
         .expect_err("Keys truncated to different granularities can't be compared")
         .to_string();
 
+    // Naming the rollup on each side matters: each was chosen on its own, so the author has to
+    // see which pair the planner ended up with.
     for expected in [
-        "td_dates.day (month)",
-        "td_facts.day (day)",
+        "td_dates.td_dates_rollup stores td_dates.day truncated to month",
+        "td_facts.td_facts_rollup stores td_facts.day truncated to day",
         "td_rollup_join",
     ] {
         assert!(err.contains(expected), "expected {} in: {}", expected, err);
@@ -162,10 +164,31 @@ fn test_rollup_join_rejects_raw_key_against_truncated_one() -> Result<(), CubeEr
         .to_string();
 
     for expected in [
-        "td_dates.day (day)",
-        "td_facts.day (not truncated)",
+        "td_dates.td_dates_rollup stores td_dates.day truncated to day",
+        "td_facts.td_facts_rollup stores td_facts.day untruncated",
         "td_rollup_join",
     ] {
+        assert!(err.contains(expected), "expected {} in: {}", expected, err);
+    }
+
+    Ok(())
+}
+
+// Storing the key at two granularities gives two columns and no reason to pick either, so
+// declaration order must not get to decide which one the join reads.
+#[test]
+fn test_rollup_join_rejects_key_stored_at_two_granularities() -> Result<(), CubeError> {
+    let ctx = TestContext::new(MockSchema::from_yaml_file(
+        "common/rollup_join_time_dimension_key_two_granularities.yaml",
+    ))?;
+
+    let err = ctx
+        .build_sql_with_used_pre_aggregations(TIME_DIMENSION_KEY_QUERY)
+        .map(|_| ())
+        .expect_err("A key stored at two granularities is ambiguous to join on")
+        .to_string();
+
+    for expected in ["td_dates.td_dates_rollup", "td_dates.day", "day, month"] {
         assert!(err.contains(expected), "expected {} in: {}", expected, err);
     }
 
