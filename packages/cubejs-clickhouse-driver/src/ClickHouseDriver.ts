@@ -37,12 +37,6 @@ import { transformRow, transformStreamRow } from './HydrationStream';
 
 const SUPPORTED_BUCKET_TYPES = ['s3'];
 
-/**
- * ClickHouse echoes query_id back in the X-ClickHouse-Query-Id response header, and the Cube
- * request id can come from a client supplied `x-request-id`, which is unbounded — past a few
- * dozen KB every query of that request dies with `Parse Error: Header overflow`. Same clamp
- * as the BigQuery job label, and enough for a request uuid or `scheduler-<uuid>`.
- */
 const MAX_QUERY_ID_PREFIX_LENGTH = 64;
 
 const ClickhouseTypeToGeneric: Record<string, string> = {
@@ -213,11 +207,6 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     this.client = this.createClient(maxPoolSize);
   }
 
-  /**
-   * ClickHouse echoes query_id into system.query_log, which is what makes a statement
-   * traceable to a query in Query History. The uuid suffix is required because ClickHouse
-   * rejects a query_id that is already running.
-   */
   private buildQueryId(requestId?: string): string {
     const prefix = requestId
       ? extractRequestUUID(requestId).slice(0, MAX_QUERY_ID_PREFIX_LENGTH)

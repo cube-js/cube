@@ -90,7 +90,6 @@ describe('ClickHouseDriver query id', () => {
 
   it('escapes the query id in the KILL QUERY statement', async () => {
     const driver = createDriver();
-    // queryResponse() returns the cancellable promise; query() awaits it and drops `cancel`
     const promise = (driver as any).queryResponse('SELECT 1', [], { requestId: 'a\'b-span-1' });
     await promise;
 
@@ -106,7 +105,6 @@ describe('ClickHouseDriver query id', () => {
   it('tags streaming queries', async () => {
     const driver = createDriver();
 
-    // The mocked client returns no rows, so stream() throws on the missing header rows
     await expect(driver.stream('SELECT 1', [], { highWaterMark: 100, requestId: 'req-1-span-1' }))
       .rejects.toThrow();
 
