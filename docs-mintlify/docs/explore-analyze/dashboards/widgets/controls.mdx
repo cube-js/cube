@@ -314,7 +314,7 @@ What does and doesn't travel in the link:
 - **The field switcher travels, but not everywhere.** A viewer's member choice is written to the link like any other pick. What it does not survive is a server-rendered copy: scheduled exports and screenshots rebuild the URL from an allowlist with no field-switcher parameter, so those render the control's [default option](#field-switcher-default-option) — or the recipient's own [user attribute](#field-switcher-user-attribute-default) where one is set.
 - **Written out on published dashboards only.** Reading these parameters works anywhere, including [embedded][ref-embed-url-filters] dashboards; it's the writing that is published-only. In the dashboard builder the URL is left to the editing session, so changing a control there doesn't rewrite it.
 
-When a dashboard opens with these parameters, they are applied on top of whatever defaults the controls carry. A parameter is ignored when nothing on the dashboard can honor it — there is no matching control for that dimension, the requested granularity isn't in the switcher's [allowed granularities](#allowed-granularities), or the selected member isn't among the field switcher's **Alternatives**.
+When a dashboard opens with these parameters, they are applied on top of whatever defaults the controls carry. A parameter is ignored when nothing on the dashboard can honor it — there is no matching control for that member, the requested granularity isn't in the switcher's [allowed granularities](#allowed-granularities), or the selected member isn't among the field switcher's **Alternatives**.
 
 ## Visibility
 
