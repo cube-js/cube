@@ -37,25 +37,6 @@ impl QueryDateTime {
         Ok(Self { date_time })
     }
 
-    pub fn start_of_year(&self) -> Self {
-        let tz = self.date_time.timezone();
-        Self::new(
-            tz.with_ymd_and_hms(self.date_time.year(), 1, 1, 0, 0, 0)
-                .unwrap(),
-        )
-    }
-
-    pub fn start_of_iso_week(&self) -> Self {
-        let tz = self.date_time.timezone();
-        let date = self.date_time.date_naive();
-        let from_monday = date.weekday().num_days_from_monday() as i64;
-        let monday = date - Duration::days(from_monday);
-        Self::new(
-            tz.with_ymd_and_hms(monday.year(), monday.month(), monday.day(), 0, 0, 0)
-                .unwrap(),
-        )
-    }
-
     /// Start of the given predefined granularity containing this instant, on the local wall clock.
     ///
     /// A midnight that a DST gap swallows resolves to whatever instant the gap pushes it to; that
@@ -146,6 +127,10 @@ impl QueryDateTime {
             minute as i32,
             second as i32,
         ))
+    }
+
+    pub fn month(&self) -> u32 {
+        self.date_time.month()
     }
 
     pub fn day(&self) -> u32 {
@@ -414,7 +399,7 @@ mod tests {
     fn test_start_of_year() {
         let tz = "Etc/GMT-3".parse::<Tz>().unwrap();
         let date = QueryDateTime::from_date_str(tz, "2024-11-03 01:30:00").unwrap();
-        let start = date.start_of_year();
+        let start = date.start_of("year").unwrap();
         assert_eq!(
             start.date_time().naive_utc(),
             NaiveDate::from_ymd_opt(2023, 12, 31)
@@ -556,7 +541,7 @@ mod tests {
         let tz = "Etc/GMT-3".parse::<Tz>().unwrap();
         let date = QueryDateTime::from_date_str(tz, "2024-01-31").unwrap();
         let interval = "1 day".parse::<SqlInterval>().unwrap();
-        let origin = date.start_of_year();
+        let origin = date.start_of("year").unwrap();
         let result = date.align_to_origin(&origin, &interval).unwrap();
         assert_eq!(
             result.naive_local(),

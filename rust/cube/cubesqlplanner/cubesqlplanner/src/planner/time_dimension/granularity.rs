@@ -78,7 +78,7 @@ impl Granularity {
             let origin = Self::fix_origin_for_weeks_if_needed(
                 Self::default_origin(timezone)?,
                 &granularity_interval,
-            );
+            )?;
             let interval = SqlInterval::from_str(offset)?;
             (origin.add_interval(&interval)?, granularity_offset)
         } else {
@@ -86,7 +86,7 @@ impl Granularity {
                 Self::fix_origin_for_weeks_if_needed(
                     Self::default_origin(timezone)?,
                     &granularity_interval,
-                ),
+                )?,
                 granularity_offset,
             )
         };
@@ -179,7 +179,7 @@ impl Granularity {
     }
 
     fn default_origin(timezone: Tz) -> Result<QueryDateTime, CubeError> {
-        Ok(QueryDateTime::now(timezone)?.start_of_year())
+        QueryDateTime::now(timezone)?.start_of("year")
     }
 
     /// An explicit origin on a single-unit interval is a natural boundary plus a constant shift,
@@ -205,9 +205,17 @@ impl Granularity {
             return Ok(None);
         }
 
-        // Adding a month clamps to the shortest month, so a day-of-month past the 28th has no
-        // day count that lands on the origin's grid in every month.
-        if matches!(unit.as_str(), "year" | "quarter" | "month") && origin.day() > 28 {
+        // The shift counts days from the first of the origin's month, so it only reproduces the
+        // grid where that month is always long enough — February 29 is the one day that is not.
+        // Month and quarter grains additionally step through `add_interval`, which clamps to the
+        // shortest month and then keeps the shortened day (a quarter grain from the 31st walks
+        // 31 -> 30 -> 30), and no fixed shift follows that drift.
+        let day_is_out_of_reach = match unit.as_str() {
+            "year" => origin.month() == 2 && origin.day() == 29,
+            "quarter" | "month" => origin.day() > 28,
+            _ => false,
+        };
+        if day_is_out_of_reach {
             return Ok(None);
         }
 
@@ -217,11 +225,11 @@ impl Granularity {
     fn fix_origin_for_weeks_if_needed(
         origin: QueryDateTime,
         interval: &SqlInterval,
-    ) -> QueryDateTime {
+    ) -> Result<QueryDateTime, CubeError> {
         if interval.is_week_only() {
-            origin.start_of_iso_week()
+            origin.start_of("week")
         } else {
-            origin
+            Ok(origin)
         }
     }
 
@@ -399,11 +407,25 @@ mod tests {
     }
 
     #[test]
-    fn a_day_of_month_past_the_28th_has_no_offset_form() {
-        // Adding a month clamps to the shortest month, so no fixed day count reproduces the grid.
+    fn a_day_of_month_out_of_reach_has_no_offset_form() {
+        // February 29 is the only day a year grain cannot reach: the shift lands on March 1 in
+        // every other year.
+        assert_eq!(offset_of("1 year", "2024-02-29"), None);
+        // Every other day past the 28th is exact for a year grain, since only February varies.
+        assert_eq!(
+            offset_of("1 year", "2024-04-30").as_deref(),
+            Some("3 month 29 day")
+        );
+        assert_eq!(offset_of("1 year", "2024-01-31").as_deref(), Some("30 day"));
+        assert_eq!(
+            offset_of("1 year", "2024-05-31").as_deref(),
+            Some("4 month 30 day")
+        );
+        // Month and quarter grains drift once `add_interval` clamps, so the whole tail is out.
+        assert_eq!(offset_of("1 month", "2024-01-29"), None);
         assert_eq!(offset_of("1 month", "2024-01-30"), None);
         assert_eq!(offset_of("1 quarter", "2024-01-31"), None);
-        assert_eq!(offset_of("1 year", "2024-02-29"), None);
+        assert_eq!(offset_of("1 quarter", "2024-05-31"), None);
         // Day counts stay exact for week- and time-based intervals.
         assert_eq!(offset_of("1 week", "2024-01-31").as_deref(), Some("2 day"));
         assert_eq!(
@@ -419,6 +441,8 @@ mod tests {
         assert!(custom("1 month", Some("2024-01-15"), None).is_natural_aligned());
         // The residue that has no offset form falls through to DATE_BIN.
         assert!(!custom("1 month", Some("2024-01-30"), None).is_natural_aligned());
+        assert!(!custom("1 year", Some("2024-02-29"), None).is_natural_aligned());
+        assert!(custom("1 year", Some("2024-04-30"), None).is_natural_aligned());
     }
 
     #[test]
