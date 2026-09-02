@@ -177,7 +177,7 @@ Run `cube <command> --help` for the full options of any command.
 | `regions` | List available deployment regions |
 | `github` (`gh`) | GitHub integration: `status`, `installations`, `repos`, `branches`, `connect` |
 | `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `delete-branch`, `enable-branch`/`disable-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
-| `dbt` | dbt sync: `sync` (`--ref`, `--wait`), `status`, `result`, `cancel` |
+| `dbt` | dbt sync: `sync` (`--ref`, `--wait`), `status`, `result`, `logs`, `history` (`--status`, `--trigger`), `cancel` |
 | `environments` | Deployment environments and environment tokens |
 | `variables` | Deployment environment variables |
 | `folders`, `workbooks`, `reports`, `workspace` | Workspace content management |
@@ -365,6 +365,52 @@ cube dbt sync DEPLOYMENT_ID --ref feature/orders-model --wait
 `--ref` takes a branch or tag, not a commit SHA. Syncs are not free — each one
 provisions a sandbox and parses the project — so prefer one per push over one per
 commit.
+
+</Note>
+
+### Sync history and logs
+
+`history` lists a deployment's recent syncs — how each one was triggered, how it
+ended, and how long it took — and `logs` prints one sync's phase timeline,
+including the text a failed phase produced:
+
+```bash
+cube dbt history DEPLOYMENT_ID
+cube dbt logs DEPLOYMENT_ID SYNC_JOB_ID
+```
+
+`history` narrows with `--status` (`RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED`,
+`UNKNOWN`) and `--trigger` (`manual`, `api`, `webhook`, `agent`, `unknown`) — both
+case-sensitive as spelled here — and pages with `--first`/`--after`, taking the cursor
+from `pageInfo.endCursor` in `--json` output. A page holds at most 100 runs, so a
+larger `--first` returns 100 with `pageInfo.hasNextPage` set. `logs` takes no paging
+flags — one sync's timeline is one page, and each line carries the phase it belongs
+to and how long that phase took.
+
+Both need only `SchemaRead`. Durations are the server's own single-clock figure, so
+they never disagree with the run they describe. `--json` carries the rest of each
+record — the dbt ref that was synced, the phase that failed, per-phase timings and
+manifest counts.
+
+`logs` is what turns a red CI step into something self-explaining: a failed
+`--wait` reports the reason, and the timeline says which phase produced it.
+
+```bash
+cube dbt sync "$DEPLOYMENT_ID" --ref "$GITHUB_HEAD_REF" --wait --json > sync.json || {
+  SYNC_JOB_ID=$(jq -r '.syncJobId // empty' sync.json)
+  [ -n "$SYNC_JOB_ID" ] && cube dbt logs "$DEPLOYMENT_ID" "$SYNC_JOB_ID"
+  exit 1
+}
+```
+
+A failed `--wait --json` still writes its document before exiting non-zero, which
+is what leaves the `syncJobId` there to follow up on.
+
+<Note>
+
+A cancelled sync is listed as `CANCELLED` by `history`, but reported as a failure by
+`status` and by `sync --wait` — a gate polling for a terminal answer needs one, and the
+reason it prints says the sync was cancelled.
 
 </Note>
 

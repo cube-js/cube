@@ -2,6 +2,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::{bail, Result};
 use clap::Subcommand;
+use owo_colors::OwoColorize;
 use serde_json::Value;
 
 use crate::client::{Client, Query};
@@ -63,6 +64,36 @@ enum Cmd {
         deployment: i64,
         /// Sync job id, as returned by `sync`
         sync_job_id: String,
+    },
+    /// Show a dbt sync's phase timeline, including the text a failed phase produced
+    ///
+    /// No paging flags: one sync's timeline is one page, bounded by the number of
+    /// phases it ran, so flags would be accepted here and ignored by the server.
+    Logs {
+        /// Deployment id
+        deployment: i64,
+        /// Sync job id, as returned by `sync`
+        sync_job_id: String,
+    },
+    /// List a deployment's recent dbt syncs
+    #[command(aliases = ["list", "ls"])]
+    History {
+        /// Deployment id
+        deployment: i64,
+        /// Only runs with this status, case-sensitive: RUNNING, COMPLETED, FAILED,
+        /// CANCELLED, UNKNOWN
+        #[arg(long, value_parser = util::nonempty_filter)]
+        status: Option<String>,
+        /// Only runs started this way, case-sensitive: manual, api, webhook, agent,
+        /// unknown
+        #[arg(long, value_parser = util::nonempty_filter)]
+        trigger: Option<String>,
+        /// Page size for cursor-based pagination (at most 100 per page)
+        #[arg(long)]
+        first: Option<u64>,
+        /// Cursor for the next page (from a previous pageInfo.endCursor)
+        #[arg(long)]
+        after: Option<String>,
     },
     /// Cancel a running dbt sync
     Cancel {
@@ -195,6 +226,245 @@ fn print_prune_hint(sync_created_it: bool, deployment: i64, branch_name: &str) {
     }
 }
 
+/// The error a terminal FAILED leaves behind, from both wait paths through one function
+/// so the two cannot drift.
+///
+/// Two sentences, because the reason alone is not the whole answer. The first is the
+/// workflow's own words, which is what a human reading a failed job wants — collapsed
+/// like the build failure in `deployments`, since a dbt reason is a compile or warehouse
+/// error that arrives multi-line and `main` renders an anyhow chain on one line with
+/// `{err:#}`; and `is_blank` rather than `is_empty`, because a reason of blanks would
+/// fill the slot without answering it on the one line somebody reads when the gate goes
+/// red. The second says WHICH PHASE produced it, which is the difference between a red
+/// CI step that explains itself and one that only says "dbt sync failed" — and it earns
+/// its place most in exactly the case the first sentence cannot fill.
+///
+/// In the message rather than printed beside it, so it survives `--json` (where advice
+/// has no place in the document, but stderr still carries it into the job log) and lands
+/// after the reason rather than above it. The only signal a gate itself needs is still
+/// the non-zero exit.
+fn failure(deployment: i64, sync_job_id: &str, status: &Value) -> anyhow::Error {
+    let error = util::one_line(&output::field(status, "error"), util::REASON_LIMIT);
+    let reason = if util::is_blank(&error) {
+        "(no reason reported)"
+    } else {
+        &error
+    };
+
+    anyhow::anyhow!(
+        "dbt sync {sync_job_id} failed: {reason}. See which phase failed with \
+         `cube dbt logs {deployment} {}`",
+        util::shell_quote(sync_job_id)
+    )
+}
+
+/// Server text as a terminal may safely show it: every control character except the
+/// line breaks and tabs the timeline keeps on purpose is dropped.
+///
+/// This is text the CLI did not write — dbt compile output, warehouse messages, model
+/// names — and an ESC sequence in it can retitle a window, move the cursor, or overwrite
+/// the lines above it in a CI log. `one_line` is not the guard it looks like: it drops
+/// control characters that are WHITESPACE as a side effect of splitting on it, and ESC
+/// is not whitespace. Printing raw would be safe only under `--json`, where `serde_json`
+/// escapes them.
+fn printable(text: &str) -> String {
+    text.chars()
+        .filter(|c| !c.is_control() || *c == '\n' || *c == '\t')
+        .collect()
+}
+
+/// How much of one server-supplied value a table cell or a line prefix keeps. Long
+/// enough for a branch name, a timestamp or a trigger with room to spare, short enough
+/// that one row stays one row: a table is laid out to its widest cell, so an unbounded
+/// one would push every other column off the screen.
+const CELL_LIMIT: usize = 120;
+
+/// One bounded, printable line of server text — what a table cell and a timeline
+/// prefix both need, and where trimming comes from: `one_line` splits on whitespace, so
+/// padding and interior newlines go the same way.
+fn one_cell(text: &str) -> String {
+    util::one_line(&printable(text), CELL_LIMIT)
+}
+
+/// A `durationMs` rendered as time, because a sync runs for minutes and `912345` is
+/// not a thing anyone reads off a table.
+///
+/// Anything that is not a plain count of milliseconds is passed through untouched:
+/// blank stays blank, and a value this build cannot parse is shown as it arrived
+/// rather than turned into a confident `0s`.
+fn human_duration_ms(raw: &str) -> String {
+    let raw = raw.trim();
+    let ms = match raw.parse::<u64>() {
+        Ok(ms) => ms,
+        // A whole number of milliseconds that arrived as a float (`912345.0`) is still
+        // a duration; a negative or non-numeric one is not, and falls through.
+        //
+        // Bounded, not merely non-negative: an `as` cast SATURATES, so `1e30` would
+        // otherwise render as a confident five-billion-hour duration instead of passing
+        // through as the nonsense it is.
+        Err(_) => match raw.parse::<f64>() {
+            Ok(value) if value.is_finite() && value >= 0.0 && value < u64::MAX as f64 => {
+                value.round() as u64
+            }
+            _ => return raw.to_string(),
+        },
+    };
+
+    let seconds = ms / 1000;
+    let (minutes, seconds) = (seconds / 60, seconds % 60);
+    let (hours, minutes) = (minutes / 60, minutes % 60);
+    match (hours, minutes) {
+        (0, 0) if ms < 1000 => format!("{ms}ms"),
+        (0, 0) => format!("{seconds}s"),
+        (0, _) => format!("{minutes}m {seconds}s"),
+        _ => format!("{hours}h {minutes}m"),
+    }
+}
+
+/// The columns of `history`, paired with the row `history_row` builds — the two are
+/// positional, so they are declared next to each other and a test holds them the same
+/// width.
+const HISTORY_COLUMNS: [&str; 6] = [
+    "SYNC JOB ID",
+    "STATUS",
+    "TRIGGER",
+    "STARTED",
+    "DURATION",
+    "BRANCH",
+];
+
+/// The column a row has to fill to be usable at all: without an id, nothing in it can
+/// be passed to `logs` or `result`.
+const ID_COLUMN: usize = 0;
+
+/// One run as a table row, under the names the list endpoint publishes.
+///
+/// The columns are the six a run is identified and judged by; the rest of the record —
+/// `gitRef`, `failedPhase`, `lastStage`, per-phase timings, manifest counts — is in
+/// `--json`, which is where a table would stop being one.
+fn history_row(run: &Value) -> Vec<String> {
+    // Every cell through `one_cell`: these are server strings landing in a laid-out
+    // table, where an interior newline breaks the row and an unbounded value pushes the
+    // other columns off the screen. Padding goes with them, so a `COMPLETED ` cannot sit
+    // beside a `COMPLETED` and read as two outcomes.
+    let cell = |field: &str| one_cell(&output::field(run, field));
+
+    vec![
+        cell("syncJobId"),
+        // Five values here, not the two the status endpoint calls terminal: a listed run
+        // can also be CANCELLED or UNKNOWN, and nothing in this command acts on them —
+        // it shows what the row says.
+        cell("status"),
+        cell("trigger"),
+        cell("startedAt"),
+        // `durationMs` ONLY — never `completedAt` minus `startedAt`. Those two stamps
+        // are written by different processes, so their difference can disagree with the
+        // server's own figure and, for a run that fails moments after starting, be
+        // negative. A run that reports no `durationMs` gets an empty cell, which is the
+        // honest answer; a computed one would be a plausible wrong number.
+        human_duration_ms(&cell("durationMs")),
+        cell("branchName"),
+    ]
+}
+
+/// One line of a sync's timeline, read out of whichever fields the entry carried.
+///
+/// Reading is separated from printing so it can be tested: colour is applied at the
+/// call site, where the terminal is, and asserting on ANSI escapes would test
+/// owo-colors rather than this.
+struct LogEntry {
+    /// When it happened; blank when the entry did not say.
+    time: String,
+    /// The phase it belongs to. Blank stays blank rather than becoming empty brackets,
+    /// for the same reason `status_label` does not print them either.
+    phase: String,
+    /// How long that phase took, on the lines that measure one — the timings are half
+    /// of what makes this a timeline rather than a list of remarks.
+    duration: String,
+    message: String,
+    /// Whether this entry is a failure, so the line can be red. A level this build
+    /// does not recognise leaves it plain: colouring an unknown level red would
+    /// announce a failure the server never reported.
+    error: bool,
+}
+
+fn log_entry(value: &Value) -> LogEntry {
+    LogEntry {
+        time: one_cell(&output::field(value, "timestamp")),
+        phase: one_cell(&output::field(value, "phase")),
+        duration: human_duration_ms(&one_cell(&output::field(value, "durationMs"))),
+        // Kept whole, unlike the prefix beside it and the poll label's `one_line`: this
+        // is the failure text itself, printed once, and a dbt compile error means its
+        // line breaks. Collapsing them would apply the label's rule where it does harm —
+        // so the control characters `one_line` would have taken with the newlines are
+        // dropped deliberately instead.
+        message: printable(output::field(value, "message").trim_end()),
+        // `error` is the level the endpoint documents beside `info`. The other two cost
+        // nothing and lean the safe way: colour is not a decision anything acts on, so a
+        // level this build has not met yet is better red than silently ordinary.
+        error: matches!(
+            output::field(value, "level")
+                .trim()
+                .to_ascii_uppercase()
+                .as_str(),
+            "ERROR" | "FATAL" | "CRITICAL"
+        ),
+    }
+}
+
+/// A failure's text is red wherever it lands, the raw-entry fallback below included:
+/// the entry this build understood least is the last place to drop the signal that it
+/// is a failure.
+fn paint_failure(text: String, error: bool) -> String {
+    if error {
+        text.red().to_string()
+    } else {
+        text
+    }
+}
+
+/// One rendered line of the timeline.
+///
+/// The colour lives here rather than at the call site, next to the choice of what to
+/// show: the fallback below has to drop a prefix as well as swap the text, and those
+/// are one decision rather than two.
+fn log_line(value: &Value) -> String {
+    let LogEntry {
+        time,
+        phase,
+        duration,
+        message,
+        error,
+    } = log_entry(value);
+
+    // The text is why somebody ran this command, so an entry this build cannot find it
+    // in is shown as it arrived rather than dropped — and on its own: the raw JSON
+    // already carries the timestamp and the phase that would otherwise prefix it, and
+    // `serde_json` escapes the control characters `printable` exists to drop.
+    if util::is_blank(&message) {
+        return paint_failure(value.to_string(), error);
+    }
+
+    let mut parts = Vec::new();
+    if !util::is_blank(&time) {
+        parts.push(time.dimmed().to_string());
+    }
+    // The phase and its timing share one bracket — metadata on one side, the line's own
+    // text on the other, so a multi-line failure is not interrupted by either. Whichever
+    // of the two is missing is simply absent: no empty brackets, for the reason
+    // `status_label` prints none, and no bare parenthesis where a timing would go.
+    let labels: Vec<String> = [phase, duration]
+        .into_iter()
+        .filter(|label| !util::is_blank(label))
+        .collect();
+    if !labels.is_empty() {
+        parts.push(format!("[{}]", labels.join(" ")).cyan().to_string());
+    }
+    parts.push(paint_failure(message, error));
+
+    parts.join(" ")
+}
+
 /// A result is available only when it is a non-empty object. Some deployments return
 /// `200 null` or `{}` while the completed workflow is still publishing its result.
 fn available_result(result: Option<Value>) -> Option<Value> {
@@ -316,23 +586,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     output::print_json(&wait_json(&started, &status, &branch_name, None));
                 }
 
-                // The only signal a CI gate needs is the non-zero exit. The message
-                // carries the workflow's own reason, which is what a human reading
-                // the failed job actually wants — and `is_blank` rather than `is_empty`
-                // because a reason of blanks would fill the slot without answering it,
-                // on the one line somebody reads when the gate goes red.
-                // Collapsed like the build failure in `deployments`: a dbt reason is a
-                // compile or warehouse error that arrives multi-line, and this is a
-                // `bail!` whose chain `main` renders on one line with `{err:#}`.
-                let error = util::one_line(&output::field(&status, "error"), util::REASON_LIMIT);
-                bail!(
-                    "dbt sync {sync_job_id} failed: {}",
-                    if util::is_blank(&error) {
-                        "(no reason reported)".to_string()
-                    } else {
-                        error
-                    }
-                );
+                return Err(failure(deployment, &sync_job_id, &status));
             }
 
             // COMPLETED from here on, so the result is a value rather than a
@@ -424,19 +678,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 let status = wait_for_sync(&api, deployment, &sync_job_id, timeout, poll).await?;
                 print_status(ctx.json, &status);
                 if util::status_of(&status, "status") == FAILED {
-                    // Collapsed like the build failure in `deployments`: a dbt reason is a
-                    // compile or warehouse error that arrives multi-line, and this is a
-                    // `bail!` whose chain `main` renders on one line with `{err:#}`.
-                    let error =
-                        util::one_line(&output::field(&status, "error"), util::REASON_LIMIT);
-                    bail!(
-                        "dbt sync {sync_job_id} failed: {}",
-                        if util::is_blank(&error) {
-                            "(no reason reported)".to_string()
-                        } else {
-                            error
-                        }
-                    );
+                    return Err(failure(deployment, &sync_job_id, &status));
                 }
 
                 return Ok(());
@@ -467,6 +709,96 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 ),
             }
         }
+        Cmd::Logs {
+            deployment,
+            sync_job_id,
+        } => {
+            let path = format!("{}/{sync_job_id}/logs", base(deployment));
+            // 404 is the tenant answering rather than a transport failure, and the three
+            // things it can mean are all actionable — so say them, the way `status` does,
+            // instead of leaving a bare status line to be interpreted.
+            let Some(res) = api.get_optional(&path, &Vec::new()).await? else {
+                bail!(
+                    "no logs for dbt sync {sync_job_id} on deployment {deployment}. It may \
+                     belong to another deployment, have aged out, or this tenant may not \
+                     serve the dbt sync history endpoints yet"
+                );
+            };
+
+            if ctx.json {
+                output::print_json(&res);
+
+                return Ok(());
+            }
+
+            let entries = output::items(&res);
+            if entries.is_empty() {
+                // Not a failure: a sync that has only just started has no timeline yet.
+                eprintln!("{}", "No log entries".dimmed());
+
+                return Ok(());
+            }
+
+            for entry in entries {
+                println!("{}", log_line(&entry));
+            }
+        }
+        Cmd::History {
+            deployment,
+            status,
+            trigger,
+            first,
+            after,
+        } => {
+            let mut query = Vec::new();
+            // Sent as given, unchecked against a list: the two vocabularies are the
+            // server's, and a filter this build has not heard of is one the server can
+            // still honour, where a list hard-coded here would refuse a run this tenant
+            // has. Only the empty string is refused, and at parse time — `push` does not
+            // drop it, it sends `status=`, and what that selects is not ours to guess.
+            //
+            // The case is the server's as well, and the two vocabularies do not share it
+            // — statuses upper, triggers lower. Hence the help spelling both out and
+            // saying so: a mis-cased value is the one mistake that may come back as an
+            // empty table rather than as a complaint, and an empty table reads as an
+            // answer.
+            util::push(&mut query, "status", &status);
+            util::push(&mut query, "trigger", &trigger);
+            util::push(&mut query, "first", &first);
+            util::push(&mut query, "after", &after);
+            let Some(res) = api.get_optional(&base(deployment), &query).await? else {
+                bail!(
+                    "no dbt sync history for deployment {deployment}. The deployment may \
+                     not exist or may not be visible to this credential, or this tenant \
+                     may not serve the dbt sync history endpoints yet"
+                );
+            };
+
+            if ctx.json {
+                output::print_json(&res);
+
+                return Ok(());
+            }
+
+            let rows: Vec<Vec<String>> = output::items(&res).iter().map(history_row).collect();
+            // A page whose rows name no sync at all is one this build could not read:
+            // every run has an id, and a row without one cannot be passed on to `logs` or
+            // `result` either. Printed as blanks it would read as "these syncs are empty"
+            // rather than "this CLI did not understand them", so say so and point at
+            // `--json`, which answers whatever the columns cannot name.
+            //
+            // Keyed on the id rather than on every cell being blank, which a single
+            // filled column was enough to defeat. It still does not claim to catch ONE
+            // renamed field: a column of blanks beside filled ones is visible on its own,
+            // and a warning per column would fire on every legitimately empty one.
+            if !rows.is_empty() && rows.iter().all(|row| util::is_blank(&row[ID_COLUMN])) {
+                eprintln!(
+                    "warning: these sync rows name no sync job id — re-run with --json, \
+                     or update the CLI with `cube update`"
+                );
+            }
+            output::table(&HISTORY_COLUMNS, rows);
+        }
         Cmd::Cancel {
             deployment,
             sync_job_id,
@@ -489,6 +821,231 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// The cell a named column holds, so a test names the column rather than an index
+    /// that a reordering would quietly point somewhere else.
+    fn cell(row: &[String], column: &str) -> String {
+        let index = HISTORY_COLUMNS
+            .iter()
+            .position(|header| *header == column)
+            .unwrap_or_else(|| panic!("no {column} column"));
+
+        row[index].clone()
+    }
+
+    #[test]
+    fn a_history_row_fills_every_column() {
+        // Positional, so a column added to one and not the other would shift every cell
+        // after it into the wrong header.
+        let row = history_row(&json!({}));
+        assert_eq!(row.len(), HISTORY_COLUMNS.len());
+        assert!(row.iter().all(|value| value.is_empty()));
+        // And the column `history`'s warning reads is the one it means.
+        assert_eq!(HISTORY_COLUMNS[ID_COLUMN], "SYNC JOB ID");
+    }
+
+    #[test]
+    fn a_run_renders_the_record_the_list_endpoint_publishes() {
+        let run = json!({
+            "syncJobId": "abc", "deploymentId": 42, "status": "COMPLETED", "trigger": "api",
+            "branchName": "dbt-sync/main-1", "gitRef": "feature/orders",
+            "startedAt": "2026-08-24T10:00:00Z", "completedAt": "2026-08-24T10:15:12Z",
+            "durationMs": 912_345, "stats": { "cubeCount": 12 }
+        });
+        assert_eq!(
+            history_row(&run),
+            vec![
+                "abc",
+                "COMPLETED",
+                "api",
+                "2026-08-24T10:00:00Z",
+                "15m 12s",
+                "dbt-sync/main-1"
+            ]
+        );
+        // A run still in flight reports no duration and no branch of its own yet; the
+        // cells it cannot fill stay empty rather than being derived from its stamps.
+        let running = json!({
+            "syncJobId": "abc", "status": "RUNNING", "trigger": "webhook",
+            "startedAt": "2026-08-24T10:00:00Z", "durationMs": null, "completedAt": null
+        });
+        assert_eq!(cell(&history_row(&running), "DURATION"), "");
+        assert_eq!(cell(&history_row(&running), "STATUS"), "RUNNING");
+        // The two values a listed run can carry that the status endpoint never reports:
+        // nothing here acts on a status, so they pass through as they arrived.
+        for status in ["CANCELLED", "UNKNOWN"] {
+            let row = history_row(&json!({"syncJobId": "abc", "status": status}));
+            assert_eq!(cell(&row, "STATUS"), status);
+        }
+        // And a padded status names the state it reports, like everywhere else here.
+        assert_eq!(
+            cell(&history_row(&json!({"status": " FAILED\n"})), "STATUS"),
+            "FAILED"
+        );
+    }
+
+    #[test]
+    fn a_duration_is_the_servers_own_figure_or_nothing() {
+        // The trap this column exists to avoid: both stamps present, no `durationMs`.
+        // They are written by different processes, so their difference can disagree with
+        // the server's figure and — for a run that fails moments after starting — be
+        // negative. An empty cell is the honest answer; a computed one would be a
+        // plausible wrong number.
+        let stamps_only = json!({
+            "syncJobId": "abc",
+            "startedAt": "2026-08-24T10:00:00Z",
+            "completedAt": "2026-08-24T10:05:00Z"
+        });
+        assert_eq!(cell(&history_row(&stamps_only), "DURATION"), "");
+    }
+
+    #[test]
+    fn a_duration_reads_as_time() {
+        // A sync runs for minutes, so the unit has to survive being read off a table.
+        assert_eq!(human_duration_ms("999"), "999ms");
+        assert_eq!(human_duration_ms("1000"), "1s");
+        assert_eq!(human_duration_ms("59999"), "59s");
+        assert_eq!(human_duration_ms("60000"), "1m 0s");
+        assert_eq!(human_duration_ms("912345"), "15m 12s");
+        assert_eq!(human_duration_ms("3600000"), "1h 0m");
+        assert_eq!(human_duration_ms("5430000"), "1h 30m");
+        // Serialised as a float, which is still a duration.
+        assert_eq!(human_duration_ms("912345.0"), "15m 12s");
+        // Not a count of milliseconds: shown as it arrived rather than as a confident
+        // `0s`, which would report a run that took a quarter of an hour as instant.
+        assert_eq!(human_duration_ms(""), "");
+        assert_eq!(human_duration_ms("  "), "");
+        assert_eq!(human_duration_ms("-1"), "-1");
+        assert_eq!(human_duration_ms("PT15M"), "PT15M");
+        // An `as` cast saturates, so this has to be rejected before it becomes a
+        // confident five-billion-hour duration.
+        assert_eq!(human_duration_ms("1e30"), "1e30");
+        assert_eq!(human_duration_ms("inf"), "inf");
+    }
+
+    #[test]
+    fn a_failure_names_the_reason_and_where_the_phase_is() {
+        let message = failure(
+            42,
+            "sync-1",
+            &json!({"error": "Compilation Error in model fct_orders\n  depends on 'stg_orders'"}),
+        )
+        .to_string();
+        // One line, because `main` renders the chain with `{err:#}`.
+        assert_eq!(
+            message,
+            "dbt sync sync-1 failed: Compilation Error in model fct_orders depends on \
+             'stg_orders'. See which phase failed with `cube dbt logs 42 'sync-1'`"
+        );
+        // A reason of blanks fills the slot without answering it, so it is not a reason —
+        // and this is the case where the second sentence is the only answer there is.
+        for status in [json!({}), json!({"error": "   "})] {
+            let message = failure(42, "sync-1", &status).to_string();
+            assert!(message.contains("(no reason reported)"), "{message}");
+            assert!(message.contains("cube dbt logs 42 'sync-1'"), "{message}");
+        }
+        // Quoted, like every other suggested command here: an id is opaque in practice,
+        // but these are copied out of CI logs without being reread.
+        assert!(failure(42, "a;rm -rf b", &json!({}))
+            .to_string()
+            .contains("`cube dbt logs 42 'a;rm -rf b'`"));
+    }
+
+    #[test]
+    fn a_log_entry_says_only_what_it_carried() {
+        let entry = log_entry(&json!({
+            "timestamp": "2026-08-24T10:00:01Z",
+            "phase": "dbt-compile",
+            "level": "info",
+            "stream": "system",
+            "message": "Parsing dbt project\n"
+        }));
+        assert_eq!(entry.time, "2026-08-24T10:00:01Z");
+        assert_eq!(entry.phase, "dbt-compile");
+        // A line that measures no phase carries no timing, rather than a `0ms` it would
+        // read as having measured one.
+        assert_eq!(entry.duration, "");
+        // Trailing whitespace only: this is the failure text itself, printed once, and a
+        // dbt compile error means its line breaks — unlike a poll label, which repeats.
+        assert_eq!(entry.message, "Parsing dbt project");
+        assert!(!entry.error);
+        // A null phase — the endpoint's shape for a line that belongs to none — stays
+        // blank, so the line cannot render as empty brackets.
+        assert!(log_entry(&json!({"phase": null})).phase.is_empty());
+        assert!(log_entry(&json!({"phase": "  "})).phase.is_empty());
+        // Failure levels colour the line; anything else is left plain rather than
+        // announcing a failure the server never reported.
+        for level in ["error", "ERROR", " Fatal ", "critical"] {
+            assert!(log_entry(&json!({"level": level})).error, "{level}");
+        }
+        for level in ["warn", "WARNING", "info", "", "  "] {
+            assert!(!log_entry(&json!({"level": level})).error, "{level}");
+        }
+    }
+
+    #[test]
+    fn a_log_line_carries_the_phase_and_its_timing() {
+        let line = log_line(&json!({
+            "timestamp": "2026-08-24T10:00:01Z",
+            "level": "info",
+            "phase": "dbt-compile",
+            "stream": "system",
+            "message": "dbt compile finished",
+            "durationMs": 1_200
+        }));
+        assert!(line.contains("2026-08-24T10:00:01Z"), "{line}");
+        // One bracket for both, so a multi-line failure below is interrupted by neither.
+        assert!(line.contains("[dbt-compile 1s]"), "{line}");
+        // Uncoloured, so the text arrives verbatim rather than wrapped.
+        assert!(line.ends_with("dbt compile finished"), "{line}");
+        // Either half alone still reads, and neither absent leaves a hole.
+        assert!(log_line(&json!({"phase": "dbt-deps", "message": "x"})).contains("[dbt-deps]"));
+        assert!(log_line(&json!({"durationMs": 340, "message": "x"})).contains("[340ms]"));
+        let bare = log_line(&json!({"phase": " ", "durationMs": null, "message": "x"}));
+        assert!(!bare.contains('['), "no empty brackets: {bare}");
+        assert!(bare.ends_with('x'), "{bare}");
+    }
+
+    #[test]
+    fn an_entry_whose_text_this_build_cannot_find_is_shown_as_it_arrived() {
+        // Exactly the entry, once: the JSON already carries whatever a prefix would
+        // repeat, so it is printed alone rather than after a timestamp and a phase.
+        let unknown = json!({"ts": "2026-08-24T10:00:01Z", "detail": "a newer shape"});
+        assert_eq!(log_line(&unknown), unknown.to_string());
+        // A failure keeps its colour even here — the entry this build understood least is
+        // the last place to drop the signal that it is one.
+        let failed = json!({"level": "error", "detail": "no message field"});
+        let line = log_line(&failed);
+        assert!(line.contains(&failed.to_string()), "{line}");
+        assert_ne!(line, failed.to_string(), "still coloured: {line}");
+    }
+
+    #[test]
+    fn server_text_cannot_drive_the_terminal() {
+        // dbt output and warehouse errors are text this CLI did not write, and an ESC
+        // sequence in one can retitle a window, move the cursor, or overwrite the lines
+        // above it in a CI log. The line breaks a compile error means are kept; the rest
+        // of the control characters are not.
+        let entry = log_entry(&json!({
+            "phase": "dbt-compile\u{1b}[2J",
+            "message": "Compilation Error\n\u{1b}]0;retitled\u{7}  in model fct_orders\tx"
+        }));
+        assert_eq!(entry.phase, "dbt-compile[2J");
+        assert_eq!(
+            entry.message,
+            "Compilation Error\n]0;retitled  in model fct_orders\tx"
+        );
+        // The same for a cell, which is one line as well: a newline in a value would
+        // otherwise break the row it sits in, and an unbounded one the whole layout.
+        let row = history_row(&json!({
+            "branchName": "dbt-sync/a\u{1b}[2J\nb",
+            "trigger": "T".repeat(500)
+        }));
+        assert_eq!(cell(&row, "BRANCH"), "dbt-sync/a[2J b");
+        let trigger = cell(&row, "TRIGGER");
+        assert!(trigger.ends_with('…'), "bounded: {trigger}");
+        assert_eq!(trigger.chars().count(), CELL_LIMIT + 1);
+    }
 
     #[test]
     fn only_nonempty_objects_are_results() {
