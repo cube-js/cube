@@ -633,7 +633,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       throw new Error('Unload is not configured');
     }
 
-    const types = await this.queryColumnTypes(`(${sql})`, params, { requestId: options?.requestId });
+    const types = await this.queryColumnTypes(`(${sql})`, params, { requestId: options.requestId });
     const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket.bucketName);
     const exportPrefix = path ? `${path}/${uuidv4()}` : uuidv4();
 
@@ -648,7 +648,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       ${sql}
     `, params);
 
-    await this.command(formattedQuery, { requestId: options?.requestId });
+    await this.command(formattedQuery, { requestId: options.requestId });
 
     const csvFile = await this.extractUnloadedFilesFromS3(
       {
