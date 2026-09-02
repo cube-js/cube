@@ -82,9 +82,11 @@ PNG and PDF downloads are server-rendered snapshots — Cube re-opens the
 dashboard (or, for a single chart, that chart on its own), waits for rendering
 to finish, and captures the result. This can take up to a couple of minutes
 for large dashboards. The control selections you currently have applied in your
-browser are carried into the export — filters, time grains and [field
-switchers][ref-controls] alike. (CSV is generated from the
-data already loaded in the chart and downloads immediately.)
+browser are carried into a download you start yourself — filters, time
+granularity switchers and [field switchers][ref-controls] alike. A scheduled
+notification has no browser session, so its attachment renders the selections
+configured on the notification instead. (CSV is generated from the data already
+loaded in the chart and downloads immediately.)
 
 Downloading the whole dashboard requires **Manage** permission on the workbook
 that owns it; exporting a single chart requires the **Download data**
