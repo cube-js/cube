@@ -27,11 +27,13 @@ Charts on a published dashboard reflect the most recent published version of the
 
 The dashboard's [filters][ref-controls] come along, so the report opens showing the same slice of data the chart was showing rather than re-running over everything.
 
-They sit in the report's filter bar next to its own filters, in violet, and read the same way — member, operator, value. What is different is that they are not the report's:
+They sit in the report's filter bar next to its own filters, tinted violet to set them apart, and read the same way — member, operator, value. Hovering one says **From dashboard**. What is different is that they are not the report's:
 
-- they apply to the results on screen, and are **not** saved to the report. Publishing the workbook again will not pin them onto the chart for everyone;
-- they cannot be edited here. To change what a viewer can filter by, edit the [filter control][ref-controls] on the dashboard;
+- they apply to the results on screen, and are **not** saved to the report. Publishing the workbook again will not pin them onto the chart for everyone.
+- their values cannot be changed in the workbook. To explore a different value, add your own filter on the same field, or change the dashboard's control and reopen the chart.
 - **Clear filter** on the chip drops it for the rest of the session, and the report re-runs without it. Reopening the chart from the dashboard brings the current values back.
+
+To change what a viewer of the dashboard can filter by, edit the [filter control][ref-controls] there — not the report.
 
 When the report already filters the same field, both filters apply — exactly as they do on the dashboard, so the numbers match the chart you came from. A carried filter that says precisely what the report already says is left out rather than shown twice.
 
