@@ -4,6 +4,7 @@ export async function* responseChunks(res: Response): AsyncIterable<Uint8Array> 
   }
 
   const reader = res.body.getReader();
+
   try {
     while (true) {
       const { done, value } = await reader.read();
