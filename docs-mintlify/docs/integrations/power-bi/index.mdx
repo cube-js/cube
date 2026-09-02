@@ -68,10 +68,24 @@ You can connect a Cube deployment to Power BI using the [SQL API][ref-sql-api]
 as if Cube is a Postgres database. It would provide much more limited functionality
 than the DAX API. However, this is the only option when using Cube Core.
 
+<Note>
+
+When Power BI aggregates a measure of the [`count_distinct`][ref-count-distinct]
+type, it generates SQL that counts `NULL` as one additional distinct value:
+`COUNT(DISTINCT measure) + MAX(CASE WHEN measure IS NULL THEN 1 ELSE 0 END)`.
+Cube does not support counting `NULL` as a distinct value, so it returns the
+distinct count of non-`NULL` values only. Any group that contains a `NULL` comes
+back one lower than Power BI asks for. Groups without `NULL` values are
+unaffected, and a group is never ranked above one with a genuinely higher count,
+so a sorted visual keeps its order except among groups that would otherwise tie.
+
+</Note>
+
 
 [link-powerbi]: https://www.microsoft.com/en-gb/power-platform/products/power-bi/
 [link-powerbi-desktop-vs-service]: https://learn.microsoft.com/en-us/power-bi/fundamentals/service-service-vs-desktop
 [link-powerbi-gateway]: https://learn.microsoft.com/en-us/power-bi/connect-data/service-gateway-onprem
+[ref-count-distinct]: /reference/data-modeling/measures#type
 [ref-dax-api]: /reference/core-data-apis/dax-api
 [ref-integrations-apis]: /admin/connect-to-data/visualization-tools
 [ref-sql-api]: /reference/core-data-apis/sql-api

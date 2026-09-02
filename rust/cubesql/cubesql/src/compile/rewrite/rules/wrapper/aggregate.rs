@@ -5,7 +5,7 @@ use crate::{
             agg_fun_expr, agg_fun_expr_within_group_empty_tail, aggregate, alias_expr,
             analysis::ConstantFolding,
             binary_expr, case_expr, column_expr, cube_scan_wrapper, grouping_set_expr,
-            literal_bool, literal_null, original_expr_name, rewrite,
+            is_null_expr, literal_bool, literal_int, literal_null, original_expr_name, rewrite,
             rewriter::{CubeEGraph, CubeRewrite},
             rules::{members::MemberRules, wrapper::WrapperRules},
             subquery, transforming_chain_rewrite, transforming_rewrite, udaf_expr, wrapped_select,
@@ -462,6 +462,56 @@ impl WrapperRules {
                     "?distinct",
                     "?cube_members",
                     "?replace_agg_type",
+                    "?out_measure_alias",
+                ),
+            ),
+            // TODO: workaround for PowerBI, it uses COUNT(DISTINCT(col)) + MAX(CASE ...) to
+            // count NULLs as a distinct value. We don't support that yet, so don't count
+            // them: fold the MAX(CASE ...) half into a literal 0, which is also what lets
+            // the aggregation keep pushing to Cube instead of falling back to an ungrouped
+            // scan. Keep in sync with "aggregate-function-powerbi-count-distinct-max-case",
+            // whose note carries the effect on results.
+            transforming_chain_rewrite(
+                "wrapper-push-down-powerbi-count-distinct-max-case",
+                wrapper_pushdown_replacer("?aggr_expr", "?context"),
+                vec![
+                    (
+                        "?aggr_expr",
+                        agg_fun_expr(
+                            "Max",
+                            vec![case_expr(
+                                None,
+                                vec![(
+                                    is_null_expr(column_expr("?measure_column")),
+                                    literal_int(1),
+                                )],
+                                Some(literal_int(0)),
+                            )],
+                            "?distinct",
+                            agg_fun_expr_within_group_empty_tail(),
+                        ),
+                    ),
+                    (
+                        "?context",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "WrapperReplacerContextPushToCube:true",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                            "?input_data_source",
+                        ),
+                    ),
+                ],
+                wrapper_pullup_replacer(
+                    alias_expr(literal_int(0), "?out_measure_alias"),
+                    "?context",
+                ),
+                self.transform_powerbi_max_case(
+                    "?aggr_expr",
+                    "?measure_column",
+                    "?cube_members",
                     "?out_measure_alias",
                 ),
             ),
@@ -1273,6 +1323,75 @@ impl WrapperRules {
                 &meta,
                 disable_strict_agg_type_match,
             )
+        }
+    }
+
+    /// The column has to resolve to a Cube measure `is_same_agg_type("countDistinct")`
+    /// accepts, which is `countDistinct` and `countDistinctApprox` but also `number`.
+    /// It does not require the paired COUNT(DISTINCT ...) to be present, so a lone
+    /// MAX(CASE WHEN <number measure> IS NULL ...) folds to 0 as well. Both are true of
+    /// "aggregate-function-powerbi-count-distinct-max-case" as well, and the two must
+    /// keep matching: narrowing one alone would make results depend on whether the query
+    /// has an ORDER BY.
+    fn transform_powerbi_max_case(
+        &self,
+        aggr_expr_var: &'static str,
+        column_var: &'static str,
+        cube_members_var: &'static str,
+        out_measure_alias_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let aggr_expr_var = var!(aggr_expr_var);
+        let column_var = var!(column_var);
+        let cube_members_var = var!(cube_members_var);
+        let out_measure_alias_var = var!(out_measure_alias_var);
+
+        let meta = self.meta_context.clone();
+
+        move |egraph, subst| {
+            let Some(alias) = original_expr_name(egraph, subst[aggr_expr_var]) else {
+                return false;
+            };
+
+            let columns = var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+                .cloned()
+                .collect::<Vec<_>>();
+
+            let Some(member_names_to_expr) = &mut egraph
+                .index_mut(subst[cube_members_var])
+                .data
+                .member_name_to_expr
+            else {
+                return false;
+            };
+
+            let mut found = false;
+            for column in columns {
+                let Some((&(Some(ref member), _, _), _)) =
+                    LogicalPlanData::do_find_member_by_alias(member_names_to_expr, &column.name)
+                else {
+                    continue;
+                };
+
+                let Some(measure) = meta.find_measure_with_name(member) else {
+                    continue;
+                };
+
+                if measure.is_same_agg_type("countDistinct", false) {
+                    found = true;
+                    break;
+                }
+            }
+
+            if !found {
+                return false;
+            }
+
+            subst.insert(
+                out_measure_alias_var,
+                egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(alias))),
+            );
+
+            true
         }
     }
 
