@@ -901,6 +901,7 @@
                   "PUT /api/v1/deployments/{deploymentId}/workbooks/{workbookId}",
                   "DELETE /api/v1/deployments/{deploymentId}/workbooks/{workbookId}",
                   "PUT /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard",
+                  "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread",
                   "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate",
                   "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/publish"
                 ]
@@ -928,6 +929,13 @@
                   "POST /api/v1/deployments/{deploymentId}/workspace/bulk-delete",
                   "POST /api/v1/deployments/{deploymentId}/workspace/bulk-move",
                   "POST /api/v1/deployments/{deploymentId}/workspace/move"
+                ]
+              },
+              {
+                "group": "Users",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "PATCH /api/v1/users/me/settings"
                 ]
               },
               {

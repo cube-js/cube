@@ -33,6 +33,7 @@ tags:
   - name: Workbooks
   - name: Notifications
   - name: Workspace
+  - name: Users
   - name: Users Admin
   - name: User Attributes
   - name: User Attribute Values
@@ -1906,6 +1907,13 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeploymentTokenInput'
+        description: CreateDeploymentTokenInput
+        required: false
       responses:
         '200':
           content:
@@ -2200,6 +2208,37 @@ paths:
                 $ref: '#/components/schemas/WorkbookDashboard'
           description: ''
       summary: Update workbook dashboard
+      tags:
+        - Workbooks
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread:
+    post:
+      operationId: updatePublishedDashboardAiWidgetThread
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePublishedAiWidgetThreadInput'
+        description: UpdatePublishedAiWidgetThreadInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+          description: ''
+      summary: Update published dashboard AI widget thread
       tags:
         - Workbooks
   /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate:
@@ -3822,8 +3861,8 @@ paths:
           [Cube REST API](https://cube.dev/docs/product/apis-integrations/rest-api)).
 
 
-          Tokens expire after ~24 hours (see `expiresAt`). Issue a fresh one per session or
-          scheduled refresh — issuing is idempotent and cheap.
+          Tokens expire after 1 hour (see `expiresAt`). Issue a fresh one per session or scheduled
+          refresh — issuing is idempotent and cheap.
 
 
           Requires Usage Analytics to be enabled for the account, otherwise `404` is returned.
@@ -4116,6 +4155,30 @@ paths:
 
           Reapplying an action a user is already in (deactivating a deactivated user) succeeds as a
           no-op.
+  /api/v1/users/me/settings:
+    patch:
+      operationId: updateMySettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSettingsInput'
+        description: UserSettings
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+      summary: Update my settings
+      tags:
+        - Users
+      x-mint:
+        content: >-
+          Merge a partial patch into the authenticated user's own settings. Omitted fields are left
+          as they are; `sheets` merges field-by-field, and an explicit `null` clears it.
   /api/v1/users/{id}:
     delete:
       operationId: deleteUser
@@ -4883,15 +4946,34 @@ components:
       properties:
         dark:
           $ref: '#/components/schemas/AppThemeScheme'
+          deprecated: true
+          description: 'Deprecated: use palette and logoUrl instead.'
         light:
           $ref: '#/components/schemas/AppThemeScheme'
+          deprecated: true
+          description: 'Deprecated: use palette and logoUrl instead.'
+        logoUrl:
+          type: string
+        palette:
+          $ref: '#/components/schemas/AppThemePalette'
         typography:
           oneOf:
             - $ref: '#/components/schemas/AppThemeTypography'
             - type: 'null'
       required:
+        - palette
+        - logoUrl
         - light
         - dark
+      type: object
+    AppThemeCodePalette:
+      properties:
+        saturation:
+          oneOf:
+            - maximum: 100
+              type: number
+              minimum: 0
+            - type: 'null'
       type: object
     AppThemeFontRef:
       properties:
@@ -4902,6 +4984,77 @@ components:
       required:
         - fontRef
         - fontWeight
+      type: object
+    AppThemePalette:
+      properties:
+        accent:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemePaletteSeed'
+            - type: 'null'
+        base:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemePaletteSeed'
+            - type: 'null'
+        contrastLevel:
+          oneOf:
+            - maximum: 100
+              type: number
+              minimum: 0
+            - type: 'null'
+        pastel:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        surfaceMode:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemeSurfaceMode'
+            - type: 'null'
+        themes:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemePaletteThemes'
+            - type: 'null'
+      type: object
+    AppThemePaletteSeed:
+      properties:
+        color:
+          oneOf:
+            - type: string
+            - type: 'null'
+        hue:
+          oneOf:
+            - maximum: 360
+              type: number
+              minimum: 0
+            - type: 'null'
+        saturation:
+          oneOf:
+            - maximum: 100
+              type: number
+              minimum: 0
+            - type: 'null'
+      type: object
+    AppThemePaletteThemes:
+      properties:
+        code:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemeCodePalette'
+            - type: 'null'
+        danger:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemePaletteSeed'
+            - type: 'null'
+        note:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemePaletteSeed'
+            - type: 'null'
+        success:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemePaletteSeed'
+            - type: 'null'
+        warning:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemePaletteSeed'
+            - type: 'null'
       type: object
     AppThemeScheme:
       properties:
@@ -4922,6 +5075,11 @@ components:
         - contrast
         - logoUrl
       type: object
+    AppThemeSurfaceMode:
+      enum:
+        - neutral
+        - tinted
+      type: string
     AppThemeTypography:
       properties:
         body:
@@ -5380,6 +5538,20 @@ components:
         - git
         - cli
       type: string
+    CreateDeploymentTokenInput:
+      properties:
+        expiresIn:
+          oneOf:
+            - maximum: 86400
+              type: integer
+              minimum: 60
+              description: >-
+                Token lifetime in seconds, between 60 and 86400. Omit to keep the historical default
+                of 24 hours (86400). Callers that hold the token outside a browser session —
+                scripts, BI tools, scheduled jobs — should request a short lifetime and re-issue
+                tokens instead.
+            - type: 'null'
+      type: object
     CreateEmbedGroupInput:
       properties:
         description:
@@ -6463,6 +6635,7 @@ components:
         - FILTER
         - AI
         - TIME_GRAIN
+        - FIELD
         - PARENT
         - SPACER
         - DIVIDER
@@ -6503,6 +6676,7 @@ components:
         - FILTER
         - AI
         - TIME_GRAIN
+        - FIELD
         - PARENT
         - SPACER
         - DIVIDER
@@ -8808,6 +8982,89 @@ components:
         - before
         - after
       type: string
+    Policy:
+      properties:
+        actions:
+          items:
+            enum:
+              - All
+              - DeploymentsManage
+              - DeploymentCreate
+              - DeploymentRead
+              - DeploymentUpdate
+              - DeploymentDelete
+              - SecretsManage
+              - DownloadData
+              - PlaygroundRead
+              - SchemaRead
+              - SchemaUpdate
+              - SchemaUpdateDevBranches
+              - APMRead
+              - PreAggregationBuild
+              - AlertsCreate
+              - AlertsRead
+              - AlertsUpdate
+              - AlertsDelete
+              - AuditLogManage
+              - BillingRead
+              - SqlRunnerRead
+              - DataAssetsRead
+              - DataAssetsManage
+              - CubeNetworkConnect
+              - ReportRead
+              - ReportEdit
+              - ReportManage
+              - WorkbookManage
+              - WorkbookRead
+              - WorkbookEdit
+              - ChatThreadRead
+              - AgentManage
+              - AgentRead
+              - AgentSpaceManage
+              - AgentAdmin
+              - DeploymentAgentRead
+              - OAuthIntegrationsManage
+              - OAuthIntegrationsIssueTokens
+              - McpToolsManage
+              - AIBIDevelop
+              - AIBIExplore
+              - AIBIView
+              - ChartPalettesManage
+              - DashboardThemesManage
+              - AIBIDeveloper
+              - AIBIUser
+              - AIBIViewer
+              - EmbedDeploymentRead
+              - EmbedDashboardRead
+              - FolderRead
+              - FolderEdit
+              - FolderManage
+            type: string
+          type: array
+        resourceType:
+          $ref: '#/components/schemas/PolicyResourceType'
+        resources:
+          items:
+            type: string
+          type: array
+      required:
+        - resourceType
+        - actions
+        - resources
+      type: object
+    PolicyResourceType:
+      enum:
+        - Global
+        - Deployment
+        - Report
+        - ReportFolder
+        - Agent
+        - AgentSpace
+        - Workbook
+        - Dashboard
+        - Folder
+        - ChatThread
+      type: string
     PostTokenBySessionIdInput:
       properties:
         sessionId:
@@ -9137,6 +9394,10 @@ components:
               type: string
         createdBy:
           type: integer
+        currentQueryChecksum:
+          oneOf:
+            - type: string
+            - type: 'null'
         deploymentId:
           type: integer
         description:
@@ -9286,6 +9547,10 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        queryChecksum:
+          oneOf:
+            - type: string
+            - type: 'null'
         refreshedAt:
           oneOf:
             - type: string
@@ -9304,6 +9569,10 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        syncStatus:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementSyncStatus'
+            - type: 'null'
         workbookId:
           type: string
         workbookName:
@@ -9318,6 +9587,12 @@ components:
       enum:
         - GOOGLE_SHEETS
         - EXCEL
+      type: string
+    ReportPlacementSyncStatus:
+      enum:
+        - UP_TO_DATE
+        - CHANGED
+        - UNKNOWN
       type: string
     ReportSnapshot:
       properties:
@@ -9552,6 +9827,29 @@ components:
     SheetsUiSettings:
       properties:
         showAppliedFilters:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+      type: object
+    SheetsUserSettingsInput:
+      properties:
+        autoRunQueryOnChange:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        openExplorationFromSheet:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        revealSheetOnOpen:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        showAppliedFilters:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        suppressDuplicateValues:
           oneOf:
             - type: boolean
             - type: 'null'
@@ -10036,6 +10334,20 @@ components:
               maxLength: 128
             - type: 'null'
       type: object
+    UpdatePublishedAiWidgetThreadInput:
+      properties:
+        checksum:
+          oneOf:
+            - type: string
+            - type: 'null'
+        threadId:
+          type: string
+        widgetId:
+          type: string
+      required:
+        - widgetId
+        - threadId
+      type: object
     UpdateReportInput:
       properties:
         endResultCell:
@@ -10270,6 +10582,15 @@ components:
                   type: string
                 - format: date-time
                   type: string
+            - type: 'null'
+        userPolicies:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/Policy'
+              type: array
+              description: >-
+                The caller's effective resource policies: direct grants, organization-wide grants,
+                and grants inherited from their groups. Only populated by `GET /api/v1/users/me`.
             - type: 'null'
         username:
           type: string
@@ -10685,10 +11006,19 @@ components:
         lastSeenChangelogId:
           oneOf:
             - type: integer
+              deprecated: true
+              description: >-
+                Deprecated and ignored. The changelog now arrives in the notification inbox, which
+                carries its own read state. Accepted for backward compatibility but never read or
+                written.
             - type: 'null'
         locale:
           oneOf:
             - type: string
+            - type: 'null'
+        sheets:
+          oneOf:
+            - $ref: '#/components/schemas/SheetsUserSettingsInput'
             - type: 'null'
         theme:
           oneOf:
