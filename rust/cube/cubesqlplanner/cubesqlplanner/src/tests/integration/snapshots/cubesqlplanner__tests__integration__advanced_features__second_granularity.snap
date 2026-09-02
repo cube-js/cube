@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/integration/advanced_features.rs
+expression: result
+---
+orders__created_at_second | orders__count
+--------------------------+--------------
+2024-01-15 10:00:00       | 1            
+2024-01-15 15:00:00       | 1

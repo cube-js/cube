@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import styles from './CodeTabs.module.css'
 
 const langs = {
@@ -23,6 +23,7 @@ const PREFERRED_LANGS = ['yaml', 'python']
 
 export const CodeTabs = ({ children }) => {
   const containerRef = useRef(null)
+  const scrollAnchorRef = useRef(null)
   const [codeBlocks, setCodeBlocks] = useState([])
   const [selectedTab, setSelectedTab] = useState(null)
   const [isInitialized, setIsInitialized] = useState(false)
@@ -99,7 +100,7 @@ export const CodeTabs = ({ children }) => {
   }, [codeBlocks, isInitialized])
 
   // Update visibility of code blocks based on selected tab
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!containerRef.current || !selectedTab || codeBlocks.length === 0) return
 
     codeBlocks.forEach((block) => {
@@ -107,6 +108,16 @@ export const CodeTabs = ({ children }) => {
         block.wrapper.style.display = block.lang === selectedTab ? 'block' : 'none'
       }
     })
+
+    // Correct scroll when tab heights change across synced CodeTabs instances
+    if (scrollAnchorRef.current) {
+      const newTop = containerRef.current.getBoundingClientRect().top
+      const delta = newTop - scrollAnchorRef.current
+      if (delta !== 0) {
+        window.scrollBy(0, delta)
+      }
+      scrollAnchorRef.current = null
+    }
   }, [selectedTab, codeBlocks])
 
   // Get unique languages maintaining order
@@ -123,6 +134,10 @@ export const CodeTabs = ({ children }) => {
 
   const handleTabClick = useCallback((lang) => {
     if (lang !== selectedTab) {
+      if (containerRef.current) {
+        scrollAnchorRef.current = containerRef.current.getBoundingClientRect().top
+      }
+
       if (lang === 'python' || lang === 'javascript' || lang === 'yaml') {
         localStorage.setItem(STORAGE_KEY, lang)
         window.dispatchEvent(

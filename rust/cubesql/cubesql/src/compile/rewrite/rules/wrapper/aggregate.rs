@@ -5,7 +5,7 @@ use crate::{
             agg_fun_expr, agg_fun_expr_within_group_empty_tail, aggregate, alias_expr,
             analysis::ConstantFolding,
             binary_expr, case_expr, column_expr, cube_scan_wrapper, grouping_set_expr,
-            literal_null, original_expr_name, rewrite,
+            literal_bool, literal_null, original_expr_name, rewrite,
             rewriter::{CubeEGraph, CubeRewrite},
             rules::{members::MemberRules, wrapper::WrapperRules},
             subquery, transforming_chain_rewrite, transforming_rewrite, udaf_expr, wrapped_select,
@@ -395,9 +395,71 @@ impl WrapperRules {
                 ),
                 self.transform_filtered_measure(
                     "?aggr_expr",
-                    "?literal",
+                    Some("?literal"),
                     "?measure_column",
                     "?fun",
+                    "?distinct",
+                    "?cube_members",
+                    "?replace_agg_type",
+                    "?out_measure_alias",
+                ),
+            ),
+            transforming_chain_rewrite(
+                "wrapper-push-down-aggregation-over-filtered-measure-simplified",
+                wrapper_pushdown_replacer("?aggr_expr", "?context"),
+                vec![
+                    (
+                        "?aggr_expr",
+                        agg_fun_expr(
+                            "?fun",
+                            vec![case_expr(
+                                None,
+                                vec![("?case_expr".to_string(), column_expr("?measure_column"))],
+                                // TODO make `ELSE NULL` optional and/or add generic rewrite to normalize it
+                                None,
+                            )],
+                            "?distinct",
+                            agg_fun_expr_within_group_empty_tail(),
+                        ),
+                    ),
+                    (
+                        "?context",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "WrapperReplacerContextPushToCube:true",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                            "?input_data_source",
+                        ),
+                    ),
+                ],
+                alias_expr(
+                    udaf_expr(
+                        PATCH_MEASURE_UDAF_NAME,
+                        vec![
+                            column_expr("?measure_column"),
+                            "?replace_agg_type".to_string(),
+                            wrapper_pushdown_replacer(
+                                // = is a proper way to filter here:
+                                // CASE NULL WHEN ... will return null
+                                // So NULL in ?case_expr is equivalent to hitting ELSE branch
+                                // TODO add "is not null" to cond? just to make is always boolean
+                                binary_expr("?case_expr", "=", literal_bool(true)),
+                                "?context",
+                            ),
+                        ],
+                        "AggregateUDFExprDistinct:false",
+                    ),
+                    "?out_measure_alias",
+                ),
+                self.transform_filtered_measure(
+                    "?aggr_expr",
+                    None,
+                    "?measure_column",
+                    "?fun",
+                    "?distinct",
                     "?cube_members",
                     "?replace_agg_type",
                     "?out_measure_alias",
@@ -1217,17 +1279,19 @@ impl WrapperRules {
     fn transform_filtered_measure(
         &self,
         aggr_expr_var: &'static str,
-        literal_var: &'static str,
+        literal_var: Option<&'static str>,
         column_var: &'static str,
         fun_name_var: &'static str,
+        distinct_var: &'static str,
         cube_members_var: &'static str,
         replace_agg_type_var: &'static str,
         out_measure_alias_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let aggr_expr_var = var!(aggr_expr_var);
-        let literal_var = var!(literal_var);
+        let literal_var = literal_var.map(|v| var!(v));
         let column_var = var!(column_var);
         let fun_name_var = var!(fun_name_var);
+        let distinct_var = var!(distinct_var);
         let cube_members_var = var!(cube_members_var);
         let replace_agg_type_var = var!(replace_agg_type_var);
         let out_measure_alias_var = var!(out_measure_alias_var);
@@ -1236,14 +1300,16 @@ impl WrapperRules {
         let disable_strict_agg_type_match = self.config_obj.disable_strict_agg_type_match();
 
         move |egraph, subst| {
-            match &egraph[subst[literal_var]].data.constant {
-                Some(ConstantFolding::Scalar(_)) => {
-                    // Do nothing
+            if let Some(literal_var) = literal_var {
+                match &egraph[subst[literal_var]].data.constant {
+                    Some(ConstantFolding::Scalar(_)) => {
+                        // Do nothing
+                    }
+                    _ => {
+                        return false;
+                    }
                 }
-                _ => {
-                    return false;
-                }
-            }
+            };
 
             let Some(alias) = original_expr_name(egraph, subst[aggr_expr_var]) else {
                 return false;
@@ -1253,80 +1319,89 @@ impl WrapperRules {
                 .cloned()
                 .collect::<Vec<_>>()
             {
-                let call_agg_type = MemberRules::get_agg_type(Some(&fun), false);
-
-                let column_iter = var_iter!(egraph[subst[column_var]], ColumnExprColumn)
-                    .cloned()
-                    .collect::<Vec<_>>();
-
-                if let Some(member_names_to_expr) = &mut egraph
-                    .index_mut(subst[cube_members_var])
-                    .data
-                    .member_name_to_expr
+                for distinct in
+                    var_iter!(egraph[subst[distinct_var]], AggregateFunctionExprDistinct)
+                        .cloned()
+                        .collect::<Vec<_>>()
                 {
+                    let call_agg_type = MemberRules::get_agg_type(Some(&fun), distinct);
+
+                    let column_iter = var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+                        .cloned()
+                        .collect::<Vec<_>>();
+
+                    let Some(member_names_to_expr) = &mut egraph
+                        .index_mut(subst[cube_members_var])
+                        .data
+                        .member_name_to_expr
+                    else {
+                        continue;
+                    };
+
                     for column in column_iter {
-                        if let Some((&(Some(ref member), _, _), _)) =
+                        let Some((&(Some(ref member), _, _), _)) =
                             LogicalPlanData::do_find_member_by_alias(
                                 member_names_to_expr,
                                 &column.name,
                             )
+                        else {
+                            continue;
+                        };
+
+                        let Some(measure) = meta.find_measure_with_name(member) else {
+                            continue;
+                        };
+
+                        if !measure.allow_add_filter(call_agg_type.as_deref()) {
+                            continue;
+                        }
+
+                        let Some(call_agg_type) = &call_agg_type else {
+                            // call_agg_type is None, rewrite as is
+                            Self::insert_patch_measure(
+                                egraph,
+                                subst,
+                                column,
+                                None,
+                                alias,
+                                None,
+                                Some(replace_agg_type_var),
+                                out_measure_alias_var,
+                            );
+
+                            return true;
+                        };
+
+                        if measure.is_same_agg_type(call_agg_type, disable_strict_agg_type_match) {
+                            Self::insert_patch_measure(
+                                egraph,
+                                subst,
+                                column,
+                                None,
+                                alias,
+                                None,
+                                Some(replace_agg_type_var),
+                                out_measure_alias_var,
+                            );
+
+                            return true;
+                        }
+
+                        if measure
+                            .allow_replace_agg_type(call_agg_type, disable_strict_agg_type_match)
                         {
-                            if let Some(measure) = meta.find_measure_with_name(member) {
-                                if !measure.allow_add_filter(call_agg_type.as_deref()) {
-                                    continue;
-                                }
+                            Self::insert_patch_measure(
+                                egraph,
+                                subst,
+                                column,
+                                Some(call_agg_type.clone()),
+                                alias,
+                                None,
+                                Some(replace_agg_type_var),
+                                out_measure_alias_var,
+                            );
 
-                                let Some(call_agg_type) = &call_agg_type else {
-                                    // call_agg_type is None, rewrite as is
-                                    Self::insert_patch_measure(
-                                        egraph,
-                                        subst,
-                                        column,
-                                        None,
-                                        alias,
-                                        None,
-                                        Some(replace_agg_type_var),
-                                        out_measure_alias_var,
-                                    );
-
-                                    return true;
-                                };
-
-                                if measure
-                                    .is_same_agg_type(call_agg_type, disable_strict_agg_type_match)
-                                {
-                                    Self::insert_patch_measure(
-                                        egraph,
-                                        subst,
-                                        column,
-                                        None,
-                                        alias,
-                                        None,
-                                        Some(replace_agg_type_var),
-                                        out_measure_alias_var,
-                                    );
-
-                                    return true;
-                                }
-
-                                if measure.allow_replace_agg_type(
-                                    call_agg_type,
-                                    disable_strict_agg_type_match,
-                                ) {
-                                    Self::insert_patch_measure(
-                                        egraph,
-                                        subst,
-                                        column,
-                                        Some(call_agg_type.clone()),
-                                        alias,
-                                        None,
-                                        Some(replace_agg_type_var),
-                                        out_measure_alias_var,
-                                    );
-
-                                    return true;
-                                }
-                            }
+                            return true;
                         }
                     }
                 }

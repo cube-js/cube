@@ -1,4 +1,4 @@
-import { TableStructure } from '@cubejs-backend/base-driver';
+import { QueuePriority, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
 import { QueryCache, QueryWithParams } from './QueryCache';
 import {
@@ -190,33 +190,26 @@ export class PreAggregationLoadCache {
     return this.versionEntries[redisKey];
   }
 
-  public async keyQueryResult(sqlQuery: QueryWithParams, waitForRenew: boolean, priority: number) {
-    const [query, values, queryOptions]: QueryWithParams = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery, [], {}];
+  public async keyQueryResult(sqlQuery: QueryWithParams, waitForRenew: boolean, priority: QueuePriority) {
+    const memoKey = this.queryCache.refreshKeyCacheKey(sqlQuery, this.dataSource);
 
-    if (!this.queryResults[this.queryCache.queryRedisKey([query, values])]) {
-      this.queryResults[this.queryCache.queryRedisKey([query, values])] = await this.queryCache.cacheQueryResult(
-        query,
-        values,
-        [query, values],
+    if (!this.queryResults[memoKey]) {
+      this.queryResults[memoKey] = await this.queryCache.cacheRefreshKeyResult(
+        sqlQuery,
         60 * 60,
         {
-          renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold
-            || queryOptions?.renewalThreshold || 2 * 60,
-          renewalKey: [query, values],
           waitForRenew,
           priority,
           requestId: this.requestId,
           dataSource: this.dataSource,
-          useInMemory: true,
-          external: queryOptions?.external
         }
       );
     }
-    return this.queryResults[this.queryCache.queryRedisKey([query, values])];
+    return this.queryResults[memoKey];
   }
 
-  public hasKeyQueryResult(keyQuery) {
-    return !!this.queryResults[this.queryCache.queryRedisKey(keyQuery)];
+  public hasKeyQueryResult(keyQuery: QueryWithParams) {
+    return !!this.queryResults[this.queryCache.refreshKeyCacheKey(keyQuery, this.dataSource)];
   }
 
   public async getQueryStage(stageQueryKey) {

@@ -1,0 +1,99 @@
+---
+title: Chart types
+description: Overview of all built-in chart types available in Cube workbooks.
+---
+
+Cube includes a library of built-in chart types covering the most common visualization patterns. Each type is designed for specific data shapes — choose the one that best fits your query structure and the question you're answering.
+
+- [Bar](/docs/explore-analyze/charts/chart-types/bar)
+- [Line](/docs/explore-analyze/charts/chart-types/line)
+- [Area](/docs/explore-analyze/charts/chart-types/area)
+- [Scatter](/docs/explore-analyze/charts/chart-types/scatter)
+- [Pie & donut](/docs/explore-analyze/charts/chart-types/pie)
+- [Sankey](/docs/explore-analyze/charts/chart-types/sankey)
+- [Heatmap](/docs/explore-analyze/charts/chart-types/heatmap)
+- [Boxplot](/docs/explore-analyze/charts/chart-types/boxplot)
+- [Table](/docs/explore-analyze/charts/chart-types/table)
+- [KPI](/docs/explore-analyze/charts/chart-types/kpi)
+- [Map](/docs/explore-analyze/charts/chart-types/map)
+- [HTML](/docs/explore-analyze/charts/chart-types/html)
+
+For configuration options that apply across chart types — axes, color, series settings, tooltips — see [Configure charts](/docs/explore-analyze/charts/configuration).
+
+## Recommended chart type
+
+When your query returns a result, Cube outlines the one chart type that best fits it and labels it
+**Recommended**. It is a suggestion: every other available type stays selectable, and the outline
+yields as soon as you pick a type in that picker.
+
+Cube never applies a chart type for you. The recommendation is always only outlined, wherever the
+picker appears, and choosing a type is always your action.
+
+### What Cube looks at
+
+The recommendation reads the shape of your query and its result: how many measures, dimensions and
+time dimensions you selected, how many distinct values each dimension has, and how long the
+category labels are. It is computed in your browser and is not saved — the suggestion lasts for the
+current session only.
+
+Where a threshold is involved, it comes from
+[Draco](https://idl.cs.washington.edu/papers/draco/) (Moritz et al., *Formalizing Visualization
+Design Knowledge as Constraints*, IEEE VIS 2018), which encodes established visualization research
+as rules: a category axis becomes crowded past 12 values, a color or stacking channel saturates
+past 10 series, and no axis reads past 30 values.
+
+One number is Cube's own rather than Draco's: a mean label length past **16 characters** counts as
+long.
+
+No threshold is applied to the number of rows. A few rules read the row count directly — a KPI
+needs exactly one row, a heatmap needs its grid at least half filled — but none of them treats "too
+many rows" as a reason to recommend a different chart, because the row count follows the
+granularity you chose rather than the shape of your query.
+
+### The conditions
+
+Cube first checks whether the query disqualifies every chart, and recommends the
+[table](/docs/explore-analyze/charts/chart-types/table) if it does:
+
+| Recommendation | When |
+| -- | -- |
+| **Table** | The query has no measure, two time dimensions, three or more dimensions, or a category past 30 values |
+
+A query meeting any of these has no chart encoding that reads well, so the table is the honest
+answer. [Maps](/docs/explore-analyze/charts/chart-types/map) are the exception and are still
+recommended over the table — a map has no category axis to crowd, so a large number of plotted
+places is normal rather than unreadable.
+
+Otherwise Cube checks these in order and takes the first that matches:
+
+| Recommendation | When |
+| -- | -- |
+| **Map** | The query contains latitude and longitude |
+| **KPI** | One measure, no dimensions, and a single row |
+| **Line** | A measure over a time dimension, optionally split by one category of up to 10 values |
+| **Scatter** | Two or more measures with no time dimension, across one category or several rows — the shape for correlating them |
+| **Bar (stacked)** | One measure split by two categories, the first up to 12 values and the second up to 10 |
+| **Heatmap** | One measure split by two categories, both past those bounds — the first past 12 values and the second past 10 — whose combinations fill at least half the grid |
+| **Bar** | One measure across up to 12 categories whose labels average 16 characters or fewer |
+| **Bar (horizontal)** | The same, where the labels are longer or the categories run past 12 |
+
+The two [bar](/docs/explore-analyze/charts/chart-types/bar) rows are variants of the same chart
+type, not separate ones.
+
+Pie, sankey, area, boxplot and HTML are never recommended — pick them yourself. Pie's shape, one measure
+across a few categories, is the one Bar already answers, and a bar chart compares those values more
+accurately. All five stay available in the picker like any other chart type.
+
+### When nothing is recommended
+
+Cube suppresses the recommendation rather than guessing. You will see no outline when:
+
+- no rule matches the query cleanly;
+- a measure over time is split into 11 to 30 series — too many for a color channel, too few to give
+  up on;
+- a value it needs is still unknown, such as the number of distinct values in a dimension;
+- the result came back empty, so there is nothing to draw;
+- the result was truncated by a row limit, so the counts it would read are incomplete;
+- you have picked a type by hand in the picker you are looking at. The outline returns the next
+  time you open it — including on the type you applied, since Cube marks the best fit whether or
+  not it is already on screen.

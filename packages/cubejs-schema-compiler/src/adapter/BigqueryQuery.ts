@@ -200,21 +200,6 @@ export class BigqueryQuery extends BaseQuery {
    * Overridden from BaseQuery to support BigQuery strict data types for
    * joining conditions (note timeStampCast)
    */
-  public override runningTotalDateJoinCondition() {
-    return this.timeDimensions
-      .map(
-        d => [
-          d,
-          (_dateFrom: string, dateTo: string, dateField: string, dimensionDateFrom: string, _dimensionDateTo: string) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${this.timeStampCast(dateTo)}`
-        ]
-      );
-  }
-
-  /**
-   * Should be protected, but BaseQuery is in js
-   * Overridden from BaseQuery to support BigQuery strict data types for
-   * joining conditions (note timeStampCast)
-   */
   public override rollingWindowToDateJoinCondition(granularity) {
     return Object.values(
       this.timeDimensions.reduce((acc, td) => {
@@ -347,14 +332,19 @@ export class BigqueryQuery extends BaseQuery {
     // DATEADD is being rewritten to DATE_ADD
     templates.functions.DATE_ADD = 'DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
+    templates.functions.UTCTIMESTAMP = 'CURRENT_TIMESTAMP()';
     delete templates.functions.TO_CHAR;
     delete templates.functions.PERCENTILECONT;
+    delete templates.functions.WIDTH_BUCKET;
     templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
     templates.expressions.interval = 'INTERVAL {{ interval }}';
+    // BigQuery `/` on INT64 operands returns FLOAT64; DIV() is integer division
+    // truncating toward zero, matching PostgreSQL (DIV(12, -7) = -1)
+    templates.expressions.int_division = 'DIV({{ left }}, {{ right }})';
     templates.expressions.extract = 'EXTRACT({% if date_part == \'DOW\' %}DAYOFWEEK{% elif date_part == \'DOY\' %}DAYOFYEAR{% else %}{{ date_part }}{% endif %} FROM {{ expr }})';
     templates.expressions.timestamp_literal = 'TIMESTAMP(\'{{ value }}\')';
     templates.expressions.rolling_window_expr_timestamp_cast = 'TIMESTAMP({{ value }})';
-    delete templates.expressions.ilike;
+    templates.expressions.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})';
     delete templates.expressions.like_escape;
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %} LIKE {{ pattern }}';
@@ -367,15 +357,15 @@ export class BigqueryQuery extends BaseQuery {
     templates.types.decimal = 'BIGDECIMAL({{ precision }},{{ scale }})';
     templates.types.binary = 'BYTES';
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
-    templates.statements.time_series_select = 'SELECT DATETIME(TIMESTAMP(f)) date_from, DATETIME(TIMESTAMP(t)) date_to \n' +
+    templates.statements.time_series_select = 'SELECT TIMESTAMP(f) date_from, TIMESTAMP(t) date_to \n' +
     'FROM (\n' +
     '{% for time_item in seria  %}' +
     '    select \'{{ time_item[0] }}\' f, \'{{ time_item[1] }}\' t \n' +
     '{% if not loop.last %} UNION ALL\n{% endif %}' +
     '{% endfor %}' +
     ') AS dates';
-    templates.statements.generated_time_series_select = 'SELECT DATETIME(d) AS date_from,\n' +
-    'DATETIME_SUB(DATETIME_ADD(DATETIME(d),  INTERVAL {{ granularity }}), INTERVAL 1 MILLISECOND) AS date_to \n' +
+    templates.statements.generated_time_series_select = 'SELECT TIMESTAMP(DATETIME(d)) AS date_from,\n' +
+    'TIMESTAMP(DATETIME_SUB(DATETIME_ADD(DATETIME(d),  INTERVAL {{ granularity }}), INTERVAL 1 MILLISECOND)) AS date_to \n' +
     'FROM UNNEST(\n' +
     '{% if minimal_time_unit|upper in ["DAY", "WEEK", "MONTH", "QUARTER", "YEAR"] %}' +
     'GENERATE_DATE_ARRAY(DATE({{ start }}), DATE({{ end }}), INTERVAL {{ granularity }})\n' +
@@ -384,8 +374,8 @@ export class BigqueryQuery extends BaseQuery {
     '{% endif %}' +
     ') AS d';
 
-    templates.statements.generated_time_series_with_cte_range_source = 'SELECT DATETIME(d) AS date_from,\n' +
-    'DATETIME_SUB(DATETIME_ADD(DATETIME(d),  INTERVAL {{ granularity }}), INTERVAL 1 MILLISECOND) AS date_to \n' +
+    templates.statements.generated_time_series_with_cte_range_source = 'SELECT TIMESTAMP(DATETIME(d)) AS date_from,\n' +
+    'TIMESTAMP(DATETIME_SUB(DATETIME_ADD(DATETIME(d),  INTERVAL {{ granularity }}), INTERVAL 1 MILLISECOND)) AS date_to \n' +
     'FROM {{ range_source }}, UNNEST(\n' +
     '{% if minimal_time_unit|upper in ["DAY", "WEEK", "MONTH", "QUARTER", "YEAR"] %}' +
     'GENERATE_DATE_ARRAY(DATE({{ range_source }}.{{ min_name }}), DATE({{ range_source }}.{{ max_name }}), INTERVAL {{ granularity }})\n' +
@@ -393,6 +383,14 @@ export class BigqueryQuery extends BaseQuery {
     'GENERATE_TIMESTAMP_ARRAY(TIMESTAMP({{ range_source }}.{{ min_name }}), TIMESTAMP({{ range_source }}.{{ max_name }}), INTERVAL {{ granularity }})\n' +
     '{% endif %}' +
     ') AS d';
+    // GoogleSQL requires a set operator to say which mode it is: a bare UNION does not parse.
+    templates.statements.union = '{% for query in queries %}(\n' +
+      '{{ query | indent(2, true) }}\n' +
+      ')' +
+      '{% if not loop.last %}\nUNION {% if distinct %}DISTINCT{% else %}ALL{% endif %} {% endif %}' +
+      '{% endfor %}' +
+      '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}';
+
     return templates;
   }
 }

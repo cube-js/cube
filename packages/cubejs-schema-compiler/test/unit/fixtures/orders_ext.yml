@@ -34,7 +34,7 @@ cubes:
         dimensions: [city]
 
     accessPolicy:
-      - role: manager
+      - group: manager
         memberLevel:
           excludes:
             - status

@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/single_cube.rs
+expression: result
+---
+orders__amount_tier | orders__count
+--------------------+--------------
+high                | 3            
+low                 | 3            
+medium              | 3

@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/member_expressions_on_views.rs
+assertion_line: 107
+expression: result
+---
+many_to_one_view__root_dim | many_to_one_view__child_dim | many_to_one_view__root_val_avg | many_to_one_view__child_val_avg | one_sum
+---------------------------+-----------------------------+--------------------------------+---------------------------------+--------
+bar                        | bar                         | 500.0000000000000000           | 500.0000000000000000            | 1      
+foo                        | foo                         | 400.0000000000000000           | 200.0000000000000000            | 3

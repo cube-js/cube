@@ -18,7 +18,7 @@ pub struct V1LoadRequest {
     #[serde(rename = "cache", skip_serializing_if = "Option::is_none")]
     pub cache: Option<Cache>,
     #[serde(rename = "query", skip_serializing_if = "Option::is_none")]
-    pub query: Option<models::V1LoadRequestQuery>,
+    pub query: Option<Box<models::V1LoadRequestQuery>>,
 }
 
 impl V1LoadRequest {

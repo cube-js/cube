@@ -97,15 +97,19 @@ describe('SQL Generation', () => {
           }]
         },
         per_visitor_revenue: perVisitorRevenueMeasure,
-        revenueRunning: {
-          type: 'runningTotal',
-          sql: 'amount'
-        },
         revenueRolling: {
           type: 'sum',
           sql: 'amount',
           rollingWindow: {
             trailing: '2 day',
+            offset: 'start'
+          }
+        },
+        revenueRollingQuarter: {
+          type: 'sum',
+          sql: 'amount',
+          rollingWindow: {
+            trailing: '2 quarters',
             offset: 'start'
           }
         },
@@ -218,14 +222,6 @@ describe('SQL Generation', () => {
             trailing: '2 day',
             offset: 'start'
           }
-        },
-        runningCount: {
-          type: 'runningTotal',
-          sql: '1'
-        },
-        runningRevenuePerCount: {
-          type: 'number',
-          sql: \`round(\${revenueRunning} / \${runningCount})\`
         },
         averageCheckins: {
           type: 'avg',
@@ -1010,64 +1006,104 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     visitors__str_case: 'More than 1'
   }]));
 
-  it('running total', async () => {
-    await compiler.compile();
+  it('simple join member to alias', async () => runQueryTest({
+    measures: [
+      'visitors.visitor_revenue',
+      'visitors.visitor_count',
+      'visitors.per_visitor_revenue'
+    ],
+    dimensions: [
+      'visitors.source'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      dateRange: ['2017-01-01', '2017-01-30'],
+      granularity: 'month'
+    }],
+    timezone: 'America/Los_Angeles',
+    memberToAlias: {
+      'visitors.visitor_revenue': 'custom_revenue',
+      'visitors.visitor_count': 'custom_count',
+      'visitors.source': 'custom_source',
+      'visitors.created_at': 'custom_created_at',
+    },
+    order: []
+  },
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: [
-        'visitors.revenueRunning'
-      ],
-      timeDimensions: [{
-        dimension: 'visitors.created_at',
-        granularity: 'day',
-        dateRange: ['2017-01-01', '2017-01-10']
-      }],
-      order: [{
-        id: 'visitors.created_at'
-      }],
-      timezone: 'America/Los_Angeles'
-    });
+  [
+    {
+      custom_source: 'google',
+      custom_created_at_month: '2017-01-01T00:00:00.000Z',
+      custom_revenue: null,
+      custom_count: '1',
+      visitors__per_visitor_revenue: null
+    },
+    {
+      custom_source: 'some',
+      custom_created_at_month: '2017-01-01T00:00:00.000Z',
+      custom_revenue: '300',
+      custom_count: '2',
+      visitors__per_visitor_revenue: '150'
+    },
+    {
+      custom_source: null,
+      custom_created_at_month: '2017-01-01T00:00:00.000Z',
+      custom_revenue: null,
+      custom_count: '2',
+      visitors__per_visitor_revenue: null
+    }
+  ]));
 
-    console.log(query.buildSqlAndParams());
+  it('member to alias for granularized time dimension', async () => runQueryTest({
+    measures: [
+      'visitors.visitor_revenue',
+      'visitors.visitor_count',
+      'visitors.per_visitor_revenue'
+    ],
+    dimensions: [
+      'visitors.source'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      dateRange: ['2017-01-01', '2017-01-30'],
+      granularity: 'month'
+    }],
+    timezone: 'America/Los_Angeles',
+    // SQL API keys a granularized override `{member}.{granularity}` (dotted) and
+    // references the CubeScan column by it. The native planner must honor it
+    // instead of defaulting to `{base alias}_{granularity}`.
+    memberToAlias: {
+      'visitors.visitor_revenue': 'custom_revenue',
+      'visitors.visitor_count': 'custom_count',
+      'visitors.source': 'custom_source',
+      'visitors.created_at.month': 'custom_created_at_month',
+    },
+    order: []
+  },
 
-    // TODO ordering doesn't work for running total
-    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-      console.log(JSON.stringify(res));
-      expect(res).toEqual(
-        [{
-          visitors__created_at_day: '2017-01-01T00:00:00.000Z',
-          visitors__revenue_running: null
-        }, {
-          visitors__created_at_day: '2017-01-02T00:00:00.000Z',
-          visitors__revenue_running: '100'
-        }, {
-          visitors__created_at_day: '2017-01-03T00:00:00.000Z',
-          visitors__revenue_running: '100'
-        }, {
-          visitors__created_at_day: '2017-01-04T00:00:00.000Z',
-          visitors__revenue_running: '300'
-        }, {
-          visitors__created_at_day: '2017-01-05T00:00:00.000Z',
-          visitors__revenue_running: '600'
-        }, {
-          visitors__created_at_day: '2017-01-06T00:00:00.000Z',
-          visitors__revenue_running: '1500'
-        }, {
-          visitors__created_at_day: '2017-01-07T00:00:00.000Z',
-          visitors__revenue_running: '1500'
-        }, {
-          visitors__created_at_day: '2017-01-08T00:00:00.000Z',
-          visitors__revenue_running: '1500'
-        }, {
-          visitors__created_at_day: '2017-01-09T00:00:00.000Z',
-          visitors__revenue_running: '1500'
-        }, {
-          visitors__created_at_day: '2017-01-10T00:00:00.000Z',
-          visitors__revenue_running: '1500'
-        }]
-      );
-    });
-  });
+  [
+    {
+      custom_source: 'google',
+      custom_created_at_month: '2017-01-01T00:00:00.000Z',
+      custom_revenue: null,
+      custom_count: '1',
+      visitors__per_visitor_revenue: null
+    },
+    {
+      custom_source: 'some',
+      custom_created_at_month: '2017-01-01T00:00:00.000Z',
+      custom_revenue: '300',
+      custom_count: '2',
+      visitors__per_visitor_revenue: '150'
+    },
+    {
+      custom_source: null,
+      custom_created_at_month: '2017-01-01T00:00:00.000Z',
+      custom_revenue: null,
+      custom_count: '2',
+      visitors__per_visitor_revenue: null
+    }
+  ]));
 
   it('rolling', async () => runQueryTest({
     measures: [
@@ -1093,6 +1129,48 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     { visitors__created_at_day: '2017-01-08T00:00:00.000Z', visitors__revenue_rolling: '900' },
     { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__revenue_rolling: null },
     { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__revenue_rolling: null }
+  ]));
+
+  it('rolling quarter', async () => runQueryTest({
+    measures: [
+      'visitors.revenueRolling'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'quarter',
+      dateRange: ['2016-01-01', '2017-01-10']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    { visitors__created_at_quarter: '2016-01-01T00:00:00.000Z', visitors__revenue_rolling: null },
+    { visitors__created_at_quarter: '2016-04-01T00:00:00.000Z', visitors__revenue_rolling: null },
+    { visitors__created_at_quarter: '2016-07-01T00:00:00.000Z', visitors__revenue_rolling: null },
+    { visitors__created_at_quarter: '2016-10-01T00:00:00.000Z', visitors__revenue_rolling: null },
+    { visitors__created_at_quarter: '2017-01-01T00:00:00.000Z', visitors__revenue_rolling: null }
+  ]));
+
+  it('rolling over 2 quarters', async () => runQueryTest({
+    measures: [
+      'visitors.revenueRollingQuarter'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'quarter',
+      dateRange: ['2016-01-01', '2017-01-10']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    { visitors__created_at_quarter: '2016-01-01T00:00:00.000Z', visitors__revenue_rolling_quarter: null },
+    { visitors__created_at_quarter: '2016-04-01T00:00:00.000Z', visitors__revenue_rolling_quarter: null },
+    { visitors__created_at_quarter: '2016-07-01T00:00:00.000Z', visitors__revenue_rolling_quarter: null },
+    { visitors__created_at_quarter: '2016-10-01T00:00:00.000Z', visitors__revenue_rolling_quarter: '500' },
+    { visitors__created_at_quarter: '2017-01-01T00:00:00.000Z', visitors__revenue_rolling_quarter: '500' }
   ]));
 
   if (getEnv('nativeSqlPlanner')) {
@@ -1648,6 +1726,24 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     visitors__created_at_day: '2017-01-10T00:00:00.000Z',
   }]));
 
+  it('rolling window with unbounded without time dimension', async () => runQueryTest({
+    measures: [
+      'visitors.countRollingUnbounded',
+    ],
+    timeDimensions: [
+      {
+        dimension: 'visitors.created_at',
+        dateRange: ['2017-01-05', '2017-01-10']
+      }
+    ],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [{
+    visitors__count_rolling_unbounded: '6'
+  }]));
+
   it('two rolling windows with two time dimension granularities', async () => runQueryTest({
     measures: [
       'visitors.countRollingUnbounded',
@@ -2164,50 +2260,6 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     { visitors__created_at_sql_utils_day: '2017-01-04T00:00:00.000Z', visitors__visitor_count: '1' },
     { visitors__created_at_sql_utils_day: '2017-01-05T00:00:00.000Z', visitors__visitor_count: '1' },
     { visitors__created_at_sql_utils_day: '2017-01-06T00:00:00.000Z', visitors__visitor_count: '2' }
-  ]));
-
-  it('running total total', async () => runQueryTest({
-    measures: [
-      'visitors.revenueRunning'
-    ],
-    timeDimensions: [{
-      dimension: 'visitors.created_at',
-      dateRange: ['2017-01-01', '2017-01-10']
-    }],
-    order: [{
-      id: 'visitors.created_at'
-    }],
-    timezone: 'America/Los_Angeles'
-  }, [
-    {
-      visitors__revenue_running: '1500'
-    }
-  ]));
-
-  it('running total ratio', async () => runQueryTest({
-    measures: [
-      'visitors.runningRevenuePerCount'
-    ],
-    timeDimensions: [{
-      dimension: 'visitors.created_at',
-      granularity: 'day',
-      dateRange: ['2017-01-01', '2017-01-10']
-    }],
-    order: [{
-      id: 'visitors.created_at'
-    }],
-    timezone: 'America/Los_Angeles'
-  }, [
-    { visitors__created_at_day: '2017-01-01T00:00:00.000Z', visitors__running_revenue_per_count: null },
-    { visitors__created_at_day: '2017-01-02T00:00:00.000Z', visitors__running_revenue_per_count: '100' },
-    { visitors__created_at_day: '2017-01-03T00:00:00.000Z', visitors__running_revenue_per_count: '100' },
-    { visitors__created_at_day: '2017-01-04T00:00:00.000Z', visitors__running_revenue_per_count: '150' },
-    { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__running_revenue_per_count: '200' },
-    { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
-    { visitors__created_at_day: '2017-01-07T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
-    { visitors__created_at_day: '2017-01-08T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
-    { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
-    { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__running_revenue_per_count: '300' }
   ]));
 
   it('hll rolling (BigQuery)', async () => {
@@ -4101,7 +4153,11 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         },
       ],
     },
-    [{ compound__count: '4' }]
+    // Tesseract computes compound.count without join multiplication, so counts all 5 rows.
+    // JS planner uses count(distinct PK) due to join multiplication, getting 4.
+    getEnv('nativeSqlPlanner')
+      ? [{ compound__count: '5' }]
+      : [{ compound__count: '4' }]
   ));
 
   it('compound key self join', async () => runQueryTest(
@@ -4123,10 +4179,17 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         },
       ],
     },
-    [
-      { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-02T00:00:00.000Z' },
-      { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-04T00:00:00.000Z' },
-    ]
+    // Tesseract correctly filters per-group: 2017-01-04 has only visitor 2 (rank=8), avg=8.0.
+    // JS planner's join multiplication merges both (2,2) PK rows, getting avg(7,8)=7.5.
+    getEnv('nativeSqlPlanner')
+      ? [
+        { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-02T00:00:00.000Z' },
+        { compound__rank_avg: '8.0000000000000000', visitors__created_at_day: '2017-01-04T00:00:00.000Z' },
+      ]
+      : [
+        { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-02T00:00:00.000Z' },
+        { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-04T00:00:00.000Z' },
+      ]
   ));
 
   it('rank measure', async () => runQueryTest(
@@ -4951,6 +5014,47 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     }]
   ));
 
+  it('raw time dimension with timezone', async () => runQueryTest(
+    {
+      measures: [
+        'visitors.visitor_revenue',
+      ],
+      dimensions: ['visitors.created_at'],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      convertTzForRawTimeDimension: true,
+      order: [{
+        id: 'visitors.created_at'
+      }]
+    },
+    [
+      {
+        visitors__created_at: '2017-01-02T16:00:00.000Z',
+        visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+        visitors__visitor_revenue: '100'
+      },
+      {
+        visitors__created_at: '2017-01-04T16:00:00.000Z',
+        visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+        visitors__visitor_revenue: '200'
+      },
+      {
+        visitors__created_at: '2017-01-05T16:00:00.000Z',
+        visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+        visitors__visitor_revenue: null
+      },
+      {
+        visitors__created_at: '2017-01-06T16:00:00.000Z',
+        visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+        visitors__visitor_revenue: null
+      }
+    ]
+  ));
+
   it('simple join with segment', async () => runQueryTest(
     {
       measures: [
@@ -5551,4 +5655,62 @@ cubes:
       },
     ]);
   });
+
+  if (getEnv('nativeSqlPlanner')) {
+    describe('FILTER_PARAMS with segments under Tesseract', () => {
+      const fpCompilers = prepareJsCompiler(`
+        cube('orders_fp', {
+          sql: \`
+            SELECT * FROM orders
+            WHERE \${FILTER_PARAMS.orders_fp.created_at.filter('created_at')}
+              AND \${FILTER_PARAMS.orders_fp.status.filter('status')}
+          \`,
+          measures: {
+            count: { type: 'count' },
+          },
+          dimensions: {
+            id: { sql: 'id', type: 'number', primaryKey: true },
+            status: { sql: 'status', type: 'string' },
+            created_at: { sql: 'created_at', type: 'time' },
+          },
+          segments: {
+            completed: { sql: \`\${CUBE}.status = 'completed'\` },
+          },
+        });
+      `);
+
+      it('FILTER_PARAMS pushdown is preserved when a segment is present', async () => {
+        await fpCompilers.compiler.compile();
+        const query = new PostgresQuery(fpCompilers, {
+          measures: ['orders_fp.count'],
+          segments: ['orders_fp.completed'],
+          filters: [
+            { member: 'orders_fp.status', operator: 'equals', values: ['completed'] },
+          ],
+          timeDimensions: [{
+            dimension: 'orders_fp.created_at',
+            dateRange: ['2024-01-01', '2024-01-31'],
+          }],
+          timezone: 'UTC',
+        });
+
+        const [sql] = query.buildSqlAndParams();
+
+        // A dropped FILTER_PARAMS renders as `1 = 1` (always_true). The segment
+        // and the outer filters always render real predicates, so `1 = 1` can
+        // only come from a FILTER_PARAMS that failed to push down. Its absence
+        // proves both placeholders received their predicates (full or partial
+        // loss would leave at least one `1 = 1`).
+        expect(sql).not.toMatch(/1\s*=\s*1/);
+
+        // The predicates must land inside the cube's base subquery
+        // (`FROM orders WHERE ...`), before it is aliased as the cube — not
+        // only on the outer query, where they appear regardless of pushdown.
+        const innerStart = sql.indexOf('FROM orders');
+        const innerSql = sql.slice(innerStart, sql.indexOf('orders_fp', innerStart));
+        expect(innerSql).toMatch(/created_at\s*>=/);
+        expect(innerSql).toMatch(/status\s*=/);
+      });
+    });
+  }
 });

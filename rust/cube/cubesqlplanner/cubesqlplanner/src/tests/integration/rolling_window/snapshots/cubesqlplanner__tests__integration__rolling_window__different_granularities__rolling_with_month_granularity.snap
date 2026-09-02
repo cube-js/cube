@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/rolling_window/different_granularities.rs
+expression: result
+---
+orders__created_at_month | orders__rolling_sum_trailing_7d
+-------------------------+--------------------------------
+2024-01-01 00:00:00      | 360.00                         
+2024-02-01 00:00:00      | 350.00                         
+2024-03-01 00:00:00      | 395.00

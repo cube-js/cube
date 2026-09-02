@@ -30,82 +30,62 @@ import {
 } from './types';
 import { lookupDriverClass, isDriver } from './DriverResolvers';
 import type { CubejsServerCore } from './server';
-import optionsValidate from './optionsValidate';
+import { validateOptions } from './optionsValidate';
 
 const { version } = require('../../../package.json');
 
-/**
- * Driver service class.
- */
 export class OptsHandler {
-  /**
-   * Class constructor.
-   */
   public constructor(
     private core: CubejsServerCore,
     private createOptions: CreateOptions,
     private systemOptions?: SystemOptions,
   ) {
-    this.assertOptions(createOptions);
-    const options = cloneDeep(this.createOptions);
-    options.driverFactory = this.getDriverFactory(options);
-    options.dbType = this.getDbType(options);
+    const options = this.sanitizeOptions(cloneDeep(this.createOptions));
+    const driverFactory = this.getDriverFactory(options);
+    options.driverFactory = driverFactory;
+    options.dbType = this.getDbType(driverFactory);
     this.initializedOptions = this.initializeCoreOptions(options);
   }
 
-  /**
-   * Decorated dbType flag.
-   */
-  private decoratedType = false;
-
-  /**
-   * Decorated driverFactory flag.
-   */
   private decoratedFactory = false;
+
+  public isCustomDriverFactory(): boolean {
+    return !this.decoratedFactory;
+  }
 
   /**
    * driverFactory function result type.
    */
   private driverFactoryType: undefined | 'BaseDriver' | 'DriverConfig';
 
-  /**
-   * Initialized options.
-   */
   private initializedOptions: ServerCoreInitializedOptions;
 
-  /**
-   * Assert create options.
-   */
-  private assertOptions(opts: CreateOptions) {
-    optionsValidate(opts);
+  private sanitizeOptions<T extends CreateOptions>(opts: T): T {
+    if ((opts as any).dbType) {
+      throw new Error(
+        'CreateOptions.dbType was removed in v1.7.0. ' +
+        'Use driverFactory instead (return a DriverConfig `{ type, ... }`), ' +
+        'or set the CUBEJS_DB_TYPE environment variable. ' +
+        'See https://github.com/cube-js/cube/blob/master/DEPRECATION.md#dbtype'
+      );
+    }
+
+    const validated = validateOptions(opts);
+
+    // Probed for its throw: the only consumer is per-request code (normalizeQuery)
+    getEnv('defaultTimezone');
 
     if (
       !this.isDevMode() &&
       !process.env.CUBEJS_DB_TYPE &&
-      !opts.dbType &&
       !opts.driverFactory
     ) {
       throw new Error(
-        'Either CUBEJS_DB_TYPE, CreateOptions.dbType or CreateOptions.driverFactory ' +
-        'must be specified'
+        'Either CUBEJS_DB_TYPE or CreateOptions.driverFactory must be specified'
       );
     }
 
-    // TODO (buntarb): this assertion should be restored after documentation
-    // will be added.
-    //
-    // if (opts.dbType) {
-    //   this.core.logger(
-    //     'Cube.js `CreateOptions.dbType` Property Deprecation',
-    //     {
-    //       warning: (
-    //         // TODO (buntarb): add https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#dbType
-    //         // link once it will be created.
-    //         'CreateOptions.dbType property is now deprecated, please migrate.'
-    //       ),
-    //     },
-    //   );
-    // }
+    return validated;
   }
 
   /**
@@ -115,25 +95,6 @@ export class OptsHandler {
     val: DriverConfig | BaseDriver,
   ) {
     if (isDriver(val)) {
-      // TODO (buntarb): these assertions should be restored after dbType
-      // deprecation period will be passed.
-      //
-      // if (this.decoratedType) {
-      //   throw new Error(
-      //     'CreateOptions.dbType is required if CreateOptions.driverFactory ' +
-      //     'returns driver instance'
-      //   );
-      // }
-      // this.core.logger(
-      //   'Cube.js CreateOptions.driverFactory Property Deprecation',
-      //   {
-      //     warning: (
-      //       // TODO (buntarb): add https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#driverFactory
-      //       // link once it will be created.
-      //       'CreateOptions.driverFactory should return DriverConfig object instead of driver instance, please migrate.'
-      //     ),
-      //   },
-      // );
       if (!this.driverFactoryType) {
         this.driverFactoryType = 'BaseDriver';
       } else if (this.driverFactoryType !== 'BaseDriver') {
@@ -168,20 +129,6 @@ export class OptsHandler {
   }
 
   /**
-   * Assert value returned from the dbType function.
-   */
-  private assertDbTypeResult(val: DatabaseType) {
-    if (typeof val !== 'string') {
-      throw new Error(`Unexpected CreateOptions.dbType result type: <${
-        typeof val
-      }>${
-        JSON.stringify(val, undefined, 2)
-      }`);
-    }
-    return val;
-  }
-
-  /**
    * Assert orchestration options.
    */
   private asserOrchestratorOptions(opts: OrchestratorOptions) {
@@ -199,21 +146,20 @@ export class OptsHandler {
 
   /**
    * Default database factory function.
-   */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   */
   private defaultDriverFactory(ctx: DriverContext): DriverConfig {
     const type = <DatabaseType>getEnv('dbType', {
       dataSource: assertDataSource(ctx.dataSource),
+      preAggregations: ctx.preAggregations,
     });
+
     return { type };
   }
 
-  /**
-   * Async driver factory getter.
-   */
   private getDriverFactory(opts: CreateOptions): DriverFactoryInternalFn {
-    const { dbType, driverFactory } = opts;
-    this.decoratedType = !dbType;
+    const { driverFactory } = opts;
     this.decoratedFactory = !driverFactory;
+
     return async (ctx: DriverContext) => {
       if (!driverFactory) {
         if (!this.driverFactoryType) {
@@ -224,6 +170,7 @@ export class OptsHandler {
             'BaseDriver or DriverConfig.'
           );
         }
+
         // TODO (buntarb): wrapping this call with assertDriverFactoryResult
         // change assertions sequence and cause a fail of few tests. Review it.
         return this.defaultDriverFactory(ctx);
@@ -235,36 +182,27 @@ export class OptsHandler {
     };
   }
 
-  /**
-   * Async driver type getter.
-   */
   private getDbType(
-    opts: CreateOptions & {
-      driverFactory: DriverFactoryInternalFn,
-    },
+    driverFactory: DriverFactoryInternalFn,
   ): DbTypeInternalFn {
-    const { dbType, driverFactory } = opts;
     return async (ctx: DriverContext) => {
-      if (!dbType) {
-        let val: undefined | BaseDriver | DriverConfig;
-        let type: DatabaseType;
-        if (!this.driverFactoryType) {
-          val = await driverFactory(ctx);
-        }
-        if (
-          this.driverFactoryType === 'BaseDriver' &&
-          process.env.CUBEJS_DB_TYPE
-        ) {
-          type = <DatabaseType>process.env.CUBEJS_DB_TYPE;
-        } else if (this.driverFactoryType === 'DriverConfig') {
-          type = (<DriverConfig>(val || await driverFactory(ctx))).type;
-        }
-        return type;
-      } else if (typeof dbType === 'function') {
-        return this.assertDbTypeResult(await dbType(ctx));
-      } else {
-        return dbType;
+      let val: undefined | BaseDriver | DriverConfig;
+      let type: DatabaseType;
+
+      if (!this.driverFactoryType) {
+        val = await driverFactory(ctx);
       }
+
+      if (
+        this.driverFactoryType === 'BaseDriver' &&
+        process.env.CUBEJS_DB_TYPE
+      ) {
+        type = <DatabaseType>process.env.CUBEJS_DB_TYPE;
+      } else if (this.driverFactoryType === 'DriverConfig') {
+        type = (<DriverConfig>(val || await driverFactory(ctx))).type;
+      }
+
+      return type;
     };
   }
 
@@ -459,7 +397,8 @@ export class OptsHandler {
       externalDbType,
       externalDriverFactory,
       externalDialectFactory,
-      apiSecret: process.env.CUBEJS_API_SECRET,
+      apiSecret: getEnv('apiSecret'),
+      apiSecrets: getEnv('apiSecrets'),
       telemetry: getEnv('telemetry'),
       scheduledRefreshTimeZones: getEnv('scheduledRefreshTimezones'),
       scheduledRefreshContexts: async () => [null],
@@ -468,6 +407,7 @@ export class OptsHandler {
       dashboardAppPort: 3000,
       scheduledRefreshConcurrency: getEnv('scheduledRefreshQueriesPerAppId'),
       scheduledRefreshBatchSize: getEnv('scheduledRefreshBatchSize'),
+      compilerCacheSize: getEnv('compilerCacheSize'),
       preAggregationsSchema:
         getEnv('preAggregationsSchema') ||
         (this.isDevMode()
@@ -663,8 +603,10 @@ export class OptsHandler {
       ? clone.rollupOnlyMode
       : getEnv('rollupOnlyMode');
 
-    // query queue options
     clone.queryCacheOptions = clone.queryCacheOptions || {};
+    clone.queryCacheOptions.localRefreshKey = getEnv('refreshKeyLocalTime');
+
+    // query queue options
     clone.queryCacheOptions.queueOptions = this.queueOptionsWrapper(
       context,
       clone.queryCacheOptions.queueOptions,

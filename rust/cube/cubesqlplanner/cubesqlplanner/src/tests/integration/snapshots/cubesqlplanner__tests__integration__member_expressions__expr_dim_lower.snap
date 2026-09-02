@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/member_expressions.rs
+expression: result
+---
+lower_status | orders__count
+-------------+--------------
+completed    | 5            
+pending      | 3            
+cancelled    | 1

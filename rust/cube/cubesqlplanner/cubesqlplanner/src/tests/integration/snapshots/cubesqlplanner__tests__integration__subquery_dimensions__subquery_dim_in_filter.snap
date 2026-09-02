@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/subquery_dimensions.rs
+expression: result
+---
+sales__total_amount
+-------------------
+1000.00

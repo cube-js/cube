@@ -1,0 +1,31 @@
+---
+title: Heatmap
+description: Visualize a measure across two categorical dimensions as a color-coded grid.
+---
+
+Heatmaps render data as a grid where each cell's color encodes a measure value at the intersection of two dimensions. Use them to spot patterns, dense clusters, and outliers across two categorical axes at once.
+
+## Variant
+
+### Color-scaled grid
+
+One dimension on the X axis, one on the Y axis, and one measure mapped to the **Color** channel. Each cell's color encodes that measure's value for its row/column pair.
+
+{/* Screenshot: heatmap — order count by product category (Y) and month (X), colored from light to dark. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Color palette
+
+A continuous gradient palette is applied by default — low values map to the lighter end, high values to the darker end. Change or reverse the palette in the **Color** section of the Style tab.
+
+{/* Screenshot: Style tab Color section open — showing the palette picker and Reverse colors toggle. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+For custom palettes, see [Color & stacking](/docs/explore-analyze/charts/configuration/color-and-stacking).
+
+## Data structure
+
+A heatmap requires exactly:
+- One dimension on the **X axis**
+- One dimension on the **Y axis**
+- One measure on the **Color** channel
+
+Cells with no data in the result set are left blank.

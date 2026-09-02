@@ -1,31 +1,40 @@
 import { pipeline, Writable } from 'stream';
 import { createGzip } from 'zlib';
-import { createWriteStream, createReadStream } from 'fs';
+import { createReadStream, createWriteStream } from 'fs';
 import { unlink } from 'fs-extra';
 import tempy from 'tempy';
 import csvWriter from 'csv-write-stream';
 import {
   BaseDriver,
+  CreateTableIndex,
   DownloadTableCSVData,
+  DownloadTableMemoryData,
+  DriverInterface,
   ExternalCreateTableOptions,
-  DownloadTableMemoryData, DriverInterface, IndexesSQL, CreateTableIndex,
-  StreamTableData,
-  StreamingSourceTableData,
+  ExternalDriverCompatibilities,
+  IndexesSQL,
   QueryOptions,
-  ExternalDriverCompatibilities, TableStructure, TableColumnQueryResult,
+  StreamingSourceTableData,
+  StreamTableData,
+  TableColumnQueryResult,
+  TableStructure,
 } from '@cubejs-backend/base-driver';
 import { AsyncDebounce, getEnv, isVersionGte } from '@cubejs-backend/shared';
-import { format as formatSql, escape } from 'sqlstring';
+import { escape, format as formatSql } from 'sqlstring';
 import fetch from 'node-fetch';
 
 import { ConnectionConfig } from './types';
 import { WebSocketConnection } from './WebSocketConnection';
+import { QueryResultFormat } from '../codegen';
 
-type CubeStoreCapability = 'queueExclusive';
-
-const CubeStoreCapabilityMinVersion: Record<CubeStoreCapability, string> = {
+const CubeStoreCapabilityMinVersion = {
   queueExclusive: '1.6.22',
-};
+  queueExternalId: '1.6.26',
+  queueAddAndRetrieve: '1.7.25',
+  sendableParameters: '1.6.38',
+  arrowFormat: '1.6.66',
+} satisfies Record<string, string>;
+type CubeStoreCapability = keyof typeof CubeStoreCapabilityMinVersion;
 
 const GenericTypeToCubeStore: Record<string, string> = {
   string: 'varchar(255)',
@@ -56,6 +65,11 @@ type CreateTableOptions = {
   sealAt?: string
   delimiter?: string
   disableQuoting?: boolean
+};
+
+type CubeStoreQueryOptions = QueryOptions & {
+  sendParameters?: boolean,
+  responseFormat?: QueryResultFormat,
 };
 
 export class CubeStoreDriver extends BaseDriver implements DriverInterface {
@@ -92,10 +106,22 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     await this.query('SELECT 1', []);
   }
 
-  public async query<R = any>(query: string, values: any[], options?: QueryOptions): Promise<R[]> {
-    const { inlineTables, ...queryTracingObj } = options ?? {};
-    const sql = formatSql(query, values || []);
-    return this.connection.query(sql, inlineTables ?? [], { ...queryTracingObj, instance: getEnv('instanceId') });
+  public async query<R = any>(query: string, values: any[], options?: CubeStoreQueryOptions): Promise<R[]> {
+    const { inlineTables, sendParameters, responseFormat, ...queryTracingObj } = options ?? {};
+
+    if (!sendParameters) {
+      query = formatSql(query, values || []);
+    }
+
+    const tracingObj = { ...queryTracingObj, instance: getEnv('instanceId') };
+
+    return this.connection.query(query, sendParameters ? values : [], {
+      inlineTables: inlineTables ?? [],
+      queryTracingObj: tracingObj,
+      responseFormat: responseFormat ?? (
+        await this.hasCapability('arrowFormat') ? QueryResultFormat.Arrow : QueryResultFormat.Legacy
+      ),
+    });
   }
 
   public async release() {
@@ -124,7 +150,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       withEntries.push(`delimiter = '${options.delimiter}'`);
     }
     if (options.disableQuoting) {
-      withEntries.push(`disable_quoting = true`);
+      withEntries.push('disable_quoting = true');
     }
     if (options.buildRangeEnd) {
       withEntries.push(`build_range_end = '${options.buildRangeEnd}'`);

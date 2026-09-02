@@ -1842,7 +1842,7 @@ The root cause is that joins are [directed](#direction-of-joins) and there's no
 join path that goes *by join definitions in the data model* from `users` to
 `companies` or in the opposite direction.
 
-In [Visual Model][ref-visual-model], you can see that both `users` and `companies`
+In [Visual Modeler][ref-visual-model], you can see that both `users` and `companies`
 are to the right of `companies_to_users`, meaning that there's no way to go
 from `users` to `companies` moving left to right or right to left:
 
@@ -1911,7 +1911,7 @@ cubes:
 </CodeTabs>
 
 Now there's a join path that goes *by join definitions in the data model* from
-`users` to `companies_to_users` to `companies`. [Visual Model][ref-visual-model]
+`users` to `companies_to_users` to `companies`. [Visual Modeler][ref-visual-model]
 also shows that you can reach `companies` from `cubes` by going left to right.
 
 <Diagram src="https://ucarecdn.com/0736a570-c1c2-45b5-a806-e90a216ce202/" />
@@ -1919,7 +1919,7 @@ also shows that you can reach `companies` from `cubes` by going left to right.
 
 [ref-schema-ref-view]: /product/data-modeling/reference/view
 [ref-schema-ref-joins-relationship]: /product/data-modeling/reference/joins#relationship
-[ref-visual-model]: /product/workspace/visual-model
+[ref-visual-model]: /product/data-modeling/visual-modeler
 [ref-cube]: /product/data-modeling/reference/cube
 [ref-cube-public]: /product/data-modeling/reference/cube#public
 [ref-rest-meta]: /product/apis-integrations/rest-api/reference#base_pathv1meta

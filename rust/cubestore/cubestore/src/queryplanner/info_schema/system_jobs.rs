@@ -4,7 +4,9 @@ use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
-use datafusion::arrow::array::{ArrayRef, StringArray, TimestampNanosecondArray, UInt64Array};
+use datafusion::arrow::array::{
+    ArrayRef, StringBuilder, TimestampNanosecondBuilder, UInt64Builder,
+};
 use datafusion::arrow::datatypes::{DataType, Field, TimeUnit};
 use std::sync::Arc;
 
@@ -18,8 +20,8 @@ impl InfoSchemaTableDef for SystemJobsTableDef {
         &self,
         ctx: InfoSchemaTableDefContext,
         _limit: Option<usize>,
-    ) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        Ok(Arc::new(ctx.meta_store.all_jobs().await?))
+    ) -> Result<Vec<Self::T>, CubeError> {
+        Ok(ctx.meta_store.all_jobs().await?)
     }
 
     fn schema(&self) -> Vec<Field> {
@@ -36,36 +38,29 @@ impl InfoSchemaTableDef for SystemJobsTableDef {
         ]
     }
 
-    fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>> {
+    fn columns(&self, rows: Vec<Self::T>) -> Vec<ArrayRef> {
+        let num_rows = rows.len();
+        let mut id_builder = UInt64Builder::with_capacity(num_rows);
+        let mut row_ref_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut job_type_builder = StringBuilder::with_capacity(num_rows, num_rows * 32);
+        let mut status_builder = StringBuilder::with_capacity(num_rows, num_rows * 32);
+        let mut heartbeat_builder = TimestampNanosecondBuilder::with_capacity(num_rows);
+
+        for row in rows.into_iter() {
+            id_builder.append_value(row.get_id());
+            let job = row.get_row();
+            row_ref_builder.append_value(format!("{:?}", job.row_reference()));
+            job_type_builder.append_value(format!("{:?}", job.job_type()));
+            status_builder.append_value(format!("{:?}", job.status()));
+            heartbeat_builder.append_value(timestamp_nanos_or_panic(job.last_heart_beat()));
+        }
+
         vec![
-            Box::new(|jobs| {
-                Arc::new(UInt64Array::from_iter_values(
-                    jobs.iter().map(|row| row.get_id()),
-                ))
-            }),
-            Box::new(|jobs| {
-                Arc::new(StringArray::from_iter_values(
-                    jobs.iter()
-                        .map(|row| format!("{:?}", row.get_row().row_reference())),
-                ))
-            }),
-            Box::new(|jobs| {
-                Arc::new(StringArray::from_iter_values(
-                    jobs.iter()
-                        .map(|row| format!("{:?}", row.get_row().job_type())),
-                ))
-            }),
-            Box::new(|jobs| {
-                Arc::new(StringArray::from_iter_values(
-                    jobs.iter()
-                        .map(|row| format!("{:?}", row.get_row().status())),
-                ))
-            }),
-            Box::new(|jobs| {
-                Arc::new(TimestampNanosecondArray::from_iter_values(jobs.iter().map(
-                    |row| timestamp_nanos_or_panic(row.get_row().last_heart_beat()),
-                )))
-            }),
+            Arc::new(id_builder.finish()),
+            Arc::new(row_ref_builder.finish()),
+            Arc::new(job_type_builder.finish()),
+            Arc::new(status_builder.finish()),
+            Arc::new(heartbeat_builder.finish()),
         ]
     }
 }

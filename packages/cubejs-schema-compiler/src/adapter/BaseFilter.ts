@@ -110,11 +110,19 @@ export class BaseFilter extends BaseDimension {
 
   // noinspection JSMethodCanBeStatic
   public escapeWildcardChars(param) {
-    return typeof param === 'string' ? param.replace(/([_%])/gi, '\\$1') : param;
+    return typeof param === 'string' ? param.replace(/([\\_%])/gi, '\\$1') : param;
   }
 
   public isWildcardOperator() {
-    return this.camelizeOperator === 'contains' || this.camelizeOperator === 'notContains';
+    // All LIKE-based operators need wildcard chars escaped in user values
+    return (
+      this.camelizeOperator === 'contains' ||
+      this.camelizeOperator === 'notContains' ||
+      this.camelizeOperator === 'startsWith' ||
+      this.camelizeOperator === 'notStartsWith' ||
+      this.camelizeOperator === 'endsWith' ||
+      this.camelizeOperator === 'notEndsWith'
+    );
   }
 
   public filterParams() {

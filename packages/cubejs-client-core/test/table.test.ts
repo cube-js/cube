@@ -1,8 +1,5 @@
-/* globals describe, expect, test */
-
-import 'jest';
-import ResultSet from '../src/ResultSet';
-import { PivotConfig } from '../src/types';
+import ResultSet from '../src/ResultSet.js';
+import { PivotConfig } from '../src/types.js';
 
 describe('resultSet tablePivot and tableColumns', () => {
   describe('it works with one measure', () => {

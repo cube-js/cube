@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/integration/advanced_features.rs
+expression: result
+---
+customers__city | orders__status_summary
+----------------+-----------------------
+Boston          | low                   
+New York        | high                  
+San Francisco   | low                   
+NULL            | low

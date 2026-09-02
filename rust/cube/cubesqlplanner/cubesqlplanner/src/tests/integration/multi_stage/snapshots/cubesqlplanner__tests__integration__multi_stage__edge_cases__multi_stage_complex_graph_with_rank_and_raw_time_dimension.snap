@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/edge_cases.rs
+assertion_line: 134
+expression: result
+---
+orders__status | orders__adjusted_amount_sum | orders__total_amount
+---------------+-----------------------------+---------------------
+cancelled      | 50.10                       | 200.00              
+completed      | 100.10                      | 1400.00             
+pending        | 30.20                       | 650.00

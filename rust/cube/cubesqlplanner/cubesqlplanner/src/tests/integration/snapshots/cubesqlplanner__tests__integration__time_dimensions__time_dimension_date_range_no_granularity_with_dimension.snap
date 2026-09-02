@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/integration/time_dimensions.rs
+expression: result
+---
+orders__status | orders__count
+---------------+--------------
+completed      | 3            
+pending        | 2

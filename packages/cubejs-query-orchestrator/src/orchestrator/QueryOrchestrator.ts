@@ -232,6 +232,8 @@ export class QueryOrchestrator {
         targetTableName: pa.targetTableName,
         refreshKeyValues: pa.refreshKeyValues,
         lastUpdatedAt: pa.lastUpdatedAt,
+        preAggregationId: pa.preAggregationId,
+        type: pa.type,
       })),
     )(preAggregationsTablesToTempTables);
 
@@ -252,7 +254,7 @@ export class QueryOrchestrator {
       // /cubejs-system/v1/pre-aggregations/jobs endpoint).
       if (queryBody.isJob) {
         return preAggregationsTablesToTempTables.map((pa) => ({
-          preAggregation: queryBody.preAggregations[0].preAggregationId,
+          preAggregation: pa[1].preAggregationId || queryBody.preAggregations[0].preAggregationId,
           tableName: pa[0],
           ...pa[1],
         }));
@@ -433,6 +435,20 @@ export class QueryOrchestrator {
 
   public async cancelPreAggregationQueriesFromQueue(queryKeys: string[], dataSource = 'default') {
     return this.preAggregations.cancelQueriesFromQueue(queryKeys, dataSource);
+  }
+
+  public async cancelQueryByRequestId(requestId: string) {
+    const cancelled = [];
+
+    for (const queue of Object.values(this.queryCache.getQueues())) {
+      cancelled.push(...await queue.cancelQueryByRequestId(requestId));
+    }
+
+    for (const queue of Object.values(this.preAggregations.getQueues())) {
+      cancelled.push(...await queue.cancelQueryByRequestId(requestId));
+    }
+
+    return cancelled;
   }
 
   public async updateRefreshEndReached() {

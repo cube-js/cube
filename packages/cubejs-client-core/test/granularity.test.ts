@@ -1,9 +1,6 @@
-/* globals describe,test,expect */
-
-import 'jest';
 import dayjs from 'dayjs';
 import ko from 'dayjs/locale/ko';
-import ResultSet from '../src/ResultSet';
+import ResultSet from '../src/ResultSet.js';
 
 describe('ResultSet Granularity', () => {
   describe('chartPivot', () => {

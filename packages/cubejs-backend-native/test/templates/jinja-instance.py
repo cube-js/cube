@@ -99,9 +99,31 @@ async def load_data():
   }
   return api_response
 
+class ExampleCallable:
+  # Invoked as `obj(...)` in a template — exercises python_obj_call_sync.
+  def __call__(self, arg1, arg2, **kwargs):
+    kwargs_str = ",".join(f"{key}={value}" for key, value in sorted(kwargs.items()))
+
+    return "arg1: " + arg1 + ", arg2: " + arg2 + ", kwarg:(" + kwargs_str + ")"
+
+@template.function
+def load_callable():
+  return ExampleCallable()
+
 class ExampleClassModelA:
   def get_name_method(self):
     return "example"
+
+  # Mirrors cube_dbt's model.as_dimensions(skip=[...]) — a method invoked with
+  # keyword arguments. Regression coverage for CUB-2659: kwargs on object-method
+  # calls must reach Python as kwargs, not as a positional dict.
+  def method_kwargs(self, arg1, arg2, **kwargs):
+    kwargs_str = ",".join(f"{key}={value}" for key, value in sorted(kwargs.items()))
+
+    return "arg1: " + arg1 + ", arg2: " + arg2 + ", kwarg:(" + kwargs_str + ")"
+
+  def method_named_arguments(self, arg1, arg2):
+    return "arg1: " + arg1 + ", arg2: " + arg2
 
 @template.function
 def load_class_model():

@@ -1,7 +1,0 @@
-[package]
-name = "cubeshared"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-flatbuffers = "23.1.21"

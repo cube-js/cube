@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+orders__count | orders__total_amount | returns__count | returns__total_refund
+--------------+----------------------+----------------+----------------------
+8             | 1375.00              | 5              | 330.00

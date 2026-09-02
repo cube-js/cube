@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/calendar.rs
+assertion_line: 409
+expression: result
+---
+custom_calendar__date_val_month | calendar_orders__count_month_to_date | calendar_orders__count
+--------------------------------+--------------------------------------+-----------------------
+2024-02-04 00:00:00+00          | 3                                    | 3                     
+2024-03-03 00:00:00+00          | 5                                    | 5                     
+2024-04-07 00:00:00+00          | 4                                    | 4

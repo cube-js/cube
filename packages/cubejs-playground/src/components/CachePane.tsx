@@ -9,7 +9,8 @@ import { FatalError } from './Error/FatalError';
 const CachePane = ({ query }) => (
   <QueryRenderer
     loadSql
-    query={{ ...query, renewQuery: true }}
+    cache="must-revalidate"
+    query={query}
     render={({ sqlQuery, resultSet, error }) => {
       if (error) {
         return <FatalError error={error} />;

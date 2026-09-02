@@ -1,14 +1,17 @@
 import { v4 as uuidv4 } from 'uuid';
-import ResultSet from './ResultSet';
-import SqlQuery from './SqlQuery';
-import Meta from './Meta';
-import ProgressResult from './ProgressResult';
-import HttpTransport, { ErrorResponse, ITransport, TransportOptions } from './HttpTransport';
-import RequestError from './RequestError';
+import ResultSet from './ResultSet.js';
+import SqlQuery from './SqlQuery.js';
+import Meta from './Meta.js';
+import ProgressResult from './ProgressResult.js';
+import HttpTransport, { ErrorResponse, ITransport, TransportOptions } from './HttpTransport.js';
+import RequestError from './RequestError.js';
 import {
   CacheMode,
+  DeeplyReadonly,
+  DimensionFormat,
   ExtractTimeMembers,
   LoadResponse,
+  MeasureFormat,
   MetaResponse,
   PivotQuery,
   ProgressResponse,
@@ -16,7 +19,7 @@ import {
   QueryOrder,
   QueryType,
   TransformedQuery
-} from './types';
+} from './types.js';
 
 export type LoadMethodCallback<T> = (error: Error | null, resultSet: T) => void;
 
@@ -59,10 +62,6 @@ export type LoadMethodOptions = {
    * Client provided request ID, if client wants to track request onb their own
    */
   baseRequestId?: string;
-};
-
-export type DeeplyReadonly<T> = {
-  readonly [K in keyof T]: DeeplyReadonly<T[K]>;
 };
 
 export type ExtractMembers<T extends DeeplyReadonly<Query>> =
@@ -112,17 +111,34 @@ export type DryRunResponse = {
   transformedQueries: TransformedQuery[];
 };
 
+export type MetaMethodOptions = LoadMethodOptions & {
+  /**
+   * Request views only — the response's `cubes` array then contains only entries
+   * whose `type` is `view`. Over HTTP, servers predating the flag ignore it and
+   * return the full model, so callers should not assume the response is filtered;
+   * over `WebSocketTransport` such servers reject the message with a 400.
+   */
+  onlyViews?: boolean;
+};
+
 export type CubeSqlOptions = LoadMethodOptions & {
   /**
    * Query timeout in milliseconds
    */
   timeout?: number;
+  /**
+   * IANA time zone name (e.g. `America/Los_Angeles`) to run the query in,
+   * same as `query.timezone` in the REST API's `/v1/load`. Passed through
+   * verbatim. When omitted, the deployment's default time zone is used.
+   */
+  timezone?: string;
 };
 
 export type CubeSqlSchemaColumn = {
   name: string;
   // eslint-disable-next-line camelcase
   column_type: string;
+  format?: DimensionFormat | MeasureFormat;
 };
 
 export type CubeSqlResult = {
@@ -164,7 +180,7 @@ function mutexPromise<T>(promise: Promise<T>): Promise<T | null> {
     });
 }
 
-export type ResponseFormat = 'compact' | 'default' | undefined;
+export type ResponseFormat = 'compact' | 'columnar' | 'default' | undefined;
 
 export type CubeApiOptions = {
   /**
@@ -180,7 +196,7 @@ export type CubeApiOptions = {
   pollInterval?: number;
   credentials?: TransportOptions['credentials'];
   parseDateMeasures?: boolean;
-  resType?: 'default' | 'compact';
+  resType?: 'default' | 'compact' | 'columnar';
   castNumerics?: boolean;
   /**
    * How many network errors would be retried before returning to users. Default to 0.
@@ -467,12 +483,12 @@ class CubeApi {
    */
   private patchQueryInternal(query: DeeplyReadonly<Query>, responseFormat: ResponseFormat): DeeplyReadonly<Query> {
     if (
-      responseFormat === 'compact' &&
-      query.responseFormat !== 'compact'
+      (responseFormat === 'compact' || responseFormat === 'columnar') &&
+      query.responseFormat !== responseFormat
     ) {
       return {
         ...query,
-        responseFormat: 'compact',
+        responseFormat,
       };
     } else {
       return query;
@@ -523,6 +539,21 @@ class CubeApi {
             });
             data.push(row);
           });
+          response.results[j].data = data;
+        });
+      } else if (response.results[0].query.responseFormat &&
+        response.results[0].query.responseFormat === 'columnar') {
+        response.results.forEach((result, j) => {
+          const { columns, members } = result.data as unknown as { columns: any[][]; members: string[] };
+          const rowCount = columns[0]?.length ?? 0;
+          const data: Record<string, any>[] = [];
+          for (let i = 0; i < rowCount; i++) {
+            const row: Record<string, any> = {};
+            members.forEach((m, k) => {
+              row[m] = columns[k][i];
+            });
+            data.push(row);
+          }
           response.results[j].data = data;
         });
       }
@@ -606,12 +637,12 @@ class CubeApi {
       ...options
     };
 
-    if (responseFormat === 'compact') {
+    if (responseFormat === 'compact' || responseFormat === 'columnar') {
       if (Array.isArray(query)) {
-        const patched = query.map((q) => this.patchQueryInternal(q, 'compact'));
+        const patched = query.map((q) => this.patchQueryInternal(q, responseFormat));
         return [patched as unknown as QueryType, options];
       } else {
-        const patched = this.patchQueryInternal(query as DeeplyReadonly<Query>, 'compact');
+        const patched = this.patchQueryInternal(query as DeeplyReadonly<Query>, responseFormat);
         return [patched as QueryType, options];
       }
     }
@@ -687,18 +718,31 @@ class CubeApi {
     );
   }
 
-  public meta(options?: LoadMethodOptions): Promise<Meta>;
+  public meta(options?: MetaMethodOptions): Promise<Meta>;
 
-  public meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): UnsubscribeObj;
+  public meta(options?: MetaMethodOptions, callback?: LoadMethodCallback<Meta>): UnsubscribeObj;
 
   /**
    * Get meta description of cubes available for querying.
+   *
+   * Pass `onlyViews: true` to request views only — the response's `cubes` array
+   * then contains only entries whose `type` is `view`.
+   *
+   * ```js
+   * const meta = await cubeApi.meta({ onlyViews: true });
+   * ```
+   *
+   * Compatibility note: over HTTP, servers predating the flag ignore it and return
+   * the full model, so callers should not assume the response is filtered. Over
+   * `WebSocketTransport` such servers reject the message with a 400 instead, since
+   * they validate `meta` params strictly.
    */
-  public meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): Promise<Meta> | UnsubscribeObj {
+  public meta(options?: MetaMethodOptions, callback?: LoadMethodCallback<Meta>): Promise<Meta> | UnsubscribeObj {
     return this.loadMethod(
       () => this.request('meta', {
         signal: options?.signal,
         baseRequestId: options?.baseRequestId,
+        ...(options?.onlyViews ? { onlyViews: true } : {}),
       }),
       (body: MetaResponse) => new Meta(body),
       options,
@@ -749,6 +793,10 @@ class CubeApi {
           cubesqlParams.cache = options.cache;
         }
 
+        if (options?.timezone) {
+          cubesqlParams.timezone = options.timezone;
+        }
+
         const request = this.request('cubesql', cubesqlParams);
 
         return request;
@@ -771,19 +819,53 @@ class CubeApi {
 
         const [schema, ...data] = response.error.split('\n');
 
+        let parsedSchema: any;
         try {
-          const parsedSchema = JSON.parse(schema);
-          return {
-            schema: parsedSchema.schema,
-            data: data
-              .filter((d: string) => d.trim().length)
-              .map((d: string) => JSON.parse(d).data)
-              .reduce((a: any, b: any) => a.concat(b), []),
-            ...(parsedSchema.lastRefreshTime ? { lastRefreshTime: parsedSchema.lastRefreshTime } : {}),
-          };
+          parsedSchema = JSON.parse(schema);
         } catch (err) {
+          // Schema line isn't valid JSON — the whole `error` payload is a real error.
           throw new Error(response.error);
         }
+
+        const rows: any[] = [];
+
+        for (const line of data) {
+          if (line.trim().length) {
+            let parsed: any;
+            try {
+              parsed = JSON.parse(line);
+            } catch (err) {
+              // A non-JSON line after a valid schema means a malformed payload — fall
+              // back to surfacing the raw response rather than dropping rows silently.
+              throw new Error(response.error);
+            }
+
+            // The stream can interleave an error chunk after the schema (e.g. a
+            // post-processing/cast error surfaced mid-result). Such a line has no
+            // `data`, so the previous `JSON.parse(d).data` concat pushed an `undefined`
+            // "phantom" row and silently swallowed the failure. Surface it instead —
+            // matching how `cubeSqlStream` classifies `error` chunks.
+            if (parsed.error) {
+              throw new Error(parsed.error);
+            }
+
+            if (parsed.data) {
+              // Append rows one at a time instead of spreading the whole chunk as
+              // call arguments (`rows.push(...parsed.data)`). A large single-chunk
+              // result (e.g. 130k+ rows) otherwise exceeds V8's argument-count
+              // limit and throws "RangeError: Maximum call stack size exceeded".
+              for (let i = 0; i < parsed.data.length; i++) {
+                rows.push(parsed.data[i]);
+              }
+            }
+          }
+        }
+
+        return {
+          schema: parsedSchema.schema,
+          data: rows,
+          ...(parsedSchema.lastRefreshTime ? { lastRefreshTime: parsedSchema.lastRefreshTime } : {}),
+        };
       },
       options,
       callback
@@ -806,7 +888,8 @@ class CubeApi {
       baseRequestId: uuidv4(),
       params: {
         query: sqlQuery,
-        cache: options?.cache
+        cache: options?.cache,
+        timezone: options?.timezone,
       }
     });
 
@@ -898,12 +981,14 @@ class CubeApi {
 export default (apiToken: string | (() => Promise<string>), options: CubeApiOptions) => new CubeApi(apiToken, options);
 
 export { CubeApi };
-export { default as Meta } from './Meta';
-export { default as SqlQuery } from './SqlQuery';
-export { default as RequestError } from './RequestError';
-export { default as ProgressResult } from './ProgressResult';
-export { default as ResultSet } from './ResultSet';
-export * from './HttpTransport';
-export * from './utils';
-export * from './time';
-export * from './types';
+export { default as Meta } from './Meta.js';
+export { default as SqlQuery } from './SqlQuery.js';
+export { default as RequestError } from './RequestError.js';
+export { default as ProgressResult } from './ProgressResult.js';
+export { default as ResultSet } from './ResultSet.js';
+export * from './HttpTransport.js';
+export * from './utils.js';
+export * from './time.js';
+export * from './types.js';
+// We don't export it for now, because size of builds for cjs/umd users will be affected
+// export * from './format.js';

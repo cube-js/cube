@@ -1,0 +1,93 @@
+cubes:
+  - name: A
+    sql: "SELECT 1 AS a_id"
+    joins:
+      - name: B
+        relationship: many_to_one
+        sql: "'A' = 'B'"
+      - name: D
+        relationship: many_to_one
+        sql: "'A' = 'D'"
+      - name: F
+        relationship: many_to_one
+        sql: "'A' = 'F'"
+    dimensions:
+      - name: a_id
+        type: number
+        sql: a_id
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+        sql: "COUNT(*)"
+
+  - name: B
+    sql: "SELECT 1 AS b_id"
+    joins:
+      - name: C
+        relationship: many_to_one
+        sql: "'B' = 'C'"
+    dimensions:
+      - name: b_id
+        type: number
+        sql: b_id
+        primary_key: true
+
+  - name: C
+    sql: "SELECT 1 AS c_id"
+    joins:
+      - name: X
+        relationship: many_to_one
+        sql: "'C' = 'X'"
+    dimensions:
+      - name: c_id
+        type: number
+        sql: c_id
+        primary_key: true
+
+  - name: D
+    sql: "SELECT 1 AS d_id"
+    joins:
+      - name: E
+        relationship: many_to_one
+        sql: "'D' = 'E'"
+    dimensions:
+      - name: d_id
+        type: number
+        sql: d_id
+        primary_key: true
+
+  - name: E
+    sql: "SELECT 1 AS e_id"
+    joins:
+      - name: X
+        relationship: many_to_one
+        sql: "'E' = 'X'"
+    dimensions:
+      - name: e_id
+        type: number
+        sql: e_id
+        primary_key: true
+
+  - name: F
+    sql: "SELECT 1 AS f_id"
+    joins:
+      - name: X
+        relationship: many_to_one
+        sql: "'F' = 'X'"
+    dimensions:
+      - name: f_id
+        type: number
+        sql: f_id
+        primary_key: true
+
+  - name: X
+    sql: "SELECT 1 AS x_id, 'foo' AS x_name"
+    dimensions:
+      - name: x_id
+        type: number
+        sql: x_id
+        primary_key: true
+      - name: x_name
+        type: string
+        sql: x_name

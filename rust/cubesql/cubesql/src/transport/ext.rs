@@ -93,7 +93,9 @@ impl V1CubeMetaMeasureExt for CubeMetaMeasure {
             | "max"
             | "count"
             | "count_distinct"
-            | "count_distinct_approx" => true,
+            | "countDistinct"
+            | "count_distinct_approx"
+            | "countDistinctApprox" => true,
             _ => false,
         }
     }
@@ -114,7 +116,6 @@ impl V1CubeMetaMeasureExt for CubeMetaMeasure {
                 "avg" => ColumnType::Double,
                 "min" => ColumnType::Double,
                 "max" => ColumnType::Double,
-                "runningTotal" => ColumnType::Double,
                 _ => from_type,
             },
             _ => from_type,

@@ -92,7 +92,7 @@ Array [
     "unusualDataTypes.bit_column": "11111111",
     "unusualDataTypes.boolean_column": true,
     "unusualDataTypes.cidr_column": "192.168.0.0/24",
-    "unusualDataTypes.id": 1,
+    "unusualDataTypes.id": "1",
     "unusualDataTypes.inet_column": "192.168.0.1",
     "unusualDataTypes.json": Object {
       "key": "value1",
@@ -120,7 +120,7 @@ Array [
     "unusualDataTypes.bit_column": "00000001",
     "unusualDataTypes.boolean_column": false,
     "unusualDataTypes.cidr_column": "192.168.0.0/24",
-    "unusualDataTypes.id": 2,
+    "unusualDataTypes.id": "2",
     "unusualDataTypes.inet_column": "192.168.0.2",
     "unusualDataTypes.json": Object {
       "key": "value2",
@@ -148,7 +148,7 @@ Array [
     "unusualDataTypes.bit_column": "11110000",
     "unusualDataTypes.boolean_column": true,
     "unusualDataTypes.cidr_column": "192.168.0.0/24",
-    "unusualDataTypes.id": 3,
+    "unusualDataTypes.id": "3",
     "unusualDataTypes.inet_column": "192.168.0.3",
     "unusualDataTypes.json": Object {
       "key": "value3",
@@ -355,6 +355,45 @@ Array [
 ]
 `;
 
+exports[`postgresql responseFormat http+responseFormat=columnar option#1+2: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql responseFormat http+responseFormat=columnar option#1: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql responseFormat http+responseFormat=columnar option#2: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
 exports[`postgresql responseFormat http+responseFormat=compact option#1+2: result-type 1`] = `
 Array [
   Object {
@@ -395,6 +434,45 @@ Array [
 `;
 
 exports[`postgresql responseFormat http+responseFormat=default: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql responseFormat ws+responseFormat=columnar option#1+2: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql responseFormat ws+responseFormat=columnar option#1: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql responseFormat ws+responseFormat=columnar option#2: result-type 1`] = `
 Array [
   Object {
     "Orders.status": "processed",

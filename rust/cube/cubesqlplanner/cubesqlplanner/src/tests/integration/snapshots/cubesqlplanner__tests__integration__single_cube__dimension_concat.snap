@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/src/tests/integration/single_cube.rs
+expression: result
+---
+customers__full_location     | orders__count
+-----------------------------+--------------
+Alice Cooper from New York   | 2            
+Alice Johnson from New York  | 2            
+Bob Smith from San Francisco | 2            
+Charlie Brown from           | 2            
+Diana Prince from Boston     | 1

@@ -1,0 +1,21 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/edge_cases.rs
+expression: result
+---
+orders__status | orders__amount_by_id
+---------------+---------------------
+cancelled      | 50.00               
+cancelled      | 50.00               
+cancelled      | 100.00              
+completed      | 400.00              
+completed      | 300.00              
+completed      | 200.00              
+completed      | 200.00              
+completed      | 200.00              
+completed      | 100.00              
+pending        | 30.00               
+pending        | 250.00              
+pending        | 150.00              
+pending        | 120.00              
+pending        | 50.00               
+pending        | 50.00

@@ -2,7 +2,7 @@ use crate::metastore::RocksPropertyRow;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
-use datafusion::arrow::array::{ArrayRef, StringArray};
+use datafusion::arrow::array::{ArrayRef, StringBuilder};
 use datafusion::arrow::datatypes::{DataType, Field};
 use std::sync::Arc;
 
@@ -32,12 +32,12 @@ impl InfoSchemaTableDef for RocksDBPropertiesTableDef {
         &self,
         ctx: InfoSchemaTableDefContext,
         _limit: Option<usize>,
-    ) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        Ok(Arc::new(if self.for_cachestore {
+    ) -> Result<Vec<Self::T>, CubeError> {
+        Ok(if self.for_cachestore {
             ctx.cache_store.rocksdb_properties().await?
         } else {
             ctx.meta_store.rocksdb_properties().await?
-        }))
+        })
     }
 
     fn schema(&self) -> Vec<Field> {
@@ -47,18 +47,22 @@ impl InfoSchemaTableDef for RocksDBPropertiesTableDef {
         ]
     }
 
-    fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>> {
+    fn columns(&self, rows: Vec<Self::T>) -> Vec<ArrayRef> {
+        let num_rows = rows.len();
+        let mut key_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut value_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+
+        for row in rows.into_iter() {
+            key_builder.append_value(&row.key);
+            match row.value.as_ref() {
+                Some(v) => value_builder.append_value(v),
+                None => value_builder.append_null(),
+            }
+        }
+
         vec![
-            Box::new(|items| {
-                Arc::new(StringArray::from_iter_values(
-                    items.iter().map(|row| row.key.clone()),
-                ))
-            }),
-            Box::new(|items| {
-                Arc::new(StringArray::from_iter(
-                    items.iter().map(|row| row.value.as_ref()),
-                ))
-            }),
+            Arc::new(key_builder.finish()),
+            Arc::new(value_builder.finish()),
         ]
     }
 }

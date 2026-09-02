@@ -1,0 +1,24 @@
+views:
+  - name: region_test_view
+    cubes:
+      - join_path: region_test
+        includes: "*"
+    access_policy:
+      - group: user_group
+        conditions:
+          - if: "{ security_context.auth.groups and security_context.auth.groups.includes('region_group') }"
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: product_id
+              operator: equals
+              values: security_context.auth.userAttributes.allowedProductIds
+
+      - group: user_group
+        conditions:
+          - if: "{ not (security_context.auth.groups and security_context.auth.groups.includes('region_group')) }"
+        member_level:
+          includes: "*"
+        row_level:
+          allow_all: true

@@ -1,0 +1,78 @@
+---
+title: "Overview"
+sidebarTitle: "Overview"
+description: "Configure how your team accesses Cube Cloud using passwords, social logins, or SAML-based single sign-on."
+---
+
+ Authentication & SSO
+
+As an account administrator, you can manage how your team and users access Cube Cloud.
+
+You can authenticate using email and password, a GitHub account, or a Google account.
+Cube Cloud also provides single sign-on (SSO) via identity providers supporting
+[SAML](#saml), e.g., Okta, Google Workspace, Azure AD, etc.
+
+<Info>
+
+[SAML](#saml) is available on [Enterprise plan](https://cube.dev/pricing).
+
+</Info>
+
+## Configuration
+
+To manage authentication settings, navigate to **Admin → Settings**
+of your Cube Cloud account, and switch to the **Authentication & SSO** tab.
+
+Use the toggles in **Password**, **Google**, and **GitHub**
+sections to enable or disable these authentication options.
+
+### SAML
+
+Use the toggle in the **SAML** section to enable or disable the authentication
+via an identity provider supporting the [SAML protocol][wiki-saml].
+Once it's enabled, you'll see the **SAML Settings** section directly below.
+
+Check the following guides to get tool-specific instructions on configuration:
+
+<CardGroup cols={2}>
+  <Card title="Google Workspace" img="https://static.cube.dev/icons/google-cloud.svg" href="/admin/sso/google-workspace">
+  </Card>
+  <Card title="Microsoft Entra ID" img="https://static.cube.dev/icons/azure.svg" href="/admin/sso/microsoft-entra-id">
+  </Card>
+  <Card title="Okta" img="https://static.cube.dev/icons/okta.svg" href="/admin/sso/okta">
+  </Card>
+</CardGroup>
+
+#### Match SAML service provider identifiers
+
+Cube shows two service provider values in the SAML settings:
+
+| Cube setting | Identity provider setting |
+| --- | --- |
+| **Single Sign-On URL** | ACS URL or Reply URL |
+| **Audience (SP Entity ID)** | Audience, Entity ID, or SP Entity ID |
+
+The **Audience (SP Entity ID)** value validates the audience in SAML responses.
+It must exactly match the value configured in your identity provider. Leaving
+the field blank disables audience validation and is supported only for
+compatibility with existing configurations.
+
+Some identity providers, including Amazon Federate, use one service provider
+identifier for both the AuthnRequest issuer and the response audience. For
+these providers, set **Audience (SP Entity ID)** in Cube to the **Single
+Sign-On URL**, then use that same value as the identity provider's Entity ID
+or Audience.
+
+<Note>
+
+Existing working SAML integrations do not need to change their Audience. When
+you change an existing configuration, keep another authentication method
+enabled until you have tested SAML sign-in in a separate browser session.
+
+</Note>
+
+[wiki-saml]: https://en.wikipedia.org/wiki/SAML_2.0
+[ref-apis]: /reference
+[ref-dap]: /docs/data-modeling/data-access-policies
+[ref-security-context]: /docs/data-modeling/access-control/context
+[ref-auth-integration]: /docs/data-modeling/access-control#authentication-integration

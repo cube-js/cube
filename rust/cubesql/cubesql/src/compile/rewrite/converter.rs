@@ -3,7 +3,7 @@ use crate::{
     compile::{
         engine::df::{
             scan::{CubeScanNode, CubeScanOptions, MemberField},
-            wrapper::{CubeScanWrapperNode, WrappedSelectNode},
+            wrapper::{CubeScanWrapperNode, WrappedSelectNode, WrappedUnionNode},
         },
         rewrite::{
             analysis::LogicalPlanAnalysis,
@@ -30,7 +30,7 @@ use crate::{
             ValuesValues, WindowFunctionExprFun, WindowFunctionExprWindowFrame, WrappedSelectAlias,
             WrappedSelectDistinct, WrappedSelectJoinJoinType, WrappedSelectLimit,
             WrappedSelectOffset, WrappedSelectPushToCube, WrappedSelectSelectType,
-            WrappedSelectType,
+            WrappedSelectType, WrappedUnionAlias, WrappedUnionDistinct,
         },
         CubeContext,
     },
@@ -149,6 +149,20 @@ macro_rules! add_binary_expr_list_node {
                 .collect::<Result<Vec<_>, _>>()?;
             to_binary_tree($graph, &list)
         }
+    }};
+}
+
+/// A flat list node: every element is a child of one node. Lists are flat here, and the
+/// cons cells `add_plan_list_node!` builds are legacy.
+macro_rules! add_plan_flat_list_node {
+    ($converter:expr, $value_expr:expr, $query_params:expr, $ctx:expr, $field_variant:ident) => {{
+        let list = $value_expr
+            .iter()
+            .map(|expr| $converter.add_logical_plan_replace_params(expr, $query_params, $ctx))
+            .collect::<Result<Vec<_>, _>>()?;
+        $converter
+            .graph
+            .add(LogicalPlanLanguage::$field_variant(list))
     }};
 }
 
@@ -698,7 +712,8 @@ impl LogicalPlanToLanguageConverter {
                 self.graph.add(LogicalPlanLanguage::Repartition([input]))
             }
             LogicalPlan::Union(node) => {
-                let inputs = add_plan_list_node!(self, node.inputs, query_params, ctx, UnionInputs);
+                let inputs =
+                    add_plan_flat_list_node!(self, node.inputs, query_params, ctx, UnionInputs);
                 let alias = add_data_node!(self, node.alias, UnionAlias);
                 self.graph.add(LogicalPlanLanguage::Union([inputs, alias]))
             }
@@ -873,7 +888,7 @@ macro_rules! match_data_node {
         match $node_by_id.index($id_expr.clone()) {
             LogicalPlanLanguage::$field_variant($field_variant(data)) => data.clone(),
             x => {
-                return Err(CubeError::internal(format!(
+                return Err(CubeError::rewrite(format!(
                     "Expected {} but found {:?}",
                     std::stringify!($field_variant),
                     x
@@ -1142,7 +1157,7 @@ pub fn node_to_expr(
             let args = match_expr_list_node!(node_by_id, to_expr, params[1], ScalarUDFExprArgs);
             let fun = cube_context
                 .get_function_meta(&fun_name)
-                .ok_or(CubeError::user(format!(
+                .ok_or(CubeError::rewrite(format!(
                     "Scalar UDF '{}' is not found",
                     fun_name
                 )))?;
@@ -1197,7 +1212,7 @@ pub fn node_to_expr(
             let distinct = match_data_node!(node_by_id, params[2], AggregateUDFExprDistinct);
             let fun = cube_context
                 .get_aggregate_meta(&fun_name)
-                .ok_or(CubeError::user(format!(
+                .ok_or(CubeError::rewrite(format!(
                     "Aggregate UDF '{}' is not found",
                     fun_name
                 )))?;
@@ -1212,7 +1227,7 @@ pub fn node_to_expr(
             let args = match_expr_list_node!(node_by_id, to_expr, params[1], TableUDFExprArgs);
             let fun = cube_context
                 .get_table_function_meta(&fun_name)
-                .ok_or(CubeError::user(format!(
+                .ok_or(CubeError::rewrite(format!(
                     "Table UDF '{}' is not found",
                     fun_name
                 )))?;
@@ -1235,7 +1250,7 @@ pub fn node_to_expr(
             Expr::GetIndexedField { expr, key }
         }
         LogicalPlanLanguage::QueryParam(_) => {
-            return Err(CubeError::user(
+            return Err(CubeError::rewrite(
                 "QueryParam can't be evaluated as an Expr node".to_string(),
             ));
         }
@@ -1321,10 +1336,16 @@ impl LanguageToLogicalPlanConverter {
                 let input = Arc::new(self.to_logical_plan(params[0])?);
                 let window_expr =
                     match_expr_list_node!(node_by_id, to_expr, params[1], WindowWindowExpr);
+                // Don't realias replaced columns inside window expressions: an alias
+                // inside e.g. ORDER BY would change the name of the whole window
+                // expression, while plans above reference it by the original name.
+                // Replacing a qualified column with its flat name keeps the rendered
+                // expression name intact, since `flat_name` of a qualified column
+                // matches the name of the unqualified flat column.
                 let window_expr = replace_qualified_col_with_flat_name_if_missing(
                     window_expr,
                     input.schema(),
-                    true,
+                    false,
                 )?;
                 let mut window_fields: Vec<DFField> =
                     exprlist_to_fields(window_expr.iter(), &input)?;
@@ -1397,14 +1418,14 @@ impl LanguageToLogicalPlanConverter {
                     if left_on.iter().any(|c| c.name == "__cubeJoinField")
                         || right_on.iter().any(|c| c.name == "__cubeJoinField")
                     {
-                        return Err(CubeError::internal(
+                        return Err(CubeError::rewrite(
                             "Can not join Cubes. This is most likely due to one of the following reasons:\n\
                             • one of the cubes contains a group by\n\
                             • one of the cubes contains a measure\n\
                             • the cube on the right contains a filter, sorting or limits\n".to_string(),
                         ));
                     } else {
-                        return Err(CubeError::internal(
+                        return Err(CubeError::rewrite(
                             "Use __cubeJoinField to join Cubes".to_string(),
                         ));
                     }
@@ -1446,7 +1467,7 @@ impl LanguageToLogicalPlanConverter {
                 if Self::have_ungrouped_cube_scan_inside(&left)
                     || Self::have_ungrouped_cube_scan_inside(&right)
                 {
-                    return Err(CubeError::internal(
+                    return Err(CubeError::rewrite(
                         "Can not join Cubes. This is most likely due to one of the following reasons:\n\
                         • one of the cubes contains a group by\n\
                         • one of the cubes contains a measure\n\
@@ -1519,7 +1540,7 @@ impl LanguageToLogicalPlanConverter {
                 let provider = self
                     .cube_context
                     .get_table_provider(table_reference)
-                    .ok_or(CubeError::user(format!(
+                    .ok_or(CubeError::rewrite(format!(
                         "Table '{}' is not found",
                         source_table_name
                     )))?;
@@ -1611,10 +1632,7 @@ impl LanguageToLogicalPlanConverter {
                             query_measures.push(measure.to_string());
                             let data_type =
                                 self.cube_context.meta.find_df_data_type(&measure).ok_or(
-                                    CubeError::internal(format!(
-                                        "Can't find measure '{}'",
-                                        measure
-                                    )),
+                                    CubeError::rewrite(format!("Can't find measure '{}'", measure)),
                                 )?;
                             fields.push((
                                 DFField::new(
@@ -1667,7 +1685,7 @@ impl LanguageToLogicalPlanConverter {
                             let expr = self.to_expr(params[1])?;
                             let data_type =
                                 self.cube_context.meta.find_df_data_type(&dimension).ok_or(
-                                    CubeError::internal(format!(
+                                    CubeError::rewrite(format!(
                                         "Can't find dimension '{}'",
                                         dimension
                                     )),
@@ -1740,11 +1758,11 @@ impl LanguageToLogicalPlanConverter {
                         }
                         LogicalPlanLanguage::MemberError(params) => {
                             let error = match_data_node!(node_by_id, params[0], MemberErrorError);
-                            return Err(CubeError::user(error.to_string()));
+                            return Err(CubeError::rewrite(error.to_string()));
                         }
                         LogicalPlanLanguage::AllMembers(_) => {
                             if !wrapped {
-                                return Err(CubeError::internal(
+                                return Err(CubeError::rewrite(
                                     "Can't detect Cube query and it may be not supported yet"
                                         .to_string(),
                                 ));
@@ -1755,7 +1773,10 @@ impl LanguageToLogicalPlanConverter {
                                         .meta
                                         .find_cube_with_name(cube)
                                         .ok_or_else(|| {
-                                            CubeError::user(format!("Can't find cube '{}'", cube))
+                                            CubeError::rewrite(format!(
+                                                "Can't find cube '{}'",
+                                                cube
+                                            ))
                                         })?;
                                     for column in cube.get_columns() {
                                         if self
@@ -1859,13 +1880,13 @@ impl LanguageToLogicalPlanConverter {
                                             and: None,
                                         });
                                         if !segments.is_empty() {
-                                            return Err(CubeError::internal(
+                                            return Err(CubeError::rewrite(
                                                 "Can't use OR operator with segments".to_string(),
                                             ));
                                         }
 
                                         if change_user.is_some() {
-                                            return Err(CubeError::internal(
+                                            return Err(CubeError::rewrite(
                                                 "Can't use OR operator with __user column"
                                                     .to_string(),
                                             ));
@@ -1929,7 +1950,7 @@ impl LanguageToLogicalPlanConverter {
                     }
 
                     if change_user_result.len() > 1 {
-                        return Err(CubeError::internal(
+                        return Err(CubeError::rewrite(
                             "Unable to use multiple __user in one Cube query".to_string(),
                         ));
                     }
@@ -1963,7 +1984,7 @@ impl LanguageToLogicalPlanConverter {
                 }
 
                 if !wrapped && fields.len() == 0 {
-                    return Err(CubeError::internal(
+                    return Err(CubeError::rewrite(
                         "Can't detect Cube query and it may be not supported yet".to_string(),
                     ));
                 }
@@ -2090,7 +2111,23 @@ impl LanguageToLogicalPlanConverter {
 
                 let node = Arc::new(CubeScanNode::new(
                     Arc::new(DFSchema::new_with_metadata(
-                        fields.into_iter().map(|(f, _)| f).collect(),
+                        fields
+                            .into_iter()
+                            .map(|(f, m)| {
+                                if let MemberField::Member(member) = &m {
+                                    let mut metadata =
+                                        f.field().metadata().cloned().unwrap_or_default();
+                                    metadata
+                                        .insert("member_name".to_string(), member.member.clone());
+                                    DFField::from_qualified(
+                                        f.qualifier().unwrap_or(&"".to_string()),
+                                        f.field().clone().with_metadata(Some(metadata)),
+                                    )
+                                } else {
+                                    f
+                                }
+                            })
+                            .collect(),
                         HashMap::new(),
                     )?),
                     member_fields,
@@ -2286,15 +2323,26 @@ impl LanguageToLogicalPlanConverter {
                     without_window_fields.clone(),
                     HashMap::new(),
                 )?);
+                // The name DataFusion derived for a window expression is what a filter or a
+                // projection above this select refers to it by, and it is built out of the
+                // expression as it was written. Take it before flattening qualified columns:
+                // that rewrite aliases a column back to its unqualified name, which renames
+                // the window column - `LAG(ta_3.ca_1) OVER (...)` becomes `LAG(ca_1) OVER
+                // (...)` - and leaves everything above pointing at a field that is no longer
+                // in the schema.
+                let window_expr_names = window_expr
+                    .iter()
+                    .map(|e| e.name(&without_window_fields_schema))
+                    .collect::<Result<Vec<_>, _>>()?;
                 let window_expr_rebased = replace_qualified_col_with_flat_name_if_missing(
                     window_expr,
                     &without_window_fields_schema,
                     true,
                 )?
-                .iter()
-                .map(|e| {
-                    let original_expr_name = e.name(&without_window_fields_schema)?;
-                    let new_expr = match replace_col_to_expr(e.clone(), &replace_map)? {
+                .into_iter()
+                .zip(window_expr_names)
+                .map(|(e, original_expr_name)| {
+                    let new_expr = match replace_col_to_expr(e, &replace_map)? {
                         Expr::Alias(expr, _) => Expr::Alias(expr, original_expr_name),
                         expr => Expr::Alias(Box::new(expr), original_expr_name),
                     };
@@ -2348,6 +2396,40 @@ impl LanguageToLogicalPlanConverter {
                         alias,
                         distinct,
                         push_to_cube,
+                    )),
+                })
+            }
+            LogicalPlanLanguage::WrappedUnion(params) => {
+                let inputs = match_list_node_ids!(node_by_id, params[0], WrappedUnionInputs)
+                    .into_iter()
+                    .map(|n| self.to_logical_plan(n).map(Arc::new))
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                let distinct: bool = match_data_node!(node_by_id, params[1], WrappedUnionDistinct);
+                let alias: Option<String> =
+                    match_data_node!(node_by_id, params[2], WrappedUnionAlias);
+
+                let Some(first_input) = inputs.first() else {
+                    return Err(CubeError::internal(
+                        "Can't convert wrapped union with no inputs".to_string(),
+                    ));
+                };
+
+                // Same as `Union`: the inputs are union compatible, so the first one's schema
+                // stands for all of them
+                let schema = first_input.schema().as_ref().clone();
+                let schema = match alias {
+                    Some(ref alias) => schema.replace_qualifier(alias.as_str()),
+                    None => schema.strip_qualifiers(),
+                };
+
+                LogicalPlan::Extension(Extension {
+                    node: Arc::new(WrappedUnionNode::new(
+                        Arc::new(schema),
+                        inputs,
+                        distinct,
+                        alias,
+                        None,
                     )),
                 })
             }

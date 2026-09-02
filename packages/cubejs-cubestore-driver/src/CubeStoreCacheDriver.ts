@@ -1,12 +1,16 @@
-import { createCancelablePromise, MaybeCancelablePromise } from '@cubejs-backend/shared';
+import { createCancelablePromise, getEnv, MaybeCancelablePromise } from '@cubejs-backend/shared';
 import { CacheDriverInterface } from '@cubejs-backend/base-driver';
 
 import { CubeStoreDriver } from './CubeStoreDriver';
 
 export class CubeStoreCacheDriver implements CacheDriverInterface {
+  protected readonly sendParameters: boolean;
+
   public constructor(
     protected connectionFactory: () => Promise<CubeStoreDriver>,
-  ) {}
+  ) {
+    this.sendParameters = getEnv('cubestoreSendableParameters');
+  }
 
   protected connection: CubeStoreDriver | null = null;
 
@@ -60,9 +64,12 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
   });
 
   public async get(key: string) {
-    const rows = await (await this.getConnection()).query('CACHE GET ?', [
+    const connection = await this.getConnection();
+    const rows = await connection.query('CACHE GET ?', [
       key
-    ]);
+    ], {
+      sendParameters: this.sendParameters && await connection.hasCapability('sendableParameters')
+    });
     if (rows && rows.length === 1) {
       return JSON.parse(rows[0].value);
     }
@@ -72,7 +79,10 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
 
   public async set(key: string, value, expiration) {
     const strValue = JSON.stringify(value);
-    await (await this.getConnection()).query('CACHE SET TTL ? ? ?', [expiration, key, strValue]);
+    const connection = await this.getConnection();
+    await connection.query('CACHE SET TTL ? ? ?', [expiration, key, strValue], {
+      sendParameters: this.sendParameters && await connection.hasCapability('sendableParameters')
+    });
 
     return {
       key,
@@ -81,9 +91,10 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
   }
 
   public async remove(key: string) {
-    await (await this.getConnection()).query('CACHE REMOVE ?', [
-      key
-    ]);
+    const connection = await this.getConnection();
+    await connection.query('CACHE REMOVE ?', [key], {
+      sendParameters: this.sendParameters && await connection.hasCapability('sendableParameters')
+    });
   }
 
   public async keysStartingWith(prefix: string) {

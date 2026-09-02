@@ -64,15 +64,20 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
                     inline_tables: InlineTables::new(),
                     trace_obj: None,
                     process_id: None,
+                    parameters: None,
                 },
                 query,
             )
             .await;
+        let res = match res {
+            Ok(qr) => qr.collect().await,
+            Err(e) => Err(e),
+        };
         if let Err(e) = res {
             error!(
-                "Error during processing {}: {}",
-                query,
-                e.display_with_backtrace()
+                "Error during query processing: {}\nQuery: {}",
+                e.display_with_backtrace(),
+                query
             );
             results.error(ErrorKind::ER_INTERNAL_ERROR, e.message.as_bytes())?;
             return Ok(());

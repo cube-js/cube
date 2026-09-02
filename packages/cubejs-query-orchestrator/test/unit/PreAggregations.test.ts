@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable global-require */
-import R from 'ramda';
 import {
   BUILD_RANGE_END_LOCAL,
   BUILD_RANGE_START_LOCAL,
   FROM_PARTITION_RANGE,
   TO_PARTITION_RANGE
 } from '@cubejs-backend/shared';
-import { PreAggregationPartitionRangeLoader, PreAggregations, version } from '../../src';
+import crypto from 'crypto';
+
+import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, LocalCacheDriver, version } from '../../src';
 
 class MockDriver {
   public tables: string[] = [];
@@ -123,34 +123,32 @@ describe('PreAggregations', () => {
   let mockExternalDriverFactory: (() => Promise<MockDriver>) | null = null;
   let queryCache: any = null;
 
-  const basicQuery: any = {
+  const defaultCacheKeyQuery: [string, any[], Record<string, any>] = ['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', [], {
+    renewalThreshold: 10,
+    external: false,
+  }];
+
+  const createBasicQuery = (overrides: Record<string, any> = {}): any => ({
     query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
     values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
     cacheKeyQueries: {
       renewalThreshold: 21600,
-      queries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', [], {
-        renewalThreshold: 10,
-        external: false,
-      }]]
+      queries: [defaultCacheKeyQuery]
     },
     preAggregations: [{
       preAggregationsSchema: 'stb_pre_aggregations',
       tableName: 'stb_pre_aggregations.orders_number_and_count20191101',
       loadSql: ['CREATE TABLE stb_pre_aggregations.orders_number_and_count20191101 AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
-      invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', [], {
-        renewalThreshold: 10,
-        external: false,
-      }]]
+      invalidateKeyQueries: [defaultCacheKeyQuery],
     }],
-    requestId: 'basic'
-  };
+    requestId: 'basic',
+    ...overrides,
+  });
 
-  const basicQueryExternal = R.clone(basicQuery);
-  basicQueryExternal.preAggregations[0].external = true;
-  const basicQueryWithRenew = R.clone(basicQuery);
-  basicQueryWithRenew.renewQuery = true;
-  const basicQueryExternalWithRenew = R.clone(basicQueryExternal);
-  basicQueryExternalWithRenew.renewQuery = true;
+  const basicQuery: any = createBasicQuery();
+  const basicQueryExternal = createBasicQuery({ preAggregations: [{ ...basicQuery.preAggregations[0], external: true }] });
+  const basicQueryWithRenew = createBasicQuery({ cacheMode: 'must-revalidate' });
+  const basicQueryExternalWithRenew = createBasicQuery({ preAggregations: [{ ...basicQuery.preAggregations[0], external: true }], cacheMode: 'must-revalidate' });
 
   beforeEach(() => {
     mockDriver = new MockDriver();
@@ -167,11 +165,6 @@ describe('PreAggregations', () => {
       return driver;
     };
 
-    jest.resetModules();
-
-    // Dynamic require after resetModules to ensure fresh module state
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { QueryCache } = require('../../src/orchestrator/QueryCache');
     queryCache = new QueryCache(
       'TEST',
       mockDriverFactory as any,
@@ -179,12 +172,403 @@ describe('PreAggregations', () => {
       () => {},
       {
         cacheAndQueueDriver: 'memory',
-        queueOptions: () => ({
+        queueOptions: async () => ({
           executionTimeout: 1,
           concurrency: 2,
         }),
+        // Only reached by a query carrying `external: true`.
+        externalDriverFactory: mockExternalDriverFactory as any,
       },
     );
+
+    // Reset the shared in-memory cache store between tests
+    (queryCache.getCacheDriver() as LocalCacheDriver).reset();
+  });
+
+  const createPreAggregations = (options: Record<string, any> = {}) => new PreAggregations(
+    'TEST',
+    mockDriverFactory as any,
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    () => {},
+    queryCache!,
+    {
+      queueOptions: async () => ({
+        executionTimeout: 1,
+        concurrency: 2,
+      }),
+      ...options,
+    },
+  );
+
+  describe('touch/used cache key cleanup', () => {
+    let preAggregations: PreAggregations;
+
+    beforeEach(() => {
+      preAggregations = new PreAggregations(
+        'TEST',
+        mockDriverFactory as any,
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
+        queryCache!,
+        {
+          queueOptions: async () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
+        },
+      );
+    });
+
+    test('removeTableUsed / removeTableTouched drop keys and evict the in-memory LRU', async () => {
+      const table = 'stb_pre_aggregations.orders_abc_def_1';
+
+      await preAggregations.addTableUsed(table);
+      await preAggregations.updateLastTouch(table);
+
+      expect(await preAggregations.tablesUsed()).toContain(table);
+      expect(await preAggregations.tablesTouched()).toContain(table);
+
+      await preAggregations.removeTableUsed(table);
+      await preAggregations.removeTableTouched(table);
+
+      expect(await preAggregations.tablesUsed()).not.toContain(table);
+      expect(await preAggregations.tablesTouched()).not.toContain(table);
+
+      // Re-adding must succeed. If the LRU guard weren't evicted, the has()
+      // short-circuit in addTableUsed/updateLastTouch would suppress the write
+      // and the keys would stay absent.
+      await preAggregations.addTableUsed(table);
+      await preAggregations.updateLastTouch(table);
+
+      expect(await preAggregations.tablesUsed()).toContain(table);
+      expect(await preAggregations.tablesTouched()).toContain(table);
+    });
+
+    test('failed pre-aggregation build drops its touch and used keys', async () => {
+      const preAggregation = {
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_number_and_count',
+        dataSource: 'default',
+        external: false,
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders_number_and_count AS SELECT 1', []],
+        invalidateKeyQueries: [],
+      };
+
+      const newVersionEntry = {
+        table_name: 'stb_pre_aggregations.orders_number_and_count',
+        structure_version: 'aaaa1111',
+        content_version: 'bbbb2222',
+        last_updated_at: 1600000000000,
+        naming_version: 2,
+      };
+
+      const targetTableName = PreAggregations.targetTableName(newVersionEntry);
+
+      // Simulate a build that fails inside the datasource.
+      jest.spyOn(mockDriver!, 'loadPreAggregationIntoTable')
+        .mockRejectedValue(new Error('build boom'));
+
+      const loadCache = new PreAggregationLoadCache(
+        mockDriverFactory as any,
+        queryCache!,
+        preAggregations,
+        { dataSource: 'default' },
+      );
+
+      const loader = new PreAggregationLoader(
+        mockDriverFactory as any,
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
+        queryCache!,
+        preAggregations,
+        preAggregation,
+        [],
+        loadCache,
+        { requestId: 'failed-build' },
+      );
+
+      await expect(loader.refresh(newVersionEntry as any, [] as any, mockDriver!))
+        .rejects.toThrow('build boom');
+
+      // The failed attempt must leave no touch/used markers behind, otherwise
+      // repeated failures accumulate keys in cache until TTL (CORE-646).
+      expect(await preAggregations.tablesTouched()).not.toContain(targetTableName);
+      expect(await preAggregations.tablesUsed()).not.toContain(targetTableName);
+    });
+  });
+
+  describe('isPartitionExist', () => {
+    test('initializes a missing data source queue before checking the job result', async () => {
+      const preAggregations = new PreAggregations(
+        'TEST',
+        mockDriverFactory as any,
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
+        queryCache!,
+        {
+          cacheAndQueueDriver: 'memory',
+          queueOptions: async () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
+        },
+      );
+      mockDriver!.tables.push('stb_pre_aggregations.orders_main');
+
+      await expect(
+        preAggregations.isPartitionExist(
+          'request-id',
+          false,
+          'named_data_source',
+          'stb_pre_aggregations',
+          'stb_pre_aggregations.orders_main',
+          ['job-key'],
+          'job-token',
+        )
+      ).resolves.toEqual([true, 'done']);
+    });
+  });
+
+  describe('refresh key memoization', () => {
+    let preAggregations: PreAggregations;
+
+    const preAggregation = {
+      preAggregationsSchema: 'stb_pre_aggregations',
+      tableName: 'stb_pre_aggregations.orders_memo',
+      dataSource: 'default',
+      external: false,
+      loadSql: ['CREATE TABLE stb_pre_aggregations.orders_memo AS SELECT 1', []],
+      invalidateKeyQueries: [defaultCacheKeyQuery],
+    };
+
+    const createLoadCache = (dataSource: string = 'default') => new PreAggregationLoadCache(
+      mockDriverFactory as any,
+      queryCache!,
+      preAggregations,
+      { dataSource },
+    );
+
+    const createPreAggLoader = (
+      loadCache: PreAggregationLoadCache,
+      options: Record<string, any> = {},
+      preAggOverrides: Record<string, any> = {},
+    ) => new PreAggregationLoader(
+      mockDriverFactory as any,
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      () => {},
+      queryCache!,
+      preAggregations,
+      { ...preAggregation, ...preAggOverrides },
+      [],
+      loadCache,
+      { requestId: 'refresh-key-memo', ...options },
+    );
+
+    beforeEach(() => {
+      preAggregations = createPreAggregations();
+    });
+
+    test('refresh key identity covers sql, params and engine, but not policy', async () => {
+      const loadCache = createLoadCache();
+      const [sql] = defaultCacheKeyQuery;
+
+      expect(loadCache.hasKeyQueryResult(defaultCacheKeyQuery)).toBe(false);
+      await loadCache.keyQueryResult(defaultCacheKeyQuery, false, 10);
+
+      expect(loadCache.hasKeyQueryResult(defaultCacheKeyQuery)).toBe(true);
+      // Missing options element, and differing policy with `external` left absent — see
+      // QueryCache.refreshKeyIdentity for why neither may move the key.
+      expect(loadCache.hasKeyQueryResult(defaultCacheKeyQuery.slice(0, 2) as any)).toBe(true);
+      expect(loadCache.hasKeyQueryResult([sql, [], { renewalThreshold: 1 }])).toBe(true);
+      // The engine does change identity — same SQL run against Cube Store is a different query.
+      expect(loadCache.hasKeyQueryResult([sql, [], { external: true }])).toBe(false);
+      expect(loadCache.hasKeyQueryResult(['SELECT NOW() as unrelated', [], {}])).toBe(false);
+    });
+
+    test('a refresh key resolved against each engine gets its own cache entry', async () => {
+      const [sql] = defaultCacheKeyQuery;
+      const loadCache = createLoadCache();
+
+      await loadCache.keyQueryResult([sql, [], { external: false }], false, 10);
+      await loadCache.keyQueryResult([sql, [], { external: true }], false, 10);
+
+      // Same SQL, different engine: conflating them would serve one engine's result for the other.
+      expect(mockDriver!.executedQueries.filter(q => q === sql).length).toEqual(1);
+      expect(mockExternalDriver!.executedQueries.filter(q => q === sql).length).toEqual(1);
+    });
+
+    test('a refresh key resolved against each data source gets its own cache entry', async () => {
+      const [sql] = defaultCacheKeyQuery;
+
+      await createLoadCache('default').keyQueryResult(defaultCacheKeyQuery, false, 10);
+      await createLoadCache('staging').keyQueryResult(defaultCacheKeyQuery, false, 10);
+
+      // The cache prefix only separates tenants, so without the data source in the key the second
+      // load cache would serve the first one's row for a different database.
+      expect(mockDriver!.executedQueries.filter(q => q === sql).length).toEqual(2);
+    });
+
+    test('an absent data source hashes as default', () => {
+      // `loadRefreshKeysFromQuery` forwards `query.dataSource` untouched, so an absent one reaches
+      // the same driver as `default` and must share its entry.
+      expect(queryCache!.refreshKeyCacheKey(defaultCacheKeyQuery, undefined))
+        .toEqual(queryCache!.refreshKeyCacheKey(defaultCacheKeyQuery, 'default'));
+    });
+
+    test('both refresh key paths store the same renewal key', async () => {
+      const cacheKey = queryCache!.refreshKeyCacheKey(defaultCacheKeyQuery, 'default');
+      const storedRenewalKey = async () => (await queryCache!.getCacheDriver().get(cacheKey)).renewalKey;
+
+      await queryCache!.loadRefreshKey(defaultCacheKeyQuery, 3600, { dataSource: 'default', requestId: 'loadRefreshKey' });
+      const throughLoadRefreshKey = await storedRenewalKey();
+
+      // Each path has to write the entry itself, otherwise the second one just reads what the
+      // first stored and any disagreement stays invisible.
+      (queryCache!.getCacheDriver() as LocalCacheDriver).reset();
+      await createLoadCache().keyQueryResult(defaultCacheKeyQuery, false, 10);
+      const throughKeyQueryResult = await storedRenewalKey();
+
+      // The same SQL can arrive as a cube cacheKeyQuery and as a pre-aggregation
+      // invalidateKeyQuery, sharing this entry — disagreeing renewal keys would make each path look
+      // stale to the other and re-fetch on every touch.
+      expect(throughLoadRefreshKey).toEqual(throughKeyQueryResult);
+    });
+
+    test('warm invalidation keys are confirmed synchronously', async () => {
+      const loadCache = createLoadCache();
+      await loadCache.keyQueryResult(defaultCacheKeyQuery, false, 10);
+
+      const result = await createPreAggLoader(loadCache, { waitForRenew: false }).loadPreAggregation(true);
+
+      // A populated refreshKeyValues is the marker of the inline path; the deferred one reports [].
+      expect(result!.refreshKeyValues.length).toEqual(1);
+    });
+
+    test('warm invalidation keys do not let externalRefresh build a pre-aggregation', async () => {
+      const loadCache = createLoadCache();
+      await loadCache.keyQueryResult(defaultCacheKeyQuery, false, 10);
+
+      await expect(createPreAggLoader(loadCache, { externalRefresh: true }).loadPreAggregation(true))
+        .rejects.toThrowError(/No pre-aggregation partitions were built yet/);
+      expect(mockDriver!.tables).toEqual([]);
+    });
+
+    test('a pre-aggregation with no invalidation keys does not let externalRefresh build either', async () => {
+      const noKeys = { invalidateKeyQueries: [] };
+
+      // The one combination whose behaviour the guard changes: an empty key list used to leave
+      // `notLoadedKey` undefined, which sent even an externalRefresh instance onto the building path.
+      await expect(createPreAggLoader(createLoadCache(), { externalRefresh: true }, noKeys).loadPreAggregation(true))
+        .rejects.toThrowError(/No pre-aggregation partitions were built yet/);
+      await expect(createPreAggLoader(createLoadCache(), { externalRefresh: true }, noKeys).loadPreAggregation(false))
+        .resolves.toBeNull();
+
+      expect(mockDriver!.tables).toEqual([]);
+    });
+  });
+
+  describe('local refresh key', () => {
+    const REFRESH_KEY_SQL = 'SELECT FLOOR((UNIX_TIMESTAMP()) / 600) as refresh_key';
+    const descriptor = { interval: 600, utcOffset: 0, dayOffset: 0, cron: false };
+
+    const newQueryCache = (localRefreshKey?: boolean) => new QueryCache(
+      'TEST',
+      mockDriverFactory as any,
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      () => {},
+      {
+        cacheAndQueueDriver: 'memory',
+        localRefreshKey,
+        queueOptions: async () => ({ executionTimeout: 1, concurrency: 2 }),
+      },
+    );
+
+    const newLoadCache = (localRefreshKey?: boolean) => {
+      const cache = newQueryCache(localRefreshKey);
+      (cache.getCacheDriver() as LocalCacheDriver).reset();
+
+      const preAggregations = new PreAggregations(
+        'TEST',
+        mockDriverFactory as any,
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
+        cache,
+        { queueOptions: async () => ({ executionTimeout: 1, concurrency: 2 }) },
+      );
+
+      return new PreAggregationLoadCache(
+        mockDriverFactory as any,
+        cache,
+        preAggregations,
+        { dataSource: 'default' },
+      );
+    };
+
+    test('keyQueryResult evaluates locally without querying the datasource', async () => {
+      const loadCache = newLoadCache(true);
+
+      const result = await loadCache.keyQueryResult(
+        [REFRESH_KEY_SQL, [], { external: true, renewalThreshold: 60, localRefreshKey: descriptor }],
+        false,
+        10,
+      );
+
+      expect(result).toEqual([{ refresh_key: String(Math.floor(Date.now() / 1000 / descriptor.interval)) }]);
+      expect(mockDriver!.executedQueries).toEqual([]);
+    });
+
+    test('keyQueryResult still queries when the flag is off', async () => {
+      const loadCache = newLoadCache(false);
+
+      await loadCache.keyQueryResult(
+        [REFRESH_KEY_SQL, [], { external: false, renewalThreshold: 60, localRefreshKey: descriptor }],
+        false,
+        10,
+      );
+
+      expect(mockDriver!.executedQueries).toEqual([REFRESH_KEY_SQL]);
+    });
+
+    test('keyQueryResult still queries an incremental key that carries no descriptor', async () => {
+      const loadCache = newLoadCache(true);
+      const incrementalSql = 'SELECT CASE WHEN NOW() < $1 THEN FLOOR((UNIX_TIMESTAMP()) / 3600) END as refresh_key';
+
+      await loadCache.keyQueryResult(
+        [incrementalSql, [], {
+          external: false,
+          renewalThreshold: 300,
+          incremental: true,
+          renewalThresholdOutsideUpdateWindow: 86400,
+        }],
+        false,
+        10,
+      );
+
+      expect(mockDriver!.executedQueries).toEqual([incrementalSql]);
+    });
+
+    // A single load reads the invalidation keys several times (contentVersion, the returned
+    // refreshKeyValues, the refresh queue key). If the clock were re-read, a load crossing an
+    // interval boundary would look a table up under one content version and enqueue it under
+    // another.
+    test('keyQueryResult is stable across an interval boundary within one load cache', async () => {
+      const loadCache = newLoadCache(true);
+      const key: [string, any[], Record<string, any>] =
+        [REFRESH_KEY_SQL, [], { external: true, renewalThreshold: 60, localRefreshKey: descriptor }];
+
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(600_000);
+      try {
+        const first = await loadCache.keyQueryResult(key, false, 10);
+        expect(first).toEqual([{ refresh_key: '1' }]);
+
+        nowSpy.mockReturnValue(1_200_000);
+        const second = await loadCache.keyQueryResult(key, false, 10);
+
+        expect(second).toEqual(first);
+      } finally {
+        nowSpy.mockRestore();
+      }
+    });
   });
 
   describe('loadAllPreAggregationsIfNeeded', () => {
@@ -198,7 +582,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -211,6 +595,34 @@ describe('PreAggregations', () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations!.loadAllPreAggregationsIfNeeded(basicQueryWithRenew);
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
       expect(result[0][1].lastUpdatedAt).toEqual(12345000);
+    });
+
+    // A jobed build gets back a flat list of entries and has to tell them apart.
+    // https://github.com/cube-js/cube/issues/11615
+    test('each entry carries the identity of the descriptor it was built from', async () => {
+      const { preAggregationsTablesToTempTables: result } = await preAggregations!.loadAllPreAggregationsIfNeeded(
+        createBasicQuery({
+          cacheMode: 'must-revalidate',
+          preAggregations: [{
+            ...basicQuery.preAggregations[0],
+            preAggregationId: 'Orders.numberAndCount',
+            dataSource: 'orders_ds',
+            timezone: 'America/Los_Angeles',
+          }],
+        })
+      );
+
+      expect(result[0][1]).toMatchObject({
+        preAggregationId: 'Orders.numberAndCount',
+        dataSource: 'orders_ds',
+        timezone: 'America/Los_Angeles',
+      });
+    });
+
+    test('an entry built without a named data source falls back to the default one', async () => {
+      const { preAggregationsTablesToTempTables: result } = await preAggregations!.loadAllPreAggregationsIfNeeded(basicQueryWithRenew);
+
+      expect(result[0][1].dataSource).toEqual('default');
     });
   });
 
@@ -225,7 +637,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -252,7 +664,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -279,7 +691,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -310,7 +722,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -344,7 +756,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -395,7 +807,7 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         {
-          queueOptions: () => ({
+          queueOptions: async () => ({
             executionTimeout: 1,
             concurrency: 2,
           }),
@@ -932,8 +1344,6 @@ describe('PreAggregations', () => {
       // Old implementation (before the unsigned shift fix)
       // This would hang on certain inputs, but for inputs that don't trigger the bug,
       // it should produce the same results as the new implementation
-      const crypto = require('crypto');
-
       function oldVersion(cacheKey: any): string | null {
         let result = '';
 

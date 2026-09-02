@@ -1,0 +1,12 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/filters.rs
+expression: result
+---
+orders__status | orders__category
+---------------+-----------------
+completed      | books           
+completed      | clothing        
+completed      | electronics     
+pending        | books           
+pending        | clothing        
+pending        | electronics

@@ -1,0 +1,12 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_default_filters.rs
+assertion_line: 134
+expression: result
+---
+orders_view__country | orders_view__amount_in_country
+---------------------+-------------------------------
+CA                   | 50.00                         
+DE                   | 75.00                         
+FR                   | 28.00                         
+GB                   | 60.00                         
+US                   | 100.00

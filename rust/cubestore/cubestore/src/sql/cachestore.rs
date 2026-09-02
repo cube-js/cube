@@ -1,4 +1,6 @@
-use crate::cachestore::{CacheItem, CacheStore, EvictionResult, QueueAddPayload, QueueItem};
+use crate::cachestore::{
+    CacheItem, CacheStore, EvictionResult, QueueAddAndRetrievePayload, QueueAddPayload, QueueItem,
+};
 use crate::metastore::{Column, ColumnType};
 
 use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType, TraceIndex};
@@ -7,7 +9,7 @@ use crate::sql::parser::{
     CacheCommand, CacheStoreCommand, CubeStoreParser, QueueCommand,
     Statement as CubeStoreStatement, SystemCommand,
 };
-use crate::sql::{QueryPlans, SqlQueryContext, SqlService};
+use crate::sql::{QueryPlans, QueryResult, SqlQueryContext, SqlService};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
 use crate::util::metrics;
@@ -49,6 +51,10 @@ impl CacheStoreSqlService {
         match command {
             CacheStoreCommand::Compaction => {
                 self.cachestore.compaction().await?;
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
+            CacheStoreCommand::Truncate => {
+                self.cachestore.truncate().await?;
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
             CacheStoreCommand::Info => {
@@ -175,6 +181,13 @@ impl CacheStoreSqlService {
                 self.cachestore.healthcheck().await?;
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
+            CacheStoreCommand::Wipe => {
+                log::warn!(
+                    "Wiping cachestore state (SYSTEM CACHESTORE WIPE): truncating all tables and persisting a fresh snapshot"
+                );
+                self.cachestore.wipe().await?;
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
         }
     }
 
@@ -253,8 +266,8 @@ impl CacheStoreSqlService {
 
                 (Arc::new(DataFrame::new(vec![], vec![])), None, true)
             }
-            CacheCommand::Truncate {} => {
-                self.cachestore.cache_truncate().await?;
+            CacheCommand::Clear {} => {
+                self.cachestore.cache_clear().await?;
 
                 (Arc::new(DataFrame::new(vec![], vec![])), None, false)
             }
@@ -327,6 +340,7 @@ impl CacheStoreSqlService {
                 priority,
                 orphaned,
                 value,
+                external_id,
             } => {
                 if exclusive && context.process_id.is_none() {
                     return Err(CubeError::user(
@@ -344,6 +358,7 @@ impl CacheStoreSqlService {
                         orphaned,
                         process_id: context.process_id.clone(),
                         exclusive,
+                        external_id,
                     })
                     .await?;
 
@@ -364,8 +379,54 @@ impl CacheStoreSqlService {
                     true,
                 )
             }
-            QueueCommand::Truncate {} => {
-                self.cachestore.queue_truncate().await?;
+            QueueCommand::AddAndRetrieve {
+                key,
+                exclusive,
+                priority,
+                orphaned,
+                value,
+                external_id,
+                concurrency,
+            } => {
+                if exclusive && context.process_id.is_none() {
+                    return Err(CubeError::user(
+                        "QUEUE ADD_AND_RETRIEVE EXCLUSIVE requires a process_id in the connection context (x-process-id header)".to_string(),
+                    ));
+                }
+
+                let value_size = key.value.deep_size_of() + value.deep_size_of();
+                let response = self
+                    .cachestore
+                    .queue_add_and_retrieve(QueueAddAndRetrievePayload {
+                        path: key.value,
+                        value,
+                        priority,
+                        orphaned,
+                        process_id: context.process_id.clone(),
+                        exclusive,
+                        external_id,
+                        concurrency,
+                    })
+                    .await?;
+
+                (
+                    Arc::new(DataFrame::new(
+                        vec![
+                            Column::new("id".to_string(), ColumnType::String, 0),
+                            Column::new("added".to_string(), ColumnType::Boolean, 1),
+                            Column::new("pending".to_string(), ColumnType::Int, 2),
+                            Column::new("active".to_string(), ColumnType::String, 3),
+                            Column::new("payload".to_string(), ColumnType::String, 4),
+                            Column::new("extra".to_string(), ColumnType::String, 5),
+                        ],
+                        vec![response.into_queue_add_and_retrieve_row()],
+                    )),
+                    Some(value_size),
+                    true,
+                )
+            }
+            QueueCommand::Clear {} => {
+                self.cachestore.queue_clear().await?;
 
                 (Arc::new(DataFrame::new(vec![], vec![])), None, false)
             }
@@ -524,8 +585,9 @@ impl CacheStoreSqlService {
                     true,
                 )
             }
-            QueueCommand::Result { key } => {
-                let ack_result = self.cachestore.queue_result_by_path(key.value).await?;
+            QueueCommand::Result { key, external_id } => {
+                let ack_result = self.cachestore.queue_result(key, external_id).await?;
+
                 let rows = if let Some(ack_result) = ack_result {
                     vec![ack_result.into_queue_result_row()]
                 } else {
@@ -537,6 +599,8 @@ impl CacheStoreSqlService {
                         vec![
                             Column::new("payload".to_string(), ColumnType::String, 0),
                             Column::new("type".to_string(), ColumnType::String, 1),
+                            Column::new("id".to_string(), ColumnType::String, 2),
+                            Column::new("external_id".to_string(), ColumnType::String, 3),
                         ],
                         rows,
                     )),
@@ -558,6 +622,8 @@ impl CacheStoreSqlService {
                         vec![
                             Column::new("payload".to_string(), ColumnType::String, 0),
                             Column::new("type".to_string(), ColumnType::String, 1),
+                            Column::new("id".to_string(), ColumnType::String, 2),
+                            Column::new("external_id".to_string(), ColumnType::String, 3),
                         ],
                         rows,
                     )),
@@ -599,18 +665,18 @@ impl CacheStoreSqlService {
 
 #[async_trait]
 impl SqlService for CacheStoreSqlService {
-    async fn exec_query(&self, q: &str) -> Result<Arc<DataFrame>, CubeError> {
+    async fn exec_query(&self, q: &str) -> Result<QueryResult, CubeError> {
         self.exec_query_with_context(SqlQueryContext::default(), q)
             .await
     }
 
     async fn exec_query_with_context(
         &self,
-        ctx: SqlQueryContext,
+        mut ctx: SqlQueryContext,
         query: &str,
-    ) -> Result<Arc<DataFrame>, CubeError> {
+    ) -> Result<QueryResult, CubeError> {
         let stmt = {
-            let mut parser = CubeStoreParser::new(query)?;
+            let mut parser = CubeStoreParser::new(query, ctx.parameters.take())?;
             parser.parse_statement()?
         };
 
@@ -628,25 +694,25 @@ impl SqlService for CacheStoreSqlService {
                 match logical_plan {
                     QueryPlan::Meta(logical_plan) => {
                         app_metrics::META_QUERIES.increment();
-                        Ok(Arc::new(
+                        Ok(QueryResult::Frame(Arc::new(
                             self.query_planner.execute_meta_plan(logical_plan).await?,
-                        ))
+                        )))
                     }
                     _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
                 }
             }
             CubeStoreStatement::System(command) => match command {
-                SystemCommand::CacheStore(command) => {
-                    self.exec_system_command_with_context(ctx, command).await
-                }
+                SystemCommand::CacheStore(command) => Ok(QueryResult::Frame(
+                    self.exec_system_command_with_context(ctx, command).await?,
+                )),
                 _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
             },
-            CubeStoreStatement::Queue(command) => {
-                self.exec_queue_command_with_context(ctx, command).await
-            }
-            CubeStoreStatement::Cache(command) => {
-                self.exec_cache_command_with_context(ctx, command).await
-            }
+            CubeStoreStatement::Queue(command) => Ok(QueryResult::Frame(
+                self.exec_queue_command_with_context(ctx, command).await?,
+            )),
+            CubeStoreStatement::Cache(command) => Ok(QueryResult::Frame(
+                self.exec_cache_command_with_context(ctx, command).await?,
+            )),
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
     }

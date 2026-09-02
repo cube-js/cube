@@ -1,0 +1,127 @@
+---
+title: Refreshing pre-aggregations
+description: Refresh worker responsibilities, key environment variables for scheduled builds, and troubleshooting when refresh intervals fall behind.
+---
+
+_Pre-aggregation refresh_ is the process of building pre-aggregations and updating
+them with new data. Pre-aggregation refresh is the responsibility of the _refresh
+worker_.
+
+## Configuration
+
+You can use the following environment variables to configure the refresh worker
+behavior:
+
+- [`CUBEJS_REFRESH_WORKER`](/reference/configuration/environment-variables#cubejs_refresh_worker) (see also [`CUBEJS_PRE_AGGREGATIONS_BUILDER`](/reference/configuration/environment-variables#cubejs_pre_aggregations_builder))
+- [`CUBEJS_PRE_AGGREGATIONS_SCHEMA`](/reference/configuration/environment-variables#cubejs_pre_aggregations_schema)
+- [`CUBEJS_SCHEDULED_REFRESH_TIMEZONES`](/reference/configuration/environment-variables#cubejs_scheduled_refresh_timezones)
+- [`CUBEJS_DB_QUERY_TIMEOUT`](/reference/configuration/environment-variables#cubejs_db_query_timeout)
+- [`CUBEJS_REFRESH_WORKER_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_refresh_worker_concurrency) (see also [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency))
+- [`CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID`](/reference/configuration/environment-variables#cubejs_scheduled_refresh_queries_per_app_id)
+- [`CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH`](/reference/configuration/environment-variables#cubejs_drop_pre_agg_without_touch)
+- [`CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME`](/reference/configuration/environment-variables#cubejs_pre_aggregations_backoff_max_time)
+
+## Pre-aggregation data source
+
+By default, each data source builds and stores its pre-aggregations using its own
+connection. You can instead point a data source's pre-aggregations at a dedicated
+connection by adding a `PRE_AGGREGATIONS` segment to its environment variables. When
+set, that source's pre-aggregations are built on and read from the dedicated
+connection rather than the source's own.
+
+Use the `CUBEJS_PRE_AGGREGATIONS_DB_*` variables for the default data source, and the
+`CUBEJS_DS_<NAME>_PRE_AGGREGATIONS_DB_*` variables for a [named data
+source][ref-multiple-data-sources]:
+
+```dotenv
+# Default data source
+CUBEJS_DB_TYPE=postgres
+CUBEJS_DB_HOST=localhost
+
+# Dedicated pre-aggregation data source for the default data source
+CUBEJS_PRE_AGGREGATIONS_DB_HOST=preagg-host
+CUBEJS_PRE_AGGREGATIONS_DB_USER=preagg-user
+CUBEJS_PRE_AGGREGATIONS_DB_PASS=preagg-pass
+
+# A named data source and its dedicated pre-aggregation data source
+CUBEJS_DATASOURCES=default,analytics
+CUBEJS_DS_ANALYTICS_DB_TYPE=postgres
+CUBEJS_DS_ANALYTICS_DB_HOST=remotehost
+CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_HOST=analytics-preagg-host
+CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_USER=analytics-preagg-user
+CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_PASS=analytics-preagg-pass
+```
+
+The `PRE_AGGREGATIONS` variant supports the same connection variables as the regular
+`CUBEJS_DB_*` / `CUBEJS_DS_<NAME>_DB_*` data source variables (for example `_DB_HOST`,
+`_DB_PORT`, `_DB_USER`, `_DB_PASS`, and `_DB_SSL`).
+
+Driver-specific variables take the same segment, so the dedicated connection is not
+limited to the `_DB_*` family — for example `CUBEJS_PRE_AGGREGATIONS_JDBC_URL` or
+`CUBEJS_PRE_AGGREGATIONS_AWS_REGION`. In the decorated form for a named data source, the
+`DB_`, `JDBC_`, `AWS_`, `DATABASE`, and `FIREBOLT_` families are supported.
+
+Setting any one of these variables switches the data source's pre-aggregations onto the
+dedicated connection; there is no separate flag to enable it. Activation is prefix-based
+rather than name-based, so a misspelled variable such as
+`CUBEJS_PRE_AGGREGATIONS_DB_HSOT` still switches it on — combined with the rule below,
+that leaves every setting at its driver default.
+
+<Warning>
+
+Each variable is read independently, and an unset one does **not** fall back to its
+`CUBEJS_DB_*` counterpart — it falls back to the driver's own default. Configure the
+dedicated connection in full: if you set only `CUBEJS_PRE_AGGREGATIONS_DB_HOST`, the build
+connects to that host with the driver's default user and password rather than the ones
+from `CUBEJS_DB_USER` and `CUBEJS_DB_PASS`.
+
+The one exception is the driver type: `CUBEJS_PRE_AGGREGATIONS_DB_TYPE` is ignored, since
+the dedicated connection always uses the same driver as the data source it belongs to.
+
+</Warning>
+
+<Info>
+
+[`CUBEJS_PRE_AGGREGATIONS_SCHEMA`](/reference/configuration/environment-variables#cubejs_pre_aggregations_schema),
+[`CUBEJS_PRE_AGGREGATIONS_BUILDER`](/reference/configuration/environment-variables#cubejs_pre_aggregations_builder),
+[`CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME`](/reference/configuration/environment-variables#cubejs_pre_aggregations_backoff_max_time),
+and [`CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH`](/reference/configuration/environment-variables#cubejs_pre_aggregations_allow_non_strict_date_range_match)
+share the prefix but configure pre-aggregation behavior rather than a connection, so they
+do not switch the data source's pre-aggregations onto a dedicated connection.
+
+</Info>
+
+A custom [`driver_factory`][ref-config-driver-factory] takes precedence over these
+variables: if both are configured, the `driver_factory` connection is used for
+pre-aggregations as well and a `Pre-aggregation driver conflict` warning is logged.
+
+## Troubleshooting
+
+### `Refresh scheduler interval error`
+
+Sometimes, you might come across the following error:
+
+```json
+{
+  "message": "Refresh Scheduler Interval Error",
+  "error": "Previous interval #2 was not finished with 60000 interval"
+}
+```
+
+It indicates that your refresh worker is overloaded. You probably have a lot of
+[tenants][ref-multitenancy], a lot of [pre-aggregations][ref-preaggs] to refresh,
+or both.
+
+If you're using [multitenancy][ref-multitenancy], you'd need to deploy several Cube
+clusters (each one per a reduced set of tenants) so there will be multiple refresh
+workers which will work only on a subset of your tenants.
+
+If you're using Cube Cloud, you can use a [Multi-cluster deployment][ref-production-multi-cluster]
+that would automatically do this for you.
+
+
+[ref-multitenancy]: /embedding/multitenancy
+[ref-preaggs]: /docs/pre-aggregations/using-pre-aggregations
+[ref-production-multi-cluster]: /admin/deployment/deployment-types#multi-cluster
+[ref-multiple-data-sources]: /admin/connect-to-data/multiple-data-sources
+[ref-config-driver-factory]: /reference/configuration/config#driver_factory

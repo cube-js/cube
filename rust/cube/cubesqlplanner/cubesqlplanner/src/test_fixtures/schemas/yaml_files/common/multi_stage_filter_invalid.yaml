@@ -1,0 +1,27 @@
+cubes:
+    - name: orders
+      sql: "SELECT * FROM orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: "{CUBE}.status"
+          - name: city
+            type: string
+            sql: "{CUBE}.city"
+      measures:
+          - name: revenue
+            type: sum
+            sql: amount
+          - name: revenue_conflicting_filter
+            type: number
+            sql: "{CUBE.revenue}"
+            multi_stage: true
+            filter:
+              exclude:
+                - status
+              keep_only:
+                - city

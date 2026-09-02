@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/src/tests/integration/calendar.rs
+expression: result
+---
+custom_calendar__retail_date_fortnight | calendar_orders__count
+---------------------------------------+-----------------------
+2025-01-29 00:00:00                    | 1                     
+2025-02-12 00:00:00                    | 2                     
+2025-02-26 00:00:00                    | 2                     
+2025-03-12 00:00:00                    | 1                     
+2025-03-26 00:00:00                    | 1

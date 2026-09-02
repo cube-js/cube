@@ -4,6 +4,7 @@ import R from 'ramda';
 import {
   AccessPolicyDefinition,
   CubeDefinitionExtended,
+  CubeRefreshKey,
   CubeSymbols,
   Folder,
   FolderInclude,
@@ -13,6 +14,7 @@ import {
   PreAggregationDefinition,
   PreAggregationDefinitionRollup,
   type ToString,
+  ViewDefaultValueFilter,
   ViewIncludedMember
 } from './CubeSymbols';
 import { UserError } from './UserError';
@@ -31,6 +33,49 @@ export type SegmentDefinition = {
   multiStage?: boolean;
 };
 
+export type MultiStageFilterIncludeMember = {
+  member: string;
+  operator: string;
+  values?: string[];
+};
+
+export type MultiStageFilterIncludeItem =
+  | MultiStageFilterIncludeMember
+  | { and: MultiStageFilterIncludeItem[] }
+  | { or: MultiStageFilterIncludeItem[] };
+
+export type MultiStageFilterDirective = {
+  mode?: 'relative' | 'fixed';
+  exclude?: (...args: Array<unknown>) => Array<ToString>;
+  keepOnly?: (...args: Array<unknown>) => Array<ToString>;
+  include?: MultiStageFilterIncludeItem[];
+  // Resolved sibling fields populated by `evaluateMultiStageReferences`.
+  // The native bridge reads these (not the function forms above).
+  excludeReferences?: string[];
+  keepOnlyReferences?: string[];
+};
+
+export type MultiStageGrainDirective = {
+  exclude?: (...args: Array<unknown>) => Array<ToString>;
+  keepOnly?: (...args: Array<unknown>) => Array<ToString>;
+  include?: (...args: Array<unknown>) => Array<ToString>;
+  // Resolved sibling fields populated by `evaluateMultiStageReferences`.
+  excludeReferences?: string[];
+  keepOnlyReferences?: string[];
+  includeReferences?: string[];
+};
+
+export type LinkDefinition = {
+  name: string;
+  label: string;
+  url?: (...args: any[]) => string;
+  dashboard?: string;
+  icon?: string;
+  target?: 'blank' | 'self';
+  primary?: boolean;
+  params?: Array<{ key: string; value: (...args: any[]) => string }>;
+};
+
 export type DimensionDefinition = {
   type: string;
   sql(): string;
@@ -42,6 +87,10 @@ export type DimensionDefinition = {
   order?: 'asc' | 'desc';
   key?: (...args: any[]) => ToString;
   keyReference?: string;
+  addGroupBy?: (...args: Array<unknown>) => Array<ToString>;
+  addGroupByReferences?: string[];
+  filter?: MultiStageFilterDirective;
+  links?: LinkDefinition[];
 };
 
 export type TimeShiftDefinition = {
@@ -60,16 +109,19 @@ export type TimeShiftDefinitionReference = {
 
 export type MeasureDefinition = {
   type: string;
+  aggType?: string,
   sql(): string;
   ownedByCube: boolean;
   rollingWindow?: any
   filters?: any
+  filter?: MultiStageFilterDirective;
   primaryKey?: true;
   drillFilters?: any;
   multiStage?: boolean;
   groupBy?: (...args: Array<unknown>) => Array<ToString>;
   reduceBy?: (...args: Array<unknown>) => Array<ToString>;
   addGroupBy?: (...args: Array<unknown>) => Array<ToString>;
+  grain?: MultiStageGrainDirective;
   timeShift?: TimeShiftDefinition[];
   groupByReferences?: string[];
   reduceByReferences?: string[];
@@ -109,6 +161,7 @@ export type PreAggregationInfo = {
   preAggregationName: string,
   preAggregation: any,
   cube: string,
+  dataSource: string,
   references: PreAggregationReferences,
   refreshKey: unknown,
   indexesReferences: unknown,
@@ -146,6 +199,8 @@ export type EvaluatedCube = {
   accessPolicy?: AccessPolicyDefinition[];
   isView?: boolean;
   includedMembers?: ViewIncludedMember[];
+  defaultFilters?: ViewDefaultValueFilter[];
+  refreshKey?: CubeRefreshKey;
 };
 
 export class CubeEvaluator extends CubeSymbols {
@@ -206,8 +261,91 @@ export class CubeEvaluator extends CubeSymbols {
     this.prepareFolders(cube, errorReporter);
 
     this.prepareAccessPolicy(cube, errorReporter);
+    this.prepareViewFilters(cube, errorReporter);
 
     return cube;
+  }
+
+  private prepareViewFilters(cube: any, errorReporter: ErrorReporter) {
+    if (!cube.defaultFilters) {
+      return;
+    }
+
+    const included = (cube.includedMembers as ViewIncludedMember[] | undefined) || [];
+
+    // Always returns view-scoped path `<view>.<member>` to match
+    // MemberSymbol::full_name on the Rust side, which is what `unless` and
+    // filter dispatch compare against.
+    const resolveViewMember = (memberType: string, reference: string): string | null => {
+      let lookupName = reference;
+      let lookupPath: string | null = null;
+
+      if (reference.indexOf('.') !== -1) {
+        const parts = reference.split('.');
+        if (parts[0] === cube.name) {
+          lookupName = parts.slice(1).join('.');
+        } else {
+          lookupPath = reference;
+        }
+      }
+
+      const match = lookupPath
+        ? included.find((m) => m.memberPath === lookupPath)
+        : included.find((m) => m.name === lookupName);
+
+      if (!match) {
+        errorReporter.error(
+          `Member '${reference}' used as ${memberType} in default value filter is not included in view '${cube.name}'`
+        );
+        return null;
+      }
+      return `${cube.name}.${match.name}`;
+    };
+
+    // A view extending another one inherits its `default_filters` entries by
+    // reference, so the resolved references have to go into a copy owned by this
+    // view. Written in place they would resolve to whichever view is prepared
+    // last, pointing the other views' filters at members they do not include.
+    cube.defaultFilters = (cube.defaultFilters as ViewDefaultValueFilter[]).map(f => ({ ...f }));
+
+    for (const filter of cube.defaultFilters as ViewDefaultValueFilter[]) {
+      const rawMember = this.evaluateReferences(cube.name, filter.member);
+      const resolved = resolveViewMember('member', rawMember);
+      if (resolved !== null) {
+        filter.memberReference = resolved;
+      }
+
+      if (filter.values) {
+        const evaluated = filter.values();
+        if (!Array.isArray(evaluated)) {
+          errorReporter.error(
+            `'values' in default value filter for view '${cube.name}' must evaluate to an array, got: ${typeof evaluated}`
+          );
+        } else {
+          // Coerce to strings to match the FilterItem.values contract used by
+          // regular query filters (Option<Vec<Option<String>>> on the Rust side).
+          filter.valuesReferences = evaluated.map(
+            (v) => (v === null || v === undefined ? null : String(v))
+          );
+        }
+      }
+
+      if (filter.unless) {
+        const rawUnless = this.evaluateReferences(
+          cube.name,
+          filter.unless,
+          { originalSorting: true }
+        );
+        const resolvedUnless: string[] = [];
+        for (const ref of rawUnless) {
+          const r = resolveViewMember('unless', ref);
+          if (r !== null) {
+            resolvedUnless.push(r);
+          }
+        }
+        filter.unlessReferences = resolvedUnless;
+      }
+    }
   }
 
   private allMembersOrList(cube: any, specifier: string | string[]): string[] {
@@ -512,6 +650,34 @@ export class CubeEvaluator extends CubeSymbols {
               : {}),
           }));
         }
+        // `filter` and `grain` are nested objects, and a cube extending another
+        // one inherits them by reference, so the resolved references have to go
+        // into a copy owned by this cube. Written in place they would resolve to
+        // whichever cube is prepared last, pointing every member of the other
+        // cubes at that cube's dimensions.
+        if (member.filter) {
+          const filter = { ...member.filter };
+          if (typeof filter.exclude === 'function') {
+            filter.excludeReferences = this.evaluateReferences(cubeName, filter.exclude);
+          }
+          if (typeof filter.keepOnly === 'function') {
+            filter.keepOnlyReferences = this.evaluateReferences(cubeName, filter.keepOnly);
+          }
+          member.filter = filter;
+        }
+        if (member.grain) {
+          const grain = { ...member.grain };
+          if (typeof grain.exclude === 'function') {
+            grain.excludeReferences = this.evaluateReferences(cubeName, grain.exclude);
+          }
+          if (typeof grain.keepOnly === 'function') {
+            grain.keepOnlyReferences = this.evaluateReferences(cubeName, grain.keepOnly);
+          }
+          if (typeof grain.include === 'function') {
+            grain.includeReferences = this.evaluateReferences(cubeName, grain.include);
+          }
+          member.grain = grain;
+        }
       }
     }
   }
@@ -563,7 +729,7 @@ export class CubeEvaluator extends CubeSymbols {
   protected preparePreAggregations(cube: any, errorReporter: ErrorReporter) {
     if (cube.preAggregations) {
       // eslint-disable-next-line no-restricted-syntax
-      for (const preAggregation of Object.values(cube.preAggregations) as any) {
+      for (const [preAggregationName, preAggregation] of Object.entries(cube.preAggregations) as any) {
         // preAggregation is actually (PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql)
         if (preAggregation.timeDimension) {
           preAggregation.timeDimensionReference = preAggregation.timeDimension;
@@ -619,10 +785,17 @@ export class CubeEvaluator extends CubeSymbols {
           delete preAggregation.buildRangeEnd;
         }
 
+        // `outputColumnTypes` names are resolved against this cube, and a cube
+        // extending another one inherits the pre-aggregation by reference, so
+        // both the entry and its columns have to be copies owned by this cube.
         if (preAggregation.outputColumnTypes) {
-          preAggregation.outputColumnTypes.forEach(column => {
-            column.name = this.evaluateReferences(cube.name, column.member, { originalSorting: true });
-          });
+          cube.preAggregations[preAggregationName] = {
+            ...preAggregation,
+            outputColumnTypes: preAggregation.outputColumnTypes.map(column => ({
+              ...column,
+              name: this.evaluateReferences(cube.name, column.member, { originalSorting: true }),
+            })),
+          };
         }
       }
     }
@@ -793,6 +966,7 @@ export class CubeEvaluator extends CubeSymbols {
               preAggregationName,
               preAggregation: preAggregations[preAggregationName],
               cube,
+              dataSource: this.evaluatedCubes[cube].dataSource || 'default',
               references: this.evaluatePreAggregationReferences(cube, preAggregations[preAggregationName]),
               refreshKey,
               indexesReferences: indexes && Object.keys(indexes).reduce((obj, indexName) => {
@@ -831,15 +1005,15 @@ export class CubeEvaluator extends CubeSymbols {
     return this.isInstanceOfType('segments', path);
   }
 
-  public measureByPath(measurePath: string): MeasureDefinition {
+  public measureByPath(measurePath: string | string[]): MeasureDefinition {
     return this.byPath('measures', measurePath) as MeasureDefinition;
   }
 
-  public dimensionByPath(dimensionPath: string): DimensionDefinition {
+  public dimensionByPath(dimensionPath: string | string[]): DimensionDefinition {
     return this.byPath('dimensions', dimensionPath) as DimensionDefinition;
   }
 
-  public segmentByPath(segmentPath: string): SegmentDefinition {
+  public segmentByPath(segmentPath: string | string[]): SegmentDefinition {
     return this.byPath('segments', segmentPath) as SegmentDefinition;
   }
 

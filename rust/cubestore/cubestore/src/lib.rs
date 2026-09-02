@@ -47,6 +47,7 @@ pub mod streaming;
 pub mod sys;
 pub mod table;
 pub mod telemetry;
+pub mod trace;
 pub mod util;
 
 pub use datafusion::cube_ext::spawn;
@@ -196,8 +197,8 @@ impl From<cuberockstore::rocksdb::Error> for CubeError {
     }
 }
 
-impl From<flatbuffers::InvalidFlatbuffer> for CubeError {
-    fn from(v: flatbuffers::InvalidFlatbuffer) -> Self {
+impl From<cubeshared::flatbuffers::InvalidFlatbuffer> for CubeError {
+    fn from(v: cubeshared::flatbuffers::InvalidFlatbuffer) -> Self {
         CubeError::from_debug_error(v)
     }
 }
@@ -211,6 +212,12 @@ impl From<std::io::Error> for CubeError {
 impl From<ParserError> for CubeError {
     fn from(v: ParserError) -> Self {
         CubeError::from_error(format!("{:?}", v))
+    }
+}
+
+impl From<regex::Error> for CubeError {
+    fn from(v: regex::Error) -> Self {
+        CubeError::from_error(v)
     }
 }
 

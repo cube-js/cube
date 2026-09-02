@@ -1,4 +1,4 @@
-FROM node:22.22.0-bookworm-slim AS builder
+FROM node:24.18.0-trixie-slim AS builder
 
 WORKDIR /cube
 COPY . .
@@ -9,9 +9,10 @@ RUN yarn config set network-timeout 120000 -g
 
 # Required for node-oracledb to buld on ARM64
 RUN apt-get update \
-    # python3 package is necessary to install `python3` executable for node-gyp
     # libpython3-dev is needed to trigger post-installer to download native with python
-    && apt-get install -y python3 python3.11 libpython3.11-dev gcc g++ make cmake ca-certificates \
+    && apt-get install -y python3.13 libpython3.13-dev gcc g++ make cmake ca-certificates \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 \
     && rm -rf /var/lib/apt/lists/*
 
 # We are copying root yarn.lock file to the context folder during the Publish GH
@@ -21,7 +22,7 @@ RUN yarn install --prod \
     && rm -rf /cube/node_modules/duckdb/src \
     && yarn cache clean
 
-FROM node:22.22.0-bookworm-slim
+FROM node:24.18.0-trixie-slim
 
 ARG IMAGE_VERSION=unknown
 
@@ -30,7 +31,9 @@ ENV CUBEJS_DOCKER_IMAGE_TAG=latest
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends libssl3 python3.11 libpython3.11-dev \
+    && apt-get install -y --no-install-recommends libssl3t64 python3.13 libpython3.13-dev \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN yarn policies set-version v1.22.22

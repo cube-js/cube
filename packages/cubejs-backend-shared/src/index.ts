@@ -2,6 +2,7 @@ export {
   getEnv,
   assertDataSource,
   keyByDataSource,
+  hasPreAggregationsEnvVars,
   isDockerImage,
   convertSizeToBytes,
 } from './env';
@@ -20,6 +21,7 @@ export * from './http-utils';
 export * from './cli';
 export * from './proxy';
 export * from './time';
+export * from './timezone';
 export * from './process';
 export * from './platform';
 export * from './FileRepository';
@@ -28,3 +30,4 @@ export * from './PerfTracker';
 export * from './disposedProxy';
 export * from './logger';
 export * from './pool';
+export * from './sql-escape';

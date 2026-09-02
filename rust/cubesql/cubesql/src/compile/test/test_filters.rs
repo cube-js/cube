@@ -1,4 +1,6 @@
-use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryFilterItem};
+use cubeclient::models::{
+    V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
+};
 use datafusion::physical_plan::displayable;
 use pretty_assertions::assert_eq;
 
@@ -185,6 +187,100 @@ WHERE
             segments: Some(vec![]),
             order: Some(vec![]),
             filters: None,
+            ..Default::default()
+        }
+    );
+}
+
+/// HAVING on a measure combined with ORDER BY on the same measure used to leave
+/// a raw `measure()` aggregate in the Sort above the rewritten CubeScan
+/// ("Physical plan does not support logical expression measure(...)").
+#[tokio::test]
+async fn test_measure_having_and_order_by_measure() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender,
+    notes,
+    DATE_TRUNC('month', order_date) AS order_date_month,
+    MEASURE(sumPrice)
+FROM KibanaSampleDataEcommerce
+WHERE
+    order_date >= '2026-01-01'
+    AND order_date <= '2026-06-26'
+    AND customer_gender IN ('male', 'female')
+GROUP BY 1, 2, 3
+HAVING
+    MEASURE(sumPrice) IS NOT NULL
+    AND MEASURE(sumPrice) != 0
+ORDER BY MEASURE(sumPrice) DESC
+LIMIT 5000
+;
+"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    // The whole query must be pushed to a single CubeScan; before the fix
+    // physical planning failed on the leftover Sort node.
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    assert_eq!(
+        query_plan.as_logical_plan().find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+            dimensions: Some(vec![
+                "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                "KibanaSampleDataEcommerce.notes".to_string(),
+            ]),
+            segments: Some(vec![]),
+            time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                granularity: Some("month".to_string()),
+                date_range: Some(serde_json::json!(vec![
+                    "2026-01-01T00:00:00.000Z".to_string(),
+                    "2026-06-26T00:00:00.000Z".to_string(),
+                ])),
+            }]),
+            order: Some(vec![vec![
+                "KibanaSampleDataEcommerce.sumPrice".to_string(),
+                "desc".to_string(),
+            ]]),
+            limit: Some(5000),
+            filters: Some(vec![
+                V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["male".to_string(), "female".to_string()]),
+                    or: None,
+                    and: None,
+                },
+                V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.sumPrice".to_string()),
+                    operator: Some("set".to_string()),
+                    values: None,
+                    or: None,
+                    and: None,
+                },
+                V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.sumPrice".to_string()),
+                    operator: Some("notEquals".to_string()),
+                    values: Some(vec!["0".to_string()]),
+                    or: None,
+                    and: None,
+                },
+            ]),
             ..Default::default()
         }
     );

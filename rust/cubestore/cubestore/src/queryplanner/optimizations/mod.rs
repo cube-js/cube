@@ -1,15 +1,17 @@
 mod check_memory;
 mod distributed_partial_aggregate;
 mod inline_aggregate_rewriter;
+pub mod is_not_distinct_from_join_keys;
 pub mod rewrite_plan;
 pub mod rolling_optimizer;
 mod trace_data_loaded;
 
 use super::serialized_plan::PreSerializedPlan;
-use crate::cluster::{Cluster, WorkerPlanningParams};
+use crate::cluster::{Cluster, PlanningFlags};
 use crate::queryplanner::optimizations::distributed_partial_aggregate::{
-    add_limit_to_workers, ensure_partition_merge, push_aggregate_to_workers,
-    replace_suboptimal_merge_sorts,
+    add_limit_to_workers, drop_sort_merge_under_global_aggregate, ensure_partition_merge,
+    push_aggregate_to_workers, push_sorted_partial_aggregate_below_merge,
+    push_worker_sort_and_limit, replace_suboptimal_merge_sorts,
 };
 use crate::queryplanner::optimizations::inline_aggregate_rewriter::replace_with_inline_aggregate;
 use crate::queryplanner::planning::CubeExtensionPlanner;
@@ -37,10 +39,13 @@ pub struct CubeQueryPlanner {
     /// Set on the router
     cluster: Option<Arc<dyn Cluster>>,
     /// Set on the worker
-    worker_partition_count: Option<WorkerPlanningParams>,
+    worker_partition_count: Option<usize>,
     serialized_plan: Arc<PreSerializedPlan>,
     memory_handler: Arc<dyn MemoryHandler>,
     data_loaded_size: Option<Arc<DataLoadedSize>>,
+    /// On the router, this node's own configuration; on a worker, what the router sent.
+    planning_flags: PlanningFlags,
+    group_by_limit_per_partition: bool,
 }
 
 impl CubeQueryPlanner {
@@ -48,6 +53,8 @@ impl CubeQueryPlanner {
         cluster: Arc<dyn Cluster>,
         serialized_plan: Arc<PreSerializedPlan>,
         memory_handler: Arc<dyn MemoryHandler>,
+        planning_flags: PlanningFlags,
+        group_by_limit_per_partition: bool,
     ) -> CubeQueryPlanner {
         CubeQueryPlanner {
             cluster: Some(cluster),
@@ -55,21 +62,29 @@ impl CubeQueryPlanner {
             serialized_plan,
             memory_handler,
             data_loaded_size: None,
+            planning_flags,
+            group_by_limit_per_partition,
         }
     }
 
+    /// The worker plans from the flags the router sent, not from its own configuration: the two
+    /// halves of a split plan only fit together when both were planned from the same values.
     pub fn new_on_worker(
         serialized_plan: Arc<PreSerializedPlan>,
-        worker_planning_params: WorkerPlanningParams,
+        worker_partition_count: usize,
         memory_handler: Arc<dyn MemoryHandler>,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
+        planning_flags: PlanningFlags,
+        group_by_limit_per_partition: bool,
     ) -> CubeQueryPlanner {
         CubeQueryPlanner {
             serialized_plan,
             cluster: None,
-            worker_partition_count: Some(worker_planning_params),
+            worker_partition_count: Some(worker_partition_count),
             memory_handler,
             data_loaded_size,
+            planning_flags,
+            group_by_limit_per_partition,
         }
     }
 }
@@ -90,8 +105,9 @@ impl QueryPlanner for CubeQueryPlanner {
         let p = DefaultPhysicalPlanner::with_extension_planners(vec![
             Arc::new(CubeExtensionPlanner {
                 cluster: self.cluster.clone(),
-                worker_planning_params: self.worker_partition_count,
+                worker_partition_count: self.worker_partition_count,
                 serialized_plan: self.serialized_plan.clone(),
+                planning_flags: self.planning_flags,
             }),
             Arc::new(RollingWindowPlanner {}),
         ])
@@ -102,17 +118,28 @@ impl QueryPlanner for CubeQueryPlanner {
             self.memory_handler.clone(),
             self.data_loaded_size.clone(),
             ctx_state.config().options(),
+            self.planning_flags.group_by_limit_factor,
+            self.group_by_limit_per_partition,
         );
         result
     }
 }
 
 #[derive(Debug)]
-pub struct PreOptimizeRule {}
+pub struct PreOptimizeRule {
+    push_partial_aggregate_below_merge: bool,
+    coalesce_under_hash_aggregate: bool,
+}
 
 impl PreOptimizeRule {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(
+        push_partial_aggregate_below_merge: bool,
+        coalesce_under_hash_aggregate: bool,
+    ) -> Self {
+        Self {
+            push_partial_aggregate_below_merge,
+            coalesce_under_hash_aggregate,
+        }
     }
 }
 
@@ -122,7 +149,11 @@ impl PhysicalOptimizerRule for PreOptimizeRule {
         plan: Arc<dyn ExecutionPlan>,
         _config: &ConfigOptions,
     ) -> datafusion::common::Result<Arc<dyn ExecutionPlan>> {
-        pre_optimize_physical_plan(plan)
+        pre_optimize_physical_plan(
+            plan,
+            self.push_partial_aggregate_below_merge,
+            self.coalesce_under_hash_aggregate,
+        )
     }
 
     fn name(&self) -> &str {
@@ -136,6 +167,8 @@ impl PhysicalOptimizerRule for PreOptimizeRule {
 
 fn pre_optimize_physical_plan(
     p: Arc<dyn ExecutionPlan>,
+    push_partial_aggregate_below_merge: bool,
+    coalesce_under_hash_aggregate: bool,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     let p = rewrite_physical_plan(p, &mut |p| push_aggregate_to_workers(p))?;
 
@@ -143,6 +176,19 @@ fn pre_optimize_physical_plan(
     let p = rewrite_physical_plan(p, &mut |p| ensure_partition_merge_with_acceptable_parent(p))?;
     // Handles the root node case
     let p = ensure_partition_merge(p)?;
+
+    // Make the merge carry partial aggregate states instead of all raw rows
+    let p = if push_partial_aggregate_below_merge {
+        rewrite_physical_plan(p, &mut |p| push_sorted_partial_aggregate_below_merge(p))?
+    } else {
+        p
+    };
+
+    // Global (no GROUP BY) aggregates -- and, when enabled, grouped hash aggregates -- don't need
+    // their input merged in the sort order.
+    let p = rewrite_physical_plan(p, &mut |p| {
+        drop_sort_merge_under_global_aggregate(p, coalesce_under_hash_aggregate)
+    })?;
 
     // Replace sorted AggregateExec with InlineAggregateExec for better performance
     let p = rewrite_physical_plan(p, &mut |p| replace_with_inline_aggregate(p))?;
@@ -156,6 +202,8 @@ fn finalize_physical_plan(
     memory_handler: Arc<dyn MemoryHandler>,
     data_loaded_size: Option<Arc<DataLoadedSize>>,
     config: &ConfigOptions,
+    group_by_limit_factor: usize,
+    group_by_limit_per_partition: bool,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     let p = rewrite_physical_plan(p, &mut |p| add_check_memory_exec(p, memory_handler.clone()))?;
     log::trace!(
@@ -179,6 +227,16 @@ fn finalize_physical_plan(
     let p = rewrite_physical_plan(p, &mut |p| replace_suboptimal_merge_sorts(p))?;
     log::trace!(
         "Rewrote physical plan by replace_suboptimal_merge_sorts:\n{}",
+        pp_phys_plan_ext(p.as_ref(), &PPOptions::show_nonmeta())
+    );
+    // Last: bound worker memory for ORDER BY <group cols> LIMIT that isn't an index prefix. Runs
+    // after replace_suboptimal_merge_sorts so it doesn't push the query's row limit into the
+    // worker merge we add (which would cut uncombined partial rows and undercount).
+    let p = rewrite_physical_plan(p, &mut |p| {
+        push_worker_sort_and_limit(p, group_by_limit_factor, group_by_limit_per_partition)
+    })?;
+    log::trace!(
+        "Rewrote physical plan by push_worker_sort_and_limit:\n{}",
         pp_phys_plan_ext(p.as_ref(), &PPOptions::show_nonmeta())
     );
     Ok(p)

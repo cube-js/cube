@@ -6,7 +6,6 @@ export default {
   "databricks-jdbc": "Databricks",
   "druid": "Druid",
   "duckdb": "DuckDB / MotherDuck",
-  "elasticsearch": "Elasticsearch",
   "firebolt": "Firebolt",
   "google-bigquery": "Google BigQuery",
   "hive": "Hive / SparkSQL",

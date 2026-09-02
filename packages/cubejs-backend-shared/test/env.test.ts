@@ -107,6 +107,25 @@ describe('getEnv', () => {
     ).toBe(10);
   });
 
+  test('refreshKeyLocalTime', () => {
+    delete process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME;
+    expect(getEnv('refreshKeyLocalTime')).toBe(false);
+
+    process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME = 'true';
+    expect(getEnv('refreshKeyLocalTime')).toBe(true);
+
+    process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME = 'false';
+    expect(getEnv('refreshKeyLocalTime')).toBe(false);
+  });
+
+  test('refreshKeyLocalTime(exception)', () => {
+    process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME = 'yes';
+
+    expect(() => getEnv('refreshKeyLocalTime')).toThrowError();
+
+    delete process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME;
+  });
+
   test('livePreview', () => {
     expect(getEnv('livePreview')).toBe(true);
 
@@ -140,6 +159,162 @@ describe('getEnv', () => {
     process.env.CUBEJS_MAX_REQUEST_SIZE = '100mb';
     expect(() => getEnv('maxRequestSize')).toThrowError(
       'Value "100mb" is not valid for CUBEJS_MAX_REQUEST_SIZE. Must be between 100kb and 64mb.'
+    );
+  });
+});
+
+describe('getEnv(apiSecret / apiSecrets)', () => {
+  afterEach(() => {
+    delete process.env.CUBEJS_API_SECRET;
+    delete process.env.CUBEJS_API_SECRETS;
+  });
+
+  test('apiSecret', () => {
+    expect(getEnv('apiSecret')).toBeUndefined();
+
+    process.env.CUBEJS_API_SECRET = 'secret';
+    expect(getEnv('apiSecret')).toBe('secret');
+  });
+
+  test('apiSecrets - unset / empty / blanks resolve to undefined', () => {
+    expect(getEnv('apiSecrets')).toBeUndefined();
+
+    process.env.CUBEJS_API_SECRETS = '';
+    expect(getEnv('apiSecrets')).toBeUndefined();
+
+    process.env.CUBEJS_API_SECRETS = ',  ,,';
+    expect(getEnv('apiSecrets')).toBeUndefined();
+  });
+
+  test('apiSecrets - trims, drops empties, deduplicates, preserves order', () => {
+    process.env.CUBEJS_API_SECRETS = ' a , b , c ';
+    expect(getEnv('apiSecrets')).toEqual(['a', 'b', 'c']);
+
+    process.env.CUBEJS_API_SECRETS = 'a,b,a,c,b';
+    expect(getEnv('apiSecrets')).toEqual(['a', 'b', 'c']);
+
+    process.env.CUBEJS_API_SECRETS = 'only';
+    expect(getEnv('apiSecrets')).toEqual(['only']);
+  });
+});
+
+describe('getEnv(defaultTimezone / scheduledRefreshTimezones)', () => {
+  afterEach(() => {
+    delete process.env.CUBEJS_DEFAULT_TIMEZONE;
+    delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES;
+  });
+
+  // env-var's .default() does not fire for a present but blank value, and it does not trim.
+  test('defaultTimezone - unset / blank / padded resolve to UTC', () => {
+    delete process.env.CUBEJS_DEFAULT_TIMEZONE;
+    expect(getEnv('defaultTimezone')).toBe('UTC');
+
+    process.env.CUBEJS_DEFAULT_TIMEZONE = '';
+    expect(getEnv('defaultTimezone')).toBe('UTC');
+
+    process.env.CUBEJS_DEFAULT_TIMEZONE = '   ';
+    expect(getEnv('defaultTimezone')).toBe('UTC');
+
+    process.env.CUBEJS_DEFAULT_TIMEZONE = ' UTC ';
+    expect(getEnv('defaultTimezone')).toBe('UTC');
+  });
+
+  test('defaultTimezone - normalizes to the canonical IANA name', () => {
+    process.env.CUBEJS_DEFAULT_TIMEZONE = 'America/Los_Angeles';
+    expect(getEnv('defaultTimezone')).toBe('America/Los_Angeles');
+
+    process.env.CUBEJS_DEFAULT_TIMEZONE = 'america/los_angeles';
+    expect(getEnv('defaultTimezone')).toBe('America/Los_Angeles');
+
+    process.env.CUBEJS_DEFAULT_TIMEZONE = 'utc';
+    expect(getEnv('defaultTimezone')).toBe('UTC');
+  });
+
+  test('defaultTimezone(exception)', () => {
+    process.env.CUBEJS_DEFAULT_TIMEZONE = 'Europ/Berlin';
+    expect(() => getEnv('defaultTimezone')).toThrowError(
+      'Value "Europ/Berlin" is not valid for CUBEJS_DEFAULT_TIMEZONE. Must be a valid IANA time zone name, e.g. UTC or America/Los_Angeles.'
+    );
+
+    process.env.CUBEJS_DEFAULT_TIMEZONE = '+05:00';
+    expect(() => getEnv('defaultTimezone')).toThrowError(
+      'Value "+05:00" is not valid for CUBEJS_DEFAULT_TIMEZONE. Must be a valid IANA time zone name, e.g. UTC or America/Los_Angeles.'
+    );
+  });
+
+  test('scheduledRefreshTimezones - unset resolves to an empty list', () => {
+    delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES;
+    expect(getEnv('scheduledRefreshTimezones')).toEqual([]);
+  });
+
+  test('scheduledRefreshTimezones - trims and normalizes each entry', () => {
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = 'utc, europe/berlin';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual(['UTC', 'Europe/Berlin']);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = 'America/New_York';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual(['America/New_York']);
+  });
+
+  // Trailing/repeated separators are common in .env files and compose YAML.
+  test('scheduledRefreshTimezones - ignores empty entries', () => {
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = 'UTC,';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual(['UTC']);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = 'UTC,,America/Los_Angeles';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual(['UTC', 'America/Los_Angeles']);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = ' UTC , ';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual(['UTC']);
+  });
+
+  test('scheduledRefreshTimezones - blank resolves to an empty list', () => {
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = '';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual([]);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = '   ';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual([]);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = ',';
+    expect(getEnv('scheduledRefreshTimezones')).toEqual([]);
+  });
+
+  test('scheduledRefreshTimezones(exception)', () => {
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES = 'UTC,Nope/Zone';
+    expect(() => getEnv('scheduledRefreshTimezones')).toThrowError(
+      'Value "Nope/Zone" is not valid for CUBEJS_SCHEDULED_REFRESH_TIMEZONES. Must be a comma-separated list of valid IANA time zone names, e.g. UTC,America/Los_Angeles.'
+    );
+  });
+});
+
+describe('getEnv(compilerCacheSize)', () => {
+  afterEach(() => {
+    delete process.env.CUBEJS_COMPILER_CACHE_SIZE;
+  });
+
+  test('defaults to 250', () => {
+    expect(getEnv('compilerCacheSize')).toBe(250);
+  });
+
+  test('reads CUBEJS_COMPILER_CACHE_SIZE', () => {
+    process.env.CUBEJS_COMPILER_CACHE_SIZE = '1000';
+    expect(getEnv('compilerCacheSize')).toBe(1000);
+  });
+
+  test('throws on zero, so it is never silently coerced to the default', () => {
+    process.env.CUBEJS_COMPILER_CACHE_SIZE = '0';
+    expect(() => getEnv('compilerCacheSize')).toThrowError(
+      'Value "0" is not valid for CUBEJS_COMPILER_CACHE_SIZE. Must be a positive integer. The compiler cache can not be disabled.'
+    );
+  });
+
+  test.each([
+    '-1',
+    'abc',
+    '1.5',
+  ])('throws on the negative or non-integer value %j', (value) => {
+    process.env.CUBEJS_COMPILER_CACHE_SIZE = value;
+    expect(() => getEnv('compilerCacheSize')).toThrowError(
+      /CUBEJS_COMPILER_CACHE_SIZE/
     );
   });
 });

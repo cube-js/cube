@@ -53,6 +53,7 @@ fn test_deserialize_meta_response_with_format_fields() {
               "title": "Orders Total Amount",
               "shortTitle": "Total Amount",
               "format": "currency",
+              "currency": "USD",
               "cumulativeTotal": false,
               "cumulative": false,
               "type": "number",
@@ -84,6 +85,7 @@ fn test_deserialize_meta_response_with_format_fields() {
               "shortTitle": "Order Sum",
               "suggestFilterValues": true,
               "format": "currency",
+              "currency": "EUR",
               "isVisible": false,
               "public": false,
               "primaryKey": false
@@ -105,6 +107,21 @@ fn test_deserialize_meta_response_with_format_fields() {
     assert!(meta_response.cubes.is_some());
     let cubes = meta_response.cubes.unwrap();
     assert_eq!(cubes.len(), 1);
+
+    // Verify currency on measure
+    let total_amount = &cubes[0].measures[2];
+    assert_eq!(total_amount.name, "orders.total_amount");
+    assert_eq!(total_amount.currency, Some("USD".to_string()));
+
+    // Verify no currency on measure without it
+    let count = &cubes[0].measures[0];
+    assert_eq!(count.name, "orders.count");
+    assert_eq!(count.currency, None);
+
+    // Verify currency on dimension
+    let order_sum = &cubes[0].dimensions[1];
+    assert_eq!(order_sum.name, "orders.order_sum");
+    assert_eq!(order_sum.currency, Some("EUR".to_string()));
 }
 
 #[test]

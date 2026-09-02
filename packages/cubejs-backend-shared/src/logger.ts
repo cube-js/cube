@@ -12,6 +12,7 @@ export type LoggerFnParams = {
   error?: Error | string;
   trace?: string,
   warning?: string,
+  level?: LogLevel,
   [key: string]: any,
 };
 

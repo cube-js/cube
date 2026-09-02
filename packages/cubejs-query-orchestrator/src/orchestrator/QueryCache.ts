@@ -17,6 +17,7 @@ import {
   CacheDriverInterface,
   TableStructure,
   DriverInterface, QueryKey,
+  QueuePriority,
 } from '@cubejs-backend/base-driver';
 
 import { QueryQueue, QueryQueueOptions } from './QueryQueue';
@@ -24,7 +25,12 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
-import { getCacheHash } from './utils';
+import {
+  getCacheHash,
+  extractRequestUUID,
+  evaluateLocalRefreshKey,
+  isValidLocalRefreshKey,
+} from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
 
 export type CacheQueryResultOptions = {
@@ -44,12 +50,31 @@ export type CacheQueryResultOptions = {
   renewCycle?: boolean,
 };
 
+/**
+ * Deliberately narrow: the cache key, the renewal key and the renewal threshold are derived inside
+ * `cacheRefreshKeyResult`, so no caller can store an entry under a key it later looks up by another.
+ */
+export type RefreshKeyCacheOptions =
+  Pick<CacheQueryResultOptions, 'priority' | 'requestId' | 'waitForRenew' | 'dataSource'>;
+
+/**
+ * Everything needed to evaluate an `every` based refreshKey without touching a
+ * database: `FLOOR((utcOffset + unixTimestamp - dayOffset) / interval)`.
+ */
+export type LocalRefreshKeyDescriptor = {
+  interval: number;
+  utcOffset: number;
+  dayOffset: number;
+  cron?: boolean;
+};
+
 type QueryOptions = {
   external?: boolean;
   renewalThreshold?: number;
   updateWindowSeconds?: number;
   renewalThresholdOutsideUpdateWindow?: number;
   incremental?: boolean;
+  localRefreshKey?: LocalRefreshKeyDescriptor;
 };
 
 export type QueryWithParams = [
@@ -61,6 +86,8 @@ export type QueryWithParams = [
 export type LoadRefreshKeyOptions = {
   requestId?: string;
   skipRefreshKeyWaitForRenew?: boolean;
+  /** Inherited from the query the keys are refreshed for: a blocked request waits on them too */
+  priority?: number;
   dataSource: string
 };
 
@@ -70,8 +97,6 @@ export type Query = {
   preAggregations?: PreAggregationDescription[];
   groupedPartitionPreAggregations?: PreAggregationDescription[][];
   preAggregationsLoadCacheByDataSource?: any;
-  // @deprecated
-  renewQuery?: boolean;
   cacheMode?: CacheMode;
   compilerCacheFn?: <T>(subKey: string[], cacheFn: () => T) => T;
 };
@@ -83,8 +108,6 @@ export type QueryBody = {
   values?: string[];
   loadRefreshKeysOnly?: boolean;
   scheduledRefresh?: boolean;
-  // @deprecated
-  renewQuery?: boolean;
   cacheMode?: CacheMode;
   requestId?: string;
   external?: boolean;
@@ -117,21 +140,40 @@ export type PreAggTableToTempTable = [
 
 export type PreAggTableToTempTableNames = [string, { targetTableName: string; }];
 
-export type CacheKeyItem = string | string[] | QueryWithParams | QueryWithParams[] | undefined;
+export type CacheKeyItem = string | string[] | boolean | QueryWithParams | QueryWithParams[] | undefined;
 
 export type CacheKey =
   [CacheKeyItem, CacheKeyItem] |
   [CacheKeyItem, CacheKeyItem, CacheKeyItem] |
   [CacheKeyItem, CacheKeyItem, CacheKeyItem, CacheKeyItem];
 
-type CacheEntry = {
+export type CacheEntry = {
   time: number;
   result: any;
-  renewalKey: string;
+  renewalKey?: string;
+  requestId?: string;
+};
+
+export enum CacheAction {
+  ServeCached = 'serve-cached',
+  RefreshSameRequest = 'refresh-same-request',
+  RefreshBackground = 'refresh-background',
+  WaitForRenew = 'wait-for-renew',
+}
+
+type CacheOperationContext = {
+  cacheKey: CacheKey;
+  redisKey: string;
+  renewalKey?: string;
+  expiration: number;
+  spanId: string;
+  options: CacheQueryResultOptions;
+  log: (message: string, extra?: Record<string, any>) => void;
 };
 
 export interface QueryCacheOptions {
   refreshKeyRenewalThreshold?: number;
+  localRefreshKey?: boolean;
   externalQueueOptions?: any;
   externalDriverFactory?: DriverFactory;
   backgroundRenew?: Boolean;
@@ -157,6 +199,10 @@ export class QueryCache {
   protected externalQueue: QueryQueue | null = null;
 
   protected memoryCache: LRUCache<string, CacheEntry>;
+
+  protected static readonly IN_MEMORY_CACHE_DISABLE_PERIOD = 5 * 60 * 1000;
+
+  protected readonly localRefreshKeyEnabled: boolean;
 
   public constructor(
     protected readonly cachePrefix: string,
@@ -184,11 +230,35 @@ export class QueryCache {
     this.memoryCache = new LRUCache<string, CacheEntry>({
       max: options.maxInMemoryCacheEntries || 10000
     });
+    this.localRefreshKeyEnabled = options.localRefreshKey ?? false;
   }
 
   /**
-   * Returns cache driver instance.
+   * Whether interval based refresh keys are answered from this instance clock instead of being
+   * run as queries and cached.
    */
+  public isLocalRefreshKeyActive(): boolean {
+    return this.localRefreshKeyEnabled && !this.options.refreshKeyRenewalThreshold;
+  }
+
+  public localRefreshKeyResult(queryOptions?: QueryOptions): [{ refresh_key: string }] | null {
+    if (!this.localRefreshKeyEnabled || !isValidLocalRefreshKey(queryOptions?.localRefreshKey)) {
+      return null;
+    }
+
+    // `refreshKeyRenewalThreshold` throttles how often the SQL result is re-read, and that is
+    // also what bounds how often the key advances: a value cached for a day advances daily,
+    // whatever `every` says. A locally evaluated key has no cache entry to age out, so the only
+    // way to keep honouring the override is to leave these keys on the SQL path.
+    // TODO: support the two together by snapping the local value to the threshold instead of
+    // falling back to a query.
+    if (!this.isLocalRefreshKeyActive()) {
+      return null;
+    }
+
+    return evaluateLocalRefreshKey(<LocalRefreshKeyDescriptor>queryOptions?.localRefreshKey);
+  }
+
   public getCacheDriver(): CacheDriverInterface {
     return this.cacheDriver;
   }
@@ -209,15 +279,10 @@ export class QueryCache {
     queryBody: QueryBody,
     preAggregationsTablesToTempTables: PreAggTableToTempTable[],
   ) {
-    const replacePreAggregationTableNames =
-      (queryAndParams: string | QueryWithParams) => (
-        QueryCache.replacePreAggregationTableNames(
-          queryAndParams,
-          preAggregationsTablesToTempTables,
-        )
-      );
-
-    const query = replacePreAggregationTableNames(queryBody.query);
+    const query = QueryCache.replacePreAggregationTableNamesInSql(
+      queryBody.query,
+      preAggregationsTablesToTempTables,
+    );
 
     const inlineTables = preAggregationsTablesToTempTables.flatMap(
       ([_, preAggregation]) => (
@@ -225,7 +290,7 @@ export class QueryCache {
       )
     );
 
-    let queuePriority = 10;
+    let queuePriority: QueuePriority = QueuePriority.Interactive;
 
     if (Number.isInteger(queryBody.queuePriority)) {
       queuePriority = queryBody.queuePriority;
@@ -237,7 +302,10 @@ export class QueryCache {
 
     const cacheKeyQueries = this
       .cacheKeyQueriesFrom(queryBody)
-      .map(replacePreAggregationTableNames);
+      .map((queryAndParams) => QueryCache.replacePreAggregationTableNames(
+        queryAndParams,
+        preAggregationsTablesToTempTables,
+      ));
 
     const renewalThreshold = queryBody.cacheKeyQueries?.renewalThreshold;
 
@@ -274,6 +342,7 @@ export class QueryCache {
             values,
             {
               cacheKey: [query, values],
+              priority: queuePriority,
               external: queryBody.external,
               requestId: queryBody.requestId,
               dataSource: queryBody.dataSource,
@@ -285,8 +354,7 @@ export class QueryCache {
       }
     }
 
-    // renewQuery has been deprecated, but keeping it for now
-    if (queryBody.cacheMode === 'must-revalidate' || queryBody.renewQuery) {
+    if (queryBody.cacheMode === 'must-revalidate') {
       this.logger('Requested renew', { cacheKey, requestId: queryBody.requestId });
       return this.renewQuery(
         query,
@@ -297,16 +365,18 @@ export class QueryCache {
         renewalThreshold,
         {
           forceNoCache,
+          priority: queuePriority,
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
           persistent: queryBody.persistent,
+          skipRefreshKeyWaitForRenew: true,
         }
       );
     }
 
     if (!this.options.backgroundRenew && queryBody.cacheMode !== 'stale-while-revalidate') {
-      const resultPromise = this.renewQuery(
+      const result = await this.renewQuery(
         query,
         values,
         cacheKeyQueries,
@@ -315,6 +385,7 @@ export class QueryCache {
         renewalThreshold,
         {
           forceNoCache,
+          priority: queuePriority,
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
@@ -323,6 +394,10 @@ export class QueryCache {
         }
       );
 
+      // Keep the cycle after the foreground renewal: concurrent passes race on a cold cache.
+      // It remains necessary when skipRefreshKeyWaitForRenew serves a stale key from a warm cache.
+      // It re-runs the same query at Background while the renewal above ran at the request's own
+      // priority, because the request is no longer blocked on the result by the time it fires.
       this.startRenewCycle(
         query,
         values,
@@ -338,7 +413,7 @@ export class QueryCache {
         }
       );
 
-      return resultPromise;
+      return result;
     }
 
     this.logger('Background fetch', { cacheKey, requestId: queryBody.requestId });
@@ -405,30 +480,107 @@ export class QueryCache {
     return key;
   }
 
-  protected static replaceAll(replaceThis, withThis, inThis) {
-    withThis = withThis.replace(/\$/g, '$$$$');
-    return inThis.replace(
-      new RegExp(replaceThis.replace(/([/,!\\^${}[\]().*+?|<>\-&])/g, '\\$&'), 'g'),
-      withThis
+  /**
+   * Identity of a refresh key query: the SQL, its params, and where it runs. `external` and
+   * `dataSource` are every dimension `cacheQueryResult` routes on; the rest of the options element
+   * is policy applied to the result rather than part of it, and `replacePartitionSqlAndParams`
+   * recomputes `renewalThreshold` from `new Date()`, so covering it would make the key drift within
+   * a single request.
+   */
+  public static refreshKeyIdentity(
+    sqlQuery: QueryWithParams,
+    dataSource: string,
+  ): [string, string[], boolean, string] {
+    const [query, values, options] = sqlQuery;
+    // Both spellings of each default have to collapse to one key: producers write "source database"
+    // as `false` or as an absent option, and `getQueue` resolves an absent `dataSource` to `default`.
+    return [query, values, !!options?.external, dataSource || 'default'];
+  }
+
+  /**
+   * The `invalidate` discriminator of the partition build range cache, written by
+   * `PreAggregationPartitionRangeLoader.loadRangeQuery` and read by
+   * `PreAggregations.checkPartitionsBuildRangeCache`. Derived here so the two cannot drift apart —
+   * when each spelled it out itself, the read stopped finding what the write had stored.
+   */
+  public static buildRangeInvalidateKey(
+    preAggregation: { invalidateKeyQueries?: QueryWithParams[], dataSource?: string },
+  ): [string, string[], boolean, string] | false {
+    const keyQuery = preAggregation.invalidateKeyQueries?.[0];
+    return keyQuery ? QueryCache.refreshKeyIdentity(keyQuery, preAggregation.dataSource) : false;
+  }
+
+  public async cacheRefreshKeyResult(
+    sqlQuery: QueryWithParams,
+    expiration: number,
+    options: RefreshKeyCacheOptions,
+  ) {
+    const [query, values, queryOptions] = sqlQuery;
+
+    const local = this.localRefreshKeyResult(queryOptions);
+    if (local) {
+      return local;
+    }
+
+    const cacheKey = QueryCache.refreshKeyIdentity(sqlQuery, options.dataSource);
+
+    return this.cacheQueryResult(query, values, cacheKey, expiration, {
+      ...options,
+      renewalThreshold: this.options.refreshKeyRenewalThreshold
+        || queryOptions?.renewalThreshold || 2 * 60,
+      renewalKey: cacheKey,
+      useInMemory: true,
+      external: cacheKey[2],
+    });
+  }
+
+  public refreshKeyCacheKey(sqlQuery: QueryWithParams, dataSource: string): string {
+    return this.queryCacheKey(QueryCache.refreshKeyIdentity(sqlQuery, dataSource));
+  }
+
+  public static extractRequestUUID(requestId: string): string {
+    return extractRequestUUID(requestId);
+  }
+
+  public static replacePreAggregationTableNamesInSql(
+    sql: string,
+    preAggregationsTablesToTempTables: PreAggTableToTempTableNames[],
+  ): string {
+    // Single-pass replacement with longest-first alternation: sequential
+    // per-name replacement would corrupt names that are prefixes of other
+    // names (e.g. `name1` vs `name10`) and rescan already inserted target
+    // names, which contain the source name as a prefix
+    const sorted = [...preAggregationsTablesToTempTables]
+      .sort(([a], [b]) => b.length - a.length);
+
+    if (!sorted.length) {
+      return sql;
+    }
+
+    const replacements = new Map(
+      sorted.map(([tableName, { targetTableName }]) => [tableName, targetTableName])
     );
+    const replaceRegex = new RegExp(
+      sorted
+        .map(([tableName]) => tableName.replace(/([/,!\\^${}[\]().*+?|<>\-&])/g, '\\$&'))
+        .join('|'),
+      'g'
+    );
+
+    return sql.replace(replaceRegex, (match) => replacements.get(match) as string);
   }
 
   public static replacePreAggregationTableNames(
-    queryAndParams: string | QueryWithParams,
+    queryAndParams: QueryWithParams,
     preAggregationsTablesToTempTables: PreAggTableToTempTableNames[],
-  ): string | QueryWithParams {
-    const [keyQuery, params, queryOptions] = Array.isArray(queryAndParams)
-      ? queryAndParams
-      : [queryAndParams, []];
-    const replacedKeyQuery: string = preAggregationsTablesToTempTables.reduce(
-      (query, [tableName, { targetTableName }]) => (
-        QueryCache.replaceAll(tableName, targetTableName, query)
-      ),
-      keyQuery
-    );
-    return Array.isArray(queryAndParams)
-      ? [replacedKeyQuery, params, queryOptions]
-      : replacedKeyQuery;
+  ): QueryWithParams {
+    const [sql, params, queryOptions] = queryAndParams;
+
+    return [
+      QueryCache.replacePreAggregationTableNamesInSql(sql, preAggregationsTablesToTempTables),
+      params,
+      queryOptions,
+    ];
   }
 
   /**
@@ -650,7 +802,7 @@ export class QueryCache {
           let logged = false;
           Promise
             .all([clientFactory()])
-            .then(([client]) => (<DriverInterface>client).stream(req.query, req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark') }))
+            .then(([client]) => (<DriverInterface>client).stream(req.query, req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark'), requestId: req.requestId }))
             .then((source) => {
               const cleanup = async (error) => {
                 if (source.release) {
@@ -732,9 +884,9 @@ export class QueryCache {
   }
 
   public startRenewCycle(
-    query: string | QueryWithParams,
+    query: string,
     values: string[],
-    cacheKeyQueries: (string | QueryWithParams)[],
+    cacheKeyQueries: QueryWithParams[],
     expireSecs: number,
     cacheKey: CacheKey,
     renewalThreshold: any,
@@ -767,15 +919,16 @@ export class QueryCache {
   }
 
   public renewQuery(
-    query: string | QueryWithParams,
+    query: string,
     values: string[],
-    cacheKeyQueries: (string | QueryWithParams)[],
+    cacheKeyQueries: QueryWithParams[],
     expireSecs: number,
     cacheKey: CacheKey,
     renewalThreshold: any,
     options: {
       requestId?: string,
       skipRefreshKeyWaitForRenew?: boolean,
+      priority?: number,
       external?: boolean,
       forceNoCache?: boolean,
       dataSource: string,
@@ -787,7 +940,7 @@ export class QueryCache {
   ) {
     options = options || { dataSource: 'default' };
     return Promise.all(
-      this.loadRefreshKeys(<QueryWithParams[]>cacheKeyQueries, expireSecs, options),
+      this.loadRefreshKeys(cacheKeyQueries, expireSecs, options),
     )
       .catch(e => {
         if (e instanceof ContinueWaitError) {
@@ -808,10 +961,11 @@ export class QueryCache {
               renewalKey: cacheKeyQueryResults && [
                 cacheKeyQueries,
                 cacheKeyQueryResults,
-                this.queryRedisKey([query, values]),
+                this.queryCacheKey([query, values]),
               ],
               waitForRenew: true,
               forceNoCache: options.forceNoCache,
+              priority: options.priority,
               external: options.external,
               requestId: options.requestId,
               dataSource: options.dataSource,
@@ -851,21 +1005,14 @@ export class QueryCache {
 
   @AsyncDebounce()
   public async loadRefreshKey(q: QueryWithParams, expireSecs: number, options: LoadRefreshKeyOptions) {
-    const [query, values, queryOptions]: QueryWithParams = Array.isArray(q) ? q : [q, [], {}];
-
-    return this.cacheQueryResult(
-      query,
-      values,
-      [query, values],
+    return this.cacheRefreshKeyResult(
+      q,
       expireSecs,
       {
-        renewalThreshold: this.options.refreshKeyRenewalThreshold || queryOptions?.renewalThreshold || 2 * 60,
-        renewalKey: q,
         waitForRenew: !options.skipRefreshKeyWaitForRenew,
+        priority: options.priority,
         requestId: options.requestId,
         dataSource: options.dataSource,
-        useInMemory: true,
-        external: queryOptions?.external,
       },
     );
   }
@@ -876,6 +1023,191 @@ export class QueryCache {
     callback: () => MaybeCancelablePromise<T>,
   ) => this.cacheDriver.withLock(`lock:${key}`, callback, ttl, true);
 
+  protected static decideCacheAction(
+    entry: CacheEntry,
+    renewedAgo: number,
+    options: CacheQueryResultOptions,
+    renewalKey?: string,
+  ): CacheAction {
+    const { renewalThreshold } = options;
+    const isExpired = !renewalThreshold || !entry.time || renewedAgo > renewalThreshold * 1000;
+    const isKeyMismatch = !!renewalKey && entry.renewalKey !== renewalKey;
+
+    if (!isExpired && !isKeyMismatch) {
+      return CacheAction.ServeCached;
+    }
+
+    const isSameRequest = options.requestId && entry.requestId &&
+      QueryCache.extractRequestUUID(entry.requestId) === QueryCache.extractRequestUUID(options.requestId);
+
+    // A client polling through continue-wait re-enters with the same requestId, so rejecting
+    // the result it just wrote would restart the fetch on every poll and never converge while
+    // the refreshKey keeps moving. Background renew opts out: fresh data is all it exists for.
+    if (isSameRequest && !options.renewCycle) {
+      return CacheAction.RefreshSameRequest;
+    }
+
+    // Without a refreshKey there is nothing to refresh against, so an elapsed threshold alone never triggers a fetch.
+    if (!renewalKey) {
+      return CacheAction.ServeCached;
+    }
+
+    return options.waitForRenew ? CacheAction.WaitForRenew : CacheAction.RefreshBackground;
+  }
+
+  protected static isMemoryEntryUsable(
+    entry: CacheEntry,
+    renewedAgo: number,
+    expiration: number,
+    renewalThreshold?: number,
+    renewalKey?: string,
+  ): boolean {
+    if (renewedAgo > expiration * 1000 || renewedAgo > QueryCache.IN_MEMORY_CACHE_DISABLE_PERIOD) {
+      return false;
+    }
+
+    if (!renewalKey) {
+      return true;
+    }
+
+    // Near expiry an in-memory entry races with refreshes carrying a different refreshKey value.
+    return !!renewalThreshold &&
+      !!entry.time &&
+      renewedAgo + QueryCache.IN_MEMORY_CACHE_DISABLE_PERIOD <= renewalThreshold * 1000 &&
+      entry.renewalKey === renewalKey;
+  }
+
+  protected cacheOperationContext(
+    cacheKey: CacheKey,
+    expiration: number,
+    options: CacheQueryResultOptions,
+  ): CacheOperationContext {
+    const spanId = crypto.randomBytes(16).toString('hex');
+    const logContext = {
+      cacheKey,
+      requestId: options.requestId,
+      spanId,
+      primaryQuery: options.primaryQuery,
+      renewCycle: options.renewCycle,
+    };
+
+    const redisKey = this.queryCacheKey(cacheKey);
+
+    return {
+      cacheKey,
+      redisKey,
+      // Refresh key entries renew against their own key, so hashing it a second time is wasted work
+      renewalKey: options.renewalKey && (
+        options.renewalKey === cacheKey ? redisKey : this.queryCacheKey(options.renewalKey)
+      ),
+      expiration,
+      spanId,
+      options,
+      log: (message, extra) => this.logger(message, extra ? { ...logContext, ...extra } : logContext),
+    };
+  }
+
+  protected fetchAndCacheQuery(
+    query: string | QueryWithParams,
+    values: string[],
+    ctx: CacheOperationContext,
+  ) {
+    const { cacheKey, redisKey, renewalKey, expiration, spanId, options } = ctx;
+
+    return this.queryWithRetryAndRelease(query, values, {
+      cacheKey,
+      priority: options.priority,
+      external: options.external,
+      requestId: options.requestId,
+      spanId,
+      persistent: options.persistent,
+      dataSource: options.dataSource,
+      useCsvQuery: options.useCsvQuery,
+      lambdaTypes: options.lambdaTypes,
+    }).then(res => {
+      const entry = {
+        time: (new Date()).getTime(),
+        result: res,
+        renewalKey,
+        requestId: options.requestId,
+      };
+
+      return this
+        .cacheDriver
+        .set(redisKey, entry, expiration)
+        .then(({ bytes }) => {
+          ctx.log('Renewed');
+          this.logger('Outgoing network usage', {
+            service: 'cache',
+            requestId: options.requestId,
+            spanId,
+            bytes,
+            cacheKey,
+          });
+          return res;
+        });
+    }).catch(e => {
+      if (!(e instanceof ContinueWaitError)) {
+        ctx.log('Dropping Cache', { error: e.stack || e });
+        this.cacheDriver.remove(redisKey)
+          .catch(err => this.logger('Error removing key', {
+            cacheKey,
+            spanId,
+            error: err.stack || err,
+            requestId: options.requestId
+          }));
+      }
+      throw e;
+    });
+  }
+
+  protected fetchAndCacheQueryInBackground(
+    query: string | QueryWithParams,
+    values: string[],
+    ctx: CacheOperationContext,
+  ): void {
+    this.fetchAndCacheQuery(query, values, ctx).catch(e => {
+      if (!(e instanceof ContinueWaitError)) {
+        ctx.log('Error renewing', { error: e.stack || e });
+      }
+    });
+  }
+
+  protected getFromMemoryCache(ctx: CacheOperationContext): CacheEntry | null {
+    const { redisKey, renewalKey, expiration, options } = ctx;
+    const entry = this.memoryCache.get(redisKey);
+
+    if (!entry) {
+      return null;
+    }
+
+    const renewedAgo = (new Date()).getTime() - entry.time;
+
+    if (!QueryCache.isMemoryEntryUsable(entry, renewedAgo, expiration, options.renewalThreshold, renewalKey)) {
+      this.memoryCache.delete(redisKey);
+      return null;
+    }
+
+    ctx.log('Found in memory cache entry', {
+      time: entry.time,
+      renewedAgo,
+      renewalKey: entry.renewalKey,
+      newRenewalKey: renewalKey,
+      renewalThreshold: options.renewalThreshold,
+    });
+
+    return entry;
+  }
+
+  protected storeInMemoryCache(entry: CacheEntry, renewedAgo: number, ctx: CacheOperationContext): void {
+    const { useInMemory, renewalThreshold } = ctx.options;
+
+    if (useInMemory && !!renewalThreshold &&
+      renewedAgo + QueryCache.IN_MEMORY_CACHE_DISABLE_PERIOD <= renewalThreshold * 1000) {
+      this.memoryCache.set(ctx.redisKey, entry);
+    }
+  }
+
   public async cacheQueryResult(
     query: string | QueryWithParams,
     values: string[],
@@ -883,165 +1215,67 @@ export class QueryCache {
     expiration: number,
     options: CacheQueryResultOptions,
   ) {
-    const spanId = crypto.randomBytes(16).toString('hex');
     options = options || { dataSource: 'default' };
-    const { renewalThreshold, primaryQuery, renewCycle } = options;
-    const renewalKey = options.renewalKey && this.queryRedisKey(options.renewalKey);
-    const redisKey = this.queryRedisKey(cacheKey);
-    const fetchNew = () => (
-      this.queryWithRetryAndRelease(query, values, {
-        cacheKey,
-        priority: options.priority,
-        external: options.external,
-        requestId: options.requestId,
-        spanId,
-        persistent: options.persistent,
-        dataSource: options.dataSource,
-        useCsvQuery: options.useCsvQuery,
-        lambdaTypes: options.lambdaTypes,
-      }).then(res => {
-        const result = {
-          time: (new Date()).getTime(),
-          result: res,
-          renewalKey
-        };
-        return this
-          .cacheDriver
-          .set(redisKey, result, expiration)
-          .then(({ bytes }) => {
-            this.logger('Renewed', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-            this.logger('Outgoing network usage', {
-              service: 'cache',
-              requestId: options.requestId,
-              spanId,
-              bytes,
-              cacheKey,
-            });
-            return res;
-          });
-      }).catch(e => {
-        if (!(e instanceof ContinueWaitError)) {
-          this.logger('Dropping Cache', {
-            cacheKey,
-            error: e.stack || e,
-            requestId: options.requestId,
-            spanId,
-            primaryQuery,
-            renewCycle
-          });
-          this.cacheDriver.remove(redisKey)
-            .catch(err => this.logger('Error removing key', {
-              cacheKey,
-              spanId,
-              error: err.stack || err,
-              requestId: options.requestId
-            }));
-        }
-        throw e;
-      })
-    );
+
+    const ctx = this.cacheOperationContext(cacheKey, expiration, options);
+    const { renewalThreshold } = options;
 
     if (options.forceNoCache) {
-      this.logger('Force no cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-      return fetchNew();
+      ctx.log('Force no cache for');
+      return this.fetchAndCacheQuery(query, values, ctx);
     }
 
-    let res;
+    let entry: CacheEntry | null = options.useInMemory ? this.getFromMemoryCache(ctx) : null;
 
-    const inMemoryCacheDisablePeriod = 5 * 60 * 1000;
-
-    if (options.useInMemory) {
-      const inMemoryValue = this.memoryCache.get(redisKey);
-      if (inMemoryValue) {
-        const renewedAgo = (new Date()).getTime() - inMemoryValue.time;
-
-        if (
-          renewalKey && (
-            !renewalThreshold ||
-            !inMemoryValue.time ||
-            // Do not cache in memory in last 5 minutes of expiry.
-            // Most likely it'll cause race condition of refreshing data with different refreshKey values.
-            renewedAgo + inMemoryCacheDisablePeriod > renewalThreshold * 1000 ||
-            inMemoryValue.renewalKey !== renewalKey
-          ) || renewedAgo > expiration * 1000 || renewedAgo > inMemoryCacheDisablePeriod
-        ) {
-          this.memoryCache.delete(redisKey);
-        } else {
-          this.logger('Found in memory cache entry', {
-            cacheKey,
-            time: inMemoryValue.time,
-            renewedAgo,
-            renewalKey: inMemoryValue.renewalKey,
-            newRenewalKey: renewalKey,
-            renewalThreshold,
-            requestId: options.requestId,
-            spanId,
-            primaryQuery,
-            renewCycle
-          });
-          res = inMemoryValue;
-        }
-      }
+    if (!entry) {
+      entry = await this.cacheDriver.get(ctx.redisKey);
     }
 
-    if (!res) {
-      res = await this.cacheDriver.get(redisKey);
+    if (!entry) {
+      ctx.log('Missing cache for');
+      return this.fetchAndCacheQuery(query, values, ctx);
     }
 
-    if (res) {
-      const parsedResult = res;
-      const renewedAgo = (new Date()).getTime() - parsedResult.time;
-      this.logger('Found cache entry', {
-        cacheKey,
-        time: parsedResult.time,
-        renewedAgo,
-        renewalKey: parsedResult.renewalKey,
-        newRenewalKey: renewalKey,
-        renewalThreshold,
-        requestId: options.requestId,
-        spanId,
-        primaryQuery,
-        renewCycle
-      });
-      if (
-        renewalKey && (
-          !renewalThreshold ||
-          !parsedResult.time ||
-          renewedAgo > renewalThreshold * 1000 ||
-          parsedResult.renewalKey !== renewalKey
-        )
-      ) {
-        if (options.waitForRenew) {
-          this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-          return fetchNew();
-        } else {
-          this.logger('Renewing existing key', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-          fetchNew().catch(e => {
-            if (!(e instanceof ContinueWaitError)) {
-              this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-            }
-          });
-        }
-      }
-      this.logger('Using cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-      if (options.useInMemory && renewedAgo + inMemoryCacheDisablePeriod <= renewalThreshold * 1000) {
-        this.memoryCache.set(redisKey, parsedResult);
-      }
-      return parsedResult.result;
-    } else {
-      this.logger('Missing cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-      return fetchNew();
+    const renewedAgo = (new Date()).getTime() - entry.time;
+
+    ctx.log('Found cache entry', {
+      time: entry.time,
+      renewedAgo,
+      renewalKey: entry.renewalKey,
+      newRenewalKey: ctx.renewalKey,
+      renewalThreshold,
+    });
+
+    switch (QueryCache.decideCacheAction(entry, renewedAgo, options, ctx.renewalKey)) {
+      case CacheAction.WaitForRenew:
+        ctx.log('Waiting for renew', { renewalThreshold });
+        return this.fetchAndCacheQuery(query, values, ctx);
+      case CacheAction.RefreshSameRequest:
+        ctx.log('Same request cache hit (background refresh)', { renewalThreshold });
+        this.fetchAndCacheQueryInBackground(query, values, ctx);
+        break;
+      case CacheAction.RefreshBackground:
+        ctx.log('Renewing existing key', { renewalThreshold });
+        this.fetchAndCacheQueryInBackground(query, values, ctx);
+        break;
+      default:
+        break;
     }
+
+    ctx.log('Using cache for');
+    this.storeInMemoryCache(entry, renewedAgo, ctx);
+
+    return entry.result;
   }
 
   protected async lastRefreshTime(cacheKey) {
-    const cachedValue = await this.cacheDriver.get(this.queryRedisKey(cacheKey));
+    const cachedValue = await this.cacheDriver.get(this.queryCacheKey(cacheKey));
     return cachedValue && new Date(cachedValue.time);
   }
 
   public async resultFromCacheIfExists(queryBody) {
     const cacheKey = QueryCache.queryCacheKey(queryBody);
-    const cachedValue = await this.cacheDriver.get(this.queryRedisKey(cacheKey));
+    const cachedValue = await this.cacheDriver.get(this.queryCacheKey(cacheKey));
     if (cachedValue) {
       return {
         data: cachedValue.result,
@@ -1051,7 +1285,7 @@ export class QueryCache {
     return null;
   }
 
-  public queryRedisKey(cacheKey: CacheKey): string {
+  public queryCacheKey(cacheKey: CacheKey): string {
     return this.getKey('SQL_QUERY_RESULT', getCacheHash(cacheKey) as any);
   }
 
