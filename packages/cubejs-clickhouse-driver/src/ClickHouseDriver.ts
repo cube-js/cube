@@ -1,7 +1,3 @@
-/**
- * @fileoverview The `ClickHouseDriver` and related types declaration.
- */
-
 import {
   getEnv,
   assertDataSource,
