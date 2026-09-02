@@ -675,16 +675,26 @@ impl PreAggregationsCompiler {
                     .all(|m| pa.dimensions.iter().any(|pa_m| m == pa_m))
             })
             .collect_vec();
+        // A rollup storing the key ambiguously is no candidate, but it is the likely cause when
+        // nothing else stands in either, so its reason is kept and reported in place of the
+        // generic one rather than failing a hop another rollup can serve.
+        let mut ambiguous = None;
         if found_pre_aggr.is_empty() {
             let mut widened = Vec::new();
             for pre_aggr in pre_aggrs_for_join.iter() {
                 let mut covers_all = true;
                 for member in members.iter() {
-                    // Propagated, not swallowed: a rollup that stores the key ambiguously has
-                    // to say so rather than drop out and leave "no rollups found" behind.
-                    if Self::resolve_join_member(pre_aggr, member)?.is_none() {
-                        covers_all = false;
-                        break;
+                    match Self::resolve_join_member(pre_aggr, member) {
+                        Ok(Some(_)) => {}
+                        Ok(None) => {
+                            covers_all = false;
+                            break;
+                        }
+                        Err(e) => {
+                            ambiguous.get_or_insert(e);
+                            covers_all = false;
+                            break;
+                        }
                     }
                 }
                 if covers_all {
@@ -694,6 +704,9 @@ impl PreAggregationsCompiler {
             found_pre_aggr = widened;
         }
         if found_pre_aggr.is_empty() {
+            if let Some(e) = ambiguous {
+                return Err(e);
+            }
             return Err(CubeError::user(format!(
                 "No rollups found that can be used for a rollup join from \"{}\" ({}) to \"{}\" ({}). Check the \"{}\" pre-aggregation definition — every rollup must declare the dimensions its own joins are on, including keys the query doesn't select",
                 join_item.original_from,

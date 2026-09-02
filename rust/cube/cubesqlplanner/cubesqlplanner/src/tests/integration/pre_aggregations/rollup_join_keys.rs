@@ -194,3 +194,28 @@ fn test_rollup_join_rejects_key_stored_at_two_granularities() -> Result<(), Cube
 
     Ok(())
 }
+
+// A rollup that can't be joined on is not a reason to fail the hop — only a reason to explain
+// it if nothing else stands in either.
+#[test]
+fn test_rollup_join_skips_an_ambiguous_candidate_for_a_resolvable_one() -> Result<(), CubeError> {
+    let ctx = TestContext::new(MockSchema::from_yaml_file(
+        "common/rollup_join_time_dimension_key_ambiguous_candidate.yaml",
+    ))?;
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(TIME_DIMENSION_KEY_QUERY)?;
+
+    let names = pre_aggrs
+        .iter()
+        .map(|pa| format!("{}.{}", pa.cube_name(), pa.name()))
+        .collect::<Vec<_>>();
+    assert_eq!(names, vec!["td_dates.td_rollup_join"]);
+    assert!(
+        sql.contains("td_dates__td_dates_rollup")
+            && !sql.contains("td_dates__td_dates_wide_rollup"),
+        "the hop must join through the rollup that can be joined on, got:\n{}",
+        sql
+    );
+
+    Ok(())
+}
