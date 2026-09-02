@@ -287,10 +287,6 @@ describe('getEnv(defaultTimezone / scheduledRefreshTimezones)', () => {
 });
 
 describe('getEnv(compilerCacheSize)', () => {
-  beforeEach(() => {
-    delete process.env.CUBEJS_COMPILER_CACHE_SIZE;
-  });
-
   afterEach(() => {
     delete process.env.CUBEJS_COMPILER_CACHE_SIZE;
   });
