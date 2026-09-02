@@ -170,12 +170,10 @@ export type CubeSqlResult = {
 /**
  * Pick the result-level metadata out of a parsed SQL API schema line.
  *
- * One place for all of it, because three call sites re-emit these fields
- * (`cubeSql`, and `cubeSqlStream` for both its per-chunk and trailing-buffer
- * paths) and a site missed when a field is added drops it silently, while still
- * type-checking. The invariant: this must cover every result-level field the
- * writer puts on the schema line (`node_export.rs`), and an absent field must
- * stay absent rather than become an explicit `undefined`.
+ * Must cover every result-level field the writer puts on that line
+ * (`node_export.rs`), and must leave an absent field absent rather than set it to
+ * an explicit `undefined`. Shared by all three emitters — `cubeSql`, and
+ * `cubeSqlStream` for both its per-chunk and trailing-buffer paths.
  */
 function pickCubeSqlResultMetadata(parsed: any): CubeSqlResultMetadata {
   return {
