@@ -189,10 +189,6 @@ A chart whose query doesn't use the replaced member at all is a different case: 
 
 A chart with a [period comparison][ref-charts] is a narrower case: the comparison can't follow a member switch, so the chart applies the switch and drops the comparison, saying so in its own notice rather than silently showing a comparison that no longer matches the data.
 
-<Note>
-A viewer's choice travels in a [shared link](#sharing-the-current-selection), but not in a scheduled export or a screenshot — those open on whatever member the control resolves for the recipient on its own.
-</Note>
-
 ## Parent
 
 A parent control is a dropdown of options you define. Picking one re-points a whole row of other controls at once — so a viewer makes a single choice instead of adjusting three or four filters by hand.
@@ -311,7 +307,6 @@ What does and doesn't travel in the link:
 - **Only what the viewer chose.** Values that came from the control's own configuration — a static default, a [default granularity](#default-granularity) — are not written into the URL. Every viewer already gets those from the dashboard itself, and leaving them out means a link stays correct after the dashboard's defaults change.
 - **Never a personalized default.** A value resolved from a [user attribute](#user-attribute-default) stays out of the link — whether it seeded a filter, a [time granularity switcher](#time-granularity-user-attribute-default) or a [field switcher](#field-switcher-user-attribute-default) directly, or reached one through a [parent control](#parent) opening on the viewer's own option. Sharing a dashboard never pins your attribute value onto the recipient; they see it through their own attributes.
 - **Every control's pick, together.** Picking in several controls puts them all in the link, including when a [parent control](#parent) sets several children at once — filters, time granularity switchers and [field switchers](#field-switcher) alike. A parent control isn't serialized itself — the link carries the values its children ended up with, so the recipient sees the same data while the parent dropdown opens on whatever default it resolves for them, which may not be the option the sharer picked.
-- **The field switcher travels, but not everywhere.** A viewer's member choice is written to the link like any other pick. What it does not survive is a server-rendered copy: scheduled exports and screenshots rebuild the URL from an allowlist with no field-switcher parameter, so the control resolves on its own — the [default option](#field-switcher-default-option), the recipient's own [user attribute](#field-switcher-user-attribute-default) where one is set, or whatever a [parent control](#parent) driving it maps for the option that parent opens on.
 - **Written out on published dashboards only.** Reading these parameters works anywhere, including [embedded][ref-embed-url-filters] dashboards; it's the writing that is published-only. In the dashboard builder the URL is left to the editing session, so changing a control there doesn't rewrite it.
 
 When a dashboard opens with these parameters, they are applied on top of whatever defaults the controls carry. A parameter is ignored when nothing on the dashboard can honor it — there is no matching control for that member, the requested granularity isn't in the switcher's [allowed granularities](#allowed-granularities), or the selected member is one the field switcher doesn't offer — its **Alternatives**, plus the replaced member.
