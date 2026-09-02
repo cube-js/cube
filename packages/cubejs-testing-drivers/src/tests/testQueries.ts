@@ -2332,6 +2332,48 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    execute('querying custom granularities ECommerce: count by fiscal_year_by_1st_april + no dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'fiscal_year_by_1st_april',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by fiscal_year_by_15th_april + no dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'fiscal_year_by_15th_april',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by monthly_from_15th + no dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'monthly_from_15th',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     execute('querying custom granularities ECommerce: count by three_months_by_march + no dimension', async () => {
       const response = await client.load({
         measures: [
