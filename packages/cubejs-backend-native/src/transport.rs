@@ -463,7 +463,7 @@ impl TransportService for NodeBridgeTransport {
             .await;
 
             if let Err(e) = &result {
-                if e.message.to_lowercase().contains("continue wait") {
+                if e.is_continue_wait() {
                     if throw_continue_wait {
                         return Err(CubeError::continue_wait());
                     }
@@ -609,7 +609,7 @@ impl TransportService for NodeBridgeTransport {
             .await;
 
             if let Err(e) = &res {
-                if e.message.to_lowercase().contains("continue wait") {
+                if e.is_continue_wait() {
                     if throw_continue_wait {
                         return Err(CubeError::continue_wait());
                     }

@@ -103,6 +103,19 @@ jobs:
                - Verify README updates for new features
                - Check API documentation accuracy
 
+            6. **Comments**
+               - An explanatory comment is **3 lines max**. Flag a longer one and ask for the
+                 load-bearing sentence, unless the reason genuinely cannot be stated shorter
+               - A comment earns its place only when its absence would let a later edit
+                 reintroduce a bug. Flag one a reader would lose nothing by deleting: a
+                 restatement of the code under it, a banner over self-describing code,
+                 narration of the change or of the review round that produced it, or a JSDoc
+                 block whose tags only re-spell already-typed names
+               - Prefer making the code carry the meaning — a named constant, a named
+                 intermediate value, an extracted function whose name states the intent
+               - Never raise this to ask for a comment to be **added**, and skip generated
+                 files and comments another rule or tool requires
+
             Provide detailed feedback using inline comments for specific issues.
             Use top-level comments for general observations or praise.
 
