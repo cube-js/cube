@@ -142,7 +142,7 @@ export class HttpTransport implements ITransport<Response> {
 
     // Currently, all methods make GET requests. If a method makes a request with a body payload,
     // remember to add {'Content-Type': 'application/json'} to the header.
-    const runRequest = () => globalThis.fetch(url, {
+    const runRequest = () => fetch(url, {
       method: requestMethod,
       headers: {
         Authorization: this.authorization,
@@ -223,7 +223,7 @@ export class HttpTransport implements ITransport<Response> {
 
     return {
       stream: async () => {
-        const response = await globalThis.fetch(url, {
+        const response = await fetch(url, {
           method: requestMethod,
           headers: {
             Authorization: this.authorization,

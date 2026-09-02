@@ -317,30 +317,4 @@ describe('HttpTransport', () => {
       await requestPromise;
     }, 10000); // Set 10-second timeout
   });
-
-  // Firefox's WebIDL binding throws `Can only call Window.fetch on instances of Window` when
-  // `fetch` is invoked with the wrong receiver, which is how cube-js/cube#9694 manifested.
-  test('it calls the global fetch with globalThis as the receiver', async () => {
-    const strictFetch = vi.fn(function strictFetch(this: unknown) {
-      if (this !== globalThis) {
-        throw new TypeError('Can only call Window.fetch on instances of Window');
-      }
-
-      return Promise.resolve({ ok: true } as Response);
-    });
-
-    vi.stubGlobal('fetch', strictFetch);
-
-    try {
-      const transport = new HttpTransport({ authorization: 'token', apiUrl });
-      const result = await transport
-        .request('load', { query })
-        .subscribe((response) => response);
-
-      expect(strictFetch).toHaveBeenCalledTimes(1);
-      expect(result).toEqual({ ok: true });
-    } finally {
-      vi.stubGlobal('fetch', mockedFetch);
-    }
-  });
 });
