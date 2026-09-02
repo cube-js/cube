@@ -91,6 +91,17 @@ export class CubeStoreQuery extends BaseQuery {
    * intervals relative to origin timestamp point.
    */
   public dateBin(interval: string, source: string, origin: string): string {
+    const intervalParsed = parseSqlInterval(interval);
+    const months = SQL_INTERVAL_UNITS.slice(0, SQL_INTERVAL_UNITS.indexOf('week'));
+    const hasMonths = months.some(unit => intervalParsed[unit]);
+    const hasDayTime = SQL_INTERVAL_UNITS.slice(SQL_INTERVAL_UNITS.indexOf('week'))
+      .some(unit => intervalParsed[unit]);
+
+    // DATE_BIN mixes no month component with a day or time one, unlike DATE_ADD / DATE_SUB.
+    if (hasMonths && hasDayTime) {
+      throw new Error(`Cannot transform interval expression "${interval}" to CubeStore dialect`);
+    }
+
     return `DATE_BIN(INTERVAL ${this.formatInterval(interval)}, ${this.dateTimeCast(source)}, ${this.dateTimeCast(`'${origin}'`)})`;
   }
 
