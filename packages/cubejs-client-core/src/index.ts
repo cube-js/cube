@@ -18,7 +18,8 @@ import {
   Query,
   QueryOrder,
   QueryType,
-  TransformedQuery
+  TransformedQuery,
+  UsedPreAggregation
 } from './types.js';
 
 export type LoadMethodCallback<T> = (error: Error | null, resultSet: T) => void;
@@ -141,17 +142,46 @@ export type CubeSqlSchemaColumn = {
   format?: DimensionFormat | MeasureFormat;
 };
 
+/**
+ * Metadata the SQL API reports alongside the schema, describing the result as a
+ * whole rather than its columns. Optional throughout: a deployment older than the
+ * field, or a query that hit no pre-aggregation, simply omits it.
+ */
+export type CubeSqlResultMetadata = {
+  lastRefreshTime?: string;
+  /**
+   * Pre-aggregations this result was served from, keyed by pre-aggregation table
+   * name. Absent when the query hit none. Carries identity only, so a client can
+   * match a result to the pre-aggregation build behind it.
+   */
+  usedPreAggregations?: Record<string, UsedPreAggregation>;
+};
+
 export type CubeSqlResult = {
   schema: CubeSqlSchemaColumn[];
   data: (string | number | boolean | null)[][];
-  lastRefreshTime?: string;
-};
+} & CubeSqlResultMetadata;
 
-export type CubeSqlStreamChunk = {
+/**
+ * Pick the result-level metadata out of a parsed SQL API schema line.
+ *
+ * Every field here is optional on the wire, and three call sites re-emit them
+ * (`cubeSql`, and `cubeSqlStream` for both its per-chunk and trailing-buffer
+ * paths), so the spread lives in one place: adding a field to the response
+ * previously meant remembering all three, and a site that was missed dropped the
+ * new field silently, with the result still type-checking.
+ */
+function pickCubeSqlResultMetadata(parsed: any): CubeSqlResultMetadata {
+  return {
+    ...(parsed.lastRefreshTime ? { lastRefreshTime: parsed.lastRefreshTime } : {}),
+    ...(parsed.usedPreAggregations ? { usedPreAggregations: parsed.usedPreAggregations } : {}),
+  };
+}
+
+export type CubeSqlStreamChunk = ({
   type: 'schema';
   schema: CubeSqlSchemaColumn[];
-  lastRefreshTime?: string;
-} | {
+} & CubeSqlResultMetadata) | {
   type: 'data';
   data: (string | number | boolean | null)[];
 } | {
@@ -864,7 +894,7 @@ class CubeApi {
         return {
           schema: parsedSchema.schema,
           data: rows,
-          ...(parsedSchema.lastRefreshTime ? { lastRefreshTime: parsedSchema.lastRefreshTime } : {}),
+          ...pickCubeSqlResultMetadata(parsedSchema),
         };
       },
       options,
@@ -914,7 +944,7 @@ class CubeApi {
                 yield {
                   type: 'schema' as const,
                   schema: parsed.schema,
-                  ...(parsed.lastRefreshTime ? { lastRefreshTime: parsed.lastRefreshTime } : {}),
+                  ...pickCubeSqlResultMetadata(parsed),
                 };
               } else if (parsed.data) {
                 yield {
@@ -945,7 +975,7 @@ class CubeApi {
             yield {
               type: 'schema' as const,
               schema: parsed.schema,
-              ...(parsed.lastRefreshTime ? { lastRefreshTime: parsed.lastRefreshTime } : {}),
+              ...pickCubeSqlResultMetadata(parsed),
             };
           } else if (parsed.data) {
             yield {
