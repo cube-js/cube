@@ -173,7 +173,7 @@ Like [filters](#user-attribute-default), [time granularity switchers](#time-gran
 
 This is how one dashboard opens on the breakdown each audience cares about — a **Breakdown** switcher opening on `region` for one team and `channel` for another, from a single published dashboard.
 
-The attribute seeds the *selection*, exactly as the [default option](#field-switcher-default-option) does, and loses to a pick the viewer has already made. A value that isn't among the **Alternatives** is ignored rather than forced: the attribute is set per user and the options are set per dashboard, so the two can drift apart without anyone editing either, and the safe reading of an unusable value is "no opinion" — the control falls back to the default option.
+The attribute seeds the *selection*, exactly as the [default option](#field-switcher-default-option) does, and loses to a pick the viewer has already made. A member passed [in the URL](#sharing-the-current-selection) outranks both, so deep links keep working. If a [parent control](#parent) drives this switcher and the option the viewer is on maps a member to it, that mapping decides the member; an option that [leaves the switcher empty](#children) has no opinion, so the attribute still seeds it, and one set to **Reset to default** sends the switcher to its [default option](#field-switcher-default-option) rather than re-resolving the attribute. A value that isn't among the **Alternatives** is ignored rather than forced: the attribute is set per user and the options are set per dashboard, so the two can drift apart without anyone editing either, and the safe reading of an unusable value is "no opinion" — the control falls back to the default option.
 
 ### What the swap preserves
 
@@ -190,7 +190,7 @@ A chart whose query doesn't use the replaced member at all is a different case: 
 A chart with a [period comparison][ref-charts] is a narrower case: the comparison can't follow a member switch, so the chart applies the switch and drops the comparison, saying so in its own notice rather than silently showing a comparison that no longer matches the data.
 
 <Note>
-A viewer's choice travels in a [shared link](#sharing-the-current-selection), but not in a scheduled export or a screenshot: those URLs are rebuilt server-side from an allowlist that has no field-switcher parameter, so both render the control's default member.
+A viewer's choice travels in a [shared link](#sharing-the-current-selection), but not in a scheduled export or a screenshot — those render the control's default member.
 </Note>
 
 ## Parent
