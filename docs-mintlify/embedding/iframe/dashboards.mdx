@@ -68,9 +68,12 @@ URL parameters:
 |---|---|---|
 | Filter | `f_<semantic_view>.<dimension>=<JSON>` | `f_orders_transactions.users_country={"value":"USA"}` |
 | Time granularity switcher | `tg_<semantic_view>.<dimension>=<granularity>` | `tg_orders_transactions.created_at=week` |
+| Field switcher | `ms_<semantic_view>.<replaced_member>=<selected_member>` | `ms_orders_transactions.status=users_city` |
 
 The `<semantic_view>` and `<dimension>` must match the internal names (not
-display titles) of the semantic view and dimension configured on the widget. For
+display titles) of the semantic view and member configured on the widget — as
+must the member on the right-hand side of `ms_`, which is a measure rather than
+a dimension when the field switcher's type is **Measure**. For
 filters, an omitted filter type defaults to `equals`. Granularities are lowercase
 and must be one of the switcher's [allowed
 granularities](/docs/explore-analyze/dashboards/widgets/controls#allowed-granularities) —
