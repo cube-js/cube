@@ -235,7 +235,9 @@ module.exports = {
 </CodeGroup>
 
 This configuration option can also be set using the [`CUBEJS_COMPILER_CACHE_SIZE`](/reference/configuration/environment-variables#cubejs_compiler_cache_size)
-environment variable, and takes precedence over it.
+environment variable, and takes precedence over it. Note that the environment
+variable also sizes the SQL API's compiler cache, which this option does not
+affect.
 
 ### `max_compiler_cache_keep_alive`
 
