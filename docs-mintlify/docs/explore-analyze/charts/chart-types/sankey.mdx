@@ -23,7 +23,7 @@ Stages come from shared node names rather than from a stage field: rows `A → B
 
 A row with a blank endpoint, or a value of zero or less, is not a flow and is left out — a sankey cannot draw a ribbon with no thickness.
 
-Cyclic data is rejected rather than drawn. A flow that returns to a node it already passed through has no left-to-right layout, so the chart names the loop and asks you to remove one hop.
+A flow that returns to a node it already passed through is a cycle. Rather than being rejected, the returned-to node is split into a numbered copy so the diagram still lays out left-to-right — `A → B → A` draws as `A → B → A (2)`. Every copy of a node shares its color, and hovering one highlights the ribbons of all of them. A node that flows directly to itself has no valid split and is still rejected.
 
 ## Node grouping
 
