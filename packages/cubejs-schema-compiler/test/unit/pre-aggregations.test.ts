@@ -1155,4 +1155,149 @@ describe('pre-aggregations', () => {
       expect(query.buildSqlAndParams()[0]).toMatch(/orders/);
     });
   });
+  // A rollupJoin resolves hop by hop, and each hop needs a leg rollup carrying that hop's key
+  // on each side. That is a requirement on every leg rollup, not a limit on how many cubes the
+  // chain spans — an interior rollup needs the upstream hop's key too, which no query selects.
+  describe('rollupJoin over a join chain', () => {
+    const chainSchema = (interiorRollupDimensions: string) => `
+      cube('cube_w', {
+        sql: \`SELECT 0 as id, 'a' as dim_w\`,
+        joins: { cube_x: { relationship: 'many_to_one', sql: \`\${CUBE.dim_w} = \${cube_x.dim_w}\` } },
+        dimensions: {
+          id: { sql: 'id', type: 'string', primary_key: true },
+          dim_w: { sql: 'dim_w', type: 'string' },
+        },
+        pre_aggregations: {
+          www: { dimensions: [dim_w] },
+          chainRollupJoin: {
+            type: 'rollupJoin',
+            dimensions: [dim_w, cube_x.dim_x, cube_y.dim_y, cube_z.dim_z],
+            rollups: [www, cube_x.xxx, cube_y.yyy, cube_z.zzz]
+          }
+        }
+      });
+      cube('cube_x', {
+        sql: \`SELECT 1 as id, 'a' as dim_w, 'b' as dim_x\`,
+        joins: { cube_y: { relationship: 'many_to_one', sql: \`\${CUBE.dim_x} = \${cube_y.dim_x}\` } },
+        dimensions: {
+          id: { sql: 'id', type: 'string', primary_key: true },
+          dim_w: { sql: 'dim_w', type: 'string' },
+          dim_x: { sql: 'dim_x', type: 'string' },
+        },
+        pre_aggregations: { xxx: { dimensions: [${interiorRollupDimensions}] } }
+      });
+      cube('cube_y', {
+        sql: \`SELECT 2 as id, 'b' as dim_x, 'c' as dim_y\`,
+        joins: { cube_z: { relationship: 'many_to_one', sql: \`\${CUBE.dim_y} = \${cube_z.dim_y}\` } },
+        dimensions: {
+          id: { sql: 'id', type: 'string', primary_key: true },
+          dim_x: { sql: 'dim_x', type: 'string' },
+          dim_y: { sql: 'dim_y', type: 'string' },
+        },
+        pre_aggregations: { yyy: { dimensions: [dim_x, dim_y] } }
+      });
+      cube('cube_z', {
+        sql: \`SELECT 3 as id, 'c' as dim_y, 'd' as dim_z\`,
+        dimensions: {
+          id: { sql: 'id', type: 'string', primary_key: true },
+          dim_y: { sql: 'dim_y', type: 'string' },
+          dim_z: { sql: 'dim_z', type: 'string' },
+        },
+        pre_aggregations: { zzz: { dimensions: [dim_y, dim_z] } }
+      });
+    `;
+
+    const chainQuery = async (schema: string) => {
+      const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(schema);
+      await compiler.compile();
+      return new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [],
+        dimensions: ['cube_w.dim_w', 'cube_x.dim_x', 'cube_y.dim_y', 'cube_z.dim_z'],
+        timezone: 'UTC',
+        preAggregationsSchema: '',
+        useNativeSqlPlanner: true,
+      } as any);
+    };
+
+    it('matches a four-cube chain when every leg rollup declares its own keys', async () => {
+      const query = await chainQuery(chainSchema('dim_w, dim_x'));
+
+      // A matched rollupJoin is described by its leg rollups, which are what get built; the
+      // join itself is named on preAggregationForQuery.
+      const description: any = query.preAggregations?.preAggregationsDescription();
+      expect(description.map((p: any) => p.preAggregationId).sort()).toEqual(
+        ['cube_w.www', 'cube_x.xxx', 'cube_y.yyy', 'cube_z.zzz']
+      );
+      expect(query.preAggregations?.preAggregationForQuery?.preAggregationName).toEqual('chainRollupJoin');
+      expect(query.buildSqlAndParams()[0]).toMatch(/"cube_w__dim_w" = "cube_x__dim_w"/);
+    });
+
+    it('names the hop an interior rollup has no key for', async () => {
+      const query = await chainQuery(chainSchema('dim_x'));
+
+      // Without the hop, the member and the rollupJoin, the author has nothing to act on —
+      // which is what makes this look like a chain-depth limitation.
+      for (const expected of [/from "cube_w"/, /to "cube_x"/, /cube_x\.dim_w/, /chainRollupJoin/]) {
+        expect(() => query.preAggregations?.preAggregationsDescription()).toThrow(expected);
+      }
+    });
+  });
+
+  // A rollup stores a time dimension truncated to its granularity, so two legs that declare
+  // the join key at different granularities hold values that can't be compared.
+  describe('rollupJoin whose legs truncate the join key differently', () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(
+      `
+        cube('td_dates', {
+          sql: \`SELECT '2026-01-01'::timestamp as day, 'Q1' as quarter_label\`,
+          joins: { td_facts: { relationship: 'one_to_many', sql: \`\${CUBE.day} = \${td_facts.day}\` } },
+          dimensions: {
+            day: { sql: 'day', type: 'time', primary_key: true },
+            quarter_label: { sql: 'quarter_label', type: 'string' },
+          },
+          pre_aggregations: {
+            td_dates_rollup: { dimensions: [quarter_label], timeDimension: day, granularity: 'month' },
+            td_rollup_join: {
+              type: 'rollupJoin',
+              measures: [td_facts.total_amount],
+              dimensions: [quarter_label],
+              timeDimension: td_facts.day,
+              granularity: 'day',
+              rollups: [td_dates_rollup, td_facts.td_facts_rollup]
+            }
+          }
+        });
+        cube('td_facts', {
+          sql: \`SELECT 1 as id, '2026-01-01'::timestamp as day, 10 as amount\`,
+          dimensions: {
+            id: { sql: 'id', type: 'number', primary_key: true },
+            day: { sql: 'day', type: 'time' },
+          },
+          measures: { total_amount: { sql: 'amount', type: 'sum' } },
+          pre_aggregations: {
+            td_facts_rollup: { measures: [total_amount], timeDimension: day, granularity: 'day' }
+          }
+        });
+      `
+    );
+
+    beforeAll(async () => {
+      await compiler.compile();
+    });
+
+    it('rejects the join instead of comparing differently truncated columns', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['td_facts.total_amount'],
+        dimensions: ['td_dates.quarter_label'],
+        timeDimensions: [{ dimension: 'td_facts.day', granularity: 'day' }],
+        timezone: 'UTC',
+        preAggregationsSchema: '',
+        useNativeSqlPlanner: true,
+      } as any);
+
+      for (const expected of [/td_dates\.day \(month\)/, /td_facts\.day \(day\)/, /td_rollup_join/]) {
+        expect(() => query.preAggregations?.preAggregationsDescription()).toThrow(expected);
+      }
+    });
+  });
 });

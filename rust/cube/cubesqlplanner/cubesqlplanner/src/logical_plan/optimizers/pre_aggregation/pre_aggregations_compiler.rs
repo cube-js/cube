@@ -4,10 +4,10 @@ use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
 use crate::logical_plan::PreAggregationJoin;
-use crate::logical_plan::PreAggregationJoinItem;
 use crate::logical_plan::PreAggregationTable;
 use crate::logical_plan::PreAggregationUnion;
 use crate::logical_plan::PreAggregationUnionItem;
+use crate::logical_plan::{PreAggregationJoinItem, PreAggregationJoinMember};
 use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::planners::JoinPlanner;
@@ -230,6 +230,7 @@ impl PreAggregationsCompiler {
                 &measures,
                 &all_dimensions,
                 &rollups,
+                name,
             )?)
         } else {
             let cube = self
@@ -413,6 +414,7 @@ impl PreAggregationsCompiler {
         measures: &Vec<Rc<MemberSymbol>>,
         all_dimensions: &Vec<Rc<MemberSymbol>>,
         rollups: &Vec<String>,
+        rollup_join_name: &PreAggregationFullName,
     ) -> Result<PreAggregationJoin, CubeError> {
         let all_symbols = measures
             .iter()
@@ -461,7 +463,9 @@ impl PreAggregationsCompiler {
 
         let items = not_existing_joins
             .iter()
-            .map(|item| self.make_pre_aggregation_join_item(&pre_aggrs_for_join, item))
+            .map(|item| {
+                self.make_pre_aggregation_join_item(&pre_aggrs_for_join, item, rollup_join_name)
+            })
             .collect::<Result<Vec<_>, _>>()?;
 
         let res = PreAggregationJoin {
@@ -475,28 +479,130 @@ impl PreAggregationsCompiler {
         &self,
         pre_aggrs_for_join: &Vec<Rc<CompiledPreAggregation>>,
         join_item: &ResolvedJoinItem,
+        rollup_join_name: &PreAggregationFullName,
     ) -> Result<PreAggregationJoinItem, CubeError> {
-        let from_pre_aggr =
-            self.find_pre_aggregation_for_join(pre_aggrs_for_join, &join_item.from_members)?;
-        let to_pre_aggr =
-            self.find_pre_aggregation_for_join(pre_aggrs_for_join, &join_item.to_members)?;
+        let from_pre_aggr = self.find_pre_aggregation_for_join(
+            pre_aggrs_for_join,
+            &join_item.from_members,
+            join_item,
+            rollup_join_name,
+        )?;
+        let to_pre_aggr = self.find_pre_aggregation_for_join(
+            pre_aggrs_for_join,
+            &join_item.to_members,
+            join_item,
+            rollup_join_name,
+        )?;
+
+        let from_members = Self::resolve_join_members(&from_pre_aggr, &join_item.from_members)?;
+        let to_members = Self::resolve_join_members(&to_pre_aggr, &join_item.to_members)?;
+        Self::check_join_members_comparable(
+            &from_members,
+            &to_members,
+            join_item,
+            rollup_join_name,
+        )?;
 
         let res = PreAggregationJoinItem {
             from: from_pre_aggr.source.clone(),
             to: to_pre_aggr.source.clone(),
-            from_members: join_item.from_members.clone(),
-            to_members: join_item.to_members.clone(),
+            from_members,
+            to_members,
             on_sql: join_item.on_sql.clone(),
         };
         Ok(res)
+    }
+
+    fn resolve_join_members(
+        pre_aggr: &CompiledPreAggregation,
+        members: &Vec<Rc<MemberSymbol>>,
+    ) -> Result<Vec<PreAggregationJoinMember>, CubeError> {
+        members
+            .iter()
+            .map(|symbol| {
+                Self::resolve_join_member(pre_aggr, symbol).ok_or_else(|| {
+                    CubeError::internal(format!(
+                        "Rollup {}.{} doesn't store join member {}",
+                        pre_aggr.cube_name,
+                        pre_aggr.name,
+                        symbol.full_name()
+                    ))
+                })
+            })
+            .collect()
+    }
+
+    /// A rollup stores a time dimension truncated to its granularity, so the two
+    /// sides of a hop are only comparable when they were truncated the same way.
+    fn check_join_members_comparable(
+        from_members: &[PreAggregationJoinMember],
+        to_members: &[PreAggregationJoinMember],
+        join_item: &ResolvedJoinItem,
+        rollup_join_name: &PreAggregationFullName,
+    ) -> Result<(), CubeError> {
+        // Every key of the hop has to be stored the same way, across both sides at once.
+        // The two sides carry no pairing between their members — comparing them side by
+        // side would let a raw column on one side line up with a truncated one on the other.
+        let members = || from_members.iter().chain(to_members.iter());
+        let stored_the_same_way = members().map(|m| &m.granularity).sorted().dedup().count() <= 1;
+        if stored_the_same_way {
+            return Ok(());
+        }
+        Err(CubeError::user(format!(
+            "The join from \"{}\" to \"{}\" in the \"{}\" pre-aggregation mixes join keys its rollups store differently ({}). A key kept as a rollup's time dimension is truncated to that granularity, so it can only be compared against a key truncated the same way",
+            join_item.original_from,
+            join_item.original_to,
+            rollup_join_name.name,
+            members()
+                .map(|m| match &m.granularity {
+                    Some(granularity) => format!("{} ({})", m.symbol.full_name(), granularity),
+                    None => format!("{} (not truncated)", m.symbol.full_name()),
+                })
+                .join(", "),
+        )))
+    }
+
+    /// How `pre_aggr` stores the join key `member`, or `None` when it doesn't
+    /// store it at all. A key kept as a time dimension rather than a plain one
+    /// is truncated to the rollup's granularity and lives under a suffixed name.
+    fn resolve_join_member(
+        pre_aggr: &CompiledPreAggregation,
+        member: &Rc<MemberSymbol>,
+    ) -> Option<PreAggregationJoinMember> {
+        if pre_aggr.dimensions.iter().any(|pa_m| member == pa_m) {
+            return Some(PreAggregationJoinMember {
+                symbol: member.clone(),
+                column: member.alias(),
+                granularity: None,
+            });
+        }
+        pre_aggr.time_dimensions.iter().find_map(|pa_m| {
+            let time_dimension = pa_m.as_time_dimension().ok()?;
+            if time_dimension.base_symbol() != member {
+                return None;
+            }
+            let granularity = time_dimension.granularity().clone();
+            let suffix = granularity
+                .as_ref()
+                .map_or(String::new(), |g| format!("_{}", g));
+            Some(PreAggregationJoinMember {
+                symbol: member.clone(),
+                column: format!("{}{}", member.alias(), suffix),
+                granularity,
+            })
+        })
     }
 
     fn find_pre_aggregation_for_join(
         &self,
         pre_aggrs_for_join: &Vec<Rc<CompiledPreAggregation>>,
         members: &Vec<Rc<MemberSymbol>>,
+        join_item: &ResolvedJoinItem,
+        rollup_join_name: &PreAggregationFullName,
     ) -> Result<Rc<CompiledPreAggregation>, CubeError> {
-        let found_pre_aggr = pre_aggrs_for_join
+        // A rollup declaring the key plainly is preferred over one keeping it as a time
+        // dimension, so a hop that already resolved keeps resolving to the same rollup.
+        let mut found_pre_aggr = pre_aggrs_for_join
             .iter()
             .filter(|pa| {
                 members
@@ -505,17 +611,43 @@ impl PreAggregationsCompiler {
             })
             .collect_vec();
         if found_pre_aggr.is_empty() {
+            found_pre_aggr = pre_aggrs_for_join
+                .iter()
+                .filter(|pa| {
+                    members
+                        .iter()
+                        .all(|m| Self::resolve_join_member(pa, m).is_some())
+                })
+                .collect_vec();
+        }
+        if found_pre_aggr.is_empty() {
             return Err(CubeError::user(format!(
-                "No rollups found that can be used for rollup join"
+                "No rollups found that can be used for a rollup join from \"{}\" ({}) to \"{}\" ({}). Check the \"{}\" pre-aggregation definition — every rollup must declare the dimensions its own joins are on, including keys the query doesn't select",
+                join_item.original_from,
+                Self::format_join_members(&join_item.from_members),
+                join_item.original_to,
+                Self::format_join_members(&join_item.to_members),
+                rollup_join_name.name,
             )));
         }
         if found_pre_aggr.len() > 1 {
             return Err(CubeError::user(format!(
-                "Multiple rollups found that can be used for rollup join"
+                "Multiple rollups found that can be used for a rollup join from \"{}\" to \"{}\" in the \"{}\" pre-aggregation: {}",
+                join_item.original_from,
+                join_item.original_to,
+                rollup_join_name.name,
+                found_pre_aggr
+                    .iter()
+                    .map(|pa| format!("{}.{}", pa.cube_name, pa.name))
+                    .join(", "),
             )));
         }
 
         Ok(found_pre_aggr[0].clone())
+    }
+
+    fn format_join_members(members: &[Rc<MemberSymbol>]) -> String {
+        members.iter().map(|m| m.full_name()).join(", ")
     }
 
     pub fn compile_all_pre_aggregations(

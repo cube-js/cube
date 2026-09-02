@@ -1089,8 +1089,7 @@ export class PreAggregations {
     join: JoinEdgeWithMembers,
     rollupJoinPreAggName: string,
   ): PreAggregationForQuery {
-    const fromPreAggObj = preAggObjsToJoin
-      .filter(p => joinMembers.every(m => !!p.references.dimensions.find(d => m === d)));
+    const fromPreAggObj = this.rollupsCarryingJoinMembers(preAggObjsToJoin, joinMembers);
     if (!fromPreAggObj.length) {
       const msg = `No rollups found that can be used for a rollup join from "${
         join.from}" (fromMembers: ${JSON.stringify(join.fromMembers)}) to "${join.to}" (toMembers: ${
@@ -1104,6 +1103,29 @@ export class PreAggregations {
       );
     }
     return fromPreAggObj[0];
+  }
+
+  /**
+   * Rollups that can stand on one side of a hop.
+   *
+   * A join key may be declared as a rollup's time dimension, which `references.dimensions`
+   * doesn't cover. Such a key lives in a granularity-suffixed column, which only the native
+   * planner renders — this side resolves it just to describe the rollups to build, so the
+   * wider reading is limited to the queries that planner serves. A rollup declaring the key
+   * plainly is preferred, so a hop that already resolved keeps resolving to the same rollup.
+   */
+  private rollupsCarryingJoinMembers(
+    preAggObjsToJoin: PreAggregationForQuery[],
+    joinMembers: string[],
+  ): PreAggregationForQuery[] {
+    const declaredAsDimensions = preAggObjsToJoin
+      .filter(p => joinMembers.every(m => !!p.references.dimensions.find(d => m === d)));
+    if (declaredAsDimensions.length || !this.query.canUseNativeSqlPlannerPreAggregation) {
+      return declaredAsDimensions;
+    }
+    return preAggObjsToJoin
+      .filter(p => joinMembers.every(m => !!p.references.dimensions.find(d => m === d) ||
+        !!p.references.timeDimensions.find(td => m === td.dimension)));
   }
 
   private resolveJoinMembers(join: FinishedJoinTree): JoinEdgeWithMembers[] {

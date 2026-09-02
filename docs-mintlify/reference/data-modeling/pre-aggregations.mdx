@@ -428,6 +428,19 @@ cube(`orders`, {
 
 </CodeGroup>
 
+<Warning>
+
+A join key may be declared as a rollup's `time_dimension` rather than as a plain
+dimension. A rollup stores a time dimension truncated to its `granularity`, so the
+join then happens on those buckets, not on the raw values the join is modeled on —
+rows that fall in the same bucket match even if the underlying timestamps differ.
+Use it for keys that are already aligned to that granularity, such as a date
+dimension joined to facts by day. Both sides of a join must store the key the same
+way; a rollup truncating it to `day` cannot be joined to one truncating it to
+`month`, or to one keeping it raw as a plain dimension.
+
+</Warning>
+
 <Info>
 
 `rollup_join` is not required to join cubes from the same data source; instead,
