@@ -181,3 +181,127 @@ async fn test_numeric_math_scalar() {
             .unwrap()
     );
 }
+
+#[tokio::test]
+async fn test_case_with_heterogeneous_then_types() {
+    init_testing_logger();
+
+    insta::assert_snapshot!(execute_query(
+        // language=PostgreSQL
+        r#"
+                SELECT
+                    i,
+                    CASE WHEN i > 1 THEN 0 WHEN i > 0 THEN i END AS c
+                FROM (
+                    SELECT 0::int4 AS i
+                    UNION ALL
+                    SELECT 1::int4 AS i
+                    UNION ALL
+                    SELECT 2::int4 AS i
+                ) AS t
+                ORDER BY i
+                "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .unwrap());
+}
+
+/// The common type has to be picked across all branches, not from the first one: an int4
+/// THEN followed by an int8 THEN must widen to int8, or the int8 value gets truncated.
+#[tokio::test]
+async fn test_case_with_heterogeneous_then_types_widening() {
+    init_testing_logger();
+
+    insta::assert_snapshot!(execute_query(
+        // language=PostgreSQL
+        r#"
+                SELECT
+                    i,
+                    CASE WHEN i > 1 THEN i WHEN i > 0 THEN 3000000000::int8 END AS c
+                FROM (
+                    SELECT 0::int4 AS i
+                    UNION ALL
+                    SELECT 1::int4 AS i
+                    UNION ALL
+                    SELECT 2::int4 AS i
+                ) AS t
+                ORDER BY i
+                "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .unwrap());
+}
+
+#[tokio::test]
+async fn test_case_with_heterogeneous_then_types_over_pg_catalog() {
+    init_testing_logger();
+
+    insta::assert_snapshot!(execute_query(
+        // language=PostgreSQL
+        r#"
+                SELECT
+                    t.typname,
+                    CASE WHEN t.typtype = 'd' THEN 0
+                         WHEN t.typtype = 'b' THEN t.typbasetype
+                         ELSE 0 END AS base
+                FROM pg_catalog.pg_type t
+                WHERE t.typname IN ('int4', 'text')
+                ORDER BY t.typname
+                "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .unwrap());
+}
+
+#[tokio::test]
+async fn test_case_with_null_then_before_typed_then() {
+    init_testing_logger();
+
+    insta::assert_snapshot!(execute_query(
+        // language=PostgreSQL
+        r#"
+                SELECT
+                    i,
+                    CASE WHEN i > 1 THEN NULL WHEN i > 0 THEN i END AS c
+                FROM (
+                    SELECT 0::int4 AS i
+                    UNION ALL
+                    SELECT 1::int4 AS i
+                    UNION ALL
+                    SELECT 2::int4 AS i
+                ) AS t
+                ORDER BY i
+                "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .unwrap());
+}
+
+/// Branches that have no common type have to fail to plan, rather than reach execution
+/// and panic there.
+#[tokio::test]
+async fn test_case_with_uncoercible_then_types() {
+    init_testing_logger();
+
+    insta::assert_snapshot!(execute_query(
+        // language=PostgreSQL
+        r#"
+                SELECT
+                    CASE WHEN i > 1 THEN true ELSE DATE '2022-01-01' END AS c
+                FROM (SELECT 1::int4 AS i) AS t
+                "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .unwrap_err()
+    .to_string());
+}
