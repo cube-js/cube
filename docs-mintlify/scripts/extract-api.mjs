@@ -425,6 +425,34 @@ if (missing.length) {
   process.exit(1);
 }
 
+// 2b. Hoist `description`/`deprecated` off a nullable field's non-null `oneOf`
+// branch, where class-validator-jsonschema puts them. Renderers read both off the
+// property schema, not a branch, so they otherwise never render. Scoped to exactly
+// a two-branch, one-bare-null shape, so a genuine polymorphic oneOf — several real
+// alternatives, each with its own description — is left alone.
+function hoistNullableMeta(node) {
+  if (Array.isArray(node)) { node.forEach(hoistNullableMeta); return; }
+  if (!node || typeof node !== 'object') return;
+  const branches = node.oneOf;
+  if (Array.isArray(branches) && branches.length === 2) {
+    const isBareNull = (b) => b && Object.keys(b).length === 1 && b.type === 'null';
+    const branch = isBareNull(branches[0]) ? branches[1] : isBareNull(branches[1]) ? branches[0] : null;
+    if (branch && typeof branch === 'object') {
+      if (branch.description !== undefined && node.description === undefined) {
+        node.description = branch.description;
+        delete branch.description;
+      }
+      if (branch.deprecated !== undefined && node.deprecated === undefined) {
+        node.deprecated = branch.deprecated;
+        delete branch.deprecated;
+      }
+    }
+  }
+  for (const v of Object.values(node)) hoistNullableMeta(v);
+}
+hoistNullableMeta(paths);
+hoistNullableMeta(schemas);
+
 // 3. Determine tag set + order (preferred order first, then any extras A–Z).
 const presentTags = new Set();
 for (const val of Object.values(paths)) {

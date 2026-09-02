@@ -7,6 +7,27 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.js against the platform client CHANGELOG.md. */}
 
+<Update label="2026-09-02" description="v0.6.0" tags={["Added","Changed","Deprecated"]}>
+  ### Added
+
+  - `User` (`GET /api/v1/users/me`, `UsersPublicController.getMe`) gained `userPolicies` — the caller's effective resource policies: direct grants, organization-wide grants and grants inherited from their groups. This is the set the console has always read over GraphQL; on REST it lets an embedded Creator Mode session resolve a workbook another embed user shared with it, which previously granted nothing beyond viewing. New schemas: `Policy`, `PolicyResourceType`.
+  - Re-added `POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread` (`WorkbooksPublicController.updatePublishedDashboardAiWidgetThread`) and its `UpdatePublishedAiWidgetThreadInput` schema (`widgetId`, `threadId`, optional `checksum`) — reverting the `0.4.0` removal. Regenerating an AI-analysis widget on a **published** dashboard persists the new thread id (+ checksum) back to the published config so an immediate reload shows the fresh result instead of the stale one. It stores **only** the thread id and checksum — never summary text (CUB-4031).
+  - `PATCH /api/v1/users/me/settings` (`UsersPublicController.updateMySettings`) — merge a partial patch into your own settings; omitted fields are left as they are, and `sheets` merges field-by-field (an explicit `null` clears it). `UserSettingsInput` gained `sheets`. New schema: `SheetsUserSettingsInput` (`autoRunQueryOnChange`, `openExplorationFromSheet`, `revealSheetOnOpen`, `showAppliedFilters`, `suppressDuplicateValues`).
+  - `POST /api/v1/deployments/{id}/token` (`DeploymentsPublicController.deploymentToken`) now accepts an optional body to request a shorter token lifetime than the 24-hour default. New schema: `CreateDeploymentTokenInput` (`expiresIn`, 60–86400 seconds) — recommended for tokens held outside a browser session (scripts, BI tools, scheduled jobs).
+  - `AppTheme` / `AppThemeResponse` (`GET /api/v1/app-theme`, `GET /api/v1/app-config`) gained `palette` and `logoUrl` — the new theme model: base/accent color seeds, contrast level, a pastel toggle, surface mode, and per-semantic color overrides (danger/warning/success/note/code). New schemas: `AppThemePalette`, `AppThemePaletteSeed`, `AppThemePaletteThemes`, `AppThemeCodePalette`, `AppThemeSurfaceMode`.
+  - `DashboardWidgetDtoType` / `DashboardWidgetInputType` gained a new `"FIELD"` enum value, for the Field switcher dashboard control.
+  - `ReportPlacement` gained `queryChecksum` and `syncStatus` (new schema `ReportPlacementSyncStatus`: `"UP_TO_DATE"` | `"CHANGED"` | `"UNKNOWN"`), and `Report` gained `currentQueryChecksum` — together they let a client tell whether the cells at a placement still reflect the exploration as it stands now.
+
+  ### Changed
+
+  - `POST /api/v1/usage-analytics/token` — corrected docs: tokens expire after 1 hour, not ~24 hours as previously stated. `expiresAt` on the response has always reflected the real value.
+
+  ### Deprecated
+
+  - `AppTheme.light` / `AppTheme.dark` — use `palette` and `logoUrl` instead.
+  - `UserSettingsInput.lastSeenChangelogId` — ignored; the changelog now arrives in the notification inbox, which carries its own read state. Accepted for backward compatibility but never read or written.
+</Update>
+
 <Update label="2026-08-30" description="v0.5.0" tags={["Added"]}>
   ### Added
 
@@ -72,7 +93,7 @@ rss: true
 
   ### Removed
 
-  - **BREAKING:** `POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread` (`WorkbooksPublicController.updatePublishedDashboardAiWidgetThread`) and its `UpdatePublishedAiWidgetThreadInput` schema (added in `0.2.0`). It persisted an AI-analysis thread id + checksum into the published dashboard config — the mechanism that caused read-only/anonymous viewers to hit `WorkbookEdit`/403s and let one viewer's filter state clobber the shared config (CUB-3898). AI-analysis results are now cached server-side keyed by dashboard state, so no client-facing endpoint replaces it. This is a deliberate breaking removal; SDK consumers referencing the operation or schema should drop those references.
+  - **BREAKING:** `POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread` (`WorkbooksPublicController.updatePublishedDashboardAiWidgetThread`) and its `UpdatePublishedAiWidgetThreadInput` schema (added in `0.2.0`). It persisted an AI-analysis thread id + checksum into the published dashboard config — the mechanism that caused read-only/anonymous viewers to hit `WorkbookEdit`/403s and let one viewer's filter state clobber the shared config (CUB-3898). AI-analysis results are recovered by replaying the chat thread whose id the dashboard config stores, so no client-facing endpoint replaces it (CUB-4031). This is a deliberate breaking removal; SDK consumers referencing the operation or schema should drop those references.
 </Update>
 
 <Update label="2026-07-30" description="v0.3.0" tags={["Added","Changed","Removed"]}>
