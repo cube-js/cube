@@ -287,12 +287,15 @@ describe('getEnv(defaultTimezone / scheduledRefreshTimezones)', () => {
 });
 
 describe('getEnv(compilerCacheSize)', () => {
+  beforeEach(() => {
+    delete process.env.CUBEJS_COMPILER_CACHE_SIZE;
+  });
+
   afterEach(() => {
     delete process.env.CUBEJS_COMPILER_CACHE_SIZE;
   });
 
   test('defaults to 250', () => {
-    delete process.env.CUBEJS_COMPILER_CACHE_SIZE;
     expect(getEnv('compilerCacheSize')).toBe(250);
   });
 
@@ -308,18 +311,12 @@ describe('getEnv(compilerCacheSize)', () => {
     );
   });
 
-  test('throws on a negative or non-integer value', () => {
-    process.env.CUBEJS_COMPILER_CACHE_SIZE = '-1';
-    expect(() => getEnv('compilerCacheSize')).toThrowError(
-      /CUBEJS_COMPILER_CACHE_SIZE/
-    );
-
-    process.env.CUBEJS_COMPILER_CACHE_SIZE = 'abc';
-    expect(() => getEnv('compilerCacheSize')).toThrowError(
-      /CUBEJS_COMPILER_CACHE_SIZE/
-    );
-
-    process.env.CUBEJS_COMPILER_CACHE_SIZE = '1.5';
+  test.each([
+    '-1',
+    'abc',
+    '1.5',
+  ])('throws on the negative or non-integer value %j', (value) => {
+    process.env.CUBEJS_COMPILER_CACHE_SIZE = value;
     expect(() => getEnv('compilerCacheSize')).toThrowError(
       /CUBEJS_COMPILER_CACHE_SIZE/
     );
