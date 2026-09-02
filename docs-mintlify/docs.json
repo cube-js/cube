@@ -585,6 +585,7 @@
               "reference/javascript-sdk",
               "reference/javascript-sdk/react",
               "reference/javascript-sdk/vue",
+              "reference/javascript-sdk/svelte",
               "reference/javascript-sdk/angular",
               {
                 "group": "SDK Reference",
@@ -592,6 +593,7 @@
                   "reference/javascript-sdk/reference/cubejs-client-core",
                   "reference/javascript-sdk/reference/cubejs-client-react",
                   "reference/javascript-sdk/reference/cubejs-client-vue",
+                  "reference/javascript-sdk/reference/cubejs-client-svelte",
                   "reference/javascript-sdk/reference/cubejs-client-ngx",
                   "reference/javascript-sdk/reference/cubejs-client-ws-transport"
                 ]
