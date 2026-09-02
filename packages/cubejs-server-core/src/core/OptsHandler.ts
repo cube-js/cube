@@ -407,6 +407,7 @@ export class OptsHandler {
       dashboardAppPort: 3000,
       scheduledRefreshConcurrency: getEnv('scheduledRefreshQueriesPerAppId'),
       scheduledRefreshBatchSize: getEnv('scheduledRefreshBatchSize'),
+      compilerCacheSize: getEnv('compilerCacheSize'),
       preAggregationsSchema:
         getEnv('preAggregationsSchema') ||
         (this.isDevMode()

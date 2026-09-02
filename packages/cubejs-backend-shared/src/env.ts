@@ -312,6 +312,12 @@ const variables: Record<string, (...args: any) => any> = {
   scheduledRefreshBatchSize: () => get('CUBEJS_SCHEDULED_REFRESH_BATCH_SIZE')
     .default('1')
     .asInt(),
+  /**
+   * Maximum number of compiled data models to keep in the in-memory compiler cache.
+   */
+  compilerCacheSize: () => get('CUBEJS_COMPILER_CACHE_SIZE')
+    .default('250')
+    .asIntPositive(),
   nativeSqlPlanner: () => {
     const explicitlySet = process.env.CUBEJS_TESSERACT_SQL_PLANNER !== undefined;
     const enabled = get('CUBEJS_TESSERACT_SQL_PLANNER').default('true').asBool();

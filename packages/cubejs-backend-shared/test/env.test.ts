@@ -285,3 +285,31 @@ describe('getEnv(defaultTimezone / scheduledRefreshTimezones)', () => {
     );
   });
 });
+
+describe('getEnv(compilerCacheSize)', () => {
+  afterEach(() => {
+    delete process.env.CUBEJS_COMPILER_CACHE_SIZE;
+  });
+
+  test('defaults to 250', () => {
+    delete process.env.CUBEJS_COMPILER_CACHE_SIZE;
+    expect(getEnv('compilerCacheSize')).toBe(250);
+  });
+
+  test('reads CUBEJS_COMPILER_CACHE_SIZE', () => {
+    process.env.CUBEJS_COMPILER_CACHE_SIZE = '1000';
+    expect(getEnv('compilerCacheSize')).toBe(1000);
+  });
+
+  test('throws on a non positive integer', () => {
+    process.env.CUBEJS_COMPILER_CACHE_SIZE = '0';
+    expect(() => getEnv('compilerCacheSize')).toThrowError(
+      /CUBEJS_COMPILER_CACHE_SIZE/
+    );
+
+    process.env.CUBEJS_COMPILER_CACHE_SIZE = 'abc';
+    expect(() => getEnv('compilerCacheSize')).toThrowError(
+      /CUBEJS_COMPILER_CACHE_SIZE/
+    );
+  });
+});
