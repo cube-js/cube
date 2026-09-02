@@ -67,8 +67,12 @@ impl Granularity {
             });
         }
 
-        let origin = if let Some(origin) = origin {
-            QueryDateTime::from_date_str(timezone, &origin)?
+        // A granularity carries either an `origin` or an `offset`, never both: `CubeValidator`
+        // describes the two as separate alternatives, neither of which allows the other's key.
+        let (origin, granularity_offset) = if let Some(origin) = origin {
+            let origin = QueryDateTime::from_date_str(timezone, &origin)?;
+            let derived_offset = Self::origin_as_offset(&origin, &granularity_interval)?;
+            (origin, derived_offset)
         } else if let Some(offset) = &granularity_offset {
             // Week-based intervals expect the offset relative to the start of a week.
             let origin = Self::fix_origin_for_weeks_if_needed(
@@ -76,15 +80,23 @@ impl Granularity {
                 &granularity_interval,
             );
             let interval = SqlInterval::from_str(offset)?;
-            origin.add_interval(&interval)?
+            (origin.add_interval(&interval)?, granularity_offset)
         } else {
-            Self::fix_origin_for_weeks_if_needed(
-                Self::default_origin(timezone)?,
-                &granularity_interval,
+            (
+                Self::fix_origin_for_weeks_if_needed(
+                    Self::default_origin(timezone)?,
+                    &granularity_interval,
+                ),
+                granularity_offset,
             )
         };
 
-        let is_natural_aligned = granularity_interval.is_trivial();
+        // DATE_TRUNC can only carry an origin that sits on its unit's natural boundary, or one
+        // expressed as an offset around the truncation. Anything else — a `1 month` grain
+        // starting on the 30th, say — has to go through DATE_BIN.
+        let is_natural_aligned = granularity_interval.is_trivial()
+            && (granularity_offset.is_some()
+                || origin.is_start_of(&granularity_interval.min_granularity()?)?);
         Ok(Self {
             granularity,
             granularity_interval,
@@ -168,6 +180,37 @@ impl Granularity {
 
     fn default_origin(timezone: Tz) -> Result<QueryDateTime, CubeError> {
         Ok(QueryDateTime::now(timezone)?.start_of_year())
+    }
+
+    /// An explicit origin on a single-unit interval is a natural boundary plus a constant shift,
+    /// which is exactly what `offset` expresses — and the offset rendering
+    /// (`DATE_TRUNC(unit, x - offset) + offset`) is exact on every dialect. Returns that shift, or
+    /// `None` when the origin needs none or cannot be expressed as one.
+    fn origin_as_offset(
+        origin: &QueryDateTime,
+        interval: &SqlInterval,
+    ) -> Result<Option<String>, CubeError> {
+        if !interval.is_trivial() {
+            return Ok(None);
+        }
+
+        let unit = interval.min_granularity()?;
+        if origin.is_start_of(&unit)? {
+            return Ok(None);
+        }
+
+        // An interval has no sub-second component to shift by.
+        if origin.nanosecond() != 0 {
+            return Ok(None);
+        }
+
+        // Adding a month clamps to the shortest month, so a day-of-month past the 28th has no
+        // day count that lands on the origin's grid in every month.
+        if matches!(unit.as_str(), "year" | "quarter" | "month") && origin.day() > 28 {
+            return Ok(None);
+        }
+
+        Ok(Some(origin.offset_from_start_of(&unit)?.to_sql()))
     }
 
     fn fix_origin_for_weeks_if_needed(
@@ -262,6 +305,12 @@ mod tests {
         .unwrap()
     }
 
+    fn offset_of(interval: &str, origin: &str) -> Option<String> {
+        custom(interval, Some(origin), None)
+            .granularity_offset()
+            .clone()
+    }
+
     #[test]
     fn week_only_default_origin_snaps_to_iso_monday() {
         assert_eq!(
@@ -292,5 +341,136 @@ mod tests {
             origin_date(&custom("2 weeks", Some("2024-01-03"), None)),
             NaiveDate::from_ymd_opt(2024, 1, 3).unwrap()
         );
+    }
+
+    #[test]
+    fn off_boundary_origin_becomes_an_offset_in_the_intervals_own_unit() {
+        assert_eq!(
+            offset_of("1 year", "2024-04-01").as_deref(),
+            Some("3 month")
+        );
+        assert_eq!(
+            offset_of("1 quarter", "2024-02-01").as_deref(),
+            Some("1 month")
+        );
+        assert_eq!(
+            offset_of("1 month", "2024-01-15").as_deref(),
+            Some("14 day")
+        );
+        // 2024-01-03 is a Wednesday.
+        assert_eq!(offset_of("1 week", "2024-01-03").as_deref(), Some("2 day"));
+        assert_eq!(
+            offset_of("1 day", "2024-04-01T06:00:00").as_deref(),
+            Some("6 hour")
+        );
+        assert_eq!(
+            offset_of("1 hour", "2024-04-01T06:30:15").as_deref(),
+            Some("30 minute 15 second")
+        );
+        assert_eq!(
+            offset_of("1 minute", "2024-04-01T06:30:15").as_deref(),
+            Some("15 second")
+        );
+    }
+
+    #[test]
+    fn a_time_of_day_carries_into_the_offset_of_date_intervals() {
+        assert_eq!(
+            offset_of("1 year", "2024-04-15T06:30:15").as_deref(),
+            Some("3 month 14 day 6 hour 30 minute 15 second")
+        );
+        assert_eq!(
+            offset_of("1 week", "2024-01-03T18:45:00").as_deref(),
+            Some("2 day 18 hour 45 minute")
+        );
+    }
+
+    #[test]
+    fn an_origin_on_the_boundary_needs_no_offset() {
+        assert_eq!(offset_of("1 year", "2024-01-01"), None);
+        assert_eq!(offset_of("1 quarter", "2024-04-01"), None);
+        assert_eq!(offset_of("1 month", "2024-04-01"), None);
+        // 2024-01-01 is a Monday.
+        assert_eq!(offset_of("1 week", "2024-01-01"), None);
+        assert_eq!(offset_of("1 day", "2024-04-01"), None);
+        assert_eq!(offset_of("1 hour", "2024-04-01T06:00:00"), None);
+        assert_eq!(offset_of("1 minute", "2024-04-01T06:30:00"), None);
+    }
+
+    #[test]
+    fn a_day_of_month_past_the_28th_has_no_offset_form() {
+        // Adding a month clamps to the shortest month, so no fixed day count reproduces the grid.
+        assert_eq!(offset_of("1 month", "2024-01-30"), None);
+        assert_eq!(offset_of("1 quarter", "2024-01-31"), None);
+        assert_eq!(offset_of("1 year", "2024-02-29"), None);
+        // Day counts stay exact for week- and time-based intervals.
+        assert_eq!(offset_of("1 week", "2024-01-31").as_deref(), Some("2 day"));
+        assert_eq!(
+            offset_of("1 day", "2024-01-31T06:00:00").as_deref(),
+            Some("6 hour")
+        );
+    }
+
+    #[test]
+    fn a_derived_offset_keeps_the_grain_on_the_date_trunc_rendering() {
+        assert!(custom("1 year", Some("2024-04-01"), None).is_natural_aligned());
+        assert!(custom("1 year", Some("2024-01-01"), None).is_natural_aligned());
+        assert!(custom("1 month", Some("2024-01-15"), None).is_natural_aligned());
+        // The residue that has no offset form falls through to DATE_BIN.
+        assert!(!custom("1 month", Some("2024-01-30"), None).is_natural_aligned());
+    }
+
+    #[test]
+    fn a_derived_offset_does_not_move_the_origin() {
+        let g = custom("1 year", Some("2024-04-01"), None);
+        assert_eq!(g.origin_local_formatted(), "2024-04-01T00:00:00.000");
+    }
+
+    #[test]
+    fn a_derived_offset_reports_the_same_min_granularity_as_the_origin() {
+        // Pre-aggregation matching reads `min_granularity`, which switches to the offset branch
+        // once an offset exists; both branches must agree on the grain.
+        assert_eq!(
+            custom("1 year", Some("2024-04-01"), None)
+                .min_granularity()
+                .unwrap(),
+            Some("month".to_string())
+        );
+        assert_eq!(
+            custom("1 year", Some("2024-04-15"), None)
+                .min_granularity()
+                .unwrap(),
+            Some("day".to_string())
+        );
+        assert_eq!(
+            custom("1 day", Some("2024-04-01T06:00:00"), None)
+                .min_granularity()
+                .unwrap(),
+            Some("hour".to_string())
+        );
+    }
+
+    #[test]
+    fn default_and_offset_origins_keep_their_existing_alignment() {
+        // No explicit origin: the default origin is the start of the year, and a week-only
+        // interval snaps to Monday — both natural boundaries.
+        assert!(custom("1 year", None, None).is_natural_aligned());
+        assert!(custom("1 week", None, None).is_natural_aligned());
+        assert_eq!(custom("1 year", None, None).granularity_offset(), &None);
+        // A model-supplied offset is passed through untouched.
+        assert_eq!(
+            custom("1 week", None, Some("-1 day"))
+                .granularity_offset()
+                .as_deref(),
+            Some("-1 day")
+        );
+        assert!(custom("1 week", None, Some("-1 day")).is_natural_aligned());
+    }
+
+    #[test]
+    fn non_trivial_intervals_are_never_natural_aligned() {
+        assert!(!custom("15 minutes", None, None).is_natural_aligned());
+        assert!(!custom("6 months", Some("2024-01-01"), None).is_natural_aligned());
+        assert_eq!(offset_of("6 months", "2024-04-01"), None);
     }
 }
