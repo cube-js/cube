@@ -427,6 +427,7 @@ describe('CubeApi cubeSql', () => {
         { name: 'status', column_type: 'String' },
       ],
       lastRefreshTime: '2026-02-24T00:34:01.594Z',
+      external: true,
       usedPreAggregations: {
         'dev_pre_aggregations.orders_main': {
           preAggregationId: 'Orders.main',
@@ -658,8 +659,9 @@ describe('CubeApi cubeSql', () => {
         type: 'rollup',
       },
     });
-    // The metadata fields are independent: reading one must not drop the other.
+    // The metadata fields are independent: reading one must not drop the others.
     expect(res.lastRefreshTime).toBe('2026-02-24T00:34:01.594Z');
+    expect(res.external).toBe(true);
     expect(res.data).toEqual([['Active']]);
   });
 
@@ -678,7 +680,10 @@ describe('CubeApi cubeSql', () => {
 
     const res = await cubeApi.cubeSql('SELECT status FROM users');
     expect(res.usedPreAggregations).toBeUndefined();
+    expect(res.external).toBeUndefined();
+    // Absent must stay ABSENT, not become an explicit `undefined` key.
     expect('usedPreAggregations' in res).toBe(false);
+    expect('external' in res).toBe(false);
   });
 
   test('should emit usedPreAggregations on the stream schema chunk', async () => {

@@ -143,7 +143,7 @@ callback? | [LoadMethodCallback](#loadmethodcallback)‹[CubeSqlResult](#cubesql
 >  **cubeSqlStream**(**sqlQuery**: string, **options?**: [CubeSqlOptions](#cubesqloptions)): *AsyncGenerator‹CubeSqlStreamChunk›*
 
 Same as [`cubeSql`](#cubesql), but yields the results as they stream in. Each
-chunk is either `{ type: 'schema', schema, lastRefreshTime?, usedPreAggregations? }`,
+chunk is either `{ type: 'schema', schema, lastRefreshTime?, external?, usedPreAggregations? }`,
 `{ type: 'data', data }` (one row), or `{ type: 'error', error }`.
 
 ```js
@@ -924,7 +924,8 @@ Name | Type | Description |
 schema | `{ name: string, column_type: string, format?: string }[]` | - |
 data | `(string \| number \| boolean \| null)[][]` | - |
 lastRefreshTime? | string | - |
-usedPreAggregations? | `Record<string, { preAggregationId?: string, lastUpdatedAt?: number, type: string }>` | Pre-aggregations this result was served from, keyed by pre-aggregation table name. Absent when the query hit none, and on deployments older than the field. |
+external? | boolean | Whether the result was served from the external (pre-aggregation) store. Only reported when true. |
+usedPreAggregations? | `Record<string, { preAggregationId?: string, lastUpdatedAt?: number, type: string }>` | Pre-aggregations this result was served from, keyed by pre-aggregation table name. Absent when the query hit none, and on deployments older than the field. Entries also carry `targetTableName` in dev mode and for the Playground. |
 
 ### `DateRange`
 

@@ -150,6 +150,11 @@ export type CubeSqlSchemaColumn = {
 export type CubeSqlResultMetadata = {
   lastRefreshTime?: string;
   /**
+   * Whether the result was served from the external (pre-aggregation) store.
+   * Only ever reported as `true`; absent means "not external, or not reported".
+   */
+  external?: boolean;
+  /**
    * Pre-aggregations this result was served from, keyed by pre-aggregation table
    * name. Absent when the query hit none. Carries identity only, so a client can
    * match a result to the pre-aggregation build behind it.
@@ -165,15 +170,17 @@ export type CubeSqlResult = {
 /**
  * Pick the result-level metadata out of a parsed SQL API schema line.
  *
- * Every field here is optional on the wire, and three call sites re-emit them
+ * One place for all of it, because three call sites re-emit these fields
  * (`cubeSql`, and `cubeSqlStream` for both its per-chunk and trailing-buffer
- * paths), so the spread lives in one place: adding a field to the response
- * previously meant remembering all three, and a site that was missed dropped the
- * new field silently, with the result still type-checking.
+ * paths) and a site missed when a field is added drops it silently, while still
+ * type-checking. The invariant: this must cover every result-level field the
+ * writer puts on the schema line (`node_export.rs`), and an absent field must
+ * stay absent rather than become an explicit `undefined`.
  */
 function pickCubeSqlResultMetadata(parsed: any): CubeSqlResultMetadata {
   return {
     ...(parsed.lastRefreshTime ? { lastRefreshTime: parsed.lastRefreshTime } : {}),
+    ...(parsed.external ? { external: parsed.external } : {}),
     ...(parsed.usedPreAggregations ? { usedPreAggregations: parsed.usedPreAggregations } : {}),
   };
 }
