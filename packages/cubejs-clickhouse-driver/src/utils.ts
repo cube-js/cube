@@ -1,8 +1,3 @@
-/**
- * @copyright Cube Dev, Inc.
- * @license Apache-2.0
- */
-
 export function formatError(e: unknown): string {
   if (e instanceof AggregateError) {
     // Node leaves `message` empty for the errors it raises itself

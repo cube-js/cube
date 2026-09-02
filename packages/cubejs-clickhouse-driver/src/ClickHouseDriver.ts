@@ -1,6 +1,4 @@
 /**
- * @copyright Cube Dev, Inc.
- * @license Apache-2.0
  * @fileoverview The `ClickHouseDriver` and related types declaration.
  */
 
