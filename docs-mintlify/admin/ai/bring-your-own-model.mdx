@@ -348,10 +348,13 @@ Cube's control plane:
   the deployment has not restarted since it was added
 - **Does not support tool calling** — the chat model the hook returned has no
   `bindTools`. Cube agents require a tool-calling model
-- **Must return a LangChain chat model, a list of chunks, ...** — the hook
-  returned something with no stream in it. In `cube.py`, a model object or an
-  async generator produces this: neither can cross to JavaScript, so use one of
-  the two Python forms above
+- **Must return a LangChain chat model, a list of chunks, ...** — a `cube.js`
+  hook returned something with no stream in it
+- **Unable to represent PyObject in JS** — a `cube.py` hook returned a value
+  with no bridge representation, most often a model object or an async
+  generator. This is raised by the bridge itself, before Cube sees the return
+  value, which is why it reads nothing like the message above. Use one of the
+  two Python forms above
 - **Stream ended before the response was complete** — the connection to your
   gateway dropped mid-answer. Check your gateway's timeouts and any proxy
   between it and the deployment

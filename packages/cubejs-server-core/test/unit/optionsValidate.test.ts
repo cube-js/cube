@@ -58,10 +58,29 @@ describe('validateOptions chatCompletion', () => {
     expect(() => validateOptions({ chatCompletion: { stream: () => [] } })).not.toThrow();
   });
 
-  test('preserves the hook by reference', () => {
+  test('preserves a factory by reference', () => {
     const chatCompletion = () => [];
 
     expect(validateOptions({ chatCompletion }).chatCompletion).toBe(chatCompletion);
+  });
+
+  // The branch that can actually break. `validateOptions` returns Joi's `value`,
+  // so were Joi ever to clone the matched object, a chat model instance would
+  // arrive at the consumer as a plain object — no prototype, no `bindTools`,
+  // which the LLM Gateway reports as "does not support tool calling". An object
+  // literal cannot show that; a class instance can.
+  test('preserves a model instance by reference, prototype intact', () => {
+    class Model {
+      public bindTools() {
+        return this;
+      }
+    }
+    const chatCompletion = new Model();
+    const validated = validateOptions({ chatCompletion }).chatCompletion;
+
+    expect(validated).toBe(chatCompletion);
+    expect(validated).toBeInstanceOf(Model);
+    expect(typeof (validated as Model).bindTools).toBe('function');
   });
 
   test('still rejects an unknown option', () => {

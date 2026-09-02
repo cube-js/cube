@@ -158,13 +158,10 @@ const schemaOptions = Joi.object().keys({
   serverless: Joi.boolean(),
   allowNodeRequire: Joi.boolean(),
   fastReload: Joi.boolean(),
-  // Consumed by Cube Cloud's LLM Gateway model provider, which routes agent
-  // inference through the deployment rather than calling a model vendor from
-  // the control plane. Core does not read it, but it has to be listed: this
-  // schema rejects unknown keys, so without an entry here every deployment
-  // that declares the hook fails to start with "Invalid cube-server-core
-  // options". Accepts an object as well as a function because the hook may be
-  // a model instance rather than a factory.
+  // LLM Gateway hook. Core does not read it, but this schema rejects unknown
+  // keys, so without an entry every deployment declaring it fails to start.
+  // An object is allowed because the hook may be a model instance, not a
+  // factory. See docs-mintlify/admin/ai/bring-your-own-model.mdx.
   chatCompletion: Joi.alternatives().try(Joi.func(), Joi.object()),
 });
 

@@ -78,17 +78,9 @@ class Configuration:
     orchestrator_options: Union[Dict, Callable[[RequestContext], Dict]]
     context_to_groups: Callable[[RequestContext], list[str]]
     fast_reload: bool
-    # Consumed by Cube Cloud's LLM Gateway model provider, which routes agent
-    # inference through this deployment instead of calling a model vendor
-    # itself. Cube Core accepts and ignores it.
-    #
-    # Must be a plain function (`def` or `async def`), and what it returns has
-    # to survive the Python-to-JavaScript bridge: a list of chunk dicts, or a
-    # dict `{"next": fn}` whose `fn` returns the next chunk dict (or None when
-    # the response is complete) on each call. Arbitrary Python objects — a
-    # LangChain model instance, an async generator — cannot cross that bridge,
-    # so `cube.js` is the file to use when you want to hand back a model object
-    # directly.
+    # LLM Gateway hook. Must be a plain function, and its return value has to
+    # cross the Python->JS bridge: a list of chunk dicts, or {"next": fn} for a
+    # stream. Model objects and async generators cannot cross — use cube.js.
     chat_completion: Callable[[Dict], Any]
 
     def __init__(self):
