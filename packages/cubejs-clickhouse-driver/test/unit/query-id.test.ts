@@ -11,6 +11,7 @@ const mockInsert = jest.fn(async (_params: any) => ({}));
 const mockPing = jest.fn(async () => ({ success: true }));
 
 jest.mock('@clickhouse/client', () => ({
+  ...jest.requireActual('@clickhouse/client'),
   createClient: jest.fn(() => ({
     ping: mockPing,
     query: mockQuery,

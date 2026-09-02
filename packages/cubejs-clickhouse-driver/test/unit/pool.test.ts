@@ -3,6 +3,7 @@ import { createClient } from '@clickhouse/client';
 import { ClickHouseDriver } from '../../src';
 
 jest.mock('@clickhouse/client', () => ({
+  ...jest.requireActual('@clickhouse/client'),
   createClient: jest.fn(() => ({ close: jest.fn() })),
 }));
 

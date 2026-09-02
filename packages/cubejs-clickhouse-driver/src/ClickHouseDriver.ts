@@ -4,6 +4,7 @@ import {
   extractRequestUUID,
   formatMySql,
 } from '@cubejs-backend/shared';
+import type { LogLevel } from '@cubejs-backend/shared';
 import {
   BaseDriver,
   DownloadQueryResultsOptions,
@@ -23,8 +24,15 @@ import {
 } from '@cubejs-backend/base-driver';
 
 import { Readable } from 'node:stream';
-import { ClickHouseClient, createClient } from '@clickhouse/client';
-import type { ClickHouseSettings, ResponseJSON } from '@clickhouse/client';
+import { ClickHouseClient, ClickHouseLogLevel, createClient } from '@clickhouse/client';
+import type {
+  ClickHouseSettings,
+  ErrorLogParams,
+  LogParams,
+  Logger,
+  ResponseJSON,
+  WarnLogParams,
+} from '@clickhouse/client';
 import { v4 as uuidv4 } from 'uuid';
 
 import { transformRow, transformStreamRow } from './HydrationStream';
@@ -97,6 +105,13 @@ export interface ClickHouseDriverOptions {
    * @see https://clickhouse.com/docs/integrations/javascript#configuration
    */
   headers?: Record<string, string>,
+
+  /**
+   * Log level of the underlying ClickHouse client, whose messages are forwarded
+   * to the Cube logger. Defaults to ERROR: at WARN the client advises enabling
+   * progress headers on every client construction, which we disable on purpose.
+   */
+  logLevel?: ClickHouseLogLevel,
 }
 
 interface ClickhouseDriverExportRequiredAWS {
@@ -124,6 +139,7 @@ type ClickHouseDriverConfig = {
   compression: { response?: boolean; request?: boolean },
   clickhouseSettings: ClickHouseSettings,
   headers: Record<string, string>,
+  logLevel: ClickHouseLogLevel,
 };
 
 export class ClickHouseDriver extends BaseDriver implements DriverInterface {
@@ -193,6 +209,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       },
       // Custom HTTP headers can only be passed via driver_factory, not env vars.
       headers: config.headers ?? {},
+      logLevel: config.logLevel ?? ClickHouseLogLevel.ERROR,
     };
 
     const maxPoolSize = config.maxPoolSize ??
@@ -255,7 +272,50 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       request_timeout: this.config.requestTimeout,
       max_open_connections: maxPoolSize,
       http_headers: this.config.headers,
+      log: {
+        LoggerClass: this.clientLoggerClass(),
+        level: this.config.logLevel,
+      },
     });
+  }
+
+  /**
+   * The client instantiates `LoggerClass` with no arguments, and `setLogger` runs
+   * after the constructor, so the Cube logger is resolved lazily on every call.
+   */
+  private clientLoggerClass(): new () => Logger {
+    const emit = (level: LogLevel, { module, message, args }: LogParams, err?: Error) => {
+      this.logger?.('ClickHouse Client Log', {
+        level,
+        module,
+        message,
+        ...args,
+        ...(err ? { error: (err.stack || err).toString() } : {}),
+      });
+    };
+
+    return class implements Logger {
+      public trace(params: LogParams) {
+        emit('trace', params);
+      }
+
+      // Cube's LogLevel has no debug counterpart
+      public debug(params: LogParams) {
+        emit('trace', params);
+      }
+
+      public info(params: LogParams) {
+        emit('info', params);
+      }
+
+      public warn(params: WarnLogParams) {
+        emit('warn', params, params.err);
+      }
+
+      public error(params: ErrorLogParams) {
+        emit('error', params, params.err);
+      }
+    };
   }
 
   public async testConnection() {
@@ -425,8 +485,14 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       }
 
       const dataRowsIter = (async function* () {
-        for await (const row of allRowsIter) {
-          yield transformStreamRow(row, names, types);
+        try {
+          for await (const row of allRowsIter) {
+            yield transformStreamRow(row, names, types);
+          }
+        } catch (e) {
+          // Since 25.11 the server reports an exception raised after the first block through
+          // the response headers and an in-stream tag, and the client rethrows it here.
+          throw new Error(`Stream query failed: ${formatError(e)}; query id: ${queryId}`, { cause: e });
         }
       }());
       const rowStream = Readable.from(dataRowsIter);
