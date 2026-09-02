@@ -93,7 +93,7 @@ suite('Python Config', () => {
     for (;;) {
       // eslint-disable-next-line no-await-in-loop
       const chunk = await stream.next();
-      if (chunk === null) {
+      if (chunk === undefined) {
         break;
       }
       chunks.push(chunk);
@@ -104,6 +104,27 @@ suite('Python Config', () => {
       { content: 'med ' },
       { content: 'gateway-model' },
     ]);
+  });
+
+  // `CLRepr::Null` converts to `cx.undefined()`, so the Python `None` that ends
+  // a stream arrives as `undefined` and never as `null`. A consumer that stops
+  // on `null` alone loops forever on an already-finished stream — pinned here
+  // because the Python side says `return None` and nothing about writing it
+  // suggests the JavaScript side sees anything else.
+  test('a Python None crosses as undefined, not null', async () => {
+    const streamConfig = await loadConfigurationFile('config-chat-completion-stream.py');
+    const stream = (await streamConfig.chatCompletion!({
+      model: 'gateway-model',
+      messages: [],
+    })) as { next: () => Promise<unknown> };
+
+    await stream.next();
+    await stream.next();
+    await stream.next();
+
+    const terminator = await stream.next();
+    expect(terminator).toBeUndefined();
+    expect(terminator).not.toBeNull();
   });
 
   // The boundary the two supported forms exist to work around. A customer's
