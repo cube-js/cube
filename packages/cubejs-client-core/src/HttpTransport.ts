@@ -1,4 +1,3 @@
-import fetch from 'cross-fetch';
 import 'url-search-params-polyfill';
 import { responseChunks } from './streaming.js';
 
@@ -143,7 +142,7 @@ export class HttpTransport implements ITransport<Response> {
 
     // Currently, all methods make GET requests. If a method makes a request with a body payload,
     // remember to add {'Content-Type': 'application/json'} to the header.
-    const runRequest = () => fetch(url, {
+    const runRequest = () => globalThis.fetch(url, {
       method: requestMethod,
       headers: {
         Authorization: this.authorization,
@@ -224,7 +223,7 @@ export class HttpTransport implements ITransport<Response> {
 
     return {
       stream: async () => {
-        const response = await fetch(url, {
+        const response = await globalThis.fetch(url, {
           method: requestMethod,
           headers: {
             Authorization: this.authorization,

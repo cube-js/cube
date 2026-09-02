@@ -1,12 +1,7 @@
-/* eslint-disable import/first */
 import { vi, MockedFunction } from 'vitest';
-import fetch from 'cross-fetch';
-
-vi.mock('cross-fetch');
-
 import HttpTransport from '../src/HttpTransport.js';
 
-const mockedFetch = fetch as MockedFunction<typeof fetch>;
+const mockedFetch = vi.fn() as MockedFunction<typeof fetch>;
 
 describe('HttpTransport', () => {
   const apiUrl = 'http://localhost:3000/cubejs-api/v1';
@@ -33,7 +28,12 @@ describe('HttpTransport', () => {
   const largeQueryJson = `{"query":{"measures":["Orders.count"],"dimensions":["Users.country"],"filters":[{"member":"Users.id","operator":"equals","values":${JSON.stringify(ids)}}]}}`;
 
   beforeAll(() => {
+    vi.stubGlobal('fetch', mockedFetch);
     mockedFetch.mockReturnValue(Promise.resolve({ ok: true } as Response));
+  });
+
+  afterAll(() => {
+    vi.unstubAllGlobals();
   });
 
   afterEach(() => {
@@ -47,8 +47,8 @@ describe('HttpTransport', () => {
     });
     const req = transport.request('load', { query });
     await req.subscribe(() => { console.log('subscribe cb'); });
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith(`${apiUrl}/load?query=${queryUrlEncoded}`, {
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    expect(mockedFetch).toHaveBeenCalledWith(`${apiUrl}/load?query=${queryUrlEncoded}`, {
       method: 'GET',
       headers: {
         Authorization: 'token',
@@ -69,8 +69,8 @@ describe('HttpTransport', () => {
     });
     const req = transport.request('meta', { extraParams });
     await req.subscribe(() => { console.log('subscribe cb'); });
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith(`${apiUrl}/meta?extraParams=${serializedExtraParams}`, {
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    expect(mockedFetch).toHaveBeenCalledWith(`${apiUrl}/meta?extraParams=${serializedExtraParams}`, {
       method: 'GET',
       headers: {
         Authorization: 'token',
@@ -87,7 +87,7 @@ describe('HttpTransport', () => {
     });
     const req = transport.request('meta', { signal: undefined, baseRequestId: undefined });
     await req.subscribe(() => { console.log('subscribe cb'); });
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
     expect(mockedFetch.mock.calls[0]?.[0]).toBe(`${apiUrl}/meta`);
   });
 
@@ -100,7 +100,7 @@ describe('HttpTransport', () => {
     });
     const req = transport.request('meta', { signal: undefined, baseRequestId: undefined, onlyViews: true });
     await req.subscribe(() => { console.log('subscribe cb'); });
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
     expect(mockedFetch.mock.calls[0]?.[0]).toBe(`${apiUrl}/meta?onlyViews=true`);
   });
 
@@ -112,8 +112,8 @@ describe('HttpTransport', () => {
     });
     const req = transport.request('load', { query });
     await req.subscribe(() => { console.log('subscribe cb'); });
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith(`${apiUrl}/load`, {
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    expect(mockedFetch).toHaveBeenCalledWith(`${apiUrl}/load`, {
       method: 'POST',
       headers: {
         Authorization: 'token',
@@ -130,8 +130,8 @@ describe('HttpTransport', () => {
     });
     const req = transport.request('load', { query: LargeQuery });
     await req.subscribe(() => { console.log('subscribe cb'); });
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith(`${apiUrl}/load`, {
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    expect(mockedFetch).toHaveBeenCalledWith(`${apiUrl}/load`, {
       method: 'POST',
       headers: {
         Authorization: 'token',
@@ -316,5 +316,31 @@ describe('HttpTransport', () => {
       // Wait for the request Promise to complete
       await requestPromise;
     }, 10000); // Set 10-second timeout
+  });
+
+  // Firefox's WebIDL binding throws `Can only call Window.fetch on instances of Window` when
+  // `fetch` is invoked with the wrong receiver, which is how cube-js/cube#9694 manifested.
+  test('it calls the global fetch with globalThis as the receiver', async () => {
+    const strictFetch = vi.fn(function strictFetch(this: unknown) {
+      if (this !== globalThis) {
+        throw new TypeError('Can only call Window.fetch on instances of Window');
+      }
+
+      return Promise.resolve({ ok: true } as Response);
+    });
+
+    vi.stubGlobal('fetch', strictFetch);
+
+    try {
+      const transport = new HttpTransport({ authorization: 'token', apiUrl });
+      const result = await transport
+        .request('load', { query })
+        .subscribe((response) => response);
+
+      expect(strictFetch).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ ok: true });
+    } finally {
+      vi.stubGlobal('fetch', mockedFetch);
+    }
   });
 });
