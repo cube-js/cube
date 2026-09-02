@@ -4,8 +4,6 @@ import { getProcessUid } from '@cubejs-backend/shared';
 import { QueryKey, QueryKeyHash } from '@cubejs-backend/base-driver';
 import { CacheKey, LocalRefreshKeyDescriptor } from './QueryCache';
 
-export { extractRequestUUID } from '@cubejs-backend/shared';
-
 /**
  * Unique process ID regexp.
  */
