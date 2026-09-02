@@ -206,11 +206,10 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   private buildQueryId(requestId?: string): string {
-    if (!requestId) {
+    const prefix = requestId ? extractRequestUUID(requestId).slice(0, 63) : '';
+    if (!prefix) {
       return uuidv4();
     }
-
-    const prefix = extractRequestUUID(requestId).slice(0, 63);
 
     return `${prefix}-${uuidv4()}`;
   }

@@ -75,6 +75,12 @@ describe('ClickHouseDriver query id', () => {
     expect(queryId).toMatch(new RegExp(`^x{63}-${UUID}$`));
   });
 
+  it('falls back to a generated uuid when the request id is all span suffix', async () => {
+    await createDriver().query('SELECT 1', [], { requestId: '-span-1' });
+
+    expect(mockQuery.mock.calls[0][0].query_id).toMatch(UUID_RE);
+  });
+
   it('falls back to a generated uuid when there is no request id', async () => {
     await createDriver().query('SELECT 1', []);
 
