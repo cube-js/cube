@@ -86,7 +86,7 @@ describe('ClickHouseDriver query id', () => {
 
     await promise.cancel();
     expect(mockCommand.mock.calls[0][0]).toEqual({
-      query: `KILL QUERY WHERE query_id = 'a\\'${queryId.slice(2)}'`,
+      query: `KILL QUERY WHERE query_id = 'a''${queryId.slice(2)}'`,
     });
   });
 

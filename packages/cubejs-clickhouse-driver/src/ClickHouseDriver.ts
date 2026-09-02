@@ -8,6 +8,7 @@ import {
   getEnv,
   assertDataSource,
   extractRequestUUID,
+  formatMySql,
 } from '@cubejs-backend/shared';
 import {
   BaseDriver,
@@ -31,7 +32,6 @@ import { Readable } from 'node:stream';
 import { ClickHouseClient, createClient } from '@clickhouse/client';
 import type { ClickHouseSettings, ResponseJSON } from '@clickhouse/client';
 import { v4 as uuidv4 } from 'uuid';
-import sqlstring from 'sqlstring';
 
 import { transformRow, transformStreamRow } from './HydrationStream';
 
@@ -242,7 +242,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       const killClient = this.createClient(1);
       try {
         await killClient.command({
-          query: `KILL QUERY WHERE query_id = ${sqlstring.escape(queryId)}`,
+          query: formatMySql('KILL QUERY WHERE query_id = ?', [queryId]),
         });
       } finally {
         await killClient.close();
@@ -282,7 +282,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   protected queryResponse(query: string, values: unknown[], options?: QueryOptions): Promise<ResponseJSON<Record<string, unknown>>> {
-    const formattedQuery = sqlstring.format(query, values);
+    const formattedQuery = formatMySql(query, values);
 
     return this.withCancel(async (connection, queryId, signal) => {
       try {
@@ -387,7 +387,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const queryId = requestId ? `${extractRequestUUID(requestId)}-${uuidv4()}` : uuidv4();
 
     try {
-      const formattedQuery = sqlstring.format(query, values);
+      const formattedQuery = formatMySql(query, values);
 
       const format = 'JSONCompactEachRowWithNamesAndTypes';
 
@@ -632,7 +632,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket.bucketName);
     const exportPrefix = path ? `${path}/${uuidv4()}` : uuidv4();
 
-    const formattedQuery = sqlstring.format(`
+    const formattedQuery = formatMySql(`
       INSERT INTO FUNCTION
          s3(
              'https://${bucketName}.s3.${this.config.exportBucket.region}.amazonaws.com/${exportPrefix}/export.csv.gz',
