@@ -93,8 +93,7 @@ describe('ClickHouseDriver query id', () => {
   it('tags streaming queries', async () => {
     const driver = createDriver();
 
-    // The mocked client returns no rows, so stream() throws while reading the header rows;
-    // we only care about the query_id it sent.
+    // The mocked client returns no rows, so stream() throws on the missing header rows
     await expect(driver.stream('SELECT 1', [], { highWaterMark: 100, requestId: 'req-1-span-1' }))
       .rejects.toThrow();
 

@@ -167,19 +167,11 @@ type UnloadQuery = {
 export type UnloadOptions = {
   maxFileSize: number,
   query?: UnloadQuery;
-  /**
-   * Cube request identifier, forwarded so drivers can tag the underlying
-   * database job/query for tracing (e.g. BigQuery job labels).
-   */
   requestId?: string;
 };
 
 export type QueryOptions = {
   inlineTables?: InlineTables,
-  /**
-   * Cube request identifier, forwarded so drivers can tag the underlying
-   * database job/query for tracing (e.g. BigQuery job labels).
-   */
   requestId?: string,
   [key: string]: any
 };

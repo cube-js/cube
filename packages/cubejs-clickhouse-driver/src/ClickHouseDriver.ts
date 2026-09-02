@@ -206,9 +206,9 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   /**
-   * ClickHouse echoes query_id into system.query_log, so prefixing it with the Cube query id
-   * makes every statement traceable to a query in Query History. ClickHouse rejects a query_id
-   * that is already running, so each statement gets its own uuid suffix.
+   * ClickHouse echoes query_id into system.query_log, which is what makes a statement
+   * traceable to a query in Query History. The uuid suffix is required because ClickHouse
+   * rejects a query_id that is already running.
    */
   private buildQueryId(requestId?: string): string {
     return requestId ? `${extractRequestUUID(requestId)}-${uuidv4()}` : uuidv4();
