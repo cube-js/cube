@@ -205,15 +205,20 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     this.client = this.createClient(maxPoolSize);
   }
 
+  /**
+   * ClickHouse echoes query_id into system.query_log, so prefixing it with the Cube query id
+   * makes every statement traceable to a query in Query History. ClickHouse rejects a query_id
+   * that is already running, so each statement gets its own uuid suffix.
+   */
+  private buildQueryId(requestId?: string): string {
+    return requestId ? `${extractRequestUUID(requestId)}-${uuidv4()}` : uuidv4();
+  }
+
   protected withCancel<T>(
     fn: (con: ClickHouseClient, queryId: string, signal: AbortSignal) => Promise<T>,
     options?: QueryOptions,
   ): Promise<T> {
-    // ClickHouse echoes query_id into system.query_log, so prefixing it with the Cube query
-    // id makes every statement traceable to a query in Query History. The uuid suffix keeps
-    // it unique: ClickHouse rejects a query whose query_id is already running, and one Cube
-    // request can run several statements concurrently.
-    const queryId = options?.requestId ? `${extractRequestUUID(options.requestId)}-${uuidv4()}` : uuidv4();
+    const queryId = this.buildQueryId(options?.requestId);
 
     const abortController = new AbortController();
     const { signal } = abortController;
@@ -384,7 +389,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   ): Promise<StreamTableDataWithTypes> {
     // Use separate client for this long-living query
     const client = this.createClient(1);
-    const queryId = requestId ? `${extractRequestUUID(requestId)}-${uuidv4()}` : uuidv4();
+    const queryId = this.buildQueryId(requestId);
 
     try {
       const formattedQuery = formatMySql(query, values);
