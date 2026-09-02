@@ -34,6 +34,7 @@ import type { ClickHouseSettings, ResponseJSON } from '@clickhouse/client';
 import { v4 as uuidv4 } from 'uuid';
 
 import { transformRow, transformStreamRow } from './HydrationStream';
+import { formatError } from './utils';
 
 const SUPPORTED_BUCKET_TYPES = ['s3'];
 
@@ -200,7 +201,12 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       headers: config.headers ?? {},
     };
 
-    const maxPoolSize = config.maxPoolSize ?? getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ?? 8;
+    // server-core passes `maxPoolSize` explicitly (2 * queue concurrency); this fallback only
+    // covers a driver built straight from `driver_factory`, where a pool below the concurrency
+    // would leave statements waiting on sockets.
+    const maxPoolSize = config.maxPoolSize ??
+      getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ??
+      ClickHouseDriver.getDefaultConcurrency();
 
     this.client = this.createClient(maxPoolSize);
   }
@@ -224,16 +230,10 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const { signal } = abortController;
 
     const promise = (async () => {
-      const pingResult = await this.client.ping();
-      if (!pingResult.success) {
-        // TODO replace string formatting with proper cause
-        // pingResult.error can be AggregateError when ClickHouse hostname resolves to multiple addresses
-        let errorMessage = pingResult.error.toString();
-        if (pingResult.error instanceof AggregateError) {
-          errorMessage = `Aggregate error: ${pingResult.error.message}; errors: ${pingResult.error.errors.join('; ')}`;
-        }
-        throw new Error(`Connection check failed: ${errorMessage}`);
-      }
+      // No health probe before the statement: `client.ping()` cost an extra HTTP round trip and a
+      // socket from the same `max_open_connections` pool as the statement itself, while `GET /ping`
+      // verifies neither credentials nor database. Stale keep-alive sockets are already recycled by
+      // the client (`keep_alive.idle_socket_ttl`), and an unreachable host fails at connect anyway.
       signal.throwIfAborted();
       // Queries sent by `fn` can hit a timeout error, would _not_ get killed, and continue running in ClickHouse
       // TODO should we kill those as well?
@@ -311,8 +311,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         const results = await resultSet.json<Record<string, unknown>>();
         return results;
       } catch (e) {
-        // TODO replace string formatting with proper cause
-        throw new Error(`Query failed: ${e}; query id: ${queryId}`);
+        throw new Error(`Query failed: ${formatError(e)}; query id: ${queryId}`, { cause: e });
       }
     }, options);
   }
@@ -460,8 +459,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       };
     } catch (e) {
       await client.close();
-      // TODO replace string formatting with proper cause
-      throw new Error(`Stream query failed: ${e}; query id: ${queryId}`);
+      throw new Error(`Stream query failed: ${formatError(e)}; query id: ${queryId}`, { cause: e });
     }
   }
 
@@ -605,12 +603,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
 
   public override async createTable(quotedTableName: string, columns: TableColumn[]) {
     const createTableSql = this.createTableSql(quotedTableName, columns);
-    try {
-      await this.command(createTableSql);
-    } catch (e) {
-      // TODO replace string formatting with proper cause
-      throw new Error(`Create table failed: ${e}`);
-    }
+    await this.command(createTableSql);
   }
 
   /**
@@ -681,24 +674,32 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   // This is not part of a driver interface, and marked public only for testing
   public async command(query: string, options?: QueryOptions): Promise<void> {
     await this.withCancel(async (connection, queryId, signal) => {
-      await connection.command({
-        query,
-        query_id: queryId,
-        abort_signal: signal,
-      });
+      try {
+        await connection.command({
+          query,
+          query_id: queryId,
+          abort_signal: signal,
+        });
+      } catch (e) {
+        throw new Error(`Command failed: ${formatError(e)}; query id: ${queryId}`, { cause: e });
+      }
     }, options);
   }
 
   // This is not part of a driver interface, and marked public only for testing
   public async insert(table: string, values: Array<Array<unknown>>, options?: QueryOptions): Promise<void> {
     await this.withCancel(async (connection, queryId, signal) => {
-      await connection.insert({
-        table,
-        values,
-        format: 'JSONCompactEachRow',
-        query_id: queryId,
-        abort_signal: signal,
-      });
+      try {
+        await connection.insert({
+          table,
+          values,
+          format: 'JSONCompactEachRow',
+          query_id: queryId,
+          abort_signal: signal,
+        });
+      } catch (e) {
+        throw new Error(`Insert failed: ${formatError(e)}; query id: ${queryId}`, { cause: e });
+      }
     }, options);
   }
 }
