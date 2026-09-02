@@ -1,4 +1,4 @@
-import { parseSqlInterval } from '@cubejs-backend/shared';
+import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { BaseTimeDimension } from './BaseTimeDimension';
@@ -84,6 +84,19 @@ export class BigqueryQuery extends BaseQuery {
    * It returns a tuple of (formatted interval, timeUnit to use in datediff functions)
    */
   private formatInterval(interval: string): [string, string] {
+    const formatted = this.tryFormatInterval(interval);
+
+    if (!formatted) {
+      throw new Error(`Cannot transform interval expression "${interval}" to BigQuery dialect`);
+    }
+
+    return formatted;
+  }
+
+  /**
+   * The formatted interval, or undefined when BigQuery has no single INTERVAL spelling for it.
+   */
+  private tryFormatInterval(interval: string): [string, string] | undefined {
     const intervalParsed = parseSqlInterval(interval);
     const intKeys = Object.keys(intervalParsed).length;
 
@@ -127,11 +140,17 @@ export class BigqueryQuery extends BaseQuery {
       return [`'${intervalParsed.hour}:${intervalParsed.minute}:${intervalParsed.second}' HOUR TO SECOND`, 'SECOND'];
     } else if (intervalParsed.minute && intervalParsed.second && intKeys === 2) {
       return [`'${intervalParsed.minute}:${intervalParsed.second}' MINUTE TO SECOND`, 'SECOND'];
+    } else if (intervalParsed.hour && intKeys === 1) {
+      return [`${intervalParsed.hour} HOUR`, 'HOUR'];
+    } else if (intervalParsed.minute && intKeys === 1) {
+      return [`${intervalParsed.minute} MINUTE`, 'MINUTE'];
+    } else if (intervalParsed.second && intKeys === 1) {
+      return [`${intervalParsed.second} SECOND`, 'SECOND'];
     } else if (intervalParsed.millisecond && intKeys === 1) {
       return [`'${intervalParsed.millisecond}' MILLISECOND`, 'MILLISECOND'];
     }
 
-    throw new Error(`Cannot transform interval expression "${interval}" to BigQuery dialect`);
+    return undefined;
   }
 
   public override intervalAndMinimalTimeUnit(interval: string): [string, string] {
@@ -158,21 +177,28 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   public subtractInterval(date, interval) {
-    const [intervalFormatted, timeUnit] = this.formatInterval(interval);
-    if (['YEAR', 'MONTH', 'QUARTER'].includes(timeUnit) || intervalFormatted.includes('WEEK')) {
-      return this.timeStampCast(`DATETIME_SUB(DATETIME(${date}), INTERVAL ${intervalFormatted})`);
-    }
-
-    return `TIMESTAMP_SUB(${date}, INTERVAL ${intervalFormatted})`;
+    return this.applyInterval('SUB', date, interval);
   }
 
   public addInterval(date, interval) {
-    const [intervalFormatted, timeUnit] = this.formatInterval(interval);
-    if (['YEAR', 'MONTH', 'QUARTER'].includes(timeUnit) || intervalFormatted.includes('WEEK')) {
-      return this.timeStampCast(`DATETIME_ADD(DATETIME(${date}), INTERVAL ${intervalFormatted})`);
-    }
+    return this.applyInterval('ADD', date, interval);
+  }
 
-    return `TIMESTAMP_ADD(${date}, INTERVAL ${intervalFormatted})`;
+  /**
+   * BigQuery INTERVAL literals only span contiguous unit ranges (MONTH TO DAY, HOUR TO SECOND, ...),
+   * so an interval it can not spell in one go is applied one unit at a time, coarsest first.
+   */
+  private applyInterval(direction: 'SUB' | 'ADD', date: string, interval: string): string {
+    const whole = this.tryFormatInterval(interval);
+    const parts = whole ? [whole] : splitSqlInterval(interval).map(part => this.formatInterval(part));
+
+    return parts.reduce((acc, [intervalFormatted, timeUnit]) => {
+      if (['YEAR', 'MONTH', 'QUARTER'].includes(timeUnit) || intervalFormatted.includes('WEEK')) {
+        return this.timeStampCast(`DATETIME_${direction}(DATETIME(${acc}), INTERVAL ${intervalFormatted})`);
+      }
+
+      return `TIMESTAMP_${direction}(${acc}, INTERVAL ${intervalFormatted})`;
+    }, date);
   }
 
   public subtractTimestampInterval(timestamp, interval) {
