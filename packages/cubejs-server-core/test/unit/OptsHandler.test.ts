@@ -1252,3 +1252,45 @@ describe('OptsHandler timezone env validation', () => {
     expect(core.options.scheduledRefreshTimeZones).toEqual(['UTC', 'America/New_York']);
   });
 });
+
+describe('OptsHandler compilerCacheSize', () => {
+  beforeEach(() => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+  });
+
+  afterEach(() => {
+    delete process.env.CUBEJS_COMPILER_CACHE_SIZE;
+  });
+
+  test('must default to 250 when neither the option nor the env variable is set', () => {
+    const core = new CubejsServerCoreExposed(conf);
+
+    expect(core.options.compilerCacheSize).toBe(250);
+  });
+
+  test('must take the value from CUBEJS_COMPILER_CACHE_SIZE', () => {
+    process.env.CUBEJS_COMPILER_CACHE_SIZE = '42';
+
+    const core = new CubejsServerCoreExposed(conf);
+
+    expect(core.options.compilerCacheSize).toBe(42);
+  });
+
+  test('must prefer CreateOptions.compilerCacheSize over the env variable', () => {
+    process.env.CUBEJS_COMPILER_CACHE_SIZE = '42';
+
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      compilerCacheSize: 7,
+    });
+
+    expect(core.options.compilerCacheSize).toBe(7);
+  });
+
+  test('must throw at construction if CUBEJS_COMPILER_CACHE_SIZE is not a valid size', () => {
+    process.env.CUBEJS_COMPILER_CACHE_SIZE = 'abc';
+
+    expect(() => new CubejsServerCoreExposed(conf))
+      .toThrow(/CUBEJS_COMPILER_CACHE_SIZE/);
+  });
+});

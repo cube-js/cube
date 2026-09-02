@@ -122,7 +122,20 @@ describe('index.test', () => {
     };
 
     expect(() => new CubejsServerCore(options))
-      .toThrowError(/"compilerCacheSize" must be greater than or equal to 0/);
+      .toThrowError(/"compilerCacheSize" must be greater than or equal to 1/);
+  });
+
+  // 0 used to validate and then get silently replaced by the default through the
+  // `|| 250` guards, which reads like a way to disable the compiler cache but isn't.
+  test('Should throw error, compilerCacheSize of 0', () => {
+    const options = {
+      externalDbType: <DatabaseType>'mysql',
+      devServer: true,
+      compilerCacheSize: 0,
+    };
+
+    expect(() => new CubejsServerCore(options))
+      .toThrowError(/"compilerCacheSize" must be greater than or equal to 1/);
   });
 
   test('Should create instance of CubejsServerCore, orchestratorOptions as func', () => {

@@ -312,6 +312,27 @@ const variables: Record<string, (...args: any) => any> = {
   scheduledRefreshBatchSize: () => get('CUBEJS_SCHEDULED_REFRESH_BATCH_SIZE')
     .default('1')
     .asInt(),
+  /**
+   * Maximum number of compiled data models to keep in the in-memory compiler cache.
+   */
+  compilerCacheSize: () => {
+    const size = get('CUBEJS_COMPILER_CACHE_SIZE')
+      .default('250')
+      .asIntPositive();
+
+    // env-var's asIntPositive() lets 0 through, but every consumer of this option
+    // falls back to the default on a falsy value, so 0 would quietly mean 250
+    // instead of doing what it looks like it does.
+    if (size === 0) {
+      throw new InvalidConfiguration(
+        'CUBEJS_COMPILER_CACHE_SIZE',
+        size,
+        'Must be a positive integer. The compiler cache can not be disabled.',
+      );
+    }
+
+    return size;
+  },
   nativeSqlPlanner: () => {
     const explicitlySet = process.env.CUBEJS_TESSERACT_SQL_PLANNER !== undefined;
     const enabled = get('CUBEJS_TESSERACT_SQL_PLANNER').default('true').asBool();

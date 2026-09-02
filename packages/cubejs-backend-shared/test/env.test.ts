@@ -285,3 +285,36 @@ describe('getEnv(defaultTimezone / scheduledRefreshTimezones)', () => {
     );
   });
 });
+
+describe('getEnv(compilerCacheSize)', () => {
+  afterEach(() => {
+    delete process.env.CUBEJS_COMPILER_CACHE_SIZE;
+  });
+
+  test('defaults to 250', () => {
+    expect(getEnv('compilerCacheSize')).toBe(250);
+  });
+
+  test('reads CUBEJS_COMPILER_CACHE_SIZE', () => {
+    process.env.CUBEJS_COMPILER_CACHE_SIZE = '1000';
+    expect(getEnv('compilerCacheSize')).toBe(1000);
+  });
+
+  test('throws on zero, so it is never silently coerced to the default', () => {
+    process.env.CUBEJS_COMPILER_CACHE_SIZE = '0';
+    expect(() => getEnv('compilerCacheSize')).toThrowError(
+      'Value "0" is not valid for CUBEJS_COMPILER_CACHE_SIZE. Must be a positive integer. The compiler cache can not be disabled.'
+    );
+  });
+
+  test.each([
+    '-1',
+    'abc',
+    '1.5',
+  ])('throws on the negative or non-integer value %j', (value) => {
+    process.env.CUBEJS_COMPILER_CACHE_SIZE = value;
+    expect(() => getEnv('compilerCacheSize')).toThrowError(
+      /CUBEJS_COMPILER_CACHE_SIZE/
+    );
+  });
+});

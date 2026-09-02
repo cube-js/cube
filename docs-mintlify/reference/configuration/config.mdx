@@ -216,6 +216,7 @@ module.exports = {
 Maximum number of compiled data models to persist with in-memory cache. Defaults
 to 250, but optimum value will depend on deployed environment. When the max is
 reached, will start dropping the least recently used data models from the cache.
+Must be a positive integer; the cache can not be disabled.
 
 <CodeGroup>
 
@@ -232,6 +233,11 @@ module.exports = {
 ```
 
 </CodeGroup>
+
+This configuration option can also be set using the [`CUBEJS_COMPILER_CACHE_SIZE`](/reference/configuration/environment-variables#cubejs_compiler_cache_size)
+environment variable, and takes precedence over it. Note that the environment
+variable also sizes the SQL API's compiler cache, which this option does not
+affect.
 
 ### `max_compiler_cache_keep_alive`
 

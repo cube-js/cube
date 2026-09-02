@@ -131,6 +131,33 @@ The cache and queue driver to use for the Cube deployment.
 It can be also set using the [`cache_and_queue_driver` configuration
 option](/reference/configuration/config#cache_and_queue_driver).
 
+## `CUBEJS_COMPILER_CACHE_SIZE`
+
+The maximum number of compiled data models to keep in the in-memory compiler
+cache. When the maximum is reached, the least recently used data models are
+dropped from the cache. The optimum value depends on the deployed environment.
+
+This variable sizes two separate caches: the data model compiler cache and the
+[SQL API][ref-sql-api]'s own compiler cache. Setting it applies the same maximum
+to both. When it is unset, each falls back to its own default, so the effective
+default differs between them.
+
+| Cache                     | Possible Values   | Default in Development | Default in Production |
+| ------------------------- | ----------------- | ---------------------- | --------------------- |
+| Data model compiler cache | A positive number | `250`                  | `250`                 |
+| SQL API compiler cache    | A positive number | `100`                  | `100`                 |
+
+<Note>
+Neither cache can be disabled, so `0` is rejected rather than accepted and
+ignored. The same applies to the configuration option.
+</Note>
+
+The data model compiler cache can be also sized using the [`compiler_cache_size`
+configuration option](/reference/configuration/config#compiler_cache_size),
+which takes precedence over this environment variable. The SQL API compiler
+cache reads this environment variable only, so the configuration option does not
+affect it.
+
 ## `CUBEJS_CONCURRENCY`
 
 The number of concurrent connections each query queue has to the database.
