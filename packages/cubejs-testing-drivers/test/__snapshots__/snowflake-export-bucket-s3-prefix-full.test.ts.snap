@@ -21186,6 +21186,36 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-s3-prefix querying custom granularities ECommerce: count by fiscal_year_by_1st_april + no dimension 1`] = `
+Array [
+  Object {
+    "ECommerce.count": "5",
+    "ECommerce.customOrderDateNoPreAgg": "2019-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.fiscal_year_by_1st_april": "2019-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "39",
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.fiscal_year_by_1st_april": "2020-04-01T00:00:00.000",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-s3-prefix querying custom granularities ECommerce: count by fiscal_year_by_15th_april + no dimension 1`] = `
+Array [
+  Object {
+    "ECommerce.count": "6",
+    "ECommerce.customOrderDateNoPreAgg": "2019-04-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.fiscal_year_by_15th_april": "2019-04-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "38",
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.fiscal_year_by_15th_april": "2020-04-15T00:00:00.000",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-s3-prefix querying custom granularities ECommerce: count by half_year + dimension 1`] = `
 Array [
   Object {
@@ -21593,6 +21623,71 @@ Array [
     "ECommerce.count": "20",
     "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-s3-prefix querying custom granularities ECommerce: count by monthly_from_15th + no dimension 1`] = `
+Array [
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2019-12-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2019-12-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-01-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-01-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-02-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-02-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "3",
+    "ECommerce.customOrderDateNoPreAgg": "2020-03-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-03-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "3",
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-04-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "5",
+    "ECommerce.customOrderDateNoPreAgg": "2020-05-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-05-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "4",
+    "ECommerce.customOrderDateNoPreAgg": "2020-06-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-06-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "3",
+    "ECommerce.customOrderDateNoPreAgg": "2020-08-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-08-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "4",
+    "ECommerce.customOrderDateNoPreAgg": "2020-09-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-09-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "8",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-10-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "9",
+    "ECommerce.customOrderDateNoPreAgg": "2020-11-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-11-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "2",
+    "ECommerce.customOrderDateNoPreAgg": "2020-12-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-12-15T00:00:00.000",
   },
 ]
 `;
