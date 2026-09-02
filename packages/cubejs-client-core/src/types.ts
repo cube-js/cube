@@ -1,5 +1,9 @@
-import Meta from './Meta';
-import { TimeDimensionGranularity } from './time';
+import Meta from './Meta.js';
+import { TimeDimensionGranularity } from './time.js';
+
+export type DeeplyReadonly<T> = {
+  readonly [K in keyof T]: DeeplyReadonly<T[K]>;
+};
 
 export type QueryOrder = 'asc' | 'desc' | 'none';
 
@@ -14,12 +18,47 @@ export type GranularityAnnotation = {
   origin?: string;
 };
 
-export type DimensionCustomTimeFormat = { type: 'custom-time'; value: string };
-export type CustomNumericFormat = { type: 'custom-numeric'; value: string };
+export type DimensionCustomTimeFormat = {
+  type: 'custom-time';
+  /** POSIX strftime format string (IEEE Std 1003.1 / POSIX.1) with d3-time-format extensions (e.g., '%Y-%m-%d', '%d/%m/%Y %H:%M:%S'). See https://d3js.org/d3-time-format */
+  value: string;
+};
+export type CustomNumericFormat = {
+  type: 'custom-numeric';
+  /** d3-format specifier string (e.g., '.2f', ',.0f', '$,.2f', '.0%', '.2s'). See https://d3js.org/d3-format */
+  value: string;
+  /** Name of the predefined format (e.g., 'percent_2', 'currency_1'). Present only when a named format was used. */
+  alias?: string;
+};
 export type DimensionLinkFormat = { type: 'link'; label: string };
+
+type FormatDescriptionBaseName = 'number' | 'percent' | 'currency' | 'abbr' | 'accounting';
+type FormatDescriptionPrecision = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+type FormatDescriptionName = 'custom' | 'id' | FormatDescriptionBaseName | `${FormatDescriptionBaseName}_${FormatDescriptionPrecision}`;
+
+type NamedNumericPrecision = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+type NamedNumericFormatName =
+  | `number_${NamedNumericPrecision}`
+  | `percent_${NamedNumericPrecision}`
+  | `currency_${NamedNumericPrecision}`
+  | `decimal_${NamedNumericPrecision}`
+  | `abbr_${NamedNumericPrecision}`
+  | `accounting_${NamedNumericPrecision}`
+  | 'decimal' | 'abbr' | 'accounting';
+
 export type DimensionFormat = 'percent' | 'currency' | 'number' | 'imageUrl' | 'id' | 'link'
+  | NamedNumericFormatName
   | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
-export type MeasureFormat = 'percent' | 'currency' | 'number' | CustomNumericFormat;
+export type MeasureFormat = 'percent' | 'currency' | 'number' | NamedNumericFormatName | CustomNumericFormat;
+
+export type FormatDescription = {
+  /** Predefined format name (e.g., 'percent_2', 'currency_1') or a base name like 'number' */
+  name: FormatDescriptionName;
+  /** d3-format specifier string (e.g., '.2f', ',.0f', '$,.2f'). See https://d3js.org/d3-format */
+  specifier: string;
+  /** ISO 4217 currency code in uppercase (e.g. USD, EUR). Present when a currency format is used. */
+  currency?: string;
+};
 
 export type Annotation = {
   title: string;
@@ -27,6 +66,10 @@ export type Annotation = {
   type: string;
   meta?: any;
   format?: DimensionFormat | MeasureFormat;
+  /** Resolved format description with the predefined name and d3-format specifier */
+  formatDescription?: FormatDescription;
+  /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
+  currency?: string;
   drillMembers?: any[];
   drillMembersGrouped?: any;
   granularity?: GranularityAnnotation;
@@ -119,10 +162,8 @@ export interface Query {
   offset?: number;
   order?: TQueryOrderObject | TQueryOrderArray;
   timezone?: string;
-  // @deprecated
-  renewQuery?: boolean;
   ungrouped?: boolean;
-  responseFormat?: 'compact' | 'default';
+  responseFormat?: 'compact' | 'columnar' | 'default';
   total?: boolean;
 }
 
@@ -156,7 +197,17 @@ export type TransformedQuery = {
 export type PreAggregationType = 'rollup' | 'rollupJoin' | 'rollupLambda' | 'originalSql';
 
 export type UsedPreAggregation = {
-  targetTableName: string;
+  /**
+   * Identity of the pre-aggregation in the data model, e.g. `Orders.main`.
+   * Stable across rebuilds, unlike `targetTableName`.
+   */
+  preAggregationId?: string;
+  /**
+   * Physical table of one specific build, content and structure versions
+   * included. Returned in dev mode and to the Playground only.
+   */
+  targetTableName?: string;
+  lastUpdatedAt?: number;
   type: PreAggregationType;
 };
 
@@ -169,6 +220,11 @@ export type LoadResponseResult<T> = {
   dbType: string;
   extDbType: string;
   requestId?: string;
+  /**
+   * Pre-aggregations this result was served from, keyed by pre-aggregation
+   * table name. Absent when the query hit none. Only carries identity fields;
+   * `refreshKeyValues` is added in dev mode and for the Playground.
+   */
   usedPreAggregations?: Record<string, UsedPreAggregation>;
   transformedQuery?: TransformedQuery;
   total?: number;
@@ -316,6 +372,10 @@ export type TableColumn = {
   title: string;
   shortTitle: string;
   format?: any;
+  /** ISO 4217 currency code in uppercase (e.g. USD, EUR). Carried over from the annotation for currency-formatted members. */
+  currency?: string;
+  /** Granularity name (e.g. 'day', 'month', 'year'). Carried over from the annotation for time dimensions. */
+  granularity?: string;
   children?: TableColumn[];
 };
 
@@ -384,6 +444,8 @@ export type TCubeMeasure = BaseCubeMember & {
     dimensions: string[];
   };
   format?: 'currency' | 'percent';
+  /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
+  currency?: string;
 };
 
 export type CubeTimeDimensionGranularity = {
@@ -395,6 +457,8 @@ export type BaseCubeDimension = BaseCubeMember & {
   primaryKey?: boolean;
   suggestFilterValues: boolean;
   format?: DimensionFormat;
+  /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
+  currency?: string;
   key?: string;
 };
 
@@ -476,6 +540,7 @@ export type Cube = {
   isVisible?: boolean;
   public?: boolean;
   meta?: any;
+  viewGroups?: string[];
 };
 
 export type CubeMap = {
@@ -489,8 +554,25 @@ export type CubesMap = Record<
   CubeMap
 >;
 
+export type ViewGroup = {
+  name: string;
+  title?: string;
+  description?: string;
+  /**
+   * The group's own direct view references at this level.
+   */
+  views: string[];
+  /**
+   * Recursive representation: view names interleaved with nested view groups,
+   * preserving authoring order. Present when the group is defined via
+   * `includes` (including nested view groups).
+   */
+  includes?: (string | ViewGroup)[];
+};
+
 export type MetaResponse = {
   cubes: Cube[];
+  viewGroups?: ViewGroup[];
 };
 
 export type FilterOperator = {
@@ -540,7 +622,7 @@ export type ProgressResponse = {
 /**
  * Cache mode options for query execution.
  *
- * - **stale-if-slow** (default): Equivalent to previously used `renewQuery: false`.
+ * - **stale-if-slow** (default):
  *   If refresh keys are up-to-date, returns the value from cache.
  *   If refresh keys are expired, tries to return the value from the database.
  *   Returns fresh value from the database if the query executed until the first "Continue wait" interval is reached.
@@ -551,7 +633,7 @@ export type ProgressResponse = {
  *   If refresh keys are expired, returns stale data from cache.
  *   Updates the cache in background.
  *
- * - **must-revalidate**: Equivalent to previously used `renewQuery: true`.
+ * - **must-revalidate**:
  *   If refresh keys are up-to-date, returns the value from cache.
  *   If refresh keys are expired, tries to return the value from the database.
  *   Returns fresh value from the database even if it takes minutes and many "Continue wait" intervals.

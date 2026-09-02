@@ -30,7 +30,7 @@ export class OrchestratorApi {
     protected readonly logger,
     protected readonly options: OrchestratorApiOptions
   ) {
-    this.continueWaitTimeout = this.options.continueWaitTimeout || 5;
+    this.continueWaitTimeout = this.options.continueWaitTimeout || 10;
 
     this.orchestrator = new QueryOrchestrator(
       options.redisPrefix || 'STANDALONE',
@@ -240,11 +240,23 @@ export class OrchestratorApi {
   }
 
   public async release() {
-    return Promise.all([
-      ...Object.keys(this.seenDataSources).map(ds => this.releaseDriver(this.driverFactory, ds)),
-      this.releaseDriver(this.options.externalDriverFactory),
-      this.orchestrator.cleanup()
-    ]);
+    try {
+      return await Promise.all([
+        ...Object.keys(this.seenDataSources).map(ds => this.releaseDriver(this.driverFactory, ds)),
+        this.releaseDriver(this.options.externalDriverFactory),
+        this.orchestrator.cleanup()
+      ]);
+    } catch (error) {
+      // `OrchestratorStorage` swallows this so that one orchestrator failing to
+      // close cannot fail shutdown, which leaves this as the only place an
+      // operator learns that a connection was not closed after all.
+      this.logger('Orchestrator Release Error', {
+        orchestratorId: this.options.redisPrefix,
+        error: (error as Error).stack || String(error),
+      });
+
+      throw error;
+    }
   }
 
   protected async releaseDriver(driverFn?: DriverFactoryByDataSource, dataSource: string = 'default') {
@@ -289,12 +301,16 @@ export class OrchestratorApi {
     return this.orchestrator.checkPartitionsBuildRangeCache(queryBody);
   }
 
-  public async getPreAggregationQueueStates() {
-    return this.orchestrator.getPreAggregationQueueStates();
+  public async getPreAggregationQueueStates(dataSource?: string) {
+    return this.orchestrator.getPreAggregationQueueStates(dataSource);
   }
 
   public async cancelPreAggregationQueriesFromQueue(queryKeys: string[], dataSource: string) {
     return this.orchestrator.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource);
+  }
+
+  public async cancelQueryByRequestId(requestId: string) {
+    return this.orchestrator.cancelQueryByRequestId(requestId);
   }
 
   public async updateRefreshEndReached() {

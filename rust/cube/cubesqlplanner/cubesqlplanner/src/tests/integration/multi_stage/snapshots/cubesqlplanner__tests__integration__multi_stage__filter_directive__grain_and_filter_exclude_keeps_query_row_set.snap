@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/filter_directive.rs
+expression: result
+---
+orders__status | orders__category | orders__total_amount | orders__amount_grain_and_filter_exclude_status
+---------------+------------------+----------------------+-----------------------------------------------
+completed      | books            | 600.00               | 880.00                                        
+completed      | clothing         | 300.00               | 720.00                                        
+completed      | electronics      | 500.00               | 650.00

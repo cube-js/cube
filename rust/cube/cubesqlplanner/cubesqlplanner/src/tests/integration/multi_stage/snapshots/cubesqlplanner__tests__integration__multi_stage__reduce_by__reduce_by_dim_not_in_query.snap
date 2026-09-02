@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/reduce_by.rs
+expression: result
+---
+orders__status | orders__amount_reduce_category
+---------------+-------------------------------
+cancelled      | 200.00                        
+completed      | 1400.00                       
+pending        | 650.00

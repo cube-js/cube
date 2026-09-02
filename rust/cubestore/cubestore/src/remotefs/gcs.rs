@@ -525,3 +525,60 @@ impl RemoteFs for GCSRemoteFs {
 
 #[async_trait]
 impl ExtendedRemoteFs for GCSRemoteFs {}
+
+struct LeadingSubpath(Regex);
+
+impl GCSRemoteFs {
+    fn leading_subpath_regex(&self) -> LeadingSubpath {
+        LeadingSubpath(Regex::new(format!("^{}", self.gcs_path("")).as_str()).unwrap())
+    }
+
+    fn object_key_to_remote_path(leading_subpath: &LeadingSubpath, obj_name: &String) -> String {
+        leading_subpath
+            .0
+            .replace(&obj_name, NoExpand(""))
+            .to_string()
+    }
+
+    async fn list_with_metadata_and_map<T, F>(
+        &self,
+        remote_prefix: String,
+        mut f: F,
+    ) -> Result<Vec<T>, CubeError>
+    where
+        F: FnMut(Object) -> T + Copy,
+    {
+        let prefix = self.gcs_path(&remote_prefix);
+        let list = Object::list_prefix(self.bucket.as_str(), prefix.as_str()).await?;
+        tokio::pin!(list);
+        let mut result = Vec::new();
+        let mut pages_count: i64 = 0;
+        while let Some(objects) = list.next().await {
+            let objects = objects?;
+            pages_count += 1;
+            result.extend(objects.into_iter().map(&mut f));
+        }
+        if pages_count > 100 {
+            log::warn!("GCS list returned more than 100 pages: {}", pages_count);
+        }
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            pages_count,
+            Some(&vec![
+                "operation:list".to_string(),
+                "driver:gcs".to_string(),
+            ]),
+        );
+        Ok(result)
+    }
+
+    fn gcs_path(&self, remote_path: &str) -> String {
+        format!(
+            "{}/{}",
+            self.sub_path
+                .as_ref()
+                .map(|p| p.to_string())
+                .unwrap_or_else(|| "".to_string()),
+            remote_path
+        )
+    }
+}

@@ -1034,7 +1034,7 @@ impl PostgresIntegrationTestSuite {
 
         assert_eq!(
             err.to_string(),
-            "db error: ERROR: Unexpected panic. Reason: value can not be represented in a timestamp with nanosecond precision."
+            "db error: ERROR: Internal Error: Unexpected panic. Reason: value can not be represented in a timestamp with nanosecond precision."
         );
 
         Ok(())

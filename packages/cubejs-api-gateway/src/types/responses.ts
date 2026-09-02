@@ -8,11 +8,6 @@ export type DBResponsePrimitive =
   number |
   string;
 
-export type DBResponseValue =
-  Date |
-  DBResponsePrimitive |
-  { value: DBResponsePrimitive };
-
 export type TransformDataResponse = {
   members: string[],
   dataset: DBResponsePrimitive[][]

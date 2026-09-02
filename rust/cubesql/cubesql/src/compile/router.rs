@@ -3,27 +3,35 @@ use crate::compile::{
     StatusFlags,
 };
 use sqlparser::ast;
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    str::FromStr,
+    sync::Arc,
+};
 
 use crate::{
     compile::{
+        copy::CopyOptions,
         engine::df::scan::CacheMode,
         error::{CompilationError, CompilationResult},
         parser::parse_sql_to_statement,
-        DatabaseVariable, DatabaseVariablesToUpdate,
+        CopyFromPlan, CreateEmptyTempTablePlan, DatabaseVariable, DatabaseVariablesToUpdate,
     },
     sql::{
         auth_service::SqlAuthServiceAuthenticateRequest,
         dataframe,
+        postgres::copy::MAX_LENGTH_METADATA,
         statement::{
             ApproximateCountDistinctVisitor, CastReplacer, RedshiftDatePartReplacer,
-            SensitiveDataSanitizer, ToTimestampReplacer, UdfWildcardArgReplacer,
+            SensitiveDataSanitizer, SqlParser062Normalizer, ToTimestampReplacer,
+            UdfWildcardArgReplacer,
         },
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
     transport::{MetaContext, SpanId},
 };
 use datafusion::{
+    arrow::datatypes::{DataType, Field, Schema, TimeUnit},
     logical_plan::{
         plan::{Analyze, Explain, ToStringifiedPlan},
         LogicalPlan, PlanType, ToDFSchema,
@@ -31,7 +39,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use itertools::Itertools;
-use sqlparser::ast::escape_single_quote_string;
+use sqlparser::ast::escape_quoted_string;
 
 #[derive(Clone)]
 pub struct QueryRouter {
@@ -91,7 +99,7 @@ impl QueryRouter {
     ) -> CompilationResult<QueryPlan> {
         let plan = match (stmt, &self.state.protocol) {
             (ast::Statement::Query(q), _) => {
-                if let ast::SetExpr::Select(select) = &q.body {
+                if let ast::SetExpr::Select(select) = &*q.body {
                     if let Some(into) = &select.into {
                         return self.select_into_to_plan(into, q, qtrace, span_id).await;
                     }
@@ -99,22 +107,26 @@ impl QueryRouter {
 
                 self.select_to_plan(stmt, qtrace, span_id.clone()).await
             }
-            (ast::Statement::SetTransaction { .. }, _) => Ok(QueryPlan::MetaTabular(
-                StatusFlags::empty(),
-                Box::new(dataframe::DataFrame::new(vec![], vec![])),
-            )),
-            (ast::Statement::SetRole { role_name, .. }, _) => {
+            (ast::Statement::Set(ast::Set::SetTransaction { .. }), _) => {
+                Ok(QueryPlan::MetaTabular(
+                    StatusFlags::empty(),
+                    Box::new(dataframe::DataFrame::new(vec![], vec![])),
+                ))
+            }
+            (ast::Statement::Set(ast::Set::SetRole { role_name, .. }), _) => {
                 self.set_role_to_plan(role_name).await
             }
-            (ast::Statement::SetVariable { key_values }, _) => {
-                self.set_variable_to_plan(&key_values).await
-            }
             (
-                ast::Statement::SetTimeZone {
-                    timezone, local, ..
-                },
+                ast::Statement::Set(
+                    set @ (ast::Set::SingleAssignment { .. }
+                    | ast::Set::ParenthesizedAssignments { .. }
+                    | ast::Set::MultipleAssignments { .. }),
+                ),
                 _,
-            ) => self.set_time_zone_to_plan(timezone, *local).await,
+            ) => self.set_variable_to_plan(set).await,
+            (ast::Statement::Set(ast::Set::SetTimeZone { value, local }), _) => {
+                self.set_time_zone_to_plan(value, *local).await
+            }
             (ast::Statement::ShowVariable { variable }, _) => {
                 self.show_variable_to_plan(variable, span_id.clone()).await
             }
@@ -146,7 +158,7 @@ impl QueryRouter {
                     CommandCompletion::Savepoint,
                 ))
             }
-            (ast::Statement::Release { .. }, DatabaseProtocol::PostgreSQL) => {
+            (ast::Statement::ReleaseSavepoint { .. }, DatabaseProtocol::PostgreSQL) => {
                 // TODO: Real support
                 Ok(QueryPlan::MetaOk(
                     StatusFlags::empty(),
@@ -163,25 +175,61 @@ impl QueryRouter {
                 ))
             }
             (
-                ast::Statement::CreateTable {
+                ast::Statement::CreateTable(ast::CreateTable {
                     query: Some(query),
                     name,
                     columns,
                     constraints,
-                    table_properties,
-                    with_options,
+                    table_options,
                     temporary,
+                    if_not_exists,
                     ..
-                },
+                }),
                 DatabaseProtocol::PostgreSQL,
             ) if columns.is_empty()
                 && constraints.is_empty()
-                && table_properties.is_empty()
-                && with_options.is_empty()
+                && matches!(table_options, ast::CreateTableOptions::None)
                 && *temporary =>
             {
                 let stmt = ast::Statement::Query(query.clone());
-                self.create_table_to_plan(name, &stmt, qtrace, span_id.clone())
+                self.create_table_to_plan(name, &stmt, *if_not_exists, qtrace, span_id.clone())
+                    .await
+            }
+            (
+                ast::Statement::CreateTable(ast::CreateTable {
+                    query: None,
+                    name,
+                    columns,
+                    constraints,
+                    table_options,
+                    temporary,
+                    on_commit,
+                    if_not_exists,
+                    ..
+                }),
+                DatabaseProtocol::PostgreSQL,
+            ) if !columns.is_empty()
+                && constraints.is_empty()
+                && matches!(table_options, ast::CreateTableOptions::None)
+                && *temporary =>
+            {
+                // Rows are always preserved: transactions are not implemented, so
+                // there is no point at which data could be dropped
+                match on_commit {
+                    None | Some(ast::OnCommit::PreserveRows) => (),
+                    Some(on_commit) => {
+                        return Err(CompilationError::unsupported(format!(
+                            "ON COMMIT {} is not supported for a temporary table",
+                            match on_commit {
+                                ast::OnCommit::DeleteRows => "DELETE ROWS",
+                                ast::OnCommit::Drop => "DROP",
+                                ast::OnCommit::PreserveRows => "PRESERVE ROWS",
+                            }
+                        )))
+                    }
+                }
+
+                self.create_empty_table_to_plan(name, columns, *if_not_exists)
                     .await
             }
             (
@@ -190,6 +238,20 @@ impl QueryRouter {
                 },
                 DatabaseProtocol::PostgreSQL,
             ) if object_type == &ast::ObjectType::Table => self.drop_table_to_plan(names).await,
+            (
+                ast::Statement::Copy {
+                    source,
+                    to,
+                    target,
+                    options,
+                    legacy_options,
+                    values,
+                },
+                DatabaseProtocol::PostgreSQL,
+            ) => {
+                self.copy_from_plan(source, *to, target, options, legacy_options, values)
+                    .await
+            }
             _ => Err(CompilationError::unsupported(format!(
                 "Unsupported query type: {stmt}"
             ))),
@@ -237,7 +299,7 @@ impl QueryRouter {
                 // TODO: column name might be expected to match variable name
                 &format!(
                     "SELECT setting FROM pg_catalog.pg_settings where name = '{}'",
-                    escape_single_quote_string(full_variable),
+                    escape_quoted_string(full_variable, '\''),
                 ),
                 self.state.protocol.clone(),
                 &mut None,
@@ -258,7 +320,10 @@ impl QueryRouter {
         let plan = self.plan_query(&statement, &mut None, None).await?;
 
         match plan {
-            QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => Ok(QueryPlan::MetaTabular(
+            QueryPlan::MetaOk(_, _)
+            | QueryPlan::MetaTabular(_, _)
+            | QueryPlan::CopyFrom(_)
+            | QueryPlan::CreateEmptyTempTable(_) => Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
                 Box::new(dataframe::DataFrame::new(
                     vec![dataframe::Column::new(
@@ -273,7 +338,7 @@ impl QueryRouter {
                 )),
             )),
             QueryPlan::DataFusionSelect(plan, context)
-            | QueryPlan::CreateTempTable(plan, context, _, _) => {
+            | QueryPlan::CreateTempTable(plan, context, _, _, _) => {
                 // EXPLAIN over CREATE TABLE AS shows the SELECT query plan
                 let plan = Arc::new(plan);
                 let schema = LogicalPlan::explain_schema();
@@ -313,7 +378,7 @@ impl QueryRouter {
         let flags = StatusFlags::SERVER_STATE_CHANGED;
         let username = role_name.as_ref().map(|role_name| role_name.value.clone());
         let Some(to_user) = username.clone().or_else(|| self.state.original_user()) else {
-            return Err(CompilationError::user(
+            return Err(CompilationError::internal(
                 "Cannot reset role when original role has not been set".to_string(),
             ));
         };
@@ -327,19 +392,51 @@ impl QueryRouter {
         Ok(QueryPlan::MetaOk(flags, CommandCompletion::Set))
     }
 
-    async fn set_variable_to_plan(
-        &self,
-        key_values: &Vec<ast::SetVariableKeyValue>,
-    ) -> Result<QueryPlan, CompilationError> {
+    async fn set_variable_to_plan(&self, set: &ast::Set) -> Result<QueryPlan, CompilationError> {
+        // Normalize the various sqlparser SET shapes into a flat list of (name, value-exprs).
+        let key_values: Vec<(String, &[ast::Expr])> = match set {
+            ast::Set::SingleAssignment {
+                variable, values, ..
+            } => vec![(variable.to_string(), values.as_slice())],
+            ast::Set::ParenthesizedAssignments { variables, values } => {
+                if variables.len() != values.len() {
+                    return Err(CompilationError::user(
+                        "SET (...) = (...) requires matching number of variables and values"
+                            .to_string(),
+                    ));
+                }
+
+                variables
+                    .iter()
+                    .zip(values.iter())
+                    .map(|(variable, value)| (variable.to_string(), std::slice::from_ref(value)))
+                    .collect()
+            }
+            ast::Set::MultipleAssignments { assignments } => assignments
+                .iter()
+                .map(|assignment| {
+                    (
+                        assignment.name.to_string(),
+                        std::slice::from_ref(&assignment.value),
+                    )
+                })
+                .collect(),
+            _ => {
+                return Err(CompilationError::unsupported(format!(
+                    "Unsupported SET statement: {set}"
+                )))
+            }
+        };
+
         let mut session_columns_to_update =
             DatabaseVariablesToUpdate::with_capacity(key_values.len());
 
         match self.state.protocol {
             DatabaseProtocol::PostgreSQL => {
-                for key_value in key_values.iter() {
-                    let value: String = match &key_value.value[0] {
-                        ast::Expr::Identifier(ident) => ident.value.to_string(),
-                        ast::Expr::Value(val) => match val {
+                for (key, exprs) in key_values.iter() {
+                    let value: String = match exprs.first() {
+                        Some(ast::Expr::Identifier(ident)) => ident.value.to_string(),
+                        Some(ast::Expr::Value(val)) => match &val.value {
                             ast::Value::SingleQuotedString(single_quoted_str) => {
                                 single_quoted_str.to_string()
                             }
@@ -349,21 +446,19 @@ impl QueryRouter {
                             ast::Value::Number(number, _) => number.to_string(),
                             _ => {
                                 return Err(CompilationError::user(format!(
-                                    "invalid {} variable format",
-                                    key_value.key.value
+                                    "invalid {key} variable format"
                                 )))
                             }
                         },
                         _ => {
                             return Err(CompilationError::user(format!(
-                                "invalid {} variable format",
-                                key_value.key.value
+                                "invalid {key} variable format"
                             )))
                         }
                     };
 
                     session_columns_to_update.push(DatabaseVariable::system(
-                        key_value.key.value.to_lowercase(),
+                        key.to_lowercase(),
                         ScalarValue::Utf8(Some(value.clone())),
                         None,
                     ));
@@ -452,7 +547,10 @@ impl QueryRouter {
 
         let timezone_str = match timezone {
             ast::Expr::Identifier(ident) => ident.value.to_string(),
-            ast::Expr::Value(ast::Value::SingleQuotedString(string)) => string.clone(),
+            ast::Expr::Value(ast::ValueWithSpan {
+                value: ast::Value::SingleQuotedString(string),
+                ..
+            }) => string.clone(),
             _ => {
                 return Err(CompilationError::unsupported(format!(
                     "Unsupported TimeZone value: {}",
@@ -471,7 +569,7 @@ impl QueryRouter {
     async fn change_user(&self, username: String) -> Result<(), CompilationError> {
         self.reauthenticate_if_needed().await?;
 
-        let auth_context = self.state.auth_context().ok_or(CompilationError::user(
+        let auth_context = self.state.auth_context().ok_or(CompilationError::internal(
             "No auth context set but tried to set current user".to_string(),
         ))?;
 
@@ -567,6 +665,7 @@ impl QueryRouter {
         &self,
         name: &ast::ObjectName,
         stmt: &ast::Statement,
+        if_not_exists: bool,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
     ) -> Result<QueryPlan, CompilationError> {
@@ -587,8 +686,15 @@ impl QueryRouter {
         Ok(QueryPlan::CreateTempTable(
             plan,
             ctx,
-            table_name.value.to_string(),
+            table_name
+                .as_ident()
+                .ok_or_else(|| {
+                    CompilationError::internal("table name is not a plain identifier".to_string())
+                })?
+                .value
+                .clone(),
             self.state.temp_tables(),
+            if_not_exists,
         ))
     }
 
@@ -606,7 +712,7 @@ impl QueryRouter {
         }
 
         let mut new_query = query.clone();
-        if let ast::SetExpr::Select(ref mut select) = new_query.body {
+        if let ast::SetExpr::Select(ref mut select) = *new_query.body {
             select.into = None
         } else {
             return Err(CompilationError::internal(
@@ -614,8 +720,181 @@ impl QueryRouter {
             ));
         }
         let new_stmt = ast::Statement::Query(Box::new(new_query));
-        self.create_table_to_plan(&into.name, &new_stmt, qtrace, span_id)
+        self.create_table_to_plan(&into.name, &new_stmt, false, qtrace, span_id)
             .await
+    }
+
+    /// Plan for `CREATE TEMPORARY TABLE t (a int, ...)`, which creates an empty
+    /// table to be filled by `COPY ... FROM STDIN`.
+    async fn create_empty_table_to_plan(
+        &self,
+        name: &ast::ObjectName,
+        columns: &[ast::ColumnDef],
+        if_not_exists: bool,
+    ) -> Result<QueryPlan, CompilationError> {
+        let table_name = table_name_from_object_name(name)?;
+
+        let mut fields = Vec::with_capacity(columns.len());
+        for column in columns {
+            let mut nullable = true;
+
+            for option in column.options.iter() {
+                match option.option {
+                    ast::ColumnOption::Null => (),
+                    ast::ColumnOption::NotNull => nullable = false,
+                    _ => {
+                        return Err(CompilationError::unsupported(format!(
+                            "Unsupported column option for a temporary table: {}",
+                            option
+                        )))
+                    }
+                }
+            }
+
+            let mut field = Field::new(
+                &normalize_ident(&column.name),
+                sql_type_to_arrow_type(&column.data_type)?,
+                nullable,
+            );
+
+            // The width of a character type is not part of the Arrow type, and has to
+            // travel with the field for COPY to enforce it
+            if let Some(length) = character_length(&column.data_type) {
+                field = field.with_metadata(Some(BTreeMap::from([(
+                    MAX_LENGTH_METADATA.to_string(),
+                    length.to_string(),
+                )])));
+            }
+
+            fields.push(field);
+        }
+
+        // The table is saved when the plan is executed, and not here: planning also
+        // happens for Parse, Bind and EXPLAIN, none of which may leave a table behind
+        Ok(QueryPlan::CreateEmptyTempTable(Box::new(
+            CreateEmptyTempTablePlan {
+                table_name,
+                schema: Arc::new(Schema::new(fields)),
+                if_not_exists,
+                temp_tables: self.state.temp_tables(),
+            },
+        )))
+    }
+
+    /// Plan for `COPY ... FROM STDIN`. Cubes are read-only, so a temporary table
+    /// of the current session is the only place the data can be loaded into.
+    async fn copy_from_plan(
+        &self,
+        source: &ast::CopySource,
+        to: bool,
+        target: &ast::CopyTarget,
+        options: &[ast::CopyOption],
+        legacy_options: &[ast::CopyLegacyOption],
+        values: &[Option<String>],
+    ) -> Result<QueryPlan, CompilationError> {
+        if to {
+            return Err(CompilationError::unsupported(
+                "COPY TO is not supported, only COPY ... FROM STDIN".to_string(),
+            ));
+        }
+
+        if !matches!(target, ast::CopyTarget::Stdin) {
+            return Err(CompilationError::unsupported(format!(
+                "COPY FROM {} is not supported, only COPY ... FROM STDIN",
+                target
+            )));
+        }
+
+        if !values.is_empty() {
+            return Err(CompilationError::unsupported(
+                "COPY data in the statement itself is not supported, send it as a data stream"
+                    .to_string(),
+            ));
+        }
+
+        // The parser rejects a query as the source of COPY FROM
+        let ast::CopySource::Table {
+            table_name,
+            columns,
+        } = source
+        else {
+            return Err(CompilationError::internal(
+                "COPY FROM must have a table as its target".to_string(),
+            ));
+        };
+
+        let table_name = table_name_from_object_name(table_name)?;
+        let temp_tables = self.state.temp_tables();
+        let Some(temp_table) = temp_tables.get(&table_name) else {
+            return Err(CompilationError::user(format!(
+                "COPY FROM STDIN is only supported for temporary tables, and temporary table \"{}\" does not exist in this session",
+                table_name
+            )));
+        };
+
+        let schema = temp_table.schema();
+        let column_index = |column: &ast::Ident| {
+            let column = normalize_ident(column);
+
+            schema.index_of(&column).map_err(|_| {
+                CompilationError::user(format!(
+                    r#"column "{}" of relation "{}" does not exist"#,
+                    column, table_name
+                ))
+            })
+        };
+
+        let column_indices = match columns.is_empty() {
+            true => (0..schema.fields().len()).collect(),
+            false => {
+                let indices = columns
+                    .iter()
+                    .map(column_index)
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                for (position, index) in indices.iter().enumerate() {
+                    if indices[..position].contains(index) {
+                        return Err(CompilationError::user(format!(
+                            r#"column "{}" is specified more than once"#,
+                            schema.field(*index).name()
+                        )));
+                    }
+                }
+
+                indices
+            }
+        };
+
+        let options = CopyOptions::parse(options, legacy_options)?;
+        for (name, columns) in [
+            ("FORCE_NOT_NULL", &options.force_not_null),
+            ("FORCE_NULL", &options.force_null),
+        ] {
+            for column in columns {
+                let index = schema.index_of(column).map_err(|_| {
+                    CompilationError::user(format!(
+                        r#"column "{}" of relation "{}" does not exist"#,
+                        column, table_name
+                    ))
+                })?;
+
+                // The option speaks about a column the copy loads, and only those
+                if !column_indices.contains(&index) {
+                    return Err(CompilationError::user(format!(
+                        r#"{} column "{}" not referenced by COPY"#,
+                        name, column
+                    )));
+                }
+            }
+        }
+
+        Ok(QueryPlan::CopyFrom(Box::new(CopyFromPlan {
+            table_name,
+            schema,
+            column_indices,
+            options,
+            temp_tables: self.state.temp_tables(),
+        })))
     }
 
     async fn drop_table_to_plan(
@@ -633,12 +912,17 @@ impl QueryRouter {
                 "table name contains no ident parts".to_string(),
             ));
         };
-        let table_name_lower = table_name.value.to_ascii_lowercase();
+        let table_name_lower = table_name
+            .as_ident()
+            .ok_or_else(|| {
+                CompilationError::internal("table name is not a plain identifier".to_string())
+            })?
+            .value
+            .to_ascii_lowercase();
         let temp_tables = self.state.temp_tables();
         tokio::task::spawn_blocking(move || temp_tables.remove(&table_name_lower))
             .await
-            .map_err(|err| CompilationError::internal(err.to_string()))?
-            .map_err(|err| CompilationError::internal(err.to_string()))?;
+            .map_err(|err| CompilationError::internal(err.to_string()))??;
         let flags = StatusFlags::empty();
         Ok(QueryPlan::MetaOk(flags, CommandCompletion::DropTable))
     }
@@ -675,7 +959,7 @@ impl QueryRouter {
     ) -> CompilationResult<QueryPlan> {
         self.reauthenticate_if_needed().await?;
         match &stmt {
-            ast::Statement::Query(query) => match &query.body {
+            ast::Statement::Query(query) => match &*query.body {
                 ast::SetExpr::Select(select) if select.into.is_some() => {
                     return Err(CompilationError::unsupported(
                         "Unsupported query type: SELECT INTO".to_string(),
@@ -695,7 +979,136 @@ impl QueryRouter {
     }
 }
 
+/// Name of a table or a column as it is stored. Unquoted identifiers are
+/// case-insensitive in PostgreSQL, and are folded to lower case.
+pub fn normalize_ident(ident: &ast::Ident) -> String {
+    match ident.quote_style {
+        Some(_) => ident.value.clone(),
+        None => ident.value.to_ascii_lowercase(),
+    }
+}
+
+fn table_name_from_object_name(name: &ast::ObjectName) -> Result<String, CompilationError> {
+    let ast::ObjectName(ident_parts) = name;
+    let Some(table_name) = ident_parts.last() else {
+        return Err(CompilationError::internal(
+            "table name contains no ident parts".to_string(),
+        ));
+    };
+
+    let table_name = table_name.as_ident().ok_or_else(|| {
+        CompilationError::internal("table name is not a plain identifier".to_string())
+    })?;
+
+    Ok(normalize_ident(table_name))
+}
+
+/// Declared width of a character type, which PostgreSQL enforces when data is loaded.
+fn character_length(data_type: &ast::DataType) -> Option<u64> {
+    let length = match data_type {
+        ast::DataType::CharVarying(length)
+        | ast::DataType::CharacterVarying(length)
+        | ast::DataType::Varchar(length)
+        | ast::DataType::Nvarchar(length) => length.as_ref()?,
+        _ => return None,
+    };
+
+    match length {
+        ast::CharacterLength::IntegerLength { length, .. } => Some(*length),
+        ast::CharacterLength::Max => None,
+    }
+}
+
+/// The widest NUMERIC a temporary table can hold: values are stored as 128-bit
+/// decimals, which is narrower than what PostgreSQL supports.
+const MAX_DECIMAL_PRECISION: usize = 38;
+
+fn decimal_precision(precision: u64) -> Result<usize, CompilationError> {
+    if precision < 1 || precision as usize > MAX_DECIMAL_PRECISION {
+        return Err(CompilationError::unsupported(format!(
+            "NUMERIC precision {} must be between 1 and {}",
+            precision, MAX_DECIMAL_PRECISION
+        )));
+    }
+
+    Ok(precision as usize)
+}
+
+/// Type of a column of a temporary table. Only types which `COPY` can load are
+/// accepted, so that a table can never be created that cannot be filled.
+fn sql_type_to_arrow_type(data_type: &ast::DataType) -> Result<DataType, CompilationError> {
+    let arrow_type = match data_type {
+        ast::DataType::Bool | ast::DataType::Boolean => DataType::Boolean,
+        ast::DataType::SmallInt(_) | ast::DataType::Int2(_) => DataType::Int16,
+        ast::DataType::Int(_) | ast::DataType::Integer(_) | ast::DataType::Int4(_) => {
+            DataType::Int32
+        }
+        ast::DataType::BigInt(_) | ast::DataType::Int8(_) => DataType::Int64,
+        ast::DataType::Real | ast::DataType::Float4 => DataType::Float32,
+        ast::DataType::Double(_) | ast::DataType::DoublePrecision | ast::DataType::Float8 => {
+            DataType::Float64
+        }
+        ast::DataType::Float(precision) => match precision {
+            ast::ExactNumberInfo::Precision(precision) if *precision <= 24 => DataType::Float32,
+            _ => DataType::Float64,
+        },
+        ast::DataType::Decimal(info) | ast::DataType::Numeric(info) => match info {
+            ast::ExactNumberInfo::None => DataType::Decimal(MAX_DECIMAL_PRECISION, 10),
+            ast::ExactNumberInfo::Precision(precision) => {
+                DataType::Decimal(decimal_precision(*precision)?, 0)
+            }
+            ast::ExactNumberInfo::PrecisionAndScale(precision, scale) => {
+                let precision = decimal_precision(*precision)?;
+                let scale = *scale as usize;
+
+                if scale > precision {
+                    return Err(CompilationError::unsupported(format!(
+                        "NUMERIC scale {} must not exceed the precision {}",
+                        scale, precision
+                    )));
+                }
+
+                DataType::Decimal(precision, scale)
+            }
+        },
+        ast::DataType::CharVarying(_)
+        | ast::DataType::CharacterVarying(_)
+        | ast::DataType::Varchar(_)
+        | ast::DataType::Nvarchar(_)
+        | ast::DataType::Text
+        | ast::DataType::String(_)
+        | ast::DataType::Uuid
+        | ast::DataType::JSON
+        | ast::DataType::JSONB => DataType::Utf8,
+        // A fixed width character type is blank padded to its width, and its trailing
+        // blanks do not count in comparisons: a text column carries neither
+        ast::DataType::Char(_) | ast::DataType::Character(_) => {
+            return Err(CompilationError::unsupported(format!(
+                "Unsupported column type for a temporary table: {}, use VARCHAR or TEXT",
+                data_type
+            )))
+        }
+        ast::DataType::Date => DataType::Date32,
+        // A time zone changes what the values of the column mean, so a column which
+        // asks for one is refused rather than quietly stored without it
+        ast::DataType::Timestamp(
+            _,
+            ast::TimezoneInfo::None | ast::TimezoneInfo::WithoutTimeZone,
+        ) => DataType::Timestamp(TimeUnit::Nanosecond, None),
+        ast::DataType::Datetime(_) => DataType::Timestamp(TimeUnit::Nanosecond, None),
+        other => {
+            return Err(CompilationError::unsupported(format!(
+                "Unsupported column type for a temporary table: {}",
+                other
+            )))
+        }
+    };
+
+    Ok(arrow_type)
+}
+
 pub fn rewrite_statement(stmt: ast::Statement) -> ast::Statement {
+    let stmt = SqlParser062Normalizer::new().replace(stmt);
     let stmt = CastReplacer::new().replace(stmt);
     let stmt = ToTimestampReplacer::new().replace(stmt);
     let stmt = UdfWildcardArgReplacer::new().replace(stmt);

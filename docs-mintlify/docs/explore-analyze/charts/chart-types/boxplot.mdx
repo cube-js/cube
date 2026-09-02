@@ -1,0 +1,32 @@
+---
+title: Boxplot
+description: Display the statistical distribution of a measure across categories using box-and-whisker plots.
+---
+
+Boxplots summarize the distribution of a numeric measure per category, showing the median, interquartile range, and outliers in a single mark. Use them to compare spread and skew across groups rather than just averages.
+
+## Variant
+
+### Box-and-whisker
+
+One dimension on the X axis groups the data into categories. One measure on the Y axis provides the raw values. The chart computes the distribution statistics internally.
+
+{/* Screenshot: boxplot — sale price distribution by product category (5–6 boxes with visible whiskers and outlier points). Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Reading a boxplot
+
+{/* Screenshot: annotated single box with labels pointing to the box, center line, whiskers, and outlier points. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+| Element | Description |
+|---|---|
+| **Box** | Interquartile range — 25th to 75th percentile |
+| **Center line** | Median (50th percentile) |
+| **Whiskers** | Extend to min/max within 1.5× the IQR |
+| **Points** | Values beyond the whiskers (outliers) |
+
+## Data structure
+
+Boxplots require **raw, row-level data** — each row is one observation. Do not pre-aggregate before using a boxplot; the chart engine computes the distribution itself.
+
+- **X axis** — the grouping dimension (e.g. product category)
+- **Y axis** — the measure to distribute (e.g. sale price)

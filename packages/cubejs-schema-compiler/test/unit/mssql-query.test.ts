@@ -121,11 +121,9 @@ describe('MssqlQuery', () => {
       const queryAndParams = query.buildSqlAndParams();
 
       const queryString = queryAndParams[0];
-      const lastGroupByIdx = queryString.lastIndexOf('GROUP BY');
-      const queryCloseIdx = queryString.indexOf(')', lastGroupByIdx + 1);
-      const finalGroupBy = queryString.substring(lastGroupByIdx, queryCloseIdx);
-
-      expect(finalGroupBy).toEqual('GROUP BY "visitors.createdAt_series"."date_from"');
+      // The native planner groups by the calculated-granularity expression
+      // directly (the legacy planner grouped by a time-series CTE alias).
+      expect(queryString).toContain('GROUP BY dateadd(week, DATEDIFF(week, 0, CAST("visitors".created_at AT TIME ZONE \'UTC\' AT TIME ZONE \'Pacific Standard Time\' AS DATETIME2)), 0)');
     }));
 
   it('should group by both time and regular dimensions on rolling windows',
@@ -154,11 +152,9 @@ describe('MssqlQuery', () => {
       const queryAndParams = query.buildSqlAndParams();
 
       const queryString = queryAndParams[0];
-      const lastGroupByIdx = queryString.lastIndexOf('GROUP BY');
-      const queryCloseIdx = queryString.indexOf(')', lastGroupByIdx + 1);
-      const finalGroupBy = queryString.substring(lastGroupByIdx, queryCloseIdx);
-
-      expect(finalGroupBy).toEqual('GROUP BY "visitors.createdAt_series"."date_from", "visitors__source"');
+      // The native planner groups by the regular dimension and the
+      // calculated-granularity expression (legacy used a time-series CTE alias).
+      expect(queryString).toContain('GROUP BY "visitors".source, dateadd(week, DATEDIFF(week, 0, CAST("visitors".created_at AT TIME ZONE \'UTC\' AT TIME ZONE \'Pacific Standard Time\' AS DATETIME2)), 0)');
     }));
 
   it('should not include order by clauses in subqueries',
@@ -199,6 +195,194 @@ describe('MssqlQuery', () => {
 
       expect(/GROUP BY/.test(queryString)).toEqual(false);
     }));
+
+  it('renders rowLimit: 0 as TOP 0 without an invalid FETCH NEXT 0', async () => {
+    await compiler.compile();
+
+    // With an ORDER BY the template would normally emit OFFSET/FETCH NEXT, but T-SQL
+    // rejects `FETCH NEXT 0 ROWS ONLY`, so a zero limit has to go through TOP
+    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['visitors.count'],
+      dimensions: ['visitors.source'],
+      order: [{ id: 'visitors.source', desc: false }],
+      timezone: 'UTC',
+      rowLimit: 0,
+    });
+
+    const sql = query.buildSqlAndParams()[0];
+
+    expect(sql).toContain('TOP 0');
+    expect(sql).not.toContain('FETCH NEXT');
+  });
+
+  it('renders rowLimit: 0 with an offset as TOP 0 and no OFFSET tail', async () => {
+    await compiler.compile();
+
+    // T-SQL forbids TOP together with OFFSET/FETCH, and a zero limit yields no rows
+    // whatever the offset is, so the whole OFFSET/FETCH tail has to go
+    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['visitors.count'],
+      dimensions: ['visitors.source'],
+      order: [{ id: 'visitors.source', desc: false }],
+      timezone: 'UTC',
+      rowLimit: 0,
+      offset: 10,
+    });
+
+    const sql = query.buildSqlAndParams()[0];
+
+    expect(sql).toContain('TOP 0');
+    expect(sql).not.toContain('FETCH NEXT');
+    expect(sql).not.toContain('OFFSET');
+  });
+
+  it('still renders OFFSET/FETCH NEXT for a non-zero rowLimit with an offset', async () => {
+    await compiler.compile();
+
+    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['visitors.count'],
+      dimensions: ['visitors.source'],
+      order: [{ id: 'visitors.source', desc: false }],
+      timezone: 'UTC',
+      rowLimit: 5,
+      offset: 10,
+    });
+
+    const sql = query.buildSqlAndParams()[0];
+
+    expect(sql).toContain('OFFSET 10 ROWS');
+    expect(sql).toContain('FETCH NEXT 5 ROWS ONLY');
+    expect(sql).not.toContain('TOP');
+  });
+
+  it('renders DISTINCT before TOP in the select template', async () => {
+    await compiler.compile();
+
+    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['visitors.count'],
+      timezone: 'UTC',
+      rowLimit: 0,
+    });
+
+    // T-SQL clause order is SELECT [ALL | DISTINCT] [TOP (expr)], so `SELECT TOP 0 DISTINCT`
+    // is a syntax error. A single select carrying both is reachable through the cubesql
+    // wrapper (`SELECT DISTINCT ... LIMIT 0`), which can't be built from here, so the
+    // template itself is what gets pinned
+    const { select } = query.sqlTemplates().statements;
+
+    expect(select).toContain('DISTINCT');
+    expect(select).toContain('TOP');
+    expect(select.indexOf('DISTINCT')).toBeLessThan(select.indexOf('TOP'));
+  });
+
+  it('keeps rowLimit: 0 out of the legacy limit clauses', async () => {
+    await compiler.compile();
+
+    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['visitors.count'],
+      timezone: 'UTC',
+      rowLimit: 0,
+      offset: 10,
+    });
+
+    expect(query.topLimit()).toEqual(' TOP 0');
+    expect(query.groupByDimensionLimit()).toEqual('');
+    // The legacy rollup query in PreAggregations renders no topLimit(), so the zero limit
+    // has to come from this hook or that statement would scan the whole rollup
+    expect(query.zeroRowLimitTopClause()).toEqual(' TOP 0');
+  });
+
+  it('renders no leading zero-limit clause for a non-zero rowLimit', async () => {
+    await compiler.compile();
+
+    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['visitors.count'],
+      timezone: 'UTC',
+      rowLimit: 5,
+    });
+
+    expect(query.zeroRowLimitTopClause()).toEqual('');
+  });
+
+  it('renders TOP 0 in the legacy-planner pre-aggregation rollup query', async () => {
+    // The rollup statement in PreAggregations renders no topLimit(), and T-SQL cannot put a
+    // zero limit in a trailing clause, so without zeroRowLimitTopClause() a `rowLimit: 0`
+    // query served from a pre-aggregation would scan the whole rollup
+    const preAggCompilers = prepareJsCompiler(`
+      cube('visits', {
+        sql: 'SELECT * FROM visits',
+
+        preAggregations: {
+          bySource: {
+            measures: [CUBE.count],
+            dimensions: [CUBE.source],
+          },
+        },
+
+        measures: {
+          count: { type: 'count' },
+        },
+
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          source: { sql: 'source', type: 'string' },
+        },
+      });
+    `);
+    await preAggCompilers.compiler.compile();
+
+    const queryOptions = {
+      measures: ['visits.count'],
+      dimensions: ['visits.source'],
+      timezone: 'UTC',
+      useNativeSqlPlanner: false,
+      preAggregationsSchema: '',
+    };
+
+    const zeroLimit = new MssqlQuery({
+      joinGraph: preAggCompilers.joinGraph,
+      cubeEvaluator: preAggCompilers.cubeEvaluator,
+      compiler: preAggCompilers.compiler,
+    }, { ...queryOptions, rowLimit: 0 });
+
+    const zeroLimitSql = zeroLimit.buildSqlAndParams()[0];
+
+    expect(zeroLimit.preAggregations.findPreAggregationForQuery()).toBeDefined();
+    expect(zeroLimitSql).toContain('TOP 0');
+
+    const nonZeroLimit = new MssqlQuery({
+      joinGraph: preAggCompilers.joinGraph,
+      cubeEvaluator: preAggCompilers.cubeEvaluator,
+      compiler: preAggCompilers.compiler,
+    }, { ...queryOptions, rowLimit: 5 });
+
+    // Non-zero limits keep their existing rendering on this path
+    expect(nonZeroLimit.buildSqlAndParams()[0]).not.toContain('TOP 0');
+  });
+
+  it('keeps DISTINCT and TOP 0 in a valid order for a multiplied-measure query', async () => {
+    await joinedSchemaCompilers.compiler.compile();
+
+    // Multiplied measures make the full-key-aggregate path emit DISTINCT keys sub-selects
+    // alongside the TOP 0 outer select
+    const query = new MssqlQuery({
+      joinGraph: joinedSchemaCompilers.joinGraph,
+      cubeEvaluator: joinedSchemaCompilers.cubeEvaluator,
+      compiler: joinedSchemaCompilers.compiler,
+    }, {
+      measures: ['B.bval_sum', 'C.count'],
+      dimensions: ['B.bid'],
+      order: [{ id: 'B.bid', desc: false }],
+      timezone: 'UTC',
+      rowLimit: 0,
+    });
+
+    const sql = query.buildSqlAndParams()[0];
+
+    expect(sql).toContain('TOP 0');
+    expect(sql).toContain('DISTINCT');
+    expect(sql).not.toMatch(/TOP\s+0\s+DISTINCT/);
+  });
 
   it('aggregating on top of sub-queries', async () => {
     await joinedSchemaCompilers.compiler.compile();

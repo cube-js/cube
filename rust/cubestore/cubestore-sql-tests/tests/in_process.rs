@@ -20,7 +20,9 @@ fn main() {
                 prefix,
                 service: services.sql_service,
             }))
-            .await;
+            .await
+            .unwrap();
+            Ok(())
         }));
     });
 }

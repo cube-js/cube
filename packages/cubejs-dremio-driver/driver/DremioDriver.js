@@ -7,10 +7,10 @@
 const {
   getEnv,
   assertDataSource,
+  formatAnsi,
   pausePromise,
 } = require('@cubejs-backend/shared');
 const axios = require('axios');
-const SqlString = require('sqlstring');
 const { BaseDriver } = require('@cubejs-backend/base-driver');
 const DremioQuery = require('./DremioQuery');
 
@@ -18,7 +18,7 @@ const DremioQuery = require('./DremioQuery');
 // @see https://docs.dremio.com/rest-api/jobs/get-job.html
 const DREMIO_JOB_LIMIT = 500;
 
-const applyParams = (query, params) => SqlString.format(query, params);
+const applyParams = (query, params) => formatAnsi(query, params);
 
 /**
  * Dremio driver class.
@@ -47,45 +47,46 @@ class DremioDriver extends BaseDriver {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     this.config = {
       dbUrl:
         config.dbUrl ||
-        getEnv('dbUrl', { dataSource }) ||
+        getEnv('dbUrl', { dataSource, preAggregations }) ||
         '',
       dremioAuthToken:
         config.dremioAuthToken ||
-        getEnv('dremioAuthToken', { dataSource }) ||
+        getEnv('dremioAuthToken', { dataSource, preAggregations }) ||
         '',
       host:
         config.host ||
-        getEnv('dbHost', { dataSource }) ||
+        getEnv('dbHost', { dataSource, preAggregations }) ||
         'localhost',
       port:
         config.port ||
-        getEnv('dbPort', { dataSource }) ||
+        getEnv('dbPort', { dataSource, preAggregations }) ||
         9047,
       user:
         config.user ||
-        getEnv('dbUser', { dataSource }),
+        getEnv('dbUser', { dataSource, preAggregations }),
       password:
         config.password ||
-        getEnv('dbPass', { dataSource }),
+        getEnv('dbPass', { dataSource, preAggregations }),
       database:
         config.database ||
-        getEnv('dbName', { dataSource }),
+        getEnv('dbName', { dataSource, preAggregations }),
       ssl:
         config.ssl ||
-        getEnv('dbSsl', { dataSource }),
+        getEnv('dbSsl', { dataSource, preAggregations }),
       ...config,
       pollTimeout: (
         config.pollTimeout ||
-        getEnv('dbPollTimeout', { dataSource }) ||
-        getEnv('dbQueryTimeout', { dataSource })
+        getEnv('dbPollTimeout', { dataSource, preAggregations }) ||
+        getEnv('dbQueryTimeout', { dataSource, preAggregations })
       ) * 1000,
       pollMaxInterval: (
         config.pollMaxInterval ||
-        getEnv('dbPollMaxInterval', { dataSource })
+        getEnv('dbPollMaxInterval', { dataSource, preAggregations })
       ) * 1000,
     };
 
@@ -207,12 +208,7 @@ class DremioDriver extends BaseDriver {
   }
 
   async query(query, values) {
-    const queryString = applyParams(
-      query,
-      (values || []).map(s => (typeof s === 'string' ? {
-        toSqlString: () => SqlString.escape(s).replace(/\\\\([_%])/g, '\\$1').replace(/\\'/g, '\'\'')
-      } : s))
-    );
+    const queryString = applyParams(query, values || []);
 
     await this.getToken();
     const jobId = await this.executeQuery(queryString);
@@ -280,3 +276,4 @@ class DremioDriver extends BaseDriver {
 }
 
 module.exports = DremioDriver;
+module.exports.applyParams = applyParams;

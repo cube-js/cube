@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/cubestore/basic.rs
+expression: result
+---
+visitors__source | visitors__count
+-----------------+----------------
+google           | 5              
+organic          | 2              
+twitter          | 2              
+NULL             | 1

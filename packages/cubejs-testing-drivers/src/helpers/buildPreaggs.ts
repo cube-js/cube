@@ -58,43 +58,103 @@ export async function buildPreaggs(
       '/cubejs-api/v1/pre-aggregations/jobs',
       token,
       { action: 'post', selector },
-    ).then((post) => {
-      readData(post).then((_jobs) => {
-        const jobs = <string[]>JSON.parse(_jobs.toString());
-        if (jobs.length === 0) {
-          resolve(true);
-        } else {
-          const interval = setInterval(async () => {
-            const inProcess = [];
-            const get = await postRequest(
-              port,
-              '/cubejs-api/v1/pre-aggregations/jobs',
-              token,
-              { action: 'get', resType: 'object', tokens: jobs },
-            );
-            const statuses = JSON.parse((await readData(get)).toString());
-            Object.keys(statuses).forEach((t: string) => {
-              const { status } = statuses[t];
-              if (status.indexOf('failure') >= 0) {
-                reject(`Cube pre-aggregations build failed: ${status}`);
-              }
-              if (status !== 'done' && status !== 'missing_partition') {
-                inProcess.push(t);
-              }
-            });
-            if (inProcess.length === 0) {
-              clearInterval(interval);
-              resolve(true);
-            }
-          }, 1000);
-
-          setTimeout(() => {
-            clearInterval(interval);
-            reject('Cube pre-aggregations build failed: timeout.');
-          }, 120000);
+    ).then((post) => readData(post)).then((_body) => {
+      const body = _body.toString();
+      let jobs: string[];
+      // Nothing downstream settles the outer promise, and the 120s backstop below
+      // is only armed once there are tokens to poll, so a body that is not JSON at
+      // all - a proxy error page, or an empty response from a cube that died during
+      // startup - would otherwise hang the build until jest's own timeout without
+      // ever printing the response.
+      try {
+        jobs = JSON.parse(body);
+      } catch (e) {
+        reject(`Cube pre-aggregations build failed, response was not JSON: ${body}`);
+        return;
+      }
+      // A rejected selector (e.g. naming a pre-aggregation the fixture does not
+      // declare) answers with an error object rather than a token array. Without
+      // this check that object is forwarded as `tokens` on the next request and
+      // the build dies 120s later on an unrelated complaint about `tokens`, hiding
+      // the selector that actually failed.
+      if (!Array.isArray(jobs)) {
+        reject(`Cube pre-aggregations build failed: ${body}`);
+        return;
+      }
+      if (jobs.length === 0) {
+        resolve(true);
+        return;
+      }
+      let timeout: NodeJS.Timeout;
+      // Every path that settles the outer promise goes through this, so neither the
+      // poll nor the backstop outlives the result.
+      let stop: () => void;
+      const interval = setInterval(async () => {
+        const inProcess = [];
+        let statusBody = '';
+        let statuses: any;
+        // Same reasoning as the parse above, one round later: a throw in here is an
+        // unhandled rejection inside the interval callback, so the build would go on
+        // polling and only die on the 120s backstop below with `timeout.` as its
+        // whole explanation.
+        try {
+          const get = await postRequest(
+            port,
+            '/cubejs-api/v1/pre-aggregations/jobs',
+            token,
+            { action: 'get', resType: 'object', tokens: jobs },
+          );
+          statusBody = (await readData(get)).toString();
+          statuses = JSON.parse(statusBody);
+        } catch (e) {
+          stop();
+          reject(`Cube pre-aggregations build failed: ${statusBody || e}`);
+          return;
         }
-      });
-    });
+        // An error response ({"error": "..."}) has no per-token job objects, so
+        // reading `status` off it would throw an opaque TypeError from inside this
+        // interval and leave the build to fail by timeout with the actual cause
+        // never surfacing. Reject with the body instead.
+        if (statuses.error) {
+          stop();
+          reject(`Cube pre-aggregations build failed: ${statusBody}`);
+          return;
+        }
+        // Checked before the tally rather than inside it: a `failure` status is
+        // neither `done` nor `missing_partition`, so rejecting from within the loop
+        // left `inProcess` non-empty and both timers armed, and the helper went on
+        // polling for the remaining ~120s after the promise had already settled -
+        // interleaving its noise with the output someone is reading to find out why
+        // the build failed.
+        const failed = Object.keys(statuses).find(
+          (t: string) => statuses[t].status.indexOf('failure') >= 0
+        );
+        if (failed) {
+          stop();
+          reject(`Cube pre-aggregations build failed: ${statuses[failed].status}`);
+          return;
+        }
+        Object.keys(statuses).forEach((t: string) => {
+          const { status } = statuses[t];
+          if (status !== 'done' && status !== 'missing_partition') {
+            inProcess.push(t);
+          }
+        });
+        if (inProcess.length === 0) {
+          stop();
+          resolve(true);
+        }
+      }, 1000);
+
+      stop = () => {
+        clearInterval(interval);
+        clearTimeout(timeout);
+      };
+      timeout = setTimeout(() => {
+        clearInterval(interval);
+        reject('Cube pre-aggregations build failed: timeout.');
+      }, 120000);
+    }).catch(reject);
   });
 }
 
@@ -118,40 +178,61 @@ export async function hookPreaggs(
     );
 
   return new Promise((resolve, reject) => {
+    let timeout: NodeJS.Timeout;
+    let stop: () => void;
     const interval = setInterval(async () => {
-      const inProcess = [];
-      const selectors: {
+      let selectors: {
         token: string,
         table: string,
         status: string,
         selector: any,
-      }[] = await core
-        .apiGateway()
-        .preAggregationsJobsGET(
-          {
-            authInfo: { tenantId: 'tenant1' },
-            securityContext: { tenantId: 'tenant1' },
-            requestId: 'XXX',
-          },
-          tokens,
-        );
-  
-      selectors.forEach((info) => {
-        const { status } = info;
-        if (status.indexOf('failure') >= 0) {
-          reject(`Cube pre-aggregations build failed: ${status}`);
-        }
-        if (status !== 'done' && status !== 'missing_partition') {
-          inProcess.push(info);
-        }
-        if (inProcess.length === 0) {
-          clearInterval(interval);
-          resolve(true);
-        }
-      });
+      }[];
+      // Without this the orchestrator and compiler errors this call can raise are
+      // unhandled rejections thrown out of an async interval callback: `stop()`
+      // never runs, the poll carries on, and the build dies 60s later on `timeout.`
+      // with the real error never printed. Mirrors the guard in `buildPreaggs`.
+      try {
+        selectors = await core
+          .apiGateway()
+          .preAggregationsJobsGET(
+            {
+              authInfo: { tenantId: 'tenant1' },
+              securityContext: { tenantId: 'tenant1' },
+              requestId: 'XXX',
+            },
+            tokens,
+          );
+      } catch (e) {
+        stop();
+        reject(`Cube pre-aggregations build failed: ${e}`);
+        return;
+      }
+
+      const failed = selectors.find((info) => info.status.indexOf('failure') >= 0);
+      if (failed) {
+        stop();
+        reject(`Cube pre-aggregations build failed: ${failed.status}`);
+        return;
+      }
+      // Counted over the whole array rather than inside a loop over it.
+      // `postBuildJobs` returns one token per partition, and the tally used to be
+      // tested after each element, so a first token reporting `done` resolved the
+      // build while later partitions were still scheduled - and the suite then
+      // queried a rollup table that did not exist yet.
+      const inProcess = selectors.filter(
+        (info) => info.status !== 'done' && info.status !== 'missing_partition'
+      );
+      if (inProcess.length === 0) {
+        stop();
+        resolve(true);
+      }
     }, 1000);
 
-    setTimeout(() => {
+    stop = () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+    timeout = setTimeout(() => {
       clearInterval(interval);
       reject('Cube pre-aggregations build failed: timeout.');
     }, 60000);

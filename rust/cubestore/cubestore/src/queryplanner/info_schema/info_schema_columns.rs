@@ -3,7 +3,7 @@ use crate::metastore::Column;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
-use datafusion::arrow::array::{ArrayRef, StringArray};
+use datafusion::arrow::array::{ArrayRef, StringBuilder};
 use datafusion::arrow::datatypes::{DataType, Field};
 use std::sync::Arc;
 
@@ -17,7 +17,7 @@ impl InfoSchemaTableDef for ColumnsInfoSchemaTableDef {
         &self,
         ctx: InfoSchemaTableDefContext,
         _limit: Option<usize>,
-    ) -> Result<Arc<Vec<(Column, TablePath)>>, CubeError> {
+    ) -> Result<Vec<(Column, TablePath)>, CubeError> {
         let rows = ctx.meta_store.get_tables_with_path(false).await?;
         let mut res = Vec::new();
 
@@ -28,7 +28,7 @@ impl InfoSchemaTableDef for ColumnsInfoSchemaTableDef {
             }
         }
 
-        Ok(Arc::new(res))
+        Ok(res)
     }
 
     fn schema(&self) -> Vec<Field> {
@@ -40,34 +40,25 @@ impl InfoSchemaTableDef for ColumnsInfoSchemaTableDef {
         ]
     }
 
-    fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<(Column, TablePath)>>) -> ArrayRef>> {
+    fn columns(&self, rows: Vec<(Column, TablePath)>) -> Vec<ArrayRef> {
+        let num_rows = rows.len();
+        let mut schema_builder = StringBuilder::with_capacity(num_rows, num_rows * 32);
+        let mut table_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut column_builder = StringBuilder::with_capacity(num_rows, num_rows * 32);
+        let mut type_builder = StringBuilder::with_capacity(num_rows, num_rows * 16);
+
+        for (column, table_path) in rows.into_iter() {
+            schema_builder.append_value(table_path.schema.get_row().get_name());
+            table_builder.append_value(table_path.table.get_row().get_table_name());
+            column_builder.append_value(column.get_name());
+            type_builder.append_value(column.get_column_type().to_string());
+        }
+
         vec![
-            Box::new(|tables| {
-                Arc::new(StringArray::from_iter_values(
-                    tables
-                        .iter()
-                        .map(|(_, row)| row.schema.get_row().get_name()),
-                ))
-            }),
-            Box::new(|tables| {
-                Arc::new(StringArray::from_iter_values(
-                    tables
-                        .iter()
-                        .map(|(_, row)| row.table.get_row().get_table_name()),
-                ))
-            }),
-            Box::new(|tables| {
-                Arc::new(StringArray::from_iter_values(
-                    tables.iter().map(|(column, _)| column.get_name()),
-                ))
-            }),
-            Box::new(|tables| {
-                Arc::new(StringArray::from_iter_values(
-                    tables
-                        .iter()
-                        .map(|(column, _)| column.get_column_type().to_string()),
-                ))
-            }),
+            Arc::new(schema_builder.finish()),
+            Arc::new(table_builder.finish()),
+            Arc::new(column_builder.finish()),
+            Arc::new(type_builder.finish()),
         ]
     }
 }

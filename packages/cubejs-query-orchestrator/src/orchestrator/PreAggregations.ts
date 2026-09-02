@@ -139,16 +139,36 @@ type PreAggJob = {
   dataSource: string,
 };
 
+/**
+ * Types a pre-aggregation description can have by the time it reaches the
+ * orchestrator. Narrower than the same-named type in `@cubejs-backend/client-core`,
+ * which also lists `rollupJoin` and `rollupLambda`: the schema compiler expands
+ * those into the rollups they reference (`preAggregationDescriptionsFor`), so no
+ * description with either type is ever built or reported here.
+ */
+export type PreAggregationType = 'rollup' | 'originalSql';
+
 export type LoadPreAggregationResult = {
   targetTableName: string;
   refreshKeyValues: any[];
   lastUpdatedAt: number;
   buildRangeEnd: string;
+  /**
+   * Identity of the pre-aggregation this table belongs to, stamped by
+   * `loadAllPreAggregationsIfNeeded` from the query's pre-aggregation
+   * description rather than by the loaders. Reported to clients as part of
+   * `usedPreAggregations` so they can match a result to a build.
+   */
+  preAggregationId?: string;
+  type?: PreAggregationType;
   lambdaTable?: InlineTable;
   queryKey?: any[];
   rollupLambdaId?: string;
   partitionRange?: QueryDateRange;
   isMultiTableUnion?: boolean;
+  usageTargetTableNames?: Record<string, string>;
+  dataSource?: string;
+  timezone?: string;
 };
 
 export type PreAggregationTableToTempTable = [string, LoadPreAggregationResult];
@@ -164,7 +184,7 @@ export type LambdaQuery = {
 
 export type PreAggregationDescription = {
   preAggregationsSchema: string;
-  type: 'rollup' | 'originalSql';
+  type: PreAggregationType;
   preAggregationId: string;
   priority: number;
   dataSource: string;
@@ -192,6 +212,7 @@ export type PreAggregationDescription = {
   sealAt?: string;
   rollupLambdaId?: string;
   lastRollupLambda?: boolean;
+  usageMapping?: Record<string, { dateRange?: QueryDateRange }>;
 };
 
 export const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
@@ -361,6 +382,12 @@ export class PreAggregations {
       .map(k => k.replace(this.tablesUsedRedisKey(''), ''));
   }
 
+  public async removeTableUsed(tableName: string): Promise<void> {
+    this.usedCache.delete(tableName);
+
+    await this.queryCache.getCacheDriver().remove(this.tablesUsedRedisKey(tableName));
+  }
+
   public async updateLastTouch(tableName: string): Promise<void> {
     if (this.touchCache.has(tableName)) {
       return;
@@ -384,6 +411,12 @@ export class PreAggregations {
   public async tablesTouched() {
     return (await this.queryCache.getCacheDriver().keysStartingWith(this.tablesTouchRedisKey('')))
       .map(k => k.replace(this.tablesTouchRedisKey(''), ''));
+  }
+
+  public async removeTableTouched(tableName: string): Promise<void> {
+    this.touchCache.delete(tableName);
+
+    await this.queryCache.getCacheDriver().remove(this.tablesTouchRedisKey(tableName));
   }
 
   public async updatePreAggBackoff(tableName: string, backoffData: { backoffMultiplier: number, nextTimestamp: Date }): Promise<void> {
@@ -438,7 +471,7 @@ export class PreAggregations {
   ): Promise<[boolean, string]> {
     // fetching tables
     const loadCache = new PreAggregationLoadCache(
-      () => this.driverFactory(dataSource),
+      () => this.driverFactory(dataSource, true),
       this.queryCache,
       this,
       {
@@ -454,9 +487,10 @@ export class PreAggregations {
     tables = tables.filter(row => `${schema}.${row.table_name}` === table);
 
     // fetching query result
-    const conn = await this.queue[dataSource].getQueueDriver().createConnection();
+    const queue = await this.getQueue(dataSource);
+    const conn = await queue.getQueueDriver().createConnection();
     const result = await conn.getResult(key);
-    this.queue[dataSource].getQueueDriver().release(conn);
+    queue.getQueueDriver().release(conn);
 
     // calculating status
     let status: string;
@@ -509,7 +543,7 @@ export class PreAggregations {
       if (!loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`]) {
         loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`] =
           new PreAggregationLoadCache(
-            () => this.driverFactory(dataSource),
+            () => this.driverFactory(dataSource, true),
             this.queryCache,
             this,
             {
@@ -532,7 +566,7 @@ export class PreAggregations {
     const preAggregationsTablesToTempTablesPromise =
       preAggregations.map((p: PreAggregationDescription, i) => (preAggregationsTablesToTempTables) => {
         const loader = new PreAggregationPartitionRangeLoader(
-          () => this.driverFactory(p.dataSource || 'default'),
+          () => this.driverFactory(p.dataSource || 'default', true),
           this.logger,
           this.queryCache,
           this,
@@ -543,7 +577,7 @@ export class PreAggregations {
             maxPartitions: this.options.maxPartitions,
             maxSourceRowLimit: this.options.maxSourceRowLimit,
             isJob: queryBody.isJob,
-            waitForRenew: queryBody.cacheMode !== undefined ? queryBody.cacheMode === 'must-revalidate' : queryBody.renewQuery,
+            waitForRenew: queryBody.cacheMode === 'must-revalidate',
             // TODO workaround to avoid continuous waiting on building pre-aggregation dependencies
             forceBuild: i === preAggregations.length - 1 ? queryBody.forceBuildPreAggregations : false,
             requestId: queryBody.requestId,
@@ -558,7 +592,10 @@ export class PreAggregations {
           const loadResult = await loader.loadPreAggregations();
           const usedPreAggregation = {
             ...loadResult,
+            preAggregationId: p.preAggregationId,
             type: p.type,
+            dataSource: p.dataSource || 'default',
+            timezone: p.timezone,
           };
           if (!usedPreAggregation.isMultiTableUnion) {
             await this.addTableUsed(usedPreAggregation.targetTableName);
@@ -570,10 +607,22 @@ export class PreAggregations {
             );
           }
 
-          return [p.tableName, usedPreAggregation];
+          return [p.tableName, usedPreAggregation] as PreAggregationTableToTempTable;
         };
 
-        return preAggregationPromise().then(res => preAggregationsTablesToTempTables.concat([res]));
+        return preAggregationPromise().then(([tableName, result]) => {
+          const { usageTargetTableNames } = result;
+          if (usageTargetTableNames && Object.keys(usageTargetTableNames).length > 0) {
+            const entries: PreAggregationTableToTempTable[] = Object.entries(usageTargetTableNames).map(
+              ([suffix, usageTarget]) => [
+                `${tableName}${suffix}`,
+                { ...result, targetTableName: usageTarget, usageTargetTableNames: undefined },
+              ]
+            );
+            return preAggregationsTablesToTempTables.concat(entries);
+          }
+          return preAggregationsTablesToTempTables.concat([[tableName, result]]);
+        });
       }).reduce((promise, fn) => promise.then(fn), Promise.resolve([]));
 
     return preAggregationsTablesToTempTablesPromise.then(preAggregationsTablesToTempTables => ({
@@ -591,10 +640,6 @@ export class PreAggregations {
     return Promise.all(
       preAggregations.map(async (preAggregation) => {
         const { preAggregationStartEndQueries } = preAggregation;
-        const invalidate =
-          preAggregation?.invalidateKeyQueries[0]
-            ? preAggregation.invalidateKeyQueries[0].slice(0, 2)
-            : false;
         const isCached = preAggregation.partitionGranularity
           ? (
             await Promise.all(
@@ -602,7 +647,7 @@ export class PreAggregations {
                 this.queryCache.resultFromCacheIfExists({
                   query,
                   values,
-                  invalidate,
+                  invalidate: QueryCache.buildRangeInvalidateKey(preAggregation),
                 })
               ))
             )
@@ -625,7 +670,7 @@ export class PreAggregations {
       if (!loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`]) {
         loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`] =
           new PreAggregationLoadCache(
-            () => this.driverFactory(dataSource),
+            () => this.driverFactory(dataSource, true),
             this.queryCache,
             this,
             {
@@ -640,7 +685,7 @@ export class PreAggregations {
 
     const expandedPreAggregations: PreAggregationDescription[][] = await Promise.all(preAggregations.map(p => {
       const loader = new PreAggregationPartitionRangeLoader(
-        () => this.driverFactory(p.dataSource || 'default'),
+        () => this.driverFactory(p.dataSource || 'default', true),
         this.logger,
         this.queryCache,
         this,
@@ -650,7 +695,7 @@ export class PreAggregations {
         {
           maxPartitions: this.options.maxPartitions,
           maxSourceRowLimit: this.options.maxSourceRowLimit,
-          waitForRenew: queryBody.cacheMode !== undefined ? queryBody.cacheMode === 'must-revalidate' : queryBody.renewQuery,
+          waitForRenew: queryBody.cacheMode === 'must-revalidate',
           requestId: queryBody.requestId,
           externalRefresh: this.externalRefresh,
           compilerCacheFn: queryBody.compilerCacheFn,
@@ -677,20 +722,20 @@ export class PreAggregations {
       if (!this.queue[dataSource]) {
         this.queue[dataSource] = QueryCache.createQueue(
           `SQL_PRE_AGGREGATIONS_${this.redisPrefix}_${dataSource}`,
-          () => this.driverFactory(dataSource),
+          () => this.driverFactory(dataSource, true),
           (client, q) => {
             const {
               preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId, invalidationKeys, buildRangeEnd
             } = q;
             const loader = new PreAggregationLoader(
-              () => this.driverFactory(dataSource),
+              () => this.driverFactory(dataSource, true),
               this.logger,
               this.queryCache,
               this,
               preAggregation,
               preAggregationsTablesToTempTables,
               new PreAggregationLoadCache(
-                () => this.driverFactory(dataSource),
+                () => this.driverFactory(dataSource, true),
                 this.queryCache,
                 this,
                 {
@@ -736,7 +781,7 @@ export class PreAggregations {
             requestId
           } = q;
           const loadCache = new PreAggregationLoadCache(
-            () => this.driverFactory(dataSource),
+            () => this.driverFactory(dataSource, true),
             this.queryCache,
             this,
             {
@@ -796,7 +841,7 @@ export class PreAggregations {
       if (!loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`]) {
         loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`] =
           new PreAggregationLoadCache(
-            () => this.driverFactory(dataSource),
+            () => this.driverFactory(dataSource, true),
             this.queryCache,
             this,
             {

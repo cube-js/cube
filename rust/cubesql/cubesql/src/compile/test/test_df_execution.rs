@@ -92,6 +92,34 @@ GROUP BY
     );
 }
 
+#[tokio::test]
+async fn union_all_ctes_with_type_coercion() {
+    init_testing_logger();
+
+    // language=PostgreSQL
+    let query = r#"
+WITH a AS (
+    SELECT 1::bigint AS t LIMIT 1
+), b AS (
+    SELECT 2::bigint AS t LIMIT 1
+), c AS (
+    SELECT 3.5::float8 AS t LIMIT 1
+)
+SELECT 'A' AS l, t FROM a
+UNION ALL
+SELECT 'B' AS l, t FROM b
+UNION ALL
+SELECT 'C' AS l, t FROM c
+;
+        "#;
+
+    insta::assert_snapshot!(
+        execute_query(query.to_string(), DatabaseProtocol::PostgreSQL)
+            .await
+            .unwrap()
+    );
+}
+
 /// See https://www.postgresql.org/docs/current/functions-math.html
 #[tokio::test]
 async fn test_round() {

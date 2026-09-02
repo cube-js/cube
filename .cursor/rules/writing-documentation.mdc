@@ -1,0 +1,9 @@
+---
+alwaysApply: true
+globs: docs-mintlify/**
+---
+
+This repo only contains code for Cube Core and documentation.
+Our cloud product codebase is located in ~/code/cubejs-enterprise (at least that is where it is located on Artyom's mac). Research the cloud product codebase when documenting new features.
+Our documenation is built with https://www.mintlify.com. Make sure you follow Mintlify best practices when designing documentation.
+Our competitors are [Omni](https://omni.co/) and [Hex](https://hex.tech/). We use their documentation sometimes as a reference.

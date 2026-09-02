@@ -11,6 +11,6 @@ export default {
   changelog: {
     type: "page",
     title: "Changelog",
-    href: "https://cube.dev/blog/category/changelog"
+    href: "https://cube.dev/changelog"
   }
 }

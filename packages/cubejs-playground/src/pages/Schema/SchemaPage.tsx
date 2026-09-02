@@ -302,7 +302,7 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
                     Data model files are located and can be edited in the mount
                     volume directory.{' '}
                     <Typography.Link
-                      href="https://cube.dev/docs/schema/getting-started"
+                      href="https://cube.dev/docs/data-modeling/overview"
                       target="_blank"
                     >
                       Learn more about working with Cube data model in the docs

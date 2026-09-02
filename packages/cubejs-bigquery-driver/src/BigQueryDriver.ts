@@ -28,6 +28,7 @@ import {
   QueryOptions,
   QuerySchemasResult,
   QueryTablesResult,
+  StreamOptions,
   StreamTableData,
   TableCSVData,
 } from '@cubejs-backend/base-driver';
@@ -92,6 +93,11 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
@@ -110,42 +116,44 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     this.options = {
       scopes: [
         'https://www.googleapis.com/auth/bigquery',
         'https://www.googleapis.com/auth/drive',
       ],
-      projectId: getEnv('bigqueryProjectId', { dataSource }),
-      keyFilename: getEnv('bigqueryKeyFile', { dataSource }),
-      credentials: getEnv('bigqueryCredentials', { dataSource })
+      projectId: getEnv('bigqueryProjectId', { dataSource, preAggregations }),
+      keyFilename: getEnv('bigqueryKeyFile', { dataSource, preAggregations }),
+      credentials: getEnv('bigqueryCredentials', { dataSource, preAggregations })
         ? JSON.parse(
           Buffer.from(
-            getEnv('bigqueryCredentials', { dataSource }),
+            getEnv('bigqueryCredentials', { dataSource, preAggregations }),
             'base64',
           ).toString('utf8')
         )
         : undefined,
       exportBucket:
-        getEnv('dbExportBucket', { dataSource }) ||
-        getEnv('bigqueryExportBucket', { dataSource }),
-      location: getEnv('bigqueryLocation', { dataSource }),
+        getEnv('dbExportBucket', { dataSource, preAggregations }) ||
+        getEnv('bigqueryExportBucket', { dataSource, preAggregations }),
+      location: getEnv('bigqueryLocation', { dataSource, preAggregations }),
       ...config,
       pollTimeout: (
         config.pollTimeout ||
-        getEnv('dbPollTimeout', { dataSource }) ||
-        getEnv('dbQueryTimeout', { dataSource })
+        getEnv('dbPollTimeout', { dataSource, preAggregations }) ||
+        getEnv('dbQueryTimeout', { dataSource, preAggregations })
       ) * 1000,
       pollMaxInterval: (
         config.pollMaxInterval ||
-        getEnv('dbPollMaxInterval', { dataSource })
+        getEnv('dbPollMaxInterval', { dataSource, preAggregations })
       ) * 1000,
-      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource, preAggregations }),
       userAgent: `CubeDev_Cube/${version}`,
     };
 
     getEnv('dbExportBucketType', {
       dataSource,
+      preAggregations,
       supported: ['gcp'],
     });
 
@@ -187,7 +195,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       query,
       params: values,
       parameterMode: 'positional',
-      useLegacySql: false
+      useLegacySql: false,
+      wrapIntegers: true,
     }, options);
 
     return <any>(
@@ -324,13 +333,17 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   public async stream(
     query: string,
-    values: unknown[]
+    values: unknown[],
+    options?: StreamOptions
   ): Promise<StreamTableData> {
+    const labels = this.buildQueryLabels(options);
     const stream = await this.bigquery.createQueryStream({
       query,
       params: values,
       parameterMode: 'positional',
-      useLegacySql: false
+      useLegacySql: false,
+      wrapIntegers: true,
+      ...(labels ? { labels } : {}),
     });
 
     const rowStream = new HydrationStream();
@@ -393,6 +406,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   protected async awaitForJobStatus(job: Job, options: any, withResults: boolean) {
     const [result] = await job.getMetadata();
+
     if (result.status && result.status.state === 'DONE') {
       if (result.status.errorResult) {
         throw new Error(
@@ -406,7 +420,28 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       return null;
     }
 
-    return withResults ? job.getQueryResults() : true;
+    return withResults ? job.getQueryResults({ wrapIntegers: true }) : true;
+  }
+
+  /**
+   * @see https://cloud.google.com/bigquery/docs/labels-intro#requirements
+   */
+  protected buildQueryLabels(options?: QueryOptions): { [k: string]: string } | undefined {
+    const requestId = options?.requestId;
+    if (!requestId) {
+      return undefined;
+    }
+
+    const rawId = String(requestId);
+    const spanIdx = rawId.lastIndexOf('-span-');
+    const queryUuid = spanIdx !== -1 ? rawId.substring(0, spanIdx) : rawId;
+
+    const value = queryUuid.toLowerCase().replace(/[^a-z0-9_-]/g, '_').slice(0, 63);
+    if (!value) {
+      return undefined;
+    }
+
+    return { cube_request_id: value };
   }
 
   protected async runQueryJob<T = QueryRowsResponse>(
@@ -414,7 +449,12 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     options: any,
     withResults: boolean = true
   ): Promise<T> {
-    const [job] = await this.bigquery.createQueryJob(bigQueryQuery);
+    const labels = this.buildQueryLabels(options);
+    const jobRequest: Query = labels
+      ? { ...bigQueryQuery, labels: { ...bigQueryQuery.labels, ...labels } }
+      : bigQueryQuery;
+    const [job] = await this.bigquery.createQueryJob(jobRequest);
+
     return <any> this.waitForJobResult(job, options, withResults);
   }
 

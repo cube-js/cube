@@ -4,12 +4,9 @@
  * @fileoverview ResultSet class unit tests.
  */
 
-/* globals describe,test,expect */
-
-import 'jest';
-import ResultSet from '../src/ResultSet';
-import { TimeDimension } from '../src';
-import { DescriptiveQueryResponse } from './helpers';
+import ResultSet from '../src/ResultSet.js';
+import { TimeDimension } from '../src/index.js';
+import { DescriptiveQueryResponse } from './helpers.js';
 
 describe('ResultSet', () => {
   describe('timeSeries', () => {
@@ -661,6 +658,8 @@ describe('ResultSet', () => {
         format: undefined,
         key: 'base_orders.created_at.month',
         meta: undefined,
+        currency: undefined,
+        granularity: 'month',
         shortTitle: 'Created at',
         title: 'Base Orders Created at',
         type: 'time',
@@ -673,6 +672,8 @@ describe('ResultSet', () => {
           addDesc: 'The status of order',
           moreNum: 42,
         },
+        currency: undefined,
+        granularity: undefined,
         shortTitle: 'Status',
         title: 'Base Orders Status',
         type: 'string',
@@ -682,6 +683,8 @@ describe('ResultSet', () => {
         format: undefined,
         key: 'base_orders.count',
         meta: undefined,
+        currency: undefined,
+        granularity: undefined,
         shortTitle: 'Count',
         title: 'Base Orders Count',
         type: 'number',

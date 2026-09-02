@@ -1,0 +1,413 @@
+---
+title: Calculating average order value
+description: Define AOV as a single measure when its numerator and denominator live in the same cube, or in two fact tables at different grains.
+---
+
+## Use case
+
+Average order value (AOV) — sometimes called basket size — is revenue divided by
+the number of orders. It looks like a one-line calculation, but where the two
+parts live decides how it is modeled:
+
+- **[Same cube](#same-cube)** — both parts are measures of one fact table.
+- **[Two fact tables](#across-two-fact-tables)** — revenue is aggregated at one
+  grain (say, day/item/location) and orders are counted at another (transaction
+  lines). This is the common shape in retail models.
+
+In both cases AOV is a ratio of two aggregates, so it must be computed _after_
+its parts are aggregated — never as a row-level `amount / orders` expression.
+
+## Same cube
+
+When both parts are measures of the same cube, define AOV as a calculated
+measure that divides them:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: orders
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    measures:
+      - name: revenue
+        sql: amount
+        type: sum
+        format: currency
+
+      - name: count
+        type: count
+
+      - name: average_order_value
+        sql: "{revenue} / NULLIF({count}, 0)"
+        type: number
+        format: currency
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
+
+  dimensions: {
+    id: { sql: `id`, type: `number`, primary_key: true }
+  },
+
+  measures: {
+    revenue: { sql: `amount`, type: `sum`, format: `currency` },
+    count: { type: `count` },
+
+    average_order_value: {
+      sql: `${revenue} / NULLIF(${count}, 0)`,
+      type: `number`,
+      format: `currency`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+`NULLIF` guards the division so a group with no orders returns `NULL` rather
+than failing.
+
+## Across two fact tables
+
+Retail models usually split the two parts. Sales dollars come from a
+pre-aggregated daily table (`item_location_sales`, one row per day, item and
+location), while the transaction count comes from the line-item table
+(`sales_line_item`, one row per transaction line). The two never join to each
+other — they meet through shared `items`, `locations` and `dates` cubes, which
+makes this a [multi-fact query][ref-multi-fact-views].
+
+<Warning>
+
+Multi-fact views and multi-stage measures are powered by Tesseract, the
+[next-generation data modeling engine][link-tesseract]. In versions before
+v1.7.0, it was not enabled by default.
+
+</Warning>
+
+### 1. Define each part on the cube that owns it
+
+The denominator counts distinct transactions and excludes exchanges and
+non-store channels. Write that logic once, as measure
+[`filters`][ref-measure-filters] on the line-item cube, so every consumer picks
+it up by including the measure — never restate it per view:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: sales_line_item
+    sql_table: sales_line_item
+
+    joins:
+      - name: items
+        sql: "{CUBE}.item_id = {items.id}"
+        relationship: many_to_one
+      - name: locations
+        sql: "{CUBE}.location_id = {locations.id}"
+        relationship: many_to_one
+      - name: dates
+        sql: "DATE_TRUNC('day', {CUBE}.sold_at) = {dates.date}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    measures:
+      - name: transactions_without_returns
+        sql: transaction_id
+        type: count_distinct
+        filters:
+          - sql: "{CUBE}.transaction_type <> 'EXCHANGE'"
+          - sql: "{CUBE}.fulfillment_channel_group IN ('IN_STORE', 'SHIP_FROM_STORE')"
+
+  - name: item_location_sales
+    sql_table: item_location_sales
+
+    joins:
+      - name: items
+        sql: "{CUBE}.item_id = {items.id}"
+        relationship: many_to_one
+      - name: locations
+        sql: "{CUBE}.location_id = {locations.id}"
+        relationship: many_to_one
+      - name: dates
+        sql: "DATE_TRUNC('day', {CUBE}.date) = {dates.date}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    measures:
+      - name: sales_amount
+        sql: sales_amount
+        type: sum
+        format: currency
+```
+
+```javascript title="JavaScript"
+cube(`sales_line_item`, {
+  sql_table: `sales_line_item`,
+
+  joins: {
+    items: {
+      sql: `${CUBE}.item_id = ${items.id}`,
+      relationship: `many_to_one`
+    },
+    locations: {
+      sql: `${CUBE}.location_id = ${locations.id}`,
+      relationship: `many_to_one`
+    },
+    dates: {
+      sql: `DATE_TRUNC('day', ${CUBE}.sold_at) = ${dates.date}`,
+      relationship: `many_to_one`
+    }
+  },
+
+  dimensions: {
+    id: { sql: `id`, type: `number`, primary_key: true }
+  },
+
+  measures: {
+    transactions_without_returns: {
+      sql: `transaction_id`,
+      type: `count_distinct`,
+      filters: [
+        { sql: `${CUBE}.transaction_type <> 'EXCHANGE'` },
+        { sql: `${CUBE}.fulfillment_channel_group IN ('IN_STORE', 'SHIP_FROM_STORE')` }
+      ]
+    }
+  }
+})
+
+cube(`item_location_sales`, {
+  sql_table: `item_location_sales`,
+
+  joins: {
+    items: {
+      sql: `${CUBE}.item_id = ${items.id}`,
+      relationship: `many_to_one`
+    },
+    locations: {
+      sql: `${CUBE}.location_id = ${locations.id}`,
+      relationship: `many_to_one`
+    },
+    dates: {
+      sql: `DATE_TRUNC('day', ${CUBE}.date) = ${dates.date}`,
+      relationship: `many_to_one`
+    }
+  },
+
+  dimensions: {
+    id: { sql: `id`, type: `number`, primary_key: true }
+  },
+
+  measures: {
+    sales_amount: { sql: `sales_amount`, type: `sum`, format: `currency` }
+  }
+})
+```
+
+</CodeGroup>
+
+Both facts join to the same `items`, `locations` and `dates` cubes. The `dates`
+spine matters: without it the two facts have no common time member to group by,
+since one is keyed by day and the other by timestamp.
+
+### 2. Define AOV on the view
+
+AOV can live on the view or on either cube — see [where to put
+it](#where-to-put-the-measure) below. On the view it is a [measure of the
+view][ref-view-measures], marked [`multi_stage`][ref-multi-stage]:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: retail_analysis
+    cubes:
+      - join_path: item_location_sales
+        includes:
+          - sales_amount
+      - join_path: sales_line_item
+        includes:
+          - transactions_without_returns
+      - join_path: dates
+        includes:
+          - date
+      - join_path: items
+        includes:
+          - department
+      - join_path: locations
+        includes:
+          - region
+
+    measures:
+      - name: aov_basket
+        type: number
+        format: currency
+        multi_stage: true
+        sql: "{CUBE.sales_amount} / NULLIF({CUBE.transactions_without_returns}, 0)"
+```
+
+```javascript title="JavaScript"
+view(`retail_analysis`, {
+  cubes: [
+    {
+      join_path: item_location_sales,
+      includes: [`sales_amount`]
+    },
+    {
+      join_path: sales_line_item,
+      includes: [`transactions_without_returns`]
+    },
+    {
+      join_path: dates,
+      includes: [`date`]
+    },
+    {
+      join_path: items,
+      includes: [`department`]
+    },
+    {
+      join_path: locations,
+      includes: [`region`]
+    }
+  ],
+
+  measures: {
+    aov_basket: {
+      type: `number`,
+      format: `currency`,
+      multi_stage: true,
+      sql: `${CUBE.sales_amount} / NULLIF(${CUBE.transactions_without_returns}, 0)`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+The shared dimension cubes sit at root-level join paths, so `date`, `department`
+and `region` are common to both facts and can be grouped by.
+
+### 3. Query it
+
+Querying `aov_basket` by `region` aggregates each fact on its own, stitches the
+two results on the shared dimension, and takes the division over the joined rows:
+
+```sql
+-- one aggregating subquery per fact, at the query's grain
+SUM(item_location_sales.sales_amount)                GROUP BY region
+COUNT(DISTINCT CASE WHEN … THEN transaction_id END)  GROUP BY region
+-- final stage, once the two are joined on region
+sales_amount / NULLIF(transactions_without_returns, 0)
+```
+
+The measure filters travel into the line-item subquery, so the exchange and
+channel rules are applied exactly where they were defined.
+
+<Note>
+
+`multi_stage: true` is what defers the division until both facts have been
+aggregated. Without it, Cube plans the expression as an ordinary calculated
+measure, looks for a single join tree covering both fact cubes, and fails with
+`Can't find join path to join 'locations', 'item_location_sales',
+'sales_line_item'`.
+
+</Note>
+
+## Where to put the measure
+
+A metric spanning two facts does not have to live on a view. A cube measure may
+reference another cube's measure, which makes it derived rather than owned by
+its cube — the same property a view measure has — so AOV can sit on either fact
+cube instead:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: sales_line_item
+    # …
+
+    measures:
+      - name: transactions_without_returns
+        sql: transaction_id
+        type: count_distinct
+        filters:
+          - sql: "{CUBE}.transaction_type <> 'EXCHANGE'"
+          - sql: "{CUBE}.fulfillment_channel_group IN ('IN_STORE', 'SHIP_FROM_STORE')"
+
+      - name: aov_basket
+        type: number
+        format: currency
+        multi_stage: true
+        sql: "{item_location_sales.sales_amount} / NULLIF({CUBE.transactions_without_returns}, 0)"
+```
+
+```javascript title="JavaScript"
+cube(`sales_line_item`, {
+  // …
+
+  measures: {
+    transactions_without_returns: {
+      sql: `transaction_id`,
+      type: `count_distinct`,
+      filters: [
+        { sql: `${CUBE}.transaction_type <> 'EXCHANGE'` },
+        { sql: `${CUBE}.fulfillment_channel_group IN ('IN_STORE', 'SHIP_FROM_STORE')` }
+      ]
+    },
+
+    aov_basket: {
+      type: `number`,
+      format: `currency`,
+      multi_stage: true,
+      sql: `${item_location_sales.sales_amount} / NULLIF(${CUBE.transactions_without_returns}, 0)`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+Both placements plan identically — the same per-fact subqueries, stitched the
+same way, divided in the same final stage — and `multi_stage` is required either
+way. What differs is reuse and coupling:
+
+| | On a cube | On a view |
+| --- | --- | --- |
+| Reuse | Defined once; every view including it gets it | Redefined in each view that needs it |
+| Coupling | The cube names the other cube's measure | The cubes stay unaware of each other |
+| Query path | Available as `sales_line_item.aov_basket` too | Only through the view |
+
+Prefer the cube when the metric is part of the model that several views expose —
+it keeps [shared logic in cubes][ref-views-shared-logic]. Prefer the view when
+the pairing is a presentation choice for one audience, or when the cubes belong
+to different domains and you would rather not have one reference the other.
+
+A cube-owned measure reaches the other fact whether or not the view naming it
+also includes that fact, so a view can expose AOV without exposing
+`sales_amount`.
+
+[ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
+[ref-multi-stage]: /reference/data-modeling/measures#multi_stage
+[ref-measure-filters]: /reference/data-modeling/measures#filters
+[ref-view-measures]: /reference/data-modeling/view#measures
+[ref-views-shared-logic]: /docs/data-modeling/views#keep-shared-logic-in-cubes
+[link-tesseract]: https://cube.dev/blog/introducing-tesseract

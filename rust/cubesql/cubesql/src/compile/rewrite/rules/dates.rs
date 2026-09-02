@@ -15,7 +15,7 @@ use crate::{
     var, var_iter,
 };
 use datafusion::{
-    arrow::datatypes::{DataType, TimeUnit},
+    arrow::datatypes::{DataType, DataType as ArrowDataType, IntervalDayTimeType, TimeUnit},
     logical_plan::DFSchema,
     scalar::ScalarValue,
 };
@@ -376,16 +376,6 @@ impl RewriteRules for DateRules {
                     "?alias",
                 ),
             ),
-            // TODO: TO_DATE should return Date32, but Timestamp works for all supported cases
-            transforming_rewrite(
-                "thoughtspot-to-date-to-timestamp",
-                udf_expr(
-                    "to_date",
-                    vec![literal_expr("?date"), literal_expr("?format")],
-                ),
-                udf_expr("date_to_timestamp", vec![literal_expr("?date")]),
-                self.transform_to_date_to_timestamp("?format"),
-            ),
             // TODO turn this rule into generic DateTrunc merge
             transforming_rewrite(
                 "datastudio-dates",
@@ -408,6 +398,53 @@ impl RewriteRules for DateRules {
                     "?inner_granularity",
                     "?new_granularity",
                 ),
+            ),
+            // ThoughtSpot's PostgreSQL quarter start calculation uses INTERVAL arithmetic
+            // that is incompatible with non-PostgreSQL dialects. Recognize the pattern and
+            // replace with DATE_TRUNC('quarter', col) which all dialects support.
+            transforming_rewrite(
+                "thoughtspot-pg-quarter-start-to-date-trunc",
+                alias_expr(
+                    binary_expr(
+                        cast_expr_explicit(
+                            binary_expr(
+                                binary_expr(
+                                    binary_expr(
+                                        self.fun_expr(
+                                            "DatePart",
+                                            vec![literal_string("year"), column_expr("?column")],
+                                        ),
+                                        "||",
+                                        literal_string("-"),
+                                    ),
+                                    "||",
+                                    self.fun_expr(
+                                        "DatePart",
+                                        vec![literal_string("month"), column_expr("?column")],
+                                    ),
+                                ),
+                                "||",
+                                literal_string("-01"),
+                            ),
+                            ArrowDataType::Date32,
+                        ),
+                        "+",
+                        binary_expr(
+                            binary_expr("?mod_part", "*", "?neg_one"),
+                            "*",
+                            "?interval_val",
+                        ),
+                    ),
+                    "?alias",
+                ),
+                alias_expr(
+                    self.fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("quarter"), column_expr("?column")],
+                    ),
+                    "?alias",
+                ),
+                Self::transform_quarter_interval_check("?neg_one", "?interval_val"),
             ),
             // AGE function seems to be a popular choice for this date arithmetic,
             // but it is not supported in SQL push down by most dialects.
@@ -488,30 +525,60 @@ impl DateRules {
                     _ => return false,
                 };
 
+                // `IntervalDayTime` keeps days and milliseconds in separate halves of an
+                // i64, so a plain millisecond count only reads back as written while it is
+                // positive and fits in the lower half. Build it the way DataFusion does.
+                //
+                // Sub-day units are counted in milliseconds, which runs out around 24 days,
+                // so whole days are carried into the other half to keep ordinary spans like
+                // `DATEADD('hour', 720, ...)` expressible. Cube reads time dimensions as
+                // naive UTC timestamps, where a day is always 24 hours, so the two halves
+                // measure the same thing.
+                //
+                // What is left over is a span that is neither day aligned nor small enough
+                // to count in milliseconds. Producing a value that decodes to a different
+                // amount of time would be worse than not rewriting: without the rewrite the
+                // original `dateadd` remains, and it is a stub that reports
+                // `NotImplemented` at execution rather than answering with a wrong date.
+                let day_time = |days: i64, millis: i64| {
+                    const MILLIS_PER_DAY: i64 = 24 * 60 * 60 * 1_000;
+                    let (days, millis) = if i32::try_from(millis).is_err() {
+                        (days + millis / MILLIS_PER_DAY, millis % MILLIS_PER_DAY)
+                    } else {
+                        (days, millis)
+                    };
+                    // The two halves are read back separately, so only one of them can
+                    // carry the span
+                    if days != 0 && millis != 0 {
+                        return None;
+                    }
+                    let days = i32::try_from(days).ok()?;
+                    let millis = i32::try_from(millis).ok()?;
+                    Some(ScalarValue::IntervalDayTime(Some(
+                        IntervalDayTimeType::make_value(days, millis),
+                    )))
+                };
+                let year_month = |months: i64| {
+                    let months = i32::try_from(months).ok()?;
+                    Some(ScalarValue::IntervalYearMonth(Some(months)))
+                };
+                let interval_int = i64::from(interval_int);
+
                 for datepart in var_iter!(egraph[subst[datepart_var]], LiteralExprValue).cloned() {
                     let interval = match utils::parse_granularity(&datepart, false).as_deref() {
-                        Some("millisecond") => {
-                            ScalarValue::IntervalDayTime(Some(i64::from(interval_int)))
-                        }
-                        Some("second") => {
-                            ScalarValue::IntervalDayTime(Some(1000 * i64::from(interval_int)))
-                        }
-                        Some("minute") => {
-                            ScalarValue::IntervalDayTime(Some(60_000 * i64::from(interval_int)))
-                        }
-                        Some("hour") => {
-                            ScalarValue::IntervalDayTime(Some(3_600_000 * i64::from(interval_int)))
-                        }
-                        Some("day") => ScalarValue::IntervalDayTime(Some(
-                            4_294_967_296 * i64::from(interval_int),
-                        )),
-                        Some("week") => ScalarValue::IntervalDayTime(Some(
-                            30_064_771_072 * i64::from(interval_int),
-                        )),
-                        Some("month") => ScalarValue::IntervalYearMonth(Some(interval_int)),
-                        Some("quarter") => ScalarValue::IntervalYearMonth(Some(3 * interval_int)),
-                        Some("year") => ScalarValue::IntervalYearMonth(Some(12 * interval_int)),
+                        Some("millisecond") => day_time(0, interval_int),
+                        Some("second") => day_time(0, 1_000 * interval_int),
+                        Some("minute") => day_time(0, 60_000 * interval_int),
+                        Some("hour") => day_time(0, 3_600_000 * interval_int),
+                        Some("day") => day_time(interval_int, 0),
+                        Some("week") => day_time(7 * interval_int, 0),
+                        Some("month") => year_month(interval_int),
+                        Some("quarter") => year_month(3 * interval_int),
+                        Some("year") => year_month(12 * interval_int),
                         _ => continue,
+                    };
+                    let Some(interval) = interval else {
+                        continue;
                     };
 
                     if let Some(original_expr) = original_expr_name(egraph, root) {
@@ -535,22 +602,37 @@ impl DateRules {
         }
     }
 
-    fn transform_to_date_to_timestamp(
-        &self,
-        format_var: &'static str,
+    fn transform_quarter_interval_check(
+        neg_one_var: &'static str,
+        interval_val_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        let format_var = var!(format_var);
+        let neg_one_var = var!(neg_one_var);
+        let interval_val_var = var!(interval_val_var);
         move |egraph, subst| {
-            for format in var_iter!(egraph[subst[format_var]], LiteralExprValue) {
-                match format {
-                    ScalarValue::Utf8(Some(format)) => match format.as_str() {
-                        "YYYY-MM-DD" | "yyyy-MM-dd" => return true,
-                        _ => (),
-                    },
-                    _ => (),
-                }
+            let neg_one_ok = match &egraph[subst[neg_one_var]].data.constant {
+                Some(ConstantFolding::Scalar(v)) => match v {
+                    ScalarValue::Int64(Some(-1))
+                    | ScalarValue::Int32(Some(-1))
+                    | ScalarValue::Decimal128(Some(-1), _, _) => true,
+                    _ => false,
+                },
+                _ => false,
+            };
+            if !neg_one_ok {
+                return false;
             }
-            false
+            match &egraph[subst[interval_val_var]].data.constant {
+                Some(ConstantFolding::Scalar(v)) => match v {
+                    ScalarValue::IntervalYearMonth(Some(1)) => true,
+                    ScalarValue::IntervalMonthDayNano(Some(iv)) => {
+                        let months = (*iv >> 96) as i32;
+                        let days = ((*iv >> 64) & 0xFFFF_FFFF) as i32;
+                        months == 1 && days == 0
+                    }
+                    _ => false,
+                },
+                _ => false,
+            }
         }
     }
 

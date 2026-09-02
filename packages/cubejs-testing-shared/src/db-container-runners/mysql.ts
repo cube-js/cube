@@ -4,29 +4,41 @@ import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract
 
 export class MysqlDBRunner extends DbRunnerAbstract {
   public static startContainer(options: DBRunnerContainerOptions) {
-    const version = process.env.TEST_MYSQL_VERSION || options.version || '5.7';
+    const version = process.env.TEST_MYSQL_VERSION || options.version || '8.0';
 
     const container = new GenericContainer(`mysql:${version}`)
       .withEnvironment({
         MYSQL_ROOT_PASSWORD: process.env.TEST_DB_PASSWORD || 'Test1test',
       })
+      // On a fresh volume MySQL initializes the data directory before it starts
+      // listening, which on a loaded CI runner takes well over the 20s the old
+      // budget (10s start period + 3 retries * 5s) allowed - Docker then marks
+      // the container unhealthy and testcontainers gives up at once, regardless
+      // of the startup timeout. Probes that fail inside the start period do not
+      // count against `retries`, and the container is reported healthy as soon
+      // as one passes, so a generous start period costs nothing when MySQL comes
+      // up quickly and only buys time when it does not.
+      //
+      // The probe must go over TCP, hence `-h 127.0.0.1` rather than `-h
+      // localhost`, which the MySQL client resolves to the Unix socket. The
+      // entrypoint initializes the data directory by running a temporary server
+      // with `--skip-networking` on that socket, and `mysqladmin ping` exits 0
+      // even on `Access denied` - the server answered - so a socket probe can
+      // report healthy mid-initialization, only for that temporary server to be
+      // stopped underneath the connecting test. Over TCP the temporary server
+      // cannot answer, so healthy means the real one is up on the mapped port.
       .withHealthCheck({
-        test: ['CMD-SHELL', 'mysqladmin ping -h localhost'],
+        test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1'],
         interval: 5 * 1000,
-        timeout: 2 * 1000,
+        timeout: 5 * 1000,
         retries: 3,
-        startPeriod: 10 * 1000,
+        startPeriod: 60 * 1000,
       })
       .withWaitStrategy(Wait.forHealthCheck())
+      // Must outlast the health check budget above, otherwise testcontainers'
+      // 60s default would cut the wait short before Docker has given up.
+      .withStartupTimeout(120 * 1000)
       .withExposedPorts(3306);
-
-    if (version.split('.')[0] === '8') {
-      /**
-       * workaround for MySQL 8 and unsupported auth in mysql package
-       * @link https://github.com/mysqljs/mysql/pull/2233
-       */
-      container.withCommand(['--default-authentication-plugin=mysql_native_password']);
-    }
 
     if (options.volumes) {
       const binds = options.volumes.map(v => ({ source: v.source, target: v.target, mode: v.bindMode }));

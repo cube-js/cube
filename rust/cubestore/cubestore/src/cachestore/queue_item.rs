@@ -13,6 +13,11 @@ use std::sync::Arc;
 use crate::cachestore::QueueKey;
 use serde::{Deserialize, Deserializer, Serialize};
 
+// It's the x-process-id header, a uuid (36 chars), bounded on ingress in src/http
+pub const QUEUE_ITEM_PROCESS_ID_MAX_LEN: usize = 64;
+// We use ${uuidv4()}, it's 36, let's limit to 48
+pub const QUEUE_ITEM_EXTERNAL_ID_MAX_LEN: usize = 48;
+
 fn merge(a: serde_json::Value, b: serde_json::Value) -> Option<serde_json::Value> {
     match (a, b) {
         (mut root @ serde_json::Value::Object(_), serde_json::Value::Object(b)) => {
@@ -90,11 +95,13 @@ pub struct QueueItem {
     pub(crate) process_id: Option<String>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub(crate) exclusive: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) external_id: Option<String>,
 }
 
 impl RocksEntity for QueueItem {
     fn version() -> u32 {
-        4
+        5
     }
 }
 
@@ -140,6 +147,7 @@ impl QueueItem {
         orphaned: Option<u32>,
         process_id: Option<String>,
         exclusive: bool,
+        external_id: Option<String>,
     ) -> Self {
         let (prefix, key) = QueueItem::parse_path(path);
         let created = Utc::now();
@@ -164,6 +172,7 @@ impl QueueItem {
             created,
             process_id,
             exclusive,
+            external_id,
         }
     }
 
@@ -227,6 +236,10 @@ impl QueueItem {
 
     pub fn get_exclusive(&self) -> bool {
         self.exclusive
+    }
+
+    pub fn get_external_id(&self) -> &Option<String> {
+        &self.external_id
     }
 
     /// Returns whether this item should be visible to the given caller process.
@@ -296,6 +309,15 @@ pub enum QueueRetrieveResponse {
     },
 }
 
+/// Wire format of the `active` column, shared by all commands which report it
+pub fn active_keys_to_value(active: Vec<String>) -> TableValue {
+    if active.is_empty() {
+        TableValue::Null
+    } else {
+        TableValue::String(active.join(","))
+    }
+}
+
 impl QueueRetrieveResponse {
     pub fn into_queue_retrieve_rows(self, extended: bool) -> Vec<Row> {
         match self {
@@ -313,11 +335,7 @@ impl QueueRetrieveResponse {
                     TableValue::Null
                 },
                 TableValue::Int(pending as i64),
-                if active.len() > 0 {
-                    TableValue::String(active.join(","))
-                } else {
-                    TableValue::Null
-                },
+                active_keys_to_value(active),
                 TableValue::String(id.to_string()),
             ])],
             QueueRetrieveResponse::LockFailed { pending, active }
@@ -329,11 +347,7 @@ impl QueueRetrieveResponse {
                         TableValue::Null,
                         TableValue::Null,
                         TableValue::Int(pending as i64),
-                        if active.len() > 0 {
-                            TableValue::String(active.join(","))
-                        } else {
-                            TableValue::Null
-                        },
+                        active_keys_to_value(active),
                         TableValue::Null,
                     ])]
                 } else {
@@ -349,6 +363,7 @@ pub(crate) enum QueueItemRocksIndex {
     ByPath = 1,
     ByPrefixAndStatus = 2,
     ByPrefix = 3,
+    ByPathAndExternalId = 4,
 }
 
 pub struct QueueItemRocksTable<'a> {
@@ -394,6 +409,7 @@ rocks_table_new!(QueueItem, QueueItemRocksTable, TableId::QueueItems, {
         Box::new(QueueItemRocksIndex::ByPath),
         Box::new(QueueItemRocksIndex::ByPrefixAndStatus),
         Box::new(QueueItemRocksIndex::ByPrefix),
+        Box::new(QueueItemRocksIndex::ByPathAndExternalId),
     ]
 });
 
@@ -402,6 +418,7 @@ pub enum QueueItemIndexKey {
     ByPath(String),
     ByPrefixAndStatus(String, QueueItemStatus),
     ByPrefix(String),
+    ByPathAndExternalId(String, Option<String>),
 }
 
 base_rocks_secondary_index!(QueueItem, QueueItemRocksIndex);
@@ -417,6 +434,10 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
             QueueItemRocksIndex::ByPrefix => {
                 QueueItemIndexKey::ByPrefix(row.get_prefix().clone().unwrap_or("".to_string()))
             }
+            QueueItemRocksIndex::ByPathAndExternalId => QueueItemIndexKey::ByPathAndExternalId(
+                row.get_path(),
+                row.get_external_id().clone(),
+            ),
         }
     }
 
@@ -424,6 +445,13 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
         match key {
             QueueItemIndexKey::ByPath(s) => s.as_bytes().to_vec(),
             QueueItemIndexKey::ByPrefix(s) => s.as_bytes().to_vec(),
+            QueueItemIndexKey::ByPathAndExternalId(path, s) => {
+                let mut r = Vec::new();
+                r.extend_from_slice(path.as_bytes());
+                r.push(0u8);
+                r.extend_from_slice(s.as_deref().unwrap_or("__null__").as_bytes());
+                r
+            }
             QueueItemIndexKey::ByPrefixAndStatus(prefix, s) => {
                 let mut r = Vec::with_capacity(prefix.len() + 1);
                 r.extend_from_slice(&prefix.as_bytes());
@@ -444,6 +472,7 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
             QueueItemRocksIndex::ByPath => true,
             QueueItemRocksIndex::ByPrefixAndStatus => false,
             QueueItemRocksIndex::ByPrefix => false,
+            QueueItemRocksIndex::ByPathAndExternalId => true,
         }
     }
 
@@ -452,6 +481,7 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
             QueueItemRocksIndex::ByPath => 1,
             QueueItemRocksIndex::ByPrefixAndStatus => 2,
             QueueItemRocksIndex::ByPrefix => 1,
+            QueueItemRocksIndex::ByPathAndExternalId => 2,
         }
     }
 
@@ -465,6 +495,13 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
 
     fn get_id(&self) -> IndexId {
         *self as IndexId
+    }
+
+    fn should_index_row(&self, row: &QueueItem) -> bool {
+        match self {
+            Self::ByPathAndExternalId => row.external_id.is_some(),
+            _ => true,
+        }
     }
 }
 
@@ -483,6 +520,7 @@ mod tests {
             None,
             None,
             false,
+            None,
         );
         let mut priority0_2 = QueueItem::new(
             "2".to_string(),
@@ -491,6 +529,7 @@ mod tests {
             None,
             None,
             false,
+            None,
         );
         let mut priority0_3 = QueueItem::new(
             "3".to_string(),
@@ -499,6 +538,7 @@ mod tests {
             None,
             None,
             false,
+            None,
         );
         let mut priority10_4 = QueueItem::new(
             "4".to_string(),
@@ -507,6 +547,7 @@ mod tests {
             None,
             None,
             false,
+            None,
         );
         let mut priority0_5 = QueueItem::new(
             "5".to_string(),
@@ -515,6 +556,7 @@ mod tests {
             None,
             None,
             false,
+            None,
         );
         let mut priority_n5_6 = QueueItem::new(
             "6".to_string(),
@@ -523,6 +565,7 @@ mod tests {
             None,
             None,
             false,
+            None,
         );
 
         // Force timestamps to be distinct (on systems that are too fast or have low clock resolution)
@@ -595,6 +638,7 @@ mod tests {
             None,
             Some("pid-1".to_string()),
             false,
+            None,
         );
         assert!(non_exclusive.is_visible_for(&None));
         assert!(non_exclusive.is_visible_for(&Some("pid-1".to_string())));
@@ -608,6 +652,7 @@ mod tests {
             None,
             Some("pid-1".to_string()),
             true,
+            None,
         );
         assert!(exclusive.is_visible_for(&Some("pid-1".to_string())));
         assert!(!exclusive.is_visible_for(&Some("pid-other".to_string())));

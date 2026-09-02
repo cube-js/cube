@@ -1,3 +1,4 @@
+import { getEnv } from '@cubejs-backend/shared';
 import { UserError } from '../../../src/compiler/UserError';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
@@ -45,10 +46,6 @@ describe('SQL Generation', () => {
           }]
         },
         per_visitor_revenue: perVisitorRevenueMeasure,
-        revenueRunning: {
-          type: 'runningTotal',
-          sql: 'amount'
-        },
         revenueRolling: {
           type: 'sum',
           sql: 'amount',
@@ -79,14 +76,6 @@ describe('SQL Generation', () => {
             trailing: '2 day',
             offset: 'start'
           }
-        },
-        runningCount: {
-          type: 'runningTotal',
-          sql: '1'
-        },
-        runningRevenuePerCount: {
-          type: 'number',
-          sql: \`round(\${revenueRunning} / \${runningCount})\`
         },
         averageCheckins: {
           type: 'avg',
@@ -490,18 +479,32 @@ describe('SQL Generation', () => {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
+      // Tesseract correctly computes each fact table independently in multi-fact queries.
+      // JS planner computes visitors measures through cards join, biasing to visitors with cards only.
       expect(res).toEqual(
-        [{
-          cards__count: '1',
-          visitors__source: 'google',
-          visitors__visitor_count: '1',
-          visitors__average_checkins: '2.0000000000000000'
-        }, {
-          cards__count: '2',
-          visitors__source: 'some',
-          visitors__visitor_count: '1',
-          visitors__average_checkins: '6.0000000000000000'
-        }]
+        getEnv('nativeSqlPlanner')
+          ? [{
+            cards__count: '1',
+            visitors__source: 'google',
+            visitors__visitor_count: '1',
+            visitors__average_checkins: '2.0000000000000000'
+          }, {
+            cards__count: '2',
+            visitors__source: 'some',
+            visitors__visitor_count: '2',
+            visitors__average_checkins: '5.0000000000000000'
+          }]
+          : [{
+            cards__count: '1',
+            visitors__source: 'google',
+            visitors__visitor_count: '1',
+            visitors__average_checkins: '2.0000000000000000'
+          }, {
+            cards__count: '2',
+            visitors__source: 'some',
+            visitors__visitor_count: '1',
+            visitors__average_checkins: '6.0000000000000000'
+          }]
       );
     });
   });
@@ -561,18 +564,28 @@ describe('SQL Generation', () => {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
+      // Tesseract: with correct multi-fact values (avg=5.0 for 'some'), the AND conditions
+      // (count=2 AND avg=6) don't match, so only google is returned.
+      // JS planner: biased avg=6.0 for 'some' matches (count=2 AND avg=6).
       expect(res).toEqual(
-        [{
-          cards__count: '1',
-          visitors__source: 'google',
-          visitors__visitor_count: '1',
-          visitors__average_checkins: '2.0000000000000000'
-        }, {
-          cards__count: '2',
-          visitors__source: 'some',
-          visitors__visitor_count: '1',
-          visitors__average_checkins: '6.0000000000000000'
-        }]
+        getEnv('nativeSqlPlanner')
+          ? [{
+            cards__count: '1',
+            visitors__source: 'google',
+            visitors__visitor_count: '1',
+            visitors__average_checkins: '2.0000000000000000'
+          }]
+          : [{
+            cards__count: '1',
+            visitors__source: 'google',
+            visitors__visitor_count: '1',
+            visitors__average_checkins: '2.0000000000000000'
+          }, {
+            cards__count: '2',
+            visitors__source: 'some',
+            visitors__visitor_count: '1',
+            visitors__average_checkins: '6.0000000000000000'
+          }]
       );
     });
   });
@@ -632,18 +645,25 @@ describe('SQL Generation', () => {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
+      // Same multi-fact issue: Tesseract computes correct values, filter excludes 'some'.
       expect(res).toEqual(
-        [{
-          // "cards__count": "1",
-          visitors__source: 'google',
-          visitors__visitor_count: '1',
-          visitors__average_checkins: '2.0000000000000000'
-        }, {
-          // "cards__count": "2",
-          visitors__source: 'some',
-          visitors__visitor_count: '1',
-          visitors__average_checkins: '6.0000000000000000'
-        }]
+        getEnv('nativeSqlPlanner')
+          ? [{
+            visitors__source: 'google',
+            visitors__visitor_count: '1',
+            visitors__average_checkins: '2.0000000000000000'
+          }]
+          : [{
+            // "cards__count": "1",
+            visitors__source: 'google',
+            visitors__visitor_count: '1',
+            visitors__average_checkins: '2.0000000000000000'
+          }, {
+            // "cards__count": "2",
+            visitors__source: 'some',
+            visitors__visitor_count: '1',
+            visitors__average_checkins: '6.0000000000000000'
+          }]
       );
     });
   });

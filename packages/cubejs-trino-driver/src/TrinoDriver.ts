@@ -1,9 +1,12 @@
-import fetch from 'node-fetch';
-import { PrestoDriver } from '@cubejs-backend/prestodb-driver';
+import fetch, { RequestInit } from 'node-fetch';
+import { Agent as HttpsAgent } from 'https';
+import { PrestoDriver, PrestoDriverConfiguration } from '@cubejs-backend/prestodb-driver';
 import { PrestodbQuery } from '@cubejs-backend/schema-compiler';
 
+export type TrinoDriverConfiguration = Omit<PrestoDriverConfiguration, 'engine'>;
+
 export class TrinoDriver extends PrestoDriver {
-  public constructor(options: any) {
+  public constructor(options: TrinoDriverConfiguration = {}) {
     super({ ...options, engine: 'trino' });
   }
 
@@ -17,10 +20,10 @@ export class TrinoDriver extends PrestoDriver {
       return this.testConnectionViaSelect();
     }
 
-    const { host, port, ssl, basic_auth: basicAuth, custom_auth: customAuth } = this.config;
+    const { host, port, ssl, basic_auth: basicAuth, custom_auth: customAuth, headers: extraHeaders } = this.config;
     const protocol = ssl ? 'https' : 'http';
     const url = `${protocol}://${host}:${port}/v1/info`;
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { ...extraHeaders };
 
     if (customAuth) {
       headers.Authorization = customAuth;
@@ -30,7 +33,13 @@ export class TrinoDriver extends PrestoDriver {
       headers.Authorization = `Basic ${encoded}`;
     }
 
-    const response = await fetch(url, { method: 'GET', headers });
+    const requestInit: RequestInit = { method: 'GET', headers };
+
+    if (ssl) {
+      requestInit.agent = new HttpsAgent({ ...ssl });
+    }
+
+    const response = await fetch(url, requestInit);
 
     if (!response.ok) {
       const text = await response.text();

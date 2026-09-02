@@ -14,7 +14,7 @@ use crate::{
     CubeError,
 };
 use futures::future::join_all;
-use log::error;
+use log::{error, warn};
 
 use std::{
     env,
@@ -114,9 +114,15 @@ pub trait ConfigObj: DIService + Debug {
 
     fn non_streaming_query_max_row_limit(&self) -> i32;
 
+    fn fail_on_limitless_post_processing(&self) -> bool;
+
+    fn cube_scan_max_batch_rows(&self) -> usize;
+
     fn max_sessions(&self) -> usize;
 
     fn no_implicit_order(&self) -> bool;
+
+    fn enable_tesseract_sql_planner(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -136,8 +142,11 @@ pub struct ConfigObjImpl {
     pub push_down_pull_up_split: bool,
     pub stream_mode: bool,
     pub non_streaming_query_max_row_limit: i32,
+    pub fail_on_limitless_post_processing: bool,
+    pub cube_scan_max_batch_rows: usize,
     pub max_sessions: usize,
     pub no_implicit_order: bool,
+    pub tesseract_sql_planner: bool,
 }
 
 impl ConfigObjImpl {
@@ -147,6 +156,22 @@ impl ConfigObjImpl {
             .map(|v| v.parse::<u64>().unwrap())
             .unwrap_or(120);
         let sql_push_down = env_parse("CUBESQL_SQL_PUSH_DOWN", true);
+
+        let db_query_limit: i32 = env_parse("CUBEJS_DB_QUERY_LIMIT", 50000);
+        let non_streaming_query_max_row_limit =
+            match env_optparse("CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT") {
+                Some(limit) if limit > db_query_limit => {
+                    warn!(
+                        "CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT ({}) exceeds \
+                        CUBEJS_DB_QUERY_LIMIT ({}), falling back to the latter",
+                        limit, db_query_limit
+                    );
+                    db_query_limit
+                }
+                Some(limit) => limit,
+                None => db_query_limit,
+            };
+
         Self {
             bind_address: env::var("CUBESQL_BIND_ADDR").ok().or_else(|| {
                 env::var("CUBESQL_PORT")
@@ -178,9 +203,15 @@ impl ConfigObjImpl {
             push_down_pull_up_split: env_optparse("CUBESQL_PUSH_DOWN_PULL_UP_SPLIT")
                 .unwrap_or(sql_push_down),
             stream_mode: env_parse("CUBESQL_STREAM_MODE", false),
-            non_streaming_query_max_row_limit: env_parse("CUBEJS_DB_QUERY_LIMIT", 50000),
+            non_streaming_query_max_row_limit,
+            fail_on_limitless_post_processing: env_parse(
+                "CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING",
+                false,
+            ),
+            cube_scan_max_batch_rows: env_parse("CUBESQL_CUBE_SCAN_MAX_BATCH_ROWS", 65536),
             max_sessions: env_parse("CUBEJS_MAX_SESSIONS", 1024),
             no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", true),
+            tesseract_sql_planner: env_parse("CUBEJS_TESSERACT_SQL_PLANNER", true),
         }
     }
 }
@@ -244,12 +275,24 @@ impl ConfigObj for ConfigObjImpl {
         self.non_streaming_query_max_row_limit
     }
 
+    fn fail_on_limitless_post_processing(&self) -> bool {
+        self.fail_on_limitless_post_processing
+    }
+
+    fn cube_scan_max_batch_rows(&self) -> usize {
+        self.cube_scan_max_batch_rows
+    }
+
     fn no_implicit_order(&self) -> bool {
         self.no_implicit_order
     }
 
     fn max_sessions(&self) -> usize {
         self.max_sessions
+    }
+
+    fn enable_tesseract_sql_planner(&self) -> bool {
+        self.tesseract_sql_planner
     }
 }
 
@@ -282,8 +325,11 @@ impl Config {
                 push_down_pull_up_split: true,
                 stream_mode: false,
                 non_streaming_query_max_row_limit: 50000,
+                fail_on_limitless_post_processing: false,
+                cube_scan_max_batch_rows: 65536,
                 max_sessions: 1024,
                 no_implicit_order: true,
+                tesseract_sql_planner: false,
             }),
         }
     }

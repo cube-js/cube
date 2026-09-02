@@ -18,6 +18,12 @@ import Python3Parser, {
   Single_string_template_atomContext,
   ArglistContext,
   CallArgumentsContext,
+  // eslint-disable-next-line camelcase
+  Not_testContext,
+  // eslint-disable-next-line camelcase
+  And_testContext,
+  // eslint-disable-next-line camelcase
+  Or_testContext,
 } from './Python3Parser';
 import { UserError } from '../compiler/UserError';
 import Python3ParserVisitor from './Python3ParserVisitor';
@@ -223,6 +229,21 @@ export class PythonParser {
           return { args: children };
         } else if (node instanceof LambdefContext) {
           return t.arrowFunctionExpression(children[0].args, children[1]);
+        } else if (node instanceof Not_testContext) {
+          if (node.getChildCount() === 1) {
+            return children[0];
+          }
+          return t.unaryExpression('!', children[0]);
+        } else if (node instanceof And_testContext) {
+          if (children.length === 1) {
+            return children[0];
+          }
+          return children.reduce((left, right) => t.logicalExpression('&&', left, right));
+        } else if (node instanceof Or_testContext) {
+          if (children.length === 1) {
+            return children[0];
+          }
+          return children.reduce((left, right) => t.logicalExpression('||', left, right));
         } else if (node instanceof ArglistContext) {
           return children;
         } else {

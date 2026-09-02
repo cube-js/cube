@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/common_sql_generation.rs
+expression: result
+---
+account_overview__region | account_overview__count
+-------------------------+------------------------
+EU                       | 1                      
+US                       | 1

@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/rolling_window/edge_cases.rs
+expression: result
+---
+orders__rolling_sum_trailing_7d
+-------------------------------
+2755.00

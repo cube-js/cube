@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/pre_aggregations/multi_fact.rs
+expression: result
+---
+customers__city | orders__count | returns__count
+----------------+---------------+---------------
+Boston          | 3             | 2             
+Chicago         | 0             | 2             
+New York        | 5             | 1

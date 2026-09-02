@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/rolling_window/basic_types.rs
+assertion_line: 82
+expression: result
+---
+orders__rolling_sum_leading
+---------------------------
+1455.00

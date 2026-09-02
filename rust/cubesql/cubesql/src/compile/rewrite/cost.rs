@@ -1,29 +1,49 @@
 use std::{
-    collections::HashMap, fmt::Debug, hash::Hash, marker::PhantomData, mem::take, sync::Arc,
+    cmp::Ordering, collections::HashMap, fmt::Debug, hash::Hash, marker::PhantomData, mem::take,
+    sync::Arc,
 };
 
 use crate::{
     compile::rewrite::{
-        rules::utils::granularity_str_to_int_order, CubeScanUngrouped, CubeScanWrapped,
-        DimensionName, LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun,
-        TimeDimensionGranularity, WrappedSelectPushToCube, WrappedSelectUngroupedScan,
+        rules::utils::granularity_str_to_int_order, CubeScanLimit, CubeScanUngrouped,
+        CubeScanWrapped, DimensionName, LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun,
+        TimeDimensionGranularity, WrappedSelectLimit, WrappedSelectPushToCube,
+        WrappedSelectUngroupedScan,
     },
     transport::{MetaContext, V1CubeMetaDimensionExt},
 };
 use egg::{Analysis, EGraph, Id, Language, RecExpr};
 use indexmap::IndexSet;
 
+/// Whether a query carrying this limit still gets truncated by the row cap.
+///
+/// No limit is capped at `max_row_limit`, and so is any limit above it, since
+/// [`CubeScanExecutionPlan::execute`] clamps the request back down to the cap before
+/// sending it.
+fn is_limitless(limit: &Option<usize>, max_row_limit: usize) -> bool {
+    limit.is_none_or(|limit| limit > max_row_limit)
+}
+
 #[derive(Debug)]
 pub struct BestCubePlan {
     meta_context: Arc<MetaContext>,
     penalize_post_processing: bool,
+    penalize_limitless_post_processing: bool,
+    max_row_limit: usize,
 }
 
 impl BestCubePlan {
-    pub fn new(meta_context: Arc<MetaContext>, penalize_post_processing: bool) -> Self {
+    pub fn new(
+        meta_context: Arc<MetaContext>,
+        penalize_post_processing: bool,
+        penalize_limitless_post_processing: bool,
+        max_row_limit: usize,
+    ) -> Self {
         Self {
             meta_context,
             penalize_post_processing,
+            penalize_limitless_post_processing,
+            max_row_limit,
         }
     }
 
@@ -53,8 +73,12 @@ impl BestCubePlan {
             _ => 0,
         };
 
+        // What a wrapper does on its own, as opposed to merely holding a scan: a wrapper
+        // with none of it is an empty wrapper, and preferring it over the plain scan it
+        // wraps would be pointless
         let ast_size_inside_wrapper = match enode {
             LogicalPlanLanguage::WrappedSelect(_) => 1,
+            LogicalPlanLanguage::WrappedUnion(_) => 1,
             _ => 0,
         };
 
@@ -127,6 +151,7 @@ impl BestCubePlan {
             LogicalPlanLanguage::JoinCheckStage(_) => 1,
             LogicalPlanLanguage::JoinCheckPushDown(_) => 1,
             LogicalPlanLanguage::JoinCheckPullUp(_) => 1,
+            LogicalPlanLanguage::MultiFactJoinWrapper(_) => 1,
             LogicalPlanLanguage::SortProjectionPushdownReplacer(_) => 1,
             LogicalPlanLanguage::SortProjectionPullupReplacer(_) => 1,
             // Not really replacers but those should be deemed as mandatory rewrites and as soon as
@@ -208,6 +233,23 @@ impl BestCubePlan {
             _ => 0,
         };
 
+        // A Cube query is capped at `non_streaming_query_max_row_limit` rows when it runs,
+        // without any ordering. That cap is harmless for the rows the client receives, but
+        // anything computed on top of a capped result in DataFusion sees an arbitrary slice
+        // of it.
+        //
+        // A limit of its own only helps while it is at or below the cap, since anything
+        // above is clamped back down to it and truncates just the same. BI tools often send
+        // a large defensive limit, so those queries are read as unlimited here.
+        let limitless_scans = match enode {
+            LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(limit))
+                if is_limitless(limit, self.max_row_limit) =>
+            {
+                1
+            }
+            _ => 0,
+        };
+
         CubePlanCost {
             replacers: this_replacers,
             // Will be filled in finalize
@@ -228,6 +270,8 @@ impl BestCubePlan {
             max_time_dimensions_granularity,
             structure_points,
             ungrouped_aggregates: 0,
+            // Will be filled in finalize
+            limitless_post_processing: 0,
             wrapper_nodes,
             joins,
             wrapped_select_non_push_to_cube,
@@ -240,13 +284,46 @@ impl BestCubePlan {
             ast_size: 1,
             ungrouped_nodes,
             unwrapped_subqueries,
+            limitless_scans: Unordered(limitless_scans),
+            // Will be filled in finalize
+            limitless_ungrouped_aggregates: Unordered(0),
         }
+    }
+}
+
+/// A cost field that carries a value forward without taking part in the comparison.
+///
+/// [`CubePlanCost`] derives its ordering from the declaration order of its fields, so any
+/// field it holds is also a tie breaker. Some fields are only inputs to other fields and
+/// have no ordering of their own to express - preferring more of them or fewer of them
+/// would both be arbitrary - so they are wrapped here and compare equal to each other.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Unordered<T>(pub T);
+
+impl<T> PartialEq for Unordered<T> {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl<T> Eq for Unordered<T> {}
+
+impl<T> PartialOrd for Unordered<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<T> Ord for Unordered<T> {
+    fn cmp(&self, _: &Self) -> Ordering {
+        Ordering::Equal
     }
 }
 
 #[derive(Clone, Copy)]
 pub struct CubePlanCostOptions {
     penalize_post_processing: bool,
+    penalize_limitless_post_processing: bool,
 }
 
 /// This cost struct maintains following structural relationships:
@@ -260,6 +337,9 @@ pub struct CubePlanCostOptions {
 /// - `filter_members` > `cube_members` - optimize for `inDateRange` filter push down to time dimension
 /// - `member_errors` > `cube_members` - extra cube members may be required (e.g. CASE)
 /// - `member_errors` > `wrapper_nodes` - use SQL push down where possible if cube scan can't be detected
+/// - `limitless_post_processing` > `wrapper_nodes`, `ast_size_outside_wrapper` - row dropping or
+///   row multiplying post processing on top of an unlimited Cube query reads a truncated result,
+///   so prefer SQL push down over any representation that leaves such a query to post processing
 /// - `non_pushed_down_window` > `wrapper_nodes` - prefer to always push down window functions
 /// - `non_pushed_down_limit_sort` > `wrapper_nodes` - prefer to always push down limit-sort expressions
 /// - `wrapped_select_non_push_to_cube` > `wrapped_select_ungrouped_scan` - otherwise cost would prefer any aggregation, even non-push-to-Cube
@@ -279,6 +359,7 @@ pub struct CubePlanCost {
     non_pushed_down_grouping_sets: i64,
     non_pushed_down_limit_sort: i64,
     joins: usize,
+    limitless_post_processing: usize,
     wrapper_nodes: i64,
     ast_size_outside_wrapper: usize,
     wrapped_select_non_push_to_cube: usize,
@@ -300,6 +381,11 @@ pub struct CubePlanCost {
     ast_size: usize,
     ast_size_inside_wrapper: usize,
     ungrouped_nodes: usize,
+    // Input for `limitless_post_processing`, which is what expresses the preference
+    limitless_scans: Unordered<usize>,
+    // Reported rather than preferred: extraction prices these through
+    // `ungrouped_aggregates`, this only records the ones that read a truncated scan
+    limitless_ungrouped_aggregates: Unordered<usize>,
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
@@ -317,6 +403,20 @@ pub enum SortState {
 }
 
 impl CubePlanCost {
+    /// Whether this plan computes something in DataFusion over a Cube query that the row
+    /// cap truncates, and so would answer with a number that is wrong rather than short.
+    ///
+    /// Two shapes qualify. `limitless_post_processing` counts the post processing that
+    /// extraction already prefers to push down. An `Aggregate` over an ungrouped scan is
+    /// the other: extraction prices it through `ungrouped_aggregates` instead, but the
+    /// rows it reads are raw and capped, so its result is just as wrong.
+    ///
+    /// Both are counted at the node that does the reading, so neither can pair an
+    /// aggregate in one branch with an unlimited scan in another.
+    pub fn truncates_post_processing(&self) -> bool {
+        self.limitless_post_processing > 0 || self.limitless_ungrouped_aggregates.0 > 0
+    }
+
     pub fn add_child(&self, other: &Self) -> Self {
         Self {
             replacers: self.replacers + other.replacers,
@@ -365,6 +465,12 @@ impl CubePlanCost {
             ast_size_inside_wrapper: self.ast_size_inside_wrapper + other.ast_size_inside_wrapper,
             ungrouped_nodes: self.ungrouped_nodes + other.ungrouped_nodes,
             unwrapped_subqueries: self.unwrapped_subqueries + other.unwrapped_subqueries,
+            limitless_post_processing: self.limitless_post_processing
+                + other.limitless_post_processing,
+            limitless_scans: Unordered(self.limitless_scans.0 + other.limitless_scans.0),
+            limitless_ungrouped_aggregates: Unordered(
+                self.limitless_ungrouped_aggregates.0 + other.limitless_ungrouped_aggregates.0,
+            ),
         }
     }
 
@@ -372,6 +478,7 @@ impl CubePlanCost {
         &self,
         state: &CubePlanState,
         sort_state: &SortState,
+        under_limit: bool,
         enode: &LogicalPlanLanguage,
         options: CubePlanCostOptions,
     ) -> Self {
@@ -443,6 +550,48 @@ impl CubePlanCost {
                 }
                 CubePlanState::Wrapper => 0,
             } + self.ungrouped_aggregates,
+            // A Cube query the user did not limit is capped at the maximum row limit when it
+            // runs, with no ordering, so post processing reads an arbitrary slice of the rows.
+            // A node whose output for a given row depends only on that row is no worse off
+            // than the client would have been reading the capped result directly:
+            //
+            // - `Projection`, `TableUDFs`, `Repartition` are row-wise, so their output is the
+            //   same slice with the same expressions applied
+            // - `Limit` on its own narrows an unordered result, which SQL already leaves
+            //   unspecified; a `Sort` underneath it is what makes the choice of rows wrong,
+            //   and that is caught below
+            // - `Aggregate` re-aggregates rows the Cube query already grouped. That holds
+            //   while its grouping matches the scan's, where the cap lands on the rows the
+            //   client asked for rather than on hidden detail. A coarser rollup, such as
+            //   `SUM(cnt)` over a scan grouped by city, does read a capped slice and is
+            //   wrong - it is exempt here because pushing harder proved counterproductive,
+            //   full push down being ungrouped itself, not because it is safe
+            //
+            // Everything else reads the slice as if it were the whole population:
+            //
+            // - `Sort` orders the slice, so the leading rows are not the true leading rows
+            // - `Filter` and `Distinct` decide what to keep by looking at rows that are missing
+            // - `Window` evaluates over a whole partition, which the cap has cut short
+            // - `Join`, `CrossJoin`, `Union` and `Subquery` pair the slice with other data, so
+            //   the rows dropped by the cap silently drop matches too
+            limitless_post_processing: match state {
+                CubePlanState::Unwrapped(_)
+                    if options.penalize_limitless_post_processing && self.limitless_scans.0 > 0 =>
+                {
+                    match enode {
+                        LogicalPlanLanguage::Sort(_)
+                        | LogicalPlanLanguage::Filter(_)
+                        | LogicalPlanLanguage::Distinct(_)
+                        | LogicalPlanLanguage::Window(_)
+                        | LogicalPlanLanguage::Join(_)
+                        | LogicalPlanLanguage::CrossJoin(_)
+                        | LogicalPlanLanguage::Union(_)
+                        | LogicalPlanLanguage::Subquery(_) => 1,
+                        _ => 0,
+                    }
+                }
+                _ => 0,
+            } + self.limitless_post_processing,
             unwrapped_subqueries: self.unwrapped_subqueries,
             wrapper_nodes: self.wrapper_nodes,
             wrapped_select_non_push_to_cube: self.wrapped_select_non_push_to_cube,
@@ -452,6 +601,28 @@ impl CubePlanCost {
             ast_size: self.ast_size,
             ast_size_inside_wrapper: self.ast_size_inside_wrapper,
             ungrouped_nodes: self.ungrouped_nodes,
+            // A limit above bounds every scan below it, so nothing there is left to be
+            // truncated by the row limit
+            limitless_scans: if under_limit {
+                Unordered(0)
+            } else {
+                self.limitless_scans
+            },
+            // Counted at the `Aggregate` itself, so the scan it reads is the one in its
+            // own subtree rather than any unlimited scan elsewhere in the plan
+            limitless_ungrouped_aggregates: Unordered(
+                match state {
+                    CubePlanState::Unwrapped(_)
+                        if self.ungrouped_nodes > 0 && self.limitless_scans.0 > 0 =>
+                    {
+                        match enode {
+                            LogicalPlanLanguage::Aggregate(_) => 1,
+                            _ => 0,
+                        }
+                    }
+                    _ => 0,
+                } + self.limitless_ungrouped_aggregates.0,
+            ),
         }
     }
 }
@@ -741,14 +912,52 @@ impl TopDownCost for CubePlanCost {
 pub struct CubePlanTopDownState {
     wrapped: CubePlanState,
     limit: SortState,
+    /// Whether a select above bounds the rows every scan below it can return
+    under_limit: bool,
+    max_row_limit: usize,
 }
 
 impl CubePlanTopDownState {
-    pub fn new() -> Self {
+    pub fn new(max_row_limit: usize) -> Self {
         Self {
             wrapped: CubePlanState::Unwrapped(0),
             limit: SortState::None,
+            under_limit: false,
+            max_row_limit,
         }
+    }
+
+    /// Whether this node bounds the rows every scan below it can return.
+    ///
+    /// A push to Cube wrapper carries the user's limit on its select rather than on the
+    /// scan below it, so the scan itself still looks unlimited. Reading the limit here and
+    /// carrying it down the plan means a scan is judged by the query it actually ends up
+    /// in, and a limited scan can never stand in for an unlimited one in a sibling branch.
+    pub fn introduces_limit<A>(
+        &self,
+        node: &LogicalPlanLanguage,
+        egraph: &EGraph<LogicalPlanLanguage, A>,
+    ) -> bool
+    where
+        A: Analysis<LogicalPlanLanguage>,
+    {
+        let limit_id = match node {
+            LogicalPlanLanguage::WrappedSelect(params) => params[10],
+            LogicalPlanLanguage::CubeScan(params) => params[4],
+            _ => return false,
+        };
+        // Anything but a single limit at or below the row cap leaves the scans below
+        // unbounded, which is the safe reading: the penalty applies rather than being
+        // silently skipped
+        let nodes = &egraph[limit_id].nodes;
+        !nodes.is_empty()
+            && nodes.iter().all(|node| match node {
+                LogicalPlanLanguage::WrappedSelectLimit(WrappedSelectLimit(limit))
+                | LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(limit)) => {
+                    !is_limitless(limit, self.max_row_limit)
+                }
+                _ => false,
+            })
     }
 
     pub fn is_wrapped<A>(
@@ -817,7 +1026,14 @@ impl TopDownState<LogicalPlanLanguage> for CubePlanTopDownState {
             _ => SortState::None,
         };
 
-        Self { wrapped, limit }
+        let under_limit = self.under_limit || self.introduces_limit(node, egraph);
+
+        Self {
+            wrapped,
+            limit,
+            under_limit,
+            max_row_limit: self.max_row_limit,
+        }
     }
 }
 
@@ -836,9 +1052,11 @@ impl TopDownCostFunction<LogicalPlanLanguage, CubePlanTopDownState, CubePlanCost
             &cost,
             &state.wrapped,
             &state.limit,
+            state.under_limit,
             node,
             CubePlanCostOptions {
                 penalize_post_processing: self.penalize_post_processing,
+                penalize_limitless_post_processing: self.penalize_limitless_post_processing,
             },
         )
     }

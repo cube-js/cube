@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/integration/member_expressions.rs
+expression: result
+---
+upper_city    | orders__count
+--------------+--------------
+NEW YORK      | 4            
+NULL          | 2            
+SAN FRANCISCO | 2            
+BOSTON        | 1

@@ -1,12 +1,12 @@
 /* eslint-disable import/first */
-/* globals describe,test,expect,jest,afterEach,beforeAll,beforeEach */
+import { vi, MockedFunction } from 'vitest';
 import fetch from 'cross-fetch';
 
-jest.mock('cross-fetch');
+vi.mock('cross-fetch');
 
-import HttpTransport from '../src/HttpTransport';
+import HttpTransport from '../src/HttpTransport.js';
 
-const mockedFetch = fetch as jest.MockedFunction<typeof fetch>;
+const mockedFetch = fetch as MockedFunction<typeof fetch>;
 
 describe('HttpTransport', () => {
   const apiUrl = 'http://localhost:3000/cubejs-api/v1';
@@ -78,6 +78,30 @@ describe('HttpTransport', () => {
       },
       body: null
     });
+  });
+
+  test('it sends the meta request with no query string when there are no params', async () => {
+    const transport = new HttpTransport({
+      authorization: 'token',
+      apiUrl,
+    });
+    const req = transport.request('meta', { signal: undefined, baseRequestId: undefined });
+    await req.subscribe(() => { console.log('subscribe cb'); });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(mockedFetch.mock.calls[0]?.[0]).toBe(`${apiUrl}/meta`);
+  });
+
+  // CubeApi.meta() sends the boolean; URLSearchParams renders it as `onlyViews=true`,
+  // which is what the gateway's `req.query.onlyViews === 'true'` check expects.
+  test('it sends onlyViews in the meta query string', async () => {
+    const transport = new HttpTransport({
+      authorization: 'token',
+      apiUrl,
+    });
+    const req = transport.request('meta', { signal: undefined, baseRequestId: undefined, onlyViews: true });
+    await req.subscribe(() => { console.log('subscribe cb'); });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(mockedFetch.mock.calls[0]?.[0]).toBe(`${apiUrl}/meta?onlyViews=true`);
   });
 
   test('it serializes the query object and sends it in the body', async () => {
@@ -217,7 +241,7 @@ describe('HttpTransport', () => {
       // Mock AbortSignal.timeout
       const originalTimeout = AbortSignal.timeout;
       const mockTimeoutSignal = {};
-      AbortSignal.timeout = jest.fn().mockReturnValue(mockTimeoutSignal);
+      AbortSignal.timeout = vi.fn().mockReturnValue(mockTimeoutSignal);
 
       const transport = new HttpTransport({
         authorization: 'token',

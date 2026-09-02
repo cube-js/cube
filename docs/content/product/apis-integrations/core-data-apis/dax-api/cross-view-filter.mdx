@@ -1,0 +1,85 @@
+# Cross-view filtering in the DAX API
+
+By default, the [DAX API][ref-dax-api] exposes each [view][ref-views] as a
+separate perspective in [Power BI][ref-powerbi]. Visualizations from different
+views can't share the same filters, and a single report can't combine measures
+and dimensions across views.
+
+Cross-view filtering removes this limitation, letting you build dashboards
+that span multiple views and apply filters consistently across visualizations.
+It is supported in both [Live connection](#live-connection-mode) and
+[DirectQuery](#directquery-mode) modes.
+
+To use cross-view filters such as slicers, you must enable single-perspective mode
+in the DAX API. To enable single-perspective mode in the DAX API,
+set the <EnvVar>CUBEJS_DAX_SINGLE_PERSPECTIVE</EnvVar> environment variable to `true`.
+
+In single-perspective mode, all views are exposed as part of a single perspective.
+This allows you to use a single connection and show visualizations from different
+views on the same dashboard.
+
+<WarningBox>
+
+Single-perspective mode changes the way views are exposed by the DAX API.
+Because of that, it is not backwards-compatible with dashboards created before
+enabling this environment variable.
+
+</WarningBox>
+
+## Live connection mode
+
+In Live connection mode, cross-view filters work automatically, provided that
+the following two conditions are met:
+
+- The column used in the filter must be present in every view that the
+cross-filter has to be applied to, and named exactly the same in each view.
+- The column in all such views must resolve to the same cube member.
+
+For example, if views `orders_view` and `users_view` both expose a column named
+`address_country` pointing to the `country.country` cube member, cross-filtering
+will be applied across these views.
+
+If the `address_country` column in `orders_view` points to `orders.country`
+while the `address_country` column in `users_view` points to `users.country`,
+cross-filtering will not be applied, because the columns resolve to different
+cube members.
+
+Likewise, if `orders_view` exposes an `address_country` column pointing to
+`country.country` and `users_view` exposes a `country` column also pointing to
+`country.country`, cross-filtering will not be applied, because the column
+names differ between the views.
+
+## DirectQuery mode
+
+In DirectQuery mode, cross-view filters require the same two conditions as in
+[Live connection mode](#live-connection-mode): the filter column must be
+present in every view with the exact same name, and it must resolve to the
+same cube member across those views.
+
+In addition, you must manually configure relationships between tables in Power
+BI so that filters propagate across views:
+
+- Open <Btn>Model view</Btn> in the left sidebar.
+- On the right, open the <Btn>Data</Btn> sidebar, then the <Btn>Model</Btn> tab.
+- Right-click <Btn>Relationships</Btn> and choose <Btn>New relationship</Btn>.
+- In the <Btn>Properties</Btn> sidebar, select a table and a column.
+- For cardinality, choose <Btn>Many to many (*:*)</Btn>. Ignore the warning.
+- Select another table with the same column.
+- For cross-filter direction, select <Btn>Both</Btn>.
+- Click <Btn>Apply changes</Btn>.
+
+Once the relationship is configured correctly, cross-view filters will work in
+DirectQuery mode.
+
+The steps above describe configuring a relationship between two tables. When
+many views need to be cross-filtered, the best practice is to create a single
+view in the Cube data model that includes all the columns from the views that
+need to be cross-filtered, and then create relationships between this large
+view and each of the other views. This keeps the relationship graph in Power
+BI simple and avoids configuring pairwise relationships between every
+combination of views.
+
+
+[ref-dax-api]: /product/apis-integrations/dax-api
+[ref-views]: /product/data-modeling/concepts#views
+[ref-powerbi]: /product/configuration/visualization-tools/powerbi

@@ -1,6 +1,6 @@
 use log::{debug, error};
 use reqwest;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::{configuration, Error};
@@ -24,10 +24,13 @@ pub enum MetaV1Error {
     UnknownValue(serde_json::Value),
 }
 
-pub async fn load_v1(
+pub async fn load_v1<D>(
     configuration: &configuration::Configuration,
     v1_load_request: Option<crate::models::V1LoadRequest>,
-) -> Result<crate::models::V1LoadResponse, Error<LoadV1Error>> {
+) -> Result<crate::models::V1LoadResponse<D>, Error<LoadV1Error>>
+where
+    D: DeserializeOwned,
+{
     let local_var_client = &configuration.client;
 
     let request_id = Uuid::new_v4().to_string();
@@ -61,7 +64,7 @@ pub async fn load_v1(
 
         if !local_var_status.is_client_error() && !local_var_status.is_server_error() {
             let response_ok =
-                serde_json::from_str::<crate::models::V1LoadResponse>(&local_var_content)
+                serde_json::from_str::<crate::models::V1LoadResponse<D>>(&local_var_content)
                     .map_err(Error::from);
             if response_ok.is_ok() {
                 return response_ok;
@@ -235,7 +238,7 @@ mod tests {
         let mut configuration = Configuration::new(client);
         configuration.base_path = server.uri();
 
-        let resp = load_v1(&configuration, None).await;
+        let resp = load_v1::<crate::models::V1LoadResultDataRow>(&configuration, None).await;
         match resp {
             Ok(_) => {}
             Err(e) => panic!("must be successful, {:?}", e),

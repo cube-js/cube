@@ -1,7 +1,7 @@
 import process from 'process';
 import color from '@oclif/color';
 
-const leastSupportedVersion = 20;
+const leastSupportedVersion = 22;
 const currentNodeVersion = process.versions.node;
 const semver = currentNodeVersion.split('.');
 const major = parseInt(<string> semver[0], 10);

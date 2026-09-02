@@ -1,0 +1,75 @@
+---
+title: Sankey
+description: Show flows between nodes, such as order status to year or channel to conversion.
+---
+
+Sankey diagrams draw one node per distinct endpoint and one ribbon per flow, with each ribbon's thickness proportional to its value. Best for showing how a quantity divides and moves between two sets of things: order statuses across years, traffic channels into outcomes, or one step of a user journey into the next.
+
+{/* Screenshot: sankey chart — order counts flowing from four statuses on the left to years on the right, with node labels on both sides. Place directly below this paragraph, full width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Fields
+
+A sankey needs exactly three fields, picked on the Fields tab:
+
+- **Source** — a dimension (a time dimension works too, labelled by its grain). The node a flow leaves.
+- **Target** — a dimension. The node a flow enters.
+- **Value** — a measure. Each row's value becomes one ribbon's thickness.
+
+Each result row is read as one flow, so a query grouped by two dimensions with one measure draws directly. **Swap** exchanges the source and target, which reverses every ribbon's direction.
+
+{/* Screenshot: Fields tab with the Source, Target and Value selectors bound, and the Swap button below them. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+Stages come from shared node names rather than from a stage field: rows `A → B` and `B → C` draw as a three-stage diagram, because `B` appears as both a target and a source. Two dimensions that share no values always draw two stages.
+
+A row with a blank endpoint, or a value of zero or less, is not a flow and is left out — a sankey cannot draw a ribbon with no thickness.
+
+Cyclic data is rejected rather than drawn. A flow that returns to a node it already passed through has no left-to-right layout, so the chart names the loop and asks you to remove one hop.
+
+## Node grouping
+
+A wide breakdown can return more flows than a diagram can carry, and the small ones become unreadable first. Node grouping folds them into a single **Other** node per side, so the tail stays represented as an aggregate instead of vanishing. It is off until you pick a mode, in the Node grouping section of the Fields tab:
+
+- **Minimal share** — fold every node below a percentage of its side's total. A node sitting exactly on the threshold is kept.
+- **Top N nodes** — keep the N largest nodes per side. Tied nodes at the cutoff are kept together, so asking for the top 3 can keep more than 3 when third place is shared.
+
+The two sides fold independently, each against its own total, because a node that is small as a target may be large as a source. The bucket's name is yours to set; leave it blank for **Other**. When both sides fold at once, the two buckets are named apart — **Other (source)** and **Other (target)** — so one is not read as the other.
+
+{/* Screenshot: Node grouping section with Minimal share selected and a threshold entered. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+A single node is never folded on its own — replacing one named node with a same-sized **Other** would say less than leaving it alone. A node whose own value already matches the bucket's name is also left out of the bucket, so a real category called "Other" is never merged into it.
+
+The bucket stands for a set of members rather than one, so it has no query behind it: clicking a ribbon that touches it does not drill down.
+
+## Truncation
+
+Independently of grouping, a sankey draws at most 50 flows, keeping the largest. This is a backstop against a runaway result, not a legibility control — when it removes anything, a warning appears beside the Flows heading on the Fields tab saying how many of the total it is showing, pointing at node grouping, which is the real answer for a diagram too wide to read.
+
+## Data labels
+
+Each node carries its name and, optionally, its value. Both are independent buttons in the Data labels section of the Style tab: **Name** is on by default, **Value** is off. With both on, the value follows the name in parentheses; with only the value on, the node carries a bare number; with both off the diagram draws no labels.
+
+A node's value is the larger of its inflow and its outflow, and takes the value field's own number format.
+
+Labels sit to the right of their node, except in the final stage, where they flip to the left so they stay inside the frame.
+
+## Color
+
+Each node takes its own color from the palette selected in the **Palette** dropdown on the Style tab. The color follows the node's name rather than its position, so filtering or re-sorting the query does not repaint the diagram. See [Palettes](/docs/explore-analyze/charts/configuration/color-and-stacking#palettes) for the built-in palettes and how to define a custom one.
+
+The **Flows** control sets where a ribbon takes its color from:
+
+- **Source** — the color of the node the ribbon leaves. The default.
+- **Neutral** — one muted color for every ribbon, leaving the nodes to carry the palette.
+- **Target** — the color of the node the ribbon enters.
+
+{/* Screenshot: Style tab Color section with the Palette dropdown and the Flows buttons. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Tooltips
+
+Hovering a ribbon shows the result columns named in **Tooltip fields** on the Fields tab, which starts as every column in the query except the three the diagram already draws — source, target and value. Add them back like any other field if you want them repeated. Hovering a node shows its name and value.
+
+See [Tooltips](/docs/explore-analyze/charts/configuration/tooltips) for adding, removing and reordering fields.
+
+## Drill down
+
+Clicking a ribbon drills into the row behind that flow. Ribbons touching a grouped **Other** node are not clickable, since that node covers several members at once.

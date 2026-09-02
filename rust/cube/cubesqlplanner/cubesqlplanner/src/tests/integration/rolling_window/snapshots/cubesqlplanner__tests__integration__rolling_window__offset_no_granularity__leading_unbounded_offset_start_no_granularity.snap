@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/rolling_window/offset_no_granularity.rs
+assertion_line: 115
+expression: result
+---
+orders__rolling_sum_leading_offset_start
+----------------------------------------
+1205.00

@@ -5,8 +5,7 @@ on:
     paths:
       - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
-      - 'rust/cubenativeutils/**'
-      - 'rust/cubesqlplanner/**'
+      - 'rust/cube/**'
       - 'rust/cubesql/**'
     branches:
       - 'master'
@@ -14,8 +13,7 @@ on:
     paths:
       - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
-      - 'rust/cubenativeutils/**'
-      - 'rust/cubesqlplanner/**'
+      - 'rust/cube/**'
       - 'rust/cubesql/**'
 
 jobs:
@@ -24,7 +22,7 @@ jobs:
     timeout-minutes: 20
     name: Check fmt/clippy
     container:
-      image: cubejs/rust-cross:x86_64-unknown-linux-gnu-15082024
+      image: cubejs/rust-cross:x86_64-unknown-linux-gnu-31072025
 
     steps:
       - name: Checkout
@@ -47,20 +45,16 @@ jobs:
         run: cd rust/cubesql && cargo fmt --all -- --check
       - name: Lint Native
         run: cd packages/cubejs-backend-native && cargo fmt --all -- --check
-      - name: Lint cubenativeutils
-        run: cd rust/cubenativeutils && cargo fmt --all -- --check
-      - name: Lint cubesqlplanner
-        run: cd rust/cubesqlplanner && cargo fmt --all -- --check
+      - name: Lint cube workspace
+        run: cd rust/cube && cargo fmt --all -- --check
       - name: Clippy CubeSQL
         run: cd rust/cubesql && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
       - name: Clippy Native
         run: cd packages/cubejs-backend-native && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
       - name: Clippy Native (with Python)
         run: cd packages/cubejs-backend-native && cargo clippy --locked --workspace --all-targets --keep-going --features python -- -D warnings
-      - name: Clippy cubenativeutils
-        run: cd rust/cubenativeutils && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
-      - name: Clippy cubesqlplanner
-        run: cd rust/cubesqlplanner && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
+      - name: Clippy cube workspace
+        run: cd rust/cube && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
 
   unit:
     #  We use host instead of cross container, because it's much faster
@@ -126,14 +120,16 @@ jobs:
     strategy:
       matrix:
         # Current used version + 1 LTS
-        # TODO: Add 24 after it's been released (don't forget to uncomment excludes below!)
-        node-version: [22]
-        python-version: ["3.9", "3.10", "3.11", "3.12", "fallback"]
+        # TODO: Re-add 26 after cubejs-duckdb-driver migrates off the frozen `duckdb`
+        # package (no prebuilt binaries for Node.js 26, don't forget to uncomment excludes below!)
+        # node-version: [24, 26]
+        node-version: [24]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "fallback"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
         # minimize number of jobs
         exclude:
-# TODO: uncomment after adding v24
-#          - node-version: 22
+# TODO: uncomment after re-adding v26
+#          - node-version: 26
 #            target: "aarch64-unknown-linux-gnu"
           - python-version: 3.10
             target: "aarch64-unknown-linux-gnu"
@@ -141,7 +137,7 @@ jobs:
             target: "aarch64-unknown-linux-gnu"
       fail-fast: false
     container:
-      image: cubejs/rust-cross:${{ matrix.target }}-15082024${{ matrix.python-version != 'fallback' && format('-python-{0}', matrix.python-version) || '' }}
+      image: cubejs/rust-cross:${{ matrix.target }}-31072025${{ matrix.python-version != 'fallback' && format('-python-{0}', matrix.python-version) || '' }}
 
     steps:
       - name: Checkout
@@ -231,7 +227,7 @@ jobs:
     strategy:
       matrix:
         # We do not need to test under all versions, we do it under linux
-        node-version: [22.x]
+        node-version: [24.x]
         target: ["x86_64-apple-darwin", "aarch64-apple-darwin"]
         include:
           - target: x86_64-apple-darwin
@@ -246,6 +242,9 @@ jobs:
           - target: x86_64-apple-darwin
             os-version: macos-15-intel
             python-version: "3.12"
+          - target: x86_64-apple-darwin
+            os-version: macos-15-intel
+            python-version: "3.13"
           - target: x86_64-apple-darwin
             os-version: macos-15-intel
             python-version: "fallback"
@@ -329,7 +328,7 @@ jobs:
     strategy:
       matrix:
         # We do not need to test under all versions, we do it under linux
-        node-version: [22.x]
+        node-version: [24.x]
         os-version: [windows-2022]
         python-version: ["fallback"]
       fail-fast: false

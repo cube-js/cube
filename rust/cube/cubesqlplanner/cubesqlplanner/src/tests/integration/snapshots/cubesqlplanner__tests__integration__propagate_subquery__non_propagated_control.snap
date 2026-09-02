@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/propagate_subquery.rs
+expression: result
+---
+customers__total_spend | customers__name | sales__total_amount
+-----------------------+-----------------+--------------------
+130.00                 | Alice           | 500.00

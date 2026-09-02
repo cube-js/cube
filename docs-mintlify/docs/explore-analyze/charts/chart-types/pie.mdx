@@ -1,0 +1,34 @@
+---
+title: Pie & donut
+description: Show how a single measure is distributed across a small number of categories.
+---
+
+Pie charts divide a circle into slices proportional to each category's share of the total. Best for communicating part-to-whole proportions to a broad audience when you have a small number of clearly distinct categories (typically five or fewer).
+
+## Variants
+
+### Pie
+
+Standard filled circle. Each slice's arc length is proportional to its value.
+
+{/* Screenshot: pie chart — total revenue split by product category (5 slices with a legend). Place directly below this heading, half-width centered or side-by-side with donut. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Donut
+
+A pie with a hollow center. Select **Donut** under **Shape** in the Style tab to switch; select **Pie** to switch back.
+
+{/* Screenshot: donut chart — same data as the pie variant. Place directly below this heading, half-width centered or side-by-side with pie. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Center total
+
+A donut shows the measure's grand total in its hole by default, using the measure's number format. Use the **Show total** button in the Data labels section of the Style tab to turn it off or on again.
+
+The button appears only for a donut, since a pie has no hollow center to fill.
+
+The total uses the font size set in the Data labels section, the same as the slice labels. If you turn on the **Percentage** label, the total also shows `100%` on a second line, since the whole is the entire circle.
+
+{/* Screenshot: donut chart with the center total visible, Style tab showing the Show total button. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Color and slice ordering
+
+Slices are colored using the active [color palette](/docs/explore-analyze/charts/configuration/color-and-stacking) in palette order, matched to the sort order of your query results. To change which slice appears first, adjust the sort in the results table.

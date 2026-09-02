@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/react",
-  "version": "1.6.23",
+  "version": "1.7.32",
   "author": "Cube Dev, Inc.",
   "license": "MIT",
   "engines": {},
@@ -12,32 +12,38 @@
   "description": "React components for cube.js",
   "main": "dist/cubejs-client-react.cjs.js",
   "module": "dist/cubejs-client-react.esm.js",
-  "types": "index.d.ts",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "lint": "eslint src/*.js src/*.jsx",
-    "lint:fix": "eslint --fix src/*.js src/*.jsx"
+    "build": "tsc --build",
+    "tsc": "tsc --build",
+    "watch": "tsc --build --watch",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint --fix src --ext .ts,.tsx"
   },
   "files": [
     "src",
-    "dist",
-    "index.d.ts"
+    "dist"
   ],
   "dependencies": {
     "@babel/runtime": "^7.1.2",
-    "@cubejs-client/core": "1.6.23",
+    "@cubejs-client/core": "1.7.32",
     "core-js": "^3.6.5",
     "ramda": "^0.27.2"
   },
   "devDependencies": {
+    "@babel/core": "^7.13.8",
     "@types/ramda": "^0.27.40",
     "@types/react": "^16.9.41",
+    "@typescript-eslint/eslint-plugin": "^6.12.0",
+    "@typescript-eslint/parser": "^6.12.0",
     "eslint": "^7.21.0",
     "eslint-config-airbnb": "^18.0.1",
     "eslint-config-airbnb-base": "^14.0.0",
     "eslint-plugin-import": "^2.18.2",
     "eslint-plugin-jsx-a11y": "^6.2.3",
     "eslint-plugin-node": "^10.0.0",
-    "eslint-plugin-react": "^7.15.1"
+    "eslint-plugin-react": "^7.15.1",
+    "typescript": "~5.2.2"
   },
   "peerDependencies": {
     "react": ">=16.10.2"

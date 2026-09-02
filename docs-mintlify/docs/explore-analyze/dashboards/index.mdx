@@ -1,0 +1,100 @@
+---
+title: Dashboards
+description: Curate and share polished views of your workbook reports with stakeholders as interactive dashboards.
+---
+
+Dashboards let you select and organize reports from your workbooks into polished, shareable views for your team and stakeholders. Transform your exploratory analysis into production-ready deliverables by choosing which insights to highlight and present.
+
+## Use cases
+
+Dashboards enable you to:
+
+- **Monitor key metrics** – Display critical business indicators that refresh with live data
+- **Distribute analysis** – Package your findings into reports for regular distribution
+- **Build data tools** – Develop specialized applications powered by your semantic layer
+- **Present insights** – Showcase important discoveries in a polished, accessible format
+
+## How it works
+
+In the dashboard builder inside your [workbook][ref-workbooks], select the reports you want to include and arrange them on the canvas alongside other [widgets][ref-widgets] to tell your data story, then publish the dashboard. This gives stakeholders direct access to the insights that matter most, without the complexity of the underlying analysis.
+
+Prefer to manage dashboards from source control? You can also apply dashboards,
+workbooks, and reports to a deployment through the REST API and keep their
+definitions in Git — see [Dashboards as code](/docs/explore-analyze/dashboards/dashboards-as-code).
+
+## Data freshness
+
+Each widget shows a [freshness](/docs/explore-analyze/workbooks/querying-data#result-freshness-and-provenance) leaf indicating how recently its data was refreshed. The dashboard's own leaf reflects its least-recently-refreshed widget, so you can see at a glance whether everything on the dashboard is up to date.
+
+## Linking between dashboards
+
+Dashboards can link to one another. When a table widget shows a dimension that
+has [links][ref-dimension-links] defined in the data model, left-clicking a cell
+opens a menu with those links: a **drill-in** link (`dashboard:`) navigates to
+another dashboard in the same deployment, filtered by the values in the clicked
+row, and an **external** link (`url:`) opens a URL. This is how you build
+overview → detail flows — click a row in a summary dashboard to jump straight to
+a focused dashboard scoped to that row.
+
+Links are declared once on the dimension in the data model (not configured
+per-dashboard), so every table that shows that dimension — in dashboards,
+workbooks, embedded dashboards, and Explore — offers the same links. A drill-in
+link targets a dashboard by its [slug](#dashboard-slug); see [Dimensions →
+Links][ref-dimension-links] to define them.
+
+## Dashboard slug
+
+A dashboard can have a **slug** — a short, stable, human-readable identifier
+(e.g. `orders-detail`) used to link to it from the data model. Data-model
+[dimension links][ref-dimension-links] with a `dashboard:` value reference a
+dashboard by its slug to drill into it.
+
+To set it, open the dashboard in the builder, open the **options sidebar**, and
+fill the **Slug** field. Slugs are **unique per deployment** and are resolved
+within the current deployment, so the same model works across environments. The
+dashboard's own URL is unaffected (it stays `publicId`-based).
+
+<Note>
+
+**There is no required order between the model and the dashboard.** You can
+reference a slug from a `dashboard:` link in the data model before any dashboard
+uses it, or set a dashboard's slug before any link references it — neither
+breaks. A link whose slug doesn't (yet) resolve is simply skipped in the cell
+menu, and starts working as soon as a dashboard in the deployment claims that
+slug. (If you later clear or change a slug that links still reference, the
+options sidebar warns you to update those links.)
+
+</Note>
+
+## Download as PNG, PDF, or CSV {#download-as-png-or-pdf}
+
+Open a published dashboard, click the **More actions** (`⋯`) button in the
+header, and choose **Download as PNG** or **Download as PDF**. The file is
+named after the dashboard's title.
+
+To export a **single chart** instead of the whole dashboard, hover the chart
+widget, open its **⋮** menu, and choose **Download as PNG** or **Download as
+PDF** — the same menu also offers **Download as CSV** for the chart's
+underlying data. The image captures just that chart, named after the chart's
+title.
+
+PNG and PDF downloads are server-rendered snapshots — Cube re-opens the
+dashboard (or, for a single chart, that chart on its own), waits for rendering
+to finish, and captures the result. This can take up to a couple of minutes
+for large dashboards. The filter and time-grain selections you currently have
+applied in your browser are carried into the export. (CSV is generated from the
+data already loaded in the chart and downloads immediately.)
+
+Downloading the whole dashboard requires **Manage** permission on the workbook
+that owns it; exporting a single chart requires the **Download data**
+permission. Both are hidden entirely when an admin turns off the account-wide
+[data download controls][ref-data-download-controls]. The same screenshot
+mechanism powers PNG/PDF attachments on [notifications][ref-notifications] sent
+after a [scheduled refresh][ref-scheduled-refreshes].
+
+[ref-workbooks]: /docs/explore-analyze/workbooks
+[ref-widgets]: /docs/explore-analyze/dashboards/widgets
+[ref-dimension-links]: /docs/data-modeling/dimensions#links
+[ref-notifications]: /docs/explore-analyze/notifications
+[ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
+[ref-data-download-controls]: /admin/users-and-permissions/roles-and-permissions#restricting-data-downloads

@@ -152,6 +152,14 @@ impl NoticeResponse {
             message,
         }
     }
+
+    pub fn notice(code: ErrorCode, message: String) -> Self {
+        Self {
+            severity: NoticeSeverity::Notice,
+            code,
+            message,
+        }
+    }
 }
 
 impl Serialize for NoticeResponse {
@@ -175,12 +183,26 @@ impl Serialize for NoticeResponse {
     }
 }
 
+/// Fields which few errors carry. They are kept apart, and behind a pointer, so
+/// that every Result of the crate does not grow by their size.
+#[derive(Debug, Default, PartialEq)]
+pub struct ErrorDetails {
+    /// Where the error happened, shown by clients as CONTEXT. PostgreSQL uses it
+    /// to point at the row of COPY data which could not be loaded.
+    pub context: Option<String>,
+    /// Suggestion on how to fix the data, shown by clients as HINT.
+    pub hint: Option<String>,
+    /// What exactly was wrong, shown by clients as DETAIL.
+    pub detail: Option<String>,
+}
+
 #[derive(thiserror::Error, Debug)]
 pub struct ErrorResponse {
     // https://www.postgresql.org/docs/14/protocol-error-fields.html
     pub severity: ErrorSeverity,
     pub code: ErrorCode,
     pub message: String,
+    pub details: Option<Box<ErrorDetails>>,
 }
 
 impl Display for ErrorResponse {
@@ -195,39 +217,60 @@ impl ErrorResponse {
             severity,
             code,
             message,
+            details: None,
         }
     }
 
     pub fn error(code: ErrorCode, message: String) -> Self {
-        Self {
-            severity: ErrorSeverity::Error,
-            code,
-            message,
-        }
+        Self::new(ErrorSeverity::Error, code, message)
     }
 
     pub fn fatal(code: ErrorCode, message: String) -> Self {
-        Self {
-            severity: ErrorSeverity::Fatal,
-            code,
-            message,
-        }
+        Self::new(ErrorSeverity::Fatal, code, message)
+    }
+
+    pub fn with_context(mut self, context: String) -> Self {
+        self.details.get_or_insert_with(Default::default).context = Some(context);
+
+        self
+    }
+
+    pub fn with_hint(mut self, hint: String) -> Self {
+        self.details.get_or_insert_with(Default::default).hint = Some(hint);
+
+        self
+    }
+
+    pub fn with_detail(mut self, detail: String) -> Self {
+        self.details.get_or_insert_with(Default::default).detail = Some(detail);
+
+        self
+    }
+
+    pub fn context(&self) -> Option<&String> {
+        self.details.as_ref().and_then(|d| d.context.as_ref())
+    }
+
+    pub fn hint(&self) -> Option<&String> {
+        self.details.as_ref().and_then(|d| d.hint.as_ref())
+    }
+
+    pub fn detail(&self) -> Option<&String> {
+        self.details.as_ref().and_then(|d| d.detail.as_ref())
     }
 
     pub fn query_canceled() -> Self {
-        Self {
-            severity: ErrorSeverity::Error,
-            code: ErrorCode::QueryCanceled,
-            message: "canceling statement due to user request".to_string(),
-        }
+        Self::error(
+            ErrorCode::QueryCanceled,
+            "canceling statement due to user request".to_string(),
+        )
     }
 
     pub fn admin_shutdown() -> Self {
-        Self {
-            severity: ErrorSeverity::Fatal,
-            code: ErrorCode::AdminShutdown,
-            message: "terminating connection due to shutdown signal".to_string(),
-        }
+        Self::fatal(
+            ErrorCode::AdminShutdown,
+            "terminating connection due to shutdown signal".to_string(),
+        )
     }
 }
 
@@ -246,6 +289,18 @@ impl Serialize for ErrorResponse {
         buffer::write_string(&mut buffer, &self.code.to_string());
         buffer.push(b'M');
         buffer::write_string(&mut buffer, &self.message);
+        if let Some(context) = self.context() {
+            buffer.push(b'W');
+            buffer::write_string(&mut buffer, context);
+        }
+        if let Some(detail) = self.detail() {
+            buffer.push(b'D');
+            buffer::write_string(&mut buffer, detail);
+        }
+        if let Some(hint) = self.hint() {
+            buffer.push(b'H');
+            buffer::write_string(&mut buffer, hint);
+        }
         buffer.push(0);
 
         Some(buffer)
@@ -451,6 +506,7 @@ pub enum PortalCompletion {
 pub enum CommandComplete {
     Select(u32),
     Fetch(u32),
+    Copy(u32),
     Plain(String),
 }
 
@@ -475,7 +531,45 @@ impl Serialize for CommandComplete {
             CommandComplete::Fetch(rows) => {
                 buffer::write_string(&mut buffer, &format!("FETCH {}", rows))
             }
+            CommandComplete::Copy(rows) => {
+                buffer::write_string(&mut buffer, &format!("COPY {}", rows))
+            }
             CommandComplete::Plain(tag) => buffer::write_string(&mut buffer, tag),
+        }
+
+        Some(buffer)
+    }
+}
+
+/// (B) Sent in reply to a `COPY ... FROM STDIN` command, after which the server
+/// reads CopyData messages until the client sends CopyDone or CopyFail.
+///
+/// The overall format is 0 for the textual formats (text, CSV) and 1 for binary.
+/// Per-column format codes must all match the overall format.
+#[derive(Debug, PartialEq)]
+pub struct CopyInResponse {
+    format: Format,
+    columns: usize,
+}
+
+impl CopyInResponse {
+    pub fn new(format: Format, columns: usize) -> Self {
+        Self { format, columns }
+    }
+}
+
+impl Serialize for CopyInResponse {
+    const CODE: u8 = b'G';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        let columns = i16::try_from(self.columns).ok()?;
+
+        let mut buffer = Vec::with_capacity(3 + 2 * self.columns);
+        buffer.put_u8(self.format as u8);
+        buffer.put_i16(columns);
+
+        for _ in 0..columns {
+            buffer.put_i16(self.format as i16);
         }
 
         Some(buffer)
@@ -533,9 +627,9 @@ impl Serialize for ParameterDescription {
     const CODE: u8 = b't';
 
     fn serialize(&self) -> Option<Vec<u8>> {
+        let size = i16::try_from(self.parameters.len()).ok()?;
+
         let mut buffer: Vec<u8> = Vec::with_capacity(6 * self.parameters.len());
-        // FIXME!
-        let size = i16::try_from(self.parameters.len()).unwrap();
         buffer.put_i16(size);
 
         for parameter in &self.parameters {
@@ -572,8 +666,7 @@ impl Serialize for RowDescription {
     const CODE: u8 = b'T';
 
     fn serialize(&self) -> Option<Vec<u8>> {
-        // FIXME!
-        let size = u16::try_from(self.fields.len()).unwrap();
+        let size = u16::try_from(self.fields.len()).ok()?;
         let mut buffer = Vec::with_capacity(DEFAULT_CAPACITY);
         buffer.extend_from_slice(&size.to_be_bytes());
 
@@ -671,6 +764,14 @@ impl Deserialize for Parse {
         let query = buffer::read_string(&mut buffer).await?;
 
         let total = buffer.read_i16().await?;
+        if total < 0 {
+            return Err(ErrorResponse::error(
+                ErrorCode::ProtocolViolation,
+                format!("Invalid parameter count: {total}"),
+            )
+            .into());
+        }
+
         let mut param_types = Vec::with_capacity(total as usize);
 
         for _ in 0..total {
@@ -847,12 +948,24 @@ impl Deserialize for Bind {
                 let len = buffer.read_i32().await?;
                 if len == -1 {
                     parameter_values.push(None);
+                } else if len < 0 {
+                    return Err(ErrorResponse::error(
+                        ErrorCode::ProtocolViolation,
+                        format!("Invalid bind parameter length: {len}"),
+                    )
+                    .into());
+                } else if len as u32 > buffer::MAX_BIND_PARAMETER_LENGTH {
+                    return Err(ErrorResponse::error(
+                        ErrorCode::ProtocolViolation,
+                        format!(
+                            "Bind parameter length {len} exceeds the maximum allowed size of {} bytes",
+                            buffer::MAX_BIND_PARAMETER_LENGTH
+                        ),
+                    )
+                    .into());
                 } else {
-                    let mut value = Vec::with_capacity(len as usize);
-                    for _ in 0..len {
-                        value.push(buffer.read_u8().await?);
-                    }
-
+                    let mut value = vec![0u8; len as usize];
+                    buffer.read_exact(&mut value).await?;
                     parameter_values.push(Some(value));
                 }
             }
@@ -930,6 +1043,43 @@ impl Deserialize for Query {
     }
 }
 
+/// (F) Data of a `COPY ... FROM STDIN` command. Message boundaries do not have to
+/// match row boundaries, so a row can span several messages.
+#[derive(Debug, PartialEq)]
+pub struct CopyData {
+    pub data: Vec<u8>,
+}
+
+#[async_trait]
+impl Deserialize for CopyData {
+    async fn deserialize(buffer: Cursor<Vec<u8>>) -> Result<Self, ProtocolError>
+    where
+        Self: Sized,
+    {
+        Ok(Self {
+            data: buffer.into_inner(),
+        })
+    }
+}
+
+/// (F) Sent by the client to abort a `COPY ... FROM STDIN`, carrying the reason.
+#[derive(Debug, PartialEq)]
+pub struct CopyFail {
+    pub message: String,
+}
+
+#[async_trait]
+impl Deserialize for CopyFail {
+    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, ProtocolError>
+    where
+        Self: Sized,
+    {
+        Ok(Self {
+            message: buffer::read_string(&mut buffer).await?,
+        })
+    }
+}
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(u8)]
 pub enum Format {
@@ -963,14 +1113,44 @@ pub enum FrontendMessage {
     Execute(Execute),
     /// Extended Query. Close Portal/Statement
     Close(Close),
+    /// COPY FROM STDIN. A chunk of the data being copied in.
+    CopyData(CopyData),
+    /// COPY FROM STDIN. All the data has been sent.
+    CopyDone,
+    /// COPY FROM STDIN. The client aborts the copy.
+    CopyFail(CopyFail),
     /// Extension
     Extension(Box<dyn FrontendMessageExtension>),
+}
+
+impl FrontendMessage {
+    /// Message type byte the client used, as it appears in protocol errors.
+    pub fn tag(&self) -> u8 {
+        match self {
+            FrontendMessage::PasswordMessage(_) => b'p',
+            FrontendMessage::Query(_) => b'Q',
+            FrontendMessage::Flush => b'H',
+            FrontendMessage::Terminate => b'X',
+            FrontendMessage::Sync => b'S',
+            FrontendMessage::Parse(_) => b'P',
+            FrontendMessage::Bind(_) => b'B',
+            FrontendMessage::Describe(_) => b'D',
+            FrontendMessage::Execute(_) => b'E',
+            FrontendMessage::Close(_) => b'C',
+            FrontendMessage::CopyData(_) => b'd',
+            FrontendMessage::CopyDone => b'c',
+            FrontendMessage::CopyFail(_) => b'f',
+            FrontendMessage::Extension(_) => 0x00,
+        }
+    }
 }
 
 /// <https://www.postgresql.org/docs/14/errcodes-appendix.html>
 #[derive(Debug)]
 #[allow(dead_code)]
 pub enum ErrorCode {
+    // Class 03 — SQL Statement Not Yet Complete
+    SqlStatementNotYetComplete,
     // 0A — Feature Not Supported
     FeatureNotSupported,
     // 8 -  Connection Exception
@@ -980,6 +1160,13 @@ pub enum ErrorCode {
     InvalidPassword,
     // 22
     DataException,
+    StringDataRightTruncation,
+    NumericValueOutOfRange,
+    CharacterNotInRepertoire,
+    InvalidTextRepresentation,
+    BadCopyFileFormat,
+    // Class 23 — Integrity Constraint Violation
+    NotNullViolation,
     // Class 25 — Invalid Transaction State
     ActiveSqlTransaction,
     NoActiveSqlTransaction,
@@ -988,16 +1175,22 @@ pub enum ErrorCode {
     // 34
     InvalidCursorName,
     // Class 42 — Syntax Error or Access Rule Violation
+    SyntaxErrorOrAccessRuleViolation,
     DuplicateCursor,
+    DuplicateTable,
     SyntaxError,
     // Class 53 — Insufficient Resources
     TooManyConnections,
     ConfigurationLimitExceeded,
+    // Class 54 — Program Limit Exceeded
+    ProgramLimitExceeded,
     // Class 55 — Object Not In Prerequisite State
     ObjectNotInPrerequisiteState,
     // Class 57 - Operator Intervention
     QueryCanceled,
     AdminShutdown,
+    // Class 58 — System Error (errors external to PostgreSQL itself)
+    SystemError,
     // XX - Internal Error
     InternalError,
 }
@@ -1005,22 +1198,33 @@ pub enum ErrorCode {
 impl Display for ErrorCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let string = match self {
+            Self::SqlStatementNotYetComplete => "03000",
             Self::FeatureNotSupported => "0A000",
             Self::ProtocolViolation => "08P01",
             Self::InvalidAuthorizationSpecification => "28000",
             Self::InvalidPassword => "28P01",
             Self::DataException => "22000",
+            Self::StringDataRightTruncation => "22001",
+            Self::NumericValueOutOfRange => "22003",
+            Self::CharacterNotInRepertoire => "22021",
+            Self::InvalidTextRepresentation => "22P02",
+            Self::BadCopyFileFormat => "22P04",
+            Self::NotNullViolation => "23502",
             Self::ActiveSqlTransaction => "25001",
             Self::NoActiveSqlTransaction => "25P01",
             Self::InvalidSqlStatement => "26000",
             Self::InvalidCursorName => "34000",
+            Self::SyntaxErrorOrAccessRuleViolation => "42000",
             Self::DuplicateCursor => "42P03",
+            Self::DuplicateTable => "42P07",
             Self::SyntaxError => "42601",
             Self::TooManyConnections => "53300",
             Self::ConfigurationLimitExceeded => "53400",
+            Self::ProgramLimitExceeded => "54000",
             Self::ObjectNotInPrerequisiteState => "55000",
             Self::QueryCanceled => "57014",
             Self::AdminShutdown => "57P01",
+            Self::SystemError => "58000",
             Self::InternalError => "XX000",
         };
         write!(f, "{}", string)
@@ -1132,7 +1336,9 @@ pub trait Deserialize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{read_message, MessageTagParserDefaultImpl, ProtocolError};
+    use crate::{
+        read_message, MessageTagParserDefaultImpl, ProtocolError, MAX_FRONTEND_MESSAGE_LENGTH,
+    };
 
     use std::io::Cursor;
 
@@ -1210,7 +1416,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Parse(parse) => {
                 assert_eq!(
@@ -1240,7 +1451,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Bind(bind) => {
                 assert_eq!(
@@ -1275,7 +1491,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Bind(body) => {
                 assert_eq!(
@@ -1313,7 +1534,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Bind(body) => {
                 assert_eq!(
@@ -1345,7 +1571,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Bind(body) => {
                 assert_eq!(body.parameter_formats, vec![Format::Binary]);
@@ -1375,7 +1606,12 @@ mod tests {
             .to_string(),
         );
         let mut cursor = Cursor::new(buffer);
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Bind(body) => {
                 assert_eq!(
@@ -1397,7 +1633,12 @@ mod tests {
             .to_string(),
         );
         let mut cursor = Cursor::new(buffer);
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Bind(body) => {
                 assert_eq!(body.parameter_formats, vec![Format::Binary]);
@@ -1424,7 +1665,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Describe(desc) => {
                 assert_eq!(
@@ -1451,7 +1697,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::PasswordMessage(body) => {
                 assert_eq!(
@@ -1477,7 +1728,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Execute(body) => {
                 assert_eq!(
@@ -1507,8 +1763,18 @@ mod tests {
 
         // This test demonstrates that protocol can decode two
         // simple messages without body in sequence
-        read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
-        read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
+        read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
 
         Ok(())
     }
@@ -1557,5 +1823,116 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_bind_rejects_oversized_parameter_length() {
+        // Bind ('B') frame declaring a single parameter whose length is
+        // i32::MAX (~2 GiB) inside a 17-byte frame. Must be rejected before
+        // allocating instead of attempting a giant Vec::with_capacity.
+        let buffer = vec![
+            0x42, // tag 'B'
+            0x00, 0x00, 0x00, 0x10, // length = 16
+            0x00, // portal: ""
+            0x00, // statement: ""
+            0x00, 0x00, // 0 parameter format codes
+            0x00, 0x01, // 1 parameter value
+            0x7F, 0xFF, 0xFF, 0xFF, // value length = i32::MAX
+            0x00, 0x00, // 0 result format codes
+        ];
+        let mut cursor = Cursor::new(buffer);
+
+        let err = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await
+        .expect_err("oversized bind parameter length must be rejected");
+
+        match err {
+            ProtocolError::ErrorResponse { source, .. } => {
+                assert!(matches!(source.code, ErrorCode::ProtocolViolation));
+                assert!(
+                    source.message.contains("exceeds the maximum allowed size"),
+                    "unexpected message: {}",
+                    source.message
+                );
+            }
+            other => panic!("expected ErrorResponse, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_bind_rejects_negative_parameter_length() {
+        // Bind ('B') frame with a negative, non-NULL (-1) parameter length.
+        // Without a guard, `len as usize` wraps to a huge value and aborts
+        // the task with a capacity overflow.
+        let buffer = vec![
+            0x42, // tag 'B'
+            0x00, 0x00, 0x00, 0x10, // length = 16
+            0x00, // portal: ""
+            0x00, // statement: ""
+            0x00, 0x00, // 0 parameter format codes
+            0x00, 0x01, // 1 parameter value
+            0xFF, 0xFF, 0xFF, 0xFE, // value length = -2
+            0x00, 0x00, // 0 result format codes
+        ];
+        let mut cursor = Cursor::new(buffer);
+
+        let err = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await
+        .expect_err("negative bind parameter length must be rejected");
+
+        match err {
+            ProtocolError::ErrorResponse { source, .. } => {
+                assert!(matches!(source.code, ErrorCode::ProtocolViolation));
+                assert!(
+                    source.message.contains("Invalid bind parameter length"),
+                    "unexpected message: {}",
+                    source.message
+                );
+            }
+            other => panic!("expected ErrorResponse, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_parse_rejects_negative_parameter_count() {
+        // Parse ('P') frame with a negative parameter-type count. Without a
+        // guard, `total as usize` wraps to usize::MAX and aborts the task
+        // with a capacity overflow.
+        let buffer = vec![
+            0x50, // tag 'P'
+            0x00, 0x00, 0x00, 0x08, // length = 8
+            0x00, // name: ""
+            0x00, // query: ""
+            0xFF, 0xFF, // parameter count = -1
+        ];
+        let mut cursor = Cursor::new(buffer);
+
+        let err = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await
+        .expect_err("negative parse parameter count must be rejected");
+
+        match err {
+            ProtocolError::ErrorResponse { source, .. } => {
+                assert!(matches!(source.code, ErrorCode::ProtocolViolation));
+                assert!(
+                    source.message.contains("Invalid parameter count"),
+                    "unexpected message: {}",
+                    source.message
+                );
+            }
+            other => panic!("expected ErrorResponse, got {:?}", other),
+        }
     }
 }

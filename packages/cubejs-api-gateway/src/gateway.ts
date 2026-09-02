@@ -19,6 +19,7 @@ import {
   ResultArrayWrapper,
   ResultMultiWrapper,
   ResultWrapper,
+  rowsToColumnar,
 } from '@cubejs-backend/native';
 import type {
   Application as ExpressApplication,
@@ -56,6 +57,7 @@ import {
   SqlApiRequest,
   MetaResponseResultFn,
   RequestQuery,
+  QueryConvertRequest,
 } from './types/request';
 import {
   CheckAuthInternalOptions,
@@ -85,6 +87,7 @@ import { SubscriptionServer, WebSocketSendMessageFn } from './ws/subscription-se
 import { LocalSubscriptionStore } from './ws/local-subscription-store';
 import {
   getPivotQuery,
+  cubeSqlRequestSchema,
   getQueryGranularity,
   normalizeQuery,
   normalizeQueryCancelPreAggregations,
@@ -126,6 +129,77 @@ function systemAsyncHandler(handler: (req: Request & { context: ExtendedRequestC
   return (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
     handler(req as any, res).catch(next);
   };
+}
+
+const DEV_TOKEN_SCOPE = 'dev-token';
+
+/**
+ * A query that hit no pre-aggregation reports nothing rather than an empty
+ * object, so the key is simply absent from the response. Applied to the dev
+ * mode object as well, otherwise `'usedPreAggregations' in response` would
+ * answer differently in dev mode and in production. The Rust side normalizes
+ * the same way in `is_reportable_used_pre_aggregations`.
+ */
+function nonEmptyUsedPreAggregations(
+  usedPreAggregations: Record<string, any> | undefined
+): Record<string, any> | undefined {
+  return usedPreAggregations && Object.keys(usedPreAggregations).length > 0
+    ? usedPreAggregations
+    : undefined;
+}
+
+/**
+ * Fields of `usedPreAggregations` that are safe to report to any client: the
+ * identity of the pre-aggregation a result was served from, so the client can
+ * match the result to a build it is watching.
+ *
+ * `refreshKeyValues` is deliberately left out. Those are raw rows of the
+ * refresh key queries - typically aggregates such as `MAX(updated_at)` or
+ * `COUNT(*)` - and a `refreshKey.sql` is often written without the security
+ * context filtering that the cube itself applies, so the values can describe
+ * data the caller cannot otherwise reach.
+ *
+ * `targetTableName` is left out too. It names the physical table of one
+ * specific build, down to the content and structure version hashes, which a
+ * data API consumer cannot query anyway; `preAggregationId` plus the entry key
+ * identify the pre-aggregation and `lastUpdatedAt` dates the build.
+ *
+ * The full object, including both, is still returned in dev mode and to the
+ * Playground.
+ */
+function publicUsedPreAggregations(
+  usedPreAggregations: Record<string, any> | undefined
+): Record<string, any> | undefined {
+  const used = nonEmptyUsedPreAggregations(usedPreAggregations);
+  if (!used) {
+    return undefined;
+  }
+
+  const publicFields = ['preAggregationId', 'lastUpdatedAt', 'type'];
+
+  return Object.fromEntries(
+    Object.entries(used).map(([tableName, usage]) => [
+      tableName,
+      // Undefined fields are dropped rather than kept: the native result
+      // pipeline deserializes a JS `undefined` into a JSON `null`, so leaving
+      // them in would put `"preAggregationId": null` on the wire.
+      Object.fromEntries(
+        publicFields
+          .filter((field) => usage?.[field] !== undefined)
+          .map((field) => [field, usage[field]])
+      ),
+    ])
+  );
+}
+
+function hasDevTokenScope(securityContext: unknown): boolean {
+  if (typeof securityContext !== 'object' || securityContext === null) {
+    return false;
+  }
+
+  const { scope } = <Record<string, any>>securityContext;
+
+  return Array.isArray(scope) && scope.includes(DEV_TOKEN_SCOPE);
 }
 
 // Prepared CheckAuthFn, default or from config: always async
@@ -175,6 +249,8 @@ class ApiGateway {
 
   protected readonly playgroundAuthSecret?: string;
 
+  protected readonly apiSecrets?: string[];
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected readonly event: (name: string, props?: object) => void;
 
@@ -200,6 +276,9 @@ class ApiGateway {
     this.standalone = options.standalone;
     this.basePath = options.basePath;
     this.playgroundAuthSecret = options.playgroundAuthSecret;
+    this.apiSecrets = options.apiSecrets && options.apiSecrets.length > 0
+      ? options.apiSecrets
+      : undefined;
 
     this.queryRewrite = options.queryRewrite || (async (query) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
@@ -290,12 +369,15 @@ class ApiGateway {
         );
 
         const compilerApi = await this.getCompilerApi(req.context);
+
+        // Cache unfiltered schema - RBAC enforcement happens at query execution time
+        // via annotation-based validation in the Rust result transform layer
         let schema = compilerApi.getGraphQLSchema();
         if (!schema) {
-          let metaConfig = await compilerApi.metaConfig(req.context, {
+          const metaConfig = await compilerApi.metaConfig(req.context, {
             requestId: req.context.requestId,
+            skipVisibilityPatch: true,
           });
-          metaConfig = this.filterVisibleItemsInMeta(req.context, metaConfig);
           schema = makeSchema(metaConfig);
           compilerApi.setGraphQLSchema(schema);
         }
@@ -415,6 +497,22 @@ class ApiGateway {
       });
     }));
 
+    app.post(`${this.basePath}/v1/convert-query`, jsonParser, userMiddlewares, userAsyncHandler(async (req, res) => {
+      await this.convertQuery({
+        payload: req.body,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
+
+    app.delete(`${this.basePath}/v1/running-query/:requestId`, userMiddlewares, userAsyncHandler(async (req: any, res) => {
+      await this.cancelQuery({
+        requestId: req.params.requestId,
+        context: req.context,
+        res: this.resToResultFn(res),
+      });
+    }));
+
     /** **************************************************************
      * meta scope                                                    *
      *************************************************************** */
@@ -423,15 +521,18 @@ class ApiGateway {
       `${this.basePath}/v1/meta`,
       userMiddlewares,
       userAsyncHandler(async (req, res) => {
+        const onlyViews = req.query.onlyViews === 'true';
         if ('extended' in req.query) {
           await this.metaExtended({
             context: req.context,
             res: this.resToResultFn(res),
+            onlyViews,
           });
         } else {
           await this.meta({
             context: req.context,
             res: this.resToResultFn(res),
+            onlyViews,
           });
         }
       })
@@ -451,7 +552,12 @@ class ApiGateway {
         try {
           await this.assertApiScope('data', req.context?.securityContext);
 
-          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext, req.body.cache, req.body.timezone, req.body.throwContinueWait);
+          const { error, value: body } = cubeSqlRequestSchema.validate(req.body);
+          if (error) {
+            throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
+          }
+
+          await this.sqlServer.execSql(body.query, res, req.context?.securityContext, body.cache, body.timezone, body.throwContinueWait, req.context?.requestId);
         } catch (e: any) {
           // Quickfix for https://github.com/cube-js/cube/issues/10450,
           // Right now, it's too complicated to fix the issue correctly, because
@@ -624,11 +730,45 @@ class ApiGateway {
       })).filter(cube => cube.config.measures?.length || cube.config.dimensions?.length || cube.config.segments?.length);
   }
 
-  public async meta({ context, res, includeCompilerId, onlyCompilerId }: {
+  /**
+   * Recursively filters a (possibly nested) view group so that only visible
+   * views are exposed. A view group is dropped (returns null) when neither it
+   * nor any of its nested groups contains a visible view, preventing leaks of
+   * restricted view names.
+   */
+  private filterVisibleViewGroup(group: any, visibleCubeNames: Set<string>): any | null {
+    const views = (group.views || []).filter((v: string) => visibleCubeNames.has(v));
+    const includes = (group.includes || [])
+      .map((include: any) => {
+        if (typeof include === 'string') {
+          return visibleCubeNames.has(include) ? include : null;
+        }
+        return this.filterVisibleViewGroup(include, visibleCubeNames);
+      })
+      .filter((include: any) => include !== null);
+
+    if (views.length === 0 && includes.length === 0) {
+      return null;
+    }
+
+    // Explicit projection (rather than spreading `group`) so internal fields
+    // added to the compiled view group in the future don't leak into the meta
+    // response by accident.
+    return {
+      name: group.name,
+      title: group.title,
+      description: group.description,
+      views,
+      includes,
+    };
+  }
+
+  public async meta({ context, res, includeCompilerId, onlyCompilerId, onlyViews }: {
     context: RequestContext,
     res: MetaResponseResultFn,
     includeCompilerId?: boolean,
-    onlyCompilerId?: boolean
+    onlyCompilerId?: boolean,
+    onlyViews?: boolean,
   }) {
     const requestStarted = new Date();
 
@@ -637,19 +777,29 @@ class ApiGateway {
       const compilerApi = await this.getCompilerApi(context);
       const metaConfig = await compilerApi.metaConfig(context, {
         requestId: context.requestId,
-        includeCompilerId: includeCompilerId || onlyCompilerId
+        includeCompilerId: includeCompilerId || onlyCompilerId,
+        includeViewGroups: true,
       });
       if (onlyCompilerId) {
-        const response: { cubes: any[], compilerId?: string } = {
+        const response: { cubes: any[], viewGroups?: any[], compilerId?: string } = {
           cubes: [],
           compilerId: metaConfig.compilerId
         };
         res(response);
         return;
       }
-      const cubesConfig = includeCompilerId ? metaConfig.cubes : metaConfig;
+      const cubesConfig = onlyViews
+        ? metaConfig.cubes.filter((c: any) => c.config?.type === 'view')
+        : metaConfig.cubes;
       const cubes = this.filterVisibleItemsInMeta(context, cubesConfig).map(cube => cube.config);
-      const response: { cubes: any[], compilerId?: string } = { cubes };
+      const visibleCubeNames = new Set(cubes.map(c => c.name));
+      const viewGroups = (metaConfig.viewGroups || [])
+        .map(group => this.filterVisibleViewGroup(group, visibleCubeNames))
+        .filter(group => group !== null);
+      const response: { cubes: any[], viewGroups?: any[], compilerId?: string } = { cubes };
+      if (viewGroups.length > 0) {
+        response.viewGroups = viewGroups;
+      }
       if (includeCompilerId) {
         response.compilerId = metaConfig.compilerId;
       }
@@ -665,7 +815,11 @@ class ApiGateway {
     }
   }
 
-  public async metaExtended({ context, res }: { context: ExtendedRequestContext, res: ResponseResultFn }) {
+  public async metaExtended({ context, res, onlyViews }: {
+    context: ExtendedRequestContext,
+    res: ResponseResultFn,
+    onlyViews?: boolean,
+  }) {
     const requestStarted = new Date();
 
     try {
@@ -676,7 +830,10 @@ class ApiGateway {
       });
       const { metaConfig, cubeDefinitions } = metaConfigExtended;
 
-      const cubes = this.filterVisibleItemsInMeta(context, metaConfig)
+      const filteredMetaConfig = onlyViews
+        ? metaConfig.filter((c: any) => c.config?.type === 'view')
+        : metaConfig;
+      const cubes = this.filterVisibleItemsInMeta(context, filteredMetaConfig)
         .map((meta) => meta.config)
         .map((cube) => ({
           ...transformCube(cube, cubeDefinitions),
@@ -905,7 +1062,7 @@ class ApiGateway {
         throw new UserError('No job description provided');
       }
 
-      const { error } = preAggsJobsRequestSchema.validate(query);
+      const { error, value } = preAggsJobsRequestSchema.validate(query);
       if (error) {
         throw new UserError(`Invalid Job query format: ${error.message || error.toString()}`);
       }
@@ -914,7 +1071,7 @@ class ApiGateway {
         case 'post':
           result = await this.preAggregationsJobsPOST(
             context,
-            <PreAggsSelector>query.selector
+            <PreAggsSelector>value.selector
           );
           if (result.length === 0) {
             throw new UserError(
@@ -1035,8 +1192,6 @@ class ApiGateway {
       .refreshScheduler()
       .getCachedBuildJobs(context, tokens);
 
-    const metaCache: Map<string, any> = new Map();
-
     const response: PreAggJobStatusItem[] = await Promise.all(
       jobs.map(async ({ job, token }) => {
         if (!job) {
@@ -1049,12 +1204,15 @@ class ApiGateway {
         const ctx = { ...context, ...job.context };
         const orchestrator = await this.getAdapterApi(ctx);
         const compiler = await this.getCompilerApi(ctx);
+        // TODO(1.8): drop the fallback, no job posted by 1.7 can still be in the cache.
+        const dataSource = job.dataSource || (await compiler.preAggregations())
+          .find(pa => pa.id === job.preagg)?.dataSource;
         const selector: PreAggsSelector = {
           cubes: [job.preagg.split('.')[0]],
           preAggregations: [job.preagg],
           contexts: [job.context],
           timezones: [job.timezone],
-          dataSources: [job.dataSource],
+          dataSources: [dataSource],
         };
         if (
           job.status.indexOf('done') === 0 ||
@@ -1072,6 +1230,7 @@ class ApiGateway {
           const status = await this.getPreAggJobQueueStatus(
             orchestrator,
             job,
+            dataSource,
           );
           if (status) {
             // returning queued status
@@ -1082,18 +1241,13 @@ class ApiGateway {
               selector,
             };
           } else {
-            const metaCacheKey = JSON.stringify(ctx);
-            if (!metaCache.has(metaCacheKey)) {
-              metaCache.set(metaCacheKey, await compiler.metaConfigExtended(context, ctx));
-            }
-
             // checking and fetching result status
             const s = await this.getPreAggJobResultStatus(
               ctx.requestId,
               orchestrator,
               compiler,
-              metaCache.get(metaCacheKey),
               job,
+              dataSource,
               token,
             );
 
@@ -1127,10 +1281,11 @@ class ApiGateway {
   private async getPreAggJobQueueStatus(
     orchestrator: any,
     job: PreAggJob,
+    dataSource?: string,
   ): Promise<false | string> {
     let inQueue = false;
     let status: string = 'n/a';
-    const queuedList = await orchestrator.getPreAggregationQueueStates();
+    const queuedList = await orchestrator.getPreAggregationQueueStates(dataSource);
     queuedList.forEach((item) => {
       if (
         item.queryHandler &&
@@ -1166,19 +1321,18 @@ class ApiGateway {
     requestId: string,
     orchestrator: any,
     compiler: any,
-    metadata: any,
     job: PreAggJob,
+    dataSource: string | undefined,
     token: string,
   ): Promise<string> {
     const preaggs = await compiler.preAggregations();
     const preagg = preaggs.find(pa => pa.id === job.preagg);
     if (preagg) {
-      const cube = metadata.cubeDefinitions[preagg.cube];
       const [, status]: [boolean, string] =
         await orchestrator.isPartitionExist(
           requestId,
           preagg.preAggregation.external,
-          cube.dataSource,
+          dataSource,
           compiler.preAggregationsSchema,
           job.target,
           job.key,
@@ -1216,6 +1370,23 @@ class ApiGateway {
       const orchestratorApi = await this.getAdapterApi(context);
       await res({
         result: await orchestratorApi.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource)
+      });
+    } catch (e: any) {
+      this.handleError({
+        e, context, res, requestStarted
+      });
+    }
+  }
+
+  public async cancelQuery(
+    { requestId, context, res }: { requestId: string, context: RequestContext, res: ResponseResultFn }
+  ) {
+    const requestStarted = new Date();
+    try {
+      const orchestratorApi = await this.getAdapterApi(context);
+      const cancelled = await orchestratorApi.cancelQueryByRequestId(requestId);
+      await res({
+        result: cancelled
       });
     } catch (e: any) {
       this.handleError({
@@ -1273,6 +1444,10 @@ class ApiGateway {
         currentQuery = this.parseMemberExpressionsInQuery(currentQuery);
       }
 
+      if ((currentQuery as any).maskedMembers) {
+        throw new UserError('maskedMembers cannot be provided in the query');
+      }
+
       return {
         normalizedQuery: (normalizeQuery(currentQuery, persistent, cacheMode)),
         hasExpressionsInQuery
@@ -1301,6 +1476,8 @@ class ApiGateway {
             queryWithRlsFilters,
             context
           ) : queryWithRlsFilters;
+
+          rewrittenQuery.maskedMembers = queryWithRlsFilters.maskedMembers;
 
           // applyRowLevelSecurity may add new filters which may contain raw member expressions
           // if that's the case, we should run an extra pass of parsing here to make sure
@@ -1598,6 +1775,35 @@ class ApiGateway {
     };
   }
 
+  protected async convertQuery({ payload, context, res }: QueryConvertRequest) {
+    try {
+      await this.assertApiScope('sql', context.securityContext);
+
+      if (payload.input !== 'sql') {
+        throw new Error(`Unexpected input parameter value '${payload.input}'`);
+      }
+
+      if (payload.output !== 'rest') {
+        throw new Error(`Unexpected output parameter value '${payload.output}'`);
+      }
+
+      if (typeof payload.query !== 'string' || !payload.query.trim()) {
+        throw new Error('query parameter must be a non-empty string');
+      }
+
+      const result = await this.sqlServer.rest4sql(payload.query, context.securityContext);
+
+      await res(result);
+    } catch (e: any) {
+      this.handleError({
+        e,
+        context,
+        query: payload,
+        res,
+      });
+    }
+  }
+
   protected async dryRun({ query, context, res }: QueryRequest) {
     const requestStarted = new Date();
 
@@ -1801,12 +2007,16 @@ class ApiGateway {
     const resObj = {
       query: normalizedQuery,
       lastRefreshTime: response.lastRefreshTime?.toISOString(),
+      // Identity of the pre-aggregations behind this result, so a client can
+      // join it to the build it is waiting on. The dev-mode block below
+      // replaces it with the unredacted object.
+      usedPreAggregations: publicUsedPreAggregations(response.usedPreAggregations),
       ...(
         getEnv('devMode') ||
           context.signedWithPlaygroundAuthSecret
           ? {
             refreshKeyValues: response.refreshKeyValues,
-            usedPreAggregations: response.usedPreAggregations,
+            usedPreAggregations: nonEmptyUsedPreAggregations(response.usedPreAggregations),
             transformedQuery: sqlQuery.canUseTransformedQuery,
             requestId: context.requestId,
           }
@@ -1958,6 +2168,13 @@ class ApiGateway {
         })
       );
 
+      // A request may consist of several queries; the oldest refresh time
+      // defines the freshness of the whole result
+      const lastRefreshTimestamps = results
+        .map((r: any) => r.getRootResultObject()[0].lastRefreshTime)
+        .filter(Boolean)
+        .map((t: string) => new Date(t).getTime());
+
       this.log(
         {
           type: 'Load Request Success',
@@ -1977,6 +2194,9 @@ class ApiGateway {
           // queriesWithData:
           //   results.filter((r: any) => r.data?.length).length,
           dbType: results.map(r => r.getRootResultObject()[0].dbType),
+          lastRefreshTime: lastRefreshTimestamps.length
+            ? new Date(Math.min(...lastRefreshTimestamps)).toISOString()
+            : undefined,
         },
         context,
       );
@@ -2009,11 +2229,6 @@ class ApiGateway {
       await this.assertApiScope('data', context.securityContext);
 
       query = this.parseQueryParam(request.query);
-      let resType: ResultType = ResultType.DEFAULT;
-
-      if (!Array.isArray(query) && query.responseFormat) {
-        resType = query.responseFormat;
-      }
 
       const [queryType, normalizedQueries] =
         await this.getNormalizedQueries(query, context, request.streaming, request.memberExpressions, cacheMode);
@@ -2078,8 +2293,37 @@ class ApiGateway {
 
           // TODO Can we just pass through data? Ensure hidden members can't be queried
           results = [{
-            data: response.data,
-            annotation
+            /**
+             * I am still working on improving cpu/memory performance of moving results from ResultWrapper
+             * into RecordBatch on a rust side. Right now, it's slower then doing transpose and JSON serialize on JS side +
+             * deserializing on Rust.
+             *
+             * Right now, it's a temporary solution, which means it will probably outlive us all.
+             *
+             * TODO(ovr): You must finish it, move to ResultWrapper after optimizing it.
+             */
+            data: rowsToColumnar(response.data),
+            annotation,
+            // Freshness metadata has to travel with the pushed-down result too,
+            // otherwise the SQL API reports "unknown" for every query cubesql
+            // hands over as pre-generated SQL.
+            lastRefreshTime: response.lastRefreshTime?.toISOString(),
+            // Same reason as `lastRefreshTime` above: the pre-aggregation
+            // identity has to travel with the pushed-down result too, or a
+            // cubesql query that goes through pre-generated SQL can never tell
+            // the client which pre-aggregation it read.
+            //
+            // Always the redacted projection, with no dev mode override unlike
+            // `prepareResultTransformData`: this branch serves the SQL API,
+            // which is not a Playground path, and its result object carries
+            // none of the other dev-only fields either.
+            usedPreAggregations: publicUsedPreAggregations(response.usedPreAggregations),
+            // Always false: this branch builds its sqlQuery with
+            // `disableExternalPreAggregations` set (above), which makes
+            // `externalPreAggregationQuery()` return false, and the
+            // orchestrator only echoes that flag back. Mirrored anyway for
+            // shape parity with `prepareResultTransformData`.
+            external: response.external,
           }];
         }
 
@@ -2111,7 +2355,7 @@ class ApiGateway {
               sqlQueries[index],
               annotation,
               response,
-              resType,
+              ResultType.COLUMNAR,
             );
           })
         );
@@ -2355,7 +2599,7 @@ class ApiGateway {
   }
 
   protected createDefaultCheckAuth(options?: JWTOptions, internalOptions?: CheckAuthInternalOptions): PreparedCheckAuthFn {
-    type VerifyTokenFn = (auth: string, secret: string) => Promise<object | string> | object | string;
+    type VerifyTokenFn = (auth: string) => Promise<object | string> | object | string;
 
     const verifyToken = (auth, secret) => jwt.verify(auth, secret, {
       algorithms: <JWTAlgorithm[] | undefined>options?.algorithms,
@@ -2364,7 +2608,44 @@ class ApiGateway {
       subject: options?.subject,
     });
 
-    let checkAuthFn: VerifyTokenFn = verifyToken;
+    // `options.key` wins (used by the playground/system path), then the
+    // rotation list (`CUBEJS_API_SECRETS`), then the singular `apiSecret`.
+    let candidateSecrets: string[];
+    if (options?.key) {
+      candidateSecrets = [options.key];
+    } else if (this.apiSecrets && this.apiSecrets.length > 0) {
+      candidateSecrets = this.apiSecrets;
+    } else if (this.apiSecret) {
+      candidateSecrets = [this.apiSecret];
+    } else {
+      candidateSecrets = [];
+    }
+
+    // Default implementation: accept the token if any configured secret
+    // verifies it. Token-level failures (expiry, nbf) reproduce for every
+    // secret, so surface them immediately rather than shadowing the real
+    // cause with a later "invalid signature".
+    let checkAuthFn: VerifyTokenFn = (auth) => {
+      let lastError: any;
+
+      for (const candidate of candidateSecrets) {
+        try {
+          return verifyToken(auth, candidate);
+        } catch (e: any) {
+          lastError = e;
+          if (e?.name === 'TokenExpiredError' || e?.name === 'NotBeforeError') {
+            throw e;
+          }
+        }
+      }
+
+      if (lastError) {
+        throw lastError;
+      }
+
+      // No secret configured at all — reproduce the upstream JWT error.
+      return verifyToken(auth, undefined);
+    };
 
     if (options?.jwkUrl) {
       const jwks = createJWKsFetcher(options, {
@@ -2418,13 +2699,12 @@ class ApiGateway {
       };
     }
 
-    const secret = options?.key || this.apiSecret;
-
     return async (req, auth) => {
       if (auth) {
         try {
-          req.securityContext = await checkAuthFn(auth, secret);
-          req.signedWithPlaygroundAuthSecret = Boolean(internalOptions?.isPlaygroundCheckAuth);
+          req.securityContext = await checkAuthFn(auth);
+          req.signedWithPlaygroundAuthSecret =
+            Boolean(internalOptions?.isPlaygroundCheckAuth) && hasDevTokenScope(req.securityContext);
         } catch (e: any) {
           if (this.enforceSecurityChecks) {
             throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token', e);

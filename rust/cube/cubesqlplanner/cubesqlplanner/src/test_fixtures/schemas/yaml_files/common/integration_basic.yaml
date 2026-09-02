@@ -1,0 +1,108 @@
+cubes:
+    - name: customers
+      sql: "SELECT * FROM customers"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: city
+            type: string
+            sql: city
+          - name: full_location
+            type: string
+            sql: "CONCAT({CUBE}.name, ' from ', {CUBE}.city)"
+          # Top-level OR over a nullable column, so the whole expression can be
+          # NULL while neither operand's own IS NULL is true.
+          - name: is_ny_or_alice
+            type: boolean
+            sql: "{CUBE}.city = 'New York' OR {CUBE}.name LIKE 'Alice%'"
+      measures:
+          - name: count
+            type: count
+      segments:
+          - name: sf_customers
+            sql: "{CUBE}.city = 'San Francisco'"
+
+    - name: orders
+      sql: "SELECT * FROM orders"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{orders}.customer_id = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+          - name: amount
+            type: number
+            sql: amount
+          - name: created_at
+            type: time
+            sql: created_at
+          - name: updated_at
+            type: time
+            sql: updated_at
+          - name: amount_tier
+            type: string
+            sql: "CASE WHEN {CUBE}.amount >= 200 THEN 'high' WHEN {CUBE}.amount >= 75 THEN 'medium' ELSE 'low' END"
+          - name: customer_id
+            type: number
+            sql: customer_id
+          # Top-level AND — binds weaker than the filter's own operator. The
+          # second operand carries its own parentheses so the mis-parse stays
+          # valid SQL and shows up as wrong rows rather than a syntax error.
+          - name: is_big_completed
+            type: boolean
+            sql: "{CUBE}.amount > 100 AND ({CUBE}.status = 'completed')"
+          # Top-level comparison — a second one next to it is a syntax error.
+          - name: is_big
+            type: boolean
+            sql: "{CUBE}.amount > 100"
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+          # The reported model's shape: a calculated boolean over a measure.
+          - name: total_amount_is_set
+            type: boolean
+            sql: "{total_amount} IS NOT NULL"
+          - name: avg_amount
+            type: avg
+            sql: amount
+          - name: min_amount
+            type: min
+            sql: amount
+          - name: max_amount
+            type: max
+            sql: amount
+          - name: unique_customers
+            type: count_distinct
+            sql: customer_id
+          - name: unique_statuses
+            type: count_distinct
+            sql: status
+          - name: approx_unique_customers
+            type: countDistinctApprox
+            sql: customer_id
+          - name: avg_order_value
+            type: number
+            sql: "{orders.total_amount} / {orders.count}"
+          - name: min_created_at
+            type: min
+            sql: created_at
+          - name: status_summary
+            type: string
+            sql: "CASE WHEN {orders.count} > 3 THEN 'high' ELSE 'low' END"
+      segments:
+          - name: completed_orders
+            sql: "{CUBE}.status = 'completed'"

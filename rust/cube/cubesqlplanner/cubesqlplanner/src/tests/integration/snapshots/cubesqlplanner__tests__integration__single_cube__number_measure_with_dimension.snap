@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/single_cube.rs
+expression: result
+---
+orders__status | orders__avg_order_value
+---------------+------------------------
+cancelled      | 25.0000000000000000    
+completed      | 250.0000000000000000   
+pending        | 55.0000000000000000

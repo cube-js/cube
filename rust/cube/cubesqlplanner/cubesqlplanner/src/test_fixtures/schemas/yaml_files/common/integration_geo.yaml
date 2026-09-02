@@ -1,0 +1,21 @@
+cubes:
+    - name: stores
+      sql: "SELECT * FROM stores"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: location
+            type: geo
+            latitude: latitude
+            longitude: longitude
+      measures:
+          - name: count
+            type: count
+          - name: total_revenue
+            type: sum
+            sql: revenue

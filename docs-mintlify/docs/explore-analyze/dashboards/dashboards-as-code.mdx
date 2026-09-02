@@ -1,0 +1,200 @@
+---
+title: Dashboards as code
+description: Manage workbooks, dashboards, and reports as code with idempotent REST endpoints keyed by portable identifiers, so a CI/CD pipeline can apply the same definitions across deployments.
+---
+
+**Dashboards as code** lets you manage the reporting assets in a deployment —
+[workbooks][ref-workbooks], their [dashboards][ref-dashboards], and the
+[reports][ref-reports] the dashboard widgets render — from source control instead
+of only through the UI. You keep each asset's definition in Git and apply it to a
+deployment with the [Cube Cloud REST API][ref-api], the same way you might manage
+Superset assets with `preset-cli` or infrastructure with Terraform.
+
+Two **idempotent upsert** endpoints make this possible. Instead of tracking the
+per-deployment numeric id that a `POST` returns, you address each asset by a
+**portable identifier you choose** and re-apply its definition as often as you
+like:
+
+| Endpoint | Keyed by | Upserts |
+| --- | --- | --- |
+| [`PUT /deployments/{deploymentId}/workbooks/by-slug/{slug}`][ref-upsert-workbook] | a deployment-scoped **slug** | a workbook (and its dashboard draft) |
+| [`PUT /deployments/{deploymentId}/reports/by-public-id/{publicId}`][ref-upsert-report] | an account-unique **`publicId`** | a report |
+
+Because the identifier is stable and lives in your repository, applying the same
+definition twice is a no-op, and applying it to a second deployment (staging →
+production) reproduces the same assets there.
+
+<Note>
+
+This page covers the REST primitives available today. They are the building
+blocks for an as-code workflow you assemble in your own pipeline — Cube does not
+yet ship a single bundle export/apply command that wraps them.
+
+</Note>
+
+## How the pieces fit
+
+Three assets are involved, each with its own identity:
+
+- A **report** is a saved query plus its visualization. Its portable identity is
+  a **`publicId`**: a 12-character alphanumeric (`[0-9A-Za-z]`) id that is unique
+  across your account. You mint it when you author the report and keep it fixed
+  for the report's lifetime.
+- A **workbook** is the container that holds a dashboard. Its portable identity
+  is a **slug**: a human-readable, deployment-scoped id (the same slug a data
+  model targets with `links: [{ dashboard: <slug> }]` for drill-in).
+- A **dashboard** is the layout — which widgets sit where. It is stored on its
+  workbook as `meta.dashboardDraft` and is made visible by **publishing** the
+  workbook. Each chart widget references a report.
+
+The identifiers you control (`publicId`, `slug`) are what make a definition
+portable. The numeric ids that `POST` responses return are per-deployment and are
+resolved at apply time — you never store them in Git.
+
+## Authenticating
+
+These are public REST endpoints. Authenticate with a deployment API key exactly
+as for the rest of the [REST API][ref-api] — see [Authentication][ref-auth] for
+how to create a key and pass it. The examples below assume:
+
+```bash
+export CUBE_API_URL="https://<your-cube-cloud-host>"
+export CUBE_API_TOKEN="<your-api-key>"
+export DEPLOYMENT_ID="<your-deployment-id>"
+```
+
+## The apply flow
+
+An as-code pipeline applies a dashboard bottom-up: reports first, then the
+workbook that lays them out, then publish.
+
+### 1. Author once, then export
+
+The report and dashboard-draft definitions are large and are not meant to be
+hand-written. Build the reports and dashboard once in the UI, then read them back
+over the API and commit the results:
+
+- [`GET /deployments/{deploymentId}/reports/{reportId}`][ref-get-report] returns a
+  report's definition.
+- [`GET /deployments/{deploymentId}/workbooks/{workbookId}`][ref-get-workbook]
+  returns the workbook, including its `dashboardDraft`.
+
+Assign each report a `publicId` and the workbook a `slug` of your choosing, store
+those alongside the exported definitions in your repository, and treat that as the
+source of truth.
+
+### 2. Upsert each report
+
+For every report, [upsert it by `publicId`][ref-upsert-report]. If a report with
+that `publicId` already exists in the deployment it is updated with the fields you
+send (same semantics as [`PUT /reports/{reportId}`][ref-update-report]);
+otherwise it is created with that `publicId`.
+
+```bash
+curl -X PUT \
+  "$CUBE_API_URL/api/v1/deployments/$DEPLOYMENT_ID/reports/by-public-id/revqZ1x8Kp0a" \
+  -H "Authorization: $CUBE_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d @report-revenue-by-month.json
+```
+
+The path `publicId` is the report's identity; the request body is the report
+definition you exported (its query in `sqlQuery` / `jsonQuery`, pivot in
+`pivotItems`, and visualization config in `meta`). Keep track of the numeric
+`id` each response returns — the dashboard draft references reports by that
+per-deployment id.
+
+### 3. Upsert the workbook and its dashboard
+
+[Upsert the workbook by `slug`][ref-upsert-workbook], carrying the dashboard
+layout in `meta.dashboardDraft`. Only the fields you send are changed, and `meta`
+is **merged** into the existing metadata rather than replacing it. The
+`dashboardDraft` is validated the same way the builder validates it.
+
+```bash
+curl -X PUT \
+  "$CUBE_API_URL/api/v1/deployments/$DEPLOYMENT_ID/workbooks/by-slug/revenue-overview" \
+  -H "Authorization: $CUBE_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Revenue Overview",
+    "meta": { "dashboardDraft": { "...": "the exported dashboard config" } }
+  }'
+```
+
+Because each chart widget inside `dashboardDraft` points at a report by its
+per-deployment numeric id, rewrite those references to the ids returned in
+step&nbsp;2 before applying the workbook to a **new** deployment. Re-applying to
+the same deployment needs no rewriting — the ids are stable there.
+
+### 4. Publish
+
+Upserting the workbook writes the dashboard **draft**. Publish it to make it
+visible to viewers with [`POST /workbooks/{workbookId}/publish`][ref-publish],
+using the workbook id returned in step&nbsp;3. Publishing is itself idempotent per
+workbook, so it is safe to run on every apply.
+
+## Idempotency and conflicts
+
+Re-applying an unchanged definition is a no-op — that is the property that makes
+these endpoints safe to run on every pipeline execution. When something does go
+wrong, both upserts fail with a `409` rather than guessing, and the report upsert
+distinguishes three cases by a `code` field in the response body so your pipeline
+can react correctly:
+
+| Endpoint | `code` | Meaning | What to do |
+| --- | --- | --- | --- |
+| workbook & report | `upsert_branch_changed` | A concurrent writer created or deleted the asset between the access check and the write, so the request would have applied under the wrong permission check. | **Retry.** Transient; happens only under concurrent applies of the same key. |
+| report | _(none)_ | The `publicId` already belongs to a report in a **different** deployment. `publicId` is unique across the account. | **Permanent.** Use a different `publicId`. |
+| report | `ambiguous_legacy_id` | The id matches more than one legacy report (see below), so it can't identify one. | **Permanent.** Give the intended report a `publicId` of your own (see below), then key on that. |
+
+The upserts serialize per key (per slug, per `publicId`), so two pipeline runs
+applying the same bundle at once can't create a duplicate — the loser gets a
+retryable `upsert_branch_changed` instead.
+
+## Choosing and adopting `publicId`s
+
+A report's `publicId` is **write-once**: you can assign one to a report that
+doesn't have one yet, but a report's existing `publicId` can never be changed,
+because clients may already have stored it. You can supply a `publicId`:
+
+- **On create** — pass it in the body to [`POST /reports`][ref-create-report], or
+  just call the [upsert endpoint][ref-upsert-report] with the id in the path.
+- **On an existing report** — assign one with
+  [`PUT /reports/{reportId}`][ref-update-report]. This is how you bring a report
+  that was authored in the UI under as-code management.
+
+Pick any distinct 12-character `[0-9A-Za-z]` id. The auto-generated placeholder
+ids shown for reports that don't have a stable id yet are a reserved, non-unique
+shape and are rejected with `400` — you must choose your own.
+
+### Reports created before stable ids
+
+Reports created before `publicId` existed don't store one; the API **synthesizes**
+one from the report's internal id so every report has an id on the wire. These
+synthesized ids are **not unique** — several reports can share one. The upsert
+endpoint resolves a synthesized id only when it is unambiguous, adopting it as the
+report's real `publicId` at that point; if it matches more than one report it
+returns the `ambiguous_legacy_id` conflict above. For anything you manage as code,
+don't rely on a synthesized id — assign a `publicId` you chose and key on that.
+
+## Reference
+
+- [Create or update a workbook by slug][ref-upsert-workbook]
+- [Create or update a report by publicId][ref-upsert-report]
+- [Create a report][ref-create-report] · [Update a report][ref-update-report]
+- [Publish dashboard][ref-publish]
+- [Building dashboards in the UI][ref-dashboards]
+
+[ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-workbooks]: /docs/explore-analyze/workbooks
+[ref-reports]: /docs/explore-analyze/workbooks/querying-data
+[ref-api]: /api-reference/introduction
+[ref-auth]: /api-reference/authentication
+[ref-upsert-workbook]: /api-reference/workbooks/create-or-update-a-workbook-by-slug
+[ref-upsert-report]: /api-reference/reports/create-or-update-a-report-by-publicid
+[ref-create-report]: /api-reference/reports/create-a-report
+[ref-update-report]: /api-reference/reports/update-a-report
+[ref-get-report]: /api-reference/reports/get-report
+[ref-get-workbook]: /api-reference/workbooks/get-workbook
+[ref-publish]: /api-reference/workbooks/publish-dashboard

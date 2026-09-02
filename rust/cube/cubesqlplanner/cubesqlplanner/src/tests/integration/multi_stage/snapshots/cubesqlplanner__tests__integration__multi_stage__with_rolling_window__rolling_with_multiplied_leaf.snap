@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/with_rolling_window.rs
+assertion_line: 128
+expression: result
+---
+orders__created_at_month | orders__total_amount_ytd
+-------------------------+-------------------------
+2024-01-01 00:00:00      | 500.00                  
+2024-02-01 00:00:00      | 1250.00                 
+2024-03-01 00:00:00      | 2250.00

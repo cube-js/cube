@@ -139,7 +139,7 @@ cubes:
           - users.email
 
       - name: percentage_of_active
-        sql: "100.0 * {total_active_count} / NULLIF({total_count}, 0)"
+        sql: "1.0 * {total_active_count} / NULLIF({total_count}, 0)"
         type: number
         format: percent
         drill_members:
@@ -168,7 +168,7 @@ cube(`monthly_retention`, {
     },
 
     percentage_of_active: {
-      sql: `100.0 * ${total_active_count} / NULLIF(${total_count}, 0)`,
+      sql: `1.0 * ${total_active_count} / NULLIF(${total_count}, 0)`,
       type: `number`,
       format: `percent`,
       drill_members: [

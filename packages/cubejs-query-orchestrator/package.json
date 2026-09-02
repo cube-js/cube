@@ -2,14 +2,14 @@
   "name": "@cubejs-backend/query-orchestrator",
   "description": "Cube.js Query Orchestrator and Cache",
   "author": "Cube Dev, Inc.",
-  "version": "1.6.23",
+  "version": "1.7.32",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-query-orchestrator"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -21,6 +21,7 @@
     "unit": "jest --runInBand --forceExit --coverage --verbose test/unit",
     "integration": "jest --runInBand --verbose test/integration",
     "integration:cubestore": "jest --runInBand --verbose test/integration/cubestore",
+    "bench:suite": "node dist/test/benchmarks/run-suite.js",
     "lint": "eslint src/* test/* --ext .ts,.js",
     "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
   },
@@ -29,22 +30,23 @@
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.6.23",
-    "@cubejs-backend/cubestore-driver": "1.6.23",
-    "@cubejs-backend/shared": "1.6.23",
+    "@cubejs-backend/base-driver": "1.7.32",
+    "@cubejs-backend/cubestore-driver": "1.7.32",
+    "@cubejs-backend/shared": "1.7.32",
     "csv-write-stream": "^2.0.0",
     "lru-cache": "^11.1.0",
     "ramda": "^0.27.2"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.6.23",
+    "@cubejs-backend/linter": "1.7.32",
     "@types/jest": "^29",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "@types/ramda": "^0.27.32",
-    "@types/uuid": "^8.3.0",
+    "@types/yargs": "^17.0.31",
     "jest": "^29",
     "ts-jest": "^29",
-    "typescript": "~5.2.2"
+    "typescript": "~5.2.2",
+    "yargs": "^17.7.1"
   },
   "license": "Apache-2.0",
   "eslintConfig": {

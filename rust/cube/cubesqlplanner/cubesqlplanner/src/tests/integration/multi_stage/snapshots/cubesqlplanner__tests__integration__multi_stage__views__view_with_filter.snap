@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/views.rs
+expression: result
+---
+orders_ms_view__created_at_month | orders_ms_view__total_amount
+---------------------------------+-----------------------------
+2024-01-01 00:00:00              | 300.00                      
+2024-02-01 00:00:00              | 500.00                      
+2024-03-01 00:00:00              | 600.00

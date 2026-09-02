@@ -1,3 +1,4 @@
+import { parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { ParamAllocator } from './ParamAllocator';
 
@@ -38,11 +39,24 @@ export class PostgresQuery extends BaseQuery {
    * This implementation should also work for AWS RedShift.
    */
   public dateBin(interval: string, source: string, origin: string): string {
-    return `('${origin}'::timestamp + INTERVAL '${interval}' *
+    const intervalStr = this.intervalString(interval);
+    return `('${origin}'::timestamp + INTERVAL ${intervalStr} *
       FLOOR(
         EXTRACT(EPOCH FROM (${source} - '${origin}'::timestamp)) /
-        EXTRACT(EPOCH FROM INTERVAL '${interval}')
+        EXTRACT(EPOCH FROM INTERVAL ${intervalStr})
       ))`;
+  }
+
+  public override intervalString(interval: string): string {
+    const parsed = parseSqlInterval(interval);
+    if (parsed.quarter) {
+      parsed.month = (parsed.month || 0) + parsed.quarter * 3;
+      delete parsed.quarter;
+    }
+    const normalized = Object.entries(parsed)
+      .map(([unit, value]) => `${value} ${unit}${value !== 1 ? 's' : ''}`)
+      .join(' ');
+    return `'${normalized}'`;
   }
 
   public hllInit(sql) {
@@ -72,8 +86,9 @@ export class PostgresQuery extends BaseQuery {
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.functions.NOW = 'NOW({{ args_concat }})';
+    templates.functions.UTCTIMESTAMP = '(NOW() AT TIME ZONE \'UTC\')';
     // DATEADD is being rewritten to DATE_ADD
-    // templates.functions.DATEADD = '({{ args[2] }} + \'{{ interval }} {{ date_part }}\'::interval)';
+    templates.functions.DATE_ADD = '({{ args[0] }} + \'{{ interval }} {{ date_part }}\'::interval)';
     // TODO: is DATEDIFF expr worth documenting?
     templates.functions.DATEDIFF = 'CASE WHEN LOWER(\'{{ date_part }}\') IN (\'year\', \'quarter\', \'month\') THEN (EXTRACT(YEAR FROM AGE(DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}), DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }}))) * 12 + EXTRACT(MONTH FROM AGE(DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}), DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }})))) / CASE LOWER(\'{{ date_part }}\') WHEN \'year\' THEN 12 WHEN \'quarter\' THEN 3 WHEN \'month\' THEN 1 END ELSE EXTRACT(EPOCH FROM DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}) - DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }})) / EXTRACT(EPOCH FROM \'1 {{ date_part }}\'::interval) END::bigint';
     templates.expressions.interval = 'INTERVAL \'{{ interval }}\'';

@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/nested_join_trees.rs
+expression: result
+---
+sites__country | carts__total_value | checkouts__total_amount
+---------------+--------------------+------------------------
+DE             | 40.00              | NULL                   
+US             | 60.00              | 600.00

@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/integration/filtered_measures.rs
+expression: result
+---
+orders__created_at_month | orders__completed_count
+-------------------------+------------------------
+2024-01-01 00:00:00      | 2                      
+2024-02-01 00:00:00      | 1                      
+2024-03-01 00:00:00      | 1                      
+2024-04-01 00:00:00      | 1

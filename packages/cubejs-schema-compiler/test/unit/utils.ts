@@ -165,13 +165,13 @@ export function createCubeSchemaWithAccessPolicy(name: string, extraPolicies: st
         },
         accessPolicy: [
           {
-            role: "*",
+            group: "*",
             rowLevel: {
               allowAll: true
             }
           },
           {
-            role: 'admin',
+            group: 'admin',
             conditions: [
               {
                 if: \`true\`,
@@ -192,7 +192,7 @@ export function createCubeSchemaWithAccessPolicy(name: string, extraPolicies: st
             },
           },
           {
-            role: 'manager',
+            group: 'manager',
             conditions: [
               {
                 if: security_context.userId === 1,
@@ -375,6 +375,59 @@ export function createCubeSchemaWithCustomGranularitiesAndTimeShift(name: string
           includes: '*'
         }]
       })`;
+}
+
+export function createViewSchemaWithDefaultValueFilter(): string {
+  return `
+    cube(\`orders\`, {
+      sql: \`SELECT * FROM orders\`,
+      dimensions: {
+        id: {
+          type: \`number\`,
+          sql: \`id\`,
+          primaryKey: true,
+          public: true,
+        },
+        currency: {
+          type: \`string\`,
+          sql: \`currency\`,
+          public: true,
+        },
+        country: {
+          type: \`string\`,
+          sql: \`country\`,
+          public: true,
+        },
+      },
+      measures: {
+        count: { type: \`count\` },
+      },
+    })
+
+    view(\`orders_view\`, {
+      cubes: [{
+        join_path: orders,
+        includes: '*',
+      }],
+      defaultFilters: [
+        {
+          member: \`currency\`,
+          operator: 'equals',
+          values: [\`USD\`],
+          unless: [\`currency\`, \`country\`],
+        },
+        {
+          member: \`country\`,
+          operator: 'set',
+        },
+        {
+          member: \`id\`,
+          operator: 'in',
+          values: [1, 2, true, \`draft\`, null],
+        },
+      ],
+    })
+  `;
 }
 
 export type CreateSchemaOptions = {
