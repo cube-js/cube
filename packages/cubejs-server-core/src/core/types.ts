@@ -241,6 +241,18 @@ export interface CreateOptions {
   allowNodeRequire?: boolean;
   semanticLayerSync?: (context: RequestContext) => Promise<BiToolSyncConfig[]> | BiToolSyncConfig[];
   fastReload?: boolean;
+  /**
+   * Streams a chat completion for Cube Cloud's LLM Gateway model provider,
+   * which routes agent inference through this deployment instead of calling a
+   * model vendor from the control plane. Cube Core accepts the option and
+   * ignores it; declared here so a `cube.ts` config that sets it type-checks.
+   *
+   * Deliberately loosely typed: the value may be a chat model instance, a
+   * factory returning one, or a function returning a stream of chunks, and
+   * Cube Core has no dependency on the model library that would let it name
+   * any of those.
+   */
+  chatCompletion?: unknown;
 }
 
 export interface DriverDecoratedOptions extends CreateOptions {

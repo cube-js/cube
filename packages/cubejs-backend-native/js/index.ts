@@ -537,6 +537,18 @@ export interface PyConfiguration {
   scheduledRefreshContexts?: (ctx: unknown) => Promise<string[]>
   scheduledRefreshTimeZones?: (ctx: unknown) => Promise<string[]>
   contextToGroups?: (ctx: unknown) => Promise<string[]>
+  /**
+   * Consumed by Cube Cloud's LLM Gateway model provider; Cube Core accepts and
+   * ignores it.
+   *
+   * The return type is what the Python-to-JavaScript bridge can carry, not what
+   * would be most natural to write: a list of chunks, or `{ next }` for a
+   * streamed response, where `next()` resolves to the following chunk and to
+   * `null` once the response is complete. A Python object with no bridge
+   * representation — a LangChain model, an async generator — reaches JS as an
+   * unrepresentable reference and throws, so those belong in `cube.js`.
+   */
+  chatCompletion?: (request: unknown) => Promise<unknown>
 }
 
 function simplifyExpressRequest(req: ExpressRequest) {

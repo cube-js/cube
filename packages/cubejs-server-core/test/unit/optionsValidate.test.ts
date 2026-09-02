@@ -45,3 +45,27 @@ describe('validateOptions sanitized result', () => {
     expect(validated).not.toBe(options);
   });
 });
+
+describe('validateOptions chatCompletion', () => {
+  // The schema rejects unknown keys, so without an entry for `chatCompletion`
+  // every deployment declaring Cube Cloud's LLM Gateway hook fails to start
+  // with "Invalid cube-server-core options" — a boot failure, not a warning.
+  test('accepts a function', () => {
+    expect(() => validateOptions({ chatCompletion: () => [] })).not.toThrow();
+  });
+
+  test('accepts a model instance rather than a factory', () => {
+    expect(() => validateOptions({ chatCompletion: { stream: () => [] } })).not.toThrow();
+  });
+
+  test('preserves the hook by reference', () => {
+    const chatCompletion = () => [];
+
+    expect(validateOptions({ chatCompletion }).chatCompletion).toBe(chatCompletion);
+  });
+
+  test('still rejects an unknown option', () => {
+    expect(() => validateOptions({ chatCompletionn: () => [] } as any))
+      .toThrow(/chatCompletionn/);
+  });
+});

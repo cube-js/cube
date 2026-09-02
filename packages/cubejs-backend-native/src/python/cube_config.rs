@@ -46,6 +46,12 @@ impl CubeConfigPy {
             "web_sockets_base_path",
             // functions
             "can_switch_sql_user",
+            // Consumed by Cube Cloud's LLM Gateway model provider; Cube Core
+            // accepts and ignores it. Listed here because this allow-list is
+            // what decides whether a `cube.py` attribute reaches JavaScript at
+            // all — an unlisted name is silently dropped, with no error to
+            // point at the omission.
+            "chat_completion",
             "check_auth",
             "check_sql_auth",
             "context_to_api_scopes",
