@@ -425,22 +425,22 @@ if (missing.length) {
   process.exit(1);
 }
 
-// 2b. Hoist `description`/`deprecated` out of a nullable field's `oneOf` branch.
-// class-validator-jsonschema represents a nullable field as `oneOf: [{ type: X,
-// description, deprecated }, { type: 'null' }]`, putting the metadata on the
+// 2b. Hoist `description`/`deprecated` out of a nullable field's `oneOf` branch,
+// e.g. `oneOf: [{ type: X, description, deprecated }, { type: 'null' }]` — the shape
+// class-validator-jsonschema emits for a nullable field, with the metadata on the
 // non-null branch. Renderers (Mintlify included) read deprecation/description off
-// the property schema itself, not a oneOf branch, so a nullable field's docs
-// silently fail to render otherwise — caught by review on the 0.6.0 release
-// (`UserSettingsInput.lastSeenChangelogId`, `CreateDeploymentTokenInput.expiresIn`,
-// `User.userPolicies`). Only hoists when the parent doesn't already carry the key,
-// so a non-nullable field's property-level metadata (e.g. `AppTheme.light`) is
-// untouched.
+// the property schema itself, not a oneOf branch, so it silently failed to render.
+// Scoped to exactly that two-branch nullable shape (one bare `{ type: 'null' }`
+// sibling) so a genuine polymorphic oneOf — several real alternatives, each with
+// its own description — is left alone.
 function hoistNullableMeta(node) {
   if (Array.isArray(node)) { node.forEach(hoistNullableMeta); return; }
   if (!node || typeof node !== 'object') return;
-  if (Array.isArray(node.oneOf)) {
-    for (const branch of node.oneOf) {
-      if (!branch || typeof branch !== 'object' || branch.type === 'null') continue;
+  const branches = node.oneOf;
+  if (Array.isArray(branches) && branches.length === 2) {
+    const isBareNull = (b) => b && Object.keys(b).length === 1 && b.type === 'null';
+    const branch = isBareNull(branches[0]) ? branches[1] : isBareNull(branches[1]) ? branches[0] : null;
+    if (branch && typeof branch === 'object') {
       if (branch.description !== undefined && node.description === undefined) {
         node.description = branch.description;
         delete branch.description;
