@@ -84,19 +84,6 @@ export class BigqueryQuery extends BaseQuery {
    * It returns a tuple of (formatted interval, timeUnit to use in datediff functions)
    */
   private formatInterval(interval: string): [string, string] {
-    const formatted = this.tryFormatInterval(interval);
-
-    if (!formatted) {
-      throw new Error(`Cannot transform interval expression "${interval}" to BigQuery dialect`);
-    }
-
-    return formatted;
-  }
-
-  /**
-   * The formatted interval, or undefined when BigQuery has no single INTERVAL spelling for it.
-   */
-  private tryFormatInterval(interval: string): [string, string] | undefined {
     const intervalParsed = parseSqlInterval(interval);
     const intKeys = Object.keys(intervalParsed).length;
 
@@ -150,7 +137,7 @@ export class BigqueryQuery extends BaseQuery {
       return [`'${intervalParsed.millisecond}' MILLISECOND`, 'MILLISECOND'];
     }
 
-    return undefined;
+    throw new Error(`Cannot transform interval expression "${interval}" to BigQuery dialect`);
   }
 
   public override intervalAndMinimalTimeUnit(interval: string): [string, string] {
@@ -185,12 +172,12 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   /**
-   * BigQuery INTERVAL literals only span contiguous unit ranges (MONTH TO DAY, HOUR TO SECOND, ...),
-   * so an interval it can not spell in one go is applied one unit at a time, coarsest first.
+   * DATETIME_ADD and friends take an INTERVAL of one date part — a range literal such as
+   * `INTERVAL '3 14' MONTH TO DAY` parses on its own but not as their argument — so a compound
+   * interval is applied one unit at a time, coarsest first.
    */
   private applyInterval(direction: 'SUB' | 'ADD', date: string, interval: string): string {
-    const whole = this.tryFormatInterval(interval);
-    const parts = whole ? [whole] : splitSqlInterval(interval).map(part => this.formatInterval(part));
+    const parts = splitSqlInterval(interval).map(part => this.formatInterval(part));
 
     return parts.reduce((acc, [intervalFormatted, timeUnit]) => {
       if (['YEAR', 'MONTH', 'QUARTER'].includes(timeUnit) || intervalFormatted.includes('WEEK')) {

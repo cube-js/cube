@@ -62,7 +62,15 @@ describe('interval rendering across dialects', () => {
     }],
     ['BigqueryQuery', {
       '6 hour': 'TIMESTAMP_SUB(x, INTERVAL 6 HOUR)',
-      '3 month 14 day': 'TIMESTAMP_SUB(x, INTERVAL \'3 14\' MONTH TO DAY)',
+      // A range literal such as `INTERVAL '3 14' MONTH TO DAY` parses on its own, but not as an
+      // argument of DATETIME_SUB
+      '3 month 14 day':
+        'TIMESTAMP_SUB(TIMESTAMP(DATETIME_SUB(DATETIME(x), INTERVAL 3 MONTH)), INTERVAL 14 DAY)',
+    }],
+    ['ClickHouseQuery', {
+      '3 month': 'subDate(x, INTERVAL 3 MONTH)',
+      // A sum of intervals of different units is a Tuple that subDate rejects
+      '3 month 14 day': 'subDate(subDate(x, INTERVAL 3 MONTH), INTERVAL 14 DAY)',
     }],
     ['HiveQuery', {
       '3 month': '(x - INTERVAL \'3\' month)',

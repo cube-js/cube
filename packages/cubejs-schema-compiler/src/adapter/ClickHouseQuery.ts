@@ -1,4 +1,4 @@
-import { parseSqlInterval } from '@cubejs-backend/shared';
+import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
@@ -84,11 +84,22 @@ export class ClickHouseQuery extends BaseQuery {
   }
 
   public subtractInterval(date: string, interval: string): string {
-    return `subDate(${date}, ${this.formatInterval(interval)})`;
+    return this.applyInterval('subDate', date, interval);
   }
 
   public addInterval(date: string, interval: string): string {
-    return `addDate(${date}, ${this.formatInterval(interval)})`;
+    return this.applyInterval('addDate', date, interval);
+  }
+
+  /**
+   * `subDate` and `addDate` take one interval, and a sum of intervals of different units is a
+   * Tuple they reject, so a compound interval is applied one unit at a time, coarsest first.
+   */
+  private applyInterval(fn: string, date: string, interval: string): string {
+    return splitSqlInterval(interval).reduce(
+      (acc, part) => `${fn}(${acc}, ${this.formatInterval(part)})`,
+      date
+    );
   }
 
   /**
