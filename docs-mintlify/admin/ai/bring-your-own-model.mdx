@@ -25,6 +25,7 @@ how you manage AI costs.
 | **GCP Vertex AI** | Yes | No |
 | **Databricks** | Yes | No |
 | **Snowflake Cortex** | Yes | No |
+| **LLM Gateway** | Yes | No |
 
 ## Configuration
 
@@ -69,12 +70,16 @@ embedding model that created them.
 
 ## Network configuration
 
-When using BYOM, Cube connects to your model provider from its control plane.
-If your provider requires IP allowlisting, ensure the Cube outbound IP
-addresses are added to your allowlist.
+For every provider except **LLM Gateway**, Cube connects to your model
+provider from its control plane. If your provider requires IP allowlisting,
+ensure the Cube outbound IP addresses are added to your allowlist.
 
 For agents running in dedicated regions, additional per-region IP addresses
 may also need to be allowlisted.
+
+The **LLM Gateway** provider works the other way around: the request is made
+by your own deployment, so nothing needs to be reachable from Cube and there
+is no allowlist to maintain. See [LLM Gateway](#llm-gateway) below.
 
 ## Billing
 
@@ -119,6 +124,119 @@ Supports two authentication methods:
 - JWT authentication
 - Key-pair authentication (requires an encrypted PKCS#8 PEM private key)
 
+### LLM Gateway
+
+Use this provider to route agent traffic through your own LLM gateway or
+proxy — including one that is only reachable from inside your own network.
+
+Unlike every other provider, Cube holds no credentials and never calls your
+model. Your deployment does: Cube sends the conversation to your deployment's
+runtime, which invokes a `chatCompletion` hook you write in your `cube.js`
+configuration file. The gateway endpoint, its API key and all LLM egress stay
+inside your network.
+
+<Note>
+
+Because the request originates from your own deployment, a gateway with no
+public ingress — for example one reachable only within your VPC — works with
+no peering, allowlisting or inbound access from Cube.
+
+</Note>
+
+#### Writing the hook
+
+The hook may return a [LangChain](https://js.langchain.com/) chat model, which
+is the shortest path if your gateway already has a LangChain integration:
+
+```javascript
+const { ChatOpenAI } = require("@langchain/openai");
+
+module.exports = {
+  chatCompletion: new ChatOpenAI({
+    model: "gpt-5",
+    apiKey: process.env.LLM_GATEWAY_API_KEY,
+    configuration: {
+      baseURL: "https://llm-gateway.internal.example.com/v1",
+    },
+  }),
+};
+```
+
+Any LangChain chat model works the same way — `ChatAnthropic`,
+`ChatBedrockConverse`, `ChatVertexAI`, or your own subclass. Add the
+integration package to your project's `package.json`; Cube does not need to
+know which one you use.
+
+The model must support tool calling. Cube agents call tools on every turn, so
+a model without it cannot serve an agent.
+
+To choose the model per request — to route by user, or to act on the model
+name configured in **Admin > Models** — export a function instead. It is
+called once per turn:
+
+```javascript
+const { ChatOpenAI } = require("@langchain/openai");
+
+module.exports = {
+  chatCompletion: ({ model, securityContext }) => new ChatOpenAI({
+    model: model ?? "gpt-5",
+    apiKey: process.env.LLM_GATEWAY_API_KEY,
+    configuration: {
+      baseURL: "https://llm-gateway.internal.example.com/v1",
+      defaultHeaders: {
+        "x-cube-tenant": securityContext?.tenantId,
+      },
+    },
+  }),
+};
+```
+
+The function receives:
+
+| Field | Description |
+| --- | --- |
+| `model` | The **Model Name** configured for the model in **Admin > Models**, if any. A routing hint — Cube does not interpret it |
+| `messages` | The conversation so far, in LangChain's message format |
+| `tools` | Tool definitions for this turn, as JSON Schema |
+| `toolChoice` | How the model should use tools, when the agent constrains it |
+| `metadata` | Attribution for cost tracking on your side. Carries no query results or model output |
+| `securityContext` | The security context of the user whose turn triggered the call |
+| `signal` | An `AbortSignal`, aborted if the user cancels the turn |
+
+If you do not use LangChain, return an async iterable of chunks instead. Each
+chunk is an object with a `content` string, and optionally `tool_call_chunks`,
+`usage_metadata` and `response_metadata`:
+
+```javascript
+module.exports = {
+  chatCompletion: async function* ({ messages, signal }) {
+    const response = await callYourGateway(messages, { signal });
+
+    for await (const token of response) {
+      yield { content: token };
+    }
+  },
+};
+```
+
+#### Configuring the model in Cube
+
+1. Add a model in **Admin > Models** and choose the **LLM Gateway** provider
+2. Leave **Model Name** blank if your hook always serves one model, or set it
+   to a name your hook routes on
+3. Optionally set **Small Model Name** for the lighter follow-up calls agents
+   make; it defaults to the main model name
+
+There are no credential fields — the credentials belong in your deployment's
+environment variables, next to the hook that uses them.
+
+<Note>
+
+The `chatCompletion` hook is supported in `cube.js` and `cube.ts`
+configuration files.
+
+</Note>
+
 ## Troubleshooting
 
 ### Rate limit errors
@@ -130,6 +248,22 @@ not by Cube. Check your provider's rate limits and usage quotas.
 
 Verify that the API key or credentials configured for the model are valid and
 have the necessary permissions.
+
+### LLM Gateway errors
+
+Errors mentioning the LLM Gateway come from your own deployment, not from
+Cube's control plane:
+
+- **No `chatCompletion` hook is configured** — the model is assigned to an
+  agent but the deployment's configuration file does not export the hook, or
+  the deployment has not restarted since it was added
+- **Does not support tool calling** — the chat model the hook returned has no
+  `bindTools`. Cube agents require a tool-calling model
+- **Stream ended before the response was complete** — the connection to your
+  gateway dropped mid-answer. Check your gateway's timeouts and any proxy
+  between it and the deployment
+
+Your gateway's own errors are passed through with their original message.
 
 ### Model not found
 
