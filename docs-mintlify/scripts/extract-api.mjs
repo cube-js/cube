@@ -425,14 +425,11 @@ if (missing.length) {
   process.exit(1);
 }
 
-// 2b. Hoist `description`/`deprecated` out of a nullable field's `oneOf` branch,
-// e.g. `oneOf: [{ type: X, description, deprecated }, { type: 'null' }]` — the shape
-// class-validator-jsonschema emits for a nullable field, with the metadata on the
-// non-null branch. Renderers (Mintlify included) read deprecation/description off
-// the property schema itself, not a oneOf branch, so it silently failed to render.
-// Scoped to exactly that two-branch nullable shape (one bare `{ type: 'null' }`
-// sibling) so a genuine polymorphic oneOf — several real alternatives, each with
-// its own description — is left alone.
+// 2b. Hoist `description`/`deprecated` off a nullable field's non-null `oneOf`
+// branch, where class-validator-jsonschema puts them. Renderers read both off the
+// property schema, not a branch, so they otherwise never render. Scoped to exactly
+// a two-branch, one-bare-null shape, so a genuine polymorphic oneOf — several real
+// alternatives, each with its own description — is left alone.
 function hoistNullableMeta(node) {
   if (Array.isArray(node)) { node.forEach(hoistNullableMeta); return; }
   if (!node || typeof node !== 'object') return;
