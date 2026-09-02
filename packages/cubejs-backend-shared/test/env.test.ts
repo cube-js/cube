@@ -301,6 +301,13 @@ describe('getEnv(compilerCacheSize)', () => {
     expect(getEnv('compilerCacheSize')).toBe(1000);
   });
 
+  test('throws on zero, so it is never silently coerced to the default', () => {
+    process.env.CUBEJS_COMPILER_CACHE_SIZE = '0';
+    expect(() => getEnv('compilerCacheSize')).toThrowError(
+      'Value "0" is not valid for CUBEJS_COMPILER_CACHE_SIZE. Must be a positive integer. The compiler cache can not be disabled.'
+    );
+  });
+
   test('throws on a negative or non-integer value', () => {
     process.env.CUBEJS_COMPILER_CACHE_SIZE = '-1';
     expect(() => getEnv('compilerCacheSize')).toThrowError(
