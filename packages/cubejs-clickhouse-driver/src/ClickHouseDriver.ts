@@ -27,7 +27,9 @@ import { ClickHouseClient, createClient } from '@clickhouse/client';
 import type { ClickHouseSettings, ResponseJSON } from '@clickhouse/client';
 import { v4 as uuidv4 } from 'uuid';
 
-import { transformRow, transformStreamRow } from './HydrationStream';
+import {
+  buildTransformFromMeta, buildTransformFromNamesAndTypes, transformRow
+} from './Transform';
 import { formatError } from './utils';
 
 const SUPPORTED_BUCKET_TYPES = ['s3'];
@@ -273,12 +275,14 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     return this.normaliseResponse(response);
   }
 
-  protected queryResponse(query: string, values: unknown[], options?: QueryOptions): Promise<ResponseJSON<Record<string, unknown>>> {
+  protected queryResponse(query: string, values: unknown[], options?: QueryOptions): Promise<ResponseJSON<Array<unknown>>> {
     const formattedQuery = formatMySql(query, values);
 
     return this.withCancel(async (connection, queryId, signal) => {
       try {
-        const format = 'JSON';
+        // Positional rows avoid repeating column names and use the same transform as `stream()`.
+        // ClickHouse serializes cell values identically in JSON and JSONCompact.
+        const format = 'JSONCompact';
 
         const resultSet = await connection.query({
           query: formattedQuery,
@@ -294,8 +298,15 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
           throw new Error(`Unexpected x-clickhouse-format in response: expected ${format}, received ${resultSet.response_headers['x-clickhouse-format']}`);
         }
 
-        // We used format JSON, so we expect each row to be Record with column names as keys
-        const results = await resultSet.json<Record<string, unknown>>();
+        const results = await resultSet.json<Array<unknown>>();
+
+        // Up to ClickHouse 25.x, failures after the first flushed block are appended to a 200
+        // response; newer versions truncate the JSON and are rejected while parsing it above.
+        const { exception } = results as { exception?: string };
+        if (exception) {
+          throw new Error(`ClickHouse aborted after ${results.data?.length ?? 0} row(s): ${exception}`);
+        }
+
         return results;
       } catch (e) {
         throw new Error(`Query failed: ${formatError(e)}; query id: ${queryId}`, { cause: e });
@@ -303,19 +314,24 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     }, options);
   }
 
-  protected normaliseResponse<R = unknown>(res: ResponseJSON<Record<string, unknown>>): Array<R> {
-    if (res.data) {
-      const meta = (res.meta ?? []).reduce<Record<string, { name: string; type: string; }>>(
-        (state, element) => ({ [element.name]: element, ...state }),
-        {}
-      );
-
-      // TODO maybe use row-based format here as well?
-      res.data.forEach((row) => {
-        transformRow(row, meta);
-      });
+  protected normaliseResponse<R = unknown>(res: ResponseJSON<Array<unknown>>): Array<R> {
+    const { data } = res;
+    if (!data || data.length === 0) {
+      return [];
     }
-    return res.data as Array<R>;
+
+    if (!res.meta) {
+      throw new Error('Unexpected response without meta for format JSONCompact');
+    }
+
+    const transform = buildTransformFromMeta(res.meta);
+
+    const rows: Array<R> = new Array(data.length);
+    for (let i = 0; i < data.length; i++) {
+      rows[i] = transformRow(data[i] as Array<unknown>, transform) as R;
+    }
+
+    return rows;
   }
 
   public async release() {
@@ -420,13 +436,11 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       // JSONCompactEachRowWithNamesAndTypes: expect first row to be column names as string
       const types = second.value as Array<string>;
 
-      if (names.length !== types.length) {
-        throw new Error(`Unexpected names and types length mismatch; names ${names.length} vs types ${types.length}`);
-      }
+      const transform = buildTransformFromNamesAndTypes(names, types);
 
       const dataRowsIter = (async function* () {
         for await (const row of allRowsIter) {
-          yield transformStreamRow(row, names, types);
+          yield transformRow(row, transform);
         }
       }());
       const rowStream = Readable.from(dataRowsIter);
