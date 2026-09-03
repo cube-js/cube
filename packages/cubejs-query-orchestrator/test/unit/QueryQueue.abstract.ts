@@ -42,6 +42,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     const processMessagePromises: Promise<any>[] = [];
     const processCancelPromises: Promise<any>[] = [];
     let cancelledQuery;
+    // Rejects of the in-flight `cancelable` queries, so that a cancellation can reject the
+    // running handler the way a driver rejects a query it has stopped.
+    let cancelableRejects: ((error: Error) => void)[] = [];
     let streamCallOrder: string[] = [];
 
     const tenantPrefix = crypto.randomBytes(6).toString('hex');
@@ -54,6 +57,17 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           delayCount += 1;
           await setCancelHandler(result);
           return delayFn(result, query.delay);
+        },
+        cancelable: async (query, setCancelHandler) => {
+          await setCancelHandler(query.result);
+
+          return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => resolve(query.result), query.delay);
+            cancelableRejects.push((error) => {
+              clearTimeout(timer);
+              reject(error);
+            });
+          });
         },
       },
       streamHandler: async (query, stream) => {
@@ -82,6 +96,10 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         delay: async (query) => {
           console.log(`cancel call: ${JSON.stringify(query)}`);
           cancelledQuery = query.queryKey;
+        },
+        cancelable: async (query) => {
+          cancelledQuery = query.queryKey;
+          cancelableRejects.splice(0).forEach((reject) => reject(new Error('Query was cancelled')));
         }
       },
       continueWaitTimeout: 1,
@@ -111,6 +129,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       streamCount = 0;
       streamHandlerDelay = 250;
       streamCallOrder = [];
+      cancelableRejects = [];
     });
 
     afterAll(async () => {
@@ -185,6 +204,36 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       // assert that query queue is able to get query def by query key
       expect(logger.mock.calls[4][0]).toEqual('Cancelling query due to timeout');
       expect(logger.mock.calls[3][0]).toEqual('Error while querying');
+    });
+
+    test('cancelled query is not reported as an error', async () => {
+      cancelledQuery = null;
+
+      const queryKey: QueryKey = ['select * from cancelled', []];
+      // The client gives up on ContinueWaitError long before the handler would resolve
+      const pending = queue
+        .executeInQueue('cancelable', queryKey, { delay: 60 * 1000, result: '1' }, QueuePriority.Background)
+        .catch(e => e);
+
+      // executionTimeout is 2s, so the cancellation has to reach a handler which is already
+      // running, otherwise the query fails with a timeout instead
+      const deadline = Date.now() + 1000;
+      while (cancelableRejects.length === 0 && Date.now() < deadline) {
+        await delayFn(null, 25);
+      }
+      expect(cancelableRejects.length).toEqual(1);
+
+      await queue.cancelQuery(queue.redisHash(queryKey), null);
+      expect(cancelledQuery).toEqual(queryKey);
+      expect(await pending).toBeInstanceOf(ContinueWaitError);
+      await awaitProcessing();
+
+      // The rejection the cancellation causes is a cancellation, not a query failure: reporting
+      // it as one would surface it in query history
+      const events = logger.mock.calls.map(([message]) => message);
+      expect(events).toContain('Cancelling query manual');
+      expect(events).toContain('Cancelled query execution');
+      expect(events).not.toContain('Error while querying');
     });
 
     test('stage reporting', async () => {

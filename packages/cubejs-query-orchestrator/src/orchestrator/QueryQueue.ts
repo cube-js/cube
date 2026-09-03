@@ -9,6 +9,7 @@ import {
   QueryStageStateResponse,
   AddToQueueOptions,
   QueuePriority,
+  QueueDriverConnectionInterface,
   RetrieveForProcessingSuccess
 } from '@cubejs-backend/base-driver';
 import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
@@ -854,6 +855,9 @@ export class QueryQueue {
     try {
       let executionResult;
       let queryExecutionFinished = false;
+      // Set once the queue item is known to be gone, so that the rejection the cancellation
+      // causes isn't reported as a query error.
+      let queryCancelled = false;
       // Set by the query handler's setCancelHandler callback once execution begins.
       // Not available on the original query def from retrieveForProcessing.
       let localCancelHandler: unknown = null;
@@ -902,6 +906,7 @@ export class QueryQueue {
             try {
               const currentDef = await queueConnection.getQueryDef(queryKeyHashed, queueId);
               if (!currentDef && !queryExecutionFinished) {
+                queryCancelled = true;
                 this.logger('Cancelling query due to external cancellation', {
                   queueId,
                   queryKey: query.queryKey,
@@ -996,7 +1001,17 @@ export class QueryQueue {
         executionResult = {
           error: (e.message || e).toString() // TODO error handling
         };
-        this.logger('Error while querying', {
+
+        // A query which is no longer in the queue has been cancelled by the queue itself: it was
+        // orphaned, stalled or explicitly cancelled, and the driver rejects the execution which is
+        // still in flight as a consequence of that cancellation. Reporting such a rejection as a
+        // query error is misleading - nothing is waiting for the result any more - and it surfaces
+        // the cancellation in query history, which orphaned queries are deliberately kept out of.
+        // A timeout is excluded: it cancels a query which is still queued, so it stays an error.
+        const cancelled = !(e instanceof TimeoutError) &&
+          (queryCancelled || await this.isQueryRemovedFromQueue(queueConnection, queryKeyHashed, queueId));
+
+        const logEvent = {
           queueId,
           queueSize,
           duration: ((new Date()).getTime() - startQueryTime),
@@ -1009,8 +1024,23 @@ export class QueryQueue {
           newVersionEntry: query.query?.newVersionEntry,
           preAggregation: query.query?.preAggregation,
           addedToQueueTime: query.addedToQueueTime,
-          error: (e.stack || e).toString()
-        });
+        };
+
+        if (cancelled) {
+          // The rejection is reported as `cancellationError` rather than `error` on purpose: an
+          // `error` field is what marks a query as failed downstream, and a cancellation is not
+          // a failure.
+          this.logger('Cancelled query execution', {
+            ...logEvent,
+            cancellationError: (e.stack || e).toString()
+          });
+        } else {
+          this.logger('Error while querying', {
+            ...logEvent,
+            error: (e.stack || e).toString()
+          });
+        }
+
         if (e instanceof TimeoutError) {
           const queryWithCancelHandle = await queueConnection.getQueryDef(queryKeyHashed, queueId);
           if (queryWithCancelHandle) {
@@ -1060,6 +1090,30 @@ export class QueryQueue {
       });
     } finally {
       this.queueDriver.release(queueConnection);
+    }
+  }
+
+  /**
+   * Whether the queue item is gone, which means a cancellation - orphaned, stalled or explicit -
+   * has removed it while its execution was still in flight. A queue lookup failure is reported as
+   * `false` so that a genuine query error is never hidden by a queue storage issue.
+   */
+  protected async isQueryRemovedFromQueue(
+    queueConnection: QueueDriverConnectionInterface,
+    queryKeyHashed: QueryKeyHash,
+    queueId: QueueId
+  ): Promise<boolean> {
+    try {
+      return !(await queueConnection.getQueryDef(queryKeyHashed, queueId));
+    } catch (e: any) {
+      this.logger('Error while checking query cancellation', {
+        queueId,
+        queryKey: queryKeyHashed,
+        queuePrefix: this.redisQueuePrefix,
+        error: (e.stack || e).toString()
+      });
+
+      return false;
     }
   }
 
