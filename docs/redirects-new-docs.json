@@ -6,7 +6,7 @@
   },
   {
     "source": "/product/administration/workspace/saved-reports",
-    "destination": "https://docs.cube.dev/admin",
+    "destination": "https://docs.cube.dev/docs/explore-analyze/explore#saving-explorations",
     "permanent": true
   },
   {
@@ -1896,7 +1896,7 @@
   },
   {
     "source": "/product/workspace/saved-reports",
-    "destination": "https://docs.cube.dev/docs/explore-analyze/workbooks",
+    "destination": "https://docs.cube.dev/docs/explore-analyze/explore#saving-explorations",
     "permanent": true
   },
   {

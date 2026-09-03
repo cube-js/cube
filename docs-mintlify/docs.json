@@ -1145,6 +1145,10 @@
   },
   "redirects": [
     {
+      "source": "/docs/workspace/saved-reports",
+      "destination": "/docs/explore-analyze/explore#saving-explorations"
+    },
+    {
       "source": "/admin/ai/agent-rules",
       "destination": "/admin/ai/rules"
     },
