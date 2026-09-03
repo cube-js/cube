@@ -361,7 +361,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         // Up to ClickHouse 25.x, failures after the first flushed block are appended to a 200
         // response; newer versions truncate the JSON and are rejected while parsing it above.
         // The client declares `exception` for `JSONEachRowWithProgress` rows only, never here.
-        const { exception } = results as any as { exception?: string };
+        const { exception } = results as { exception?: string };
         if (exception) {
           throw new Error(`ClickHouse aborted after ${results.data?.length ?? 0} row(s): ${exception}`);
         }
