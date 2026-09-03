@@ -1002,14 +1002,14 @@ export class QueryQueue {
           error: (e.message || e).toString() // TODO error handling
         };
 
-        // A query which is no longer in the queue has been cancelled by the queue itself: it was
-        // orphaned, stalled or explicitly cancelled, and the driver rejects the execution which is
-        // still in flight as a consequence of that cancellation. Reporting such a rejection as a
-        // query error is misleading - nothing is waiting for the result any more - and it surfaces
-        // the cancellation in query history, which orphaned queries are deliberately kept out of.
-        // A timeout is excluded: it cancels a query which is still queued, so it stays an error.
+        // The queue removes an item when it cancels it - orphaned, stalled or explicit - and the
+        // driver then rejects the execution still in flight. Reporting that rejection as a query
+        // failure surfaces the cancellation in query history, which orphaned queries are kept out
+        // of. The lookup happens after the rejection, so a query which genuinely fails as its item
+        // is orphaned is reclassified too: harmless, nothing is waiting for either result. A
+        // timeout is excluded - it cancels a query which is still queued, so it stays an error.
         const cancelled = !(e instanceof TimeoutError) &&
-          (queryCancelled || await this.isQueryRemovedFromQueue(queueConnection, queryKeyHashed, queueId));
+          (queryCancelled || await this.isQueryRemovedFromQueue(queueConnection, query, queryKeyHashed, queueId));
 
         const logEvent = {
           queueId,
@@ -1027,11 +1027,12 @@ export class QueryQueue {
         };
 
         if (cancelled) {
-          // The rejection is reported as `cancellationError` rather than `error` on purpose: an
-          // `error` field is what marks a query as failed downstream, and a cancellation is not
-          // a failure.
+          // `warning` rather than `error` on purpose: an `error` field is what marks a query as
+          // failed downstream, and a cancellation is not a failure. It still has to be one of the
+          // two, otherwise the default logger drops the event at the default `info` level.
           this.logger('Cancelled query execution', {
             ...logEvent,
+            warning: 'Query execution was rejected because the query had been cancelled',
             cancellationError: (e.stack || e).toString()
           });
         } else {
@@ -1100,6 +1101,7 @@ export class QueryQueue {
    */
   protected async isQueryRemovedFromQueue(
     queueConnection: QueueDriverConnectionInterface,
+    query: QueryDef,
     queryKeyHashed: QueryKeyHash,
     queueId: QueueId
   ): Promise<boolean> {
@@ -1108,8 +1110,9 @@ export class QueryQueue {
     } catch (e: any) {
       this.logger('Error while checking query cancellation', {
         queueId,
-        queryKey: queryKeyHashed,
+        queryKey: query.queryKey,
         queuePrefix: this.redisQueuePrefix,
+        requestId: query.requestId,
         error: (e.stack || e).toString()
       });
 

@@ -216,10 +216,12 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         .catch(e => e);
 
       // executionTimeout is 2s, so the cancellation has to reach a handler which is already
-      // running, otherwise the query fails with a timeout instead
-      const deadline = Date.now() + 1000;
+      // running, otherwise the query fails with a timeout instead. The deadline stays well under
+      // it so that a worker which never picks the query up fails here rather than as a confusing
+      // assertion on the log events below.
+      const deadline = Date.now() + 750;
       while (cancelableRejects.length === 0 && Date.now() < deadline) {
-        await delayFn(null, 25);
+        await pausePromise(10);
       }
       expect(cancelableRejects.length).toEqual(1);
 
