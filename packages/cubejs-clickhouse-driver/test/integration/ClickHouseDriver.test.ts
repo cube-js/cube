@@ -57,19 +57,25 @@ describe('ClickHouseDriver', () => {
               decimal64 Decimal64(2),
               decimal128 Decimal128(2),
               enum8 Enum('hello' = 1, 'world' = 2),
-              enum16 Enum('hello' = 1, 'world' = 1000)
+              enum16 Enum('hello' = 1, 'world' = 1000),
+              enum_type_named Enum('Date' = 1, 'Int' = 2),
+              array_int32 Array(Int32),
+              array_datetime Array(DateTime),
+              map_str_int32 Map(String, Int32),
+              tuple_int32_str Tuple(Int32, String),
+              lc_nullable LowCardinality(Nullable(String))
             ) ENGINE Log
         `
       );
 
       await driver.insert('test.types_test', [
-        ['2020-01-01', '2020-01-01 00:00:00', '2020-01-01 00:00:00.000', '2020-01-01 00:00:00.000000', '2020-01-01 00:00:00.000000000', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.01, 1.01, 1.01, 'hello', 'world']
+        ['2020-01-01', '2020-01-01 00:00:00', '2020-01-01 00:00:00.000', '2020-01-01 00:00:00.000000', '2020-01-01 00:00:00.000000000', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.01, 1.01, 1.01, 'hello', 'world', 'Date', [1, 2], ['2020-01-01 00:00:00'], { a: 1 }, [1, 'a'], 'x']
       ]);
       await driver.insert('test.types_test', [
-        ['2020-01-02', '2020-01-02 00:00:00', '2020-01-02 00:00:00.123', '2020-01-02 00:00:00.123456', '2020-01-02 00:00:00.123456789', 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2.02, 2.02, 2.02, 'hello', 'world']
+        ['2020-01-02', '2020-01-02 00:00:00', '2020-01-02 00:00:00.123', '2020-01-02 00:00:00.123456', '2020-01-02 00:00:00.123456789', 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2.02, 2.02, 2.02, 'hello', 'world', 'Date', [1, 2], ['2020-01-01 00:00:00'], { a: 1 }, [1, 'a'], 'x']
       ]);
       await driver.insert('test.types_test', [
-        ['2020-01-03', '2020-01-03 00:00:00', '2020-01-03 00:00:00.234', '2020-01-03 00:00:00.234567', '2020-01-03 00:00:00.234567890', 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3.03, 3.03, 3.03, 'hello', 'world']
+        ['2020-01-03', '2020-01-03 00:00:00', '2020-01-03 00:00:00.234', '2020-01-03 00:00:00.234567', '2020-01-03 00:00:00.234567890', 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3.03, 3.03, 3.03, 'hello', 'world', 'Date', [1, 2], ['2020-01-01 00:00:00'], { a: 1 }, [1, 'a'], 'x']
       ]);
     });
   }, 30 * 1000);
@@ -180,6 +186,12 @@ describe('ClickHouseDriver', () => {
         decimal128: '1.01',
         enum8: 'hello',
         enum16: 'world',
+        enum_type_named: 'Date',
+        array_int32: [1, 2],
+        array_datetime: ['2020-01-01 00:00:00'],
+        map_str_int32: { a: 1 },
+        tuple_int32_str: [1, 'a'],
+        lc_nullable: 'x',
       }]);
     });
   });
@@ -281,6 +293,69 @@ describe('ClickHouseDriver', () => {
     });
   });
 
+  it('leaves container types untouched', async () => {
+    await doWithDriver(async (driver) => {
+      const rows = await driver.query(
+        `SELECT
+           [map('a', toDateTime('2020-01-01 00:00:00'))] AS array_map_datetime,
+           [NULL, 1::Nullable(Int32)] AS array_nullable_int32,
+           CAST('Date', 'Nullable(Enum8(\\'Date\\' = 1))') AS nullable_enum_type_named,
+           CAST(NULL, 'Nullable(Enum8(\\'Date\\' = 1))') AS nullable_enum_null`,
+        []
+      );
+
+      expect(rows).toEqual([{
+        array_map_datetime: [{ a: '2020-01-01 00:00:00' }],
+        array_nullable_int32: [null, 1],
+        nullable_enum_type_named: 'Date',
+        nullable_enum_null: null,
+      }]);
+    });
+  });
+
+  // Pre-aggregation content versions hash JSON.stringify output, so this pins ordering and value
+  // representation to the previous JSON format.
+  it('pins the serialisation of a row', async () => {
+    await doWithDriver(async (driver) => {
+      const rows = await driver.query('SELECT * FROM test.types_test ORDER BY int8 LIMIT 1', []);
+      expect(JSON.stringify(rows)).toEqual(
+        '[{"date":"2020-01-01T00:00:00.000","datetime":"2020-01-01T00:00:00.000",' +
+        '"datetime64_millis":"2020-01-01T00:00:00.000","datetime64_micros":"2020-01-01T00:00:00.000",' +
+        '"datetime64_nanos":"2020-01-01T00:00:00.000","int8":"1","int16":"1","int32":"1","int64":"1",' +
+        '"uint8":"1","uint16":"1","uint32":"1","uint64":"1","float32":"1","float64":"1",' +
+        '"decimal32":"1.01","decimal64":"1.01","decimal128":"1.01","enum8":"hello","enum16":"world",' +
+        '"enum_type_named":"Date","array_int32":[1,2],"array_datetime":["2020-01-01 00:00:00"],' +
+        '"map_str_int32":{"a":1},"tuple_int32_str":[1,"a"],"lc_nullable":"x"}]'
+      );
+    });
+  });
+
+  it('collapses a duplicated column name to one key', async () => {
+    await doWithDriver(async (driver) => {
+      const rows = await driver.query(
+        'SELECT toDate(\'2020-01-02\') AS x, \'a\' AS y, toDate(\'2020-01-02\') AS x', []
+      );
+      expect(JSON.stringify(rows)).toEqual('[{"x":"2020-01-02T00:00:00.000","y":"a"}]');
+    });
+  });
+
+  it('does not let a __proto__ column reach Object.prototype', async () => {
+    await doWithDriver(async (driver) => {
+      const rows = await driver.query('SELECT 1 AS `__proto__`', []);
+
+      expect(JSON.stringify(rows)).toEqual('[{"__proto__":"1"}]');
+      expect(Object.getPrototypeOf({})).toBe(Object.prototype);
+    });
+  });
+
+  it('raises when a query fails after its first block', async () => {
+    await doWithDriver(async (driver) => {
+      await expect(
+        driver.query('SELECT throwIf(number = 100000, \'boom\') AS c FROM numbers(200000)', [])
+      ).rejects.toThrow();
+    });
+  });
+
   it('stream', async () => {
     await doWithDriver(async (driver) => {
       const tableData = await driver.stream('SELECT * FROM test.types_test ORDER BY int8', [], {
@@ -309,11 +384,17 @@ describe('ClickHouseDriver', () => {
           { name: 'decimal128', type: 'decimal' },
           { name: 'enum8', type: 'text' },
           { name: 'enum16', type: 'text' },
+          { name: 'enum_type_named', type: 'text' },
+          { name: 'array_int32', type: 'int[]' },
+          { name: 'array_datetime', type: 'timestamp[]' },
+          { name: 'map_str_int32', type: 'text' },
+          { name: 'tuple_int32_str', type: 'text' },
+          { name: 'lc_nullable', type: 'text' },
         ]);
         expect(await streamToArray(tableData.rowStream as any)).toEqual([
-          { date: '2020-01-01T00:00:00.000', datetime: '2020-01-01T00:00:00.000', datetime64_millis: '2020-01-01T00:00:00.000', datetime64_micros: '2020-01-01T00:00:00.000', datetime64_nanos: '2020-01-01T00:00:00.000', int8: '1', int16: '1', int32: '1', int64: '1', uint8: '1', uint16: '1', uint32: '1', uint64: '1', float32: '1', float64: '1', decimal32: '1.01', decimal64: '1.01', decimal128: '1.01', enum8: 'hello', enum16: 'world' },
-          { date: '2020-01-02T00:00:00.000', datetime: '2020-01-02T00:00:00.000', datetime64_millis: '2020-01-02T00:00:00.123', datetime64_micros: '2020-01-02T00:00:00.123', datetime64_nanos: '2020-01-02T00:00:00.123', int8: '2', int16: '2', int32: '2', int64: '2', uint8: '2', uint16: '2', uint32: '2', uint64: '2', float32: '2', float64: '2', decimal32: '2.02', decimal64: '2.02', decimal128: '2.02', enum8: 'hello', enum16: 'world' },
-          { date: '2020-01-03T00:00:00.000', datetime: '2020-01-03T00:00:00.000', datetime64_millis: '2020-01-03T00:00:00.234', datetime64_micros: '2020-01-03T00:00:00.234', datetime64_nanos: '2020-01-03T00:00:00.234', int8: '3', int16: '3', int32: '3', int64: '3', uint8: '3', uint16: '3', uint32: '3', uint64: '3', float32: '3', float64: '3', decimal32: '3.03', decimal64: '3.03', decimal128: '3.03', enum8: 'hello', enum16: 'world' },
+          { date: '2020-01-01T00:00:00.000', datetime: '2020-01-01T00:00:00.000', datetime64_millis: '2020-01-01T00:00:00.000', datetime64_micros: '2020-01-01T00:00:00.000', datetime64_nanos: '2020-01-01T00:00:00.000', int8: '1', int16: '1', int32: '1', int64: '1', uint8: '1', uint16: '1', uint32: '1', uint64: '1', float32: '1', float64: '1', decimal32: '1.01', decimal64: '1.01', decimal128: '1.01', enum8: 'hello', enum16: 'world', enum_type_named: 'Date', array_int32: [1, 2], array_datetime: ['2020-01-01 00:00:00'], map_str_int32: { a: 1 }, tuple_int32_str: [1, 'a'], lc_nullable: 'x' },
+          { date: '2020-01-02T00:00:00.000', datetime: '2020-01-02T00:00:00.000', datetime64_millis: '2020-01-02T00:00:00.123', datetime64_micros: '2020-01-02T00:00:00.123', datetime64_nanos: '2020-01-02T00:00:00.123', int8: '2', int16: '2', int32: '2', int64: '2', uint8: '2', uint16: '2', uint32: '2', uint64: '2', float32: '2', float64: '2', decimal32: '2.02', decimal64: '2.02', decimal128: '2.02', enum8: 'hello', enum16: 'world', enum_type_named: 'Date', array_int32: [1, 2], array_datetime: ['2020-01-01 00:00:00'], map_str_int32: { a: 1 }, tuple_int32_str: [1, 'a'], lc_nullable: 'x' },
+          { date: '2020-01-03T00:00:00.000', datetime: '2020-01-03T00:00:00.000', datetime64_millis: '2020-01-03T00:00:00.234', datetime64_micros: '2020-01-03T00:00:00.234', datetime64_nanos: '2020-01-03T00:00:00.234', int8: '3', int16: '3', int32: '3', int64: '3', uint8: '3', uint16: '3', uint32: '3', uint64: '3', float32: '3', float64: '3', decimal32: '3.03', decimal64: '3.03', decimal128: '3.03', enum8: 'hello', enum16: 'world', enum_type_named: 'Date', array_int32: [1, 2], array_datetime: ['2020-01-01 00:00:00'], map_str_int32: { a: 1 }, tuple_int32_str: [1, 'a'], lc_nullable: 'x' },
         ]);
       } finally {
         // @ts-ignore

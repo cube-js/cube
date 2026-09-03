@@ -18,7 +18,7 @@ describe('ClickHouseDriver statement path', () => {
       ping: jest.fn(async () => ({ success: true })),
       query: jest.fn(async () => ({
         response_headers: {},
-        json: async () => ({ meta: [{ name: 'one', type: 'UInt8' }], data: [{ one: 1 }] }),
+        json: async () => ({ meta: [{ name: 'one', type: 'UInt8' }], data: [[1]] }),
       })),
       command: jest.fn(async () => ({ query_id: 'test' })),
       insert: jest.fn(async () => ({ executed: true })),
@@ -44,6 +44,45 @@ describe('ClickHouseDriver statement path', () => {
     expect(client.ping).not.toHaveBeenCalled();
     // A single long-lived client, so no extra socket pool per statement
     expect(createClientMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('requests format JSONCompact', async () => {
+    await createDriver().query('SELECT 1 AS one', []);
+
+    expect(client.query).toHaveBeenCalledWith(expect.objectContaining({ format: 'JSONCompact' }));
+  });
+
+  it('returns an empty result set as an empty array', async () => {
+    client.query.mockImplementation(async () => ({
+      response_headers: {},
+      json: async () => ({ meta: [{ name: 'one', type: 'UInt8' }], data: [] }),
+    }));
+
+    expect(await createDriver().query('SELECT 1 AS one WHERE 0', [])).toEqual([]);
+  });
+
+  it('refuses to name positional cells without meta', async () => {
+    client.query.mockImplementation(async () => ({
+      response_headers: {},
+      json: async () => ({ data: [[1]] }),
+    }));
+
+    await expect(createDriver().query('SELECT 1 AS one', []))
+      .rejects.toThrow('Unexpected response without meta for format JSONCompact');
+  });
+
+  it('raises on an exception appended to a 200 response', async () => {
+    client.query.mockImplementation(async () => ({
+      response_headers: {},
+      json: async () => ({
+        meta: [{ name: 'one', type: 'UInt8' }],
+        data: [[1], [2]],
+        exception: 'Code: 395. DB::Exception: boom',
+      }),
+    }));
+
+    await expect(createDriver().query('SELECT 1 AS one', []))
+      .rejects.toThrow('ClickHouse aborted after 2 row(s): Code: 395. DB::Exception: boom');
   });
 
   it('does not run a health check per command or insert', async () => {
