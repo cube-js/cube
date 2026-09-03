@@ -114,6 +114,83 @@ describe('getColumnConverter', () => {
     expect(convert('LowCardinality(Nullable(Date))', '2020-01-01')).toEqual('2020-01-01T00:00:00.000');
   });
 
+  it('never diverges from the generic formatter, at every precision', () => {
+    const fraction = '234567890';
+
+    for (let p = 0; p <= 9; p++) {
+      const frac = p === 0 ? '' : `.${fraction.slice(0, p)}`;
+
+      for (const value of [`2020-01-02 03:04:05${frac}`, `2020-01-02T03:04:05${frac}Z`]) {
+        expect(convert(`DateTime64(${p})`, value)).toEqual(formatDateTime(value));
+        expect(convert(`DateTime64(${p}, 'UTC')`, value)).toEqual(formatDateTime(value));
+      }
+    }
+
+    expect(convert('DateTime', '2020-01-02T03:04:05Z')).toEqual('2020-01-02T03:04:05.000');
+  });
+
+  it('falls back on an offset suffix whose width does not match', () => {
+    for (const [type, value] of [
+      ['DateTime64(5)', '2020-01-01 12:34:56+03:00'],
+      ['DateTime64(8)', '2020-01-02T12:34:56.789+03:00'],
+      ['DateTime64(3)', '2020-01-02T12:34:56.7+03:00'],
+      ['DateTime', '2020-01-01 12:34:56+03:00'],
+    ] as Array<[string, string]>) {
+      expect(convert(type, value)).toEqual(viaMoment(value));
+    }
+  });
+
+  it('reshapes an offset suffix that happens to match the width', () => {
+    // Accepted blind spot: no date_time_output_format shape writes an offset for a DateTime
+    // column, so the fraction is never checked for digits and the wall clock survives unshifted.
+    const value = '2020-01-01 12:34:56.789+03:00';
+
+    expect(convert('DateTime64(9)', value)).toEqual('2020-01-01T12:34:56.789');
+    expect(viaMoment(value)).toEqual('2020-01-01T09:34:56.789');
+  });
+
+  it('falls back when the value width does not match the declared precision', () => {
+    expect(convert('DateTime64(3, \'UTC\')', '2020-01-02 03:04:05.234567')).toEqual('2020-01-02T03:04:05.234');
+    expect(convert('DateTime64(6)', '2020-01-02 03:04:05.234')).toEqual('2020-01-02T03:04:05.234');
+    expect(convert('DateTime', '2020-01-02 03:04:05.234')).toEqual('2020-01-02T03:04:05.234');
+    expect(convert('DateTime64(3)', '1577923200.234')).toEqual(viaMoment('1577923200.234'));
+  });
+
+  it('reads the precision out of the type', () => {
+    expect(convert('DateTime64', '2020-01-02 03:04:05.234')).toEqual('2020-01-02T03:04:05.234');
+    expect(convert('DateTime64(6,\'UTC\')', '2020-01-02 03:04:05.234567')).toEqual('2020-01-02T03:04:05.234');
+    expect(convert('LowCardinality(Nullable(DateTime64(6)))', '2020-01-02 03:04:05.234567'))
+      .toEqual('2020-01-02T03:04:05.234');
+    expect(convert('SimpleAggregateFunction(max, DateTime64(3))', '2020-01-02 03:04:05.234'))
+      .toEqual('2020-01-02T03:04:05.234');
+    // Not a real ClickHouse precision, so it stays on the generic path
+    expect(convert('DateTime64(10)', '2020-01-02 03:04:05.2345678901')).toEqual('2020-01-02T03:04:05.234');
+  });
+
+  it('shares one converter instance per precision', () => {
+    expect(getColumnConverter('DateTime64(3)')).toBe(getColumnConverter('Nullable(DateTime64(3, \'UTC\'))'));
+    expect(getColumnConverter('DateTime')).toBe(getColumnConverter('DateTime(\'Asia/Istanbul\')'));
+    expect(getColumnConverter('DateTime')).toBe(getColumnConverter('DateTime64(0)'));
+    expect(getColumnConverter('DateTime64(3)')).not.toBe(getColumnConverter('DateTime64(6)'));
+  });
+
+  it('trusts the digits once the width and separators match', () => {
+    // The same blind spot on the date and time positions.
+    const value = '20x0-01-02 03:04:05.234';
+
+    expect(convert('DateTime64(3)', value)).toEqual('20x0-01-02T03:04:05.234');
+    expect(viaMoment(value)).not.toEqual('20x0-01-02T03:04:05.234');
+  });
+
+  it('passes null and undefined through at every precision', () => {
+    for (let p = 0; p <= 9; p++) {
+      expect(convert(`DateTime64(${p})`, null)).toBeNull();
+      expect(convert(`DateTime64(${p})`, undefined)).toBeUndefined();
+    }
+
+    expect(convert('DateTime', null)).toBeNull();
+  });
+
   // Not an AggregateFunction state: it reads back as a plain value of its argument type
   it('still stringifies a SimpleAggregateFunction', () => {
     expect(convert('SimpleAggregateFunction(sum, Int64)', 1)).toEqual('1');

@@ -197,9 +197,14 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         /// Let's disable it, because we don't need them.
         send_progress_in_http_headers: 0,
         // If ClickHouse user's permissions are restricted with "readonly = 1",
-        // change settings queries are not allowed. Thus, "join_use_nulls" setting
-        // can not be changed
-        ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
+        // change settings queries are not allowed
+        ...(this.readOnlyMode ? {} : {
+          join_use_nulls: 1,
+          // Pins every DateTime value to the width its column type implies, which is what the
+          // specialized converters in Transform.ts key off. Not guaranteed: a readonly user or a
+          // driver_factory override still lands on the generic formatter.
+          date_time_output_format: 'simple',
+        }),
       },
       // Custom HTTP headers can only be passed via driver_factory, not env vars.
       headers: config.headers ?? {},

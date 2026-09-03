@@ -17,6 +17,7 @@ const CHAR_DASH = 45;
 const CHAR_DOT = 46;
 const CHAR_COLON = 58;
 const CHAR_T = 84;
+const CHAR_LPAREN = 40;
 const CHAR_Z = 90;
 
 const ZEROS = '000';
@@ -98,6 +99,82 @@ export function formatDateTime(value: unknown): string {
   return moment.utc(value as any).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 }
 
+// A DateTime column reads back at a width its type pins exactly, and none of the three
+// `date_time_output_format` shapes (simple, iso, unix_timestamp) puts anything but digits in the
+// fraction, so the width plus these five separators are the whole check.
+function hasSimpleSeparators(s: string): boolean {
+  return s.charCodeAt(4) === CHAR_DASH &&
+    s.charCodeAt(7) === CHAR_DASH &&
+    s.charCodeAt(10) === CHAR_SPACE &&
+    s.charCodeAt(13) === CHAR_COLON &&
+    s.charCodeAt(16) === CHAR_COLON;
+}
+
+const dateTime0Converter: ColumnConverter = (value) => {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.length === 19 && hasSimpleSeparators(value)) {
+    return `${value.slice(0, 10)}T${value.slice(11, 19)}.${ZEROS}`;
+  }
+
+  return formatDateTime(value);
+};
+
+const dateTime1Converter: ColumnConverter = (value) => {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.length === 21 && hasSimpleSeparators(value) && value.charCodeAt(19) === CHAR_DOT) {
+    return `${value.slice(0, 10)}T${value.slice(11, 19)}.${value.slice(20, 21)}00`;
+  }
+
+  return formatDateTime(value);
+};
+
+const dateTime2Converter: ColumnConverter = (value) => {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.length === 22 && hasSimpleSeparators(value) && value.charCodeAt(19) === CHAR_DOT) {
+    return `${value.slice(0, 10)}T${value.slice(11, 19)}.${value.slice(20, 22)}0`;
+  }
+
+  return formatDateTime(value);
+};
+
+// A width captured in the closure measures the same as one inlined per precision.
+function createTruncatingDateTimeConverter(width: number): ColumnConverter {
+  return (value) => {
+    if (value === null || value === undefined) {
+      return value;
+    }
+
+    if (typeof value === 'string' && value.length === width && hasSimpleSeparators(value) && value.charCodeAt(19) === CHAR_DOT) {
+      return `${value.slice(0, 10)}T${value.slice(11, 23)}`;
+    }
+
+    return formatDateTime(value);
+  };
+}
+
+// Prebuilt so a plan built from meta and a plan built from names/types stay reference-equal.
+const DATE_TIME_CONVERTERS: ReadonlyArray<ColumnConverter> = [
+  dateTime0Converter,
+  dateTime1Converter,
+  dateTime2Converter,
+  createTruncatingDateTimeConverter(23),
+  createTruncatingDateTimeConverter(24),
+  createTruncatingDateTimeConverter(25),
+  createTruncatingDateTimeConverter(26),
+  createTruncatingDateTimeConverter(27),
+  createTruncatingDateTimeConverter(28),
+  createTruncatingDateTimeConverter(29),
+];
+
 const dateTimeConverter: ColumnConverter = (value) => (
   value === null || value === undefined ? value : formatDateTime(value)
 );
@@ -138,6 +215,41 @@ function unwrapScalar(type: string): string {
   return inner;
 }
 
+const DATE_TIME64 = 'DateTime64';
+const DEFAULT_DATE_TIME64_PRECISION = 3;
+const MAX_DATE_TIME64_PRECISION = 9;
+const PRECISION_UNSUPPORTED = -1;
+
+// `DateTime` and `DateTime64(0)` read back with the same 19 character shape, so a plain DateTime is
+// precision 0. indexOf rather than startsWith, because SimpleAggregateFunction(max, DateTime64(3))
+// reads back as its argument type. charCodeAt past the end is NaN, so no bounds checks are needed.
+function parseDateTimePrecision(inner: string): number {
+  const at = inner.indexOf(DATE_TIME64);
+  if (at === -1) {
+    return 0;
+  }
+
+  let i = at + DATE_TIME64.length;
+  if (inner.charCodeAt(i) !== CHAR_LPAREN) {
+    return DEFAULT_DATE_TIME64_PRECISION;
+  }
+
+  i++;
+  let precision = 0;
+  let digits = 0;
+  while (isDigit(inner.charCodeAt(i))) {
+    precision = precision * 10 + (inner.charCodeAt(i) - CHAR_0);
+    digits++;
+    i++;
+  }
+
+  if (digits === 0 || precision > MAX_DATE_TIME64_PRECISION) {
+    return PRECISION_UNSUPPORTED;
+  }
+
+  return precision;
+}
+
 export function getColumnConverter(type: string): ColumnConverter | null {
   const inner = unwrapScalar(type);
 
@@ -146,7 +258,13 @@ export function getColumnConverter(type: string): ColumnConverter | null {
   }
 
   if (inner.includes('Date')) {
-    return inner.includes('DateTime') ? dateTimeConverter : dateConverter;
+    if (!inner.includes('DateTime')) {
+      return dateConverter;
+    }
+
+    const precision = parseDateTimePrecision(inner);
+
+    return precision === PRECISION_UNSUPPORTED ? dateTimeConverter : DATE_TIME_CONVERTERS[precision];
   }
 
   if (inner.includes('Int') || inner.includes('Float') || inner.includes('Decimal')) {
