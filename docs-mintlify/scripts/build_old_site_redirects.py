@@ -141,11 +141,7 @@ OVERRIDES = {
 # Legacy redirects normally take precedence over canonical page mappings. This
 # page was renamed rather than consolidated into the workspace landing, so its
 # old redirect must follow the canonical override above.
-LEGACY_REDIRECT_OVERRIDES = {
-    "/product/administration/workspace/saved-reports": OVERRIDES[
-        "/product/administration/workspace/saved-reports"
-    ],
-}
+LEGACY_SOURCE_WINS = {"/product/administration/workspace/saved-reports"}
 
 # Where to send any /product/* URL that matches nothing else.
 PRODUCT_CATCH_ALL = "/docs/introduction"
@@ -278,9 +274,8 @@ def build_redirects(old_redirects: list, page_map: dict) -> list:
     # 1. Legacy aliases from the old redirects.json.
     for r in old_redirects:
         source = r.get("source", "")
-        destination = LEGACY_REDIRECT_OVERRIDES.get(source)
-        if destination:
-            add(source, to_absolute(destination))
+        if source in LEGACY_SOURCE_WINS:
+            add(source, to_absolute(OVERRIDES[source]))
         else:
             add(source, resolve_destination(r.get("destination", ""), page_map))
 
