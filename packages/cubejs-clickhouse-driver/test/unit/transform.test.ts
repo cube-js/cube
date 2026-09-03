@@ -131,6 +131,7 @@ describe('getColumnConverter', () => {
 
   it('falls back on an offset suffix whose width does not match', () => {
     for (const [type, value] of [
+      // Exactly a DateTime64(5) width; only the missing fraction marker keeps it off the fast path
       ['DateTime64(5)', '2020-01-01 12:34:56+03:00'],
       ['DateTime64(8)', '2020-01-02T12:34:56.789+03:00'],
       ['DateTime64(3)', '2020-01-02T12:34:56.7+03:00'],
@@ -174,12 +175,21 @@ describe('getColumnConverter', () => {
     expect(getColumnConverter('DateTime64(3)')).not.toBe(getColumnConverter('DateTime64(6)'));
   });
 
-  it('trusts the digits once the width and separators match', () => {
+  it('trusts everything but the width and the fraction marker', () => {
     // The same blind spot on the date and time positions.
     const value = '20x0-01-02 03:04:05.234';
 
     expect(convert('DateTime64(3)', value)).toEqual('20x0-01-02T03:04:05.234');
     expect(viaMoment(value)).not.toEqual('20x0-01-02T03:04:05.234');
+  });
+
+  it('agrees with the generic formatter on a T separated value of matching width', () => {
+    // The fast path overwrites index 10 regardless, so widening the gate to let this shape in
+    // cannot diverge from the formatter that used to handle it.
+    for (const value of ['2020-01-02T03:04:05.234', '2020-01-02T03:04:05']) {
+      expect(convert('DateTime64(3)', value)).toEqual(formatDateTime(value));
+      expect(convert('DateTime', value)).toEqual(formatDateTime(value));
+    }
   });
 
   it('passes null and undefined through at every precision', () => {

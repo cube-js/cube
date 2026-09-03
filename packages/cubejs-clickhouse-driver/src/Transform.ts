@@ -80,7 +80,7 @@ export function formatCanonicalDateTime(s: string): string | null {
     tail = end;
   }
 
-  // Offsets require a timezone shift and stay on the moment fallback path.
+  // Offsets require a timezone shift, which only moment does.
   if (tail !== len && !(tail === len - 1 && s.charCodeAt(tail) === CHAR_Z)) {
     return null;
   }
@@ -99,23 +99,15 @@ export function formatDateTime(value: unknown): string {
   return moment.utc(value as any).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 }
 
-// A DateTime column reads back at a width its type pins exactly, and none of the three
-// `date_time_output_format` shapes (simple, iso, unix_timestamp) puts anything but digits in the
-// fraction, so the width plus these five separators are the whole check.
-function hasSimpleSeparators(s: string): boolean {
-  return s.charCodeAt(4) === CHAR_DASH &&
-    s.charCodeAt(7) === CHAR_DASH &&
-    s.charCodeAt(10) === CHAR_SPACE &&
-    s.charCodeAt(13) === CHAR_COLON &&
-    s.charCodeAt(16) === CHAR_COLON;
-}
-
+// The other two `date_time_output_format` shapes never share the width a column type pins: iso is
+// always one character longer, unix_timestamp far shorter. The fraction marker is checked on top of
+// the width because `2020-01-01 12:34:56+03:00` is exactly as wide as a DateTime64(5) value.
 const dateTime0Converter: ColumnConverter = (value) => {
   if (value === null || value === undefined) {
     return value;
   }
 
-  if (typeof value === 'string' && value.length === 19 && hasSimpleSeparators(value)) {
+  if (typeof value === 'string' && value.length === 19) {
     return `${value.slice(0, 10)}T${value.slice(11, 19)}.${ZEROS}`;
   }
 
@@ -127,7 +119,7 @@ const dateTime1Converter: ColumnConverter = (value) => {
     return value;
   }
 
-  if (typeof value === 'string' && value.length === 21 && hasSimpleSeparators(value) && value.charCodeAt(19) === CHAR_DOT) {
+  if (typeof value === 'string' && value.length === 21 && value.charCodeAt(19) === CHAR_DOT) {
     return `${value.slice(0, 10)}T${value.slice(11, 19)}.${value.slice(20, 21)}00`;
   }
 
@@ -139,7 +131,7 @@ const dateTime2Converter: ColumnConverter = (value) => {
     return value;
   }
 
-  if (typeof value === 'string' && value.length === 22 && hasSimpleSeparators(value) && value.charCodeAt(19) === CHAR_DOT) {
+  if (typeof value === 'string' && value.length === 22 && value.charCodeAt(19) === CHAR_DOT) {
     return `${value.slice(0, 10)}T${value.slice(11, 19)}.${value.slice(20, 22)}0`;
   }
 
@@ -153,7 +145,7 @@ function createTruncatingDateTimeConverter(width: number): ColumnConverter {
       return value;
     }
 
-    if (typeof value === 'string' && value.length === width && hasSimpleSeparators(value) && value.charCodeAt(19) === CHAR_DOT) {
+    if (typeof value === 'string' && value.length === width && value.charCodeAt(19) === CHAR_DOT) {
       return `${value.slice(0, 10)}T${value.slice(11, 23)}`;
     }
 
@@ -161,7 +153,6 @@ function createTruncatingDateTimeConverter(width: number): ColumnConverter {
   };
 }
 
-// Prebuilt so a plan built from meta and a plan built from names/types stay reference-equal.
 const DATE_TIME_CONVERTERS: ReadonlyArray<ColumnConverter> = [
   dateTime0Converter,
   dateTime1Converter,

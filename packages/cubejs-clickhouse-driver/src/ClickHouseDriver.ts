@@ -338,7 +338,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
 
     return this.withCancel(async (connection, queryId, signal) => {
       try {
-        // Positional rows avoid repeating column names and use the same transform as `stream()`.
+        // Positional rows drop the repeated column names and share the transform with `stream()`;
         // ClickHouse serializes cell values identically in JSON and JSONCompact.
         const format = 'JSONCompact';
 
