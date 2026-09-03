@@ -238,8 +238,8 @@ cube(`retail_calendar_completed`, {
 <Warning>
 
 **Repeat `calendar: true` on the extending cube.** A cube inherits it from its parent, but
-an inherited value is not passed to the query engine. Without it, the extending cube is
-not treated as a calendar cube and its granularity overrides are ignored.
+inherited cube-level parameters are not always passed to the query engine. Setting it
+again keeps the extending cube a calendar cube.
 
 </Warning>
 

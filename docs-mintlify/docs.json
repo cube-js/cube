@@ -157,6 +157,7 @@
               "docs/data-modeling/joins",
               "docs/data-modeling/measures",
               "docs/data-modeling/dimensions",
+              "docs/data-modeling/concepts/calendar-cubes",
               "docs/data-modeling/ai-context",
               "docs/data-modeling/concepts/syntax",
               {
