@@ -385,11 +385,10 @@ describe('ClickHouseDriver', () => {
           { name: 'enum8', type: 'text' },
           { name: 'enum16', type: 'text' },
           { name: 'enum_type_named', type: 'text' },
-          // toGenericType reports a container using one of its argument types.
-          { name: 'array_int32', type: 'int' },
-          { name: 'array_datetime', type: 'timestamp' },
+          { name: 'array_int32', type: 'int[]' },
+          { name: 'array_datetime', type: 'timestamp[]' },
           { name: 'map_str_int32', type: 'text' },
-          { name: 'tuple_int32_str', type: 'int' },
+          { name: 'tuple_int32_str', type: 'text' },
           { name: 'lc_nullable', type: 'text' },
         ]);
         expect(await streamToArray(tableData.rowStream as any)).toEqual([

@@ -549,37 +549,53 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     };
   }
 
+  /**
+   * Example of types:
+   *
+   * Int64
+   * Nullable(Int64) / Nullable(String)
+   * Nullable(DateTime('UTC'))
+   * LowCardinality(Nullable(String))
+   * Array(DateTime) -> timestamp[]
+   * Map(String, Int32) / Tuple(Int32, String)
+   */
   protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): GenericDataBaseType {
-    if (columnType.toLowerCase() in ClickhouseTypeToGeneric) {
-      return ClickhouseTypeToGeneric[columnType.toLowerCase()];
+    const type = columnType.trim();
+    const lowerType = type.toLowerCase();
+
+    if (lowerType in ClickhouseTypeToGeneric) {
+      return ClickhouseTypeToGeneric[lowerType];
     }
 
-    const match = columnType.trim().toLowerCase().match(/decimal\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)/i);
-
-    if (match) {
-      precision = Number(match[1]);
-      scale = Number(match[2]);
+    const argsStart = type.indexOf('(');
+    if (argsStart === -1) {
+      return super.toGenericType(type, precision, scale);
     }
 
-    /**
-     * Example of types:
-     *
-     * Int64
-     * Nullable(Int64) / Nullable(String)
-     * Nullable(DateTime('UTC'))
-     */
-    if (columnType.includes('(')) {
-      const types = columnType.toLowerCase().match(/([a-z0-9']+)/g);
-      if (types) {
-        for (const type of types) {
-          if (type in ClickhouseTypeToGeneric) {
-            return ClickhouseTypeToGeneric[type];
-          }
-        }
+    const name = lowerType.slice(0, argsStart).trim();
+    const args = type.slice(argsStart + 1, type.lastIndexOf(')'));
+
+    switch (name) {
+      case 'nullable':
+      case 'lowcardinality':
+        return this.toGenericType(args, precision, scale);
+      case 'array':
+        return `${this.toGenericType(args)}[]`;
+      case 'map':
+      case 'tuple':
+      case 'nested':
+        return 'text';
+      case 'decimal': {
+        const [argPrecision, argScale] = args.split(',');
+        return super.toGenericType(name, Number(argPrecision), Number(argScale));
       }
+      default:
+        // Parameterized scalars: DateTime('UTC'), DateTime64(3, 'UTC'), Enum8('Date' = 1),
+        // FixedString(16). Their arguments never carry a type, so only the name is mapped.
+        return name in ClickhouseTypeToGeneric
+          ? ClickhouseTypeToGeneric[name]
+          : super.toGenericType(name, precision, scale);
     }
-
-    return super.toGenericType(columnType, precision, scale);
   }
 
   public async createSchemaIfNotExists(schemaName: string): Promise<void> {
