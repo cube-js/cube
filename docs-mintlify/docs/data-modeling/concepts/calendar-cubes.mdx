@@ -95,16 +95,16 @@ cube('fiscal_calendar', {
       type: 'time',
 
       time_shift: [
-        { type: 'prior', interval: '1 week', sql: '{CUBE}.week_ago' },
-        { type: 'prior', interval: '1 month', sql: '{CUBE}.month_ago' },
-        { type: 'prior', interval: '1 year', sql: '{CUBE}.year_ago' }
+        { type: `prior`, interval: `1 week`, sql: `${CUBE}.week_ago` },
+        { type: `prior`, interval: `1 month`, sql: `${CUBE}.month_ago` },
+        { type: `prior`, interval: `1 year`, sql: `${CUBE}.year_ago` }
       ],
 
-      granularities: [
-        { name: 'week', sql: '{CUBE}.start_of_week' },
-        { name: 'month', sql: '{CUBE}.start_of_month' },
-        { name: 'year', sql: '{CUBE}.start_of_year' }
-      ]
+      granularities: {
+        week: { sql: `${CUBE}.start_of_week` },
+        month: { sql: `${CUBE}.start_of_month` },
+        year: { sql: `${CUBE}.start_of_year` }
+      }
     }
   }
 })
@@ -421,9 +421,9 @@ cube(`custom_calendar`, {
       type: `time`,
       primary_key: true,
 
-      granularities: [
-        { name: `month`, sql: `${CUBE}.mid_month::TIMESTAMP` }
-      ]
+      granularities: {
+        month: { sql: `${CUBE}.mid_month::TIMESTAMP` }
+      }
     }
   }
 })
