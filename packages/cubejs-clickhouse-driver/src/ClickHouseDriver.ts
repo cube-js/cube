@@ -286,10 +286,10 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   private clientLoggerClass(): new () => Logger {
     const emit = (level: LogLevel, { module, message, args }: LogParams, err?: Error) => {
       this.logger?.('ClickHouse Client Log', {
+        ...args,
         level,
         module,
         message,
-        ...args,
         ...(err ? { error: (err.stack || err).toString() } : {}),
       });
     };
