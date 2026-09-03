@@ -422,7 +422,9 @@ A [pre-aggregation][ref-pre-aggregations] over an overridden granularity must de
 granularity. A rollup on `month` is built from the `retail_month_begins` column and serves
 queries at `month`:
 
-```yaml
+<CodeGroup>
+
+```yaml title="YAML"
 cubes:
   - name: orders
     # ...
@@ -434,6 +436,22 @@ cubes:
         time_dimension: retail_calendar.date
         granularity: month
 ```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: {
+    orders_by_retail_month: {
+      measures: [count],
+      time_dimension: retail_calendar.date,
+      granularity: `month`
+    }
+  }
+})
+```
+
+</CodeGroup>
 
 <Warning>
 
