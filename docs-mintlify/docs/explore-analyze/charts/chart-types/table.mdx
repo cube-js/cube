@@ -23,7 +23,7 @@ Pivot columns are the exception: they can also be sorted from the table itself, 
 
 ## Pivots
 
-Pivoting a dimension turns its unique values into columns, creating a cross-tab view. Drag a dimension to the **Pivot columns** drop zone in the **Fields** section to pivot it.
+Pivoting a dimension turns its unique values into columns, creating a cross-tab view. The **Pivot** section of the **Fields** tab holds three drop zones — **Rows**, **Columns**, and **Values** — plus a **Measures** placeholder that decides whether the measure names run across the top or down the side. Drag a dimension to **Columns** to pivot it.
 
 {/* TODO screenshot: table with pivot active — dimension values as column headers (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -31,6 +31,17 @@ Pivot behavior:
 - Pivot columns can be sorted by clicking the column header, including the totals column.
 - Pivot columns can also be sorted by row values — click a row number to sort by that row, including the totals row.
 - Pivoted columns can be hidden, but hiding is indexed to the specific value (e.g. hiding `status: returned`), not position.
+
+### Pivot presets
+
+Open the menu in the corner of the Pivot section to apply a preset — a one-shot arrangement of the three drop zones that you can rearrange further afterwards:
+
+- **Table (default)** — dimensions down the left, measures across the top; the standard cross-tab.
+- **Vertical records** — every dimension becomes a column header and the measure names run down the side, so a single record reads as a list of labelled values. This produces the values-as-rows layout.
+
+A table with every dimension in **Columns** and nothing in **Values** shows its headers alone, which is a valid way to read one record.
+
+Use **Reset** in the section header to return to the default layout.
 
 ## Row grouping
 
@@ -82,7 +93,7 @@ can't be recomputed at another grain, so their cells stay empty on group rows �
 exclusion that [row, column, and pivot
 totals](/docs/explore-analyze/workbooks/querying-data#subtotals) make. Period-comparison
 columns are also left empty. The toggle is disabled unless grouping is active and the
-values are placed in columns, since the values-as-rows layout has no per-measure column
+values are placed in columns, since the [values-as-rows layout](#pivot-presets) has no per-measure column
 for a subtotal to sit under.
 
 ## Column field options
