@@ -4,6 +4,7 @@ import { ClickHouseDriver } from '../../src';
 import { formatError } from '../../src/utils';
 
 jest.mock('@clickhouse/client', () => ({
+  ...jest.requireActual('@clickhouse/client'),
   createClient: jest.fn(),
 }));
 

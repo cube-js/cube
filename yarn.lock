@@ -2595,17 +2595,10 @@
   resolved "https://registry.yarnpkg.com/@bcoe/v8-coverage/-/v8-coverage-1.0.2.tgz#bbe12dca5b4ef983a0d0af4b07b9bc90ea0ababa"
   integrity sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA==
 
-"@clickhouse/client-common@1.12.0":
-  version "1.12.0"
-  resolved "https://registry.yarnpkg.com/@clickhouse/client-common/-/client-common-1.12.0.tgz#62da883cde96c95de68b8729345e5f99a04d0330"
-  integrity sha512-cyI4n7u9jK30d9q1q0ceQ7IwJ/MtTs5HxoQfc8yHpN+ok5wqaU2jAtq5hpa1z7C7sS1pDy/ZOFmOzg1v1F683g==
-
-"@clickhouse/client@^1.12.0":
-  version "1.12.0"
-  resolved "https://registry.yarnpkg.com/@clickhouse/client/-/client-1.12.0.tgz#784fdf10641c6a92971423d50bcd0edb044781b1"
-  integrity sha512-vJUSX8THhTzlVn0WxPukVjOgNRaSoY02ubQkB0LpqNoHFxXuF5jQZZAYvGZWpBGbYQ/4gfPrqu8g4TX5UKeNxA==
-  dependencies:
-    "@clickhouse/client-common" "1.12.0"
+"@clickhouse/client@^1.23.1":
+  version "1.23.1"
+  resolved "https://registry.yarnpkg.com/@clickhouse/client/-/client-1.23.1.tgz#d597ed50f100bd35d187c068500235669579cf98"
+  integrity sha512-vs3/Zc1dHvT171btW5nMoPsPCJ6QVJ5pp7obxzO5sjqwFx/jjz9wwCAqcFOdc2DhprugDBaVn+4dVY8hG3A9nw==
 
 "@codemirror/highlight@^0.19.0":
   version "0.19.6"
