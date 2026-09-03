@@ -45,6 +45,8 @@ function App() {
 
 The React Embed SDK uses the same session-based authentication as [signed embedding](/embedding/iframe/auth/signed). Generate a session using the [Generate Session API](/reference/embed-apis/generate-session) and pass the `sessionId` to the provider.
 
+A session expires after about 23 hours. `@cube-dev/embed-sdk` also exposes `connectCubeEmbed` and `autoRenewSession` for keeping an iframe's session alive without a reload — see [Keeping a signed session alive](/embedding/iframe/events#keeping-a-signed-session-alive).
+
 ## Example
 
 For a complete working implementation, see the [antd-cube-embed-sdk example](https://github.com/cubedevinc/cube-agent-examples/tree/main/examples/antd-cube-embed-sdk) on GitHub.

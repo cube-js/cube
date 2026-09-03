@@ -64,6 +64,35 @@ The API Requests view includes the security context behind each request, so
 embedded analytics customers can slice usage by tenant — for example, to find
 the heaviest tenants or compare per-tenant latency and cache efficiency.
 
+## Query programmatically
+
+Beyond the embedded dashboards, account administrators can mint a short-lived
+Cube API token to query the same usage and billing data directly — from the
+[REST API](https://cube.dev/docs/product/apis-integrations/rest-api), a BI
+tool, or a script — instead of only viewing it in-app.
+
+```bash
+curl -X POST https://your-account.cubecloud.dev/api/v1/usage-analytics/token \
+  -H "Authorization: Bearer <api-token>"
+```
+
+The response includes a `token`, the `apiUrl` to send it to, and an
+`expiresAt` timestamp:
+
+```json
+{
+  "token": "eyJhbGc...",
+  "apiUrl": "https://usage-analytics.cubecloud.dev/cubejs-api/v1",
+  "deploymentId": 331,
+  "expiresAt": "2026-09-03T13:00:00.000Z"
+}
+```
+
+The token is scoped to your account, the same way the embedded page is, so
+queries only ever see your own data. It expires after **1 hour** — issue a
+fresh one for each session or scheduled refresh rather than caching it.
+Requires an admin-scoped API key and Usage Analytics enabled for the account.
+
 ## Data freshness and isolation
 
 Usage Analytics data is available on a slight delay compared to live activity.
