@@ -6,7 +6,7 @@ description: "Cube for Excel is the native Microsoft Excel add-in for Cube Cloud
 it works with Excel on all operating systems,
 including macOS, and all platforms, including web and mobile. It doesn't integrate
 with the native [PivotTable][link-pivottable] in Excel but provides a custom
-[pivot table](#create-reports-via-pivot-table) UI.
+[pivot table](#create-explorations-via-pivot-table) UI.
 
 <Note>
 
@@ -16,8 +16,8 @@ Available on [Enterprise plan](https://cube.dev/pricing).
 
 After [configuring](#configuration), [installing](#installation), and
 [authenticating](#authentication) this add-in, you will be able to [create
-reports via pivot table](#create-reports-via-pivot-table) and work with
-[saved reports](#work-with-saved-reports).
+explorations via pivot table](#create-explorations-via-pivot-table) and work with
+[explorations](#work-with-explorations).
 
 <iframe
   width="100%"
@@ -72,10 +72,10 @@ Once you see the `Access Granted` message, close the modal window.
 If you want to revoke the authentication, open the add-in menu and click
 **Sign out**.
 
-## Create reports via pivot table
+## Create explorations via pivot table
 
-To create a report, go to the add-in menu and click **Create report via pivot
-table**. Then, select a Cube Cloud deployment from the drop-down. Finally,
+To create an exploration, open the add-in and click **Create exploration**.
+Then, select a Cube Cloud deployment from the drop-down. Finally,
 you can start building a query by selecting a view and its members in the UI that
 looks and feels like [Playground][ref-playground].
 
@@ -100,16 +100,16 @@ members to **Filters**. Click on **×** to remove members from a query.
 </Frame>
 
 Use **Order** and **Filters** panes below to sort and filter the
-data in the report.
+data in the exploration.
 
-If you'd like to move the report to a new location, click on the desired top-left
+If you'd like to move the exploration to a new location, click on the desired top-left
 cell and then confirm with the target button under **Result location**.
 
 <Frame>
   <img src="https://ucarecdn.com/4c3af7b9-4ef6-4f7f-8d0f-6d579609482e/" />
 </Frame>
 
-With every change to your query, Cube for Excel will update the report on
+With every change to your query, Cube for Excel will update the exploration on
 the sheet after a slight delay. If you'd like to minimize it, consider
 implementing [pre-aggregations][ref-pre-aggs].
 
@@ -136,12 +136,12 @@ with **Measures on**, in the same tab) — there it's labeled **After rows** /
 
 To change the order measures appear in within their group, drag them within
 the **Measures** pane on the **Pivot** tab. Position and order are saved with
-the report and survive **Refresh**.
+the exploration and survive **Refresh**.
 
-When your report is ready, you can optionally move it to [saved reports](#work-with-saved-reports)
-by clicking **Save**.
+When your exploration is ready, click **Save** to add it to your workspace. You
+can then [work with the exploration](#work-with-explorations) from the add-in.
 
-## Work with saved reports
+## Work with explorations
 
 Opening the add-in shows the current workbook's home: every exploration
 placed in this workbook, grouped by sheet, with each placement's range and
@@ -176,14 +176,14 @@ targets the wrong cell.
   <img src="https://ucarecdn.com/167abe25-635c-4fa6-b4a2-c090aa533f3c/" />
 </Frame>
 
-If a report has filters applied, an admin can turn on **Show applied filters
+If an exploration has filters applied, an admin can turn on **Show applied filters
 in reports** (Settings → Spreadsheet Add-ins) to make the filter state
 visible on the sheet itself. When enabled, a summary of active filters is
 added above the table, and filtered columns are marked "(filtered)" in
-their header, both when the report is inserted and after **Refresh**.
+their header, both when the exploration is inserted and after **Refresh**.
 
-You can also manage saved reports in the **[Saved Reports][ref-saved-reports]** page
-in Cube Cloud.
+Saved explorations also appear in the Cube Cloud workspace. See
+[Saving explorations][ref-explorations] for details.
 
 
 [ref-excel]: /admin/connect-to-data/visualization-tools/excel
@@ -195,4 +195,4 @@ in Cube Cloud.
 [ref-sql-api-enabled]: /reference/core-data-apis/sql-api#cube-cloud
 [link-excel-addins]: https://support.microsoft.com/en-us/office/add-or-remove-add-ins-in-excel-0af570c4-5cf3-4fa9-9b88-403625a0b460
 [link-ms-appsource]: https://appsource.microsoft.com/en-us/product/office/WA200008486
-[ref-saved-reports]: /docs/workspace/saved-reports
+[ref-explorations]: /docs/explore-analyze/explore#saving-explorations

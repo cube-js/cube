@@ -36,14 +36,14 @@ See [Generate Session → Creator mode bootstrap][ref-bootstrap] for the input s
 
 ## Default dashboards
 
-You can pre-populate every embed user's workspace with ready-made content so they see useful dashboards the first time they open the embedded app, instead of an empty workspace. This is a good way to ship templates or starter reports that your users can explore and build on.
+You can pre-populate every embed user's workspace with ready-made content so they see useful dashboards the first time they open the embedded app, instead of an empty workspace. This is a good way to ship templates or starter explorations that your users can open.
 
 Default dashboards are shared from your **main workspace** with the **All embed users** (`all_embed_users`) group — a system group that Cube creates automatically once Creator Mode is enabled. Sharing is read-only: embed users can open and explore the shared content but can't edit it.
 
 To set up default dashboards:
 
-1. Build the workbooks, dashboards, folders, and reports you want everyone to see in your main workspace.
-2. Open the share dialog for a workbook or folder and share it with **All embed users**. The only available access level is **Can view**.
+1. Build the workbooks, dashboards, folders, and explorations you want everyone to see in your main workspace.
+2. Open the share dialog for a workbook, exploration, or folder and share it with **All embed users**. The only available access level is **Can view**.
 3. Embed users in Creator Mode now see the shared items at the root of their workspace as soon as they open the app.
 
 <Note>
@@ -52,15 +52,15 @@ To set up default dashboards:
 
 Keep the following behavior in mind:
 
-- **Sharing a folder** shares everything inside it — all nested folders, workbooks, and reports become available to embed users.
-- **Sharing a single workbook or report** exposes that item plus the folders above it (so users can navigate to it), but not the other contents of those folders.
+- **Sharing a folder** shares everything inside it — all nested folders, workbooks, and explorations become available to embed users.
+- **Sharing a single workbook or exploration** exposes that item plus the folders above it (so users can navigate to it), but not the other contents of those folders.
 - All embed users see the **same** default dashboards, regardless of their [groups](/admin/users-and-permissions/user-groups) or user attributes. The shared set applies across every embed tenant that belongs to your account.
 - Embed users can't edit content shared from the main workspace. Opening a shared workbook shows its published dashboard, so a workbook must have a published dashboard for users to open it.
 - Removing the share from the **All embed users** group removes those items from embed users' workspaces immediately.
 
-## Sharing workbooks, dashboards, and folders
+## Sharing workbooks, explorations, dashboards, and folders
 
-Embed users in Creator Mode can share the workbooks, dashboards, and folders they build with other users, the same way they would in the full Cube app. Sharing a folder shares everything inside it, and follows the same access levels — **Full access**, **Can edit**, **Can view** — as sharing a workbook.
+Embed users in Creator Mode can share the workbooks, explorations, dashboards, and folders they build with other users, the same way they would in the full Cube app. Sharing a folder shares everything inside it, and follows the same access levels — **Full access**, **Can edit**, **Can view** — as sharing a workbook.
 
 <Note>
   Sharing is scoped to the [embed tenant](#embed-tenant-scoping): users can only share with others in the same tenant, never across tenants.
