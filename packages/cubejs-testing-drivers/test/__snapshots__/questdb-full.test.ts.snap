@@ -9383,6 +9383,21 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/questdb-driver querying custom granularities ECommerce: count by fiscal_year_by_15th_april + no dimension 1`] = `
+Array [
+  Object {
+    "ECommerce.count": "6",
+    "ECommerce.customOrderDateNoPreAgg": "2019-04-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.fiscal_year_by_15th_april": "2019-04-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "38",
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.fiscal_year_by_15th_april": "2020-04-15T00:00:00.000",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/questdb-driver querying custom granularities ECommerce: count by half_year + dimension 1`] = `
 Array [
   Object {
