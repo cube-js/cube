@@ -483,14 +483,15 @@ length and cannot be derived arithmetically, such as the months and quarters of 
 retail calendar. The [custom calendar recipe][ref-recipe-custom-calendar] models a 4-5-4
 calendar in full.
 
-<Info>
+<Warning>
 
-**A [pre-aggregation][ref-pre-aggregations] over an overridden granularity must declare
-that granularity.** A rollup on the `month` granularity above serves queries at `month`,
-and it is built from the `mid_month` column rather than `DATE_TRUNC`. A rollup at another
-granularity will not serve those queries correctly.
+**Do not [pre-aggregate][ref-pre-aggregations] a query that groups by an overridden
+granularity.** A rollup is built with `DATE_TRUNC` on the underlying column rather than
+from the overriding column, so it holds Gregorian buckets — even when the rollup declares
+the overridden granularity itself. Queries served from it return Gregorian periods, with
+no error.
 
-</Info>
+</Warning>
 
 
 [ref-time-shift]: /docs/data-modeling/measures#time-shift
