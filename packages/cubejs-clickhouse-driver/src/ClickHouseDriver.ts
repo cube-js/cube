@@ -42,6 +42,10 @@ import { formatError } from './utils';
 
 const SUPPORTED_BUCKET_TYPES = ['s3'];
 
+// The client's ResponseJSON declares `exception` only on the row union of
+// `JSONEachRowWithProgress`, never on the parsed body of a single-object format.
+type ResponseJSONWithException<T> = ResponseJSON<T> & { exception?: string };
+
 const ClickhouseTypeToGeneric: Record<string, string> = {
   enum: 'text',
   string: 'text',
@@ -333,7 +337,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     return this.normaliseResponse(response);
   }
 
-  protected queryResponse(query: string, values: unknown[], options?: QueryOptions): Promise<ResponseJSON<Array<unknown>>> {
+  protected queryResponse(query: string, values: unknown[], options?: QueryOptions): Promise<ResponseJSONWithException<Array<unknown>>> {
     const formattedQuery = formatMySql(query, values);
 
     return this.withCancel(async (connection, queryId, signal) => {
@@ -356,11 +360,11 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
           throw new Error(`Unexpected x-clickhouse-format in response: expected ${format}, received ${resultSet.response_headers['x-clickhouse-format']}`);
         }
 
-        const results = await resultSet.json<Array<unknown>>();
+        const results: ResponseJSONWithException<Array<unknown>> = await resultSet.json<Array<unknown>>();
 
         // Up to ClickHouse 25.x, failures after the first flushed block are appended to a 200
         // response; newer versions truncate the JSON and are rejected while parsing it above.
-        const { exception } = results as { exception?: string };
+        const { exception } = results;
         if (exception) {
           throw new Error(`ClickHouse aborted after ${results.data?.length ?? 0} row(s): ${exception}`);
         }
