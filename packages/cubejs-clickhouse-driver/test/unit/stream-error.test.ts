@@ -22,7 +22,7 @@ jest.mock('@clickhouse/client', () => ({
 const createClientMock = createClient as unknown as jest.Mock;
 
 /**
- * A batch as produced by ResultSet.stream(): rows exposing .json().
+ * A batch as produced by ResultSet.stream().
  */
 function batch(...rows: Array<Array<unknown>>) {
   return rows.map((row) => ({ json: () => row }));
@@ -48,8 +48,6 @@ describe('ClickHouseDriver mid-stream exceptions', () => {
   });
 
   it('rejects the row stream when the server raises after the first block', async () => {
-    // Since 25.11 the client detects an exception raised after the response started
-    // and rethrows it while the stream is being consumed.
     mockStream.mockImplementation(async function* rows() {
       yield batch(['id']);
       yield batch(['UInt8']);
