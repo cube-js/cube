@@ -31,4 +31,5 @@ export * from './disposedProxy';
 export * from './logger';
 export * from './pool';
 export * from './sql-escape';
+export * from './object-shape';
 export * from './request-id';

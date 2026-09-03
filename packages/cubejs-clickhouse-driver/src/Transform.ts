@@ -1,4 +1,5 @@
 import * as moment from 'moment';
+import { buildObjectShape } from '@cubejs-backend/shared';
 
 export type ColumnConverter = (value: unknown) => unknown;
 
@@ -7,7 +8,7 @@ export type ColumnMeta = { name: string, type: string };
 export type Transform = {
   names: Array<string>,
   converters: Array<ColumnConverter | null>,
-  nullPrototype: boolean,
+  objectShape: Record<string, unknown> | null,
 };
 
 const CHAR_0 = 48;
@@ -268,9 +269,7 @@ function buildTransform(names: Array<string>, converters: Array<ColumnConverter 
   return {
     names,
     converters,
-    // Assignment to `__proto__` invokes Object.prototype's setter. Limit the slower null-prototype
-    // object to result sets that need it.
-    nullPrototype: names.includes('__proto__'),
+    objectShape: buildObjectShape(names),
   };
 }
 
@@ -302,13 +301,15 @@ export function buildTransformFromNamesAndTypes(names: Array<string>, types: Arr
 // Left-to-right assignment preserves JSON.parse's ordering and last-value behavior for duplicate
 // column names, keeping pre-aggregation content versions stable.
 export function transformRow(row: ReadonlyArray<unknown>, transform: Transform): Record<string, unknown> {
-  const { names, converters } = transform;
+  const { names, converters, objectShape } = transform;
 
   if (row.length !== names.length) {
     throw new Error(`Unexpected row and names/types length mismatch; row ${row.length} vs names ${names.length}`);
   }
 
-  const rowObj: Record<string, unknown> = transform.nullPrototype ? Object.create(null) : {};
+  // Cloning a shape that already holds every column keeps the row in fast-properties mode; see
+  // buildObjectShape for why that matters to everything reading the row afterwards.
+  const rowObj: Record<string, unknown> = objectShape === null ? {} : { ...objectShape };
 
   for (let i = 0; i < names.length; i++) {
     const converter = converters[i];
