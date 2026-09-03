@@ -486,7 +486,7 @@ lifecycle](/embedding/iframe/auth/signed#how-it-works)) and can't refresh
 itself — left alone, a tab open that long drops to a "Session expired"
 message. Renew it in place instead.
 
-If you're using [`@cube-dev/embed-sdk`](/embedding/react-embed-sdk), call
+If you're using `@cube-dev/embed-sdk`, call
 `autoRenewSession` on the connection instead of hand-rolling the listener
 below — it drives renewal from all three triggers (both events plus the tab
 returning to the foreground, which catches a renewal that timers missed while
