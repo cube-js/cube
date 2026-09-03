@@ -139,6 +139,28 @@ export function parseSqlInterval(intervalStr: SqlInterval): ParsedInterval {
   return interval;
 }
 
+/**
+ * SQL interval units, coarsest first.
+ */
+export const SQL_INTERVAL_UNITS: unitOfTime.DurationConstructor[] = [
+  'year', 'quarter', 'month', 'week', 'day', 'hour', 'minute', 'second'
+];
+
+/**
+ * Splits an interval into one single-unit interval string per component, coarsest first.
+ * Units outside SQL_INTERVAL_UNITS are kept, so a caller that can not render one still sees it.
+ */
+export function splitSqlInterval(intervalStr: SqlInterval): string[] {
+  const parsed = parseSqlInterval(intervalStr);
+  const units = Object.keys(parsed) as unitOfTime.DurationConstructor[];
+  const ordered = [
+    ...SQL_INTERVAL_UNITS.filter(unit => units.includes(unit)),
+    ...units.filter(unit => !SQL_INTERVAL_UNITS.includes(unit)),
+  ];
+
+  return ordered.map(unit => `${parsed[unit]} ${unit}`);
+}
+
 export function addInterval(date: moment.Moment, interval: ParsedInterval): moment.Moment {
   const res = date.clone();
 

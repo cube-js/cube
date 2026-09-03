@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import { parseSqlInterval, getEnv } from '@cubejs-backend/shared';
+import { parseSqlInterval, getEnv, SQL_INTERVAL_UNITS } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { BaseMeasure } from './BaseMeasure';
@@ -91,6 +91,17 @@ export class CubeStoreQuery extends BaseQuery {
    * intervals relative to origin timestamp point.
    */
   public dateBin(interval: string, source: string, origin: string): string {
+    const intervalParsed = parseSqlInterval(interval);
+    const months = SQL_INTERVAL_UNITS.slice(0, SQL_INTERVAL_UNITS.indexOf('week'));
+    const hasMonths = months.some(unit => intervalParsed[unit]);
+    const hasDayTime = SQL_INTERVAL_UNITS.slice(SQL_INTERVAL_UNITS.indexOf('week'))
+      .some(unit => intervalParsed[unit]);
+
+    // DATE_BIN mixes no month component with a day or time one, unlike DATE_ADD / DATE_SUB.
+    if (hasMonths && hasDayTime) {
+      throw new Error(`Cannot transform interval expression "${interval}" to CubeStore dialect`);
+    }
+
     return `DATE_BIN(INTERVAL ${this.formatInterval(interval)}, ${this.dateTimeCast(source)}, ${this.dateTimeCast(`'${origin}'`)})`;
   }
 
@@ -100,53 +111,16 @@ export class CubeStoreQuery extends BaseQuery {
    */
   private formatInterval(interval: string): string {
     const intervalParsed = parseSqlInterval(interval);
-    const intKeys = Object.keys(intervalParsed).length;
+    const parts = SQL_INTERVAL_UNITS
+      .filter(unit => intervalParsed[unit])
+      .map(unit => `${intervalParsed[unit]} ${unit.toUpperCase()}`);
 
-    if (intervalParsed.year && intKeys === 1) {
-      return `'${intervalParsed.year} YEAR'`;
-    } else if (intervalParsed.year && intervalParsed.month && intKeys === 2) {
-      return `'${intervalParsed.year} YEAR ${intervalParsed.month} MONTH'`;
-    } else if (intervalParsed.year && intervalParsed.month && intervalParsed.quarter && intKeys === 3) {
-      return `'${intervalParsed.year} YEAR ${intervalParsed.quarter} QUARTER ${intervalParsed.month} MONTH'`;
-    } else if (intervalParsed.quarter && intKeys === 1) {
-      return `'${intervalParsed.quarter} QUARTER'`;
-    } else if (intervalParsed.quarter && intervalParsed.month && intKeys === 2) {
-      return `'${intervalParsed.quarter} QUARTER ${intervalParsed.month} MONTH'`;
-    } else if (intervalParsed.month && intKeys === 1) {
-      return `'${intervalParsed.month} MONTH'`;
-    } else if (intervalParsed.week && intKeys === 1) {
-      return `'${intervalParsed.week} WEEK'`;
-    } else if (intervalParsed.week && intervalParsed.day && intKeys === 2) {
-      return `'${intervalParsed.week} WEEK ${intervalParsed.day} DAY'`;
-    } else if (intervalParsed.week && intervalParsed.day && intervalParsed.hour && intKeys === 3) {
-      return `'${intervalParsed.week} WEEK ${intervalParsed.day} DAY ${intervalParsed.hour} HOUR'`;
-    } else if (intervalParsed.week && intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intKeys === 4) {
-      return `'${intervalParsed.week} WEEK ${intervalParsed.day} DAY ${intervalParsed.hour} HOUR ${intervalParsed.minute} MINUTE'`;
-    } else if (intervalParsed.week && intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 5) {
-      return `'${intervalParsed.week} WEEK ${intervalParsed.day} DAY ${intervalParsed.hour} HOUR ${intervalParsed.minute} MINUTE ${intervalParsed.second} SECOND'`;
-    } else if (intervalParsed.day && intKeys === 1) {
-      return `'${intervalParsed.day} DAY'`;
-    } else if (intervalParsed.day && intervalParsed.hour && intKeys === 2) {
-      return `'${intervalParsed.day} DAY ${intervalParsed.hour} HOUR'`;
-    } else if (intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intKeys === 3) {
-      return `'${intervalParsed.day} DAY ${intervalParsed.hour} HOUR ${intervalParsed.minute} MINUTE'`;
-    } else if (intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 4) {
-      return `'${intervalParsed.day} DAY ${intervalParsed.hour} HOUR ${intervalParsed.minute} MINUTE ${intervalParsed.second} SECOND'`;
-    } else if (intervalParsed.hour && intKeys === 1) {
-      return `'${intervalParsed.hour} HOUR'`;
-    } else if (intervalParsed.hour && intervalParsed.minute && intKeys === 2) {
-      return `'${intervalParsed.hour} HOUR ${intervalParsed.minute} MINUTE'`;
-    } else if (intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 3) {
-      return `'${intervalParsed.hour} HOUR ${intervalParsed.minute} MINUTE ${intervalParsed.second} SECOND'`;
-    } else if (intervalParsed.minute && intKeys === 1) {
-      return `'${intervalParsed.minute} MINUTE'`;
-    } else if (intervalParsed.minute && intervalParsed.second && intKeys === 2) {
-      return `'${intervalParsed.minute} MINUTE ${intervalParsed.second} SECOND'`;
+    // Sub-second units have no representation here.
+    if (!parts.length || parts.length !== Object.keys(intervalParsed).length) {
+      throw new Error(`Cannot transform interval expression "${interval}" to CubeStore dialect`);
     }
 
-    // No need to support microseconds.
-
-    throw new Error(`Cannot transform interval expression "${interval}" to CubeStore dialect`);
+    return `'${parts.join(' ')}'`;
   }
 
   public escapeColumnName(name) {

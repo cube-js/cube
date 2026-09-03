@@ -217,5 +217,23 @@ describe('QuestQuery', () => {
       expect(() => query.dateBin('1 second', 't', '2024-01-01T00:00:00.000'))
         .toThrow(/32-bit range/);
     });
+
+    // A custom granularity whose origin sits off its unit's boundary is rendered as
+    // `DATE_TRUNC(unit, t - offset) + offset`, and that offset can carry several units at once:
+    // `1 year` from April 15 shifts by `3 month 14 day`.
+    it('applies a compound interval one unit at a time', () => {
+      const query = buildQuery();
+
+      expect(query.subtractInterval('t', '3 month')).toEqual("dateadd('M', -3, t)");
+      expect(query.addInterval('t', '3 month')).toEqual("dateadd('M', 3, t)");
+
+      expect(query.subtractInterval('t', '3 month 14 day'))
+        .toEqual("dateadd('d', -14, dateadd('M', -3, t))");
+      expect(query.addInterval('t', '3 month 14 day'))
+        .toEqual("dateadd('d', 14, dateadd('M', 3, t))");
+
+      // A quarter is three months here, and the factor has to survive the split.
+      expect(query.subtractInterval('t', '1 quarter')).toEqual("dateadd('M', -3, t)");
+    });
   });
 });

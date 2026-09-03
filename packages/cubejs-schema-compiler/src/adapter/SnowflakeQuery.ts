@@ -59,6 +59,14 @@ export class SnowflakeQuery extends BaseQuery {
         ${this.dateTimeCast(`'${origin}'`)})`;
   }
 
+  public subtractInterval(date: string, interval: string): string {
+    return `${date} - interval '${this.formatInterval(interval)}'`;
+  }
+
+  public addInterval(date: string, interval: string): string {
+    return `${date} + interval '${this.formatInterval(interval)}'`;
+  }
+
   /**
    * The input interval in format "2 years 3 months 4 weeks 5 days...."
    * will be converted to Snowflake dialect "2 years, 3 months, 4 weeks, 5 days...."

@@ -33,7 +33,7 @@ export class DruidQuery extends BaseQuery {
   }
 
   public subtractInterval(date: string, interval: string) {
-    return `(${date} + INTERVAL ${interval})`;
+    return `(${date} - INTERVAL ${interval})`;
   }
 
   public addInterval(date: string, interval: string) {

@@ -262,7 +262,15 @@
     "    a literal percent sign - are answered by Pinot and are vacuous: each",
     "    expects an empty result, which is what Pinot returns for everything.",
     "    They still discriminate on every other engine, which is why they stay.",
-    "filtering Products: contains a literal underscore (no pre-aggregation)"
+    "filtering Products: contains a literal underscore (no pre-aggregation)",
+
+    "---------------------------------------",
+    "Requires Tesseract.                    ",
+    "---------------------------------------",
+    "    A custom granularity origin on a single-unit interval only reaches the grouping under Tesseract.",
+    "querying custom granularities ECommerce: count by fiscal_year_by_1st_april + no dimension",
+    "querying custom granularities ECommerce: count by fiscal_year_by_15th_april + no dimension",
+    "querying custom granularities ECommerce: count by monthly_from_15th + no dimension"
   ],
   "tesseractSkip": [
     "---------------------------------------",
