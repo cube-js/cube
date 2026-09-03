@@ -42,8 +42,8 @@ import { formatError } from './utils';
 
 const SUPPORTED_BUCKET_TYPES = ['s3'];
 
-// The client's ResponseJSON declares `exception` only on the row union of
-// `JSONEachRowWithProgress`, never on the parsed body of a single-object format.
+// The client declares `exception` for `JSONEachRowWithProgress` rows only, never on the
+// ResponseJSON it parses a single-document format into.
 type ResponseJSONWithException<T> = ResponseJSON<T> & { exception?: string };
 
 const ClickhouseTypeToGeneric: Record<string, string> = {

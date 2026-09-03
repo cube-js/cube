@@ -138,7 +138,6 @@ const dateTime2Converter: ColumnConverter = (value) => {
   return formatDateTime(value);
 };
 
-// A width captured in the closure measures the same as one inlined per precision.
 function createTruncatingDateTimeConverter(width: number): ColumnConverter {
   return (value) => {
     if (value === null || value === undefined) {

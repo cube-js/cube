@@ -176,7 +176,6 @@ describe('getColumnConverter', () => {
   });
 
   it('trusts everything but the width and the fraction marker', () => {
-    // The same blind spot on the date and time positions.
     const value = '20x0-01-02 03:04:05.234';
 
     expect(convert('DateTime64(3)', value)).toEqual('20x0-01-02T03:04:05.234');
@@ -184,8 +183,6 @@ describe('getColumnConverter', () => {
   });
 
   it('agrees with the generic formatter on a T separated value of matching width', () => {
-    // The fast path overwrites index 10 regardless, so widening the gate to let this shape in
-    // cannot diverge from the formatter that used to handle it.
     for (const value of ['2020-01-02T03:04:05.234', '2020-01-02T03:04:05']) {
       expect(convert('DateTime64(3)', value)).toEqual(formatDateTime(value));
       expect(convert('DateTime', value)).toEqual(formatDateTime(value));
@@ -201,7 +198,6 @@ describe('getColumnConverter', () => {
     expect(convert('DateTime', null)).toBeNull();
   });
 
-  // Not an AggregateFunction state: it reads back as a plain value of its argument type
   it('still stringifies a SimpleAggregateFunction', () => {
     expect(convert('SimpleAggregateFunction(sum, Int64)', 1)).toEqual('1');
     expect(convert('SimpleAggregateFunction(max, Float64)', 1.5)).toEqual('1.5');
