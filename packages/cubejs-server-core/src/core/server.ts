@@ -260,7 +260,7 @@ type DriverReplacementReason =
  * the caller counts.
  */
 type DriverStaleness =
-  | { stale: false, probeFailed?: boolean }
+  | { stale: false, probeFailed?: boolean, probeResolved?: boolean }
   | { stale: true, reason: DriverStalenessReason, factoryResult?: DriverFactoryResult };
 
 /** Rebuild history of the one driver an alias set resolves to. */
@@ -1062,7 +1062,15 @@ export class CubejsServerCore {
         // and `probeFailed` below would not typecheck.
         } else if (staleness.stale === false) {
           if (!staleness.probeFailed) {
-            delete driverProbeFailures[rebuildKey];
+            // Only a probe that reached the factory says anything about whether
+            // it is still refusing. Most reuse never calls it — an unchanged
+            // security context fingerprint is a plain cache hit — and clearing
+            // on those lets one context's hits erase another's refusals
+            // indefinitely, which is every mixed-traffic deployment: a refresh
+            // scheduler tick alone would keep the bound out of reach.
+            if (staleness.probeResolved) {
+              delete driverProbeFailures[rebuildKey];
+            }
 
             return cached;
           }
@@ -1703,7 +1711,9 @@ export class CubejsServerCore {
         origin.expiresAt = this.resolveBuiltDriverExpiry(config, context.dataSource, origin);
       }
 
-      return { stale: false };
+      // The only reuse that reached the factory, so the only one that is
+      // evidence about whether it is still refusing.
+      return { stale: false, probeResolved: true };
     }
 
     return {

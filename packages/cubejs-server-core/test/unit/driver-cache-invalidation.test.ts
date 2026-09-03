@@ -1044,6 +1044,54 @@ describe('driver cache invalidation', () => {
     expect(core.builtDrivers).toHaveLength(1);
   });
 
+  // Refusals are recorded for a context that changed, but most requests never
+  // probe at all — a security context matching the cached driver is a plain
+  // cache hit. If those cleared the record, one context's hits would erase
+  // another's refusals forever, and on a shared orchestrator a refresh
+  // scheduler tick alone would keep the bound permanently out of reach.
+  test('a cache hit that never probed does not clear recorded refusals', async () => {
+    let shouldFail = false;
+    const { driverFactory, request } = await createCore({
+      driverFactory: (ctx: any) => {
+        if (shouldFail) {
+          throw new Error('credential is unusable');
+        }
+
+        return <any>{ type: 'postgres', password: ctx.securityContext.token };
+      },
+    }, { token: 'token-a' });
+
+    const first = await driverFactory('default');
+
+    shouldFail = true;
+
+    // Each refusal is a changed context; between them, a request on the very
+    // context the driver was built from, which matches the fingerprint and so
+    // returns without ever asking the factory.
+    for (const token of ['token-b', 'token-c']) {
+      // eslint-disable-next-line no-await-in-loop
+      await request({ token }, `req-${token}`);
+      // eslint-disable-next-line no-await-in-loop
+      expect(await driverFactory('default')).toBe(first);
+
+      clock.advance(4 * 60 * 1000);
+
+      // eslint-disable-next-line no-await-in-loop
+      await request({ token: 'token-a' }, `req-hit-${token}`);
+      // eslint-disable-next-line no-await-in-loop
+      expect(await driverFactory('default')).toBe(first);
+    }
+
+    // Third refusal: the count survived the interleaved hits, so the bound is
+    // reached and the caller sees the factory's own error.
+    await request({ token: 'token-d' }, 'req-d');
+
+    await expect(driverFactory('default')).rejects.toThrow('credential is unusable');
+
+    await new Promise(process.nextTick);
+    expect((<FakeDriver>first).release).toHaveBeenCalled();
+  });
+
   // Replacing a driver cannot move a deadline the factory keeps re-asserting.
   // Honouring one would find the new driver stale the moment its suppression
   // window closed, for the life of the process.
