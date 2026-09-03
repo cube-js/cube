@@ -45,7 +45,7 @@ describe('ClickHouseDriver client options', () => {
     expect(createClientMock.mock.calls[0][0]).toMatchObject({ http_headers: {} });
   });
 
-  it('defaults the client log level to ERROR', () => {
+  it('pins the client log level to ERROR', () => {
     // eslint-disable-next-line no-new
     new ClickHouseDriver({
       host: 'localhost',
@@ -55,20 +55,6 @@ describe('ClickHouseDriver client options', () => {
 
     expect(createClientMock.mock.calls[0][0]).toMatchObject({
       log: { level: ClickHouseLogLevel.ERROR },
-    });
-  });
-
-  it('forwards a custom log level', () => {
-    // eslint-disable-next-line no-new
-    new ClickHouseDriver({
-      host: 'localhost',
-      port: '8123',
-      dataSource: 'default',
-      logLevel: ClickHouseLogLevel.TRACE,
-    });
-
-    expect(createClientMock.mock.calls[0][0]).toMatchObject({
-      log: { level: ClickHouseLogLevel.TRACE },
     });
   });
 

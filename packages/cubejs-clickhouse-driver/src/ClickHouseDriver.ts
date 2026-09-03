@@ -105,13 +105,6 @@ export interface ClickHouseDriverOptions {
    * @see https://clickhouse.com/docs/integrations/javascript#configuration
    */
   headers?: Record<string, string>,
-
-  /**
-   * Log level of the underlying ClickHouse client, whose messages are forwarded
-   * to the Cube logger. Defaults to ERROR: at WARN the client advises enabling
-   * progress headers on every client construction, which we disable on purpose.
-   */
-  logLevel?: ClickHouseLogLevel,
 }
 
 interface ClickhouseDriverExportRequiredAWS {
@@ -139,7 +132,6 @@ type ClickHouseDriverConfig = {
   compression: { response?: boolean; request?: boolean },
   clickhouseSettings: ClickHouseSettings,
   headers: Record<string, string>,
-  logLevel: ClickHouseLogLevel,
 };
 
 export class ClickHouseDriver extends BaseDriver implements DriverInterface {
@@ -209,7 +201,6 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       },
       // Custom HTTP headers can only be passed via driver_factory, not env vars.
       headers: config.headers ?? {},
-      logLevel: config.logLevel ?? ClickHouseLogLevel.ERROR,
     };
 
     const maxPoolSize = config.maxPoolSize ??
@@ -274,7 +265,9 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       http_headers: this.config.headers,
       log: {
         LoggerClass: this.clientLoggerClass(),
-        level: this.config.logLevel,
+        // At WARN the client advises enabling progress headers on every construction,
+        // which we disable on purpose.
+        level: ClickHouseLogLevel.ERROR,
       },
     });
   }
