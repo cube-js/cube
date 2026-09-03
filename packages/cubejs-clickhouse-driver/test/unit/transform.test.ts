@@ -323,12 +323,11 @@ describe('buildTransformFromMeta', () => {
       { name: 'n', type: 'Int32' },
     ]);
 
-    expect(transform.nullPrototype).toBe(true);
-
     const row = transformRow(['pwned', 1], transform);
 
     expect(Object.keys(row)).toEqual(['__proto__', 'n']);
     expect(Object.getOwnPropertyDescriptor(row, '__proto__')?.value).toEqual('pwned');
+    expect(Object.getPrototypeOf(row)).toBe(Object.prototype);
     expect(({} as any).pwned).toBeUndefined();
     expect(Object.getPrototypeOf({})).toBe(Object.prototype);
   });
@@ -341,6 +340,36 @@ describe('buildTransformFromMeta', () => {
 
     expect(() => transformRow(['only-one'], transform))
       .toThrow('Unexpected row and names/types length mismatch; row 1 vs names 2');
+  });
+});
+
+// Rows are cloned from an object shape holding every column, which is what keeps them in
+// fast-properties mode; buildObjectShape carries the reasoning and its own tests.
+describe('row object shape', () => {
+  const meta = (count: number) => Array.from({ length: count }, (_, i) => ({ name: `c${i}`, type: 'String' }));
+  const values = (count: number) => Array.from({ length: count }, (_, i) => `v${i}`);
+
+  it('is resolved once per result set', () => {
+    const transform = buildTransformFromMeta([
+      { name: 's', type: 'String' },
+      { name: 'n', type: 'Int64' },
+    ]);
+
+    expect(transform.objectShape).toEqual({ s: null, n: null });
+  });
+
+  it('is skipped for a result set buildObjectShape declines', () => {
+    expect(buildTransformFromMeta([]).objectShape).toBeNull();
+    expect(buildTransformFromMeta(meta(128)).objectShape).toBeNull();
+  });
+
+  it('produces the same row as the shapeless path', () => {
+    const wide = buildTransformFromMeta(meta(128));
+    const narrow = buildTransformFromMeta(meta(127));
+
+    expect(wide.objectShape).toBeNull();
+    expect(narrow.objectShape).not.toBeNull();
+    expect(transformRow(values(128), wide)).toEqual({ ...transformRow(values(127), narrow), c127: 'v127' });
   });
 });
 
