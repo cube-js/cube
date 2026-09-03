@@ -418,20 +418,33 @@ five-week month accumulates over all five of its weeks.
 
 ## Pre-aggregations
 
+A [pre-aggregation][ref-pre-aggregations] over an overridden granularity must declare that
+granularity. A rollup on `month` is built from the `retail_month_begins` column and serves
+queries at `month`:
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: orders_by_retail_month
+        measures:
+          - count
+        time_dimension: retail_calendar.date
+        granularity: month
+```
+
 <Warning>
 
-**Do not pre-aggregate a query that groups by an overridden granularity.** A rollup is
-built with `DATE_TRUNC` on the underlying column rather than from the calendar column, so
-it holds Gregorian buckets. This applies even when the rollup declares the overridden
-granularity itself.
+**Declare the overridden granularity explicitly rather than relying on a finer rollup.**
+Cube can match a `day` rollup for a `month` query through the granularity hierarchy, but
+that rollup holds `DATE_TRUNC` buckets, and retail months cannot be assembled from them.
+The query then either fails or returns Gregorian months.
 
-Queries served from such a rollup return Gregorian months, not retail ones, with no error.
+Add a rollup for each retail period you query.
 
 </Warning>
-
-Query the calendar cube directly for these groupings. Other
-[pre-aggregations][ref-pre-aggregations] on the same cube are unaffected — those
-grouped by a granularity you have not overridden, or by non-time dimensions.
 
 [link-454]: https://nrf.com/resources/4-5-4-calendar
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine

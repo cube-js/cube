@@ -485,11 +485,15 @@ calendar in full.
 
 <Warning>
 
-**Do not [pre-aggregate][ref-pre-aggregations] a query that groups by an overridden
-granularity.** A rollup is built with `DATE_TRUNC` on the underlying column rather than
-from the overriding column, so it holds Gregorian buckets — even when the rollup declares
-the overridden granularity itself. Queries served from it return Gregorian periods, with
-no error.
+**A [pre-aggregation][ref-pre-aggregations] must declare the overridden granularity
+itself.** A rollup that names it is built from the overriding column and serves those
+queries correctly.
+
+A rollup at a finer granularity is not a correct source. Cube can still match one through
+the granularity hierarchy — a `day` rollup for a `month` query — but the rollup holds
+`DATE_TRUNC` buckets that the overriding column cannot be recovered from, so the query
+either fails or returns Gregorian periods. Custom periods cannot be assembled from
+predefined ones.
 
 </Warning>
 
