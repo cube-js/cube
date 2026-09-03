@@ -468,6 +468,49 @@ When querying `sales.revenue` by `custom_calendar.date` with monthly granularity
 `mid_month` column will be used instead of the standard `DATE_TRUNC('month', date)`
 expression in the generated SQL.
 
+### Naming a granularity defined with `sql`
+
+A granularity defined with `sql` must be named after a default granularity: `second`,
+`minute`, `hour`, `day`, `week`, `month`, `quarter`, or `year`. Names are matched
+case-insensitively. The `sql` parameter changes what an existing unit of time means; it
+cannot introduce a new one. A granularity under a name of your own, such as `fiscal_week`,
+does not compile:
+
+```
+dimensions.<dimension>.granularities.fiscal_week: a granularity defined with 'sql'
+must be named after one of the predefined granularities (day, hour, minute, month,
+quarter, second, week, year). Define 'fiscal_week' with 'interval' instead
+```
+
+The reason is that `interval` is what places a granularity in the `day` → `week` →
+`month` → `quarter` → `year` hierarchy, so Cube knows what to roll it up from and what to
+decompose it into. A default granularity brings that position with it; a name of your own
+does not, so it has to state its `interval`.
+
+The two styles serve different purposes:
+
+| | `interval` with `offset` or `origin` | `sql` |
+| --- | --- | --- |
+| **Name** | Any name of your own | A default granularity only |
+| **Definition** | Derived arithmetically from a fixed-length unit | Read from a pre-calculated column |
+| **Variable-length periods** | Not supported | Supported |
+
+Use `interval` to add a granularity, for example a fiscal week of a regular seven days.
+See the [custom granularity recipe][ref-recipe-custom-granularity] for `fiscal_week`,
+`fiscal_quarter`, and `fiscal_year` defined that way. Use `sql` when a period varies in
+length and cannot be derived arithmetically, such as the months and quarters of a 4-5-4
+retail calendar. The [custom calendar recipe][ref-recipe-custom-calendar] models a 4-5-4
+calendar in full.
+
+<Info>
+
+**A [pre-aggregation][ref-pre-aggregations] over an overridden granularity must declare
+that granularity.** A rollup on the `month` granularity above serves queries at `month`,
+and it is built from the `mid_month` column rather than `DATE_TRUNC`. A rollup at another
+granularity will not serve those queries correctly.
+
+</Info>
+
 
 [ref-time-shift]: /docs/data-modeling/measures#time-shift
 [ref-time-dimension]: /docs/data-modeling/dimensions#time-dimensions
@@ -475,4 +518,7 @@ expression in the generated SQL.
 [ref-cubes]: /reference/data-modeling/cube
 [ref-cubes-calendar]: /reference/data-modeling/cube#calendar
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
+[ref-recipe-custom-granularity]: /recipes/data-modeling/custom-granularity
+[ref-recipe-custom-calendar]: /recipes/data-modeling/custom-calendar
+[ref-pre-aggregations]: /docs/pre-aggregations/matching-pre-aggregations
 [ref-primary-key]: /reference/data-modeling/dimensions#primary_key
