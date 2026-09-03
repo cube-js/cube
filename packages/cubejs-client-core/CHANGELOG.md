@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.33](https://github.com/cube-js/cube/compare/v1.7.32...v1.7.33) (2026-09-03)
+
+### Features
+
+- **api-gateway:** Expose `usedPreAggregations` on data responses ([#11591](https://github.com/cube-js/cube/issues/11591)) ([4931901](https://github.com/cube-js/cube/commit/49319017f5ecc556f38859f008c478d8799a4aa9))
+- **client-core:** Drop usage of cross-fetch, migrate to fetch API ([#11736](https://github.com/cube-js/cube/issues/11736)) ([66210e3](https://github.com/cube-js/cube/commit/66210e3c6ff068707e44b07e10929956b54c5b3a))
+- **client-core:** forward `usedPreAggregations` on `cubeSql` results ([#11735](https://github.com/cube-js/cube/issues/11735)) ([fca1d73](https://github.com/cube-js/cube/commit/fca1d73001de88f5092516af33748e037913d00e)), closes [#11591](https://github.com/cube-js/cube/issues/11591)
+
 ## [1.7.32](https://github.com/cube-js/cube/compare/v1.7.31...v1.7.32) (2026-09-01)
 
 **Note:** Version bump only for package @cubejs-client/core
