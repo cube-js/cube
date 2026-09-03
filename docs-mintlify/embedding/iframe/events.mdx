@@ -499,7 +499,11 @@ import { connectCubeEmbed } from "@cube-dev/embed-sdk";
 const cube = connectCubeEmbed(iframe);
 
 cube.autoRenewSession({
-  mintSession: () => fetch("/api/cube-embed-session", { method: "POST" }).then((r) => r.json()),
+  // must resolve to the new session id
+  mintSession: () =>
+    fetch("/api/cube-embed-session", { method: "POST" })
+      .then((r) => r.json())
+      .then(({ sessionId }) => sessionId),
 });
 ```
 
