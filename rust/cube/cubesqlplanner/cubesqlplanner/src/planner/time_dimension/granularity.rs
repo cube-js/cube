@@ -67,8 +67,11 @@ impl Granularity {
             });
         }
 
-        let origin = if let Some(origin) = origin {
-            QueryDateTime::from_date_str(timezone, &origin)?
+        // `origin` takes precedence over `offset`, and drops it: keeping the offset around would
+        // let the rendering shift buckets that `origin` — which every alignment check reads —
+        // knows nothing about.
+        let (origin, granularity_offset) = if let Some(origin) = origin {
+            (QueryDateTime::from_date_str(timezone, &origin)?, None)
         } else if let Some(offset) = &granularity_offset {
             // Week-based intervals expect the offset relative to the start of a week.
             let origin = Self::fix_origin_for_weeks_if_needed(
@@ -76,15 +79,26 @@ impl Granularity {
                 &granularity_interval,
             );
             let interval = SqlInterval::from_str(offset)?;
-            origin.add_interval(&interval)?
+            (origin.add_interval(&interval)?, granularity_offset)
         } else {
-            Self::fix_origin_for_weeks_if_needed(
-                Self::default_origin(timezone)?,
-                &granularity_interval,
+            (
+                Self::fix_origin_for_weeks_if_needed(
+                    Self::default_origin(timezone)?,
+                    &granularity_interval,
+                ),
+                granularity_offset,
             )
         };
 
-        let is_natural_aligned = granularity_interval.is_trivial();
+        // A trivial interval can only ride the DATE_TRUNC path when its origin actually sits on
+        // that unit's natural boundary — `1 year` from 2024-04-01 is a fiscal year, and truncating
+        // to the calendar year would silently discard the origin. An `offset` origin is exempt:
+        // it is off-boundary by construction, and the aligned branch renders it by subtracting the
+        // offset before truncating and adding it back.
+        let is_natural_aligned = granularity_interval.is_trivial()
+            && (granularity_offset.is_some()
+                || origin.is_start_of(&granularity_interval.min_granularity()?)?);
+
         Ok(Self {
             granularity,
             granularity_interval,
@@ -292,5 +306,75 @@ mod tests {
             origin_date(&custom("2 weeks", Some("2024-01-03"), None)),
             NaiveDate::from_ymd_opt(2024, 1, 3).unwrap()
         );
+    }
+
+    #[test]
+    fn trivial_interval_with_off_boundary_origin_is_not_natural_aligned() {
+        // A fiscal year starting on April 1 cannot be rendered as DATE_TRUNC('year', ...).
+        assert!(!custom("1 year", Some("2024-04-01"), None).is_natural_aligned());
+    }
+
+    #[test]
+    fn trivial_interval_with_on_boundary_origin_stays_natural_aligned() {
+        // January 1 is the natural year boundary, so DATE_TRUNC is still correct.
+        assert!(custom("1 year", Some("2024-01-01"), None).is_natural_aligned());
+    }
+
+    #[test]
+    fn off_boundary_origin_is_judged_against_the_intervals_own_unit() {
+        // April 1 is off the year boundary but exactly on the month and quarter boundaries.
+        assert!(custom("1 month", Some("2024-04-01"), None).is_natural_aligned());
+        assert!(custom("1 quarter", Some("2024-04-01"), None).is_natural_aligned());
+        // ...and February 1 is on the month boundary but not the quarter one.
+        assert!(custom("1 month", Some("2024-02-01"), None).is_natural_aligned());
+        assert!(!custom("1 quarter", Some("2024-02-01"), None).is_natural_aligned());
+    }
+
+    #[test]
+    fn origin_with_a_time_component_defeats_alignment_of_date_intervals() {
+        assert!(!custom("1 day", Some("2024-04-01T06:00:00"), None).is_natural_aligned());
+        assert!(custom("1 hour", Some("2024-04-01T06:00:00"), None).is_natural_aligned());
+    }
+
+    #[test]
+    fn week_origin_is_judged_against_monday() {
+        // 2024-01-01 is a Monday; 2024-01-03 is a Wednesday.
+        assert!(custom("1 week", Some("2024-01-01"), None).is_natural_aligned());
+        assert!(!custom("1 week", Some("2024-01-03"), None).is_natural_aligned());
+    }
+
+    #[test]
+    fn default_and_offset_origins_keep_their_existing_alignment() {
+        // No explicit origin: the default origin is the start of the year, and the week-only
+        // interval snaps to Monday — both natural boundaries, so DATE_TRUNC still applies.
+        assert!(custom("1 year", None, None).is_natural_aligned());
+        assert!(custom("1 week", None, None).is_natural_aligned());
+        // `offset` renders through the subtract/truncate/add branch, which stays aligned.
+        assert!(custom("1 week", None, Some("-1 day")).is_natural_aligned());
+    }
+
+    #[test]
+    fn explicit_origin_discards_the_offset() {
+        // `origin` takes precedence when both are set. The offset must be dropped outright —
+        // left in place it would shift the rendered buckets away from the origin that
+        // `align_date_to_origin` and the materialized time series both bin on.
+        let g = custom("1 year", Some("2024-04-01"), Some("3 months"));
+        assert_eq!(g.granularity_offset(), &None);
+        assert!(!g.is_natural_aligned());
+
+        // Same for an on-boundary origin, which would otherwise stay on the offset sub-branch.
+        let g = custom("1 year", Some("2024-01-01"), Some("3 months"));
+        assert_eq!(g.granularity_offset(), &None);
+        assert_eq!(
+            origin_date(&g),
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap()
+        );
+        assert!(g.is_natural_aligned());
+    }
+
+    #[test]
+    fn non_trivial_intervals_are_never_natural_aligned() {
+        assert!(!custom("15 minutes", None, None).is_natural_aligned());
+        assert!(!custom("6 months", Some("2024-01-01"), None).is_natural_aligned());
     }
 }
