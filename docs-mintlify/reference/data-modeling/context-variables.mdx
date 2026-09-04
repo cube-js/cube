@@ -410,18 +410,40 @@ Pass a function instead. It receives the query's own filter values, so it can
 widen the pushed-down range to cover the periods the shifted stages read — here
 a fiscal prior year, bracketed at 371 and 364 days:
 
-```yaml
+<CodeGroup>
+
+```yaml title="YAML"
 cubes:
   - name: weekly_margin
     sql: |
       SELECT *
       FROM weekly_margin
       WHERE {FILTER_PARAMS.retail_calendar.calendar_d.filter(
-        lambda x, y: f"(week_end_d >= {x} AND week_end_d <= {y}) "
-                     f"OR (week_end_d >= DATE_SUB({x}, INTERVAL 371 DAY) "
-                     f"AND week_end_d <= DATE_SUB({y}, INTERVAL 364 DAY))"
+        lambda x, y: f"""
+          (week_end_d >= {x} AND week_end_d <= {y})
+          OR (week_end_d >= DATE_SUB({x}, INTERVAL 371 DAY)
+              AND week_end_d <= DATE_SUB({y}, INTERVAL 364 DAY))
+        """
       )}
 ```
+
+```javascript title="JavaScript"
+cube(`weekly_margin`, {
+  sql: `
+    SELECT *
+    FROM weekly_margin
+    WHERE ${FILTER_PARAMS.retail_calendar.calendar_d.filter(
+      (x, y) => `
+        (week_end_d >= ${x} AND week_end_d <= ${y})
+        OR (week_end_d >= DATE_SUB(${x}, INTERVAL 371 DAY)
+            AND week_end_d <= DATE_SUB(${y}, INTERVAL 364 DAY))
+      `
+    )}
+  `
+})
+```
+
+</CodeGroup>
 
 Every stage then scans every band, so keep the bands as narrow as the calendar
 actually requires.
