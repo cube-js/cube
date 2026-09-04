@@ -4202,3 +4202,69 @@ async fn test_wrapper_multi_arg_aggregate_function_without_template() {
         error
     );
 }
+
+/// Reproduction for https://github.com/cube-js/cube/issues/11762
+///
+/// A CTE query that joins two independently grouped cube queries can be answered as a
+/// query with post-processing: two regular Cube queries, joined by DataFusion. Regular
+/// queries are pre-aggregation eligible, a query with push down is not, so planning this
+/// as a single pushed down join costs the pre-aggregations.
+///
+/// Run with `CUBESQL_SQL_PUSH_DOWN=false` to see the post-processing plan this asserts.
+///
+/// Ignored: this currently fails, it documents the reported regression rather than a
+/// behaviour the planner already has.
+#[tokio::test]
+#[ignore]
+async fn test_repro_11762_grouped_cte_join_skips_pre_aggregations() {
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+WITH orders AS (
+    SELECT
+        customer_gender AS gender,
+        SUM(sumPrice) AS total
+    FROM KibanaSampleDataEcommerce
+    GROUP BY 1
+),
+logs AS (
+    SELECT
+        content AS gender,
+        MEASURE(agentCount) AS agents
+    FROM Logs
+    GROUP BY 1
+)
+SELECT
+    orders.gender,
+    orders.total,
+    logs.agents
+FROM orders
+INNER JOIN logs ON orders.gender = logs.gender
+"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let printed = query_plan.print(true).unwrap();
+    println!("plan:\n{}", printed);
+    if printed.contains("CubeScanWrappedSql") {
+        println!(
+            "pushed down SQL:\n{}",
+            query_plan
+                .as_logical_plan()
+                .find_cube_scan_wrapped_sql()
+                .wrapped_sql
+                .sql
+        );
+    }
+
+    assert!(
+        !printed.contains("CubeScanWrappedSql"),
+        "the whole join was pushed down to the data source, so pre-aggregations can't \
+         be used; expected two regular Cube queries joined by post processing:\n{}",
+        printed
+    );
+}
