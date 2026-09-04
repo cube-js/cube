@@ -10,5 +10,12 @@
     "rootDir": ".",
     "allowJs": true,
     "resolveJsonModule": true
-  }
+  },
+  "references": [
+    { "path": "../cubejs-backend-native" },
+    { "path": "../cubejs-backend-shared" },
+    { "path": "../cubejs-cubestore-driver" },
+    { "path": "../cubejs-query-orchestrator" },
+    { "path": "../cubejs-server-core" }
+  ]
 }

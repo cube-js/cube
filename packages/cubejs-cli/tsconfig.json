@@ -14,5 +14,11 @@
     "strictFunctionTypes": true,
     "strictBindCallApply": true,
     "strictPropertyInitialization": true,
-  }
+  },
+  "references": [
+    { "path": "../cubejs-backend-cloud" },
+    { "path": "../cubejs-backend-shared" },
+    { "path": "../cubejs-schema-compiler" },
+    { "path": "../cubejs-server" }
+  ]
 }

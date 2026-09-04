@@ -3,6 +3,7 @@
     "outDir": "dist",
     "rootDir": "./js-wrapper",
     "incremental": true,
+    "composite": true,
     "lib": ["es2017", "es2018", "es2019", "es2020"],
     "target": "es2018",
     "module": "nodenext",
@@ -25,5 +26,8 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "exclude": ["target", "dist", "node_modules"]
+  "exclude": ["target", "dist", "node_modules"],
+  "references": [
+    { "path": "../../packages/cubejs-backend-shared" }
+  ]
 }

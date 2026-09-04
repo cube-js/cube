@@ -14,4 +14,15 @@
     "strictBindCallApply": false,
     "strictPropertyInitialization": false,
   },
+  "references": [
+    { "path": "../cubejs-api-gateway" },
+    { "path": "../cubejs-backend-cloud" },
+    { "path": "../cubejs-backend-native" },
+    { "path": "../cubejs-backend-shared" },
+    { "path": "../cubejs-base-driver" },
+    { "path": "../cubejs-cubestore-driver" },
+    { "path": "../cubejs-query-orchestrator" },
+    { "path": "../cubejs-schema-compiler" },
+    { "path": "../cubejs-templates" }
+  ]
 }

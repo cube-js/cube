@@ -8,5 +8,10 @@
     "noImplicitAny": false,
     "outDir": "dist",
     "rootDir": ".",
-  }
+  },
+  "references": [
+    { "path": "../cubejs-backend-shared" },
+    { "path": "../cubejs-base-driver" },
+    { "path": "../cubejs-schema-compiler" }
+  ]
 }

@@ -7,7 +7,8 @@
     "types": ["*"],
     "declaration": true,
     "declarationMap": true,                   /* Generates a sourcemap for each corresponding '.d.ts' file. */
-    "declarationDir": "./dist",                   /* Generates a sourcemap for each corresponding '.d.ts' file. */
+    "declarationDir": "./dist",
+    "composite": true,                   /* Generates a sourcemap for each corresponding '.d.ts' file. */
     "rootDir": "./src",
     "sourceMap": false,                        /* Generates corresponding '.map' file. */
     "outDir": "./temp",                       /* Redirect output structure to the directory. */
@@ -23,5 +24,8 @@
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,                     /* Skip type checking of declaration files. */
     "forceConsistentCasingInFileNames": true  /* Disallow inconsistently-cased references to the same file. */
-  }
+  },
+  "references": [
+    { "path": "../cubejs-client-core" }
+  ]
 }
