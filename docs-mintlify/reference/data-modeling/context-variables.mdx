@@ -408,7 +408,9 @@ string in that case fails with a planning error naming the shift.
 
 Pass a function instead. It receives the query's own filter values, so it can
 widen the pushed-down range to cover the periods the shifted stages read — here
-a fiscal prior year, bracketed at 371 and 364 days:
+a fiscal prior year, bracketed at 371 and 364 days. The bracketing is the
+load-bearing part; the date arithmetic below is BigQuery syntax, so adjust it
+for your data source:
 
 <CodeGroup>
 
