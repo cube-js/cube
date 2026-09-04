@@ -1,6 +1,6 @@
 ---
-title: Cube Cloud for Sheets
-description: "Cube Cloud for Sheets is the native Google Sheets add-on for Cube Cloud."
+title: Cube for Sheets
+description: "Cube for Sheets is the native Google Sheets add-on for Cube."
 ---
 
 <Note>
@@ -26,12 +26,12 @@ explorations via pivot table](#create-explorations-via-pivot-table) and work wit
 
 ## Configuration
 
-Cube Cloud for Sheets uses the SQL API internally. So, the SQL API has to be
-[enabled][ref-sql-api-enabled] in the Cube Cloud deployment settings.
+Cube for Sheets uses the SQL API internally. So, the SQL API has to be
+[enabled][ref-sql-api-enabled] in the Cube deployment settings.
 
 ## Installation
 
-You have to install Cube Cloud for Sheets into your Google Workspace organization.
+You have to install Cube for Sheets into your Google Workspace organization.
 To do so, navigate to its [page in the Google Workspace
 Marketplace][link-marketplace-listing] and click **Install**:
 
@@ -41,7 +41,7 @@ Marketplace][link-marketplace-listing] and click **Install**:
 
 To verify that the add-on is successfully installed, go to any Google Sheets
 document, open the **Extensions** menu, and check that there is the
-**Cube Cloud for Sheets** menu item:
+**Cube for Sheets** menu item:
 
 <Frame>
   <img src="https://ucarecdn.com/90f3a9d0-abde-4eb4-9222-27e4ebc46c6c/" />
@@ -49,9 +49,9 @@ document, open the **Extensions** menu, and check that there is the
 
 ## Authentication
 
-You need to authenticate Cube Cloud for Sheets to retrieve data from Cube Cloud.
+You need to authenticate Cube for Sheets to retrieve data from Cube.
 To do so, open the sidebar by going to the **Extensions** menu and choosing
-**Cube Cloud for Sheets → Open Sidebar**. Then, click **Sign in**.
+**Cube for Sheets → Open Sidebar**. Then, click **Sign in**.
 
 <Frame>
   <img src="https://ucarecdn.com/d47c8faa-97ed-4ce1-ba0e-99b7add1ab61/" />
@@ -67,13 +67,13 @@ If you want to revoke the authentication, open the add-on menu and click
 ## Create explorations via pivot table
 
 To create an exploration, open the add-on and click **Create exploration**.
-Then, select a Cube Cloud deployment from the drop-down. Finally,
+Then, select a Cube deployment from the drop-down. Finally,
 you can start building a query by selecting a view and its members in the UI that
 looks and feels like [Playground][ref-playground].
 
 <Info>
 
-Cube Cloud for Sheets works only with [views][ref-views], not cubes.
+Cube for Sheets works only with [views][ref-views], not cubes.
 
 </Info>
 
@@ -103,7 +103,7 @@ cell and then confirm with the target button under **Result location**.
   <img src="https://ucarecdn.com/5a8d2b6a-b415-46ee-9e03-57ea5eeb693a/" />
 </Frame>
 
-With every change to your query, Cube Cloud for Sheets will update the exploration on
+With every change to your query, Cube for Sheets will update the exploration on
 the sheet after a slight delay. If you'd like to minimize it, consider
 implementing [pre-aggregations][ref-pre-aggs].
 
@@ -194,7 +194,7 @@ visible on the sheet itself. When enabled, a summary of active filters is
 added above the table, and filtered columns are marked "(filtered)" in
 their header, both when the exploration is inserted and after **Refresh**.
 
-Saved explorations also appear in the Cube Cloud workspace. See
+Saved explorations also appear in the Cube workspace. See
 [Saving explorations][ref-explorations] for details.
 
 
