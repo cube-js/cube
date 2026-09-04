@@ -415,9 +415,11 @@ above. And the band is parenthesised as a whole because it is an `OR` — withou
 that, appending another condition to the `WHERE` would bind it to the second
 branch alone.
 
-The bracketing is what carries across data sources; the date arithmetic is
-BigQuery syntax, so adjust it for yours — here a fiscal prior year, bracketed at
-371 and 364 days:
+`weekly_margin` joins a calendar cube whose `calendar_d` declares the
+`prior_fiscal_year` shift, so the shifted stage reaches fact rows through that
+mapping — which is why the band has to be widened by hand. The bracketing is
+what carries across data sources; the date arithmetic is BigQuery syntax, so
+adjust it for yours — here a fiscal prior year, bracketed at 371 and 364 days:
 
 <CodeGroup>
 
@@ -435,6 +437,11 @@ cubes:
                AND week_end_d <= DATE_SUB(DATE(TIMESTAMP({y})), INTERVAL 364 DAY)))
         """
       )}
+
+    joins:
+      - name: retail_calendar
+        sql: "{CUBE}.week_end_d = {retail_calendar.calendar_d}"
+        relationship: many_to_one
 ```
 
 ```javascript title="JavaScript"
@@ -450,7 +457,14 @@ cube(`weekly_margin`, {
              AND week_end_d <= DATE_SUB(DATE(TIMESTAMP(${y})), INTERVAL 364 DAY)))
       `
     )}
-  `
+  `,
+
+  joins: {
+    retail_calendar: {
+      sql: `${CUBE}.week_end_d = ${retail_calendar.calendar_d}`,
+      relationship: `many_to_one`
+    }
+  }
 })
 ```
 
