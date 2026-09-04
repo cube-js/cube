@@ -20,13 +20,19 @@ let source: SourceState;
 
 /**
  * Mimics @clickhouse/client: a Readable of batches, every batch an array of `Row` objects.
- * The names and types header rows are prepended to the first batch.
+ * A batch given as a promise is pushed once it settles, which keeps the source parked on that
+ * fetch until the test releases it.
  */
-function mockSource(batches: Array<Batch>, error?: Error): SourceState {
-  const remaining = batches.length
-    ? [[NAMES, TYPES, ...batches[0]], ...batches.slice(1)]
-    : [];
+function rawSource(batches: Array<Batch | Promise<Batch>>, error?: Error): SourceState {
+  const remaining = [...batches];
   const state: Partial<SourceState> = { pulledRows: 0, destroyed: false };
+
+  const toRows = (batch: Batch) => batch.map((row) => ({
+    json: () => {
+      state.pulledRows! += 1;
+      return row;
+    },
+  }));
 
   const stream = new Readable({
     objectMode: true,
@@ -42,18 +48,25 @@ function mockSource(batches: Array<Batch>, error?: Error): SourceState {
         return;
       }
 
-      this.push(batch.map((row) => ({
-        json: () => {
-          state.pulledRows! += 1;
-          return row;
-        },
-      })));
+      if (batch instanceof Promise) {
+        batch.then((settled) => this.push(toRows(settled)));
+      } else {
+        this.push(toRows(batch));
+      }
     },
   });
   stream.on('close', () => { state.destroyed = true; });
 
   state.stream = stream;
   return state as SourceState;
+}
+
+/** `rawSource` with the names and types header rows prepended to the first batch. */
+function mockSource(batches: Array<Batch>, error?: Error): SourceState {
+  return rawSource(
+    batches.length ? [[NAMES, TYPES, ...batches[0]], ...batches.slice(1)] : [],
+    error,
+  );
 }
 
 const mockQuery = jest.fn(async (_params: any) => ({
@@ -239,35 +252,23 @@ describe('ClickHouseDriver stream', () => {
   });
 
   it('stops pushing when destroyed while waiting on the source', async () => {
-    source = mockSource([]);
-    let resolveNext!: (batch: any) => void;
-    const pending = new Promise((resolve) => { resolveNext = resolve; });
-    let hydrated = 0;
-    const late = [{ json: () => { hydrated += 1; return [1, 'a', '2020-01-01 00:00:00']; } }];
-
-    // Header batch arrives at once; the next batch stays in flight until we release it
-    source.stream = new Readable({
-      objectMode: true,
-      read() {
-        if (!this.readableLength && this.readableDidRead === false) {
-          this.push([{ json: () => NAMES }, { json: () => TYPES }]);
-          return;
-        }
-        pending.then((batch) => { this.push(batch); this.push(null); });
-      },
-    });
+    let releaseBatch!: (batch: Batch) => void;
+    const inFlight = new Promise<Batch>((resolve) => { releaseBatch = resolve; });
+    // Header batch arrives at once; the next batch stays in flight until the test releases it
+    source = rawSource([[NAMES, TYPES], inFlight]);
     const { rowStream } = await openStream({ highWaterMark: 100 });
 
     const received: Array<unknown> = [];
     rowStream.on('data', (row) => received.push(row));
     await settle();
+    const pulledBefore = source.pulledRows;
 
     rowStream.destroy();
-    resolveNext(late);
+    releaseBatch([[1, 'a', '2020-01-01 00:00:00']]);
     await settle();
 
     expect(received).toEqual([]);
-    expect(hydrated).toEqual(0);
+    expect(source.pulledRows).toEqual(pulledBefore);
   });
 
   it('wraps a source error raised before the header rows and closes the client', async () => {
@@ -290,11 +291,9 @@ describe('ClickHouseDriver stream', () => {
   });
 
   it('releases the result stream when the header rows are malformed', async () => {
-    source = mockSource([]);
     // A names row shorter than the types row fails validation inside open(), after the
     // stream already owns the source iterator
-    source.stream = Readable.from([[{ json: () => ['only_names'] }, { json: () => ['Int64', 'String'] }]]);
-    source.stream.on('close', () => { source.destroyed = true; });
+    source = rawSource([[['only_names'], ['Int64', 'String']]]);
 
     await expect(createDriver().stream('SELECT 1', [], { highWaterMark: 100 }))
       .rejects.toThrow('Unexpected names and types length mismatch');
