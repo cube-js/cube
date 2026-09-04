@@ -97,6 +97,8 @@ describe('ClickHouseDriver stream', () => {
     createClientMock.mockClear();
     mockQuery.mockClear();
     delete process.env.CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK;
+    // A test that forgets to set up its source must fail, not reuse the previous one's drained stream
+    source = undefined as unknown as SourceState;
   });
 
   it('sizes the row stream with the requested highWaterMark', async () => {
@@ -266,6 +268,19 @@ describe('ClickHouseDriver stream', () => {
 
     expect(received).toEqual([]);
     expect(hydrated).toEqual(0);
+  });
+
+  it('wraps a source error raised before the header rows and closes the client', async () => {
+    source = mockSource([], new Error('Code: 60. DB::Exception: Table default.missing does not exist'));
+
+    await expect(createDriver().stream('SELECT 1', [], { highWaterMark: 100, requestId: 'req-10-span-1' }))
+      .rejects.toThrow(/^Stream query failed: Error: Code: 60\. DB::Exception: Table default\.missing does not exist; query id: req-10-/);
+
+    // open() failed before the stream was handed out, so the dedicated client (created after the
+    // constructor's shared one) is released here
+    const client = createClientMock.mock.results.at(-1)!.value;
+    expect(createClientMock).toHaveBeenCalledTimes(2);
+    expect(client.close).toHaveBeenCalledTimes(1);
   });
 
   it('fails when the stream ends before the header rows', async () => {
