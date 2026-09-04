@@ -7,7 +7,6 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": ".",
     "typeRoots": ["./node_modules/@types", "./src/types"]
   }
 }

@@ -1,10 +1,11 @@
 {
   "compilerOptions": {
     "outDir": "dist",
+    "rootDir": "./js-wrapper",
     "incremental": true,
     "lib": ["es2017", "es2018", "es2019", "es2020"],
     "target": "es2018",
-    "module": "commonjs",
+    "module": "nodenext",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -17,7 +18,8 @@
     "strictPropertyInitialization": true,
     "noImplicitThis": true,
     "alwaysStrict": true,
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
+    "types": ["*"],
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,

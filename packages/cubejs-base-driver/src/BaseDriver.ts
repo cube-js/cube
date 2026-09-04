@@ -686,7 +686,9 @@ export abstract class BaseDriver implements DriverInterface {
     prefix: string
   ): Promise<string[]> {
     // Lazy loading, because it's using azure SDK, which is quite heavy.
-    return (await import('./storage-fs/aws.fs')).extractUnloadedFilesFromS3(clientOptions, bucketName, prefix);
+    // eslint-disable-next-line global-require
+    const { extractUnloadedFilesFromS3 } = require('./storage-fs/aws.fs') as typeof import('./storage-fs/aws.fs.js');
+    return extractUnloadedFilesFromS3(clientOptions, bucketName, prefix);
   }
 
   /**
@@ -698,7 +700,9 @@ export abstract class BaseDriver implements DriverInterface {
     tableName: string
   ): Promise<string[]> {
     // Lazy loading, because it's using azure SDK, which is quite heavy.
-    return (await import('./storage-fs/gcs.fs')).extractFilesFromGCS(gcsConfig, bucketName, tableName);
+    // eslint-disable-next-line global-require
+    const { extractFilesFromGCS } = require('./storage-fs/gcs.fs') as typeof import('./storage-fs/gcs.fs.js');
+    return extractFilesFromGCS(gcsConfig, bucketName, tableName);
   }
 
   protected async extractFilesFromAzure(
@@ -707,6 +711,8 @@ export abstract class BaseDriver implements DriverInterface {
     tableName: string
   ): Promise<string[]> {
     // Lazy loading, because it's using azure SDK, which is quite (extremely) heavy.
-    return (await import('./storage-fs/azure.fs')).extractFilesFromAzure(azureConfig, bucketName, tableName);
+    // eslint-disable-next-line global-require
+    const { extractFilesFromAzure } = require('./storage-fs/azure.fs') as typeof import('./storage-fs/azure.fs.js');
+    return extractFilesFromAzure(azureConfig, bucketName, tableName);
   }
 }

@@ -38,7 +38,7 @@
     "jest": "^29",
     "stream-to-array": "^2.3.0",
     "testcontainers": "^10.28.0",
-    "typescript": "~5.2.2"
+    "typescript": "~6.0.3"
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"

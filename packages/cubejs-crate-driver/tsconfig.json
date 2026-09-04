@@ -7,6 +7,6 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": ".",
-  }
+  },
+  "references": [{ "path": "../cubejs-postgres-driver" }]
 }

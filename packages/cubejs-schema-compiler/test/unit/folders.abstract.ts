@@ -1,4 +1,4 @@
-import { CubeToMetaTransformer } from 'src/compiler/CubeToMetaTransformer';
+import { CubeToMetaTransformer } from '../../src/compiler/CubeToMetaTransformer';
 
 type PreparedCompiler = {
   compiler: any;
