@@ -23,7 +23,15 @@ Pivot columns are the exception: they can also be sorted from the table itself, 
 
 ## Pivots
 
-Pivoting a dimension turns its unique values into columns, creating a cross-tab view. Drag a dimension to the **Pivot columns** drop zone in the **Fields** section to pivot it.
+Pivoting a dimension turns its unique values into columns, creating a cross-tab view. Pivots are
+configured in the **Pivot** section of the **Fields** tab, below the **Fields** section that lists
+the columns. The **Pivot** section holds:
+
+- **Rows** — dimensions listed down the left.
+- **Columns** — dimensions whose values become column headers. Drag a dimension here to pivot it.
+- **Values** — the measures filling the cells.
+- A **Measures** placeholder that decides where the measure names go. Drag it to **Columns** to run
+  them across the top, or to **Rows** to run them down the side.
 
 {/* TODO screenshot: table with pivot active — dimension values as column headers (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -31,6 +39,20 @@ Pivot behavior:
 - Pivot columns can be sorted by clicking the column header, including the totals column.
 - Pivot columns can also be sorted by row values — click a row number to sort by that row, including the totals row.
 - Pivoted columns can be hidden, but hiding is indexed to the specific value (e.g. hiding `status: returned`), not position.
+
+### Pivot presets
+
+Open the menu in the corner of the Pivot section to apply a preset — a one-shot arrangement of the three drop zones that you can rearrange further afterwards:
+
+- **Table (default)** — dimensions to **Rows**, measures to **Values**, measure names across the
+  top; the standard cross-tab.
+- **Vertical records** — the transpose: dimensions to **Columns**, measures to **Values**, and the
+  **Measures** placeholder to **Rows**, so the measure names run down the side and a single record
+  reads as a list of labelled values. This produces the values-as-rows layout. On a query with no
+  measures, **Values** stays empty and the table shows its pivot headers alone.
+
+**Reset**, beside the menu, restores the **Table (default)** arrangement — the two write the same
+layout. It is disabled while the pivot already matches it.
 
 ## Row grouping
 
@@ -82,8 +104,8 @@ can't be recomputed at another grain, so their cells stay empty on group rows �
 exclusion that [row, column, and pivot
 totals](/docs/explore-analyze/workbooks/querying-data#subtotals) make. Period-comparison
 columns are also left empty. The toggle is disabled unless grouping is active and the
-values are placed in columns, since the values-as-rows layout has no per-measure column
-for a subtotal to sit under.
+values are placed in columns, since the [values-as-rows layout](#pivot-presets) has no
+per-measure column for a subtotal to sit under.
 
 ## Column field options
 
