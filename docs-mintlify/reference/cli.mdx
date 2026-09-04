@@ -169,22 +169,22 @@ Run `cube <command> --help` for the full options of any command.
 
 | Command | Description |
 | --- | --- |
-| `login`, `logout`, `whoami`, `context` | Authentication and saved contexts |
-| `deployments` | List, get, create, update, delete deployments; `settings`, `versions`, `token`, `build-status`, `advance-step`, `reset-step` |
+| `login`, `logout`, `whoami`, `context` | Authentication and saved contexts — see [Authentication commands](#authentication-commands) |
+| `deployments` | List, get, create, update and delete deployments — see [Deployment commands](#deployment-commands) |
 | `deploy` | Upload a local project directory and build it |
 | `validate` | Compile a deployment's data model and report compilation errors (`--branch`, `--dev-mode`) |
 | `logs` | Tail deployment pod logs (`--pod`, `-c/--container`, `--source production\|dev`) |
 | `regions` | List available deployment regions |
-| `github` (`gh`) | GitHub integration: `status`, `installations`, `repos`, `branches`, `connect` |
-| `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `delete-branch`, `enable-branch`/`disable-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
-| `dbt` | dbt sync: `sync` (`--ref`, `--wait`), `status`, `result`, `logs`, `history` (`--status`, `--trigger`), `cancel` |
-| `environments` | Deployment environments and environment tokens |
-| `variables` | Deployment environment variables |
-| `folders`, `workbooks`, `reports`, `workspace` | Workspace content management |
-| `users`, `groups`, `attributes`, `policies` | Users, groups, and access control |
-| `tenant`, `notifications`, `integrations`, `oidc`, `api-keys` | Account administration |
-| `embed` | Embed sessions, tokens, embed tenants; `enable-dashboard`/`disable-dashboard` toggle signed embedding for a dashboard |
-| `agents`, `app`, `meta`, `scim` | Agents, app config, model metadata, SCIM v2 |
+| `github` (`gh`) | GitHub integration — see [GitHub commands](#github-commands) |
+| `data-model` | Data model files and Git workflow — see [Data model commands](#data-model-commands) |
+| `dbt` | dbt sync — see [dbt commands](#dbt-commands) |
+| `environments` | Deployment environments and environment tokens — see [Deployment commands](#deployment-commands) |
+| `variables` | Deployment environment variables — see [Deployment commands](#deployment-commands) |
+| `folders`, `workbooks`, `reports`, `workspace` | Workspace content management — see [Workspace content commands](#workspace-content-commands) |
+| `users`, `groups`, `attributes`, `policies` | Users, groups, and access control — see [User and access control commands](#user-and-access-control-commands) |
+| `tenant`, `notifications`, `integrations`, `oidc`, `api-keys` | Account administration — see [Administration commands](#administration-commands) |
+| `embed` | Embed sessions, tokens, dashboards and embed tenants — see [Embedding commands](#embedding-commands) |
+| `agents`, `app`, `meta`, `scim` | Agents, app config, model metadata, SCIM v2 — see [Agent and app commands](#agent-and-app-commands) |
 | `spec` | Show the API's OpenAPI specification — see [Discovering the API](#discovering-the-api) |
 | `api` | Raw authenticated API request (escape hatch): `cube api GET /api/v1/... -q key=value -d '{...}'` |
 | `update` | Update the CLI to the latest release |
@@ -192,6 +192,138 @@ Run `cube <command> --help` for the full options of any command.
 
 List commands print tables by default; pass `--json` anywhere for raw JSON
 output, suitable for piping to `jq`.
+
+The commands below take subcommands. Every subcommand that acts on a deployment
+takes its id as the first argument.
+
+### Authentication commands
+
+| Command | Description |
+| --- | --- |
+| `context list` | List saved contexts |
+| `context use` | Switch the default context |
+
+### Deployment commands
+
+| Command | Description |
+| --- | --- |
+| `deployments list`, `get` | List deployments, or show a single one |
+| `deployments create`, `update`, `delete` | Create, rename (or update via `--data`) and delete a deployment |
+| `deployments settings` | Show every setting of a deployment |
+| `deployments versions` | List the Cube versions a deployment can switch to — see [Changing the Cube version](#changing-the-cube-version) |
+| `deployments token` | Generate a Cube API token for a deployment |
+| `deployments build-status` | Show the latest build status for a branch |
+| `deployments advance-step`, `reset-step` | Advance onboarding to a creation step, or reset it to the first |
+| `environments list` | List a deployment's environments |
+| `environments tokens`, `create-token` | List tokens issued for an environment, or create one |
+| `variables list` | List environment variables — the API masks secret values |
+| `variables set` | Upsert environment variables; omitted variables keep their values |
+
+### GitHub commands
+
+| Command | Description |
+| --- | --- |
+| `github status` | Show GitHub link/install state and the browser URLs to finish setup |
+| `github installations` | List your GitHub App installations |
+| `github repos` | List repositories available to an installation |
+| `github branches` | List branches of a repository |
+| `github connect` | Connect a deployment to a repo, cloning it in and triggering the first build |
+
+### Data model commands
+
+| Command | Description |
+| --- | --- |
+| `data-model list`, `get` | List the data model source tree, or print a single file |
+| `data-model put`, `delete`, `rename` | Create, overwrite, delete or move a file — writes require a dev-mode branch |
+| `data-model file-hashes` | List the server's content hashes, to compare against local files |
+| `data-model branches` | List branches and their staging environment state |
+| `data-model create-branch` | Create a branch, optionally entering dev mode |
+| `data-model delete-branch` | Delete a branch and its Cube-side Git ref |
+| `data-model enable-branch` | Keep the branch's staging environment always active — see [Keeping a branch queryable](#keeping-a-branch-queryable-with-enable-branch) |
+| `data-model disable-branch` | Revert to an environment that is active only while the branch is viewed |
+| `data-model dev-mode`, `exit-dev-mode` | Enter dev mode on a branch, printing the personal `dev-…` branch that writes must target — or leave it |
+| `data-model commit` | Commit and push a branch to the shared branch it was forked from |
+| `data-model pull` | Sync a branch from its remote and rebuild if it moved |
+| `data-model merge` | Merge a branch into its parent branch |
+| `data-model merge-to-default` | Merge a branch straight into the deploy branch (production) |
+
+The workflow these fit into is described under
+[Data model Git workflow](#data-model-git-workflow).
+
+### dbt commands
+
+| Command | Description |
+| --- | --- |
+| `dbt sync` | Start a dbt sync (`--ref`, `--wait`) |
+| `dbt status` | Show the status of a dbt sync |
+| `dbt result` | Show what a completed dbt sync generated |
+| `dbt logs` | Show a sync's phase timeline, including the text a failed phase produced |
+| `dbt history` | List a deployment's recent dbt syncs (`--status`, `--trigger`) |
+| `dbt cancel` | Cancel a running dbt sync |
+
+Worked examples, including a CI gate, are under [dbt sync](#dbt-sync).
+
+### Workspace content commands
+
+| Command | Description |
+| --- | --- |
+| `folders list`, `create`, `update`, `delete` | Manage workspace folders — a folder must have no sub-folders to be deleted, and its content moves to the root |
+| `folders ancestors` | Show a folder's ancestor chain (breadcrumb) |
+| `workbooks list`, `get`, `create`, `update`, `delete` | Manage workbooks and dashboards |
+| `workbooks duplicate` | Clone a workbook, including its reports and published dashboard |
+| `workbooks publish`, `dashboard` | Publish a workbook's dashboard, or update its draft |
+| `workbooks ai-thread` | Attach an AI widget thread to a published dashboard |
+| `reports list`, `get`, `create`, `update`, `delete` | Manage reports |
+| `reports refresh` | Re-run a report's query |
+| `reports connect-workbook` | Link a report to a spreadsheet placement |
+| `reports folders` | List report folders |
+| `workspace list`, `shared` | List workspace items, or those shared with embed users |
+| `workspace move` | Move a workbook, report or folder into a folder |
+
+### User and access control commands
+
+| Command | Description |
+| --- | --- |
+| `users list`, `me` | List users, or show the current one |
+| `users create`, `update`, `delete` | Manage users (admin only) |
+| `users embed-theme` | Show the embed theme for the current user |
+| `groups list`, `delete` | List and delete user groups |
+| `attributes list`, `create`, `update`, `delete` | Manage user attribute definitions |
+| `attributes values get`, `set` | Read or upsert a user's attribute values |
+| `policies get` | Show user and group policies for a resource |
+| `policies set-user`, `set-group` | Set or clear a user's or group's policy on a resource |
+
+### Administration commands
+
+| Command | Description |
+| --- | --- |
+| `tenant settings`, `update` | Show or update tenant settings |
+| `notifications list`, `get`, `create`, `update`, `delete` | Manage scheduled notifications (admin only); deleting one removes its recipients |
+| `notifications recipients list`, `add`, `remove` | Subscribe and unsubscribe a notification's recipients |
+| `integrations list`, `get`, `create`, `update`, `delete` | Manage OAuth integrations |
+| `integrations tokens list`, `get`, `revoke`, `initiate` | Manage the current user's OAuth tokens, or start the OAuth flow |
+| `oidc list`, `get`, `create`, `update`, `delete` | Manage OIDC token configs |
+| `api-keys list`, `get`, `create`, `delete` | Manage [API keys][ref-api-keys] — a new key's secret is returned only once |
+
+### Embedding commands
+
+| Command | Description |
+| --- | --- |
+| `embed generate-session` | Generate a one-time embed session (admin only) |
+| `embed token` | Exchange a session id for a signed embed JWT |
+| `embed dashboard` | Fetch an embeddable dashboard by public id |
+| `embed enable-dashboard`, `disable-dashboard` | Turn signed embedding on or off for a dashboard (admin only) |
+| `embed tenant delete`, `groups`, `delete-group` | Manage embed tenants and their groups |
+
+### Agent and app commands
+
+| Command | Description |
+| --- | --- |
+| `agents list`, `skills` | List a deployment's agents, or its agent skills |
+| `app config`, `theme` | Show app-level configuration (theme, creator mode, embedding) or the app theme |
+| `meta` | Fetch data model metadata — takes no subcommand |
+| `scim users`, `scim groups` | SCIM v2 provisioning: `list`, `get`, `create`, `patch`, `replace`, `delete` |
+| `scim resource-types`, `schemas`, `service-provider-config` | Show the SCIM resource types, schemas and service provider config |
 
 ## Changing the Cube version
 
@@ -270,6 +402,7 @@ request without any hardcoded knowledge of the API.
 
 ## Data model Git workflow
 
+The subcommands are listed under [Data model commands](#data-model-commands).
 Edit the data model through branches without touching production:
 
 ```bash
@@ -317,6 +450,8 @@ new branch without forking, so writes to the name you gave it are rejected with
 as `dev_mode`. Run `dev-mode` on it to get a name you can write to.
 
 </Info>
+
+### Keeping a branch queryable with enable-branch
 
 `enable-branch` keeps a shared branch's [staging environment][ref-staging-env]
 always active, so it stays queryable without anyone viewing the branch in the
