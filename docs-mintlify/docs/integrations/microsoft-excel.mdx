@@ -91,9 +91,11 @@ are in workbooks. They are a starting point, not enforcement: you can change
 their values, switch operators, or remove them.
 
 Click on members to add them to **Rows** and **Measures**, or drag a member from
-the list straight onto **Rows**, **Columns**, or **Measures**. You can also drag
-members between zones to rearrange them. Click on the funnel buttons to add
-members to **Filters**. Click on **×** to remove members from a query.
+the list straight onto **Rows**, **Columns**, **Measures**, or **Filters**. You
+can also drag members between zones to rearrange them, or use the funnel
+buttons to add a member to **Filters** the same way. A member dropped onto
+**Filters** has no value yet, so it appears greyed until you set one on the
+**Filters** tab. Click on **×** to remove members from a query.
 
 <Frame>
   <img src="https://ucarecdn.com/670fda9d-358a-4345-9242-7888d8aaedd8/" />
@@ -140,17 +142,21 @@ the exploration and survive **Refresh**.
 
 When your exploration is ready, click **Save** to add it to your workspace. You
 can then [work with the exploration](#work-with-explorations) from the add-in.
+To discard an unsaved exploration instead, choose **Delete exploration** from
+the editor's **⋮** menu.
 
 ## Work with explorations
 
 Opening the add-in shows the current workbook's home: every exploration
-placed in this workbook, grouped by sheet, with each placement's range and
-how long ago it last refreshed. A placement is tagged **Stale** when its
-source exploration has been edited since that copy was written to the sheet.
-Running an exploration keeps its progress even if you close the pane before
-saving — the workbook home lists it under **Unsaved**, and reopening it
-resumes exactly where you left off. The pane can also hold more than one
-exploration open at once, switchable from a picker at the top.
+placed in this workbook, grouped by sheet — a sheet isn't limited to one
+placement — with each placement's range and how long ago it last refreshed.
+A placement shows **Out of date** when its source exploration has been
+edited since that copy was written to the sheet. Running an exploration
+keeps its progress even if you close the pane before saving: it's listed as
+**Not saved** under its sheet, or under a separate **Unsaved** heading if it
+has no sheet or anchor yet. Reopening it resumes exactly where you left off.
+The pane can also hold more than one exploration open at once, switchable
+from a picker at the top.
 
 Click **Browse all explorations** to search by name across your whole
 deployment, not just the current folder — results are grouped by type and
@@ -164,6 +170,17 @@ Hovering a row in this list shows every placement it has in the **current**
 document under **Location** / **Locations**. Click **Refresh** to update all
 of that exploration's placements in the current document at once; click its
 title to open it and change the query, which applies to every placement.
+
+**Refresh all**, at the top of the workbook home, refreshes every placement
+in the document as a tracked run: a footer at the bottom of the pane tracks
+overall progress (**N of M refreshed**) with a **Stop** button, while each
+row shows **Queued**, **Refreshing…**, or **Not refreshed** with a reason if
+it failed. The run keeps going if you navigate away and back; refreshes are
+written one sheet at a time, so a large workbook takes a while.
+
+If you've edited a placement's cells by hand since it last refreshed, a
+banner names the affected rows and warns that the next **Refresh** will
+overwrite them — its **Locate** button jumps straight to them.
 
 A placement survives renaming the sheet it's on or the workbook it's in —
 it's tracked by the sheet's and workbook's own stable ids, not by name. A
