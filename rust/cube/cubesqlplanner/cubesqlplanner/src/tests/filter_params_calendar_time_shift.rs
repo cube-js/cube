@@ -162,3 +162,77 @@ fn stage_predicate_uses_the_named_mapping_column() {
         sql
     );
 }
+
+// A calendar cube may declare a shift as a plain interval, with no mapping
+// `sql`. That shape is arithmetic, so the column carries it rather than being
+// rejected - and the sign has to match what `CalendarTimeShiftSqlNode` renders:
+// the calendar map holds the declaration as written and inverts at render,
+// unlike `TimeShiftState`, which is stored already inverted.
+fn interval_declared_schema() -> MockSchema {
+    MockSchema::from_yaml(indoc! {"
+        cubes:
+            - name: fpi_calendar
+              calendar: true
+              sql: \"SELECT * FROM fpi_calendar\"
+              dimensions:
+                  - name: calendar_d
+                    type: time
+                    sql: calendar_d
+                    primary_key: true
+                    time_shift:
+                        - name: prior_year
+                          interval: \"1 year\"
+                          type: prior
+
+            - name: fpi_margin
+              sql: \"SELECT * FROM fpi_margin WHERE {FILTER_PARAMS_COLUMN:fpi_calendar.calendar_d:week_end_d}\"
+              joins:
+                  - name: fpi_calendar
+                    relationship: many_to_one
+                    sql: \"{fpi_margin}.week_end_d = {fpi_calendar.calendar_d}\"
+              dimensions:
+                  - name: id
+                    type: number
+                    sql: id
+                    primary_key: true
+                  - name: week_end_d
+                    type: time
+                    sql: week_end_d
+              measures:
+                  - name: net_sales
+                    type: sum
+                    sql: net_sales_a
+
+                  - name: net_sales_ly
+                    type: number
+                    sql: \"{CUBE.net_sales}\"
+                    multi_stage: true
+                    time_shift:
+                        - name: prior_year
+    "})
+    .unwrap()
+}
+
+#[test]
+fn interval_declared_calendar_shift_offsets_the_column() {
+    let ctx = TestContext::new(interval_declared_schema()).unwrap();
+
+    let (sql, _) = ctx
+        .build_sql_and_params(indoc! {"
+            measures:
+              - fpi_margin.net_sales_ly
+            time_dimensions:
+              - dimension: fpi_calendar.calendar_d
+                dateRange:
+                  - \"2026-06-20\"
+                  - \"2026-06-20\"
+        "})
+        .expect("an interval-declared calendar shift is arithmetic the column can carry");
+
+    assert!(
+        sql.contains("(week_end_d + interval '-1 year')"),
+        "the column must be offset by the inverted declaration, the same way \
+         CalendarTimeShiftSqlNode renders the dimension\\nsql: {}",
+        sql
+    );
+}

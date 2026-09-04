@@ -37,9 +37,24 @@ impl ToSql for BaseFilter {
                     .and_then(|shift| shift.interval.as_ref())
                     .map(FilterParamsTimeShift::Interval)
                     .or_else(|| {
-                        visitor
-                            .calendar_time_shifts()
+                        // The calendar map is keyed by the calendar cube's PK,
+                        // which is the filtered symbol only when FILTER_PARAMS
+                        // binds the calendar dimension itself. A binding on the
+                        // fact's own time dimension reaches the same shift
+                        // through that dimension's `time_shift_pk_full_name`, so
+                        // probe both - matching how `get_for_symbol` probes more
+                        // than the bare name. Missing here is silent: the column
+                        // would render bare against unshifted bounds.
+                        let calendar_shifts = visitor.calendar_time_shifts();
+                        calendar_shifts
                             .get(&symbol_to_match.full_name())
+                            .or_else(|| {
+                                let pk = symbol_to_match
+                                    .as_dimension()
+                                    .ok()?
+                                    .time_shift_pk_full_name()?;
+                                calendar_shifts.get(&pk)
+                            })
                             .map(FilterParamsTimeShift::Calendar)
                     });
                 return self.typed_filter().to_sql_for_filter_params(

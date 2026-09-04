@@ -95,6 +95,38 @@ impl TypedFilter {
                         );
                         shifted_column.as_str()
                     }
+                    // A calendar shift is only a mapping when it declares
+                    // `sql`. Declared as a plain interval it is arithmetic after
+                    // all - `CalendarTimeShiftSqlNode` renders exactly this
+                    // offset - so the column can carry it like any other
+                    // interval.
+                    //
+                    // The inverse is not symmetric with the arm above:
+                    // `extract_time_shifts` inverts before storing into
+                    // `TimeShiftState`, while the calendar map keeps the
+                    // declaration as written and the calendar node inverts at
+                    // render. Taking `to_sql()` directly here would shift the
+                    // pushed-down bounds the wrong way.
+                    Some(FilterParamsTimeShift::Calendar(shift))
+                        if shift.sql.is_none() && shift.interval.is_some() =>
+                    {
+                        let interval = shift.interval.as_ref().unwrap();
+                        shifted_column = format!(
+                            "({})",
+                            plan_templates.add_timestamp_interval(
+                                column_sql.clone(),
+                                interval.inverse().to_sql()
+                            )?
+                        );
+                        shifted_column.as_str()
+                    }
+                    // Neither a mapping nor an offset: the calendar node renders
+                    // the dimension unshifted too, so there is nothing to carry.
+                    Some(FilterParamsTimeShift::Calendar(shift))
+                        if shift.sql.is_none() && shift.interval.is_none() =>
+                    {
+                        column_sql.as_str()
+                    }
                     Some(FilterParamsTimeShift::Calendar(shift)) => {
                         return Err(CubeError::user(format!(
                             concat!(
