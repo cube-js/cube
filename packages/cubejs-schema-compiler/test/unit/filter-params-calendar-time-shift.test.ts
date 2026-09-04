@@ -1,20 +1,11 @@
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { prepareYamlCompiler } from './PrepareCompiler';
 
-// A fact whose `sql` pushes a joined CALENDAR cube's date down through
-// FILTER_PARAMS, with multi_stage measures that shift that date by NAME.
-//
-// Named shifts are what a retail 4-5-4 calendar forces: "one fiscal year back"
-// is a mapping column on the calendar, not an interval any arithmetic can
-// express, so the shift is declared as `time_shift: [{ name, sql }]` on the
-// calendar dimension and referenced by name from the measure.
-//
-// Compare `multi-stage-time-shift-filter-params.test.ts` (CORE-543 / #11030),
-// which covers the INTERVAL form: there the pushed-down column is offset by the
-// same interval as the stage predicate, so a shifted stage scans the rows it
-// groups by. A calendar shift has no such offset, so a string column cannot
-// carry it and is rejected; a callback column receives the query's own bounds
-// and can widen the pushed-down range itself.
+// A calendar shift declared with `sql` maps through a column on the calendar
+// (`prior_fiscal_year` -> `next_fiscal_year_d`) rather than offsetting the date,
+// so a string FILTER_PARAMS column is rejected and a callback — handed the
+// query's own bounds — is not. Interval-declared shifts are offset onto the
+// column instead; that shape is pinned in the planner suite.
 const model = (filterParams: string) => `
 cubes:
   - name: fpc_calendar
