@@ -1,4 +1,5 @@
 use super::ToSql;
+use crate::physical_plan::filter::typed_filter::FilterParamsTimeShift;
 use crate::physical_plan::sql_nodes::SqlNode;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::filter::typed_filter::resolve_base_symbol;
@@ -25,10 +26,22 @@ impl ToSql for BaseFilter {
                 .filter_params_columns
                 .get(&symbol_to_match.full_name())
             {
+                // Both shift kinds, not just the interval one. A calendar shift
+                // never reaches `time_shifts` - `extract_time_shifts` routes it
+                // to its own map - and reading only that map is what used to
+                // leave the pushed-down column bare against unshifted bounds
+                // inside a calendar-shifted stage.
                 let time_shift = visitor
                     .time_shifts()
                     .get_for_symbol(&symbol_to_match)
-                    .and_then(|shift| shift.interval.as_ref());
+                    .and_then(|shift| shift.interval.as_ref())
+                    .map(FilterParamsTimeShift::Interval)
+                    .or_else(|| {
+                        visitor
+                            .calendar_time_shifts()
+                            .get(&symbol_to_match.full_name())
+                            .map(FilterParamsTimeShift::Calendar)
+                    });
                 return self.typed_filter().to_sql_for_filter_params(
                     filter_params_item,
                     time_shift,

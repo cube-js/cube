@@ -12,8 +12,10 @@ import { prepareYamlCompiler } from './PrepareCompiler';
 // Compare `multi-stage-time-shift-filter-params.test.ts` (CORE-543 / #11030),
 // which covers the INTERVAL form: there the pushed-down column is offset by the
 // same interval as the stage predicate, so a shifted stage scans the rows it
-// groups by. A named shift gets no such treatment — see the last test here.
-const CALENDAR_SHIFT_MODEL = `
+// groups by. A calendar shift has no such offset, so a string column cannot
+// carry it and is rejected; a callback column receives the query's own bounds
+// and can widen the pushed-down range itself.
+const model = (filterParams: string) => `
 cubes:
   - name: fpc_calendar
     calendar: true
@@ -34,8 +36,7 @@ cubes:
 
   - name: fpc_margin
     sql: >
-      SELECT * FROM fpc_margin
-      WHERE {FILTER_PARAMS.fpc_calendar.calendar_d.filter('week_end_d')}
+      SELECT * FROM fpc_margin WHERE ${filterParams}
     joins:
       - name: fpc_calendar
         sql: "{CUBE}.week_end_d = {fpc_calendar.calendar_d}"
@@ -66,113 +67,61 @@ cubes:
           - name: prior_two_fiscal_year
 `;
 
-// The same push-down, shifted by an interval instead of by name.
-const INTERVAL_SHIFT_MODEL = `
-cubes:
-  - name: fpi_margin
-    sql: >
-      SELECT * FROM fpi_margin
-      WHERE {FILTER_PARAMS.fpi_margin.week_end_d.filter('week_end_d')}
-    dimensions:
-      - name: id
-        sql: id
-        type: number
-        primary_key: true
-      - name: week_end_d
-        sql: week_end_d
-        type: time
-    measures:
-      - name: net_sales
-        sql: net_sales_a
-        type: sum
-      - name: net_sales_ly
-        multi_stage: true
-        sql: "{net_sales}"
-        type: number
-        time_shift:
-          - time_dimension: week_end_d
-            interval: 1 year
-            type: prior
-`;
+const STRING_COLUMN = '{FILTER_PARAMS.fpc_calendar.calendar_d.filter(\'week_end_d\')}';
 
-async function buildSql(model: string, query: any): Promise<[string, unknown[]]> {
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(model);
+// The band a model writes by hand once it knows the shifted periods it has to
+// cover. 371/364 days back brackets the fiscal prior year. YAML `.filter()`
+// bodies are Python, so this is a lambda — the same form the reporting models
+// that hit this use.
+const CALLBACK_COLUMN = '{FILTER_PARAMS.fpc_calendar.calendar_d.filter('
+  + 'lambda x, y: f"(week_end_d >= {x} AND week_end_d <= {y}) '
+  + 'OR (week_end_d >= {x}::timestamptz - interval \'371 day\' '
+  + 'AND week_end_d <= {y}::timestamptz - interval \'364 day\')")}';
+
+async function buildSql(filterParams: string): Promise<[string, unknown[]]> {
+  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(model(filterParams));
   await compiler.compile();
 
   return new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    measures: ['fpc_margin.net_sales_ly', 'fpc_margin.net_sales_ly2'],
+    timeDimensions: [{
+      dimension: 'fpc_calendar.calendar_d',
+      dateRange: ['2026-06-20', '2026-06-20'],
+    }],
     timezone: 'UTC',
     // Named calendar time shifts are planned by Tesseract only.
     useNativeSqlPlanner: true,
-    ...query,
   }).buildSqlAndParams();
 }
 
-const calendarShiftSql = () => buildSql(CALENDAR_SHIFT_MODEL, {
-  measures: ['fpc_margin.net_sales_ly', 'fpc_margin.net_sales_ly2'],
-  timeDimensions: [{
-    dimension: 'fpc_calendar.calendar_d',
-    dateRange: ['2026-06-20', '2026-06-20'],
-  }],
-});
-
 describe('FILTER_PARAMS under a named calendar time shift', () => {
-  // Each named shift builds its own stage, and each stage rescans the fact. The
-  // binding stays attributed to `fpc_calendar.calendar_d` — the shift
-  // substitutes the column only where the stage's own predicate renders — so
-  // FILTER_PARAMS keeps matching and no stage scans the fact unfiltered.
-  it('pushes the column into every shifted stage', async () => {
-    const [sql] = await calendarShiftSql();
+  // Before this was rejected the column rendered bare and was bound to the
+  // unshifted reporting bounds in every stage. Each stage joins the calendar on
+  // its own mapping column, so the pushed-down predicate contradicted the stage
+  // around it and the stage came back empty — the same failure CORE-543 fixed
+  // for interval shifts, reached by a different route.
+  it('rejects a string column', async () => {
+    await expect(buildSql(STRING_COLUMN)).rejects.toThrow(
+      /fpc_calendar\.calendar_d.*prior_fiscal_year.*callback/s
+    );
+  });
 
-    expect(sql.match(/FROM fpc_margin WHERE \(week_end_d >=/g)).toHaveLength(2);
+  // A callback column is handed the query's bounds and decides the range
+  // itself, so it is left alone. This is what a model widened by hand relies
+  // on, and it must keep working.
+  it('pushes a callback column into every shifted stage', async () => {
+    const [sql] = await buildSql(CALLBACK_COLUMN);
+
+    expect(sql.match(/week_end_d >=/g)).toHaveLength(4);
     expect(sql).not.toContain('FROM fpc_margin WHERE (1 = 1)');
   });
 
   // The stage predicate is what carries the shift: each stage compares the
-  // calendar's mapping column, not `calendar_d`.
+  // calendar's own mapping column, not `calendar_d`.
   it('filters each stage on its own mapping column', async () => {
-    const [sql] = await calendarShiftSql();
+    const [sql] = await buildSql(CALLBACK_COLUMN);
 
-    expect(sql).toContain('"fpc_calendar".next_fiscal_year_d >=');
-    expect(sql).toContain('"fpc_calendar".next_two_fiscal_year_d >=');
-  });
-
-  // The interval form, for contrast: the pushed-down column is offset so the
-  // rows the shifted stage scans line up with the bounds it groups by.
-  it('offsets the pushed-down column for an interval shift', async () => {
-    const [sql] = await buildSql(INTERVAL_SHIFT_MODEL, {
-      measures: ['fpi_margin.net_sales', 'fpi_margin.net_sales_ly'],
-      timeDimensions: [{
-        dimension: 'fpi_margin.week_end_d',
-        dateRange: ['2026-06-20', '2026-06-20'],
-      }],
-    });
-
-    expect(sql).toContain('(week_end_d + interval \'1 year\')');
-  });
-
-  // The gap.
-  //
-  // A named shift never reaches the offsetting branch above. In
-  // `base_filter.rs` the shift handed to `to_sql_for_filter_params` is
-  // `time_shifts().get_for_symbol(sym).and_then(|s| s.interval.as_ref())`, and a
-  // named calendar shift carries `interval: None` — so the column is rendered
-  // bare and bound to the UNSHIFTED reporting bounds, in every stage.
-  //
-  // That contradicts the stage around it. `cte_0` joins the calendar on
-  // `week_end_d = next_fiscal_year_d`, so it reads PRIOR-year fact rows, while
-  // the pushed-down predicate restricts the same scan to the REPORTING week.
-  // The stage comes back empty unless the model widens the pushed-down band by
-  // hand to cover the shifted periods — and once it does, every stage scans
-  // every band.
-  it('binds the pushed-down column to unshifted bounds', async () => {
-    const [sql, params] = await calendarShiftSql();
-
-    expect(sql).not.toContain('week_end_d + interval');
-
-    // Eight bounds: a pushed-down pair and a stage pair per shifted stage.
-    // Every one of them is the reporting day, so nothing distinguishes the scan
-    // of the prior-fiscal-year stage from the scan of the two-year one.
-    expect(params).toHaveLength(8);
-    expect(params.every((p) => String(p).startsWith('2026-06-20'))).toBe(true);
+    expect(sql).toContain('next_fiscal_year_d >=');
+    expect(sql).toContain('next_two_fiscal_year_d >=');
   });
 });

@@ -7,6 +7,7 @@ use crate::planner::filter::typed_filter::{resolve_base_symbol, FilterOp, TypedF
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_call::SqlCallFilterParamsItem;
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::symbols::CalendarDimensionTimeShift;
 use crate::planner::FiltersContext;
 use crate::planner::SqlInterval;
 use cubenativeutils::CubeError;
@@ -46,11 +47,20 @@ impl ToSql for TypedFilter {
     }
 }
 
+/// The time shift active on the stage a FILTER_PARAMS column is rendered into.
+/// The two kinds are not interchangeable: an interval is arithmetic the column
+/// can carry, while a calendar shift resolves through a mapping column on the
+/// calendar cube and has no expression over the fact's own column.
+pub enum FilterParamsTimeShift<'a> {
+    Interval(&'a SqlInterval),
+    Calendar(&'a CalendarDimensionTimeShift),
+}
+
 impl TypedFilter {
     pub fn to_sql_for_filter_params(
         &self,
         item: &SqlCallFilterParamsItem,
-        time_shift: Option<&SqlInterval>,
+        time_shift: Option<FilterParamsTimeShift<'_>>,
         visitor: &SqlEvaluatorVisitor,
         node_processor: Rc<dyn SqlNode>,
         query_tools: &Rc<QueryTools>,
@@ -65,16 +75,43 @@ impl TypedFilter {
                 // same shift as the regular time-dimension filter, otherwise its
                 // current-period bounds contradict the shifted predicate and empty
                 // the CTE.
+                //
+                // An interval shift is arithmetic, so the column can carry it by
+                // being offset. A NAMED calendar shift is not: it resolves through
+                // a mapping column on the calendar cube (`prior_fiscal_year` ->
+                // `next_fiscal_year_d`, and so on), which is data, not an offset,
+                // and is not in scope inside the cube's own `sql`. There is no
+                // expression over this column that stands for it, and no bound the
+                // planner can widen to without knowing the calendar's contents - so
+                // say that, rather than emit a predicate that silently empties the
+                // stage.
                 let shifted_column;
-                let member_sql = if let Some(interval) = time_shift {
-                    shifted_column = format!(
-                        "({})",
-                        plan_templates
-                            .add_timestamp_interval(column_sql.clone(), interval.to_sql())?
-                    );
-                    shifted_column.as_str()
-                } else {
-                    column_sql.as_str()
+                let member_sql = match &time_shift {
+                    Some(FilterParamsTimeShift::Interval(interval)) => {
+                        shifted_column = format!(
+                            "({})",
+                            plan_templates
+                                .add_timestamp_interval(column_sql.clone(), interval.to_sql())?
+                        );
+                        shifted_column.as_str()
+                    }
+                    Some(FilterParamsTimeShift::Calendar(shift)) => {
+                        return Err(CubeError::user(format!(
+                            concat!(
+                                "FILTER_PARAMS column for `{}` is a string, so it cannot carry ",
+                                "the `{}` calendar time shift this query applies: that shift ",
+                                "resolves through a mapping column on the calendar cube rather ",
+                                "than offsetting the column, and no expression over `{}` stands ",
+                                "for it. Pass the column as a callback instead - it receives the ",
+                                "query's own bounds and can widen the pushed-down range to cover ",
+                                "the shifted periods."
+                            ),
+                            item.filter_symbol_name,
+                            shift.name.as_deref().unwrap_or("<unnamed>"),
+                            column_sql,
+                        )));
+                    }
+                    None => column_sql.as_str(),
                 };
                 let ctx = FilterSqlContext::new(
                     member_sql,
@@ -86,7 +123,12 @@ impl TypedFilter {
                 dispatch_to_sql(self.operation(), &ctx)
             }
             FilterParamsColumn::Compiled(compiled) => {
-                if time_shift.is_some() {
+                // An INTERVAL shift is carried by offsetting the column, which
+                // only a string column allows. A named calendar shift is carried
+                // by the callback itself: it is handed the query's own bounds and
+                // decides what range around them to push down, which is the only
+                // place that mapping can be expressed.
+                if matches!(time_shift, Some(FilterParamsTimeShift::Interval(_))) {
                     return Err(CubeError::user(format!(
                         "FILTER_PARAMS column for `{}` is a callback, which cannot carry the time \
                          shift the surrounding query applies; pass the column as a string instead",

@@ -1,4 +1,3 @@
-use crate::cube_bridge::base_query_options::FilterValue;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
@@ -10,13 +9,19 @@ use indoc::indoc;
 // arithmetic can express.
 //
 // Contrast with filter_params_time_shift.rs, which covers the interval form.
-// The two are handled by the same call site but only one of them can produce a
-// shift: see `base_filter.rs`, where the shift handed to
-// `to_sql_for_filter_params` is `…get_for_symbol(sym).and_then(|s| s.interval.as_ref())`.
-// A named calendar shift carries `interval: None`, so that resolves to `None`
-// and the pushed-down column is rendered bare.
-fn schema() -> MockSchema {
-    MockSchema::from_yaml(indoc! {"
+// There the pushed-down column is offset by the same interval as the stage
+// predicate, so the rows a shifted stage scans line up with the bounds it
+// groups by. A calendar shift has no such offset: `prior_fiscal_year` resolves
+// to `next_fiscal_year_d` on the calendar cube, which is data rather than
+// arithmetic and is not in scope inside the fact's own `sql`.
+//
+// So a STRING column is rejected - it would otherwise be bound to the
+// unshifted reporting bounds and empty the stage - while a CALLBACK column is
+// accepted, because it is handed the query's own bounds and can widen the
+// pushed-down range itself.
+fn schema(margin_sql: &str) -> MockSchema {
+    MockSchema::from_yaml(&format!(
+        indoc! {"
         cubes:
             - name: fpc_calendar
               calendar: true
@@ -28,16 +33,16 @@ fn schema() -> MockSchema {
                     primary_key: true
                     time_shift:
                         - name: prior_fiscal_year
-                          sql: \"{CUBE}.next_fiscal_year_d\"
+                          sql: \"{{CUBE}}.next_fiscal_year_d\"
                         - name: prior_two_fiscal_year
-                          sql: \"{CUBE}.next_two_fiscal_year_d\"
+                          sql: \"{{CUBE}}.next_two_fiscal_year_d\"
 
             - name: fpc_margin
-              sql: \"SELECT * FROM fpc_margin WHERE {FILTER_PARAMS_COLUMN:fpc_calendar.calendar_d:week_end_d}\"
+              sql: \"{margin_sql}\"
               joins:
                   - name: fpc_calendar
                     relationship: many_to_one
-                    sql: \"{fpc_margin}.week_end_d = {fpc_calendar.calendar_d}\"
+                    sql: \"{{fpc_margin}}.week_end_d = {{fpc_calendar.calendar_d}}\"
               dimensions:
                   - name: id
                     type: number
@@ -53,23 +58,37 @@ fn schema() -> MockSchema {
 
                   - name: net_sales_ly
                     type: number
-                    sql: \"{CUBE.net_sales}\"
+                    sql: \"{{CUBE.net_sales}}\"
                     multi_stage: true
                     time_shift:
                         - name: prior_fiscal_year
 
                   - name: net_sales_ly2
                     type: number
-                    sql: \"{CUBE.net_sales}\"
+                    sql: \"{{CUBE.net_sales}}\"
                     multi_stage: true
                     time_shift:
                         - name: prior_two_fiscal_year
-    "})
+    "},
+        margin_sql = margin_sql
+    ))
     .unwrap()
 }
 
-fn shifted_stages() -> (String, Vec<FilterValue>) {
-    let ctx = TestContext::new(schema()).unwrap();
+const STRING_COLUMN: &str =
+    "SELECT * FROM fpc_margin WHERE {FILTER_PARAMS_COLUMN:fpc_calendar.calendar_d:week_end_d}";
+
+// The band a model writes by hand once it knows the shifted periods it has to
+// cover - the callback form, which receives the query's own bounds as %0/%1.
+const CALLBACK_COLUMN: &str = concat!(
+    "SELECT * FROM fpc_margin WHERE ",
+    "{FILTER_PARAMS:fpc_calendar.calendar_d:",
+    "(week_end_d >= %0 AND week_end_d <= %1) OR ",
+    "(week_end_d >= %0 - interval '371 day' AND week_end_d <= %1 - interval '364 day')}"
+);
+
+fn build(margin_sql: &str) -> Result<String, cubenativeutils::CubeError> {
+    let ctx = TestContext::new(schema(margin_sql)).unwrap();
 
     ctx.build_sql_and_params(indoc! {"
             measures:
@@ -81,25 +100,42 @@ fn shifted_stages() -> (String, Vec<FilterValue>) {
                   - \"2026-06-20\"
                   - \"2026-06-20\"
         "})
-        .unwrap()
+        .map(|(sql, _)| sql)
 }
 
-fn shifted_stages_sql() -> String {
-    shifted_stages().0
-}
-
-// Each named shift builds its own stage, and each stage rescans the fact. The
-// binding stays attributed to `fpc_calendar.calendar_d` - the shift substitutes
-// the column only where the stage's own predicate renders - so FILTER_PARAMS
-// keeps matching and the fact scan is never left unfiltered.
+// Before this was rejected, the column rendered bare and was bound to the
+// unshifted reporting bounds in every stage. Each stage joins the calendar on
+// its own mapping column, so the pushed-down predicate contradicted the stage
+// around it and the stage came back empty - the same failure CORE-543 fixed for
+// interval shifts, reached by a different route.
 #[test]
-fn pushed_down_column_reaches_every_named_shift_stage() {
-    let sql = shifted_stages_sql();
+fn string_column_is_rejected_under_a_named_calendar_shift() {
+    let err = build(STRING_COLUMN).expect_err("a string column cannot carry a calendar shift");
+    let message = err.to_string();
+
+    assert!(
+        message.contains("fpc_calendar.calendar_d") && message.contains("prior_fiscal_year"),
+        "the error must name the binding and the shift it cannot carry\nerror: {}",
+        message
+    );
+    assert!(
+        message.contains("callback"),
+        "the error must point at the form that can carry it\nerror: {}",
+        message
+    );
+}
+
+// A callback column is handed the query's bounds and decides the range itself,
+// so it is left alone. This is what a model widened by hand relies on, and it
+// must keep working.
+#[test]
+fn callback_column_is_pushed_into_every_shifted_stage() {
+    let sql = build(CALLBACK_COLUMN).expect("a callback column carries its own band");
 
     assert_eq!(
-        sql.matches("FROM fpc_margin WHERE (week_end_d >=").count(),
-        2,
-        "both named-shift stages must push the column down\nsql: {}",
+        sql.matches("week_end_d >=").count(),
+        4,
+        "both bands must render in both shifted stages\nsql: {}",
         sql
     );
     assert!(
@@ -110,10 +146,10 @@ fn pushed_down_column_reaches_every_named_shift_stage() {
 }
 
 // The stage predicate is what carries the shift: each stage compares the
-// calendar's mapping column, not `calendar_d`.
+// calendar's own mapping column, not `calendar_d`.
 #[test]
 fn stage_predicate_uses_the_named_mapping_column() {
-    let sql = shifted_stages_sql();
+    let sql = build(CALLBACK_COLUMN).unwrap();
 
     assert!(
         sql.contains("next_fiscal_year_d"),
@@ -123,51 +159,6 @@ fn stage_predicate_uses_the_named_mapping_column() {
     assert!(
         sql.contains("next_two_fiscal_year_d"),
         "the prior-two-fiscal-year stage must filter on its mapping column\nsql: {}",
-        sql
-    );
-}
-
-// The gap this file exists to pin down.
-//
-// `filter_params_time_shift.rs` asserts that an INTERVAL shift offsets the
-// pushed-down column, so the rows a shifted stage scans line up with the bounds
-// that stage groups by. A NAMED calendar shift gets no such treatment: the
-// column is rendered bare and bound to the UNSHIFTED reporting bounds, in every
-// stage.
-//
-// That is a contradiction inside each stage. `cte_0` joins the calendar on
-// `week_end_d = next_fiscal_year_d`, so it reads PRIOR-year fact rows - while
-// the pushed-down predicate restricts the same scan to the REPORTING week. The
-// stage is empty unless the model widens the pushed-down band by hand to cover
-// the shifted periods, and once it does, every stage scans every band.
-#[test]
-fn named_shift_binds_the_pushed_down_column_to_unshifted_bounds() {
-    let (sql, params) = shifted_stages();
-
-    assert!(
-        !sql.contains("week_end_d + interval"),
-        "a named calendar shift currently cannot offset the pushed-down column; \
-         if this now passes, base_filter.rs learned to carry non-interval shifts \
-         and this test should be inverted\nsql: {}",
-        sql
-    );
-
-    // Eight bounds: a pushed-down pair and a stage pair per shifted stage. Every
-    // one of them is the reporting day, so nothing distinguishes the scan of the
-    // prior-fiscal-year stage from the scan of the two-year one.
-    let bounds: Vec<String> = params
-        .iter()
-        .map(|p| match p {
-            FilterValue::Str(s) => s.clone(),
-            other => panic!("unexpected bound {:?}", other),
-        })
-        .collect();
-    assert_eq!(bounds.len(), 8, "sql: {}", sql);
-    assert!(
-        bounds.iter().all(|b| b.starts_with("2026-06-20")),
-        "every bound stays on the reporting day - none is shifted back a fiscal \
-         year or two\nbounds: {:?}\nsql: {}",
-        bounds,
         sql
     );
 }

@@ -532,6 +532,7 @@ impl SqlCall {
                         &SqlNodesFactory::new(),
                         filter_params_columns,
                         visitor.time_shifts().clone(),
+                        visitor.calendar_time_shifts().clone(),
                     );
                     return crate::physical_plan::filter::render_filter_item(
                         &context, &subtree, templates,
