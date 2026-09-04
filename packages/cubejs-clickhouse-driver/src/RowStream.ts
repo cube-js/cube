@@ -102,14 +102,20 @@ export class ClickHouseRowStream extends Readable {
           return;
         }
 
+        // A destroy() while parked on the source settles the pending next() via source.return();
+        // the rows it carried have no reader anymore
+        if (this.destroyed) {
+          return;
+        }
+
         canPush = this.push(transformRow(this.batch[this.idx++].json(), this.transform));
       }
-
-      this.reading = false;
     } catch (e) {
       // Since 25.11 the server reports an exception raised after the first block through
       // the response headers and an in-stream tag, and the client rethrows it here.
       this.destroy(new Error(`Stream query failed: ${formatError(e)}; query id: ${this.queryId}`, { cause: e }));
+    } finally {
+      this.reading = false;
     }
   }
 

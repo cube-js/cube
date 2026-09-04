@@ -236,6 +236,38 @@ describe('ClickHouseDriver stream', () => {
     await release();
   });
 
+  it('stops pushing when destroyed while waiting on the source', async () => {
+    source = mockSource([]);
+    let resolveNext!: (batch: any) => void;
+    const pending = new Promise((resolve) => { resolveNext = resolve; });
+    let hydrated = 0;
+    const late = [{ json: () => { hydrated += 1; return [1, 'a', '2020-01-01 00:00:00']; } }];
+
+    // Header batch arrives at once; the next batch stays in flight until we release it
+    source.stream = new Readable({
+      objectMode: true,
+      read() {
+        if (!this.readableLength && this.readableDidRead === false) {
+          this.push([{ json: () => NAMES }, { json: () => TYPES }]);
+          return;
+        }
+        pending.then((batch) => { this.push(batch); this.push(null); });
+      },
+    });
+    const { rowStream } = await openStream({ highWaterMark: 100 });
+
+    const received: Array<unknown> = [];
+    rowStream.on('data', (row) => received.push(row));
+    await settle();
+
+    rowStream.destroy();
+    resolveNext(late);
+    await settle();
+
+    expect(received).toEqual([]);
+    expect(hydrated).toEqual(0);
+  });
+
   it('fails when the stream ends before the header rows', async () => {
     source = mockSource([]);
     await expect(createDriver().stream('SELECT 1', [], { highWaterMark: 100 }))
