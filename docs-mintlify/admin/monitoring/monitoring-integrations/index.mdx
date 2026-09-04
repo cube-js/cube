@@ -195,6 +195,9 @@ including the following ones:
   and [Azure Blob Storage][vector-docs-sinks-azureblob]
 - [Datadog][vector-docs-sinks-datadog]
 
+GCP sinks need both `credentials_base64` and `credentials_path` — see
+[Authentication][ref-monitoring-integrations-gcs-auth].
+
 Example configuration for exporting all logs, including all Cube Store logs to
 [Azure Blob Storage][vector-docs-sinks-azureblob]:
 
@@ -301,6 +304,10 @@ following sinks:
   [Prometheus][prometheus], compatible with [Mimir][mimir])
 - [`prometheus_remote_write`][vector-docs-sinks-prometheus] (compatible with
   [Grafana Cloud][grafana-cloud])
+
+The `gcp_stackdriver_metrics` sink also works, but like every GCP sink it needs both
+`credentials_base64` and `credentials_path` — see
+[Authentication][ref-monitoring-integrations-gcs-auth].
 
 Example configuration for exporting all metrics from `cubejs-server` to
 [Prometheus][vector-docs-sinks-prometheus-exporter] using the
@@ -434,6 +441,8 @@ Query History export.
   https://vector.dev/docs/reference/configuration/sinks/aws_s3/
 [vector-docs-sinks-azureblob]:
   https://vector.dev/docs/reference/configuration/sinks/azure_blob/
+[ref-monitoring-integrations-gcs-auth]:
+  /admin/monitoring/monitoring-integrations/gcs#authentication
 [vector-docs-sinks-gcs]:
   https://vector.dev/docs/reference/configuration/sinks/gcp_cloud_storage/
 [vector-docs-sinks-datadog]:
