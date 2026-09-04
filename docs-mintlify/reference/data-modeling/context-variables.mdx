@@ -392,6 +392,40 @@ binding always renders as `1 = 1`.
 
 </Info>
 
+### Time-shifted measures
+
+A [`multi_stage` measure with a `time_shift`][ref-measures-time-shift] plans each
+shift as its own query stage, and every stage re-reads the cube's `sql`. The
+pushed-down column has to carry the same shift as the stage around it, otherwise
+it filters the source rows by the unshifted range while the stage reads the
+shifted one, and the stage comes back empty.
+
+A shift declared as an `interval` is applied to the column for you. A shift
+declared on a [calendar cube][ref-calendar-cubes] with its own `sql` cannot be:
+it maps through a column on the calendar rather than offsetting the date, and
+that column is not in scope inside the cube's `sql`. Passing the column as a
+string in that case fails with a planning error naming the shift.
+
+Pass a function instead. It receives the query's own filter values, so it can
+widen the pushed-down range to cover the periods the shifted stages read — here
+a fiscal prior year, bracketed at 371 and 364 days:
+
+```yaml
+cubes:
+  - name: weekly_margin
+    sql: |
+      SELECT *
+      FROM weekly_margin
+      WHERE {FILTER_PARAMS.retail_calendar.calendar_d.filter(
+        lambda x, y: f"(week_end_d >= {x} AND week_end_d <= {y}) "
+                     f"OR (week_end_d >= DATE_SUB({x}, INTERVAL 371 DAY) "
+                     f"AND week_end_d <= DATE_SUB({y}, INTERVAL 364 DAY))"
+      )}
+```
+
+Every stage then scans every band, so keep the bands as narrow as the calendar
+actually requires.
+
 ## `FILTER_GROUP`
 
 If you use `FILTER_PARAMS` in your query more than once, you must wrap them
@@ -880,3 +914,5 @@ cube(`orders`, {
 [ref-links]: /reference/data-modeling/dimensions#links
 [ref-ref-segments]: /reference/data-modeling/segments
 [ref-env-tesseract]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
+[ref-measures-time-shift]: /reference/data-modeling/measures#time_shift
+[ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes

@@ -232,7 +232,86 @@ fn interval_declared_calendar_shift_offsets_the_column() {
     assert!(
         sql.contains("(week_end_d + interval '-1 year')"),
         "the column must be offset by the inverted declaration, the same way \
-         CalendarTimeShiftSqlNode renders the dimension\\nsql: {}",
+         CalendarTimeShiftSqlNode renders the dimension\nsql: {}",
         sql
     );
+}
+
+// A calendar cube whose shifted time dimension is NOT its primary key. The
+// shift is registered under the calendar's PK (`calendar_time_shift_for_*`
+// returns `time_shift_pk_full_name`), while FILTER_PARAMS binds the shifted
+// dimension itself - so a lookup on the bound symbol's own name misses and the
+// column would render bare against unshifted bounds.
+fn non_pk_binding_schema() -> MockSchema {
+    MockSchema::from_yaml(indoc! {"
+        cubes:
+            - name: fpk_calendar
+              calendar: true
+              sql: \"SELECT * FROM fpk_calendar\"
+              dimensions:
+                  - name: date_key
+                    type: time
+                    sql: date_key
+                    primary_key: true
+                  - name: retail_d
+                    type: time
+                    sql: retail_d
+                    time_shift:
+                        - name: prior_fiscal_year
+                          sql: \"{CUBE}.prior_retail_d\"
+
+            - name: fpk_margin
+              sql: \"SELECT * FROM fpk_margin WHERE {FILTER_PARAMS_COLUMN:fpk_calendar.retail_d:week_end_d}\"
+              joins:
+                  - name: fpk_calendar
+                    relationship: many_to_one
+                    sql: \"{fpk_margin}.week_end_d = {fpk_calendar.date_key}\"
+              dimensions:
+                  - name: id
+                    type: number
+                    sql: id
+                    primary_key: true
+                  - name: week_end_d
+                    type: time
+                    sql: week_end_d
+              measures:
+                  - name: net_sales
+                    type: sum
+                    sql: net_sales_a
+
+                  - name: net_sales_ly
+                    type: number
+                    sql: \"{CUBE.net_sales}\"
+                    multi_stage: true
+                    time_shift:
+                        - name: prior_fiscal_year
+    "})
+    .unwrap()
+}
+
+#[test]
+fn shift_is_found_when_the_binding_is_not_the_calendar_pk() {
+    let ctx = TestContext::new(non_pk_binding_schema()).unwrap();
+
+    let result = ctx.build_sql_and_params(indoc! {"
+            measures:
+              - fpk_margin.net_sales_ly
+            time_dimensions:
+              - dimension: fpk_calendar.retail_d
+                dateRange:
+                  - \"2026-06-20\"
+                  - \"2026-06-20\"
+        "});
+
+    match result {
+        Err(err) => assert!(
+            err.to_string().contains("prior_fiscal_year"),
+            "the shift must be found through the calendar PK, not silently missed\nerror: {}",
+            err
+        ),
+        Ok((sql, _)) => panic!(
+            "the binding's shift was missed and the column rendered bare\nsql: {}",
+            sql
+        ),
+    }
 }
