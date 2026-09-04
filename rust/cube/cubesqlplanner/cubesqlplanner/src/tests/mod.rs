@@ -6,6 +6,7 @@ mod cube_names_collector;
 mod date_filters;
 mod dimension_symbol;
 mod filter;
+mod filter_params_calendar_time_shift;
 mod filter_params_callback_column;
 mod filter_params_segment;
 mod filter_params_time_shift;
