@@ -2,23 +2,11 @@ use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
 
-// A fact whose `sql` pushes a joined CALENDAR cube's date down through
-// FILTER_PARAMS, with multi-stage measures that shift that date by NAME rather
-// than by interval - the shape a retail 4-5-4 calendar forces, where "one
-// fiscal year back" is a mapping column on the calendar and not an interval any
-// arithmetic can express.
-//
-// Contrast with filter_params_time_shift.rs, which covers the interval form.
-// There the pushed-down column is offset by the same interval as the stage
-// predicate, so the rows a shifted stage scans line up with the bounds it
-// groups by. A calendar shift has no such offset: `prior_fiscal_year` resolves
-// to `next_fiscal_year_d` on the calendar cube, which is data rather than
-// arithmetic and is not in scope inside the fact's own `sql`.
-//
-// So a STRING column is rejected - it would otherwise be bound to the
-// unshifted reporting bounds and empty the stage - while a CALLBACK column is
-// accepted, because it is handed the query's own bounds and can widen the
-// pushed-down range itself.
+// A calendar shift declared with `sql` resolves through a mapping column on the
+// calendar (`prior_fiscal_year` -> `next_fiscal_year_d`), not an offset, so a
+// string FILTER_PARAMS column is rejected and a callback - handed the query's
+// own bounds - is not. Interval-declared shifts are arithmetic and are offset
+// onto the column; see `interval_declared_calendar_shift_offsets_the_column`.
 fn schema(margin_sql: &str) -> MockSchema {
     MockSchema::from_yaml(&format!(
         indoc! {"
