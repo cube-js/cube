@@ -9,7 +9,6 @@
     "rootDir": ".",
   },
   "references": [
-    { "path": "../cubejs-schema-compiler" },
-    { "path": "../cubejs-testing" }
+    { "path": "../cubejs-schema-compiler" }
   ]
 }
