@@ -5,6 +5,7 @@ mod custom_granularities;
 mod db_time_series;
 mod different_granularities;
 mod edge_cases;
+mod fanout_repro;
 mod filtered_rolling_measures;
 mod mixed_measures;
 mod multi_fact;
