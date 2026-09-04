@@ -409,12 +409,6 @@ string in that case fails with a planning error naming the shift.
 Pass a function instead. It receives the query's own filter values, so it can
 widen the pushed-down range to cover the periods the shifted stages read.
 
-Two details in the example below are easy to miss. The values arrive as bare
-query parameters, so they are cast before use, the same as the shard example
-above. And the band is parenthesised as a whole because it is an `OR` — without
-that, appending another condition to the `WHERE` would bind it to the second
-branch alone.
-
 `weekly_margin` joins a calendar cube whose `calendar_d` declares the
 `prior_fiscal_year` shift, so the shifted stage reaches fact rows through that
 mapping — which is why the band has to be widened by hand. The bracketing is
@@ -469,6 +463,10 @@ cube(`weekly_margin`, {
 ```
 
 </CodeGroup>
+
+The values arrive as bare query parameters, so they are cast before use; and the
+band is parenthesised as a whole because it is an `OR`, without which appending
+another condition to the `WHERE` would bind it to the second branch alone.
 
 Every stage then scans every band, so keep the bands as narrow as the calendar
 actually requires.
