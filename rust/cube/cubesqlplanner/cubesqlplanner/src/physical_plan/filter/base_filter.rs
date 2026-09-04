@@ -34,11 +34,17 @@ impl ToSql for BaseFilter {
                     .and_then(|shift| shift.interval.as_ref())
                     .map(FilterParamsTimeShift::Interval)
                     .or_else(|| {
-                        // Keyed by the calendar cube's PK, which is the filtered
-                        // symbol only when FILTER_PARAMS binds the calendar
-                        // dimension itself; a binding on the fact's own time
-                        // dimension reaches it via `time_shift_pk_full_name`.
-                        // Probe both - a miss here renders the column bare.
+                        // Keyed by the calendar cube's PK, so a filter on a
+                        // non-PK dimension of that calendar misses the bare
+                        // name and needs the PK probe. A miss renders the
+                        // column bare, which is the silent failure this whole
+                        // path exists to avoid.
+                        //
+                        // A filter on a NON-calendar cube's dimension is out of
+                        // reach either way: `time_shift_pk_full_name` is only
+                        // populated for calendar-cube dimensions, and a named
+                        // shift on such a dimension is dropped by
+                        // `extract_time_shifts` before it gets here.
                         let calendar_shifts = visitor.calendar_time_shifts();
                         calendar_shifts
                             .get(&symbol_to_match.full_name())
