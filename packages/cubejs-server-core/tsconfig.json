@@ -23,7 +23,5 @@
     { "path": "../cubejs-cubestore-driver" },
     { "path": "../cubejs-query-orchestrator" },
     { "path": "../cubejs-schema-compiler" }
-    // No reference to ../cubejs-templates: the Docker images build server-core without that
-    // package in the tree and take @cubejs-backend/templates from the registry instead.
   ]
 }
