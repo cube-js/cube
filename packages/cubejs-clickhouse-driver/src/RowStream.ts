@@ -97,15 +97,18 @@ export class ClickHouseRowStream extends Readable {
       let canPush = true;
 
       while (canPush) {
-        if (this.idx >= this.batch.length && !await this.fetchBatch()) {
-          this.push(null);
-          return;
-        }
+        if (this.idx >= this.batch.length) {
+          if (!await this.fetchBatch()) {
+            this.push(null);
+            return;
+          }
 
-        // A destroy() while parked on the source settles the pending next() via source.return();
-        // the rows it carried have no reader anymore
-        if (this.destroyed) {
-          return;
+          // A destroy() while parked on the source settles the pending next() via source.return();
+          // the rows it carried have no reader anymore. A destroy() mid-batch needs no check of its
+          // own: push() into a destroyed stream returns false, so the loop exits on its own
+          if (this.destroyed) {
+            return;
+          }
         }
 
         canPush = this.push(transformRow(this.batch[this.idx++].json(), this.transform));
