@@ -261,14 +261,15 @@ describe('ClickHouseDriver stream', () => {
     const received: Array<unknown> = [];
     rowStream.on('data', (row) => received.push(row));
     await settle();
-    const pulledBefore = source.pulledRows;
+    // Only the two header rows, i.e. the loop is parked on the in-flight second batch
+    expect(source.pulledRows).toEqual(2);
 
     rowStream.destroy();
     releaseBatch([[1, 'a', '2020-01-01 00:00:00']]);
     await settle();
 
     expect(received).toEqual([]);
-    expect(source.pulledRows).toEqual(pulledBefore);
+    expect(source.pulledRows).toEqual(2);
   });
 
   it('wraps a source error raised before the header rows and closes the client', async () => {
