@@ -1,7 +1,6 @@
 import path from 'path';
 import fs from 'fs';
 import fsAsync from 'fs/promises';
-import vm from 'vm';
 import color from '@oclif/color';
 import dotenv from '@cubejs-backend/dotenv';
 import { parse as semverParse, SemVer, compare as semverCompare } from 'semver';
@@ -9,7 +8,6 @@ import {
   displayCLIWarning,
   getEnv,
   isDockerImage, isNativeSupported,
-  packageExists,
   PackageManifest,
   resolveBuiltInPackageVersion,
 } from '@cubejs-backend/shared';
@@ -19,12 +17,11 @@ import { isFallbackBuild, pythonLoadConfig } from '@cubejs-backend/native';
 import {
   getMajorityVersion,
   isCubeNotServerPackage,
-  isDevPackage,
+  isCubePackage,
   isSimilarPackageRelease, parseNpmLock,
   parseYarnLock, ProjectLock,
 } from './utils';
 import { CreateOptions, CubejsServer } from '../server';
-import type { TypescriptCompiler as TypescriptCompilerType } from './typescript-compiler';
 
 function safetyParseSemver(version: string | null) {
   if (version) {
@@ -40,19 +37,6 @@ export class ServerContainer {
   public constructor(
     protected readonly configuration: { debug: boolean }
   ) {
-  }
-
-  protected getTypeScriptCompiler(): TypescriptCompilerType {
-    if (packageExists('typescript', isDockerImage())) {
-      // eslint-disable-next-line global-require
-      const { TypescriptCompiler } = require('./typescript-compiler');
-
-      return new TypescriptCompiler();
-    }
-
-    throw new Error(
-      'Typescript dependency not found. Please run this command from project directory.'
-    );
   }
 
   protected compareBuiltInAndUserVersions(builtInVersion: SemVer, userVersion: SemVer) {
@@ -182,7 +166,7 @@ export class ServerContainer {
     if (manifest.dependencies) {
       // eslint-disable-next-line no-restricted-syntax
       for (const [pkgName] of Object.entries(manifest.dependencies)) {
-        if (isDevPackage(pkgName) && !deepsToIgnore.includes(pkgName)) {
+        if (isCubePackage(pkgName) && !deepsToIgnore.includes(pkgName)) {
           displayCLIWarning(`"${pkgName}" package must be installed in devDependencies`);
         }
       }
@@ -286,14 +270,14 @@ export class ServerContainer {
       return this.loadConfigurationFromPythonFile();
     }
 
-    if (fs.existsSync(path.join(process.cwd(), 'cube.ts'))) {
-      return this.loadConfigurationFromMemory(
-        this.getTypeScriptCompiler().compileConfiguration()
-      );
-    }
-
     if (fs.existsSync(path.join(process.cwd(), 'cube.js'))) {
       return this.loadConfigurationFromFile();
+    }
+
+    if (fs.existsSync(path.join(process.cwd(), 'cube.ts'))) {
+      throw new Error(
+        'Configuration in cube.ts is no longer supported. Please use cube.js or cube.py instead.'
+      );
     }
 
     displayCLIWarning(
@@ -301,36 +285,6 @@ export class ServerContainer {
     );
 
     return {};
-  }
-
-  protected async loadConfigurationFromMemory(content: string): Promise<CreateOptions> {
-    if (this.configuration.debug) {
-      console.log('Loaded configuration from memory', content);
-    }
-
-    const exports: Record<string, any> = {};
-
-    const script = new vm.Script(content);
-    script.runInNewContext(
-      {
-        require,
-        console,
-        // Workaround for ES5 exports
-        exports
-      },
-      {
-        filename: 'cube.js',
-        displayErrors: true,
-      }
-    );
-
-    if (exports.default) {
-      return exports.default;
-    }
-
-    throw new Error(
-      'Configure file must export configuration as default.'
-    );
   }
 
   protected async loadConfigurationFromPythonFile(): Promise<CreateOptions> {
