@@ -23,7 +23,6 @@ import {
   UnloadOptions,
 } from '@cubejs-backend/base-driver';
 
-import { Readable } from 'node:stream';
 import { ClickHouseClient, ClickHouseLogLevel, createClient } from '@clickhouse/client';
 import type {
   ClickHouseSettings,
@@ -35,9 +34,8 @@ import type {
 } from '@clickhouse/client';
 import { v4 as uuidv4 } from 'uuid';
 
-import {
-  buildTransformFromMeta, buildTransformFromNamesAndTypes, transformRow
-} from './Transform';
+import { ClickHouseRowStream } from './RowStream';
+import { buildTransformFromMeta, transformRow } from './Transform';
 import { formatError } from './utils';
 
 const SUPPORTED_BUCKET_TYPES = ['s3'];
@@ -445,7 +443,6 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   public async stream(
     query: string,
     values: unknown[],
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     { highWaterMark, requestId }: StreamOptions
   ): Promise<StreamTableDataWithTypes> {
     // Use separate client for this long-living query
@@ -471,44 +468,11 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       // Array<unknown> is okay, because we use fixed JSONCompactEachRowWithNamesAndTypes format
       // And each row after first two will look like this: [42, "hello", [0,1]]
       // https://clickhouse.com/docs/en/interfaces/formats#jsoncompacteachrowwithnamesandtypes
-      const resultSetStream = resultSet.stream<Array<unknown>>();
-
-      const allRowsIter = (async function* allRowsIter() {
-        for await (const rowsBatch of resultSetStream) {
-          for (const row of rowsBatch) {
-            yield row.json();
-          }
-        }
-      }());
-
-      const first = await allRowsIter.next();
-      if (first.done) {
-        throw new Error('Unexpected stream end before row with names');
-      }
-      // JSONCompactEachRowWithNamesAndTypes: expect first row to be column names as string
-      const names = first.value as Array<string>;
-
-      const second = await allRowsIter.next();
-      if (second.done) {
-        throw new Error('Unexpected stream end before row with types');
-      }
-      // JSONCompactEachRowWithNamesAndTypes: expect first row to be column names as string
-      const types = second.value as Array<string>;
-
-      const transform = buildTransformFromNamesAndTypes(names, types);
-
-      const dataRowsIter = (async function* () {
-        try {
-          for await (const row of allRowsIter) {
-            yield transformRow(row, transform);
-          }
-        } catch (e) {
-          // Since 25.11 the server reports an exception raised after the first block through
-          // the response headers and an in-stream tag, and the client rethrows it here.
-          throw new Error(`Stream query failed: ${formatError(e)}; query id: ${queryId}`, { cause: e });
-        }
-      }());
-      const rowStream = Readable.from(dataRowsIter);
+      const { rowStream, names, types } = await ClickHouseRowStream.open(
+        resultSet.stream<Array<unknown>>()[Symbol.asyncIterator](),
+        queryId,
+        highWaterMark || getEnv('dbQueryStreamHighWaterMark'),
+      );
 
       return {
         rowStream,
