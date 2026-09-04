@@ -280,8 +280,10 @@ describe('ClickHouseDriver stream', () => {
 
     // open() failed before the stream was handed out, so the dedicated client (created after the
     // constructor's shared one) is released here
-    const client = createClientMock.mock.results.at(-1)!.value;
     expect(createClientMock).toHaveBeenCalledTimes(2);
+    // open() failed before the stream was handed out, so the dedicated client (created after the
+    // constructor's shared one) is released here
+    const client = createClientMock.mock.results.at(-1)!.value;
     expect(client.close).toHaveBeenCalledTimes(1);
   });
 
