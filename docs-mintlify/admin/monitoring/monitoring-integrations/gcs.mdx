@@ -43,6 +43,7 @@ inputs = [
 bucket = "your-gcs-bucket-name"
 compression = "gzip"
 credentials_base64 = "$CUBE_CLOUD_MONITORING_GCS_CREDENTIALS"
+credentials_path = "/etc/credentials/gcp-cloud-storage.json"
 
 [sinks.gcp-cloud-storage.encoding]
 codec = "json"
@@ -56,15 +57,23 @@ navigate to your bucket and watch the logs coming.
 
 ### Authentication
 
-Authenticate with the `credentials_base64` option, referencing the environment
-variable that holds the base64-encoded service account key, as in the example above.
-This is the only supported way to give the sink its credentials.
+Authenticate with the `credentials_base64` and `credentials_path` options together, as
+in the example above.
 
 `credentials_base64` is specific to Cube — it does not appear in [Vector's own sink
-reference][vector-docs-sinks-gcs]. Cube decodes the key and provides it to the Vector
-agent as a file named after the sink.
+reference][vector-docs-sinks-gcs]. Cube strips it from the configuration, decodes the
+base64-encoded service account key, and mounts it read-only at
+`/etc/credentials/<sink-name>.json`. Vector never sees the option itself, so
+`credentials_path` must point at that file — for the `gcp-cloud-storage` sink above,
+that is `/etc/credentials/gcp-cloud-storage.json`.
 
 <Warning>
+
+Both options are required, on every GCP sink — `gcp_cloud_storage`,
+`gcp_stackdriver_logs`, `gcp_stackdriver_metrics`, `gcp_pubsub` — not just the one in
+the example above. Without `credentials_path` the sink has no credentials of its own:
+Vector falls back to the cluster's workload identity, makes requests as the node's
+service account rather than yours, and fails with authorization errors.
 
 The sink name becomes the name of a Kubernetes object that carries the credentials
 file, so it must be lowercase alphanumeric characters and dashes only — **no
