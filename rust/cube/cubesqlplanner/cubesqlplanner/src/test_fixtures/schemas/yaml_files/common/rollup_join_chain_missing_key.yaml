@@ -1,0 +1,118 @@
+# The four-cube chain of `rollup_join_chain.yaml` with the interior rollup missing `dim_w`,
+# the key on its own side of the cube_w -> cube_x hop. The hop can't be resolved and the
+# rejection has to say which one it is.
+cubes:
+  - name: cube_w
+    sql: "SELECT 0 as id, 'a' as dim_w"
+    joins:
+      - name: cube_x
+        relationship: many_to_one
+        sql: "{CUBE.dim_w} = {cube_x.dim_w}"
+    dimensions:
+      - name: id
+        type: string
+        sql: id
+        primary_key: true
+      - name: dim_w
+        type: string
+        sql: dim_w
+    measures:
+      - name: count
+        type: count
+        sql: "COUNT(*)"
+    pre_aggregations:
+      - name: www
+        type: rollup
+        dimensions:
+          - dim_w
+      - name: chain_rollup_join
+        type: rollupJoin
+        dimensions:
+          - dim_w
+          - cube_x.dim_x
+          - cube_y.dim_y
+          - cube_z.dim_z
+        rollups:
+          - cube_w.www
+          - cube_x.xxx
+          - cube_y.yyy
+          - cube_z.zzz
+
+  - name: cube_x
+    sql: "SELECT 1 as id, 'a' as dim_w, 'b' as dim_x"
+    joins:
+      - name: cube_y
+        relationship: many_to_one
+        sql: "{CUBE.dim_x} = {cube_y.dim_x}"
+    dimensions:
+      - name: id
+        type: string
+        sql: id
+        primary_key: true
+      - name: dim_w
+        type: string
+        sql: dim_w
+      - name: dim_x
+        type: string
+        sql: dim_x
+    measures:
+      - name: count
+        type: count
+        sql: "COUNT(*)"
+    pre_aggregations:
+      - name: xxx
+        type: rollup
+        dimensions:
+          - dim_x
+
+  - name: cube_y
+    sql: "SELECT 2 as id, 'b' as dim_x, 'c' as dim_y"
+    joins:
+      - name: cube_z
+        relationship: many_to_one
+        sql: "{CUBE.dim_y} = {cube_z.dim_y}"
+    dimensions:
+      - name: id
+        type: string
+        sql: id
+        primary_key: true
+      - name: dim_x
+        type: string
+        sql: dim_x
+      - name: dim_y
+        type: string
+        sql: dim_y
+    measures:
+      - name: count
+        type: count
+        sql: "COUNT(*)"
+    pre_aggregations:
+      - name: yyy
+        type: rollup
+        dimensions:
+          - dim_x
+          - dim_y
+
+  - name: cube_z
+    sql: "SELECT 3 as id, 'c' as dim_y, 'd' as dim_z"
+    dimensions:
+      - name: id
+        type: string
+        sql: id
+        primary_key: true
+      - name: dim_y
+        type: string
+        sql: dim_y
+      - name: dim_z
+        type: string
+        sql: dim_z
+    measures:
+      - name: count
+        type: count
+        sql: "COUNT(*)"
+    pre_aggregations:
+      - name: zzz
+        type: rollup
+        dimensions:
+          - dim_y
+          - dim_z

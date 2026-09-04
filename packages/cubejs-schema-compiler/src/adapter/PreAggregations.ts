@@ -1089,8 +1089,7 @@ export class PreAggregations {
     join: JoinEdgeWithMembers,
     rollupJoinPreAggName: string,
   ): PreAggregationForQuery {
-    const fromPreAggObj = preAggObjsToJoin
-      .filter(p => joinMembers.every(m => !!p.references.dimensions.find(d => m === d)));
+    const fromPreAggObj = this.rollupsCarryingJoinMembers(preAggObjsToJoin, joinMembers);
     if (!fromPreAggObj.length) {
       const msg = `No rollups found that can be used for a rollup join from "${
         join.from}" (fromMembers: ${JSON.stringify(join.fromMembers)}) to "${join.to}" (toMembers: ${
@@ -1104,6 +1103,25 @@ export class PreAggregations {
       );
     }
     return fromPreAggObj[0];
+  }
+
+  /**
+   * Rollups that can stand on one side of a hop. The wider reading — a key declared as a
+   * rollup's time dimension — is limited to the native planner, the only one that renders the
+   * granularity-suffixed column such a key lives in.
+   */
+  private rollupsCarryingJoinMembers(
+    preAggObjsToJoin: PreAggregationForQuery[],
+    joinMembers: string[],
+  ): PreAggregationForQuery[] {
+    const declaredAsDimensions = preAggObjsToJoin
+      .filter(p => joinMembers.every(m => !!p.references.dimensions.find(d => m === d)));
+    if (declaredAsDimensions.length || !this.query.canUseNativeSqlPlannerPreAggregation) {
+      return declaredAsDimensions;
+    }
+    return preAggObjsToJoin
+      .filter(p => joinMembers.every(m => !!p.references.dimensions.find(d => m === d) ||
+        !!p.references.timeDimensions.find(td => m === td.dimension)));
   }
 
   private resolveJoinMembers(join: FinishedJoinTree): JoinEdgeWithMembers[] {
