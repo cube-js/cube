@@ -75,16 +75,6 @@ impl TypedFilter {
                 // same shift as the regular time-dimension filter, otherwise its
                 // current-period bounds contradict the shifted predicate and empty
                 // the CTE.
-                //
-                // An interval shift is arithmetic, so the column can carry it by
-                // being offset. A NAMED calendar shift is not: it resolves through
-                // a mapping column on the calendar cube (`prior_fiscal_year` ->
-                // `next_fiscal_year_d`, and so on), which is data, not an offset,
-                // and is not in scope inside the cube's own `sql`. There is no
-                // expression over this column that stands for it, and no bound the
-                // planner can widen to without knowing the calendar's contents - so
-                // say that, rather than emit a predicate that silently empties the
-                // stage.
                 let shifted_column;
                 let member_sql = match &time_shift {
                     Some(FilterParamsTimeShift::Interval(interval)) => {

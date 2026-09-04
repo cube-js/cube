@@ -26,25 +26,19 @@ impl ToSql for BaseFilter {
                 .filter_params_columns
                 .get(&symbol_to_match.full_name())
             {
-                // Both shift kinds, not just the interval one. A calendar shift
-                // never reaches `time_shifts` - `extract_time_shifts` routes it
-                // to its own map - and reading only that map is what used to
-                // leave the pushed-down column bare against unshifted bounds
-                // inside a calendar-shifted stage.
+                // Both shift kinds: `extract_time_shifts` routes calendar
+                // shifts to their own map, so `time_shifts` alone misses them.
                 let time_shift = visitor
                     .time_shifts()
                     .get_for_symbol(&symbol_to_match)
                     .and_then(|shift| shift.interval.as_ref())
                     .map(FilterParamsTimeShift::Interval)
                     .or_else(|| {
-                        // The calendar map is keyed by the calendar cube's PK,
-                        // which is the filtered symbol only when FILTER_PARAMS
-                        // binds the calendar dimension itself. A binding on the
-                        // fact's own time dimension reaches the same shift
-                        // through that dimension's `time_shift_pk_full_name`, so
-                        // probe both - matching how `get_for_symbol` probes more
-                        // than the bare name. Missing here is silent: the column
-                        // would render bare against unshifted bounds.
+                        // Keyed by the calendar cube's PK, which is the filtered
+                        // symbol only when FILTER_PARAMS binds the calendar
+                        // dimension itself; a binding on the fact's own time
+                        // dimension reaches it via `time_shift_pk_full_name`.
+                        // Probe both - a miss here renders the column bare.
                         let calendar_shifts = visitor.calendar_time_shifts();
                         calendar_shifts
                             .get(&symbol_to_match.full_name())
