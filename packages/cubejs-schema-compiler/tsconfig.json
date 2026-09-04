@@ -2,12 +2,10 @@
   "extends": "../../tsconfig.base.json",
   "include": ["src", "test"],
   "compilerOptions": {
-    // antlr4's type tree is unresolvable under node16/nodenext: `types` is a .d.cts re-exporting
-    // `.d.ts` files that are ESM under antlr4's own `type: module`, so their extensionless
-    // specifiers fail (TS2834) and the module resolves to nothing. A `paths` redirect does not
-    // help — the failing specifiers are inside antlr4. `bundler` therefore type-checks against
-    // the `import` condition while `commonjs` emits require(); of the deps here only lru-cache
-    // splits types by condition, and its two declaration files are identical.
+    // antlr4's `types` is a .d.cts re-exporting `.d.ts` files that are ESM under antlr4's own
+    // `type: module`, so under node16/nodenext their extensionless specifiers fail (TS2834) and
+    // the module resolves to nothing. A `paths` redirect cannot help — the failing specifiers are
+    // inside antlr4. Cost: `bundler` checks the `import` condition while `commonjs` emits require().
     "module": "commonjs",
     "moduleResolution": "bundler",
     "outDir": "dist",
