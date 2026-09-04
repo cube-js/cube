@@ -5,6 +5,7 @@ import { Client as PgClient } from 'pg';
 import cubejs, { CubeApi, Query } from '@cubejs-client/core';
 import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import type { StartedTestContainer } from 'testcontainers';
+import fetch from 'node-fetch';
 
 import { BirdBox, getBirdbox } from '../src';
 import {
@@ -1476,6 +1477,54 @@ describe('Cube RBAC Engine', () => {
       });
       // order_open should return all values since it has no access policy
       expect(result.rawData()).toMatchSnapshot('orders_open_rest');
+    });
+
+    // https://github.com/cube-js/cube/issues/11769
+    // A member-level denial is an authorization outcome, so /load must answer with
+    // a 4xx that identifies it as such. Today the denial is raised as a plain
+    // `bail!` in the Rust result transform (ensure_member_in_annotation), which is
+    // neither a CubejsHandlerError nor a UserError, so gateway.handleError falls
+    // through to its catch-all branch and the caller gets an HTTP 500 carrying
+    // advice ("make it visible using `public: true`", primary keys) that belongs to
+    // the plain visibility path and would mean weakening the control that just
+    // correctly denied the request.
+    describe('member-level denial status code', () => {
+      async function load(token: string, query: Query) {
+        const response = await fetch(`${birdbox.configuration.apiUrl}/load`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: token,
+          },
+          body: JSON.stringify({ query }),
+        });
+
+        return { status: response.status, body: await response.json() as any };
+      }
+
+      test('member excluded by a matching policy is a 4xx, not a 500', async () => {
+        // The `admin` policy on `line_items` matches this token but excludes
+        // `price_dim` via `memberLevel.excludes`.
+        const { status, body } = await load(ADMIN_API_TOKEN, {
+          measures: ['line_items.count'],
+          dimensions: ['line_items.price_dim'],
+        });
+
+        expect(status).toBe(403);
+        expect(body.error).not.toContain('public: true');
+      });
+
+      test('no matching policy on a view is a 4xx, not a 500', async () => {
+        // `orders_view` only declares an `admin` policy, so the default token
+        // (no groups) matches nothing and every member is denied.
+        const { status, body } = await load(DEFAULT_API_TOKEN, {
+          measures: ['orders_view.count'],
+          dimensions: ['orders_view.created_at'],
+        });
+
+        expect(status).toBe(403);
+        expect(body.error).not.toContain('public: true');
+      });
     });
   });
 });
