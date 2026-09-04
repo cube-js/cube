@@ -407,11 +407,17 @@ that column is not in scope inside the cube's `sql`. Passing the column as a
 string in that case fails with a planning error naming the shift.
 
 Pass a function instead. It receives the query's own filter values, so it can
-widen the pushed-down range to cover the periods the shifted stages read — here
-a fiscal prior year, bracketed at 371 and 364 days. The bracketing is the
-load-bearing part; the date arithmetic below is BigQuery syntax, so adjust it
-for your data source. Note that the values arrive as bare query parameters, so
-they are cast before use — the same as the shard example above:
+widen the pushed-down range to cover the periods the shifted stages read.
+
+Two details in the example below are easy to miss. The values arrive as bare
+query parameters, so they are cast before use, the same as the shard example
+above. And the band is parenthesised as a whole because it is an `OR` — without
+that, appending another condition to the `WHERE` would bind it to the second
+branch alone.
+
+The bracketing is what carries across data sources; the date arithmetic is
+BigQuery syntax, so adjust it for yours — here a fiscal prior year, bracketed at
+371 and 364 days:
 
 <CodeGroup>
 
@@ -423,10 +429,10 @@ cubes:
       FROM weekly_margin
       WHERE {FILTER_PARAMS.retail_calendar.calendar_d.filter(
         lambda x, y: f"""
-          (week_end_d >= DATE(TIMESTAMP({x}))
-           AND week_end_d <= DATE(TIMESTAMP({y})))
-          OR (week_end_d >= DATE_SUB(DATE(TIMESTAMP({x})), INTERVAL 371 DAY)
-              AND week_end_d <= DATE_SUB(DATE(TIMESTAMP({y})), INTERVAL 364 DAY))
+          ((week_end_d >= DATE(TIMESTAMP({x}))
+            AND week_end_d <= DATE(TIMESTAMP({y})))
+           OR (week_end_d >= DATE_SUB(DATE(TIMESTAMP({x})), INTERVAL 371 DAY)
+               AND week_end_d <= DATE_SUB(DATE(TIMESTAMP({y})), INTERVAL 364 DAY)))
         """
       )}
 ```
@@ -438,10 +444,10 @@ cube(`weekly_margin`, {
     FROM weekly_margin
     WHERE ${FILTER_PARAMS.retail_calendar.calendar_d.filter(
       (x, y) => `
-        (week_end_d >= DATE(TIMESTAMP(${x}))
-         AND week_end_d <= DATE(TIMESTAMP(${y})))
-        OR (week_end_d >= DATE_SUB(DATE(TIMESTAMP(${x})), INTERVAL 371 DAY)
-            AND week_end_d <= DATE_SUB(DATE(TIMESTAMP(${y})), INTERVAL 364 DAY))
+        ((week_end_d >= DATE(TIMESTAMP(${x}))
+          AND week_end_d <= DATE(TIMESTAMP(${y})))
+         OR (week_end_d >= DATE_SUB(DATE(TIMESTAMP(${x})), INTERVAL 371 DAY)
+             AND week_end_d <= DATE_SUB(DATE(TIMESTAMP(${y})), INTERVAL 364 DAY)))
       `
     )}
   `
