@@ -5,8 +5,8 @@ export async function getDriver(type: string): Promise<{
   source: BaseDriver,
   storage: BaseDriver,
 }> {
-  // require, not import(): under `module: nodenext` a dynamic import is emitted verbatim, and a
-  // native import of these CommonJS driver packages puts the whole module on `.default`.
+  // `module: nodenext` emits import() verbatim, and a native import of these CommonJS packages
+  // would put the whole module on `.default`.
   // eslint-disable-next-line global-require, import/no-dynamic-require
   const driverModule = require(`@cubejs-backend/${type}-driver`);
   // eslint-disable-next-line new-cap

@@ -309,8 +309,7 @@ export class ServerContainer {
   }
 
   protected async loadConfigurationFromFile(): Promise<CreateOptions> {
-    // require, not import(): under `module: nodenext` a dynamic import is emitted verbatim, which
-    // hands an absolute path to the ESM loader (fatal on Windows) and changes the namespace shape.
+    // `module: nodenext` emits import() verbatim, handing an absolute path to the ESM loader.
     // eslint-disable-next-line global-require, import/no-dynamic-require
     const file = require(path.join(process.cwd(), 'cube.js'));
 
@@ -318,7 +317,6 @@ export class ServerContainer {
       console.log('Loaded js configuration file', file);
     }
 
-    // A transpiled `export default` lands on `.default`; `module.exports = {...}` is the module itself.
     const config = file?.__esModule ? file.default : file;
 
     if (config) {

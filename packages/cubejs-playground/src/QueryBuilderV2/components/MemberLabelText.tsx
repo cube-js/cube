@@ -1,8 +1,8 @@
 import { Props, tasty } from '@cube-dev/ui-kit';
 import { ComponentType } from 'react';
 
-// Annotated because ui-kit re-exports neither `VariantMap` nor `WithVariant`, so the inferred
-// type has no portable name (TS2883).
+// ui-kit re-exports neither `VariantMap` nor `WithVariant`, so the inferred type has no
+// portable name (TS2883).
 export const MemberLabelText: ComponentType<Props> = tasty({
   qa: 'MemberLabel',
   'aria-label': 'Member label',
