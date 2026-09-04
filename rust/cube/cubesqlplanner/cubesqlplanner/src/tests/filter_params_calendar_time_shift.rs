@@ -292,11 +292,19 @@ fn shift_is_found_when_the_binding_is_not_the_calendar_pk() {
         "});
 
     match result {
-        Err(err) => assert!(
-            err.to_string().contains("prior_fiscal_year"),
-            "the shift must be found through the calendar PK, not silently missed\nerror: {}",
-            err
-        ),
+        Err(err) => {
+            let message = err.to_string();
+            // Both halves matter: naming the shift alone would also be
+            // satisfied by a "time shift not found" or a join-resolution
+            // failure, so pin that this is the rejection and not some other
+            // planner error that happens to mention it.
+            assert!(
+                message.contains("cannot carry") && message.contains("prior_fiscal_year"),
+                "the shift must be found through the calendar PK and rejected here, \
+                 not silently missed\nerror: {}",
+                message
+            );
+        }
         Ok((sql, _)) => panic!(
             "the binding's shift was missed and the column rendered bare\nsql: {}",
             sql
