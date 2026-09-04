@@ -9,5 +9,10 @@
     "outDir": "dist",
     "rootDir": ".",
     "resolveJsonModule": true
-  }
+  },
+  "references": [
+    { "path": "../cubejs-backend-shared" },
+    { "path": "../cubejs-base-driver" },
+    { "path": "../cubejs-testing-shared" }
+  ]
 }

@@ -47,6 +47,9 @@
       "path": "packages/cubejs-api-gateway"
     },
     {
+      "path": "packages/cubejs-testing"
+    },
+    {
       "path": "packages/cubejs-druid-driver"
     },
     {
@@ -126,11 +129,6 @@
     },
     {
       "path": "packages/cubejs-dbt-schema-extension"
-    },
-    // Keep last: its tests resolve the driver packages by name, and a resolution failure recorded
-    // before those projects are built poisons the shared cache for the rest of `tsc --build`.
-    {
-      "path": "packages/cubejs-testing"
     }
   ]
 }

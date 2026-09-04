@@ -27,5 +27,7 @@
     "noEmitOnError": true,
     "forceConsistentCasingInFileNames": true
   },
-  "references": [{ "path": "../cubejs-client-core" }]
+  "references": [
+    { "path": "../cubejs-client-core" }
+  ]
 }

@@ -5,5 +5,10 @@
     "outDir": "dist",
     "rootDir": ".",
   },
-  "references": [{ "path": "../cubejs-postgres-driver" }]
+  "references": [
+    { "path": "../cubejs-backend-shared" },
+    { "path": "../cubejs-base-driver" },
+    { "path": "../cubejs-postgres-driver" },
+    { "path": "../cubejs-testing" }
+  ]
 }

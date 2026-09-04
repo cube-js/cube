@@ -8,4 +8,7 @@
     "rootDir": ".",
     "noImplicitAny": false,
   },
+  "references": [
+    { "path": "../cubejs-backend-shared" }
+  ]
 }

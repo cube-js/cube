@@ -9,5 +9,9 @@
     "rootDir": ".",
     "allowJs": true,
     "checkJs": false
-  }
+  },
+  "references": [
+    { "path": "../cubejs-backend-shared" },
+    { "path": "../cubejs-base-driver" }
+  ]
 }

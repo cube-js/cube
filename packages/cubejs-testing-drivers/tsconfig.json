@@ -4,5 +4,27 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
-  }
+  },
+  "references": [
+    { "path": "../cubejs-athena-driver" },
+    { "path": "../cubejs-backend-shared" },
+    { "path": "../cubejs-base-driver" },
+    { "path": "../cubejs-bigquery-driver" },
+    { "path": "../cubejs-clickhouse-driver" },
+    { "path": "../cubejs-client-core" },
+    { "path": "../cubejs-client-ws-transport" },
+    { "path": "../cubejs-crate-driver" },
+    { "path": "../cubejs-cubestore-driver" },
+    { "path": "../cubejs-databricks-jdbc-driver" },
+    { "path": "../cubejs-mssql-driver" },
+    { "path": "../cubejs-mysql-driver" },
+    { "path": "../cubejs-pinot-driver" },
+    { "path": "../cubejs-postgres-driver" },
+    { "path": "../cubejs-query-orchestrator" },
+    { "path": "../cubejs-questdb-driver" },
+    { "path": "../cubejs-server-core" },
+    { "path": "../cubejs-snowflake-driver" },
+    { "path": "../cubejs-testing-shared" },
+    { "path": "../cubejs-trino-driver" }
+  ]
 }
