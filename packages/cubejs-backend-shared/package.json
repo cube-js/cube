@@ -36,8 +36,8 @@
     "@types/shelljs": "^0.8.5",
     "@types/throttle-debounce": "^2.1.0",
     "jest": "^29",
-    "ts-jest": "^29",
-    "typescript": "~5.2.2"
+    "ts-jest": "^29.4.12",
+    "typescript": "~6.0.3"
   },
   "dependencies": {
     "@oclif/color": "^0.1.2",

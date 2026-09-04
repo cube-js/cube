@@ -40,7 +40,7 @@
   "devDependencies": {
     "@cubejs-backend/linter": "1.7.33",
     "testcontainers": "^10.28.0",
-    "typescript": "~5.2.2"
+    "typescript": "~6.0.3"
   },
   "jest": {
     "testEnvironment": "node"

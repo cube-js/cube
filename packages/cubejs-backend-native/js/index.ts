@@ -466,7 +466,7 @@ export const buildSqlAndParams = (cubeEvaluator: any): any[] => {
 
 export type ResultRow = Record<string, string>;
 
-export const parseCubestoreResultMessage = async (message: ArrayBuffer): Promise<ResultWrapper> => {
+export const parseCubestoreResultMessage = async (message: Buffer): Promise<ResultWrapper> => {
   const native = loadNative();
 
   const msg = await native.parseCubestoreResultMessage(message) as NativeQueryResultRef;

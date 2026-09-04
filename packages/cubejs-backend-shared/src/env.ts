@@ -2115,7 +2115,7 @@ const variables: Record<string, (...args: any) => any> = {
 
 type Vars = typeof variables;
 
-export function getEnv<T extends keyof Vars>(key: T, opts?: Parameters<Vars[T]>): ReturnType<Vars[T]> {
+export function getEnv<T extends keyof Vars>(key: T, opts?: Parameters<Vars[T]>[0]): ReturnType<Vars[T]> {
   if (key in variables) {
     return variables[key](opts);
   }

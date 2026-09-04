@@ -34,16 +34,16 @@
     "@babel/core": "^7.13.8",
     "@types/ramda": "^0.27.40",
     "@types/react": "^16.9.41",
-    "@typescript-eslint/eslint-plugin": "^6.12.0",
-    "@typescript-eslint/parser": "^6.12.0",
-    "eslint": "^7.21.0",
+    "@typescript-eslint/eslint-plugin": "^8.46.0",
+    "@typescript-eslint/parser": "^8.46.0",
+    "eslint": "^8.57.1",
     "eslint-config-airbnb": "^18.0.1",
     "eslint-config-airbnb-base": "^14.0.0",
     "eslint-plugin-import": "^2.18.2",
     "eslint-plugin-jsx-a11y": "^6.2.3",
     "eslint-plugin-node": "^10.0.0",
     "eslint-plugin-react": "^7.15.1",
-    "typescript": "~5.2.2"
+    "typescript": "~6.0.3"
   },
   "peerDependencies": {
     "react": ">=16.10.2"

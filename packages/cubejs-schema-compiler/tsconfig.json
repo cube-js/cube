@@ -2,9 +2,14 @@
   "extends": "../../tsconfig.base.json",
   "include": ["src", "test"],
   "compilerOptions": {
+    // antlr4 ships `types: index.d.cts` re-exporting `.d.ts` files that are ESM under its
+    // `type: module`, so every re-export fails under node16/nodenext resolution (TS2834) and
+    // the module resolves to nothing. `bundler` resolution ignores the CJS/ESM split; emit is
+    // unaffected because `module` stays commonjs.
+    "module": "commonjs",
+    "moduleResolution": "bundler",
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": ".",
     "allowJs": true,
     "checkJs": false,
     "noImplicitAny": false,

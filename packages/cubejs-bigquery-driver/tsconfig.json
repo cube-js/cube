@@ -8,7 +8,6 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": ".",
     "resolveJsonModule": true
   }
 }

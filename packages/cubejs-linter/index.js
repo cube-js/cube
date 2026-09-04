@@ -4,7 +4,7 @@ module.exports = {
   env: {
     node: true,
   },
-  plugins: ['import', '@typescript-eslint/eslint-plugin'],
+  plugins: ['import', '@typescript-eslint/eslint-plugin', '@stylistic/ts'],
   parser: '@typescript-eslint/parser',
   parserOptions: {
     sourceType: 'module',
@@ -43,7 +43,7 @@ module.exports = {
     'no-empty-function': 'off',
     '@typescript-eslint/no-empty-function': 'error',
     'no-extra-semi': 'off',
-    '@typescript-eslint/no-extra-semi': 'error',
+    '@stylistic/ts/no-extra-semi': 'error',
     'no-underscore-dangle': 'off',
     'no-unused-vars': 'off',
     '@typescript-eslint/no-unused-vars': [
@@ -57,8 +57,8 @@ module.exports = {
     '@typescript-eslint/prefer-as-const': 'error',
     '@typescript-eslint/prefer-namespace-keyword': 'error',
     '@typescript-eslint/triple-slash-reference': 'error',
-    '@typescript-eslint/type-annotation-spacing': 'error',
-    '@typescript-eslint/space-infix-ops': 'error',
+    '@stylistic/ts/type-annotation-spacing': 'error',
+    '@stylistic/ts/space-infix-ops': 'error',
     'no-restricted-syntax': [
       'error',
       {
@@ -107,7 +107,7 @@ module.exports = {
         '@typescript-eslint/no-shadow': ['error', { ignoreTypeValueShadow: true }],
         'no-duplicate-imports': 'off',
         semi: 'off',
-        '@typescript-eslint/semi': 'error',
+        '@stylistic/ts/semi': 'error',
       },
     },
   ],

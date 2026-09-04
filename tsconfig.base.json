@@ -9,20 +9,10 @@
     "incremental": true,
     "lib": ["es2023"],
     "target": "es2022",
-    "module": "commonjs",
-    "baseUrl": ".",
-    "paths": {
-      "@cubejs-backend/*": [
-        "rust/js-wrapper",
-        "packages/cubejs-cubestore-driver/src",
-        "packages/cubejs-api-gateway/src",
-        "packages/cubejs-cli/src",
-        "packages/cubejs-query-orchestrator/src",
-        "packages/cubejs-schema-compiler/src",
-        "packages/cubejs-server/src",
-        "packages/cubejs-server-core/src"
-      ]
-    },
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    // TypeScript 6.0 defaults `types` to [], which would drop the ambient @types/* globals
+    "types": ["*"],
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -35,7 +25,6 @@
     "strictPropertyInitialization": true,
     "noImplicitThis": true,
     "alwaysStrict": true,
-    "moduleResolution": "node",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
