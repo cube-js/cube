@@ -41,19 +41,26 @@ export class ClickHouseRowStream extends Readable {
   ): Promise<{ rowStream: ClickHouseRowStream, names: Array<string>, types: Array<string> }> {
     const rowStream = new ClickHouseRowStream(source, queryId, highWaterMark);
 
-    const names = await rowStream.readRawRow() as Array<string> | undefined;
-    if (!names) {
-      throw new Error('Unexpected stream end before row with names');
+    try {
+      const names = await rowStream.readRawRow() as Array<string> | undefined;
+      if (!names) {
+        throw new Error('Unexpected stream end before row with names');
+      }
+
+      const types = await rowStream.readRawRow() as Array<string> | undefined;
+      if (!types) {
+        throw new Error('Unexpected stream end before row with types');
+      }
+
+      rowStream.transform = buildTransformFromNamesAndTypes(names, types);
+
+      return { rowStream, names, types };
+    } catch (e) {
+      // Nobody holds the stream yet, so destroy it without an error to release the source
+      // rather than emit 'error' with no listener attached
+      rowStream.destroy();
+      throw e;
     }
-
-    const types = await rowStream.readRawRow() as Array<string> | undefined;
-    if (!types) {
-      throw new Error('Unexpected stream end before row with types');
-    }
-
-    rowStream.transform = buildTransformFromNamesAndTypes(names, types);
-
-    return { rowStream, names, types };
   }
 
   /** Advances to the next non-empty batch; false once the source is exhausted. */

@@ -241,4 +241,18 @@ describe('ClickHouseDriver stream', () => {
     await expect(createDriver().stream('SELECT 1', [], { highWaterMark: 100 }))
       .rejects.toThrow('Unexpected stream end before row with names');
   });
+
+  it('releases the result stream when the header rows are malformed', async () => {
+    source = mockSource([]);
+    // A names row shorter than the types row fails validation inside open(), after the
+    // stream already owns the source iterator
+    source.stream = Readable.from([[{ json: () => ['only_names'] }, { json: () => ['Int64', 'String'] }]]);
+    source.stream.on('close', () => { source.destroyed = true; });
+
+    await expect(createDriver().stream('SELECT 1', [], { highWaterMark: 100 }))
+      .rejects.toThrow('Unexpected names and types length mismatch');
+
+    await settle();
+    expect(source.destroyed).toEqual(true);
+  });
 });
