@@ -125,6 +125,7 @@
                   "docs/explore-analyze/dashboards/dashboard-agent"
                 ]
               },
+              "docs/explore-analyze/apps",
               "docs/explore-analyze/scheduled-refreshes",
               "docs/explore-analyze/notifications"
             ]
