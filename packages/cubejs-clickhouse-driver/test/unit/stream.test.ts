@@ -278,8 +278,6 @@ describe('ClickHouseDriver stream', () => {
     await expect(createDriver().stream('SELECT 1', [], { highWaterMark: 100, requestId: 'req-10-span-1' }))
       .rejects.toThrow(/^Stream query failed: Error: Code: 60\. DB::Exception: Table default\.missing does not exist; query id: req-10-/);
 
-    // open() failed before the stream was handed out, so the dedicated client (created after the
-    // constructor's shared one) is released here
     expect(createClientMock).toHaveBeenCalledTimes(2);
     // open() failed before the stream was handed out, so the dedicated client (created after the
     // constructor's shared one) is released here
