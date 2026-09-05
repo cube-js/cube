@@ -281,6 +281,20 @@ DELETE /api/v1/embed-tenants/{embedTenantName}/user-attributes/{id}
 
 These endpoints use the same `Api-Key` authentication as Generate Session and require admin access. List endpoints return cursor-paginated results (`?first=`, `?after=`).
 
+### Provisioning users ahead of a session
+
+An embed user is normally created the first time they generate a session. To put your directory into Cube up front — for example, so a creator can share a workbook with a teammate who hasn't opened the embed yet — provision users directly:
+
+```text
+GET  /api/v1/embed-tenants/{embedTenantName}/users
+POST /api/v1/embed-tenants/{embedTenantName}/user
+POST /api/v1/embed-tenants/{embedTenantName}/users
+```
+
+The single-user endpoint takes the same identity fields as `generate-session` — `externalId`, `email`, `userProfile`, `groups`, `tenantGroups` — and is idempotent: provisioning an `externalId` that already exists updates it rather than failing. Each `groups`/`tenantGroups` lane is replaced when supplied, left untouched when omitted, and cleared with `[]`. A later session for the same `externalId` still applies whatever it carries, so provisioning only changes who a user is, never what their session grants.
+
+The bulk endpoint accepts a `users` array (up to the account's bulk-action limit) and is partially successful: it returns `200` with a `succeeded` list and a `failed` list (each entry carrying the `externalId` and the error the single-user call would have returned), rather than failing the whole batch over one bad entry.
+
 ### Response
 
 The API returns a session object:
