@@ -820,6 +820,10 @@ impl CubeScanWrapperNode {
             LogicalPlan::Extension(Extension { node }) => {
                 if let Some(cube_scan) = node.as_any().downcast_ref::<CubeScanNode>() {
                     cube_scan.request.ungrouped == Some(true)
+                } else if let Some(wrapper) = node.as_any().downcast_ref::<CubeScanWrapperNode>() {
+                    // A wrapper can sit inside a plan, in a join of a wrapped select, the same
+                    // way SQL generation finds it there
+                    Self::has_ungrouped_wrapped_node(wrapper.wrapped_plan.as_ref())
                 } else if let Some(wrapped_select) =
                     node.as_any().downcast_ref::<WrappedSelectNode>()
                 {
@@ -1193,6 +1197,21 @@ impl CubeScanWrapperNode {
                         node,
                         transport.as_ref(),
                         &load_request_meta,
+                    )
+                    .await
+                } else if let Some(wrapper_node) = node_any.downcast_ref::<CubeScanWrapperNode>() {
+                    // A wrapper can sit inside a plan, in a join of a wrapped select: rules put
+                    // it there instead of the plan it wraps, so that the plan to render is the
+                    // one extraction picked out of it
+                    Self::generate_sql_for_node_rec(
+                        meta,
+                        transport,
+                        load_request_meta,
+                        state,
+                        Arc::clone(&wrapper_node.wrapped_plan),
+                        can_rename_columns,
+                        values,
+                        parent_data_source,
                     )
                     .await
                 } else if let Some(wrapped_select_node) =
@@ -3940,7 +3959,17 @@ impl WrappedSelectNode {
         let join_subqueries = {
             let mut join_subqueries = vec![];
             for (lp, cond, join_type) in &self.joins {
-                match lp.as_ref() {
+                // A join can hold the wrapper of the joined side rather than the plan inside it,
+                // the same way SQL generation finds it there
+                let mut joined = lp.as_ref();
+                while let LogicalPlan::Extension(Extension { node }) = joined {
+                    let Some(wrapper) = node.as_any().downcast_ref::<CubeScanWrapperNode>() else {
+                        break;
+                    };
+                    joined = wrapper.wrapped_plan.as_ref();
+                }
+
+                match joined {
                     LogicalPlan::Extension(Extension { node }) => {
                         if let Some(join_cube_scan) = node.as_any().downcast_ref::<CubeScanNode>() {
                             if join_cube_scan.request.ungrouped == Some(true) {

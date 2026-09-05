@@ -66,11 +66,11 @@ impl WrapperRules {
                     ),
                     "CubeScanWrapperFinalized:false",
                 ),
-                [ListApplierListPattern {
-                    list_type: ListType::WrappedUnionInputs,
-                    new_list_var: "?new_list".to_string(),
-                    elem_pattern: "?elem".to_string(),
-                }],
+                [ListApplierListPattern::new(
+                    ListType::WrappedUnionInputs,
+                    "?new_list",
+                    "?elem",
+                )],
                 &["?input_data_source"],
                 // One query is not a union, and folding a `Distinct` into a single query
                 // one would leave the deduplication with no operator to render it on

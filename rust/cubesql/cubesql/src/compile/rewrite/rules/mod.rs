@@ -114,11 +114,11 @@ pub fn replacer_flat_pull_up_node(
             elem: replacer_node("?elem".to_string()),
         },
         &replacer_node("?new_list".to_string()),
-        [ListApplierListPattern {
-            list_type: substitute_list_type,
-            new_list_var: "?new_list".to_string(),
-            elem_pattern: "?elem".to_string(),
-        }],
+        [ListApplierListPattern::new(
+            substitute_list_type,
+            "?new_list",
+            "?elem",
+        )],
         top_level_elem_vars,
     );
     vec![pull_up_rule]
@@ -165,11 +165,11 @@ pub fn replacer_flat_push_down_node_substitute_rules(
                 elem: "?elem".to_string(),
             },
             "?new_list",
-            [ListApplierListPattern {
-                list_type: substitute_type.clone(),
-                new_list_var: "?new_list".to_string(),
-                elem_pattern: replacer_node("?elem".to_string()),
-            }],
+            [ListApplierListPattern::new(
+                substitute_type.clone(),
+                "?new_list",
+                &replacer_node("?elem".to_string()),
+            )],
         ),
         rewrite(
             &format!("{}-tail", name),

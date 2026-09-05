@@ -10,7 +10,8 @@ use crate::{
             LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
             ScalarFunctionExprFun, SegmentMemberMember, SegmentName, TableScanSourceTableName,
             TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube,
-            VirtualFieldName,
+            VirtualFieldName, WrappedSelectSelectType, WrappedSelectType, WRAPPED_SELECT_FROM,
+            WRAPPED_SELECT_JOINS, WRAPPED_SELECT_SELECT_TYPE,
         },
         CubeContext,
     },
@@ -51,6 +52,33 @@ pub struct LogicalPlanData {
     pub cube_reference: Option<String>,
     pub filter_operators: Option<Vec<(String, String)>>,
     pub is_empty_list: Option<bool>,
+    /// A `WrappedSelectJoins` list with at least one join in it.
+    pub non_empty_joins: bool,
+    /// A `WrappedSelectSelectType` that is not an aggregation.
+    pub non_aggregate_select_type: bool,
+    /// A `WrappedSelect` that carries joins of its own.
+    pub select_with_joins: bool,
+    /// Whether the rows of this plan come from a join of subqueries, looking through the
+    /// selects stacked on top of the join and through replacers when a select below is not
+    /// pulled up yet. A grouping in between is where the search stops: aggregation collapses
+    /// the rows a join below it could have duplicated. Note that this does not make the result
+    /// unique on the join keys - that also needs the join keys to cover the group keys, which
+    /// nothing here checks (TODO: check key coverage, the pre-existing subquery join path needs
+    /// it as well).
+    ///
+    /// This is what decides whether a plan can be joined to a Cube query as a subquery join.
+    /// Such a join is rendered by the schema compiler in two ways - counted into the measures
+    /// over the joined rowset, or computed per distinct primary key - which agree only when
+    /// the joined subquery is unique on the join keys. A plan that is itself a join of
+    /// subqueries has no such guarantee, and nothing here can check it, so it is refused: the
+    /// query then plans without pushing the join into the Cube query, or fails with an
+    /// explicit error, instead of returning numbers that depend on how a measure happens to
+    /// be classified.
+    ///
+    /// All four of these only ever go from false to true, which is what makes them safe to
+    /// compute per node and merge with `or`: an e-class only gains representations, and a
+    /// single one that joins subqueries taints the class for everything reading it.
+    pub joins_subqueries: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -1251,6 +1279,71 @@ impl LogicalPlanAnalysis {
         }
     }
 
+    fn make_non_empty_joins(enode: &LogicalPlanLanguage) -> bool {
+        match enode {
+            LogicalPlanLanguage::WrappedSelectJoins(joins) => !joins.is_empty(),
+            _ => false,
+        }
+    }
+
+    fn make_non_aggregate_select_type(enode: &LogicalPlanLanguage) -> bool {
+        match enode {
+            LogicalPlanLanguage::WrappedSelectSelectType(WrappedSelectSelectType(select_type)) => {
+                !matches!(select_type, WrappedSelectType::Aggregate)
+            }
+            _ => false,
+        }
+    }
+
+    fn make_select_with_joins(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> bool {
+        let LogicalPlanLanguage::WrappedSelect(params) = enode else {
+            return false;
+        };
+        params
+            .get(WRAPPED_SELECT_JOINS)
+            .is_some_and(|joins| egraph.index(*joins).data.non_empty_joins)
+    }
+
+    fn make_joins_subqueries(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> bool {
+        match enode {
+            LogicalPlanLanguage::WrappedSelect(params) => {
+                let (Some(select_type), Some(from)) = (
+                    params.get(WRAPPED_SELECT_SELECT_TYPE),
+                    params.get(WRAPPED_SELECT_FROM),
+                ) else {
+                    return false;
+                };
+                // An aggregation collapses the rows a join could have duplicated - the ones
+                // below it and the ones it makes itself - so the search stops there. Every
+                // node of the e-class has to agree that this is one: a class holding an
+                // Aggregate next to something else would otherwise hide the joins from
+                // everything above.
+                if !egraph.index(*select_type).data.non_aggregate_select_type {
+                    return false;
+                }
+                Self::make_select_with_joins(egraph, enode)
+                    || egraph.index(*from).data.joins_subqueries
+            }
+            // A select that is still wrapped in a replacer, or in a wrapper of its own, hides
+            // the same structure one node deeper. A wrapper is not supposed to be reachable
+            // here - every rule that builds one binds a select or a scan inside it - but this
+            // change is what makes a wrapper something that can sit mid-plan at all, and the
+            // three walks in `wrapper.rs` unwrap it for the same reason.
+            LogicalPlanLanguage::WrapperPullupReplacer(params)
+            | LogicalPlanLanguage::WrapperPushdownReplacer(params)
+            | LogicalPlanLanguage::CubeScanWrapper(params) => params
+                .first()
+                .is_some_and(|input| egraph.index(*input).data.joins_subqueries),
+            _ => false,
+        }
+    }
+
     fn make_is_empty_list(
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
@@ -1292,6 +1385,16 @@ impl LogicalPlanAnalysis {
         res
     }
 
+    /// Merges a fact that only ever goes from false to true, so a class holding one
+    /// representation it holds for is true for everything reading the class.
+    #[inline]
+    fn merge_or_field(&mut self, a: &mut bool, b: bool) -> DidMerge {
+        let merged = *a || b;
+        let res = DidMerge(merged != *a, merged != b);
+        *a = merged;
+        res
+    }
+
     fn merge_max_field<T: Ord>(&mut self, a: &mut T, mut b: T) -> DidMerge {
         match Ord::cmp(a, &mut b) {
             Ordering::Less => {
@@ -1324,6 +1427,10 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             cube_reference: Self::make_cube_reference(egraph, enode),
             is_empty_list: Self::make_is_empty_list(egraph, enode),
             filter_operators: Self::make_filter_operators(egraph, enode),
+            non_empty_joins: Self::make_non_empty_joins(enode),
+            non_aggregate_select_type: Self::make_non_aggregate_select_type(enode),
+            select_with_joins: Self::make_select_with_joins(egraph, enode),
+            joins_subqueries: Self::make_joins_subqueries(egraph, enode),
         }
     }
 
@@ -1341,6 +1448,13 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
         let is_empty_list = self.merge_option_field(&mut a.is_empty_list, b.is_empty_list);
         let filter_operators = self.merge_option_field(&mut a.filter_operators, b.filter_operators);
         let column_name = self.merge_option_field(&mut a.column, b.column);
+        let non_empty_joins = self.merge_or_field(&mut a.non_empty_joins, b.non_empty_joins);
+        let non_aggregate_select_type = self.merge_or_field(
+            &mut a.non_aggregate_select_type,
+            b.non_aggregate_select_type,
+        );
+        let select_with_joins = self.merge_or_field(&mut a.select_with_joins, b.select_with_joins);
+        let joins_subqueries = self.merge_or_field(&mut a.joins_subqueries, b.joins_subqueries);
         original_expr
             | member_name_to_expr
             | trivial_push_down
@@ -1352,6 +1466,10 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             | column_name
             | filter_operators
             | is_empty_list
+            | non_empty_joins
+            | non_aggregate_select_type
+            | select_with_joins
+            | joins_subqueries
             | self.merge_max_field(&mut a.iteration_timestamp, b.iteration_timestamp)
     }
 

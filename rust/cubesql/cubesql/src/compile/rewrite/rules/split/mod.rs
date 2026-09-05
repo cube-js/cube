@@ -578,16 +578,16 @@ impl SplitRules {
                         inner_list_type.to_string(),
                     ),
                     [
-                        ListApplierListPattern {
-                            list_type: inner_list_type.clone(),
-                            new_list_var: "?inner_list".to_string(),
-                            elem_pattern: "?inner".to_string(),
-                        },
-                        ListApplierListPattern {
-                            list_type: substitute_list_type.clone(),
-                            new_list_var: "?outer_list".to_string(),
-                            elem_pattern: "?outer".to_string(),
-                        },
+                        ListApplierListPattern::new(
+                            inner_list_type.clone(),
+                            "?inner_list",
+                            "?inner",
+                        ),
+                        ListApplierListPattern::new(
+                            substitute_list_type.clone(),
+                            "?outer_list",
+                            "?outer",
+                        ),
                     ],
                     top_level_elem_vars,
                 )
