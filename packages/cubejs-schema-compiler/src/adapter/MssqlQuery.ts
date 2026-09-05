@@ -384,6 +384,11 @@ export class MssqlQuery extends BaseQuery {
       ') AS {{ from_alias }}{% elif from_prepared %}\n' +
       'FROM {{ from_prepared }}' +
       '{% endif %}' +
+      // The joins the planner supplied, each already carrying its own type, source and ON
+      // condition. Without this loop the projection still references the right-hand alias
+      // while nothing binds it, and T-SQL rejects the query with "The multi-part
+      // identifier ... could not be bound"
+      '{% for join in joins %}\n{{ join }}{% endfor %}' +
       '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
       '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
       '{% if having %}\nHAVING {{ having }}{% endif %}' +
