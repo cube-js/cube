@@ -2022,11 +2022,44 @@ impl WrappedSelectNode {
         )
         .await?;
 
+        // Sort pushdown can replace a grouped literal's alias with the literal expression.
+        // Integer literals in ORDER BY are interpreted as select-list positions by some SQL
+        // dialects, so restore the generated alias when the literal is selected in this query.
+        let order_expr = self
+            .order_expr
+            .iter()
+            .map(|order_expr| match order_expr {
+                Expr::Sort {
+                    expr,
+                    asc,
+                    nulls_first,
+                } => {
+                    let literal_alias = flat_group_expr.iter().zip(group_by.iter()).find_map(
+                        |(selected_expr, (aliased_column, _))| {
+                            (matches!(selected_expr, Expr::Literal(_))
+                                && selected_expr == expr.as_ref())
+                            .then(|| aliased_column.alias.clone())
+                        },
+                    );
+
+                    match literal_alias {
+                        Some(alias) => Expr::Sort {
+                            expr: Box::new(Expr::Column(Column::from_name(alias))),
+                            asc: *asc,
+                            nulls_first: *nulls_first,
+                        },
+                        None => order_expr.clone(),
+                    }
+                }
+                _ => order_expr.clone(),
+            })
+            .collect::<Vec<_>>();
+
         // Sort expressions can reference window expressions computed in this same select
         // by their full DataFusion name. Those columns don't exist in the source SQL, so
         // rewrite them to the generated window aliases, which ORDER BY can reference by name.
         let order_expr = if window.is_empty() {
-            self.order_expr.clone()
+            order_expr
         } else {
             let window_columns = self
                 .window_expr
@@ -2040,9 +2073,9 @@ impl WrappedSelectNode {
                 })
                 .collect::<result::Result<HashMap<_, _>, CubeError>>()?;
             let window_columns_ref = window_columns.iter().collect();
-            self.order_expr
-                .iter()
-                .map(|e| replace_col(e.clone(), &window_columns_ref))
+            order_expr
+                .into_iter()
+                .map(|e| replace_col(e, &window_columns_ref))
                 .collect::<Result<Vec<_>>>()?
         };
 
