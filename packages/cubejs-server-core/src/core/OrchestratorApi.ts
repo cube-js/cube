@@ -62,7 +62,38 @@ export class OrchestratorApi {
    */
   public async streamQuery(query: QueryBody): Promise<stream.Writable> {
     // TODO merge with fetchQuery
-    return this.orchestrator.streamQuery(query);
+    try {
+      return await this.orchestrator.streamQuery(query);
+    } catch (err) {
+      // A pre-aggregation still building is not a query error. `executeQuery`
+      // logs it as 'Continue wait' rather than a failure, and `ApiGateway.stream`
+      // keys its retryable 200 off `err.message === 'Continue wait'` — which
+      // only survives if the error reaches it unwrapped.
+      //
+      // `ApiGateway.load`, the other caller, does not normalize it and reports
+      // a building pre-aggregation as a 500. That is pre-existing and not this
+      // guard's to fix; rethrowing is simply never worse than wrapping.
+      if (err instanceof ContinueWaitError) {
+        this.logger('Continue wait', {
+          query: query.query?.replace(/\s+/g, ' '),
+          params: query.values,
+          requestId: query.requestId,
+        });
+
+        throw err;
+      }
+
+      this.logger('Error querying db', {
+        query: query.query?.replace(/\s+/g, ' '),
+        params: query.values,
+        error: ((err as Error).stack || err),
+        requestId: query.requestId,
+      });
+
+      // Shaped like executeQuery's rejection so the gateway reports a query
+      // error rather than falling through to its Internal Server Error branch.
+      throw { error: (err as Error).toString() };
+    }
   }
 
   /**
