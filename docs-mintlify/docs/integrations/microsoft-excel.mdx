@@ -196,14 +196,37 @@ targets the wrong cell.
   <img src="https://ucarecdn.com/167abe25-635c-4fa6-b4a2-c090aa533f3c/" />
 </Frame>
 
+If a placement's written cells come back empty — for example, someone deleted
+them by hand — the workbook home shows a **No data** tag next to it. Opening
+the pane also checks whether the cells it wrote still hold what was last
+written; if any have been typed over or cleared since, it shows a notice with
+an option to jump straight to the changed cells, which clears the next time you
+run the exploration. Neither check catches rows or columns inserted above the
+block — that's the anchor limitation described above.
+
+Use the row menu's **Detach** or **Delete** to stop working with an exploration
+in this document. **Detach** removes it from this workbook only — it stays in
+your Cube Cloud workspace and in any other document it's placed in. **Delete**
+removes it everywhere it's been placed. Both offer to clear the written cells,
+which is checked by default.
+
 If an exploration has filters applied, an admin can turn on **Show applied filters
 in reports** (Settings → Spreadsheet Add-ins) to make the filter state
 visible on the sheet itself. When enabled, a summary of active filters is
 added above the table, and filtered columns are marked "(filtered)" in
-their header, both when the exploration is inserted and after **Refresh**.
+their header, both when the exploration is inserted and after **Refresh**. Each
+user can override this for themselves from the add-in's own **Settings**.
 
 Saved explorations also appear in the Cube workspace. See
 [Saving explorations][ref-explorations] for details.
+
+## Add-in settings
+
+Open **Settings** from the add-in's menu to set personal preferences: whether
+selecting a sheet jumps the pane to its exploration and vice versa, whether an
+exploration runs automatically, whether duplicate values in the result are
+suppressed, and the per-user override of **Show applied filters in reports**
+described above.
 
 
 [ref-excel]: /admin/connect-to-data/visualization-tools/excel
