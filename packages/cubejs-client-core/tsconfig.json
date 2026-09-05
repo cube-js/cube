@@ -9,6 +9,7 @@
     "lib": ["dom", "dom.iterable", "ES2022"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "types": ["*"],
     "composite": true,
     "noEmitOnError": true,
     "declaration": true,
@@ -29,7 +30,6 @@
     "forceConsistentCasingInFileNames": true, /* Disallow inconsistently-cased references to the same file. */
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": ".",
     "resolveJsonModule": true,
   }
 }

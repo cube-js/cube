@@ -36,7 +36,7 @@
   "devDependencies": {
     "@cubejs-backend/linter": "1.7.34",
     "@cubejs-backend/testing": "1.7.34",
-    "typescript": "~5.2.2"
+    "typescript": "~6.0.3"
   },
   "publishConfig": {
     "access": "public"

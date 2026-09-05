@@ -7,7 +7,6 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": ".",
     "allowJs": true,
     "noImplicitAny": false,
     "strictNullChecks": false,
@@ -15,4 +14,9 @@
     "strictBindCallApply": false,
     "strictPropertyInitialization": false
   },
+  "references": [
+    { "path": "../cubejs-backend-shared" },
+    { "path": "../cubejs-base-driver" },
+    { "path": "../cubejs-cubestore-driver" }
+  ]
 }

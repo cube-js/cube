@@ -7,8 +7,12 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": ".",
     "allowJs": true,
     "noImplicitAny": false,
   },
+  "references": [
+    { "path": "../cubejs-backend-native" },
+    { "path": "../cubejs-backend-shared" },
+    { "path": "../cubejs-query-orchestrator" }
+  ]
 }

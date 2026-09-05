@@ -6,6 +6,10 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": ".",
-  }
+  },
+  "references": [
+    { "path": "../cubejs-backend-shared" },
+    { "path": "../cubejs-query-orchestrator" },
+    { "path": "../cubejs-schema-compiler" }
+  ]
 }

@@ -46,7 +46,9 @@
     "@rollup/plugin-commonjs": "^17.1.0",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^11.2.0",
-    "@typescript-eslint/eslint-plugin": "^6.12.0",
+    "@typescript-eslint/eslint-plugin": "^8.46.0",
+    "@typescript-eslint/parser": "^8.46.0",
+    "eslint": "^8.57.1",
     "@types/fs-extra": "^9.0.1",
     "@types/jest": "^29",
     "husky": "^5.0.4",
@@ -59,7 +61,7 @@
     "rollup": "2.80.0",
     "rollup-plugin-peer-deps-external": "^2.2.4",
     "rollup-plugin-tsconfig-paths": "^1.5.2",
-    "typescript": "~5.2.2"
+    "typescript": "~6.0.3"
   },
   "repository": {
     "type": "git",

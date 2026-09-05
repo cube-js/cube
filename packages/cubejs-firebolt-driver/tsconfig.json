@@ -7,7 +7,12 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": ".",
     "resolveJsonModule": true
-  }
+  },
+  "references": [
+    { "path": "../cubejs-backend-shared" },
+    { "path": "../cubejs-base-driver" },
+    { "path": "../cubejs-schema-compiler" },
+    { "path": "../cubejs-testing-shared" }
+  ]
 }

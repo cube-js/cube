@@ -11,7 +11,9 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": ".",
     "allowJs": true,
-  }
+  },
+  "references": [
+    { "path": "../cubejs-backend-shared" }
+  ]
 }

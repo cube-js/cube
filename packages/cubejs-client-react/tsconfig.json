@@ -4,11 +4,13 @@
     "lib": ["dom", "dom.iterable", "es2020"],
     "target": "es2020",
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
+    "types": ["*"],
     "jsx": "react",
     "declaration": true,
     "declarationMap": true,
     "declarationDir": "./dist",
+    "rootDir": "./src",
     "emitDeclarationOnly": true,
     "strict": true,
     "noImplicitAny": true,
@@ -25,5 +27,7 @@
     "noEmitOnError": true,
     "forceConsistentCasingInFileNames": true
   },
-  "references": [{ "path": "../cubejs-client-core" }]
+  "references": [
+    { "path": "../cubejs-client-core" }
+  ]
 }
