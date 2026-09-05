@@ -1101,6 +1101,16 @@ export class BaseQuery {
       const lambdaPreAgg = preAggForQuery.referencedPreAggregations[preAggForQuery.referencedPreAggregations.length - 1];
       // TODO(cristipp) Use source query instead of preaggregation references.
       const references = this.cubeEvaluator.evaluatePreAggregationReferences(lambdaPreAgg.cube, lambdaPreAgg.preAggregation);
+      const [timeDimension] = references.timeDimensions;
+      // @see https://github.com/cube-js/cube/issues/11682
+      const sourceDateRange = timeDimension &&
+        this.preAggregations.lambdaSourceDateRange(lambdaPreAgg, preAggForQuery);
+      // Tesseract renders LIMIT as an inline number and can't carry the MAX_SOURCE_ROW_LIMIT
+      // placeholder (it parses to None, emitting no LIMIT at all), so resolve it here.
+      const resolvedRowLimit = this.options.maxSourceRowLimit ?? getEnv('maxSourceRowLimit');
+      const maxSourceRowLimit = typeof resolvedRowLimit === 'number' && resolvedRowLimit > 0
+        ? resolvedRowLimit
+        : undefined;
       const lambdaQuery = this.newSubQuery(
         {
           measures: references.measures,
@@ -1108,19 +1118,24 @@ export class BaseQuery {
           timeDimensions: references.timeDimensions,
           filters: [
             ...this.options.filters ?? [],
-            references.timeDimensions.length > 0
-              ? {
-                member: references.timeDimensions[0].dimension,
-                operator: 'afterDate',
-                values: [FROM_PARTITION_RANGE]
-              }
-              : [],
+            ...(timeDimension ? [{
+              member: timeDimension.dimension,
+              operator: 'afterDate',
+              values: [FROM_PARTITION_RANGE]
+            }] : []),
+            // Kept separate from the afterDate filter on purpose: inDateRange's lower bound is
+            // inclusive and would double count rows sitting exactly at the partition end.
+            ...(sourceDateRange ? [{
+              member: timeDimension.dimension,
+              operator: 'inDateRange',
+              values: sourceDateRange
+            }] : []),
           ],
           segments: this.options.segments,
           order: [],
           limit: undefined,
           offset: undefined,
-          rowLimit: MAX_SOURCE_ROW_LIMIT,
+          rowLimit: maxSourceRowLimit ?? MAX_SOURCE_ROW_LIMIT,
           preAggregationQuery: true,
         }
       );
@@ -1129,7 +1144,11 @@ export class BaseQuery {
         () => this.cacheKeyQueries(),
         { preAggregationQuery: true }
       );
-      result[this.preAggregations.preAggregationId(lambdaPreAgg)] = { sqlAndParams, cacheKeyQueries };
+      result[this.preAggregations.preAggregationId(lambdaPreAgg)] = {
+        sqlAndParams,
+        cacheKeyQueries,
+        maxSourceRowLimit,
+      };
     }
     return result;
   }

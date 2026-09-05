@@ -266,8 +266,17 @@ export class PreAggregationPartitionRangeLoader {
       if (this.preAggregation.rollupLambdaId) {
         if (this.lambdaQuery && loadResults.length > 0) {
           const { buildRangeEnd, targetTableName } = loadResults[loadResults.length - 1];
-          const lambdaTypes = await this.loadCache.getTableColumnTypes(this.preAggregation, targetTableName);
-          lambdaTable = await this.downloadLambdaTable(buildRangeEnd, lambdaTypes);
+          if (this.lambdaSourceDataCovered(buildRangeEnd)) {
+            this.logger('Skipping lambda source query', {
+              preAggregationId: this.preAggregation.preAggregationId,
+              requestId: this.requestId,
+              buildRangeEnd,
+              matchedTimeDimensionDateRange: this.preAggregation.matchedTimeDimensionDateRange,
+            });
+          } else {
+            const lambdaTypes = await this.loadCache.getTableColumnTypes(this.preAggregation, targetTableName);
+            lambdaTable = await this.downloadLambdaTable(buildRangeEnd, lambdaTypes);
+          }
         }
         const rollupLambdaResults = this.preAggregationsTablesToTempTables.filter(tempTableResult => tempTableResult[1].rollupLambdaId === this.preAggregation.rollupLambdaId);
         const filteredResults = loadResults.filter(
@@ -369,6 +378,20 @@ export class PreAggregationPartitionRangeLoader {
   }
 
   /**
+   * The lambda query is lower bounded by `buildRangeEnd` (exclusive, via
+   * `afterDate FROM_PARTITION_RANGE`), so it can only contribute rows strictly after it.
+   * @see https://github.com/cube-js/cube/issues/11682
+   */
+  private lambdaSourceDataCovered(buildRangeEnd?: string): boolean {
+    const matchedRangeEnd = this.preAggregation.matchedTimeDimensionDateRange?.[1];
+    if (!matchedRangeEnd || !buildRangeEnd) {
+      return false;
+    }
+    // buildRangeEnd comes back from the DB and may carry a `Z` suffix.
+    return reformatInIsoLocal(matchedRangeEnd) <= reformatInIsoLocal(buildRangeEnd);
+  }
+
+  /**
    * Downloads the lambda table from the source DB.
    */
   private async downloadLambdaTable(fromDate: string, lambdaTypes: TableStructure): Promise<InlineTable> {
@@ -400,8 +423,9 @@ export class PreAggregationPartitionRangeLoader {
         lambdaTypes,
       }
     );
-    if (data.rowCount === this.options.maxSourceRowLimit) {
-      throw new Error(`The maximum number of source rows ${this.options.maxSourceRowLimit} was reached for ${this.preAggregation.preAggregationId}`);
+    const appliedRowLimit = this.lambdaQuery.maxSourceRowLimit ?? this.options.maxSourceRowLimit;
+    if (data.rowCount === appliedRowLimit) {
+      throw new Error(`The maximum number of source rows ${appliedRowLimit} was reached for ${this.preAggregation.preAggregationId}`);
     }
     return {
       name: `${LAMBDA_TABLE_PREFIX}_${this.preAggregation.tableName.replace('.', '_')}`,
