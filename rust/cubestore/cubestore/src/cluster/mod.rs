@@ -19,7 +19,7 @@ use crate::cluster::worker_services::{
     WorkerProcessing,
 };
 
-use crate::ack_error;
+use crate::app_metrics;
 use crate::cluster::message::NetworkMessage;
 use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType, TraceIndex};
 use crate::cluster::transport::{ClusterTransport, MetaStoreTransport, WorkerConnection};
@@ -2143,13 +2143,11 @@ impl ClusterImpl {
                     log::debug!("Startup warmup cancelled");
                     return;
                 }
-                // TODO: propagate 'not found' and log in debug mode. Compaction might remove files,
-                //       so they are not errors most of the time.
-                ack_error!(
-                    self.remote_fs
-                        .download_file(file, p.get_row().file_size())
-                        .await
-                );
+                let result = self
+                    .remote_fs
+                    .download_file(file.clone(), p.get_row().file_size())
+                    .await;
+                self.report_warmup_download(result, &file);
             }
             for c in chunks {
                 if self.stop_token.is_cancelled() {
@@ -2159,20 +2157,32 @@ impl ClusterImpl {
                 if c.get_row().in_memory() {
                     continue;
                 }
+                let file = chunk_file_name(c.get_id(), c.get_row().suffix());
                 let result = self
                     .remote_fs
-                    .download_file(
-                        chunk_file_name(c.get_id(), c.get_row().suffix()),
-                        c.get_row().file_size(),
-                    )
+                    .download_file(file.clone(), c.get_row().file_size())
                     .await;
-                // TODO: propagate 'not found' and log in debug mode. Compaction might remove files,
-                //       so they are not errors most of the time.
-                ack_error!(result);
+                self.report_warmup_download(result, &file);
             }
         }
         log::debug!("Startup warmup finished");
         return;
+    }
+
+    /// A file that is gone by the time the pass reaches it is the normal case: the walk takes as
+    /// long as it takes and compaction removes what it replaces meanwhile, so its absence says how
+    /// far behind the snapshot the pass ran rather than that anything is wrong. A file that is
+    /// really missing is reported by the query that needs it, which is also the one that can tell,
+    /// since by then the metastore either still names the file or does not.
+    fn report_warmup_download(&self, result: Result<String, CubeError>, remote_path: &str) {
+        match result {
+            Ok(_) => {}
+            Err(e) if e.is_file_not_found() => {
+                app_metrics::WARMUP_MISSING.increment();
+                log::debug!("Skipping warmup of {}: {}", remote_path, e.message);
+            }
+            Err(e) => log::error!("Warmup of {} failed: {:?}", remote_path, e),
+        }
     }
 }
 
