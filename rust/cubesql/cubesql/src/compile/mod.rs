@@ -7284,7 +7284,7 @@ ORDER BY
                         "expr": {
                             "type": "SqlFunction",
                             "cubeParams": [],
-                            "sql": "0",
+                            "sql": "CAST(0 AS DOUBLE)",
                         },
                         "groupingSet": null,
                     })
@@ -7615,7 +7615,7 @@ ORDER BY "source"."str0" ASC
         assert_eq!(
             member_expression_sql(&request.dimensions),
             [
-                "((FLOOR(((${KibanaSampleDataEcommerce.taxful_total_price} - 1.1) / 0.025)) * 0.025) + 1.1)",
+                "((FLOOR(((${KibanaSampleDataEcommerce.taxful_total_price} - CAST(1.1 AS DOUBLE)) / CAST(0.025 AS DOUBLE))) * CAST(0.025 AS DOUBLE)) + CAST(1.1 AS DOUBLE))",
             ]
         );
     }
@@ -7827,7 +7827,7 @@ ORDER BY "source"."str0" ASC
         assert_eq!(
             member_expression_sql(&request.dimensions),
             [
-                "CEIL((CAST(EXTRACT(doy FROM CAST(${KibanaSampleDataEcommerce.order_date.week} AS TIMESTAMP)) AS INTEGER) / 7))",
+                "CEIL((CAST(EXTRACT(doy FROM CAST(${KibanaSampleDataEcommerce.order_date.week} AS TIMESTAMP)) AS INTEGER) / CAST(7 AS DOUBLE)))",
             ]
         );
     }
@@ -12064,7 +12064,7 @@ ORDER BY "source"."str0" ASC
         assert!(member_expression_sql(&request.measures).is_empty());
         assert_eq!(
             member_expression_sql(&request.dimensions),
-            ["(EXTRACT(day FROM ${KibanaSampleDataEcommerce.order_date}) = 15)",]
+            ["(EXTRACT(day FROM ${KibanaSampleDataEcommerce.order_date}) = CAST(15 AS DOUBLE))",]
         );
     }
 
@@ -12125,7 +12125,7 @@ ORDER BY "source"."str0" ASC
         assert_eq!(
             member_expression_sql(&request.dimensions),
             [
-                "(EXTRACT(month FROM ${KibanaSampleDataEcommerce.order_date}) < (EXTRACT(month FROM ${KibanaSampleDataEcommerce.last_mod}) + 1))",
+                "(EXTRACT(month FROM ${KibanaSampleDataEcommerce.order_date}) < (EXTRACT(month FROM ${KibanaSampleDataEcommerce.last_mod}) + CAST(1 AS DOUBLE)))",
             ]
         );
     }
@@ -12270,7 +12270,7 @@ ORDER BY "source"."str0" ASC
         assert!(member_expression_sql(&request.measures).is_empty());
         assert_eq!(
             member_expression_sql(&request.dimensions),
-            ["(${KibanaSampleDataEcommerce.taxful_total_price} > 10)",]
+            ["(${KibanaSampleDataEcommerce.taxful_total_price} > CAST(10 AS DOUBLE))",]
         );
     }
 
@@ -15532,6 +15532,37 @@ ORDER BY "source"."str0" ASC
             "{}",
             "float division must not use expressions/int_division template, got: {sql}"
         );
+    }
+
+    #[tokio::test]
+    async fn test_float_literal_percentage_pushdown() {
+        for (constant, rendered) in [
+            ("100.0", "CAST(100 AS FLOAT(53))"),
+            ("CAST(100 AS DOUBLE)", "CAST(100 AS FLOAT(53))"),
+            ("100.1", "CAST(100.1 AS FLOAT(53))"),
+        ] {
+            let query_plan = convert_select_to_query_plan_customized(
+                format!(
+                    "SELECT customer_gender, {constant} * COUNT(*) / NULLIF(COUNT(DISTINCT notes), 0) AS ratio
+                     FROM KibanaSampleDataEcommerce
+                     WHERE LOWER(customer_gender) = 'test'
+                     GROUP BY 1 ORDER BY 2 DESC LIMIT 100"
+                ),
+                DatabaseProtocol::PostgreSQL,
+                vec![
+                    ("types/double".into(), "FLOAT(53)".into()),
+                    ("expressions/int_division".into(), "UNEXPECTED_INT_DIVISION({{ left }}, {{ right }})".into()),
+                ],
+            ).await;
+            let sql = query_plan
+                .as_logical_plan()
+                .find_cube_scan_wrapped_sql()
+                .wrapped_sql
+                .sql;
+            assert!(sql.contains(rendered), "{}: {}", constant, sql);
+            assert!(!sql.contains("UNEXPECTED_INT_DIVISION"), "{}", sql);
+            assert!(sql.contains("NULLIF("), "{}", sql);
+        }
     }
 
     #[tokio::test]

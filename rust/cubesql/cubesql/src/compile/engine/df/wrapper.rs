@@ -3101,16 +3101,34 @@ impl WrappedSelectNode {
                 sql_query,
             ),
             ScalarValue::Float32(f) => (
-                f.map(|f| format!("{f}")).map_or_else(
-                    || Self::generate_null_for_literal(sql_generator, &literal),
-                    Ok,
+                f.map_or_else(
+                    || Self::generate_null_for_literal(sql_generator.clone(), &literal),
+                    |f| {
+                        let data_type =
+                            Self::generate_sql_type(sql_generator.clone(), DataType::Float32)?;
+                        Self::generate_sql_cast_expr(
+                            sql_generator.clone(),
+                            format!("{f}"),
+                            data_type,
+                        )
+                    },
                 )?,
                 sql_query,
             ),
             ScalarValue::Float64(f) => (
-                f.map(|f| format!("{f}")).map_or_else(
-                    || Self::generate_null_for_literal(sql_generator, &literal),
-                    Ok,
+                // Display formats integral floats without a decimal point. Keep the
+                // scalar type so the source does not infer integer arithmetic.
+                f.map_or_else(
+                    || Self::generate_null_for_literal(sql_generator.clone(), &literal),
+                    |f| {
+                        let data_type =
+                            Self::generate_sql_type(sql_generator.clone(), DataType::Float64)?;
+                        Self::generate_sql_cast_expr(
+                            sql_generator.clone(),
+                            format!("{f}"),
+                            data_type,
+                        )
+                    },
                 )?,
                 sql_query,
             ),
@@ -4762,6 +4780,38 @@ impl<'ctx, 'mem> ExpressionVisitor for CollectMembersVisitor<'ctx, 'mem> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn test_float_literal_preserves_sql_type() {
+        let generator = crate::compile::test::sql_generator(vec![
+            ("types/float".into(), "FLOAT(24)".into()),
+            ("types/double".into(), "FLOAT(53)".into()),
+        ]);
+        for (literal, expected) in [
+            (ScalarValue::Float32(Some(100.0)), "CAST(100 AS FLOAT(24))"),
+            (ScalarValue::Float64(Some(100.0)), "CAST(100 AS FLOAT(53))"),
+            (
+                ScalarValue::Float64(Some(100.1)),
+                "CAST(100.1 AS FLOAT(53))",
+            ),
+            (ScalarValue::Float64(Some(0.0)), "CAST(0 AS FLOAT(53))"),
+            (
+                ScalarValue::Float64(Some(-100.0)),
+                "CAST(-100 AS FLOAT(53))",
+            ),
+            (ScalarValue::Float32(None), "CAST(NULL AS FLOAT(24))"),
+            (ScalarValue::Float64(None), "CAST(NULL AS FLOAT(53))"),
+            (ScalarValue::Int64(Some(100)), "100"),
+        ] {
+            let (sql, _) = WrappedSelectNode::generate_sql_for_literal(
+                SqlQuery::new(String::new(), vec![]),
+                generator.clone(),
+                literal,
+            )
+            .unwrap();
+            assert_eq!(sql, expected);
+        }
+    }
+
     use crate::{
         compile::engine::df::scan::CubeScanOptions,
         sql::HttpAuthContext,

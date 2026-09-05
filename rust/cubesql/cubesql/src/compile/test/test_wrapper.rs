@@ -4094,7 +4094,7 @@ async fn test_wrapper_multi_arg_aggregate_function() {
                     .request
                     .measures
             ),
-            vec!["APPROX_PERCENTILE(${KibanaSampleDataEcommerce.taxful_total_price}, 0.5)"],
+            vec!["APPROX_PERCENTILE(${KibanaSampleDataEcommerce.taxful_total_price}, CAST(0.5 AS DOUBLE))"],
             "{} is not pushed down",
             call
         );
