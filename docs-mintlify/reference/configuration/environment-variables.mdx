@@ -1053,6 +1053,84 @@ The authentication token for StarTree to be passed as HTTP headers.
 | ----------------------------------- | ---------------------- | --------------------- |
 | A valid string containing the token |	N/A                    | N/A                   |
 
+## `CUBEJS_DB_SQL_PREAMBLE`
+
+SQL executed in the context of every query Cube sends to a data source. Its main
+use is defining temporary UDFs that the data model's SQL then calls, which is the
+only way to get a user-defined function onto a stateless data source such as
+Google BigQuery.
+
+The value is passed to the data source as one opaque string, so a multi-statement
+preamble needs no delimiter convention beyond the data source's own — separate
+statements with `;`.
+
+<Info>
+
+When using multiple data sources, this environment variable can be [decorated
+with a data source][ref-config-multiple-ds-decorating-env].
+
+</Info>
+
+| Possible Values                | Default in Development | Default in Production |
+| ------------------------------ | ---------------------- | --------------------- |
+| A valid SQL statement or batch | N/A                    | N/A                   |
+
+```dotenv
+CUBEJS_DB_SQL_PREAMBLE=CREATE TEMP FUNCTION median(x ARRAY<FLOAT64>) AS (x[OFFSET(ARRAY_LENGTH(x) DIV 2)])
+
+# Decorated with a data source named `datasource1`
+CUBEJS_DS_DATASOURCE1_DB_SQL_PREAMBLE=SET my_setting = 'value'
+
+# Applied to pre-aggregation builds instead of the value above
+CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE=SET my_setting = 'build'
+```
+
+Unlike the connection credentials, the pre-aggregation variant **inherits** the
+regular one when it is not set: a preamble defining a function the data model
+depends on has to reach pre-aggregation builds as well. Set it to an empty value
+to run builds with no preamble at all.
+
+<Warning>
+
+The preamble participates in the pre-aggregation cache key, so changing it
+rebuilds every pre-aggregation. See [pre-aggregation data
+source][ref-preagg-data-source].
+
+</Warning>
+
+Supported by the BigQuery, Snowflake, Postgres, Redshift, CrateDB, Materialize,
+MySQL, DuckDB and JDBC-based (including Databricks) drivers.
+
+<Warning>
+
+Any other driver ignores this variable, so setting it there changes nothing about
+how queries run — while still moving the pre-aggregation cache key and rebuilding
+every pre-aggregation on that data source. Cube logs a warning the first time it
+connects to the data source when it detects this.
+
+</Warning>
+
+When the preamble runs depends on how the data source handles connections. On
+Snowflake it runs once on the session, so every later query inherits it. On
+Postgres, Redshift, CrateDB, Materialize, MySQL, DuckDB and the JDBC-based
+drivers it runs on each pooled connection, and on BigQuery it is prepended to the
+query itself. In every case the query executes in the preamble's context,
+streamed queries included.
+
+Because pooled connections are reused, a statement the preamble has already
+applied to a connection is skipped rather than treated as an error — so a
+preamble that creates something does not fail on the second query. Genuine
+failures, such as a syntax or permission error, still surface. A statement the
+preamble runs after a driver's own connection setup can override it deliberately:
+the built-in statements run first.
+
+The equivalent driver option is `sqlPreamble`, which takes precedence over this
+variable and can be set from a custom [`driver_factory`][ref-config-driver-factory].
+Note that a preamble set that way does not participate in the pre-aggregation
+cache key. The deprecated `initSql` (DuckDB) and `prepareConnectionQueries`
+(JDBC-based drivers) options are still accepted, and continue to behave as they
+did.
+
 ## `CUBEJS_DB_SSL`
 
 If `true`, enables SSL encryption for database connections from Cube.

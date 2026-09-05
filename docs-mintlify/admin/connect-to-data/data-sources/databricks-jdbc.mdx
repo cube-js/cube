@@ -62,8 +62,25 @@ docker run -it -p 4000:4000 --env-file=.env cube-jdk
 | [`CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR`](/reference/configuration/environment-variables#cubejs_db_export_bucket_mount_dir)  | The path for the [Databricks DBFS mount][databricks-docs-dbfs] (Not needed if using Unity Catalog connection)         | A valid mount path    |    ❌    |
 | [`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool)                 | The maximum number of concurrent database connections to pool. Default is `8`                   | A valid number        |    ❌    |
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+| [`CUBEJS_DB_SQL_PREAMBLE`](/reference/configuration/environment-variables#cubejs_db_sql_preamble) | SQL run in the context of every query, typically to define temporary UDFs | A valid SQL statement or batch |    ❌    |
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
+### SQL preamble
+
+SQL set with [`CUBEJS_DB_SQL_PREAMBLE`](/reference/configuration/environment-variables#cubejs_db_sql_preamble),
+or with the `sqlPreamble` driver option, runs on each pooled connection before the
+query that uses it, on both the query and streaming paths.
+
+<Info>
+
+The `prepareConnectionQueries` driver option is deprecated in favour of
+`sqlPreamble` and will be removed in a future release. Databricks ships no
+built-in connection statements, so the two options behave identically here; on
+drivers that do have them, `sqlPreamble` is appended after them while
+`prepareConnectionQueries` replaces them, as it always has.
+
+</Info>
+
 ## Pre-Aggregation Feature Support
 
 ### count_distinct_approx

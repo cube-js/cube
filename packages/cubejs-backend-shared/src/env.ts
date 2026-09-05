@@ -155,6 +155,10 @@ export function hasPreAggregationsEnvVars(dataSource: string = 'default'): boole
       'CUBEJS_PRE_AGGREGATIONS_BUILDER',
       'CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME',
       'CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH',
+      // Session setup, not a connection target. Left out, setting a pre-agg
+      // preamble alone would swing every credential into the pre-aggregation
+      // namespace and leave builds without a host, user or password.
+      'CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE',
     ]);
 
     for (const key of Object.keys(process.env)) {
@@ -166,8 +170,15 @@ export function hasPreAggregationsEnvVars(dataSource: string = 'default'): boole
     return false;
   }
 
+  const prefix = `CUBEJS_DS_${dataSource.toUpperCase()}_PRE_AGGREGATIONS_`;
+  // Same exclusion as the default data source above: a non-credential var must
+  // not divert credential resolution into the pre-aggregation namespace.
+  const nonCredentialKeys = new Set([
+    `${prefix}DB_SQL_PREAMBLE`,
+  ]);
+
   for (const key of Object.keys(process.env)) {
-    if (key.startsWith(`CUBEJS_DS_${dataSource.toUpperCase()}_PRE_AGGREGATIONS_`)) {
+    if (key.startsWith(prefix) && !nonCredentialKeys.has(key)) {
       return true;
     }
   }
@@ -581,6 +592,33 @@ const variables: Record<string, (...args: any) => any> = {
   }: DataSourceOpts) => (
     get(keyByDataSource('CUBEJS_DB_PASS', dataSource, preAggregations)).asString()
   ),
+
+  /**
+   * SQL executed in the context of every query on the connection.
+   *
+   * Passed through as one opaque string: the data source parses it, so no
+   * delimiter convention is imposed on multi-statement values.
+   *
+   * Unlike the credential vars, the pre-aggregation variant *inherits* the
+   * default when unset: a preamble defining a UDF the model depends on must
+   * reach pre-aggregation builds too, and half-inheritance would fail only
+   * later, at build time, on a missing function. Credentials deliberately do
+   * not inherit — a half-inherited connection target is worse than none — so
+   * the fallback is spelled out here rather than pushed into
+   * `keyByDataSource`, which resolves to exactly one key by design.
+   */
+  dbSqlPreamble: ({
+    dataSource,
+    preAggregations,
+  }: DataSourceOpts) => {
+    const value = get(keyByDataSource('CUBEJS_DB_SQL_PREAMBLE', dataSource, preAggregations)).asString();
+
+    if (value !== undefined || !preAggregations) {
+      return value;
+    }
+
+    return get(keyByDataSource('CUBEJS_DB_SQL_PREAMBLE', dataSource, false)).asString();
+  },
 
   /**
    * Database name.

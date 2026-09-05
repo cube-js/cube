@@ -13,6 +13,7 @@ import fs from 'fs';
 
 import { cancelCombinator } from './utils';
 import { detectTypesFromTabular } from './type-detection';
+import { normalizeSqlPreamble } from './sql-preamble';
 import {
   ExternalCreateTableOptions,
   DownloadQueryResultsOptions,
@@ -97,6 +98,8 @@ export abstract class BaseDriver implements DriverInterface {
 
   protected logger?: LoggerFn;
 
+  private readonly sqlPreambleValue?: string;
+
   /**
    * Class constructor.
    */
@@ -106,8 +109,59 @@ export abstract class BaseDriver implements DriverInterface {
      * request before determining it as not valid. Default - 10000 ms.
      */
     testConnectionTimeout?: number,
+    /**
+     * SQL executed in the context of every query on this connection.
+     * One opaque blob — the data source parses it, so no delimiter
+     * convention is imposed.
+     */
+    sqlPreamble?: string,
   } = {}) {
     this.testConnectionTimeoutValue = _options.testConnectionTimeout || 10000;
+    this.sqlPreambleValue = normalizeSqlPreamble(_options.sqlPreamble);
+  }
+
+  /**
+   * The user-configured preamble, or undefined when none is set.
+   *
+   * Drivers apply this at their own connection or query site: once per
+   * connection where one exists, prepended into the query text where the
+   * data source is stateless. What must hold everywhere is that the primary
+   * query executes in the preamble's context — including streamed queries,
+   * whose paths are separate hooks in every driver.
+   */
+  protected sqlPreamble(): string | undefined {
+    return this.sqlPreambleValue;
+  }
+
+  /**
+   * The effective preamble, for callers outside the driver.
+   *
+   * The pre-aggregation version key needs it: a preamble can define a function
+   * the rollup SQL calls, so a table built under a different one must not be
+   * served. Public because the key is computed in the orchestrator, and because
+   * a preamble set through `driverFactory` never passes through the environment
+   * the key would otherwise read.
+   */
+  public effectiveSqlPreamble(): string | undefined {
+    return this.sqlPreambleValue;
+  }
+
+  /**
+   * Whether this driver applies `sql_preamble`.
+   *
+   * False here, overridden by the drivers that wire it, so **inheritance carries
+   * the answer**: `RedshiftDriver extends PostgresDriver` and every JDBC-based
+   * driver inherit both the hook and this flag without listing themselves
+   * anywhere. That is the point — a hand-maintained list of supporting dbTypes
+   * would be a second source of truth that goes stale silently every time a
+   * driver is added or subclassed.
+   *
+   * Used to warn when a preamble is configured for a driver that ignores it: the
+   * option is then a no-op that still moves the pre-aggregation version key, so
+   * it costs a full rebuild and changes nothing about how queries run.
+   */
+  public supportsSqlPreamble(): boolean {
+    return false;
   }
 
   protected informationSchemaQuery() {

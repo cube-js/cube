@@ -26,7 +26,7 @@ import {
 
 import type { Application as ExpressApplication } from 'express';
 
-import { BaseDriver, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
+import { BaseDriver, DriverFactoryByDataSource, normalizeSqlPreamble } from '@cubejs-backend/query-orchestrator';
 import type { SubscriptionServer, WebSocketSendMessageFn } from '@cubejs-backend/api-gateway';
 
 import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
@@ -129,6 +129,13 @@ export class CubejsServerCore {
   protected devServer: DevServer | undefined;
 
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
+
+  /**
+   * Data sources already warned about an unapplied SQL preamble. Driver
+   * resolution runs per data source and can retry, so this keeps the warning to
+   * one line rather than one per attempt.
+   */
+  protected readonly sqlPreambleWarnedDataSources: Set<string> = new Set();
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
@@ -609,6 +616,31 @@ export class CubejsServerCore {
         const hasSeparatePreAggEnv = hasPreAggregationsEnvVars(dataSource);
         const usePreAgg = preAggregations && hasSeparatePreAggEnv && !this.optsHandler.isCustomDriverFactory();
 
+        // A pre-aggregation preamble that differs from the regular one needs its
+        // own driver even when the credentials are shared. It is excluded from
+        // `hasPreAggregationsEnvVars` on purpose — it is session setup, not a
+        // connection target — so without this the two keys would share one
+        // driver and a build would run the query-path preamble.
+        //
+        // Resolution is guarded: it reads the environment through
+        // `assertDataSource`, which rejects a data source absent from
+        // CUBEJS_DATASOURCES. That is already reported further down, by
+        // `resolveDriver`, and pre-empting it here would replace a clear error
+        // with one about the preamble.
+        let hasSeparatePreAggSqlPreamble = false;
+        try {
+          // Normalized, so the sharing decision matches both the value the
+          // driver runs and the pre-aggregation cache key. A re-indented or
+          // trailing-newline value is the same preamble and must not split the
+          // driver into a second connection pool.
+          hasSeparatePreAggSqlPreamble =
+            normalizeSqlPreamble(getEnv('dbSqlPreamble', { dataSource, preAggregations: true }))
+            !== normalizeSqlPreamble(getEnv('dbSqlPreamble', { dataSource, preAggregations: false }));
+        } catch (e) {
+          hasSeparatePreAggSqlPreamble = false;
+        }
+        const shareDriverAcrossKeys = !preAggregations && !hasSeparatePreAggEnv && !hasSeparatePreAggSqlPreamble;
+
         if (preAggregations && hasSeparatePreAggEnv && this.optsHandler.isCustomDriverFactory()) {
           this.logger('Pre-aggregation driver conflict', {
             error: 'Both driverFactory and PRE_AGGREGATIONS env vars are defined. driverFactory will take precedence.',
@@ -625,6 +657,15 @@ export class CubejsServerCore {
                 ...context,
                 dataSource,
                 preAggregations: usePreAgg || false,
+                // Tracks "this driver serves pre-aggregation builds", which is
+                // not the same question as `usePreAgg` ("resolve credentials
+                // from the pre-aggregation namespace"). The SQL preamble is a
+                // non-credential setting, so it deliberately does not switch
+                // the credential namespace — without this flag a build that
+                // set only a pre-aggregation preamble would silently run the
+                // regular one, and the pre-aggregation would be keyed on a
+                // preamble that never ran.
+                preAggregationsSqlPreamble: preAggregations,
               },
               orchestratorOptions,
             );
@@ -633,6 +674,8 @@ export class CubejsServerCore {
               if (driver.setLogger) {
                 driver.setLogger(this.logger);
               }
+
+              this.warnUnsupportedSqlPreamble(driver, dataSource);
 
               await driver.testConnection();
 
@@ -645,7 +688,7 @@ export class CubejsServerCore {
           } catch (e) {
             driverPromise[factoryKey] = null;
 
-            if (!preAggregations && !hasSeparatePreAggEnv) {
+            if (shareDriverAcrossKeys) {
               driverPromise[`${dataSource}@pre_agg`] = null;
             }
 
@@ -658,7 +701,7 @@ export class CubejsServerCore {
         })();
 
         // No separate pre-agg driver needed — share the same promise for both keys
-        if (!preAggregations && !hasSeparatePreAggEnv) {
+        if (shareDriverAcrossKeys) {
           driverPromise[`${dataSource}@pre_agg`] = driverPromise[factoryKey];
         }
 
@@ -872,6 +915,57 @@ export class CubejsServerCore {
   }
 
   /**
+   * Warns once per data source when a SQL preamble is configured for a driver
+   * that does not apply it.
+   *
+   * The option is then a no-op for queries, but it still participates in the
+   * pre-aggregation version key, so setting it rebuilds every pre-aggregation on
+   * that data source for no behavioural change. Cost with no effect, and
+   * previously with no signal either.
+   *
+   * Asks the driver rather than consulting a list of dbTypes: `supportsSqlPreamble()`
+   * is inherited, so `RedshiftDriver extends PostgresDriver` and every JDBC-based
+   * driver answer correctly without being enumerated anywhere. It also fires here
+   * rather than in the orchestrator, so a deployment with no pre-aggregations at
+   * all still sees it — the query-path no-op is the part that surprises people.
+   */
+  protected warnUnsupportedSqlPreamble(driver: BaseDriver, dataSource: string) {
+    if (this.sqlPreambleWarnedDataSources.has(dataSource)) {
+      return;
+    }
+
+    // Optional on `DriverInterface`, so a driver that does not extend
+    // `BaseDriver` — or was compiled against an older one — is not assumed
+    // unsupported. Saying nothing beats telling someone their working config
+    // does nothing.
+    if (typeof driver.supportsSqlPreamble !== 'function' || driver.supportsSqlPreamble()) {
+      return;
+    }
+
+    let configured: string | undefined;
+    try {
+      configured = normalizeSqlPreamble(getEnv('dbSqlPreamble', { dataSource }))
+        ?? normalizeSqlPreamble(getEnv('dbSqlPreamble', { dataSource, preAggregations: true }));
+    } catch (e) {
+      // An undeclared data source is reported elsewhere, with a clearer message.
+      return;
+    }
+
+    if (configured) {
+      this.sqlPreambleWarnedDataSources.add(dataSource);
+      this.logger('SQL preamble not applied', {
+        warning:
+          'A SQL preamble is configured for this data source, but its driver does not apply it, so ' +
+          'it changes nothing about how queries run. It still participates in the pre-aggregation ' +
+          'version key, so setting it rebuilds every pre-aggregation on this data source. Supported ' +
+          'by the BigQuery, Snowflake, Postgres, Redshift, CrateDB, Materialize, MySQL, DuckDB and ' +
+          'JDBC-based drivers.',
+        dataSource,
+      });
+    }
+  }
+
+  /**
    * Resolve driver by the data source.
    */
   public async resolveDriver(
@@ -892,6 +986,8 @@ export class CubejsServerCore {
         };
       opts.dataSource = assertDataSource(context.dataSource);
       opts.preAggregations = context.preAggregations || false;
+      opts.preAggregationsSqlPreamble =
+        context.preAggregationsSqlPreamble ?? context.preAggregations ?? false;
       return CubejsServerCore.createDriver(type, opts);
     }
   }

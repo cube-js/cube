@@ -291,4 +291,10 @@ export interface DriverInterface {
   release(): Promise<void>
 
   capabilities(): DriverCapabilities;
+
+  // Whether this driver applies `sql_preamble`. Optional so a driver that does
+  // not extend BaseDriver, or that was compiled against an older one, still
+  // satisfies the interface; a driver that omits it is not assumed unsupported,
+  // because warning that a working preamble does nothing is worse than silence.
+  supportsSqlPreamble?(): boolean;
 }
