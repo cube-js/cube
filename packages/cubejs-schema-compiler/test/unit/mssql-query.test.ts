@@ -96,6 +96,25 @@ describe('MssqlQuery', () => {
 
   const joinedSchemaCompilers = prepareJsCompiler(createJoinedCubesSchema());
 
+  it('renders a scalar null discriminator for SQL API pushdown sorting', async () => {
+    await compiler.compile();
+
+    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['visitors.count'],
+      dimensions: ['visitors.source'],
+    });
+
+    // SQL API pushdown uses expressions.sort, rather than the regular query's
+    // order_by template. T-SQL rejects a bare IS NULL predicate in ORDER BY and
+    // can report the subsequent FETCH NEXT clause as the failing syntax.
+    const { sort } = query.sqlTemplates().expressions;
+    expect(sort).toContain('CASE WHEN {{ expr }} IS NULL THEN 1 ELSE 0 END');
+    // The discriminator's direction depends on null placement, independently
+    // of the value's direction. NULL maps to 1, so DESC puts NULLs first.
+    expect(sort).toContain('END {% if nulls_first %}DESC{% else %}ASC{% endif %},');
+    expect(sort).toContain('{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}');
+  });
+
   it('should group by the created_at field on the calculated granularity for unbounded trailing windows',
     () => compiler.compile().then(() => {
       const query = new MssqlQuery(
