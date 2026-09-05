@@ -155,6 +155,23 @@ async fn plan_view_join(sql: &str, tesseract: bool) -> Result<QueryPlan, Compila
     convert_sql_to_cube_query(&sql.to_string(), meta, session).await
 }
 
+/// Asserts that the view join was NOT merged into a single multi-fact CubeScan:
+/// the plan must contain two separate ungrouped CubeScans (one per view),
+/// joined as standalone subqueries in the pushed-down SQL.
+fn assert_not_merged_subquery_join(logical_plan: &datafusion::logical_plan::LogicalPlan) {
+    let scans = logical_plan.find_cube_scans();
+    assert_eq!(
+        scans.len(),
+        2,
+        "expected two separate view scans, got: {:?}",
+        scans.iter().map(|scan| &scan.request).collect::<Vec<_>>()
+    );
+    for scan in &scans {
+        assert_eq!(scan.request.ungrouped, Some(true));
+        assert_eq!(scan.request.join_hints, None);
+    }
+}
+
 const GROUPED_LEFT_JOIN: &str = r#"
     SELECT c.customer_city, measure(o.revenue), measure(c.avg_age)
     FROM customers_view c
@@ -244,8 +261,12 @@ async fn test_group_by_inner_join_two_views_on_shared_member() {
     )
 }
 
-/// The merge relies on the Tesseract SQL planner; with it disabled the join is
-/// not merged and the query is rejected like any other unsupported cube join.
+/// The merge relies on the Tesseract SQL planner; with it disabled the join
+/// can't be planned at all: the fallback would be a join of standalone raw
+/// subqueries, but those would have to carry measure columns (`revenue`,
+/// `avg_age`), and measure columns have no defined per-row materialization
+/// (e.g. multi-stage measures), so the raw-join path refuses and the query is
+/// rejected at compile time.
 #[tokio::test]
 async fn test_grouped_view_join_not_merged_without_tesseract() {
     if !Rewriter::sql_push_down_enabled() {
@@ -257,11 +278,48 @@ async fn test_grouped_view_join_not_merged_without_tesseract() {
     assert!(matches!(error, CompilationError::Rewrite(..)));
 }
 
-/// Ungrouped query (`SELECT *`): the shared-member merge only applies to
-/// grouped queries, so an ungrouped join is not merged and is rejected even
-/// when Tesseract is enabled.
+/// Ungrouped join of two views over dimension columns only: the shared-member
+/// merge only applies to grouped queries, so this is not merged even when
+/// Tesseract is enabled. It is planned as a plain SQL join of two standalone
+/// ungrouped subqueries instead. The per-side subselects narrow each scan to
+/// its dimension columns, which is what makes the sides valid raw subqueries.
 #[tokio::test]
 async fn test_ungrouped_join_two_views_on_shared_member_is_not_merged() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = plan_view_join(
+        r#"
+            SELECT c.customer_city, o.customer_city
+            FROM (SELECT customer_city FROM customers_view) c
+            LEFT JOIN (SELECT customer_city FROM orders_view) o
+                ON (o.customer_city = c.customer_city)
+            "#,
+        true,
+    )
+    .await
+    .unwrap()
+    .as_logical_plan();
+
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("LEFT JOIN ("),
+        "wrapped SQL is missing LEFT JOIN of standalone subqueries:\n{}",
+        sql
+    );
+    assert_not_merged_subquery_join(&logical_plan);
+}
+
+/// An ungrouped join of bare views (`SELECT *`, or any shape that leaves the
+/// sides unnarrowed) puts the views' measure columns on the raw join sides. A
+/// raw join side carrying a measure column can't be pushed down: a measure has
+/// no defined per-row materialization (e.g. a multi-stage measure like a
+/// percentage of total has no meaning for a single raw row), so the query is
+/// rejected instead of returning meaningless values.
+#[tokio::test]
+async fn test_ungrouped_join_views_with_measures_is_rejected() {
     if !Rewriter::sql_push_down_enabled() {
         return;
     }
@@ -283,7 +341,9 @@ async fn test_ungrouped_join_two_views_on_shared_member_is_not_merged() {
 
 /// The join is over a dimension (`customer_city`) that is not in the GROUP BY
 /// (the query groups by `status` instead). The merge requires the join key to
-/// be the group-by key, so this is not merged and is rejected.
+/// be the group-by key, so this is not merged; the raw-join fallback would
+/// need the sides to carry measure columns, which have no defined per-row
+/// materialization, so the query is rejected at compile time.
 #[tokio::test]
 async fn test_group_by_join_dimension_not_in_group_by_is_not_merged() {
     if !Rewriter::sql_push_down_enabled() {
@@ -783,8 +843,9 @@ async fn test_left_join_on_multiple_dimensions_group_by_both() {
 }
 
 /// Grouping by only part of a composite join key must not merge: the GROUP BY
-/// must cover the full join key, so this falls back to standard join handling
-/// (which errors for ungrouped-style cube joins).
+/// must cover the full join key. The raw-join fallback would need the orders
+/// side to carry the `revenue` measure column, which has no defined per-row
+/// materialization, so the query is rejected at compile time.
 #[tokio::test]
 async fn test_join_on_multiple_dimensions_partial_group_by_is_not_merged() {
     if !Rewriter::sql_push_down_enabled() {
@@ -792,7 +853,7 @@ async fn test_join_on_multiple_dimensions_partial_group_by_is_not_merged() {
     }
     init_testing_logger();
 
-    let result = plan_view_join(
+    let error = plan_view_join(
         r#"
             SELECT c.customer_city, measure(o.revenue)
             FROM customers_view c
@@ -803,13 +864,9 @@ async fn test_join_on_multiple_dimensions_partial_group_by_is_not_merged() {
             "#,
         true,
     )
-    .await;
-
-    assert!(
-        result.is_err(),
-        "expected partial-group-by composite join not to merge, got: {:?}",
-        result.map(|p| p.as_logical_plan().find_cube_scan().request)
-    );
+    .await
+    .unwrap_err();
+    assert!(matches!(error, CompilationError::Rewrite(..)));
 }
 
 /// Joining on a mix of a `DATE_TRUNC` equality and a plain dimension equality.
@@ -870,7 +927,9 @@ async fn test_inner_join_on_date_trunc_and_dimension() {
 /// A join on the raw time column (exact-timestamp equality, "no grain") does not
 /// match a truncated `DATE_TRUNC('day', ...)` GROUP BY, so it is not merged: the
 /// multi-fact stitch happens at the GROUP BY grain, which must be the grain the
-/// user joined on. Truncate the join key to the grain you group by instead.
+/// user joined on. The raw-join fallback would need the orders side to carry the
+/// `revenue` measure column, which has no defined per-row materialization, so
+/// the query is rejected at compile time.
 #[tokio::test]
 async fn test_raw_time_join_with_date_trunc_group_by_is_not_merged() {
     if !Rewriter::sql_push_down_enabled() {
@@ -878,7 +937,7 @@ async fn test_raw_time_join_with_date_trunc_group_by_is_not_merged() {
     }
     init_testing_logger();
 
-    let result = plan_view_join(
+    let error = plan_view_join(
         r#"
             SELECT DATE_TRUNC('day', c.created_at), measure(o.revenue)
             FROM customers_view c
@@ -887,11 +946,7 @@ async fn test_raw_time_join_with_date_trunc_group_by_is_not_merged() {
             "#,
         true,
     )
-    .await;
-
-    assert!(
-        result.is_err(),
-        "expected raw-time-column join with a DATE_TRUNC GROUP BY not to merge, got: {:?}",
-        result.map(|p| p.as_logical_plan().find_cube_scan().request)
-    );
+    .await
+    .unwrap_err();
+    assert!(matches!(error, CompilationError::Rewrite(..)));
 }
