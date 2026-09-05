@@ -20,6 +20,9 @@ use crate::cubesql_utils::with_session;
 use crate::logger::NodeBridgeLogger;
 use crate::rest4sql::rest4sql;
 use crate::sql4sql::sql4sql;
+use crate::sql_filters::{
+    add_sql_filters, delete_sql_filters, get_sql_filters, replace_sql_filters, set_sql_filters,
+};
 use crate::stream::{OnCloseHandler, OnDrainHandler};
 use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
@@ -975,6 +978,11 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
     cx.export_function("execSql", exec_sql)?;
     cx.export_function("sql4sql", sql4sql)?;
     cx.export_function("rest4sql", rest4sql)?;
+    cx.export_function("getSqlFilters", get_sql_filters)?;
+    cx.export_function("addSqlFilters", add_sql_filters)?;
+    cx.export_function("setSqlFilters", set_sql_filters)?;
+    cx.export_function("deleteSqlFilters", delete_sql_filters)?;
+    cx.export_function("replaceSqlFilters", replace_sql_filters)?;
     cx.export_function("isFallbackBuild", is_fallback_build)?;
     cx.export_function("__js_to_clrepr_to_js", debug_js_to_clrepr_to_js)?;
 
