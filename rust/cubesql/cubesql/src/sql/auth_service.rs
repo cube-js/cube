@@ -48,6 +48,8 @@ pub struct AuthenticateResponse {
 pub struct SqlAuthServiceAuthenticateRequest {
     pub protocol: String,
     pub method: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub database: Option<String>,
 }
 
 #[async_trait]
