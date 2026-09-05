@@ -420,12 +420,12 @@ describe('sql-escape', () => {
     });
 
     it('normalizes a scalar values argument to one parameter like sqlstring', () => {
-      expect(presto.format('SELECT ?, ?', 'whole string'))
-        .toBe("SELECT 'whole string', ?");
       expect(presto.format('SELECT ?', '')).toBe("SELECT ''");
       expect(presto.format('SELECT ?', 0)).toBe('SELECT 0');
       expect(presto.format('SELECT ?', false)).toBe('SELECT FALSE');
       expect(presto.format('SELECT ??', 'column"name')).toBe('SELECT "column""name"');
+      // A scalar is one value, so two placeholders no longer leave a dangling `?`.
+      expect(() => presto.format('SELECT ?, ?', 'whole string')).toThrow(/parameter count mismatch/);
     });
 
     it('closes the injection that the old PrestoDriver escaper allowed', () => {
@@ -454,15 +454,18 @@ describe('sql-escape', () => {
         .toBe('SELECT ???, \'value\', "column""name"');
     });
 
-    it('leaves unmatched placeholders and ignores surplus values', () => {
-      expect(presto.format('SELECT ?, ?', ['first'])).toBe("SELECT 'first', ?");
-      expect(presto.format('SELECT ?', ['first', "'; DROP TABLE users; --"]))
-        .toBe("SELECT 'first'");
+    it('rejects unmatched placeholders and surplus values (fail closed)', () => {
+      expect(() => presto.format('SELECT ?, ?', ['first'])).toThrow(/parameter count mismatch/);
+      expect(() => presto.format('SELECT ?', ['first', "'; DROP TABLE users; --"]))
+        .toThrow(/parameter count mismatch/);
     });
 
-    it('returns SQL unchanged when supplied values have no usable placeholder', () => {
-      expect(presto.format('SELECT 1', ["'; DROP TABLE users; --"])).toBe('SELECT 1');
-      expect(presto.format('SELECT ???', ["'; DROP TABLE users; --"])).toBe('SELECT ???');
+    it('rejects values supplied for SQL with no usable placeholder (fail closed)', () => {
+      expect(() => presto.format('SELECT 1', ["'; DROP TABLE users; --"]))
+        .toThrow(/parameter count mismatch/);
+      // `???` is not a consumable placeholder, so the value has nowhere to land.
+      expect(() => presto.format('SELECT ???', ["'; DROP TABLE users; --"]))
+        .toThrow(/parameter count mismatch/);
     });
 
     it('formats JSON-shaped objects as escaped assignments', () => {
@@ -524,8 +527,59 @@ describe('sql-escape', () => {
     });
 
     it('helpers normalize scalar values', () => {
-      expect(formatAnsi('SELECT ?, ?', "a'b")).toBe("SELECT 'a''b', ?");
       expect(formatMySql('SELECT ?', false)).toBe('SELECT FALSE');
+      // Scalar is one value: two placeholders now fail closed rather than leaving `?`.
+      expect(() => formatAnsi('SELECT ?, ?', "a'b")).toThrow(/parameter count mismatch/);
+    });
+  });
+
+  describe('fail-closed parameter count guard', () => {
+    it('throws when a literal ? in SQL shifts real placeholders (FILTER_PARAMS vector)', () => {
+      // Model SQL with a literal `?` ahead of real placeholders: the compiler emits
+      // one `?` per value, so the stray literal makes the counts diverge and a naive
+      // scan would land the attacker's value in the wrong slot.
+      expect(() => formatAnsi("WHERE (status = '?') AND status = ? AND number = ?", ['x', '7']))
+        .toThrow(/parameter count mismatch/);
+    });
+
+    it('throws on surplus values', () => {
+      expect(() => formatAnsi('WHERE a = ?', ['x', 'y'])).toThrow(/parameter count mismatch/);
+    });
+
+    it('rejects a literal ? even after every real placeholder (intentional break)', () => {
+      expect(() => formatAnsi("SELECT ?, regexp_like(a, 'x+?')", ['v']))
+        .toThrow(/parameter count mismatch/);
+      expect(() => formatAnsi("WHERE a = ? AND b LIKE 'y?'", ['v']))
+        .toThrow(/parameter count mismatch/);
+    });
+
+    it('throws on too few values', () => {
+      expect(() => formatAnsi('WHERE a = ? AND b = ?', ['x'])).toThrow(/parameter count mismatch/);
+    });
+
+    it('accepts a balanced placeholder/value count', () => {
+      expect(formatAnsi('WHERE a = ? AND b = ?', ['x', 'y']))
+        .toBe("WHERE a = 'x' AND b = 'y'");
+    });
+
+    it('counts ?? identifier placeholders as consumable', () => {
+      expect(formatAnsi('SELECT ??, ?', ['col', 'v'])).toBe('SELECT "col", \'v\'');
+      expect(() => formatAnsi('SELECT ??, ?', ['col'])).toThrow(/parameter count mismatch/);
+    });
+
+    it('leaves the no-substitution paths non-throwing', () => {
+      expect(formatAnsi('SELECT 1')).toBe('SELECT 1');
+      expect(formatAnsi('SELECT 1', [])).toBe('SELECT 1');
+      expect(formatAnsi('SELECT ???', [])).toBe('SELECT ???');
+      expect(formatAnsi('SELECT ?')).toBe('SELECT ?');
+      expect(formatAnsi('SELECT ?', null)).toBe('SELECT ?');
+      expect(formatAnsi('SELECT ?', undefined)).toBe('SELECT ?');
+    });
+
+    it('rejects a placeholder against an empty values array', () => {
+      expect(() => formatAnsi('SELECT ?', [])).toThrow(/parameter count mismatch/);
+      expect(() => formatAnsi("SELECT regexp_like(a, 'x+?') FROM t", []))
+        .toThrow(/parameter count mismatch/);
     });
   });
 
