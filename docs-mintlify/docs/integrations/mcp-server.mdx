@@ -208,7 +208,7 @@ neither `listDeployments` nor the `chat` selection can reach an excluded deploym
 
 ## Available actions
 
-The MCP server exposes 23 tools, grouped below.
+The MCP server exposes 24 tools, grouped below.
 
 Every tool runs as the authenticated user. Queries respect the same
 [permissions][ref-roles] as the rest of Cube, including row-level security — MCP is a new
@@ -238,11 +238,17 @@ work together.
 
 | Tool | Description | Access |
 | --- | --- | --- |
+| `searchExplorations` | Searches saved queries — [explorations][ref-explorations] and workbook tabs alike — by name and description. Returns each one's `sqlQuery`, where available, ready to pass to `runQuery`. | Read-only |
 | `searchDataModel` | Searches the semantic model by similarity — views and their measures and dimensions — to discover what is queryable. Returns compact records (name, title, description, type) to reference in `runQuery`. | Read-only |
 | `runQuery` | Runs a Cube SQL query (PostgreSQL dialect) against the [SQL API][ref-sql-api]. Returns a schema, a page of rows, and `hasMore` / `totalRows` for pagination via `offset`. Pass the dev `branchName` from `startDataModelEdit` to query that branch instead of the deployed model. | Read-only |
 
-Call `searchDataModel` before `runQuery` to find exact view and member names rather than
-guessing them.
+Call `searchExplorations` first when a saved query may already answer the question —
+re-running one reuses a query your team has already vetted. Matching is on names and
+descriptions, not on the query body, and results cover only the explorations you can
+access. A saved query with no runnable SQL comes back with `sqlQuery` set to `null`.
+
+Otherwise call `searchDataModel` before `runQuery` to find exact view and member names
+rather than guessing them.
 
 Omitting `branchName` queries the deployed model, exactly as before this parameter existed.
 Passing a `branchName` that isn't an active dev branch — for example the deploy branch's own
@@ -438,6 +444,7 @@ and friends) are set.
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-pre-aggregations]: /docs/pre-aggregations/using-pre-aggregations
 [ref-sql-api]: /reference/core-data-apis/sql-api
+[ref-explorations]: /docs/explore-analyze/explore#saving-explorations
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-dashboards]: /docs/explore-analyze/dashboards
 [ref-dev-mode]: /docs/data-modeling/dev-mode
