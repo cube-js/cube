@@ -1,4 +1,4 @@
-import { evaluateLocalRefreshKey, isValidLocalRefreshKey } from '../../src/orchestrator/utils';
+import { evaluateLocalRefreshKey, isValidLocalRefreshKey, snapToRenewalThreshold } from '../../src/orchestrator/utils';
 
 describe('evaluateLocalRefreshKey', () => {
   const tenMinutes = { interval: 600, utcOffset: 0, dayOffset: 0 };
@@ -64,5 +64,64 @@ describe('isValidLocalRefreshKey', () => {
     expect(isValidLocalRefreshKey({ interval: Infinity, utcOffset: 0, dayOffset: 0 })).toBe(false);
     expect(isValidLocalRefreshKey({ interval: 600, utcOffset: NaN, dayOffset: 0 })).toBe(false);
     expect(isValidLocalRefreshKey({ interval: 600, utcOffset: 0, dayOffset: NaN })).toBe(false);
+  });
+});
+
+describe('snapToRenewalThreshold', () => {
+  const day = 24 * 60 * 60;
+
+  test('leaves the clock alone when no threshold is configured', () => {
+    for (const threshold of [undefined, 0, -60, NaN, Infinity]) {
+      expect(snapToRenewalThreshold(1_234_567, threshold)).toBe(1_234_567);
+    }
+  });
+
+  test('floors to the threshold boundary', () => {
+    expect(snapToRenewalThreshold(0, 120)).toBe(0);
+    expect(snapToRenewalThreshold(119_999, 120)).toBe(0);
+    expect(snapToRenewalThreshold(120_000, 120)).toBe(120_000);
+    expect(snapToRenewalThreshold(239_999, 120)).toBe(120_000);
+  });
+
+  test('never goes backwards', () => {
+    let previous = -1;
+
+    for (let ms = 0; ms < 600_000; ms += 17_000) {
+      const snapped = snapToRenewalThreshold(ms, 120);
+
+      expect(snapped).toBeGreaterThanOrEqual(previous);
+      expect(snapped).toBeLessThanOrEqual(ms);
+      previous = snapped;
+    }
+  });
+
+  test('advances a 10 minute key once per daily threshold, staying in its own series', () => {
+    const tenMinutes = { interval: 600, utcOffset: 0, dayOffset: 0 };
+    const at = (ms: number) => evaluateLocalRefreshKey(tenMinutes, snapToRenewalThreshold(ms, day))[0].refresh_key;
+
+    expect(at(0)).toBe('0');
+    expect(at(600_000)).toBe('0');
+    expect(at(86_399_000)).toBe('0');
+    expect(at(86_400_000)).toBe('144');
+    expect(at(86_400_000 + 600_000)).toBe('144');
+    expect(at(2 * 86_400_000)).toBe('288');
+
+    for (const ms of [0, 86_400_000, 2 * 86_400_000]) {
+      expect(at(ms)).toBe(evaluateLocalRefreshKey(tenMinutes, ms)[0].refresh_key);
+    }
+  });
+
+  test('keeps the numbering of a cron key', () => {
+    // every '0 10 * * *' => interval 1 day, dayOffset 10 hours
+    const daily = { interval: day, utcOffset: 0, dayOffset: 36_000 };
+    const threshold = 4 * 60 * 60;
+    const at = (ms: number) => evaluateLocalRefreshKey(daily, snapToRenewalThreshold(ms, threshold))[0].refresh_key;
+
+    expect(at(36_000_000 - 1)).toBe('-1');
+    // The fire at 10:00 is observed at the 12:00 sample, exactly as a 4 hour cache would have
+    expect(at(36_000_000)).toBe('-1');
+    expect(at(43_200_000)).toBe('0');
+    expect(at(36_000_000 + 86_400_000)).toBe('0');
+    expect(at(43_200_000 + 86_400_000)).toBe('1');
   });
 });

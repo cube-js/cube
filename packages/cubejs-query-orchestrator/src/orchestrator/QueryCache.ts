@@ -30,6 +30,7 @@ import {
   getCacheHash,
   evaluateLocalRefreshKey,
   isValidLocalRefreshKey,
+  snapToRenewalThreshold,
 } from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
 
@@ -238,25 +239,21 @@ export class QueryCache {
    * run as queries and cached.
    */
   public isLocalRefreshKeyActive(): boolean {
-    return this.localRefreshKeyEnabled && !this.options.refreshKeyRenewalThreshold;
+    return this.localRefreshKeyEnabled;
   }
 
   public localRefreshKeyResult(queryOptions?: QueryOptions): [{ refresh_key: string }] | null {
-    if (!this.localRefreshKeyEnabled || !isValidLocalRefreshKey(queryOptions?.localRefreshKey)) {
+    if (!this.isLocalRefreshKeyActive() || !isValidLocalRefreshKey(queryOptions?.localRefreshKey)) {
       return null;
     }
 
-    // `refreshKeyRenewalThreshold` throttles how often the SQL result is re-read, and that is
-    // also what bounds how often the key advances: a value cached for a day advances daily,
-    // whatever `every` says. A locally evaluated key has no cache entry to age out, so the only
-    // way to keep honouring the override is to leave these keys on the SQL path.
-    // TODO: support the two together by snapping the local value to the threshold instead of
-    // falling back to a query.
-    if (!this.isLocalRefreshKeyActive()) {
-      return null;
-    }
-
-    return evaluateLocalRefreshKey(<LocalRefreshKeyDescriptor>queryOptions?.localRefreshKey);
+    // The per-key `queryOptions.renewalThreshold` is deliberately not snapped to: it is a fraction
+    // of the interval (`BaseQuery.refreshKeyRenewalThresholdForInterval`), so the SQL path re-reads
+    // faster than the key can move and snapping would only delay the boundary.
+    return evaluateLocalRefreshKey(
+      <LocalRefreshKeyDescriptor>queryOptions?.localRefreshKey,
+      snapToRenewalThreshold(Date.now(), this.options.refreshKeyRenewalThreshold),
+    );
   }
 
   public getCacheDriver(): CacheDriverInterface {

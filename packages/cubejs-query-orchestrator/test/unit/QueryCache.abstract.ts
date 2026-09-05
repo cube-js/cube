@@ -632,16 +632,17 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(executed).toBe(1);
       });
 
-      // Local evaluation would advance the key on every interval boundary, ignoring the
-      // throttle a deployment asked for and multiplying pre-aggregation rebuilds.
-      it('runs the query when refreshKeyRenewalThreshold is configured', async () => {
+      it('evaluates locally under a refreshKeyRenewalThreshold, snapped to it', async () => {
+        const day = 24 * 60 * 60;
         const { result, executed } = await loadRefreshKey(
           { external: true, renewalThreshold: 60, localRefreshKey: descriptor },
-          { localRefreshKey: true, refreshKeyRenewalThreshold: 24 * 60 * 60 },
+          { localRefreshKey: true, refreshKeyRenewalThreshold: day },
         );
 
-        expect(executed).toBe(1);
-        expect(result).toEqual([{ refresh_key: 12345 }]);
+        expect(executed).toBe(0);
+        expect(result).toEqual([{
+          refresh_key: String(Math.floor(Math.floor(Date.now() / 1000 / day) * day / descriptor.interval)),
+        }]);
       });
 
       // The refresh scheduler reads this to decide whether warming a refresh key is pointless,
@@ -654,7 +655,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         try {
           expect(enabled.isLocalRefreshKeyActive()).toBe(true);
           expect(disabled.isLocalRefreshKeyActive()).toBe(false);
-          expect(throttled.isLocalRefreshKeyActive()).toBe(false);
+          expect(throttled.isLocalRefreshKeyActive()).toBe(true);
         } finally {
           await Promise.all([enabled.cleanup(), disabled.cleanup(), throttled.cleanup()]);
         }
@@ -676,10 +677,6 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       it.each([
         { name: 'the flag is off', additionalOptions: { localRefreshKey: false } },
         { name: 'the flag is unset', additionalOptions: {} },
-        {
-          name: 'refreshKeyRenewalThreshold is configured',
-          additionalOptions: { localRefreshKey: true, refreshKeyRenewalThreshold: 24 * 60 * 60 },
-        },
       ])('does not report the declined local evaluation when $name', async ({ additionalOptions }) => {
         const { logged } = await loadRefreshKey(
           { external: true, renewalThreshold: 60, localRefreshKey: descriptor },
@@ -735,10 +732,28 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           )).toBeNull();
         }));
 
-        it('declines when refreshKeyRenewalThreshold is configured', () => withCache(
+        // `144` is the value a 10 minute key really has at the start of day two: the throttled key
+        // stays in the un-throttled series instead of being renumbered.
+        it('snaps the value to refreshKeyRenewalThreshold', () => withCache(
           { localRefreshKey: true, refreshKeyRenewalThreshold: 24 * 60 * 60 },
           localCache => {
-            expect(localCache.localRefreshKeyResult(queryOptions(descriptor))).toBeNull();
+            const nowSpy = jest.spyOn(Date, 'now');
+
+            try {
+              nowSpy.mockReturnValue(86_400_000 + 600_000);
+              expect(localCache.localRefreshKeyResult(queryOptions(descriptor)))
+                .toEqual([{ refresh_key: '144' }]);
+
+              nowSpy.mockReturnValue(2 * 86_400_000 - 1);
+              expect(localCache.localRefreshKeyResult(queryOptions(descriptor)))
+                .toEqual([{ refresh_key: '144' }]);
+
+              nowSpy.mockReturnValue(2 * 86_400_000);
+              expect(localCache.localRefreshKeyResult(queryOptions(descriptor)))
+                .toEqual([{ refresh_key: '288' }]);
+            } finally {
+              nowSpy.mockRestore();
+            }
           },
         ));
       });
