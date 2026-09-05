@@ -5,6 +5,7 @@ use crate::planner::filter::Filter;
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::symbols::CalendarDimensionTimeShift;
 use crate::planner::FiltersContext;
 use crate::planner::{MemberSymbol, SqlCall};
 use cubenativeutils::CubeError;
@@ -17,6 +18,10 @@ pub struct VisitorContext {
     cube_ref_evaluator: Rc<CubeRefEvaluator>,
     all_filters: Option<Filter>, //To pass to FILTER_PARAMS and FILTER_GROUP
     time_shifts: TimeShiftState, //To pass to FILTER_PARAMS in time-shifted CTEs
+    /// Calendar-cube shifts active on this CTE, carried alongside `time_shifts`
+    /// so FILTER_PARAMS rendering can tell a shift it cannot express from no
+    /// shift at all.
+    calendar_time_shifts: HashMap<String, CalendarDimensionTimeShift>,
     filters_context: FiltersContext,
 }
 
@@ -38,6 +43,7 @@ impl VisitorContext {
             cube_ref_evaluator: Rc::new(nodes_factory.cube_ref_evaluator()),
             all_filters,
             time_shifts: nodes_factory.time_shifts().clone(),
+            calendar_time_shifts: nodes_factory.calendar_time_shifts().clone(),
             filters_context,
         }
     }
@@ -47,6 +53,7 @@ impl VisitorContext {
         nodes_factory: &SqlNodesFactory,
         filter_params_columns: HashMap<String, crate::planner::sql_call::SqlCallFilterParamsItem>,
         time_shifts: TimeShiftState,
+        calendar_time_shifts: HashMap<String, CalendarDimensionTimeShift>,
     ) -> Self {
         let filters_context = FiltersContext {
             use_local_tz: nodes_factory.use_local_tz_in_date_range(),
@@ -60,6 +67,7 @@ impl VisitorContext {
             cube_ref_evaluator: Rc::new(nodes_factory.cube_ref_evaluator()),
             all_filters: None,
             time_shifts,
+            calendar_time_shifts,
             filters_context,
         }
     }
@@ -71,6 +79,7 @@ impl VisitorContext {
             self.all_filters.clone(),
         )
         .with_time_shifts(self.time_shifts.clone())
+        .with_calendar_time_shifts(self.calendar_time_shifts.clone())
     }
 
     pub fn node_processor(&self) -> Rc<dyn SqlNode> {

@@ -392,6 +392,85 @@ binding always renders as `1 = 1`.
 
 </Info>
 
+### Time-shifted measures
+
+A [`multi_stage` measure with a `time_shift`][ref-measures-time-shift] plans each
+shift as its own query stage, and every stage re-reads the cube's `sql`. The
+pushed-down column has to carry the same shift as the stage around it, otherwise
+it filters the source rows by the unshifted range while the stage reads the
+shifted one, and the stage comes back empty.
+
+A shift declared as an `interval` is applied to the column for you. A shift
+declared on a [calendar cube][ref-calendar-cubes] with its own `sql` cannot be:
+it maps through a column on the calendar rather than offsetting the date, and
+that column is not in scope inside the cube's `sql`. Passing the column as a
+string in that case fails with a planning error naming the shift.
+
+Pass a function instead. It receives the query's own filter values, so it can
+widen the pushed-down range to cover the periods the shifted stages read.
+
+`weekly_margin` joins a calendar cube whose `calendar_d` declares the
+`prior_fiscal_year` shift, so the shifted stage reaches fact rows through that
+mapping — which is why the band has to be widened by hand. The bracketing is
+what carries across data sources; the date arithmetic is BigQuery syntax, so
+adjust it for yours — here a fiscal prior year, bracketed at 371 and 364 days:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: weekly_margin
+    sql: |
+      SELECT *
+      FROM weekly_margin
+      WHERE {FILTER_PARAMS.retail_calendar.calendar_d.filter(
+        lambda x, y: f"""
+          ((week_end_d >= DATE(TIMESTAMP({x}))
+            AND week_end_d <= DATE(TIMESTAMP({y})))
+           OR (week_end_d >= DATE_SUB(DATE(TIMESTAMP({x})), INTERVAL 371 DAY)
+               AND week_end_d <= DATE_SUB(DATE(TIMESTAMP({y})), INTERVAL 364 DAY)))
+        """
+      )}
+
+    joins:
+      - name: retail_calendar
+        sql: "{CUBE}.week_end_d = {retail_calendar.calendar_d}"
+        relationship: many_to_one
+```
+
+```javascript title="JavaScript"
+cube(`weekly_margin`, {
+  sql: `
+    SELECT *
+    FROM weekly_margin
+    WHERE ${FILTER_PARAMS.retail_calendar.calendar_d.filter(
+      (x, y) => `
+        ((week_end_d >= DATE(TIMESTAMP(${x}))
+          AND week_end_d <= DATE(TIMESTAMP(${y})))
+         OR (week_end_d >= DATE_SUB(DATE(TIMESTAMP(${x})), INTERVAL 371 DAY)
+             AND week_end_d <= DATE_SUB(DATE(TIMESTAMP(${y})), INTERVAL 364 DAY)))
+      `
+    )}
+  `,
+
+  joins: {
+    retail_calendar: {
+      sql: `${CUBE}.week_end_d = ${retail_calendar.calendar_d}`,
+      relationship: `many_to_one`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+The values arrive as bare query parameters, so they are cast before use; and the
+band is parenthesised as a whole because it is an `OR`, without which appending
+another condition to the `WHERE` would bind it to the second branch alone.
+
+Every stage then scans every band, so keep the bands as narrow as the calendar
+actually requires.
+
 ## `FILTER_GROUP`
 
 If you use `FILTER_PARAMS` in your query more than once, you must wrap them
@@ -880,3 +959,5 @@ cube(`orders`, {
 [ref-links]: /reference/data-modeling/dimensions#links
 [ref-ref-segments]: /reference/data-modeling/segments
 [ref-env-tesseract]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
+[ref-measures-time-shift]: /reference/data-modeling/measures#time_shift
+[ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes

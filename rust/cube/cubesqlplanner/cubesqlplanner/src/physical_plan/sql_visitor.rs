@@ -5,8 +5,10 @@ use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_call::CubeRef;
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::symbols::CalendarDimensionTimeShift;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -17,6 +19,11 @@ pub struct SqlEvaluatorVisitor {
     /// Active per-dimension time shifts, carried so that FILTER_PARAMS rendering
     /// can apply the same shift to its column as the regular filter rendering.
     time_shifts: TimeShiftState,
+    /// Active calendar-cube time shifts, keyed by the shifted dimension's full
+    /// name. Carried for the same reason as `time_shifts`, but these cannot be
+    /// applied to a FILTER_PARAMS column - they resolve through the calendar
+    /// rather than offsetting - so the rendering path rejects them instead.
+    calendar_time_shifts: HashMap<String, CalendarDimensionTimeShift>,
     ignore_tz_convert: bool,
     /// When `true`, the caller (typically a `SqlCall` substitution site) expects
     /// the rendered expression to be safe for embedding next to operators —
@@ -35,6 +42,7 @@ impl SqlEvaluatorVisitor {
             cube_ref_evaluator,
             all_filters,
             time_shifts: TimeShiftState::default(),
+            calendar_time_shifts: HashMap::new(),
             ignore_tz_convert: false,
             arg_needs_paren_safe: false,
         }
@@ -46,8 +54,21 @@ impl SqlEvaluatorVisitor {
         self_copy
     }
 
+    pub fn with_calendar_time_shifts(
+        &self,
+        calendar_time_shifts: HashMap<String, CalendarDimensionTimeShift>,
+    ) -> Self {
+        let mut self_copy = self.clone();
+        self_copy.calendar_time_shifts = calendar_time_shifts;
+        self_copy
+    }
+
     pub fn time_shifts(&self) -> &TimeShiftState {
         &self.time_shifts
+    }
+
+    pub fn calendar_time_shifts(&self) -> &HashMap<String, CalendarDimensionTimeShift> {
+        &self.calendar_time_shifts
     }
 
     pub fn with_ignore_tz_convert(&self) -> Self {

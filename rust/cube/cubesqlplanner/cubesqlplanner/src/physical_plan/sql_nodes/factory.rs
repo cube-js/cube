@@ -49,6 +49,10 @@ impl SqlNodesFactory {
         &self.time_shifts
     }
 
+    pub fn calendar_time_shifts(&self) -> &HashMap<String, CalendarDimensionTimeShift> {
+        &self.calendar_time_shifts
+    }
+
     pub fn set_calendar_time_shifts(
         &mut self,
         calendar_time_shifts: HashMap<String, CalendarDimensionTimeShift>,
