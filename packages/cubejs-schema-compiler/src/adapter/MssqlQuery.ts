@@ -311,8 +311,13 @@ export class MssqlQuery extends BaseQuery {
     delete templates.expressions.ilike;
     // MSSQL uses + for string concatenation instead of ||
     templates.expressions.concat_strings = '{{ strings | join(\' + \' ) }}';
-    // NOTE: this template contains a comma; two order expressions are being generated
-    templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
+    // NOTE: this template contains a comma; two order expressions are being generated.
+    // T-SQL has no boolean type, so `IS NULL` is a predicate and can't be a sort key the way
+    // it can in MySQL (`ORDER BY x IS NULL` fails with "Incorrect syntax near the keyword
+    // 'IS'", and the trailing OFFSET/FETCH then surfaces as "Invalid usage of the option NEXT
+    // in the FETCH statement"). CASE projects it onto the same 1/0 discriminator, so null
+    // placement stays controlled by `nulls_first`, independently of `asc`.
+    templates.expressions.sort = 'CASE WHEN {{ expr }} IS NULL THEN 1 ELSE 0 END {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
     // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z');
     // CONVERT style 127 is defined as exactly this format (yyyy-mm-ddThh:mi:ss.mmmZ,
     // "ISO8601 with time zone Z"). The base template renders the value bare, which is

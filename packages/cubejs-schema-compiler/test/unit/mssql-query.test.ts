@@ -275,6 +275,40 @@ describe('MssqlQuery', () => {
     expect(select.indexOf('DISTINCT')).toBeLessThan(select.indexOf('TOP'));
   });
 
+  it('renders the null discriminator as a scalar in the sort template', async () => {
+    await compiler.compile();
+
+    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['visitors.count'],
+      timezone: 'UTC',
+    });
+
+    // T-SQL has no boolean type: `IS NULL` is a predicate, valid in WHERE/ON/CASE but not as
+    // an ORDER BY sort key, so `ORDER BY x IS NULL ASC` fails with "Incorrect syntax near the
+    // keyword 'IS'". With OFFSET/FETCH attached the driver surfaces that as "Invalid usage of
+    // the option NEXT in the FETCH statement". Only the cubesql pushdown path renders this
+    // template and it can't be built from here, so the template itself is what gets pinned.
+    const { sort } = query.sqlTemplates().expressions;
+
+    // The template branches only on `nulls_first`/`asc` and substitutes `expr`
+    const render = (nullsFirst: boolean, asc: boolean) => sort
+      .replace(/\{%\s*if nulls_first\s*%\}(.*?)\{%\s*else\s*%\}(.*?)\{%\s*endif\s*%\}/g, nullsFirst ? '$1' : '$2')
+      .replace(/\{%\s*if asc\s*%\}(.*?)\{%\s*else\s*%\}(.*?)\{%\s*endif\s*%\}/g, asc ? '$1' : '$2')
+      .replace(/\{\{\s*expr\s*\}\}/g, 'x');
+
+    for (const nullsFirst of [true, false]) {
+      for (const asc of [true, false]) {
+        const [nullKey, valueKey] = render(nullsFirst, asc).split(', ');
+
+        // A bare predicate can't be a sort key; it has to be projected onto a scalar
+        expect(nullKey).not.toMatch(/^x IS NULL /);
+        expect(nullKey).toEqual(`CASE WHEN x IS NULL THEN 1 ELSE 0 END ${nullsFirst ? 'DESC' : 'ASC'}`);
+        // Null placement stays independent of the value direction
+        expect(valueKey).toEqual(`x ${asc ? 'ASC' : 'DESC'}`);
+      }
+    }
+  });
+
   it('keeps rowLimit: 0 out of the legacy limit clauses', async () => {
     await compiler.compile();
 
