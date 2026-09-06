@@ -30,10 +30,12 @@ use http_auth_basic::Credentials;
 use log::error;
 use log::info;
 use log::trace;
+use log::Level;
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::error::Error as StdError;
+use std::io;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
@@ -43,6 +45,7 @@ use tokio::io::{AsyncWriteExt, BufReader};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, Mutex};
 use tokio_tungstenite::tungstenite;
+use tokio_tungstenite::tungstenite::error::ProtocolError;
 use tokio_util::sync::CancellationToken;
 use warp::filters::ws::{Message, Ws};
 use warp::http::StatusCode;
@@ -147,6 +150,71 @@ fn message_too_large_reason(
         }
         _ => None,
     }
+}
+
+/// Level at which an error from the websocket read stream is reported.
+///
+/// A peer that disappears without a close handshake ends the connection the
+/// same way a graceful client does: nothing on this side failed and there is
+/// nothing for an operator to act on, while a fleet of clients going away at
+/// once — a rolling restart of the API, say — produces one line per connection.
+/// Reporting those as errors buries the transport failures that do need
+/// attention, so they are separated here.
+///
+/// `warp` boxes the underlying `tungstenite` error, so it has to be recovered
+/// through `source()`; an error that is not one is left at `Error`, since it is
+/// not known to be benign.
+fn websocket_error_level(e: &warp::Error) -> Level {
+    match e
+        .source()
+        .and_then(|s| s.downcast_ref::<tungstenite::Error>())
+    {
+        Some(e) => tungstenite_error_level(e),
+        None => Level::Error,
+    }
+}
+
+fn tungstenite_error_level(e: &tungstenite::Error) -> Level {
+    match e {
+        // The socket reached end of file or was reset before a close frame
+        // arrived. Clients drop connections this way by design — `ws`'s
+        // `terminate()`, a killed process, a closed browser tab — and the
+        // server learns nothing else about them.
+        tungstenite::Error::Protocol(ProtocolError::ResetWithoutClosingHandshake) => Level::Debug,
+        tungstenite::Error::Io(io) => {
+            if is_peer_gone(io.kind()) {
+                Level::Debug
+            } else {
+                Level::Error
+            }
+        }
+        // A finished close handshake. The stream reports this as its end rather
+        // than as an error, so it is not expected here, but it is a normal
+        // close either way.
+        tungstenite::Error::ConnectionClosed | tungstenite::Error::AlreadyClosed => Level::Debug,
+        // The peer sent a frame after its own close frame. Harmless for this
+        // connection — whatever was already in flight raced the close — but a
+        // client that does it often is not closing correctly.
+        tungstenite::Error::Protocol(ProtocolError::ReceivedAfterClosing) => Level::Warn,
+        // Everything else is either a real transport failure (TLS, capacity,
+        // an IO error that is not a vanished peer) or a protocol violation the
+        // client should never commit, such as an invalid opcode, a masking
+        // violation or an oversized control frame.
+        _ => Level::Error,
+    }
+}
+
+/// Whether an IO error means the peer is simply gone, as opposed to the
+/// connection failing while the peer is still there.
+fn is_peer_gone(kind: io::ErrorKind) -> bool {
+    matches!(
+        kind,
+        io::ErrorKind::ConnectionReset
+            | io::ErrorKind::ConnectionAborted
+            | io::ErrorKind::BrokenPipe
+            | io::ErrorKind::NotConnected
+            | io::ErrorKind::UnexpectedEof
+    )
 }
 
 pub struct HttpServer {
@@ -499,7 +567,10 @@ impl HttpServer {
                                                     error!("Websocket close send error: {:?}", e)
                                                 }
                                             }
-                                            None => error!("Websocket error: {:?}", e),
+                                            None => log::log!(
+                                                websocket_error_level(&e),
+                                                "Websocket error: {:?}", e
+                                            ),
                                         }
                                         break;
                                     }
@@ -1455,6 +1526,46 @@ mod tests {
     use tokio_tungstenite::tungstenite::{Error as WsError, Message};
     use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
     use url::Url;
+
+    #[test]
+    fn websocket_error_levels() {
+        // A peer gone without a close handshake, in either of the two shapes it
+        // reaches the read stream in.
+        assert_eq!(
+            tungstenite_error_level(&tungstenite::Error::Protocol(
+                ProtocolError::ResetWithoutClosingHandshake
+            )),
+            Level::Debug
+        );
+        assert_eq!(
+            tungstenite_error_level(&tungstenite::Error::Io(io::Error::from(
+                io::ErrorKind::ConnectionReset
+            ))),
+            Level::Debug
+        );
+
+        // A close frame raced by an in-flight frame.
+        assert_eq!(
+            tungstenite_error_level(&tungstenite::Error::Protocol(
+                ProtocolError::ReceivedAfterClosing
+            )),
+            Level::Warn
+        );
+
+        // A protocol violation and an IO failure that is not a vanished peer.
+        assert_eq!(
+            tungstenite_error_level(&tungstenite::Error::Protocol(ProtocolError::InvalidOpcode(
+                7
+            ))),
+            Level::Error
+        );
+        assert_eq!(
+            tungstenite_error_level(&tungstenite::Error::Io(io::Error::from(
+                io::ErrorKind::PermissionDenied
+            ))),
+            Level::Error
+        );
+    }
 
     /// Minimal SqlService that always replies with a fixed DataFrame, used to
     /// drive process_command in unit tests.
