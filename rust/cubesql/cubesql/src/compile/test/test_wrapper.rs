@@ -4176,6 +4176,54 @@ async fn test_wrapper_approx_percentile_cont_is_binary() {
     );
 }
 
+/// Reproduces cube-js/cube#11780. `generate_sql_for_literal` renders a float with
+/// `format!("{f}")`, so an integral float loses its decimal point on the way to the data
+/// source: `taxful_total_price * 100.0` is pushed down as `... * 100`. The source then types
+/// the expression as integer arithmetic, and a percentage like `100.0 * matched / total`
+/// truncates - 33 where 33.33 was meant. Constant folding routes an explicit
+/// `CAST(100 AS DOUBLE PRECISION)` through the same path, so the cast users reach for as a
+/// workaround is erased too, which is why both spellings are checked here.
+///
+/// Only the decimal point matters for the bug; how the type is preserved (a bare `100.0`, or
+/// a cast the way Decimal128 already renders one) is up to the fix, so this only asserts that
+/// the literal no longer reaches the source as a bare integer.
+#[tokio::test]
+async fn test_wrapper_float_literal_keeps_type() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for literal in ["100.0", "CAST(100 AS DOUBLE PRECISION)"] {
+        let query_plan = convert_select_to_query_plan(
+            format!(
+                "SELECT customer_gender, SUM(taxful_total_price * {literal}) AS pct \
+                 FROM KibanaSampleDataEcommerce GROUP BY 1"
+            ),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let measures = member_expression_sql(
+            &query_plan
+                .as_logical_plan()
+                .find_cube_scan_wrapped_sql_deep()
+                .request
+                .measures,
+        );
+
+        // `100` on its own, rather than as part of `100.0` or `1100`
+        let bare_integer = Regex::new(r"(?:^|[^.\d])100(?:[^.\d]|$)").unwrap();
+        assert!(
+            !measures.iter().any(|m| bare_integer.is_match(m)),
+            "`{}` reached the data source as a bare integer, so it will do integer \
+             arithmetic and truncate the result; pushed down: {:?}",
+            literal,
+            measures
+        );
+    }
+}
+
 /// A dialect without the template does not get the aggregate. It does not fall back either:
 /// nothing rewrites the expression, and an approximate percentile over a dimension is not a
 /// Cube measure, so the query ends up with no plan at all. That hard failure - rather than
