@@ -164,6 +164,15 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
     expect(res.filterGroups[0].filterParams.map(p => p.time_shift_name)).toEqual([null, 'prev_fy']);
   });
 
+  // Every string under `time_shifts` reads as a shift name, so leaving the
+  // name off has to say so rather than reach the template as an object.
+  it('rejects time_shifts coerced without a shift name', () => {
+    expect(() => compileMemberSql(
+      (FILTER_PARAMS) => `${FILTER_PARAMS.calendar.d.time_shifts}`,
+      ['FILTER_PARAMS']
+    )).toThrow(/needs the name of a time shift/);
+  });
+
   it('counts a defaulted parameter as a filter value', () => {
     const res = compileMemberSql(
       (FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((from, to = 1) => `d BETWEEN ${from} AND ${to}`)}`,

@@ -150,6 +150,22 @@ describe('FILTER_PARAMS addressing a time shift', () => {
     expect(sql).toContain('1 = 1');
   });
 
+  // Every string under `time_shifts` reads as a shift name, so leaving the name
+  // off has to say so rather than fail somewhere inside the compiler.
+  describe.each([
+    ['legacy planner', false],
+    ['native planner', true],
+  ])('%s', (_name, useNativeSqlPlanner) => {
+    it('reports time_shifts left without a shift name', async () => {
+      const query = await queryFor(
+        '${FILTER_PARAMS.fiscal_calendar.reportD.time_shifts}',
+        useNativeSqlPlanner
+      );
+
+      expect(() => query.buildSqlAndParams()).toThrow(/needs the name of a time shift/);
+    });
+  });
+
   // A build query carries no user filters, so the group has nothing to state
   // and the scan stays open.
   describe.each([

@@ -53,7 +53,7 @@ pub fn select_binding<'a>(
 
 /// Rejects a binding whose shift the member does not declare, and one that
 /// addresses a shift through a column the planner cannot shift.
-fn validate_bindings(
+pub fn validate_bindings(
     items: &[SqlCallFilterParamsItem],
     symbol: &Rc<MemberSymbol>,
 ) -> Result<(), CubeError> {

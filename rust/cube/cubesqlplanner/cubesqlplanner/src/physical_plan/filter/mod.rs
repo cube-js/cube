@@ -1,7 +1,7 @@
 pub mod base_filter;
 pub mod base_segment;
 pub mod filter;
-mod filter_params_binding;
+pub(crate) mod filter_params_binding;
 pub(crate) mod operators;
 pub mod render_filter;
 pub mod to_sql;
