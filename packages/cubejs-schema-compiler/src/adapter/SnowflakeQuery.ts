@@ -12,6 +12,9 @@ const GRANULARITY_TO_INTERVAL = {
   year: 'YEAR'
 };
 
+// Ordered from the smallest, so the first match is the interval's own unit.
+const INTERVAL_UNITS = ['second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year'];
+
 class SnowflakeFilter extends BaseFilter {
   public likeIgnoreCase(column: string, not: boolean, param: any, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
@@ -84,6 +87,19 @@ export class SnowflakeQuery extends BaseQuery {
     return `${value}::timestamp_tz`;
   }
 
+  /**
+   * The generated time series steps with DATEADD, which takes a time unit and a
+   * row number rather than an interval, so it needs the unit the interval is
+   * actually expressed in. `diffTimeUnitForInterval` answers a different
+   * question - it degrades WEEK to DAY and QUARTER to MONTH, which DATEADD would
+   * then step by, producing seven or three times as many periods as asked for.
+   */
+  public override intervalAndMinimalTimeUnit(interval: string): [string, string] {
+    const unit = INTERVAL_UNITS.find(u => new RegExp(u, 'i').test(interval));
+
+    return [interval, unit || 'year'];
+  }
+
   public defaultRefreshKeyRenewalThreshold() {
     return 120;
   }
@@ -146,6 +162,26 @@ export class SnowflakeQuery extends BaseQuery {
     // the same reason described there.
     templates.tesseract.ilike = '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }} ESCAPE \'\\\\\'';
     templates.tesseract.join_types_full = 'FULL';
+    // Snowflake has no generate_series, and GENERATOR only takes a literal row
+    // count. ARRAY_GENERATE_RANGE does accept arbitrary expressions for its
+    // bounds, so the series covers whatever range the query turns out to need;
+    // the only ceiling is the maximum size of a single ARRAY value.
+    //
+    // Its row number is a count of whole time units, which is all DATEADD can
+    // step by. A custom granularity's interval carries no such count, so
+    // `supportGeneratedSeriesForCustomTd` stays off and those queries keep
+    // asking for an explicit date range.
+    //
+    // Snowflake folds unquoted identifiers to upper case while the planner reads
+    // the series back by lower-case name, so the two output columns are quoted.
+    templates.statements.generated_time_series_select = 'SELECT series_date AS "date_from",\n' +
+      'DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, series_date)) AS "date_to"\n' +
+      'FROM (SELECT DATEADD({{ minimal_time_unit }}, series_index.value::int, {{ start }}::timestamp_ntz) AS series_date\n' +
+      'FROM TABLE(FLATTEN(input => ARRAY_GENERATE_RANGE(0, DATEDIFF({{ minimal_time_unit }}, {{ start }}::timestamp_ntz, {{ end }}::timestamp_ntz) + 1))) AS series_index) AS series';
+    templates.statements.generated_time_series_with_cte_range_source = 'SELECT series_date AS "date_from",\n' +
+      'DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, series_date)) AS "date_to"\n' +
+      'FROM (SELECT DATEADD({{ minimal_time_unit }}, series_index.value::int, {{ range_source }}."{{ min_name }}") AS series_date\n' +
+      'FROM {{ range_source }}, LATERAL FLATTEN(input => ARRAY_GENERATE_RANGE(0, DATEDIFF({{ minimal_time_unit }}, {{ range_source }}."{{ min_name }}", {{ range_source }}."{{ max_name }}") + 1)) AS series_index) AS series';
     delete templates.types.interval;
     return templates;
   }
