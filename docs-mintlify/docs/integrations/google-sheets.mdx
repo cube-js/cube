@@ -105,6 +105,11 @@ With every change to your query, Cube for Sheets will update the exploration on
 the sheet after a slight delay. If you'd like to minimize it, consider
 implementing [pre-aggregations][ref-pre-aggs].
 
+Writing a large result to the sheet can take a few seconds. When it does, a
+thin progress bar appears above the run controls to track the write itself
+(not the query) — it only shows up for an explicit run, not for auto-run's
+own updates or for **Refresh**.
+
 ### Measure position and order
 
 By default, measures nest under each value of the dimension they're paired
