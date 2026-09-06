@@ -41,13 +41,12 @@ impl PushDownBuilderContext {
     pub fn make_sql_nodes_factory(&self) -> Result<SqlNodesFactory, CubeError> {
         let mut factory = SqlNodesFactory::new();
 
-        let (time_shifts, calendar_time_shifts) = self.time_shifts.extract_time_shifts()?;
-        let common_time_shifts = TimeShiftState {
-            dimensions_shifts: time_shifts,
-        };
-
-        factory.set_time_shifts(common_time_shifts);
-        factory.set_calendar_time_shifts(calendar_time_shifts);
+        let extracted = self.time_shifts.extract_time_shifts()?;
+        factory.set_time_shifts(TimeShiftState {
+            dimensions_shifts: extracted.interval_shifts,
+        });
+        factory.set_calendar_time_shifts(extracted.calendar_shifts);
+        factory.set_filter_params_time_shifts(extracted.filter_params_shifts);
         factory.set_original_sql_pre_aggregations(self.original_sql_pre_aggregations.clone());
         Ok(factory)
     }

@@ -814,7 +814,7 @@ impl QueryProperties {
                     if let Some(new_interval) = ts.interval {
                         exists.interval = Some(interval + new_interval);
                     } else {
-                        return Err(CubeError::internal(format!(
+                        return Err(CubeError::user(format!(
                             "Cannot use both named ({}) and interval ({}) shifts for the same dimension: {}.",
                             ts.name.clone().unwrap_or("-".to_string()),
                             interval.to_sql(),
@@ -823,14 +823,14 @@ impl QueryProperties {
                     }
                 } else if let Some(named_shift) = exists.name.clone() {
                     return if let Some(new_interval) = ts.interval {
-                        Err(CubeError::internal(format!(
+                        Err(CubeError::user(format!(
                             "Cannot use both named ({}) and interval ({}) shifts for the same dimension: {}.",
                             named_shift,
                             new_interval.to_sql(),
                             ts.dimension.full_name(),
                         )))
                     } else {
-                        Err(CubeError::internal(format!(
+                        Err(CubeError::user(format!(
                             "Cannot use more than one named shifts ({}, {}) for the same dimension: {}.",
                             ts.name.clone().unwrap_or("-".to_string()),
                             named_shift,

@@ -19,7 +19,12 @@ impl ToSql for BaseSegment {
         templates: &PlanSqlTemplates,
         filters_ctx: &FiltersContext,
     ) -> Result<String, CubeError> {
-        if let Some(item) = self.matching_filter_params_column(filters_ctx) {
+        if let Some(items) = self.matching_filter_params_columns(filters_ctx) {
+            // A segment is not shifted by anything, so a binding written for a
+            // time shift has no segment to restate and is passed over.
+            let Some(item) = items.iter().find(|item| item.time_shift_name.is_none()) else {
+                return templates.always_true();
+            };
             return self.filter_params_column_sql(
                 item,
                 visitor,
@@ -45,10 +50,10 @@ impl BaseSegment {
     // meant. A view re-exporting a segment leaves only the underlying cube's
     // path to match, which takes a scan; the name breaks the tie when a group
     // binds both paths, since the map is unordered.
-    fn matching_filter_params_column<'a>(
+    fn matching_filter_params_columns<'a>(
         &self,
         filters_ctx: &'a FiltersContext,
-    ) -> Option<&'a SqlCallFilterParamsItem> {
+    ) -> Option<&'a Vec<SqlCallFilterParamsItem>> {
         if let Some(item) = filters_ctx.filter_params_columns.get(&self.full_name()) {
             return Some(item);
         }

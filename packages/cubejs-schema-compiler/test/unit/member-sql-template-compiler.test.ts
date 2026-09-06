@@ -84,7 +84,9 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
       ['FILTER_PARAMS']
     );
     expect(res.template).toBe('{fp:0}');
-    expect(res.filterParams).toEqual([{ cube_name: 'orders', name: 'status', column: 't.status' }]);
+    expect(res.filterParams).toEqual([
+      { cube_name: 'orders', name: 'status', time_shift_name: null, column: 't.status' }
+    ]);
   });
 
   it('compiles a column callback into a template of its own and records {fp:N}', () => {
@@ -125,6 +127,41 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
     expect(res.symbolPaths).toEqual([['CUBE', 'a']]);
     expect(res.filterParams[0].column.template).toBe('{arg:0} = {fpv:0}');
     expect(res.filterParams[0].column.symbolPaths).toEqual([['CUBE', 'b']]);
+  });
+
+  it('records a binding addressing a named time shift', () => {
+    const res = compileMemberSql(
+      (FILTER_PARAMS) => `${FILTER_PARAMS.calendar.d.time_shifts.prev_fy.filter((from, to) => `c >= ${from} AND c <= ${to}`)}`,
+      ['FILTER_PARAMS']
+    );
+    expect(res.template).toBe('{fp:0}');
+    expect(res.filterParams).toHaveLength(1);
+    expect(res.filterParams[0].cube_name).toBe('calendar');
+    expect(res.filterParams[0].name).toBe('d');
+    expect(res.filterParams[0].time_shift_name).toBe('prev_fy');
+    expect(res.filterParams[0].column.template).toBe('c >= {fpv:0} AND c <= {fpv:1}');
+  });
+
+  it('accepts timeShifts as well as time_shifts', () => {
+    const res = compileMemberSql(
+      (FILTER_PARAMS) => `${FILTER_PARAMS.calendar.d.timeShifts.prev_fy.filter('c')}`,
+      ['FILTER_PARAMS']
+    );
+    expect(res.filterParams[0].time_shift_name).toBe('prev_fy');
+  });
+
+  // A group can bind one member several times, once per shift it addresses.
+  it('records a group of bindings on one member addressing different shifts', () => {
+    const res = compileMemberSql(
+      (FILTER_PARAMS, FILTER_GROUP) => `${FILTER_GROUP(
+        FILTER_PARAMS.calendar.d.filter('c'),
+        FILTER_PARAMS.calendar.d.time_shifts.prev_fy.filter((from, to) => `c >= ${from} AND c <= ${to}`),
+      )}`,
+      ['FILTER_PARAMS', 'FILTER_GROUP']
+    );
+    expect(res.template).toBe('{fg:0}');
+    expect(res.filterGroups).toHaveLength(1);
+    expect(res.filterGroups[0].filterParams.map(p => p.time_shift_name)).toEqual([null, 'prev_fy']);
   });
 
   it('counts a defaulted parameter as a filter value', () => {

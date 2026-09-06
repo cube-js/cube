@@ -5378,7 +5378,7 @@ export class BaseQuery {
     }
 
     const filterParams = filter.filterParams();
-    const filterParamArg = filterParamArgs.filter(p => {
+    const matching = filterParamArgs.filter(p => {
       const member = p.__member();
       return member === filter.measure ||
         member === filter.dimension ||
@@ -5386,10 +5386,18 @@ export class BaseQuery {
           aliases[member] === filter.measure ||
           aliases[member] === filter.dimension
         ));
-    })[0];
+    });
+
+    if (!matching.length) {
+      throw new Error(`FILTER_PARAMS arg not found for ${filter.measure || filter.dimension}`);
+    }
+
+    // Several args can name the same member, one per time shift it addresses.
+    // Only the one addressing no shift describes the rows this query reads.
+    const filterParamArg = matching.find(p => !(p.__timeShift && p.__timeShift()));
 
     if (!filterParamArg) {
-      throw new Error(`FILTER_PARAMS arg not found for ${filter.measure || filter.dimension}`);
+      return BaseFilter.ALWAYS_TRUE;
     }
 
     if (typeof filterParamArg.__column() !== 'function') {
@@ -5453,51 +5461,81 @@ export class BaseQuery {
         // and do not check cube validity as it's part of compilation step.
         const cubeName = allFilters && cubeEvaluator.cubeNameFromPath(name);
         return new Proxy({ cube: cubeName }, {
-          get: (cubeNameObj, propertyName) => ({
-            filter: (column) => ({
-              __column() {
-                return column;
-              },
-              __member() {
-                return cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]);
-              },
-              toString() {
-                // Segments should be excluded because they are evaluated separately in cubeReferenceProxy
-                // In other case this falls into the recursive loop/stack exceeded caused by:
-                // collectFrom() -> traverseSymbol() -> evaluateSymbolSql() ->
-                // evaluateSql() -> resolveSymbolsCall() -> cubeReferenceProxy->toString() ->
-                // evaluateSymbolSql() -> evaluateSql()... -> and got here again
-                //
-                // When FILTER_PARAMS is used in dimension/measure SQL - we also hit recursive loop:
-                // allBackAliasMembersExceptSegments() -> collectFrom() -> traverseSymbol() -> evaluateSymbolSql() ->
-                // autoPrefixAndEvaluateSql() -> evaluateSql() -> filterProxyFromAllFilters->Proxy->toString()
-                // and so on...
-                // For this case aliasGathering flag is added to the context in first iteration and
-                // is checked below to prevent looping.
-                const aliases = allFilters ?
-                  allFilters
-                    .map(v => (v.query && !v.query.safeEvaluateSymbolContext().aliasGathering ? v.query.allBackAliasMembersExceptSegments() : {}))
-                    .reduce((a, b) => ({ ...a, ...b }), {})
-                  : {};
-                // Filtering aliases that somehow relate to this group member
-                const groupMember = cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]);
-                const aliasesForGroupMembers = Object.entries(aliases)
-                  .filter(([key, _value]) => key === groupMember)
-                  .map(([_key, value]) => value);
-                const filter = BaseQuery.findAndSubTreeForFilterGroup(
-                  newGroupFilter({ operator: 'and', values: allFilters }),
-                  [groupMember],
-                  newGroupFilter,
-                  aliasesForGroupMembers
+          get: (cubeNameObj, propertyName) => new Proxy({}, {
+            get: (memberTarget, prop) => {
+              if (prop === 'filter') {
+                return (column) => BaseQuery.filterProxyBinding(
+                  cubeNameObj.cube, propertyName, false, column, allFilters, cubeEvaluator, allocateParam, newGroupFilter
                 );
-
-                return `(${BaseQuery.renderFilterParams(filter, [this], allocateParam, newGroupFilter, aliases)})`;
               }
-            })
+              // A time shift is addressed only by the native planner. Here the
+              // binding still has to exist, so that a model written for it
+              // compiles and FILTER_GROUP can recover its member, but it
+              // restates nothing.
+              if (prop === 'time_shifts' || prop === 'timeShifts') {
+                return new Proxy({}, {
+                  get: () => ({
+                    filter: (column) => BaseQuery.filterProxyBinding(
+                      cubeNameObj.cube, propertyName, true, column, allFilters, cubeEvaluator, allocateParam, newGroupFilter
+                    )
+                  })
+                });
+              }
+              return Reflect.get(memberTarget, prop);
+            }
           })
         });
       }
     });
+  }
+
+  static filterProxyBinding(cubeName, propertyName, isTimeShift, column, allFilters, cubeEvaluator, allocateParam, newGroupFilter) {
+    return {
+      __column() {
+        return column;
+      },
+      __member() {
+        return cubeEvaluator.pathFromArray([cubeName, propertyName]);
+      },
+      __timeShift() {
+        return isTimeShift;
+      },
+      toString() {
+        if (isTimeShift) {
+          return `(${BaseFilter.ALWAYS_TRUE})`;
+        }
+        // Segments should be excluded because they are evaluated separately in cubeReferenceProxy
+        // In other case this falls into the recursive loop/stack exceeded caused by:
+        // collectFrom() -> traverseSymbol() -> evaluateSymbolSql() ->
+        // evaluateSql() -> resolveSymbolsCall() -> cubeReferenceProxy->toString() ->
+        // evaluateSymbolSql() -> evaluateSql()... -> and got here again
+        //
+        // When FILTER_PARAMS is used in dimension/measure SQL - we also hit recursive loop:
+        // allBackAliasMembersExceptSegments() -> collectFrom() -> traverseSymbol() -> evaluateSymbolSql() ->
+        // autoPrefixAndEvaluateSql() -> evaluateSql() -> filterProxyFromAllFilters->Proxy->toString()
+        // and so on...
+        // For this case aliasGathering flag is added to the context in first iteration and
+        // is checked below to prevent looping.
+        const aliases = allFilters ?
+          allFilters
+            .map(v => (v.query && !v.query.safeEvaluateSymbolContext().aliasGathering ? v.query.allBackAliasMembersExceptSegments() : {}))
+            .reduce((a, b) => ({ ...a, ...b }), {})
+          : {};
+        // Filtering aliases that somehow relate to this group member
+        const groupMember = cubeEvaluator.pathFromArray([cubeName, propertyName]);
+        const aliasesForGroupMembers = Object.entries(aliases)
+          .filter(([key, _value]) => key === groupMember)
+          .map(([_key, value]) => value);
+        const filter = BaseQuery.findAndSubTreeForFilterGroup(
+          newGroupFilter({ operator: 'and', values: allFilters }),
+          [groupMember],
+          newGroupFilter,
+          aliasesForGroupMembers
+        );
+
+        return `(${BaseQuery.renderFilterParams(filter, [this], allocateParam, newGroupFilter, aliases)})`;
+      }
+    };
   }
 
   /**
