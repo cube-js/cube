@@ -1,9 +1,22 @@
 ---
-title: Spacer & Divider
-description: Non-data layout elements — a spacer for whitespace and a divider line — that help you structure a dashboard.
+title: Layout widgets
+description: Non-data layout elements — a stack container, spacer, and divider — that help you structure a dashboard.
 ---
 
-Spacer and divider are non-data **layout** widgets. They carry no data of their own; you place them on the canvas alongside charts, text, and controls to add whitespace and visual structure to a dashboard.
+Stack, spacer, and divider are non-data **layout** widgets. Stack carries other widgets; spacer and divider carry no data of their own. Place them on the canvas alongside charts, text, and controls to structure a dashboard.
+
+## Stack
+
+A stack is a container that groups other widgets and lays them out along one axis:
+
+- **Horizontal stack** — arranges its children side by side.
+- **Vertical stack** — stacks its children on top of each other.
+
+A stack's children share the space evenly along that axis and have no size of their own — only a position in the line. Resizing the stack resizes every child with it.
+
+Drag a widget onto a stack to add it — an empty stack prompts you to **Drag widgets here**. As you drag over the stack, it opens a slot under the pointer showing exactly where the widget will land. A stack can hold other stacks too, nested up to 4 levels deep.
+
+Controls placed inside a stack ([filters](/docs/explore-analyze/dashboards/widgets/controls#filter), [time granularity switchers](/docs/explore-analyze/dashboards/widgets/controls#time-granularity-switcher), [field switchers](/docs/explore-analyze/dashboards/widgets/controls#field-switcher), and [parent controls](/docs/explore-analyze/dashboards/widgets/controls#parent)) drive the dashboard the same as controls placed directly on the canvas.
 
 ## Spacer
 
@@ -17,11 +30,11 @@ A divider is a horizontal separator line that breaks up the layout flow — a li
 
 ## Adding a layout widget
 
-In the [dashboard builder][ref-workbooks], open the **Add Widgets** menu in the toolbar and choose **Spacer** or **Divider**. The widget is added to the canvas, where you can drag it into place and (for a spacer) resize it.
+In the [dashboard builder][ref-workbooks], open the **Add Widgets** menu in the toolbar and choose **Horizontal stack**, **Vertical stack**, **Spacer**, or **Divider**. The widget is added to the canvas, where you can drag it into place and (for a spacer or stack) resize it.
 
 ## Styling
 
-Both widgets follow the dashboard's [widget styling settings](/docs/explore-analyze/dashboards/styling):
+The spacer and divider follow the dashboard's [widget styling settings](/docs/explore-analyze/dashboards/styling):
 
 - The **divider** draws its line using the widget **border** width, style, and color.
 - A **spacer** picks up the same border and background settings while you are editing, so its bounds are easy to see.
