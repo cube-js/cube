@@ -36,6 +36,10 @@ cubes:
             type: time
             time_shift: *shifts
 
+          - name: plain_d
+            sql: "{CUBE}.d"
+            type: time
+
           - name: fy_name
             sql: "{CUBE}.fy_name"
             type: string
@@ -434,6 +438,53 @@ fn a_calendar_shift_silences_bindings_on_the_calendars_other_members() {
         1,
         "only the unshifted stage states the fiscal year\npredicates: {:?}",
         predicates
+    );
+}
+
+// Which shift names exist is the calendar's business, not the bound member's:
+// a calendar shift moves the primary key the whole cube joins through, so a
+// member that declares no shift of its own is still shifted by one. Reading the
+// names off the bound member instead would turn such a binding into an error on
+// every query against the model, shifted or not.
+#[test]
+fn a_binding_on_a_calendar_member_declaring_no_shift_is_not_an_error() {
+    let ctx = TestContext::new(schema(&[
+        BASE,
+        PREV_FY,
+        "FILTER_PARAMS:fpts_calendar.plain_d@prev_fy:\
+         day_d >= (%0)::timestamptz - interval '364 day' \
+         AND day_d <= (%1)::timestamptz - interval '364 day'",
+    ]))
+    .unwrap();
+
+    let sql = ctx
+        .build_sql(indoc! {r#"
+            measures:
+              - fpts_sales.amount
+            time_dimensions:
+              - dimension: fpts_calendar.report_d
+                granularity: day
+                dateRange:
+                  - "2024-12-29"
+                  - "2025-01-04"
+            filters:
+              - member: fpts_calendar.plain_d
+                operator: inDateRange
+                values:
+                  - "2024-12-29"
+                  - "2025-01-04"
+        "#})
+        .unwrap();
+
+    let predicates = fact_scan_predicates(&sql);
+    assert_eq!(predicates.len(), 1, "expected one stage\nsql: {}", sql);
+    // The bound member the query reports by still narrows the scan; the one
+    // holding only a shift binding states nothing here, and says so rather than
+    // failing the query.
+    assert!(
+        predicates[0].contains("day_d >=") && predicates[0].contains("1 = 1"),
+        "predicate: {}",
+        predicates[0]
     );
 }
 

@@ -173,6 +173,15 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
     )).toThrow(/needs the name of a time shift/);
   });
 
+  // `time_shifts.filter(...)` is the plain form with `time_shifts.` inserted by
+  // mistake, and would otherwise read as a shift named `filter`.
+  it('rejects filter written as a shift name', () => {
+    expect(() => compileMemberSql(
+      (FILTER_PARAMS) => `${FILTER_PARAMS.calendar.d.time_shifts.filter('c')}`,
+      ['FILTER_PARAMS']
+    )).toThrow(/needs the name of a time shift/);
+  });
+
   it('counts a defaulted parameter as a filter value', () => {
     const res = compileMemberSql(
       (FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((from, to = 1) => `d BETWEEN ${from} AND ${to}`)}`,

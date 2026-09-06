@@ -412,7 +412,7 @@ cubes:
       WHERE {FILTER_GROUP(
         FILTER_PARAMS.fiscal_calendar.report_date.filter('day_date'),
         FILTER_PARAMS.fiscal_calendar.report_date.time_shifts.prev_fiscal_year.filter(
-          (from, to) => `day_date >= ${from}::date - 364 AND day_date <= ${to}::date - 364`
+          lambda x, y: f"day_date >= {x}::date - 364 AND day_date <= {y}::date - 364"
         )
       )}
 ```

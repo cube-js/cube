@@ -205,7 +205,7 @@ fn a_segment_binding_naming_a_time_shift_is_rejected() {
         .unwrap_err();
 
     assert!(
-        err.message.contains("does not declare"),
+        err.message.contains("nothing shifts a segment"),
         "unexpected error: {}",
         err.message
     );

@@ -5475,10 +5475,10 @@ export class BaseQuery {
               if (prop === 'time_shifts' || prop === 'timeShifts') {
                 return new Proxy({}, {
                   get: (_shiftTarget, timeShiftName) => {
-                    // Every string reads as a shift name, so coercing the
-                    // namespace itself — the name left off — would otherwise
-                    // reach the template as an object.
-                    if (typeof timeShiftName !== 'string' || timeShiftName === 'toString' || timeShiftName === 'valueOf') {
+                    // Under `time_shifts` every string reads as the name of a
+                    // shift, so string coercion and `filter` — the plain form
+                    // with `time_shifts.` inserted by mistake — are reserved.
+                    if (typeof timeShiftName !== 'string' || BaseQuery.NOT_SHIFT_NAMES.has(timeShiftName)) {
                       return () => {
                         throw new UserError(
                           `FILTER_PARAMS.${cubeNameObj.cube}.${propertyName}.time_shifts needs the name of a time shift: ` +
@@ -5500,6 +5500,10 @@ export class BaseQuery {
         });
       }
     });
+  }
+
+  static get NOT_SHIFT_NAMES() {
+    return new Set(['toString', 'valueOf', 'filter']);
   }
 
   static filterProxyBinding(cubeName, propertyName, isTimeShift, column, allFilters, cubeEvaluator, allocateParam, newGroupFilter) {

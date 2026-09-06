@@ -29,10 +29,9 @@ impl ToSql for BaseFilter {
                 let shift = visitor
                     .filter_params_time_shifts()
                     .get_for_symbol(&symbol_to_match);
-                let Some(selected) = select_binding(items, &symbol_to_match, shift)? else {
-                    // The stage applies a predicate the model gave no binding
-                    // for, so nothing is restated here and the cube's sql scans
-                    // unrestricted.
+                let Some(selected) = select_binding(items, shift)? else {
+                    // No binding for the shift this stage applies: the scan
+                    // stays open rather than being narrowed to the wrong band.
                     return templates.always_true();
                 };
                 return self.typed_filter().to_sql_for_filter_params(

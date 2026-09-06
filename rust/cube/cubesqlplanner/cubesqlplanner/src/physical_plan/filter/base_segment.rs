@@ -1,4 +1,4 @@
-use super::filter_params_binding::validate_bindings;
+use super::filter_params_binding::{reject_segment_shifts, reject_shifted_string_columns};
 use super::ToSql;
 use crate::cube_bridge::member_sql::FilterParamsColumn;
 use crate::physical_plan::sql_nodes::SqlNode;
@@ -21,13 +21,13 @@ impl ToSql for BaseSegment {
         filters_ctx: &FiltersContext,
     ) -> Result<String, CubeError> {
         if let Some(items) = self.matching_filter_params_columns(filters_ctx) {
-            // Checked here as well as on the dimension path, so the same
+            // Both checked here as well as on the dimension path, so the same
             // modelling mistake reads the same whichever kind of member the
-            // group happens to bind.
-            validate_bindings(items, &self.member_evaluator())?;
-            // A segment is not shifted by anything, so a binding written for a
-            // time shift has no segment to restate and is passed over.
-            let Some(item) = items.iter().find(|item| item.time_shift_name.is_none()) else {
+            // group binds. Nothing shifts a segment, so past them every binding
+            // of this member states the same thing.
+            reject_shifted_string_columns(items)?;
+            reject_segment_shifts(items)?;
+            let Some(item) = items.first() else {
                 return templates.always_true();
             };
             return self.filter_params_column_sql(

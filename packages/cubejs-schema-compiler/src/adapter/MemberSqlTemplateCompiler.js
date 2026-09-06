@@ -197,8 +197,11 @@ function compileColumnCallback(column, state) {
   }
 }
 
-// Properties JS reads when it coerces an object to a string.
-const COERCION_PROPS = new Set(['toString', 'valueOf']);
+// Under `time_shifts` every string reads as the name of a shift, so the
+// properties JS reads when it coerces an object to a string are reserved, and
+// so is `filter` — writing it there is the plain form with `time_shifts.`
+// inserted by mistake.
+const NOT_SHIFT_NAMES = new Set(['toString', 'valueOf', 'filter']);
 
 // A `.filter(...)` binding on one member, optionally addressing one of the
 // member's time shifts.
@@ -233,10 +236,7 @@ function filterParamsItemProxy(cubeName, name, state) {
       if (prop === 'time_shifts' || prop === 'timeShifts') {
         return new Proxy({}, {
           get(_t2, timeShiftName) {
-            // Every string reads as a shift name, so coercing the namespace
-            // itself — `${FILTER_PARAMS.c.m.time_shifts}`, the name left off —
-            // would otherwise reach the template as an object.
-            if (typeof timeShiftName !== 'string' || COERCION_PROPS.has(timeShiftName)) {
+            if (typeof timeShiftName !== 'string' || NOT_SHIFT_NAMES.has(timeShiftName)) {
               return () => {
                 throw new Error(
                   `FILTER_PARAMS.${cubeName}.${name}.time_shifts needs the name of a time shift: `

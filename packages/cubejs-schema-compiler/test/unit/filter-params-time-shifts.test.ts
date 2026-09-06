@@ -1,6 +1,6 @@
 /* eslint-disable no-template-curly-in-string */
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
-import { prepareJsCompiler } from './PrepareCompiler';
+import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 
 // A fact cube narrowing its own scan through FILTER_PARAMS on the time
 // dimension of a fiscal calendar. The calendar maps a date onto the matching
@@ -156,14 +156,86 @@ describe('FILTER_PARAMS addressing a time shift', () => {
     ['legacy planner', false],
     ['native planner', true],
   ])('%s', (_name, useNativeSqlPlanner) => {
-    it('reports time_shifts left without a shift name', async () => {
-      const query = await queryFor(
-        '${FILTER_PARAMS.fiscal_calendar.reportD.time_shifts}',
-        useNativeSqlPlanner
-      );
+    it.each([
+      ['coerced without a shift name', '${FILTER_PARAMS.fiscal_calendar.reportD.time_shifts}'],
+      ['given filter as the shift name', '${FILTER_PARAMS.fiscal_calendar.reportD.time_shifts.filter(\'day_d\')}'],
+    ])('reports time_shifts %s', async (_case, binding) => {
+      const query = await queryFor(binding, useNativeSqlPlanner);
 
       expect(() => query.buildSqlAndParams()).toThrow(/needs the name of a time shift/);
     });
+  });
+
+  // A YAML model states the callback as a Python lambda, which is what the
+  // documented form uses — and `from` is a keyword there, so the bounds cannot
+  // even be named the way the JavaScript form names them.
+  it('binds the shift from a YAML model', async () => {
+    const model = `
+cubes:
+  - name: fiscal_calendar
+    calendar: true
+    sql: "SELECT '2025-01-01'::timestamp AS d, '2024-01-03'::timestamp AS d_prev_fy"
+    dimensions:
+      - name: d
+        sql: "{CUBE}.d"
+        type: time
+        primary_key: true
+        time_shift: &shifts
+          - name: prev_fy
+            sql: "{CUBE.d_prev_fy}"
+      - name: report_d
+        sql: "{CUBE}.d"
+        type: time
+        time_shift: *shifts
+      - name: d_prev_fy
+        sql: "{CUBE}.d_prev_fy"
+        type: time
+  - name: sales
+    sql: |
+      SELECT * FROM sales WHERE {FILTER_GROUP(
+        FILTER_PARAMS.fiscal_calendar.report_d.filter('day_d'),
+        FILTER_PARAMS.fiscal_calendar.report_d.time_shifts.prev_fy.filter(
+          lambda x, y: f"day_d >= {x}::timestamptz - interval '364 day' AND day_d <= {y}::timestamptz - interval '364 day'"
+        )
+      )}
+    joins:
+      - name: fiscal_calendar
+        sql: "{CUBE}.day_d = {fiscal_calendar.d}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: day_d
+        sql: day_d
+        type: time
+    measures:
+      - name: amount
+        sql: amount
+        type: sum
+      - name: amount_prev_fy
+        type: number
+        multi_stage: true
+        sql: "{amount}"
+        time_shift:
+          - name: prev_fy
+`;
+    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(model);
+    await compiler.compile();
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['sales.amount', 'sales.amount_prev_fy'],
+      timeDimensions: [{
+        dimension: 'fiscal_calendar.report_d',
+        granularity: 'day',
+        dateRange: ['2025-01-01', '2025-01-07'],
+      }],
+      timezone: 'UTC',
+    });
+    const [sql] = query.buildSqlAndParams();
+
+    expect(sql.match(SHIFTED_BAND)).toHaveLength(1);
+    expect(sql.match(REPORTING_BAND)).toHaveLength(1);
   });
 
   // A build query carries no user filters, so the group has nothing to state

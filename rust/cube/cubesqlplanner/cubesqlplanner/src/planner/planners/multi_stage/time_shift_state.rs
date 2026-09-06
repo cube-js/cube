@@ -6,6 +6,7 @@ use crate::planner::symbols::MemberSymbol;
 use crate::planner::DimensionTimeShift;
 use crate::planner::SqlInterval;
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -78,7 +79,10 @@ impl TimeShiftState {
     pub fn extract_time_shifts(&self) -> Result<ExtractedTimeShifts, CubeError> {
         let mut extracted = ExtractedTimeShifts::default();
 
-        for (key, shift) in self.dimensions_shifts.iter() {
+        // Sorted, so that two dimensions of one calendar cube resolving to the
+        // same key always leave the same one standing: a `HashMap`'s order
+        // would otherwise make the SQL differ between runs of one query.
+        for (key, shift) in self.dimensions_shifts.iter().sorted_by_key(|(key, _)| *key) {
             if let Ok(dimension) = shift.dimension.as_dimension() {
                 // 1. Shift might be referenced by name or by interval
                 // 2. Shift body might be defined in calendar dimension as:
@@ -148,45 +152,61 @@ pub struct ExtractedTimeShifts {
 }
 
 impl ExtractedTimeShifts {
-    // A calendar shift is applied to the cube's primary key, which is what the
-    // fact table joins to, so it moves every row the stage reads — not just the
-    // rows of the dimension the shift was asked for. Both the asked-for
-    // dimension's cube and the primary key's are recorded, since a view can
-    // re-export the one without the other.
+    // Recorded per cube, not per member: the shift moves the primary key the
+    // fact table joins to, so it moves every row the stage reads. Both the
+    // asked-for dimension's cube and the primary key's are kept, since a view
+    // can re-export the one without the other.
     fn add_calendar_shift(
         &mut self,
         dimension: &Rc<DimensionSymbol>,
         pk_full_name: &str,
         name: Option<&String>,
     ) {
+        let shift = CalendarShift {
+            name: name.cloned(),
+            declared_names: dimension
+                .time_shift()
+                .iter()
+                .filter_map(|declared| declared.name.clone())
+                .collect(),
+        };
         self.filter_params_shifts
-            .add_calendar_cube(dimension.cube_name().clone(), name.cloned());
+            .add_calendar_cube(dimension.cube_name().clone(), shift.clone());
         if let Some((pk_cube, _)) = pk_full_name.split_once('.') {
             self.filter_params_shifts
-                .add_calendar_cube(pk_cube.to_string(), name.cloned());
+                .add_calendar_cube(pk_cube.to_string(), shift);
         }
     }
 }
 
-/// What a `FILTER_PARAMS` binding can do about the time shift active on the
-/// member it names.
+/// What a `FILTER_PARAMS` binding can state about the time shift active on the
+/// member it names. An interval shift is carried by offsetting the column, so
+/// the plain binding renders shifted; a calendar shift is a mapping in the
+/// calendar's own table that no expression over the column reproduces, so only
+/// a binding naming it renders.
 #[derive(Clone, Debug, PartialEq)]
 pub enum FilterParamsTimeShift {
-    /// The shift offsets the member's own expression, so a column standing for
-    /// the member carries it by being offset the same way.
     Interval(SqlInterval),
-    /// A calendar cube maps the rows the stage reads onto other rows, which no
-    /// expression over the source column reproduces. Only a binding addressing
-    /// this shift by name renders; `name` is `None` when the calendar
+    Calendar(CalendarShift),
+}
+
+/// The calendar shift a stage applies, as a `FILTER_PARAMS` binding sees it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CalendarShift {
+    /// The name a binding addresses this shift by; `None` when the calendar
     /// declaration has none, leaving the shift unaddressable.
-    Calendar { name: Option<String> },
+    pub name: Option<String>,
+    /// Every shift name the calendar declares, so a binding on one of the
+    /// cube's other members is checked against the calendar rather than against
+    /// the member it binds.
+    pub declared_names: Vec<String>,
 }
 
 /// The stage's time shifts as `FILTER_PARAMS` rendering sees them.
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct FilterParamsTimeShifts {
     interval_shifts: HashMap<String, SqlInterval>,
-    calendar_cubes: HashMap<String, Option<String>>,
+    calendar_cubes: HashMap<String, CalendarShift>,
 }
 
 impl FilterParamsTimeShifts {
@@ -194,15 +214,15 @@ impl FilterParamsTimeShifts {
         self.interval_shifts.insert(key, interval);
     }
 
-    fn add_calendar_cube(&mut self, cube_name: String, shift_name: Option<String>) {
-        self.calendar_cubes.insert(cube_name, shift_name);
+    fn add_calendar_cube(&mut self, cube_name: String, shift: CalendarShift) {
+        self.calendar_cubes.insert(cube_name, shift);
     }
 
     /// The shift a `FILTER_PARAMS` binding on this member has to account for.
     pub fn get_for_symbol(&self, symbol: &Rc<MemberSymbol>) -> Option<FilterParamsTimeShift> {
         let resolved = resolve_base_symbol(symbol).resolve_reference_chain();
-        if let Some(name) = self.calendar_cubes.get(&resolved.cube_name()) {
-            return Some(FilterParamsTimeShift::Calendar { name: name.clone() });
+        if let Some(shift) = self.calendar_cubes.get(&resolved.cube_name()) {
+            return Some(FilterParamsTimeShift::Calendar(shift.clone()));
         }
         if let Some(interval) = self.interval_shifts.get(&resolved.full_name()) {
             return Some(FilterParamsTimeShift::Interval(interval.clone()));
