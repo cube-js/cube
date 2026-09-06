@@ -1139,7 +1139,8 @@ export class PreAggregations {
   private cubesHintsFromPreAggregation(preAggObj: PreAggregationForQuery): string[][] {
     return R.uniq(
       preAggObj.references.measures.concat(
-        preAggObj.references.dimensions
+        preAggObj.references.dimensions,
+        (preAggObj.references.timeDimensions || []).map(td => td.dimension)
       ).map(p => p.split('.').slice(0, -1))
     );
   }
