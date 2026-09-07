@@ -1,5 +1,5 @@
 ---
-title: Spacer, Divider & Stacks
+title: Spacer, Divider & Stack
 description: Non-data layout elements — a spacer for whitespace, a divider line, and stack containers that group widgets — to help you structure a dashboard.
 ---
 
@@ -15,13 +15,18 @@ A spacer is only visible while you are editing in the [dashboard builder][ref-wo
 
 A divider is a horizontal separator line that breaks up the layout flow — a lightweight way to signal the boundary between sections of a dashboard. Unlike other widgets, a divider is a fixed height and **cannot be resized** vertically.
 
-## Stacks
+## Stack
 
 A **horizontal stack** or **vertical stack** is a container that groups several widgets and lays them out evenly — side by side in a horizontal stack, or top to bottom in a vertical stack. Use a stack to keep a set of related widgets aligned and sized together, instead of positioning each one on the grid by hand.
 
-Place a stack on the canvas and resize it to any width and height; its children always share that space evenly. In a horizontal stack each child takes the full height and an equal share of the width; in a vertical stack each child takes the full width and an equal share of the height. Add a widget to a stack by dragging it in — from the canvas, the **Add Widgets** menu, or another stack — and remove one by dragging it back out; the remaining children redistribute to fill the space. Stacks can be nested inside one another.
+Place a stack on the canvas and resize it to any width and height; its children always share that space evenly:
 
-Because a stack owns its children's layout, you work with the **container as a unit**: select, move, resize, or delete the stack itself and it carries its children with it. Individual widgets inside a stack are not separately selectable on the board — to rearrange them, drag a child to a new position **within** the stack; to take one out, drag it onto the canvas or into another container.
+- In a **horizontal stack**, each child takes the full height and an equal share of the width.
+- In a **vertical stack**, each child takes the full width and an equal share of the height.
+
+Add a widget to a stack by dragging it in — from the canvas, the **Add Widgets** menu, or another stack — and remove one by dragging it back out; the remaining children redistribute to fill the space. Stacks can be nested inside one another.
+
+Because a stack owns its children's layout, you work with the **container as a unit**: select, move, resize, or delete the stack itself and it carries its children with it. Individual widgets inside a stack are not separately selectable on the board — a marquee drawn over a stack selects the container, not its children. To rearrange children, drag one to a new position **within** the stack; to take one out, drag it onto the canvas or into another container.
 
 ## Adding a layout widget
 
@@ -29,9 +34,11 @@ In the [dashboard builder][ref-workbooks], open the **Add Widgets** menu in the 
 
 ## Styling
 
-Both widgets follow the dashboard's [widget styling settings](/docs/explore-analyze/dashboards/styling):
+The **spacer** and **divider** follow the dashboard's [widget styling settings](/docs/explore-analyze/dashboards/styling):
 
 - The **divider** draws its line using the widget **border** width, style, and color.
 - A **spacer** picks up the same border and background settings while you are editing, so its bounds are easy to see.
+
+A **stack** draws no card of its own — it only groups and sizes its children, each of which keeps its own styling.
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
