@@ -25,10 +25,7 @@
     "docs-mintlify/",
     "examples/",
     "rust/cubesql/",
-    // still on ESLint: oxlint cannot parse Vue SFCs
-    "packages/cubejs-client-vue3/",
     // never covered by the ESLint setup this replaced
-    "packages/cubejs-client-ngx/",
     "packages/cubejs-playground/",
     "packages/cubejs-testing/cypress/",
     "packages/cubejs-testing/birdbox-fixtures/",
