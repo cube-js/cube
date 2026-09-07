@@ -24,7 +24,6 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "moduleResolution": "bundler",
-    "noUncheckedSideEffectImports": false,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noImplicitAny": false,

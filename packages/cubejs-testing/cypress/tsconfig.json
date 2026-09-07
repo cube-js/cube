@@ -1,7 +1,6 @@
 {
   "extends": "../../../tsconfig.base.json",
   "include": [
-    "e2e",
     "support",
     "queries.ts",
     "global.d.ts"

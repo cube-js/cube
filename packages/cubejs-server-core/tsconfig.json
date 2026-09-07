@@ -23,6 +23,7 @@
     { "path": "../cubejs-base-driver" },
     { "path": "../cubejs-cubestore-driver" },
     { "path": "../cubejs-query-orchestrator" },
-    { "path": "../cubejs-schema-compiler" }
+    { "path": "../cubejs-schema-compiler" },
+    { "path": "../cubejs-templates" }
   ]
 }
