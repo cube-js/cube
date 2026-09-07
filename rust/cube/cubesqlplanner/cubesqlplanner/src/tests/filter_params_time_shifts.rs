@@ -690,3 +690,149 @@ async fn a_model_without_a_binding_for_its_shift_still_answers() {
         base_only
     );
 }
+
+// The mirror of the fixture above, and the shape a real model takes.
+//
+// Which way the calendar's own column has to point depends on where the shift
+// lands. Above, the join is written as a member reference, so the shift rewrites
+// the join key and the column holds the *earlier* date. Here the join names the
+// raw column, so the member is left to render in the projection and the filter
+// only — and the column has to hold the *later* date, reached by a reverse
+// lookup, for the same reporting label to read the earlier rows.
+const CUSTOMER_SCHEMA: &str = r#"
+cubes:
+    - name: cst_calendar
+      calendar: true
+      sql: "SELECT *, d + interval '364 day' AS d_next_fy, d + interval '728 day' AS d_next_two_fy FROM fpts_calendar"
+      dimensions:
+          - name: calendar_d
+            sql: "{CUBE}.d"
+            type: time
+            primary_key: true
+            time_shift:
+                - name: ly
+                  sql: "{CUBE}.d_next_fy"
+                - name: ly2
+                  sql: "{CUBE}.d_next_two_fy"
+      measures:
+          - name: count
+            type: count
+
+    - name: cst_fact
+      sql: "__FACT_SQL__"
+      joins:
+          - name: cst_calendar
+            sql: "{CUBE}.day_d = {cst_calendar}.d"
+            relationship: many_to_one
+      dimensions:
+          - name: id
+            sql: id
+            type: number
+            primary_key: true
+          - name: day_d
+            sql: day_d
+            type: time
+      measures:
+          - name: amount
+            type: sum
+            sql: amount
+
+          - name: amount_ly
+            type: number
+            multi_stage: true
+            sql: "{amount}"
+            time_shift:
+                - name: ly
+
+          - name: amount_ly2
+            type: number
+            multi_stage: true
+            sql: "{amount}"
+            time_shift:
+                - name: ly2
+"#;
+
+const CUSTOMER_BINDINGS: &str = "FILTER_GROUP|\
+                                 FILTER_PARAMS_COLUMN:cst_calendar.calendar_d:day_d|\
+                                 FILTER_PARAMS:cst_calendar.calendar_d@ly:\
+                                 day_d >= (%0)::timestamptz - interval '364 day' \
+                                 AND day_d <= (%1)::timestamptz - interval '364 day'|\
+                                 FILTER_PARAMS:cst_calendar.calendar_d@ly2:\
+                                 day_d >= (%0)::timestamptz - interval '728 day' \
+                                 AND day_d <= (%1)::timestamptz - interval '728 day'";
+
+fn customer_schema(bindings: Option<&str>) -> MockSchema {
+    let fact_sql = match bindings {
+        Some(bindings) => format!("SELECT * FROM fpts_sales WHERE {{{}}}", bindings),
+        None => "SELECT * FROM fpts_sales".to_string(),
+    };
+    MockSchema::from_yaml(&CUSTOMER_SCHEMA.replace("__FACT_SQL__", &fact_sql)).unwrap()
+}
+
+const CUSTOMER_QUERY: &str = indoc! {r#"
+    measures:
+      - cst_fact.amount
+      - cst_fact.amount_ly
+      - cst_fact.amount_ly2
+    time_dimensions:
+      - dimension: cst_calendar.calendar_d
+        granularity: day
+        dateRange:
+          - "2024-12-29"
+          - "2025-01-04"
+    order:
+      - id: cst_calendar.calendar_d
+"#};
+
+// One band per stage here too: the rule keys on the cube whose calendar is
+// shifted, not on where in the SQL that shift comes out.
+#[test]
+fn each_stage_binds_its_own_shift_with_the_shift_in_the_projection() {
+    let ctx = TestContext::new(customer_schema(Some(CUSTOMER_BINDINGS))).unwrap();
+    let sql = ctx.build_sql(CUSTOMER_QUERY).unwrap();
+    let predicates = fact_scan_predicates(&sql);
+
+    assert_eq!(predicates.len(), 3, "expected three stages\nsql: {}", sql);
+    assert_eq!(
+        predicates
+            .iter()
+            .filter(|p| !p.contains("interval"))
+            .count(),
+        1,
+        "one stage reads the reporting band\npredicates: {:?}",
+        predicates
+    );
+    for band in ["364 day", "728 day"] {
+        assert_eq!(
+            predicates.iter().filter(|p| p.contains(band)).count(),
+            1,
+            "exactly one stage reads the band {} back\npredicates: {:?}",
+            band,
+            predicates
+        );
+    }
+    // The shift comes out in the projection and the filter; the join is left
+    // alone, since it names the column rather than the member.
+    assert!(
+        sql.contains(r#"ON "cst_fact".day_d = "cst_calendar".d"#),
+        "the join key is not shifted\nsql: {}",
+        sql
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn pushdown_does_not_change_the_answer_with_the_shift_in_the_projection() {
+    let with_pushdown = TestContext::new(customer_schema(Some(CUSTOMER_BINDINGS))).unwrap();
+    let without = TestContext::new(customer_schema(None)).unwrap();
+
+    let Some(pushed_down) = with_pushdown.try_execute_pg(CUSTOMER_QUERY, SEED).await else {
+        return;
+    };
+    let full_scan = without
+        .try_execute_pg(CUSTOMER_QUERY, SEED)
+        .await
+        .expect("the plain model runs wherever the pushdown one does");
+
+    assert_eq!(pushed_down, full_scan);
+    insta::assert_snapshot!(pushed_down);
+}
