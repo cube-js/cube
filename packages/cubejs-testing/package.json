@@ -114,12 +114,12 @@
     "@cubejs-backend/linter": "1.7.35",
     "@cubejs-client/core": "1.7.35",
     "@jest/globals": "^29",
+    "@simonsmith/cypress-image-snapshot": "^11.0.0",
     "@types/dedent": "^0.7.0",
     "@types/http-proxy": "^1.17.5",
     "@types/jest": "^29",
     "@types/node": "^22",
-    "cypress": "14.0.0",
-    "cypress-image-snapshot": "^4.0.1",
+    "cypress": "15.21.1",
     "cypress-localstorage-commands": "^1.4.5",
     "cypress-plugin-snapshots": "^1.4.4",
     "cypress-wait-until": "^1.7.2",
@@ -129,7 +129,7 @@
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^3.1.2",
     "pg": "^8.7.3",
-    "typescript": "~5.2.2",
+    "typescript": "~6.0.3",
     "yaml": "^1.10.2"
   },
   "publishConfig": {

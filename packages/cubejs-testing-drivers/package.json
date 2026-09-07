@@ -19,7 +19,7 @@
     "lint": "eslint src/* test/ --ext .ts",
     "lint:fix": "eslint --fix src/* test/ --ext .ts",
     "image": "node dist/test/buildCubeImage",
-    "test-driver": "TZ=UTC jest --forceExit --runInBand --verbose",
+    "test-driver": "TZ=UTC NODE_OPTIONS=--experimental-vm-modules jest --forceExit --runInBand --verbose",
     "athena-driver": "yarn test-driver -i dist/test/athena-driver.test.js",
     "athena-core": "yarn test-driver -i dist/test/athena-core.test.js",
     "athena-export-bucket-s3-full": "yarn test-driver -i dist/test/athena-export-bucket-s3-full.test.js",
@@ -121,7 +121,7 @@
     "pg": "^8.7.3",
     "ramda": "^0.28.0",
     "testcontainers": "^10.28.0",
-    "typescript": "~5.2.2",
+    "typescript": "~6.0.3",
     "yaml": "^1.10.2",
     "yargs": "^17.7.1"
   },

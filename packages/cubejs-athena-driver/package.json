@@ -16,9 +16,9 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "yarn integration",
-    "unit": "jest --verbose dist/test/unit",
+    "unit": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test/unit",
     "integration": "npm run integration:athena",
-    "integration:athena": "jest --verbose dist/test",
+    "integration:athena": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
@@ -37,8 +37,10 @@
   "devDependencies": {
     "@cubejs-backend/linter": "1.7.35",
     "@cubejs-backend/testing-shared": "1.7.35",
+    "@types/jest": "^29",
+    "@types/node": "^22",
     "@types/ramda": "^0.27.40",
-    "typescript": "~5.2.2"
+    "typescript": "~6.0.3"
   },
   "publishConfig": {
     "access": "public"

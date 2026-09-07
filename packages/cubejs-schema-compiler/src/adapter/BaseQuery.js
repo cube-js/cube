@@ -3825,6 +3825,9 @@ export class BaseQuery {
     };
   }
 
+  /**
+   * @returns {string[]}
+   */
   collectLeafMeasures(fn) {
     const context = { leafMeasures: {} };
     this.evaluateSymbolSqlWithContext(
@@ -5712,7 +5715,7 @@ export class BaseQuery {
   /**
    * Returns a function that constructs the full member path
    * based on the query's join structure.
-   * @returns {(function(member: string): (string))}
+   * @returns {(member: string) => string}
    */
   resolveFullMemberPathFn() {
     const { root: queryJoinRoot } = this.join || {};
