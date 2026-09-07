@@ -1,6 +1,13 @@
 import * as moment from 'moment';
 import { buildObjectShape } from '@cubejs-backend/shared';
 
+import {
+  PRECISION_UNSUPPORTED,
+  dateTimePrecision,
+  isNumericTypeName,
+  unwrapScalarType,
+} from './TypeParser';
+
 export type ColumnConverter = (value: unknown) => unknown;
 
 export type ColumnMeta = { name: string, type: string };
@@ -18,7 +25,6 @@ const CHAR_DASH = 45;
 const CHAR_DOT = 46;
 const CHAR_COLON = 58;
 const CHAR_T = 84;
-const CHAR_LPAREN = 40;
 const CHAR_Z = 90;
 
 const ZEROS = '000';
@@ -182,87 +188,21 @@ const numberConverter: ColumnConverter = (value) => {
   return typeof value === 'string' ? value : String(value);
 };
 
-const WRAPPER_PREFIXES = ['Nullable(', 'LowCardinality('];
-
-// Scalar names inside container arguments must not select a converter for the container itself.
-// SimpleAggregateFunction is excluded because it reads back as its scalar argument type.
-const NON_SCALAR_PREFIXES = ['Array(', 'Map(', 'Tuple(', 'Nested(', 'Enum', 'JSON', 'AggregateFunction('];
-
-function unwrapScalar(type: string): string {
-  let inner = type;
-  let stripped = true;
-
-  while (stripped) {
-    stripped = false;
-
-    for (const prefix of WRAPPER_PREFIXES) {
-      if (inner.startsWith(prefix)) {
-        inner = inner.slice(prefix.length);
-        stripped = true;
-      }
-    }
-  }
-
-  return inner;
-}
-
-const DATE_TIME64 = 'DateTime64';
-const DEFAULT_DATE_TIME64_PRECISION = 3;
-const MAX_DATE_TIME64_PRECISION = 9;
-const PRECISION_UNSUPPORTED = -1;
-
-// `DateTime` and `DateTime64(0)` read back with the same 19 character shape, so a plain DateTime is
-// precision 0. indexOf rather than startsWith, because SimpleAggregateFunction(max, DateTime64(3))
-// reads back as its argument type. charCodeAt past the end is NaN, so no bounds checks are needed.
-function parseDateTimePrecision(inner: string): number {
-  const at = inner.indexOf(DATE_TIME64);
-  if (at === -1) {
-    return 0;
-  }
-
-  let i = at + DATE_TIME64.length;
-  if (inner.charCodeAt(i) !== CHAR_LPAREN) {
-    return DEFAULT_DATE_TIME64_PRECISION;
-  }
-
-  i++;
-  let precision = 0;
-  let digits = 0;
-  while (isDigit(inner.charCodeAt(i))) {
-    precision = precision * 10 + (inner.charCodeAt(i) - CHAR_0);
-    digits++;
-    i++;
-  }
-
-  if (digits === 0 || precision > MAX_DATE_TIME64_PRECISION) {
-    return PRECISION_UNSUPPORTED;
-  }
-
-  return precision;
-}
-
 export function getColumnConverter(type: string): ColumnConverter | null {
-  const inner = unwrapScalar(type);
+  const parsed = unwrapScalarType(type);
+  const { name } = parsed;
 
-  if (NON_SCALAR_PREFIXES.some((prefix) => inner.startsWith(prefix))) {
-    return null;
+  if (name === 'date' || name === 'date32') {
+    return dateConverter;
   }
 
-  if (inner.includes('Date')) {
-    if (!inner.includes('DateTime')) {
-      return dateConverter;
-    }
-
-    const precision = parseDateTimePrecision(inner);
+  if (name === 'datetime' || name === 'datetime64') {
+    const precision = dateTimePrecision(parsed);
 
     return precision === PRECISION_UNSUPPORTED ? dateTimeConverter : DATE_TIME_CONVERTERS[precision];
   }
 
-  if (inner.includes('Int') || inner.includes('Float') || inner.includes('Decimal')) {
-    return numberConverter;
-  }
-
-  return null;
+  return isNumericTypeName(name) ? numberConverter : null;
 }
 
 function buildTransform(names: Array<string>, converters: Array<ColumnConverter | null>): Transform {

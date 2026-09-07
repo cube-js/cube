@@ -38,6 +38,7 @@ import { version } from '../package.json';
 
 import { ClickHouseRowStream } from './RowStream';
 import { buildTransformFromMeta, transformRow } from './Transform';
+import { parseType } from './TypeParser';
 import { formatError } from './utils';
 
 const SUPPORTED_BUCKET_TYPES = ['s3'];
@@ -65,6 +66,38 @@ const ClickhouseTypeToGeneric: Record<string, string> = {
   // We don't support enums
   enum8: 'text',
   enum16: 'text',
+  // Without an entry here these reach Cube Store as their raw ClickHouse name and fail the
+  // CREATE TABLE. Bool is the exception, already covered by the base driver's own mapping.
+  date32: 'date',
+  bool: 'boolean',
+  uuid: 'uuid',
+  fixedstring: 'text',
+  ipv4: 'text',
+  ipv6: 'text',
+  nothing: 'text',
+  bfloat16: 'float',
+  // 128 and 256 bit integers arrive as strings; bigint would truncate them.
+  int128: 'decimal',
+  int256: 'decimal',
+  uint128: 'decimal',
+  uint256: 'decimal',
+  // A duration, not a point in time.
+  time: 'string',
+  time64: 'string',
+};
+
+// Containers and opaque types are handed over as their JSON/string rendering.
+const OPAQUE_TYPES = new Set([
+  'map', 'tuple', 'nested', 'variant', 'dynamic', 'json', 'object',
+  'point', 'ring', 'polygon', 'multipolygon', 'linestring', 'multilinestring',
+]);
+
+// Decimal32/64/128/256 name their precision by width and take only a scale argument.
+const DECIMAL_WIDTH_PRECISION: Record<string, number> = {
+  decimal32: 9,
+  decimal64: 18,
+  decimal128: 38,
+  decimal256: 76,
 };
 
 export interface ClickHouseDriverOptions {
@@ -525,44 +558,46 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
    * LowCardinality(Nullable(String))
    * Array(DateTime) -> timestamp[]
    * Map(String, Int32) / Tuple(Int32, String)
+   *
+   * An unrecognized name is passed on to the base driver, which returns it unchanged, and then fails
+   * the Cube Store CREATE TABLE. That is deliberate: guessing `text` for something numeric would
+   * corrupt the column quietly instead.
    */
   protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): GenericDataBaseType {
-    const type = columnType.trim();
-    const lowerType = type.toLowerCase();
-
-    if (lowerType in ClickhouseTypeToGeneric) {
-      return ClickhouseTypeToGeneric[lowerType];
-    }
-
-    const argsStart = type.indexOf('(');
-    if (argsStart === -1) {
-      return super.toGenericType(type, precision, scale);
-    }
-
-    const name = lowerType.slice(0, argsStart).trim();
-    const args = type.slice(argsStart + 1, type.lastIndexOf(')'));
+    const { name, args } = parseType(columnType);
 
     switch (name) {
       case 'nullable':
       case 'lowcardinality':
-        return this.toGenericType(args, precision, scale);
+        return args.length > 0 ? this.toGenericType(args[0], precision, scale) : 'text';
+      // SimpleAggregateFunction stores and reads back a plain value of its argument type
+      case 'simpleaggregatefunction':
+        return args.length > 1 ? this.toGenericType(args[1]) : 'text';
       case 'array':
-        return `${this.toGenericType(args)}[]`;
-      case 'map':
-      case 'tuple':
-      case 'nested':
-        return 'text';
-      case 'decimal': {
-        const [argPrecision, argScale] = args.split(',');
-        return super.toGenericType(name, Number(argPrecision), Number(argScale));
-      }
+        return args.length > 0 ? `${this.toGenericType(args[0])}[]` : 'text';
+      case 'decimal':
+        return super.toGenericType(name, Number(args[0]), Number(args[1]));
       default:
-        // Parameterized scalars: DateTime('UTC'), DateTime64(3, 'UTC'), Enum8('Date' = 1),
-        // FixedString(16). Their arguments never carry a type, so only the name is mapped.
-        return name in ClickhouseTypeToGeneric
-          ? ClickhouseTypeToGeneric[name]
-          : super.toGenericType(name, precision, scale);
+        break;
     }
+
+    if (OPAQUE_TYPES.has(name)) {
+      return 'text';
+    }
+
+    if (Object.hasOwn(DECIMAL_WIDTH_PRECISION, name)) {
+      return super.toGenericType('decimal', DECIMAL_WIDTH_PRECISION[name], Number(args[0]));
+    }
+
+    if (Object.hasOwn(ClickhouseTypeToGeneric, name)) {
+      return ClickhouseTypeToGeneric[name];
+    }
+
+    if (name.startsWith('interval')) {
+      return 'text';
+    }
+
+    return super.toGenericType(name, precision, scale);
   }
 
   public async createSchemaIfNotExists(schemaName: string): Promise<void> {
