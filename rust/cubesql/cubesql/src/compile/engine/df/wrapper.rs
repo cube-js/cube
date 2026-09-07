@@ -2039,38 +2039,53 @@ impl WrappedSelectNode {
         )
         .await?;
 
-        // Sort pushdown can replace a grouped literal's alias with the literal expression.
+        // Sort pushdown can replace a select-list alias with the literal expression.
         // Integer literals in ORDER BY are interpreted as select-list positions by some SQL
         // dialects, so restore the generated alias when the literal is selected in this query.
-        let order_expr = self
-            .order_expr
+        fn unalias(mut expr: &Expr) -> &Expr {
+            while let Expr::Alias(inner, _) = expr {
+                expr = inner;
+            }
+            expr
+        }
+        let literal_aliases = self
+            .projection_expr
             .iter()
-            .map(|order_expr| match order_expr {
-                Expr::Sort {
-                    expr,
-                    asc,
-                    nulls_first,
-                } => {
-                    let literal_alias = flat_group_expr.iter().zip(group_by.iter()).find_map(
-                        |(selected_expr, (aliased_column, _))| {
-                            (matches!(selected_expr, Expr::Literal(_))
-                                && selected_expr == expr.as_ref())
-                            .then(|| aliased_column.alias.clone())
-                        },
-                    );
-
-                    match literal_alias {
-                        Some(alias) => Expr::Sort {
-                            expr: Box::new(Expr::Column(Column::from_name(alias))),
-                            asc: *asc,
-                            nulls_first: *nulls_first,
-                        },
-                        None => order_expr.clone(),
-                    }
-                }
-                _ => order_expr.clone(),
+            .zip(projection.iter())
+            .chain(flat_group_expr.iter().zip(group_by.iter()))
+            .filter_map(|(selected_expr, (aliased_column, _))| {
+                let expr = unalias(selected_expr);
+                matches!(expr, Expr::Literal(_)).then(|| (expr, &aliased_column.alias))
             })
             .collect::<Vec<_>>();
+        let order_expr = if literal_aliases.is_empty() {
+            self.order_expr.clone()
+        } else {
+            self.order_expr
+                .iter()
+                .map(|order_expr| {
+                    let Expr::Sort {
+                        expr,
+                        asc,
+                        nulls_first,
+                    } = order_expr
+                    else {
+                        return order_expr.clone();
+                    };
+                    let Some((_, alias)) = literal_aliases
+                        .iter()
+                        .find(|(literal, _)| *literal == unalias(expr))
+                    else {
+                        return order_expr.clone();
+                    };
+                    Expr::Sort {
+                        expr: Box::new(Expr::Column(Column::from_name(*alias))),
+                        asc: *asc,
+                        nulls_first: *nulls_first,
+                    }
+                })
+                .collect()
+        };
 
         // Sort expressions can reference window expressions computed in this same select
         // by their full DataFusion name. Those columns don't exist in the source SQL, so

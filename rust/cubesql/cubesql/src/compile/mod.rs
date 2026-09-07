@@ -17607,21 +17607,21 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-        let hour_slot_alias = &Regex::new(r#"19 "([^"]+)""#)
+        let hour_slot_alias = &Regex::new(r#"\b19 "([^"]+)""#)
             .unwrap()
             .captures(&sql)
             .unwrap_or_else(|| {
                 panic!(
-                    "literal expression with alias must be present in generated SQL: {}",
+                    "aliased literal 19 must be present in generated SQL: {}",
                     sql
                 )
             })[1];
-        let minute_slot_alias = &Regex::new(r#"8 "([^"]+)""#)
+        let minute_slot_alias = &Regex::new(r#"\b8 "([^"]+)""#)
             .unwrap()
             .captures(&sql)
             .unwrap_or_else(|| {
                 panic!(
-                    "literal expression with alias must be present in generated SQL: {}",
+                    "aliased literal 8 must be present in generated SQL: {}",
                     sql
                 )
             })[1];
@@ -17635,6 +17635,47 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         assert!(
             sql.contains(r#", "with_rate"."customer_gender" ASC"#),
             "ordinary sort expression must be preserved: {}",
+            sql
+        );
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sort_by_projected_literal_alias_sql_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            WITH with_rate AS (
+                SELECT
+                    customer_gender,
+                    SUM(taxful_total_price) AS hourly_rate
+                FROM KibanaSampleDataEcommerce
+                GROUP BY 1
+            )
+            SELECT customer_gender, 19 AS hour_slot, hourly_rate
+            FROM with_rate
+            ORDER BY hour_slot ASC, customer_gender ASC
+            LIMIT 100
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(
+            sql.contains(r#"ORDER BY "hour_slot" ASC, "with_rate"."customer_gender" ASC"#),
+            "literal sort expression must reference the projected alias: {}",
             sql
         );
 
