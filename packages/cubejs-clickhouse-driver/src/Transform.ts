@@ -5,6 +5,7 @@ import {
   PRECISION_UNSUPPORTED,
   dateTimePrecision,
   isNumericTypeName,
+  isOpaqueTypeName,
   unwrapScalarType,
 } from './TypeParser';
 
@@ -180,6 +181,17 @@ const dateConverter: ColumnConverter = (value) => (
   value === null || value === undefined ? value : `${value}T00:00:00.000`
 );
 
+// A container is reported as text by toGenericType, so the value has to arrive as text too:
+// everything downstream, Cube Store inserts included, only accepts scalars. A Variant or Dynamic
+// column already holding a string is left alone rather than gaining a pair of quotes.
+const jsonConverter: ColumnConverter = (value) => {
+  if (value === null || value === undefined || typeof value === 'string') {
+    return value;
+  }
+
+  return JSON.stringify(value);
+};
+
 const numberConverter: ColumnConverter = (value) => {
   if (value === null || value === undefined) {
     return value;
@@ -200,6 +212,10 @@ export function getColumnConverter(type: string): ColumnConverter | null {
     const precision = dateTimePrecision(parsed);
 
     return precision === PRECISION_UNSUPPORTED ? dateTimeConverter : DATE_TIME_CONVERTERS[precision];
+  }
+
+  if (isOpaqueTypeName(name)) {
+    return jsonConverter;
   }
 
   return isNumericTypeName(name) ? numberConverter : null;

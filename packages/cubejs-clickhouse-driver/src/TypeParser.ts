@@ -1,12 +1,9 @@
 /**
  * ClickHouse type string parsing. Every raw type string in the driver is read through here.
  *
- * TODO: replace this file with `@clickhouse/datatype-parser`, ClickHouse's own parser. It cannot be
- * a dependency yet: it ships ESM only (`"type": "module"` with an `exports` map that carries just an
- * `import` condition) while this package is still CommonJS, so `require()` fails with
- * ERR_PACKAGE_PATH_NOT_EXPORTED and even `import type` fails with TS1479. Reaching it needs
- * `module`/`moduleResolution: node16` plus a real `await import()`, which turns every parse site
- * async and makes jest require `--experimental-vm-modules`. Revisit once this package is ESM.
+ * TODO: replace with `@clickhouse/datatype-parser`, ClickHouse's own parser, once this package is
+ * ESM. It is ESM only, so reaching it from CommonJS needs `await import()`, which turns every parse
+ * site async.
  */
 
 export type ParsedType = {
@@ -28,11 +25,7 @@ const CHAR_BACKTICK = 96;
 const NO_ARGS: string[] = [];
 
 function pushArgument(args: string[], type: string, start: number, end: number): void {
-  const arg = type.slice(start, end).trim();
-
-  if (arg.length > 0 || args.length > 0) {
-    args.push(arg);
-  }
+  args.push(type.slice(start, end).trim());
 }
 
 // `Enum8('a,b' = 1)` must not be split on its comma, and `Map(String, Enum8('a,b' = 1))` must not
@@ -98,9 +91,12 @@ export function parseType(type: string): ParsedType {
     return { name: trimmed.toLowerCase(), args: NO_ARGS };
   }
 
+  const args = splitArguments(trimmed, argsStart + 1);
+
   return {
     name: trimmed.slice(0, argsStart).trim().toLowerCase(),
-    args: splitArguments(trimmed, argsStart + 1),
+    // `Foo()` is an empty argument list, not one empty argument.
+    args: args.length === 1 && args[0] === '' ? NO_ARGS : args,
   };
 }
 
@@ -188,4 +184,15 @@ const NUMERIC_TYPE_NAMES = new Set([
 
 export function isNumericTypeName(name: string): boolean {
   return NUMERIC_TYPE_NAMES.has(name);
+}
+
+// Containers and opaque types have no scalar equivalent; a value of one is handed over as its JSON
+// rendering. Geo types are Point/Ring/Polygon and friends, all of them tuples of coordinates.
+const OPAQUE_TYPE_NAMES = new Set([
+  'map', 'tuple', 'nested', 'variant', 'dynamic', 'json', 'object',
+  'point', 'ring', 'polygon', 'multipolygon', 'linestring', 'multilinestring',
+]);
+
+export function isOpaqueTypeName(name: string): boolean {
+  return OPAQUE_TYPE_NAMES.has(name);
 }

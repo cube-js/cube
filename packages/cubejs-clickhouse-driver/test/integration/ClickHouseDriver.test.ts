@@ -226,8 +226,8 @@ describe('ClickHouseDriver', () => {
         enum_type_named: 'Date',
         array_int32: [1, 2],
         array_datetime: ['2020-01-01 00:00:00'],
-        map_str_int32: { a: 1 },
-        tuple_int32_str: [1, 'a'],
+        map_str_int32: '{"a":1}',
+        tuple_int32_str: '[1,"a"]',
         lc_nullable: 'x',
       }]);
     });
@@ -330,7 +330,7 @@ describe('ClickHouseDriver', () => {
     });
   });
 
-  it('leaves container types untouched', async () => {
+  it('leaves the contents of an array untouched', async () => {
     await doWithDriver(async (driver) => {
       const rows = await driver.query(
         `SELECT
@@ -351,7 +351,8 @@ describe('ClickHouseDriver', () => {
   });
 
   // Pre-aggregation content versions hash JSON.stringify output, so this pins ordering and value
-  // representation to the previous JSON format.
+  // representation to the previous JSON format. Containers are the one departure: they are reported
+  // as text, so they are rendered as text rather than left as the object ClickHouse parsed to.
   it('pins the serialisation of a row', async () => {
     await doWithDriver(async (driver) => {
       const rows = await driver.query('SELECT * FROM test.types_test ORDER BY int8 LIMIT 1', []);
@@ -362,7 +363,7 @@ describe('ClickHouseDriver', () => {
         '"uint8":"1","uint16":"1","uint32":"1","uint64":"1","float32":"1","float64":"1",' +
         '"decimal32":"1.01","decimal64":"1.01","decimal128":"1.01","enum8":"hello","enum16":"world",' +
         '"enum_type_named":"Date","array_int32":[1,2],"array_datetime":["2020-01-01 00:00:00"],' +
-        '"map_str_int32":{"a":1},"tuple_int32_str":[1,"a"],"lc_nullable":"x"}]'
+        '"map_str_int32":"{\\"a\\":1}","tuple_int32_str":"[1,\\"a\\"]","lc_nullable":"x"}]'
       );
     });
   });
@@ -429,9 +430,9 @@ describe('ClickHouseDriver', () => {
           { name: 'lc_nullable', type: 'text' },
         ]);
         expect(await streamToArray(tableData.rowStream as any)).toEqual([
-          { date: '2020-01-01T00:00:00.000', datetime: '2020-01-01T00:00:00.000', datetime64_millis: '2020-01-01T00:00:00.000', datetime64_micros: '2020-01-01T00:00:00.000', datetime64_nanos: '2020-01-01T00:00:00.000', int8: '1', int16: '1', int32: '1', int64: '1', uint8: '1', uint16: '1', uint32: '1', uint64: '1', float32: '1', float64: '1', decimal32: '1.01', decimal64: '1.01', decimal128: '1.01', enum8: 'hello', enum16: 'world', enum_type_named: 'Date', array_int32: [1, 2], array_datetime: ['2020-01-01 00:00:00'], map_str_int32: { a: 1 }, tuple_int32_str: [1, 'a'], lc_nullable: 'x' },
-          { date: '2020-01-02T00:00:00.000', datetime: '2020-01-02T00:00:00.000', datetime64_millis: '2020-01-02T00:00:00.123', datetime64_micros: '2020-01-02T00:00:00.123', datetime64_nanos: '2020-01-02T00:00:00.123', int8: '2', int16: '2', int32: '2', int64: '2', uint8: '2', uint16: '2', uint32: '2', uint64: '2', float32: '2', float64: '2', decimal32: '2.02', decimal64: '2.02', decimal128: '2.02', enum8: 'hello', enum16: 'world', enum_type_named: 'Date', array_int32: [1, 2], array_datetime: ['2020-01-01 00:00:00'], map_str_int32: { a: 1 }, tuple_int32_str: [1, 'a'], lc_nullable: 'x' },
-          { date: '2020-01-03T00:00:00.000', datetime: '2020-01-03T00:00:00.000', datetime64_millis: '2020-01-03T00:00:00.234', datetime64_micros: '2020-01-03T00:00:00.234', datetime64_nanos: '2020-01-03T00:00:00.234', int8: '3', int16: '3', int32: '3', int64: '3', uint8: '3', uint16: '3', uint32: '3', uint64: '3', float32: '3', float64: '3', decimal32: '3.03', decimal64: '3.03', decimal128: '3.03', enum8: 'hello', enum16: 'world', enum_type_named: 'Date', array_int32: [1, 2], array_datetime: ['2020-01-01 00:00:00'], map_str_int32: { a: 1 }, tuple_int32_str: [1, 'a'], lc_nullable: 'x' },
+          { date: '2020-01-01T00:00:00.000', datetime: '2020-01-01T00:00:00.000', datetime64_millis: '2020-01-01T00:00:00.000', datetime64_micros: '2020-01-01T00:00:00.000', datetime64_nanos: '2020-01-01T00:00:00.000', int8: '1', int16: '1', int32: '1', int64: '1', uint8: '1', uint16: '1', uint32: '1', uint64: '1', float32: '1', float64: '1', decimal32: '1.01', decimal64: '1.01', decimal128: '1.01', enum8: 'hello', enum16: 'world', enum_type_named: 'Date', array_int32: [1, 2], array_datetime: ['2020-01-01 00:00:00'], map_str_int32: '{"a":1}', tuple_int32_str: '[1,"a"]', lc_nullable: 'x' },
+          { date: '2020-01-02T00:00:00.000', datetime: '2020-01-02T00:00:00.000', datetime64_millis: '2020-01-02T00:00:00.123', datetime64_micros: '2020-01-02T00:00:00.123', datetime64_nanos: '2020-01-02T00:00:00.123', int8: '2', int16: '2', int32: '2', int64: '2', uint8: '2', uint16: '2', uint32: '2', uint64: '2', float32: '2', float64: '2', decimal32: '2.02', decimal64: '2.02', decimal128: '2.02', enum8: 'hello', enum16: 'world', enum_type_named: 'Date', array_int32: [1, 2], array_datetime: ['2020-01-01 00:00:00'], map_str_int32: '{"a":1}', tuple_int32_str: '[1,"a"]', lc_nullable: 'x' },
+          { date: '2020-01-03T00:00:00.000', datetime: '2020-01-03T00:00:00.000', datetime64_millis: '2020-01-03T00:00:00.234', datetime64_micros: '2020-01-03T00:00:00.234', datetime64_nanos: '2020-01-03T00:00:00.234', int8: '3', int16: '3', int32: '3', int64: '3', uint8: '3', uint16: '3', uint32: '3', uint64: '3', float32: '3', float64: '3', decimal32: '3.03', decimal64: '3.03', decimal128: '3.03', enum8: 'hello', enum16: 'world', enum_type_named: 'Date', array_int32: [1, 2], array_datetime: ['2020-01-01 00:00:00'], map_str_int32: '{"a":1}', tuple_int32_str: '[1,"a"]', lc_nullable: 'x' },
         ]);
       } finally {
         // @ts-ignore
@@ -485,13 +486,13 @@ describe('ClickHouseDriver', () => {
             nullable_uuid: null,
             array_date32: ['2020-01-01'],
             array_uuid: ['00000000-0000-0000-0000-000000000001'],
-            map_str_date32: { a: '2020-01-01' },
+            map_str_date32: '{"a":"2020-01-01"}',
             simple_agg_int64: '5',
             simple_agg_datetime64: '2020-01-02T00:00:00.123',
             // A container behind SimpleAggregateFunction used to be stringified into
             // "[object Object]" by the substring based converter lookup. Int64 inside the map is
             // quoted by ClickHouse itself, output_format_json_quote_64bit_integers is on by default.
-            simple_agg_map: { a: '1' },
+            simple_agg_map: '{"a":"1"}',
           },
         ]);
       } finally {

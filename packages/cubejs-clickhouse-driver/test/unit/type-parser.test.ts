@@ -2,6 +2,7 @@ import {
   PRECISION_UNSUPPORTED,
   dateTimePrecision,
   isNumericTypeName,
+  isOpaqueTypeName,
   parseType,
   unwrapScalarType,
 } from '../../src/TypeParser';
@@ -27,6 +28,11 @@ describe('parseType', () => {
 
   it('has no arguments for an empty argument list', () => {
     expect(parseType('DateTime64()')).toEqual({ name: 'datetime64', args: [] });
+  });
+
+  it('keeps an empty argument in place when there are others', () => {
+    expect(parseType('Decimal(,2)').args).toEqual(['', '2']);
+    expect(parseType('Decimal(9,)').args).toEqual(['9', '']);
   });
 
   it('keeps what it has on unbalanced input', () => {
@@ -84,6 +90,19 @@ describe('dateTimePrecision', () => {
     expect(precisionOf('DateTime64(10)')).toEqual(PRECISION_UNSUPPORTED);
     expect(precisionOf('DateTime64(\'UTC\')')).toEqual(PRECISION_UNSUPPORTED);
     expect(precisionOf('DateTime64(-1)')).toEqual(PRECISION_UNSUPPORTED);
+  });
+});
+
+describe('isOpaqueTypeName', () => {
+  it('covers the containers and the geo types', () => {
+    for (const name of ['map', 'tuple', 'nested', 'variant', 'dynamic', 'json', 'object', 'point', 'multipolygon']) {
+      expect(isOpaqueTypeName(name)).toBe(true);
+    }
+
+    // Array keeps its element type in the generic type, so it is not opaque.
+    for (const name of ['array', 'string', 'int64', 'aggregatefunction', '']) {
+      expect(isOpaqueTypeName(name)).toBe(false);
+    }
   });
 });
 
