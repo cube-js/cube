@@ -16,9 +16,9 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "yarn integration",
-    "unit": "jest --verbose dist/test/unit",
+    "unit": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test/unit",
     "integration": "npm run integration:athena",
-    "integration:athena": "jest --verbose dist/test",
+    "integration:athena": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },

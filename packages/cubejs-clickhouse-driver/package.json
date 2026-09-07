@@ -23,9 +23,9 @@
     "watch": "tsc -w",
     "lint": "eslint src/* test/* --ext .ts",
     "lint:fix": "eslint --fix src/* test/* --ext .ts",
-    "unit": "jest dist/test/unit",
-    "integration": "jest dist/test/integration",
-    "integration:clickhouse": "jest dist/test/integration"
+    "unit": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/unit",
+    "integration": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/integration",
+    "integration:clickhouse": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/integration"
   },
   "dependencies": {
     "@clickhouse/client": "^1.23.1",

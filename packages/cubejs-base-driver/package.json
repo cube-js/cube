@@ -18,7 +18,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
-    "unit": "jest --runInBand --coverage --verbose test/unit",
+    "unit": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand --coverage --verbose test/unit",
     "lint": "eslint src/* test/* --ext .ts,.js",
     "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
   },

@@ -21,9 +21,9 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "unit": "jest dist/test/unit",
-    "integration": "jest dist/test/integration",
-    "integration:presto": "jest dist/test/integration",
+    "unit": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/unit",
+    "integration": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/integration",
+    "integration:presto": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/integration",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
