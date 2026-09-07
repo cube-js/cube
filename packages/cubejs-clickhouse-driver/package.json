@@ -31,7 +31,7 @@
     "@clickhouse/client": "^1.23.1",
     "@cubejs-backend/base-driver": "1.7.35",
     "@cubejs-backend/shared": "1.7.35",
-    "moment": "^2.24.0",
+    "moment": "^2.30.1",
     "uuid": "^11.1.1"
   },
   "license": "Apache-2.0",

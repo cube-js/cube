@@ -45,7 +45,7 @@
     "cargo-cp-artifact": "^0.1.9",
     "jest": "^29",
     "jest-bench": "^29",
-    "pg": "^8.11.3",
+    "pg": "^8.18.0",
     "typescript": "~6.0.3",
     "uuid": "^11.1.1"
   },

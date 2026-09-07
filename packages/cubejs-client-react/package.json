@@ -25,24 +25,24 @@
     "dist"
   ],
   "dependencies": {
-    "@babel/runtime": "^7.1.2",
+    "@babel/runtime": "^7.13.9",
     "@cubejs-client/core": "1.7.35",
-    "core-js": "^3.6.5",
+    "core-js": "^3.34.0",
     "ramda": "^0.27.2"
   },
   "devDependencies": {
-    "@babel/core": "^7.13.8",
+    "@babel/core": "^7.24.5",
     "@types/ramda": "^0.27.40",
     "@types/react": "^16.9.41",
     "@typescript-eslint/eslint-plugin": "^8.46.0",
     "@typescript-eslint/parser": "^8.46.0",
     "eslint": "^8.57.1",
-    "eslint-config-airbnb": "^18.0.1",
-    "eslint-config-airbnb-base": "^14.0.0",
-    "eslint-plugin-import": "^2.18.2",
+    "eslint-config-airbnb": "^18.1.0",
+    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-plugin-import": "^2.22.1",
     "eslint-plugin-jsx-a11y": "^6.2.3",
     "eslint-plugin-node": "^10.0.0",
-    "eslint-plugin-react": "^7.15.1",
+    "eslint-plugin-react": "^7.20.0",
     "typescript": "~6.0.3"
   },
   "peerDependencies": {

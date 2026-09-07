@@ -26,14 +26,14 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "@babel/core": "^7.13.8",
+    "@babel/core": "^7.24.5",
     "@babel/eslint-parser": "^7",
-    "@babel/preset-env": "^7.3.1",
+    "@babel/preset-env": "^7.24.5",
     "@types/jest": "^29",
     "babel-jest": "^29",
     "eslint": "^7.21.0",
     "eslint-config-airbnb-base": "^13.1.0",
-    "eslint-plugin-import": "^2.16.0",
+    "eslint-plugin-import": "^2.22.1",
     "eslint-plugin-node": "^10.0.0",
     "jest": "^29"
   },

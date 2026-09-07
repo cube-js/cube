@@ -32,8 +32,8 @@
     "@cubejs-backend/prestodb-driver": "1.7.35",
     "@cubejs-backend/schema-compiler": "1.7.35",
     "@cubejs-backend/shared": "1.7.35",
-    "node-fetch": "^2.6.1",
-    "presto-client": "^1.2.0"
+    "node-fetch": "^2.7.0",
+    "presto-client": "1.2.0"
   },
   "license": "Apache-2.0",
   "publishConfig": {
