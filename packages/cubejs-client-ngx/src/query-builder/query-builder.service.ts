@@ -177,10 +177,10 @@ export class QueryBuilderService {
   }
 
   public disableHeuristics() {
-    this._disableHeuristics = false;
+    this._disableHeuristics = true;
   }
 
   public enableHeuristics() {
-    this._disableHeuristics = true;
+    this._disableHeuristics = false;
   }
 }
