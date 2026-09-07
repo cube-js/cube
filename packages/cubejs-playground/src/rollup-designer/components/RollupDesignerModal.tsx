@@ -17,8 +17,7 @@ export function RollupDesignerModal({
   onAfterClose,
   ...props
 }: RollupDesignerModalProps) {
-  const { isModalOpen, toggleModal, memberTypeCubeMap } =
-    useRollupDesignerContext();
+  const { isModalOpen, toggleModal, memberTypeCubeMap } = useRollupDesignerContext();
 
   return (
     <Modal
@@ -27,7 +26,7 @@ export function RollupDesignerModal({
       bodyStyle={{ padding: 0 }}
       destroyOnClose
       wrapClassName="rollup-designer"
-      footer={
+      footer={(
         <Link
           href="https://cube.dev/docs/pre-aggregations/getting-started-pre-aggregations"
           target="_blank"
@@ -44,7 +43,7 @@ export function RollupDesignerModal({
             </Box>
           </Flex>
         </Link>
-      }
+      )}
       width={1190}
       afterClose={onAfterClose}
       onCancel={() => toggleModal()}

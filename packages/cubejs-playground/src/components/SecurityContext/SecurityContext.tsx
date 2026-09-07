@@ -65,7 +65,7 @@ export function SecurityContext() {
           values?.token || null
         )
       );
-    } catch (_) {
+    } catch {
       await saveToken(values?.token || null);
     } finally {
       setEditingToken(false);
@@ -81,7 +81,7 @@ export function SecurityContext() {
     try {
       JSON.parse(value);
       setIsJsonValid(true);
-    } catch (error: any) {
+    } catch {
       setIsJsonValid(false);
     }
   }

@@ -53,7 +53,7 @@ export function ListMember(props: ListMemberProps) {
   const name = member.name.replace(`${cube.name}.`, '').trim();
   const title = 'shortTitle' in member ? member.shortTitle : undefined;
   // @ts-ignore
-  const description = member.description;
+  const { description } = member;
   const { shownMemberName } = useShownMemberName({
     cubeName: cube.name,
     cubeTitle: 'title' in cube ? cube.title : undefined,
@@ -62,15 +62,13 @@ export function ListMember(props: ListMemberProps) {
     type: memberViewType,
   });
 
-  const onFilterPress = useEvent(() =>
-    !isFiltered ? onAddFilter?.(member.name) : onRemoveFilter?.(member.name)
-  );
+  const onFilterPress = useEvent(() => (!isFiltered ? onAddFilter?.(member.name) : onRemoveFilter?.(member.name)));
 
   const filterMenu = useMemo(() => {
     const dangerProps = isFiltered
       ? {
-          color: '#danger-text',
-        }
+        color: '#danger-text',
+      }
       : {};
 
     return (
@@ -78,7 +76,7 @@ export function ListMember(props: ListMemberProps) {
         <FilterByMemberButton
           isAngular
           type={category.replace(/s$/, '')}
-          isFiltered={true}
+          isFiltered
           {...(isMissing ? { color: '#danger-text' } : {})}
         />
         <Menu
@@ -131,39 +129,39 @@ export function ListMember(props: ListMemberProps) {
           )}
         </Text>
         <Space gap=".5x">
-          {description ||
-          isImported ||
-          ('primaryKey' in member && member.primaryKey) ||
-          ('public' in member && member.public === false) ? (
-            <Space gap="1x" color="#dark.6">
-              {description || isImported ? (
-                <ItemInfoIcon
-                  description={
-                    isImported ? (
-                      <>
-                        {description ? (
-                          <>
-                            {description}
-                            <br />
-                            <br />
-                          </>
-                        ) : null}
-                        <Text preset="t4">This member is imported from another cube:</Text>
-                        <br />
-                        <CubeIcon /> <b>{member.name.split('.')[0]}</b>
-                      </>
-                    ) : (
-                      description
-                    )
-                  }
-                />
-              ) : undefined}
-              {'primaryKey' in member && member.primaryKey ? (
-                <PrimaryKeyIcon color={'dark-02'} />
-              ) : undefined}
-              {'public' in member && member.public === false ? <NonPublicIcon /> : undefined}
-            </Space>
-          ) : null}
+          {description
+          || isImported
+          || ('primaryKey' in member && member.primaryKey)
+          || ('public' in member && member.public === false) ? (
+              <Space gap="1x" color="#dark.6">
+                {description || isImported ? (
+                  <ItemInfoIcon
+                    description={
+                      isImported ? (
+                        <>
+                          {description ? (
+                            <>
+                              {description}
+                              <br />
+                              <br />
+                            </>
+                          ) : null}
+                          <Text preset="t4">This member is imported from another cube:</Text>
+                          <br />
+                          <CubeIcon /> <b>{member.name.split('.')[0]}</b>
+                        </>
+                      ) : (
+                        description
+                      )
+                    }
+                  />
+                ) : undefined}
+                {'primaryKey' in member && member.primaryKey ? (
+                  <PrimaryKeyIcon color="dark-02" />
+                ) : undefined}
+                {'public' in member && member.public === false ? <NonPublicIcon /> : undefined}
+              </Space>
+            ) : null}
           {onAddFilter || onRemoveFilter ? (
             isFiltered && !isMissing ? (
               filterMenu

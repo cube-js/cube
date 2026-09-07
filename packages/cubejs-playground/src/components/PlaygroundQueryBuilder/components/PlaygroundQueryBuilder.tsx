@@ -95,28 +95,27 @@ export const frameworkChartLibraries: Record<
   ],
 };
 
-const playgroundActionUpdateMethods = (updateMethods, memberName) =>
-  Object.keys(updateMethods)
-    .map((method) => ({
-      [method]: (member, values, ...rest) => {
-        let actionName = `${method
-          .split('')
-          .map((c, i) => (i === 0 ? c.toUpperCase() : c))
-          .join('')} Member`;
-        if (values?.values) {
-          actionName = 'Update Filter Values';
-        }
-        if (values?.dateRange) {
-          actionName = 'Update Date Range';
-        }
-        if (values?.granularity) {
-          actionName = 'Update Granularity';
-        }
-        playgroundAction(actionName, { memberName });
-        return updateMethods[method].apply(null, [member, values, ...rest]);
-      },
-    }))
-    .reduce((a, b) => ({ ...a, ...b }), {});
+const playgroundActionUpdateMethods = (updateMethods, memberName) => Object.keys(updateMethods)
+  .map((method) => ({
+    [method]: (member, values, ...rest) => {
+      let actionName = `${method
+        .split('')
+        .map((c, i) => (i === 0 ? c.toUpperCase() : c))
+        .join('')} Member`;
+      if (values?.values) {
+        actionName = 'Update Filter Values';
+      }
+      if (values?.dateRange) {
+        actionName = 'Update Date Range';
+      }
+      if (values?.granularity) {
+        actionName = 'Update Granularity';
+      }
+      playgroundAction(actionName, { memberName });
+      return updateMethods[method].apply(null, [member, values, ...rest]);
+    },
+  }))
+  .reduce((a, b) => ({ ...a, ...b }), {});
 
 type PivotChangeEmitterProps = {
   iframeRef: RefObject<HTMLIFrameElement> | null;
@@ -586,9 +585,9 @@ export function PlaygroundQueryBuilder({
                           queryHasMissingMembers={missingMembers.length > 0}
                           onRunButtonClick={async () => {
                             if (
-                              isChartRendererReady &&
-                              iframeRef.current &&
-                              missingMembers.length === 0
+                              isChartRendererReady
+                              && iframeRef.current
+                              && missingMembers.length === 0
                             ) {
                               await refreshToken();
 
@@ -602,9 +601,7 @@ export function PlaygroundQueryBuilder({
                         />
                       );
                     }}
-                    onChartRendererReadyChange={(isReady) =>
-                      setChartRendererReady(queryId, isReady)
-                    }
+                    onChartRendererReadyChange={(isReady) => setChartRendererReady(queryId, isReady)}
                   />
                 )}
               </Col>

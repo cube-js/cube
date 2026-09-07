@@ -194,55 +194,48 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
 
   const [dateRangesStore, setDateRangesStore] = useState<string[]>(
     (query?.timeDimensions || [])
-      .filter((timeDimension) => {
-        return !!timeDimension.dateRange;
-      })
+      .filter((timeDimension) => !!timeDimension.dateRange)
       .map((timeDimension) => timeDimension.dimension)
   );
 
-  const [pivotConfig, setPivotConfig] = useState<PivotConfig>(() => {
-    return ResultSet.getNormalizedPivotConfig(
-      { ...query, queryType: 'regularQuery' },
-      defaultPivotConfig
-    );
-  });
+  const [pivotConfig, setPivotConfig] = useState<PivotConfig>(() => ResultSet.getNormalizedPivotConfig(
+    { ...query, queryType: 'regularQuery' },
+    defaultPivotConfig
+  ));
 
   const progressCallback = (progressResult: ProgressResult) => {
     setProgress(progressResult);
   };
 
-  const { usedCubes, usedMembers, usedMembersInFilters, usedMembersInGrouping, usedGranularities } =
-    useMemo(() => getUsedCubesAndMembers(query, dateRangesStore), [query, dateRangesStore.join()]);
+  const { usedCubes, usedMembers, usedMembersInFilters, usedMembersInGrouping, usedGranularities } = useMemo(() => getUsedCubesAndMembers(query, dateRangesStore), [query, dateRangesStore.join()]);
 
-  const [missingCubes, missingMembers] = useMemo<[string[], MissingMember[]]>(() => {
-    return [
-      usedCubes.filter((cube) => !cubes.some((c) => c.name === cube)),
-      [
-        ...(query.dimensions
-          ?.filter((dimension) => !members.dimensions[dimension])
-          .map((name) => ({ name, category: 'dimensions' }) as MissingMember) || []),
-        ...(query.measures
-          ?.filter((measure) => !members.measures[measure])
-          .map((name) => ({ name, category: 'measures' }) as MissingMember) || []),
-        ...(query.segments
-          ?.filter((segment) => !members.segments[segment])
-          .map((name) => ({ name, category: 'segments' }) as MissingMember) || []),
-        ...(query.timeDimensions
-          ?.filter((timeDimension) => !members.dimensions[timeDimension.dimension])
-          .map(
-            ({ dimension, granularity }) =>
-              ({
-                name: dimension,
-                category: 'timeDimensions',
-                granularity,
-              }) as MissingMember
-          ) || []),
-        ...(usedMembersInFilters
-          .filter((dimension) => !members.dimensions[dimension] && !members.measures[dimension])
-          .map((name) => ({ name, category: 'dimensions' }) as MissingMember) || []),
-      ],
-    ];
-  }, [usedCubes, usedMembers, meta, members]);
+  const [missingCubes, missingMembers] = useMemo<[string[], MissingMember[]]>(() => [
+    usedCubes.filter((cube) => !cubes.some((c) => c.name === cube)),
+    [
+      ...(query.dimensions
+        ?.filter((dimension) => !members.dimensions[dimension])
+        .map((name) => ({ name, category: 'dimensions' }) as MissingMember) || []),
+      ...(query.measures
+        ?.filter((measure) => !members.measures[measure])
+        .map((name) => ({ name, category: 'measures' }) as MissingMember) || []),
+      ...(query.segments
+        ?.filter((segment) => !members.segments[segment])
+        .map((name) => ({ name, category: 'segments' }) as MissingMember) || []),
+      ...(query.timeDimensions
+        ?.filter((timeDimension) => !members.dimensions[timeDimension.dimension])
+        .map(
+          ({ dimension, granularity }) => ({
+            name: dimension,
+            category: 'timeDimensions',
+            granularity,
+          }) as MissingMember
+        ) || []),
+      ...(usedMembersInFilters
+        .filter((dimension) => !members.dimensions[dimension] && !members.measures[dimension])
+        .map((name) => ({ name, category: 'dimensions' }) as MissingMember) || []),
+    ],
+  ],
+  [usedCubes, usedMembers, meta, members]);
 
   // place joined cubes first
   cubes.sort((c1, c2) => {
@@ -335,10 +328,7 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
           return;
         }
 
-        const visibilityFilter = (item: { public?: boolean }) => {
-          return !displayPrivateItems ? item.public : true;
-        };
-
+        const visibilityFilter = (item: { public?: boolean }) => (!displayPrivateItems ? item.public : true);
         setIsMetaLoading(false);
 
         const memberData: CubeMembers = {
@@ -366,14 +356,14 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
         setCubes(
           newMeta.meta.cubes
             .filter(visibilityFilter)
-            .map((cube) => {
-              return {
+            .map((cube) => (
+              {
                 ...cube,
                 measures: cube.measures.filter(visibilityFilter),
                 dimensions: cube.dimensions.filter(visibilityFilter),
                 segments: cube.segments.filter(visibilityFilter),
-              };
-            })
+              }
+            ))
             .sort((a, b) => a.name.localeCompare(b.name)) as Cube[]
         );
 
@@ -427,10 +417,10 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
       try {
         const originalHash = getQueryHash(originalQuery);
 
-        let validatedQuery = queryValidation(query);
+        const validatedQuery = queryValidation(query);
 
         return originalHash !== getQueryHash(validatedQuery) ? validatedQuery : originalQuery;
-      } catch (e: any) {
+      } catch {
         console.error('An invalid query has been set', query);
 
         return originalQuery;
@@ -464,7 +454,7 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
         }
 
         return originalHash !== getQueryHash(query) ? query : originalQuery;
-      } catch (e: any) {
+      } catch {
         console.error('An invalid query has been set', query);
 
         return originalQuery;
@@ -502,13 +492,11 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
 
     if (cube) {
       // Find all hierarchies that include the given dimension
-      const hierarchiesToFill = (cube.hierarchies ?? []).filter((hierarchy) => {
-        return hierarchy.levels.includes(name);
-      });
+      const hierarchiesToFill = (cube.hierarchies ?? []).filter((hierarchy) => hierarchy.levels.includes(name));
 
       // If there is only one hierarchy that can be filled, we can add all levels that are above the given dimension
       if (hierarchiesToFill.length === 1) {
-        const levels = hierarchiesToFill[0].levels;
+        const { levels } = hierarchiesToFill[0];
 
         // If no dimension in the hierarchy selected, then we can proceed
         if (!levels.some((dimensionName) => query.dimensions?.includes(dimensionName))) {
@@ -606,11 +594,11 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
         return true;
       },
       clear() {
-        updateQuery(() => {
-          return {
+        updateQuery(() => (
+          {
             [type]: [],
-          };
-        });
+          }
+        ));
       },
       get list() {
         return query[type] || [];
@@ -745,11 +733,11 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
       });
     },
     clear() {
-      updateQuery((query) => {
-        return {
+      updateQuery((query) => (
+        {
           timeDimensions: query.timeDimensions?.filter((d) => !d.granularity),
-        };
-      });
+        }
+      ));
     },
   };
 
@@ -818,9 +806,7 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
         return { timeDimensions };
       });
 
-      setDateRangesStore((dateRanges) => {
-        return dateRanges.filter((d) => d !== name);
-      });
+      setDateRangesStore((dateRanges) => dateRanges.filter((d) => d !== name));
 
       return true;
     },
@@ -828,11 +814,11 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
       return dateRangesStore;
     },
     clear() {
-      updateQuery((query) => {
-        return {
+      updateQuery((query) => (
+        {
           timeDimensions: query.timeDimensions?.filter((d) => !d.dateRange),
-        };
-      });
+        }
+      ));
 
       setDateRangesStore([]);
     },
@@ -926,11 +912,11 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
       return Object.keys(orderMap) as string[];
     },
     clear() {
-      updateQuery(() => {
-        return {
+      updateQuery(() => (
+        {
           order: undefined,
-        };
-      });
+        }
+      ));
     },
   };
 
@@ -948,7 +934,6 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
         }
       }
 
-      const hash = JSON.stringify(filter);
 
       updateQuery((query) => {
         const filters = query?.filters || [];
@@ -1001,11 +986,11 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
       return query?.filters || [];
     },
     clear() {
-      updateQuery(() => {
-        return {
+      updateQuery(() => (
+        {
           filters: [],
-        };
-      });
+        }
+      ));
     },
   };
 
@@ -1048,9 +1033,7 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
 
     // ...make sure that all the related dateRanges are added
     timeDimensions
-      .filter((timeDimension) => {
-        return !!timeDimension.dateRange;
-      })
+      .filter((timeDimension) => !!timeDimension.dateRange)
       .map((timeDimension) => timeDimension.dimension)
       .forEach((dimensionName) => {
         if (!dateRangesStore.includes(dimensionName)) {
@@ -1074,12 +1057,11 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
     void loadMeta();
   }, [schemaVersion, cubeApi]);
 
-  const isQueryEmpty =
-    !query.measures?.length &&
-    !query.dimensions?.length &&
-    !query.timeDimensions?.length &&
-    !query.filters?.length &&
-    !query.segments?.length;
+  const isQueryEmpty = !query.measures?.length
+    && !query.dimensions?.length
+    && !query.timeDimensions?.length
+    && !query.filters?.length
+    && !query.segments?.length;
 
   // @ts-ignore
   const connectionId = usedCubes[0]
@@ -1096,34 +1078,26 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
     ? [...cubes]
     : cubes.filter((cube) =>
       // @ts-ignore
-      connectionId != null ? cube.connectedComponent === connectionId : cube.name === usedCubes[0]
-    );
+      (connectionId != null ? cube.connectedComponent === connectionId : cube.name === usedCubes[0]));
   const joinableCubeNames = joinableCubes.map((cube) => cube.name);
   const joinableMembers = useMemo(
-    () =>
-      !usedCubes.length
-        ? {
-          dimensions: members.dimensions,
-          measures: members.measures,
-          segments: members.segments,
-        }
-        : {
-          dimensions: Object.fromEntries(
-            Object.entries(members.dimensions).filter(([name]) =>
-              joinableCubeNames.includes(name.split('.')[0])
-            )
-          ),
-          measures: Object.fromEntries(
-            Object.entries(members.measures).filter(([name]) =>
-              joinableCubeNames.includes(name.split('.')[0])
-            )
-          ),
-          segments: Object.fromEntries(
-            Object.entries(members.segments).filter(([name]) =>
-              joinableCubeNames.includes(name.split('.')[0])
-            )
-          ),
-        },
+    () => (!usedCubes.length
+      ? {
+        dimensions: members.dimensions,
+        measures: members.measures,
+        segments: members.segments,
+      }
+      : {
+        dimensions: Object.fromEntries(
+          Object.entries(members.dimensions).filter(([name]) => joinableCubeNames.includes(name.split('.')[0]))
+        ),
+        measures: Object.fromEntries(
+          Object.entries(members.measures).filter(([name]) => joinableCubeNames.includes(name.split('.')[0]))
+        ),
+        segments: Object.fromEntries(
+          Object.entries(members.segments).filter(([name]) => joinableCubeNames.includes(name.split('.')[0]))
+        ),
+      }),
     [joinableCubeNames.join(',')]
   );
 
@@ -1173,14 +1147,12 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
     const dimensions = query?.dimensions || [];
     const segments = query?.segments || [];
     const filters = extractMembersFromFilters(query?.filters || []);
-    const dateRanges =
-      query?.timeDimensions
-        ?.filter((timeDimension) => timeDimension.dateRange)
-        .map((timeDimension) => timeDimension.dimension) || [];
-    const grouping =
-      query?.timeDimensions
-        ?.filter((timeDimension) => timeDimension.granularity)
-        .map((timeDimension) => timeDimension.dimension) || [];
+    const dateRanges = query?.timeDimensions
+      ?.filter((timeDimension) => timeDimension.dateRange)
+      .map((timeDimension) => timeDimension.dimension) || [];
+    const grouping = query?.timeDimensions
+      ?.filter((timeDimension) => timeDimension.granularity)
+      .map((timeDimension) => timeDimension.dimension) || [];
     const all = [...measures, ...dimensions, ...segments, ...filters, ...dateRanges, ...grouping];
     const allCubeNames: string[] = [];
 
@@ -1323,17 +1295,15 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
     );
   }, [queryHash, meta, cubes.length]);
 
-  const memberList = useMemo(() => {
-    return [...Object.values(members.dimensions), ...Object.values(members.measures)];
-  }, [members]);
+  const memberList = useMemo(() => [...Object.values(members.dimensions), ...Object.values(members.measures)],
+    [members]);
 
-  const hasPrivateMembers = useMemo(() => {
-    return usedMembers.some((memberName) => {
-      const member = memberList.find((m) => m.name === memberName);
+  const hasPrivateMembers = useMemo(() => usedMembers.some((memberName) => {
+    const member = memberList.find((m) => m.name === memberName);
 
-      return !member?.public;
-    });
-  }, [usedCubes, usedMembers]);
+    return !member?.public;
+  }),
+  [usedCubes, usedMembers]);
 
   return {
     // options
@@ -1399,8 +1369,8 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
     isApiTokenChanged,
     isDataModelChanged,
     isResultOutdated: !!(
-      executedQuery &&
-      (queryHash !== getQueryHash(executedQuery) || isApiTokenChanged || isDataModelChanged)
+      executedQuery
+      && (queryHash !== getQueryHash(executedQuery) || isApiTokenChanged || isDataModelChanged)
     ),
     // api
     cubeApi,

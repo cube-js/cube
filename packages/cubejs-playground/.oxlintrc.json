@@ -1,0 +1,53 @@
+// cubejs-playground's lint config: the shared React rule set plus this package's own
+// environment. The rules themselves live in @cubejs-backend/linter/airbnb-react.json,
+// which cubejs-client-react extends too.
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": [
+    "../../.oxlintrc.json",
+    "../cubejs-linter/airbnb-react.json"
+  ],
+  // env and ignorePatterns are not inherited through `extends`
+  "env": {
+    "node": true,
+    "browser": true,
+    "es6": true
+  },
+  "ignorePatterns": [
+    "build/",
+    "coverage/",
+    "lib/",
+    "public/",
+    "**/*.d.ts",
+    // a separate sub-project with its own package.json, yarn.lock and ESLint setup
+    "vizard/"
+  ],
+  "rules": {
+    // airbnb's `destructuring: "any"` reports a `let { ... } = props` pattern when any one
+    // binding is never reassigned, which is unfixable here: this package follows the
+    // @cube-dev/ui-kit idiom of reassigning some props-derived locals
+    // (`titleStyles = useMemo(...)`), so the pattern needs `let` and the rule reported 44
+    // bindings no autofix could touch. "all" still flags declarations that are wholly const.
+    "prefer-const": ["error", { "destructuring": "all", "ignoreReadBeforeAssign": true }]
+  },
+  "overrides": [
+    {
+      // airbnb-react.json declares these in an `overrides` block, and an extended
+      // `overrides` entry outranks the extending config's top-level `rules` -- so
+      // re-tuning them has to happen in an `overrides` entry here too.
+      "files": ["**/*.ts", "**/*.tsx"],
+      "rules": {
+        // this package lays files out top-down -- exported component first, its local
+        // helpers below -- and hoisted function declarations make that legal
+        "no-use-before-define": [
+          "error",
+          { "functions": false, "classes": true, "variables": true }
+        ],
+        // purely cosmetic, and its autofix makes JSX harder to read rather than easier:
+        // splitting `{cubeName} <b>{name}</b>` onto separate lines forces a literal
+        // `{' '}` line in to preserve the space, 61 times across this package
+        "@stylistic/jsx-one-expression-per-line": "off"
+      }
+    }
+  ]
+}

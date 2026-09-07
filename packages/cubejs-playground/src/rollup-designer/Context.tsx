@@ -45,8 +45,7 @@ export function RollupDesignerContext({
   const [isModalOpen, toggleModal] = useToggle();
   const [error, setError] = useState<Error | null>(null);
   const [query, setQuery] = useState<Query | null>(null);
-  const [transformedQuery, setTransformedQuery] =
-    useState<TransformedQuery | null>(null);
+  const [transformedQuery, setTransformedQuery] = useState<TransformedQuery | null>(null);
   const [memberTypeCubeMap, setMemberTypeCubeMap] = useState<AvailableMembers>({
     measures: [],
     dimensions: [],

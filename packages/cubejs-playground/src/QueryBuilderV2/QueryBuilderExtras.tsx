@@ -9,7 +9,6 @@ import {
   DownIcon,
   Flow,
   Grid,
-  InfoCircleIcon,
   Link,
   NumberInput,
   Radio,
@@ -19,7 +18,6 @@ import {
   tasty,
   Text,
   Title,
-  TooltipProvider,
 } from '@cube-dev/ui-kit';
 import { forwardRef, Key, useEffect, useMemo, useState } from 'react';
 import { DragDropContext, Draggable, Droppable, OnDragEndResponder } from 'react-beautiful-dnd';
@@ -64,7 +62,7 @@ function timezoneByName(name: string) {
   return {
     tzCode: name,
     label: name,
-    name: name,
+    name,
     utc: '',
   };
 }
@@ -176,7 +174,7 @@ type OrderListItemProps = {
   onSortChange: (name: string, sorting: SortDirection) => void;
 };
 
-export const OrderListItem = forwardRef(function OrderListItem(props: OrderListItemProps, ref) {
+export const OrderListItem = forwardRef((props: OrderListItemProps, ref) => {
   const {
     name,
     memberType,
@@ -221,8 +219,7 @@ export function QueryBuilderExtras() {
   const [showOrder, setShowOrder] = useState(true);
   const fields = [...(query?.dimensions ?? []), ...(query?.measures ?? [])];
   const storedTimezones = useStoredTimezones(query.timezone);
-  const timeDimensions =
-    query?.timeDimensions?.filter((time) => time.granularity).map((time) => time.dimension) ?? [];
+  const timeDimensions = query?.timeDimensions?.filter((time) => time.granularity).map((time) => time.dimension) ?? [];
 
   timeDimensions.forEach((name) => {
     if (name && !fields.includes(name)) {
@@ -317,18 +314,16 @@ export function QueryBuilderExtras() {
 
   const optionsPopover = useMemo(() => {
     // ungrouped
-    const isSelected =
-      query.ungrouped ||
-      query.total ||
-      query.timezone ||
-      query.offset ||
-      (query.limit && query.limit !== DEFAULT_LIMIT);
-    const selectedCount =
-      (query.ungrouped ? 1 : 0) +
-      (query.total ? 1 : 0) +
-      (query.timezone ? 1 : 0) +
-      (query.limit && query.limit !== DEFAULT_LIMIT ? 1 : 0) +
-      (query.offset ? 1 : 0);
+    const isSelected = query.ungrouped
+      || query.total
+      || query.timezone
+      || query.offset
+      || (query.limit && query.limit !== DEFAULT_LIMIT);
+    const selectedCount = (query.ungrouped ? 1 : 0)
+      + (query.total ? 1 : 0)
+      + (query.timezone ? 1 : 0)
+      + (query.limit && query.limit !== DEFAULT_LIMIT ? 1 : 0)
+      + (query.offset ? 1 : 0);
 
     // timezone
     const timezone = query?.timezone || '';
@@ -596,13 +591,13 @@ export function QueryBuilderLimitSelect() {
           </Link>
         ) : null
       }
-      labelSuffix={
+      labelSuffix={(
         <InfoIconButton
           tooltip="Click to learn more about the row limit"
           tooltipSuffix=""
           to="!https://cube.dev/reference/core-data-apis/rest-api/query-format#row-limit"
         />
-      }
+      )}
       selectedKey={query.limit == null ? '0' : String(query.limit)}
       onSelectionChange={(val: Key) => {
         updateQuery(() => ({ limit: val === '0' ? undefined : Number(val as string) }));

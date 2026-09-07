@@ -112,8 +112,7 @@ export function RollupDesigner({
   const token = appToken || designerToken;
 
   const { isCloud, ...cloud } = useCloud();
-  const { query, transformedQuery, isLoading, error, toggleModal, defaultSchemaFormat } =
-    useRollupDesignerContext();
+  const { query, transformedQuery, isLoading, error, toggleModal, defaultSchemaFormat } = useRollupDesignerContext();
 
   const [isCronValid, setCronValidity] = useState<boolean>(true);
   const [settings, setSettings] = useState<RollupSettings>({});
@@ -208,8 +207,7 @@ export function RollupDesigner({
       if (isMounted() && active) {
         setMatching((prevMatching) => {
           if (prevMatching === undefined) {
-            initialMatching.current =
-              json.canUsePreAggregationForTransformedQuery;
+            initialMatching.current = json.canUsePreAggregationForTransformedQuery;
           }
           return json.canUsePreAggregationForTransformedQuery;
         });
@@ -228,9 +226,9 @@ export function RollupDesigner({
 
     if (transformedQuery) {
       cubeName = (
-        transformedQuery?.leafMeasures[0] ||
-        transformedQuery?.ownedDimensions[0] ||
-        'CubeName'
+        transformedQuery?.leafMeasures[0]
+        || transformedQuery?.ownedDimensions[0]
+        || 'CubeName'
       ).split('.')[0];
     } else if (!areReferencesEmpty(references)) {
       const [key] = getSelectedKeys(references);
@@ -287,8 +285,7 @@ export function RollupDesigner({
         return leafMeasure.type === 'countDistinct';
       });
 
-      showCountDistinctAlert =
-        hasCountDistinctMeasures && !references.timeDimensions[0]?.granularity;
+      showCountDistinctAlert = hasCountDistinctMeasures && !references.timeDimensions[0]?.granularity;
     }
 
     return [
@@ -384,7 +381,7 @@ export function RollupDesigner({
         />
 
         {cubeName ? (
-          <Space direction="vertical" style={{width: '100%'}} size={32}>
+          <Space direction="vertical" style={{ width: '100%' }} size={32}>
             <Flex justifyContent="end" gap={2} alignItems="center">
               <Box>
                 <Typography.Text>Data Model Format</Typography.Text>
@@ -596,7 +593,7 @@ export function RollupDesigner({
                 <Box style={{ marginBottom: 24 }}>
                   <Alert
                     type="info"
-                    message={
+                    message={(
                       <Text>
                         Because <b>{nonAdditiveMeasure}</b> is a non-additive
                         measure that is calculated with additive measures, this
@@ -610,20 +607,20 @@ export function RollupDesigner({
                         </Typography.Link>
                         .
                       </Text>
-                    }
+                    )}
                   />
                 </Box>
               )}
 
-              {!areReferencesEmpty(references) &&
-                !references.timeDimensions.length && (
-                  <Box style={{ marginBottom: 24 }}>
-                    <Alert
-                      type="warning"
-                      message="This rollup has no time dimension so it cannot be partitioned"
-                    />
-                  </Box>
-                )}
+              {!areReferencesEmpty(references)
+                && !references.timeDimensions.length && (
+                <Box style={{ marginBottom: 24 }}>
+                  <Alert
+                    type="warning"
+                    message="This rollup has no time dimension so it cannot be partitioned"
+                  />
+                </Box>
+              )}
 
               <Box style={{ marginBottom: 16 }}>
                 {!areReferencesEmpty(references) ? (
@@ -672,13 +669,13 @@ export function RollupDesigner({
                     {showCountDistinctAlert && (
                       <Alert
                         type="warning"
-                        message={
+                        message={(
                           <Text>
                             This query does not have any time dimension
                             granularity, which prevents pre-aggregating any
                             count distinct measures.
                           </Text>
-                        }
+                        )}
                       />
                     )}
 
@@ -689,12 +686,12 @@ export function RollupDesigner({
                         <Alert
                           data-testid="rd-incompatible-query"
                           type="warning"
-                          message={
+                          message={(
                             <Text>
                               This rollup does <b>NOT</b> match the following
                               query:
                             </Text>
-                          }
+                          )}
                         />
 
                         {!hideMatchRollupButton && (

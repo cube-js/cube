@@ -123,8 +123,7 @@ export default function ChartRenderer({
     slowQuery,
     slowQueryFromCache,
   } = useChartRendererState(queryId);
-  const { setResultSetExists, setChartRendererReady, setQueryError } =
-    useChartRendererStateMethods();
+  const { setResultSetExists, setChartRendererReady, setQueryError } = useChartRendererStateMethods();
 
   const runButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -133,12 +132,11 @@ export default function ChartRenderer({
     runButtonRef.current?.click();
   });
 
-  useEffect(() => {
-    return () => {
-      setChartRendererReady(queryId, false);
-    };
-    // eslint-disable-next-line
-  }, []);
+  useEffect(() => () => {
+    setChartRendererReady(queryId, false);
+  }
+  // eslint-disable-next-line
+  , []);
 
   useEffect(() => {
     if (!areQueriesEqual && queryError) {
@@ -150,17 +148,15 @@ export default function ChartRenderer({
     setResultSetExists(queryId, false);
   }, [framework]);
 
-  const loading: boolean =
-    queryHasMissingMembers || isQueryLoading || isBuildInProgress || !cubeApi;
+  const loading: boolean = queryHasMissingMembers || isQueryLoading || isBuildInProgress || !cubeApi;
 
-  const invisible: boolean =
-    !isChartRendererReady ||
-    isBuildInProgress ||
-    Boolean(queryError) ||
-    queryHasMissingMembers ||
-    loading ||
-    !areQueriesEqual ||
-    !resultSetExists;
+  const invisible: boolean = !isChartRendererReady
+    || isBuildInProgress
+    || Boolean(queryError)
+    || queryHasMissingMembers
+    || loading
+    || !areQueriesEqual
+    || !resultSetExists;
 
   const renderExtras = () => {
     if (queryError) {
@@ -222,8 +218,8 @@ export default function ChartRenderer({
   const slowQueryMsg = slowQuery
     ? 'This query takes more than 5 seconds to execute. Please consider using pre-aggregations to improve its performance. '
     : slowQueryFromCache
-    ? "This query takes more than 5 seconds to execute. It was served from the cache because Cube wasn't able to renew it in less than 5 seconds. Please consider using pre-aggregations to improve its performance. "
-    : '';
+      ? "This query takes more than 5 seconds to execute. It was served from the cache because Cube wasn't able to renew it in less than 5 seconds. Please consider using pre-aggregations to improve its performance. "
+      : '';
 
   return (
     <>

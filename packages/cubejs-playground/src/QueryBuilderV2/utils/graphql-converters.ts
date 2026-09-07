@@ -151,10 +151,10 @@ export class CubeGraphQLConverter {
     | t.ObjectFieldNode
     | t.ObjectFieldNode[]
     | {
-        kind: 'ObjectField';
-        name: { kind: 'Name'; value: string };
-        value: { kind: 'ObjectValue'; fields: t.ObjectFieldNode[] };
-      }
+      kind: 'ObjectField';
+      name: { kind: 'Name'; value: string };
+      value: { kind: 'ObjectValue'; fields: t.ObjectFieldNode[] };
+    }
   )[] {
     const plainFilters = Object.values(
       filter.reduce((memo: any, f: any) => {
@@ -330,23 +330,23 @@ export class CubeGraphQLConverter {
             f.values === undefined && !['set', 'notSet'].includes(f.operator)
               ? []
               : [
-                  {
-                    kind: t.Kind.OBJECT_FIELD,
-                    name: {
-                      kind: t.Kind.NAME,
-                      // A single value maps to "equals"
-                      // Whereas multiple values for "equals" operator maps to "in"
-                      // value: operatorsMap[f.operator] || f.operator,
-                      value:
+                {
+                  kind: t.Kind.OBJECT_FIELD,
+                  name: {
+                    kind: t.Kind.NAME,
+                    // A single value maps to "equals"
+                    // Whereas multiple values for "equals" operator maps to "in"
+                    // value: operatorsMap[f.operator] || f.operator,
+                    value:
                         f.operator === 'equals' && (f.values || []).length <= 1
                           ? 'equals'
                           : f.operator in OPERATORS_MAP
                             ? OPERATORS_MAP[f.operator as keyof typeof OPERATORS_MAP]
                             : f.operator,
-                    },
-                    value: value(f),
                   },
-                ],
+                  value: value(f),
+                },
+              ],
         },
       } as t.ObjectFieldNode;
     });
@@ -561,8 +561,8 @@ export class CubeGraphQLConverter {
           name: field,
           ...(gqlGranularity
             ? {
-                granularities: [...(currentField?.granularities || []), gqlGranularity],
-              }
+              granularities: [...(currentField?.granularities || []), gqlGranularity],
+            }
             : null),
         });
       });

@@ -53,7 +53,7 @@ export function AddFilterInput(props: AddFilterInputProps) {
     dateRanges: queryDateRanges,
   } = useQueryBuilderContext();
 
-  const [members, dimensions, measures, dateRanges, segments, nameToMemberType] = useMemo(() => {
+  const [members, dimensions, measures, dateRanges, segments] = useMemo(() => {
     // Sort members by cube name and used status
     const sort = (
       a: TCubeDimension | TCubeMeasure | TCubeSegment,
@@ -94,31 +94,20 @@ export function AddFilterInput(props: AddFilterInputProps) {
       {} as Record<string, MemberType>
     );
 
-    const dimensions = members.filter((member) => {
-      return nameToMemberType[member.name] === 'dimension';
-    });
+    const dimensions = members.filter((member) => nameToMemberType[member.name] === 'dimension');
 
-    const measures = members.filter((member) => {
-      return nameToMemberType[member.name] === 'measure';
-    });
+    const measures = members.filter((member) => nameToMemberType[member.name] === 'measure');
 
     const segments = members
-      .filter((member) => {
-        return nameToMemberType[member.name] === 'segment';
-      })
-      .filter((member) => {
-        return !query.segments?.includes(member.name);
-      });
+      .filter((member) => nameToMemberType[member.name] === 'segment')
+      .filter((member) => !query.segments?.includes(member.name));
 
     const dateRanges = members
       .filter(
-        (member) =>
-          nameToMemberType[member.name] === 'dimension' &&
-          (member as TCubeDimension).type === 'time'
+        (member) => nameToMemberType[member.name] === 'dimension'
+          && (member as TCubeDimension).type === 'time'
       )
-      .filter((member) => {
-        return !queryDateRanges.list.includes(member.name);
-      }) as TCubeDimension[];
+      .filter((member) => !queryDateRanges.list.includes(member.name)) as TCubeDimension[];
 
     return [
       members,

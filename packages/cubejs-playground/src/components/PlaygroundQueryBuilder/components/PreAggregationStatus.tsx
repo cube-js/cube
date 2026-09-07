@@ -72,13 +72,13 @@ export function PreAggregationStatus({
 
         {isAggregated && !external && preAggregationType !== 'originalSql' ? (
           <Alert
-            message={
+            message={(
               <>
                 For optimized performance, consider using <b>external</b>{' '}
                 {preAggregationType} pre-aggregation, rather than the source
                 database (internal)
               </>
-            }
+            )}
             type="warning"
           />
         ) : null}

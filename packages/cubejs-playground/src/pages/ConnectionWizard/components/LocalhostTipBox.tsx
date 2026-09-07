@@ -32,7 +32,7 @@ export function LocalhostTipBox({ onHostnameCopy }: TLocalhostTipBoxProps) {
     <StyledAlert
       data-testid="wizard-localhost-tipbox"
       type="warning"
-      message={
+      message={(
         <Space direction="vertical" size="middle">
           <Typography.Text>
             To connect to the database running on the localhost use the
@@ -78,7 +78,7 @@ export function LocalhostTipBox({ onHostnameCopy }: TLocalhostTipBoxProps) {
             </Space>
           </StyledForm>
         </Space>
-      }
+      )}
     />
   );
 }

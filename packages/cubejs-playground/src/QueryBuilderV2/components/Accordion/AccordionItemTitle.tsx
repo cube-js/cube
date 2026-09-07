@@ -137,7 +137,7 @@ export function AccordionItemTitle(props: AccordionItemTitleProps) {
   );
 }
 
-const AccordionItemIcon = memo(function StyledAccordionItemIcon(props: { isExpanded: boolean }) {
+const AccordionItemIcon = memo((props: { isExpanded: boolean }) => {
   const { isExpanded } = props;
 
   return (
@@ -147,10 +147,10 @@ const AccordionItemIcon = memo(function StyledAccordionItemIcon(props: { isExpan
   );
 });
 
-const AccordionItemContent = memo(function AccordionItemContent(props: {
+const AccordionItemContent = memo((props: {
   id: string;
   title: ReactText;
-}) {
+}) => {
   const { id, title } = props;
 
   return (

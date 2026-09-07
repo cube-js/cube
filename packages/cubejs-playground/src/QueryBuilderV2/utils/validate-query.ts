@@ -30,23 +30,20 @@ const VALID_BINARY_OPERATORS: BinaryOperator[] = [
   'afterOrOnDate',
 ];
 
-const isArrayOfStrings = (value: any): value is string[] =>
-  Array.isArray(value) && value.every((item) => typeof item === 'string');
+const isArrayOfStrings = (value: any): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string');
 
-const isValidUnaryFilter = (filter: any): filter is UnaryFilter =>
-  typeof filter === 'object' &&
-  'member' in filter &&
-  'operator' in filter &&
-  (filter.operator === 'set' || filter.operator === 'notSet') &&
-  filter.values === undefined;
+const isValidUnaryFilter = (filter: any): filter is UnaryFilter => typeof filter === 'object'
+  && 'member' in filter
+  && 'operator' in filter
+  && (filter.operator === 'set' || filter.operator === 'notSet')
+  && filter.values === undefined;
 
-const isValidBinaryFilter = (filter: any): filter is BinaryFilter =>
-  typeof filter === 'object' &&
-  'member' in filter &&
-  'operator' in filter &&
-  VALID_BINARY_OPERATORS.includes(filter.operator) &&
-  'values' in filter &&
-  isArrayOfStrings(filter.values);
+const isValidBinaryFilter = (filter: any): filter is BinaryFilter => typeof filter === 'object'
+  && 'member' in filter
+  && 'operator' in filter
+  && VALID_BINARY_OPERATORS.includes(filter.operator)
+  && 'values' in filter
+  && isArrayOfStrings(filter.values);
 
 const sanitizeLogicalFilter = (filter: any): LogicalAndFilter | LogicalOrFilter | null => {
   if (typeof filter !== 'object' || (!('and' in filter) && !('or' in filter))) {
@@ -74,22 +71,19 @@ const sanitizeFilter = (filter: any): Filter | null => {
   return sanitizeLogicalFilter(filter);
 };
 
-const sanitizeFilters = (filters: any): Filter[] =>
-  Array.isArray(filters) ? (filters.map(sanitizeFilter).filter(Boolean) as Filter[]) : [];
+const sanitizeFilters = (filters: any): Filter[] => (Array.isArray(filters) ? (filters.map(sanitizeFilter).filter(Boolean) as Filter[]) : []);
 
-const isValidTimeDimension = (td: any): td is TimeDimension =>
-  typeof td === 'object' &&
-  'dimension' in td &&
-  typeof td.dimension === 'string' &&
-  (!td.granularity || typeof td.granularity === 'string') &&
-  (!td.dateRange ||
-    typeof td.dateRange === 'string' ||
-    (Array.isArray(td.dateRange) &&
-      td.dateRange.length === 2 &&
-      td.dateRange.every((date: any) => typeof date === 'string')));
+const isValidTimeDimension = (td: any): td is TimeDimension => typeof td === 'object'
+  && 'dimension' in td
+  && typeof td.dimension === 'string'
+  && (!td.granularity || typeof td.granularity === 'string')
+  && (!td.dateRange
+    || typeof td.dateRange === 'string'
+    || (Array.isArray(td.dateRange)
+      && td.dateRange.length === 2
+      && td.dateRange.every((date: any) => typeof date === 'string')));
 
-const sanitizeTimeDimensions = (timeDimensions: any): TimeDimension[] =>
-  Array.isArray(timeDimensions) ? timeDimensions.filter(isValidTimeDimension) : [];
+const sanitizeTimeDimensions = (timeDimensions: any): TimeDimension[] => (Array.isArray(timeDimensions) ? timeDimensions.filter(isValidTimeDimension) : []);
 
 export function validateQuery(query: Record<string, any>): Query {
   const sanitizedQuery: Partial<Query> = {};
@@ -127,9 +121,9 @@ export function validateQuery(query: Record<string, any>): Query {
   }
 
   if (
-    typeof query.order === 'object' &&
-    !Array.isArray(query.order) &&
-    Object.keys(query.order).length > 0
+    typeof query.order === 'object'
+    && !Array.isArray(query.order)
+    && Object.keys(query.order).length > 0
   ) {
     sanitizedQuery.order = query.order;
   }

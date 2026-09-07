@@ -89,8 +89,7 @@ export function ConnectionWizardPage({ history }) {
   const [isTestConnectionLoading, setTestConnectionLoading] = useState(false);
   const [testConnectionResult, setTestConnectionResult] = useState<any>(null);
   const [db, selectDatabase] = useState<Database | null>(null);
-  const [isDriverInstallationInProgress, setDriverInstallationInProgress] =
-    useState<boolean>(false);
+  const [isDriverInstallationInProgress, setDriverInstallationInProgress] = useState<boolean>(false);
   const [dependencyName, setDependencyName] = useState<string | null>(null);
   const [installationError, setInstallationError] = useState<string | null>(
     null
@@ -104,8 +103,7 @@ export function ConnectionWizardPage({ history }) {
     if (playgroundContext?.dbType && !playgroundContext?.isDocker) {
       selectDatabase(
         databases.find(
-          (currentDb) =>
-            currentDb.driver.toLowerCase() === playgroundContext.dbType
+          (currentDb) => currentDb.driver.toLowerCase() === playgroundContext.dbType
         ) || null
       );
     }
@@ -254,7 +252,7 @@ export function ConnectionWizardPage({ history }) {
 
               <Alert
                 type="info"
-                message={
+                message={(
                   <>
                     For advanced configuration, use the <b>cube.js</b> or{' '}
                     <b>.env</b> configuration files in your Cube project.
@@ -269,7 +267,7 @@ export function ConnectionWizardPage({ history }) {
                       documentation.
                     </Typography.Link>
                   </>
-                }
+                )}
               />
 
               {db.title === 'MongoDB' ? (
@@ -339,10 +337,10 @@ export function ConnectionWizardPage({ history }) {
               {['MySQL', 'PostgreSQL', 'Druid', 'ClickHouse', 'Crate'].includes(
                 db?.title || ''
               ) && playgroundContext?.isDocker ? (
-                <Col span={12}>
-                  <LocalhostTipBox onHostnameCopy={setHostname} />
-                </Col>
-              ) : null}
+                  <Col span={12}>
+                    <LocalhostTipBox onHostnameCopy={setHostname} />
+                  </Col>
+                ) : null}
             </Row>
           </Space>
         </>

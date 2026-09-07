@@ -26,7 +26,6 @@
     "examples/",
     "rust/cubesql/",
     // never covered by the ESLint setup this replaced
-    "packages/cubejs-playground/",
     "packages/cubejs-testing/cypress/",
     "packages/cubejs-testing/birdbox-fixtures/",
     // a mongosh script, not Node: `db` is a shell global

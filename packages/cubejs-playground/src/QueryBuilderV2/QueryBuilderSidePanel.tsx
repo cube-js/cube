@@ -10,7 +10,6 @@ import {
   tasty,
   Text,
   Title,
-  CloseIcon,
   TooltipProvider,
   ResizablePanel,
   ClearIcon,
@@ -106,10 +105,9 @@ export function QueryBuilderSidePanel({
   const appliedFilterString = preparedFilterString.length < 2 ? '' : debouncedFilterString;
 
   const cubesOrViews = selectedType === 'cubes' ? cubes : views;
-  const allJoinableCubes =
-    selectedType === 'views' && usedCubes.length
-      ? cubesOrViews.filter((cube) => usedCubes[0] === cube.name)
-      : cubesOrViews.filter((cube) => joinableCubes.includes(cube));
+  const allJoinableCubes = selectedType === 'views' && usedCubes.length
+    ? cubesOrViews.filter((cube) => usedCubes[0] === cube.name)
+    : cubesOrViews.filter((cube) => joinableCubes.includes(cube));
 
   const [openCubes, setOpenCubes] = useState<Set<string>>(new Set());
 
@@ -195,36 +193,35 @@ export function QueryBuilderSidePanel({
     []
   );
 
-  const typeSwitcher = useMemo(() => {
-    return (
-      <Space qa="QueryBuilderSwitcher" gap="1x">
-        {editQueryButton}
-        <Radio.ButtonGroup
-          aria-label="Cube type"
-          value={selectedType}
-          styles={{ flexGrow: 1 }}
-          onChange={(val) => switchType(val as 'cubes' | 'views')}
+  const typeSwitcher = useMemo(() => (
+    <Space qa="QueryBuilderSwitcher" gap="1x">
+      {editQueryButton}
+      <Radio.ButtonGroup
+        aria-label="Cube type"
+        value={selectedType}
+        styles={{ flexGrow: 1 }}
+        onChange={(val) => switchType(val as 'cubes' | 'views')}
+      >
+        <RadioButton
+          qa="QueryBuilderTab-cubes"
+          value="cubes"
+          isDisabled={!cubes.length}
+          inputStyles={{ placeContent: 'center' }}
         >
-          <RadioButton
-            qa="QueryBuilderTab-cubes"
-            value="cubes"
-            isDisabled={!cubes.length}
-            inputStyles={{ placeContent: 'center' }}
-          >
-            Cubes <CountBadge radius="1r">{cubes.length}</CountBadge>
-          </RadioButton>
-          <RadioButton
-            qa="QueryBuilderTab-views"
-            value="views"
-            isDisabled={!views.length}
-            inputStyles={{ placeContent: 'center' }}
-          >
-            Views <CountBadge radius="1r">{views.length}</CountBadge>
-          </RadioButton>
-        </Radio.ButtonGroup>
-      </Space>
-    );
-  }, [selectedType, meta, cubes.length, views.length]);
+          Cubes <CountBadge radius="1r">{cubes.length}</CountBadge>
+        </RadioButton>
+        <RadioButton
+          qa="QueryBuilderTab-views"
+          value="views"
+          isDisabled={!views.length}
+          inputStyles={{ placeContent: 'center' }}
+        >
+          Views <CountBadge radius="1r">{views.length}</CountBadge>
+        </RadioButton>
+      </Radio.ButtonGroup>
+    </Space>
+  ),
+  [selectedType, meta, cubes.length, views.length]);
 
   const searchInput = useMemo(() => {
     const description = `Search ${selectedType === 'cubes' ? 'cubes' : 'views'} and members`;
@@ -317,56 +314,53 @@ export function QueryBuilderSidePanel({
     }
   });
 
-  const cubeList = useMemo(() => {
-    return (
-      <Flex gap="1bw" flow="column" padding="0 0 2x 0">
-        {missingCubes
-          .filter((cubeName) => (appliedFilterString ? filteredCubes.includes(cubeName) : true))
-          .map((cubeName) => (
-            <SidePanelCubeItem
-              key={cubeName}
-              isOpen={openCubes.has(cubeName)}
-              filterString={appliedFilterString}
-              cubeName={cubeName}
-              mode={viewMode}
-              rightIcon="arrow"
-              onHierarchyToggle={onHierarchyToggle}
-              onMemberToggle={(name) => {
-                onMemberToggle(cubeName, name);
-              }}
-            />
-          ))}
-        {cubesOrViews
-          .filter((cube) =>
-            appliedFilterString
-              ? // If filter is applied, show only filtered cubes
-                filteredCubes.includes(cube.name)
-              : viewMode === 'query'
-                ? // In query mode, show only used cubes
-                  usedCubes.includes(cube.name)
-                : true
-          )
-          .map((cube) => (
-            <SidePanelCubeItem
-              key={cube.name}
-              isNonJoinable={!allJoinableCubes.includes(cube) && !usedCubes.includes(cube.name)}
-              isOpen={openCubes.has(cube.name)}
-              filterString={appliedFilterString}
-              cubeName={cube.name}
-              mode={viewMode}
-              rightIcon={isQueryEmpty ? 'arrow' : 'plus'}
-              onToggle={(isOpen) => {
-                onCubeToggle(cube.name, isOpen);
-              }}
-              onMemberToggle={(name) => {
-                onMemberToggle(cube.name, name);
-              }}
-              onHierarchyToggle={onHierarchyToggle}
-            />
-          ))}
-      </Flex>
-    );
-  }, [
+  const cubeList = useMemo(() => (
+    <Flex gap="1bw" flow="column" padding="0 0 2x 0">
+      {missingCubes
+        .filter((cubeName) => (appliedFilterString ? filteredCubes.includes(cubeName) : true))
+        .map((cubeName) => (
+          <SidePanelCubeItem
+            key={cubeName}
+            isOpen={openCubes.has(cubeName)}
+            filterString={appliedFilterString}
+            cubeName={cubeName}
+            mode={viewMode}
+            rightIcon="arrow"
+            onHierarchyToggle={onHierarchyToggle}
+            onMemberToggle={(name) => {
+              onMemberToggle(cubeName, name);
+            }}
+          />
+        ))}
+      {cubesOrViews
+        .filter((cube) => (appliedFilterString
+          ? // If filter is applied, show only filtered cubes
+          filteredCubes.includes(cube.name)
+          : viewMode === 'query'
+            ? // In query mode, show only used cubes
+            usedCubes.includes(cube.name)
+            : true))
+        .map((cube) => (
+          <SidePanelCubeItem
+            key={cube.name}
+            isNonJoinable={!allJoinableCubes.includes(cube) && !usedCubes.includes(cube.name)}
+            isOpen={openCubes.has(cube.name)}
+            filterString={appliedFilterString}
+            cubeName={cube.name}
+            mode={viewMode}
+            rightIcon={isQueryEmpty ? 'arrow' : 'plus'}
+            onToggle={(isOpen) => {
+              onCubeToggle(cube.name, isOpen);
+            }}
+            onMemberToggle={(name) => {
+              onMemberToggle(cube.name, name);
+            }}
+            onHierarchyToggle={onHierarchyToggle}
+          />
+        ))}
+    </Flex>
+  ),
+  [
     viewMode,
     queryStats,
     [...openCubes.values()].join(),
@@ -380,7 +374,7 @@ export function QueryBuilderSidePanel({
       const validatedQuery = validateQuery(query);
 
       setQuery(validatedQuery);
-    } catch (e: any) {
+    } catch {
       throw 'Invalid query';
     }
   }, []);
@@ -401,63 +395,62 @@ export function QueryBuilderSidePanel({
     }
   }, [viewMode, isQueryEmpty]);
 
-  const topBar = useMemo(() => {
-    return (
-      <Space placeContent="space-between" gap="1x">
-        <Space gap="1x">
-          {showEditQueryButton ? editQueryButton : null}
-          {!usedCubes.length ? (
-            <Title preset="h6">All members</Title>
-          ) : (
-            <TooltipProvider
-              title={'Toggle between all members and only those that are used in the query'}
-              placement="top"
-            >
-              <Button
-                qa="ToggleMembersButton"
-                qaVal={viewMode === 'all' ? 'all' : 'used'}
-                type={viewMode === 'all' ? 'outline' : 'primary'}
-                size="small"
-                icon={viewMode === 'all' ? <StarOutlined /> : <StarFilled />}
-                onPress={() => setViewMode(viewMode === 'all' ? 'query' : 'all')}
-              >
-                {viewMode === 'all' ? 'All members' : 'Used only'}
-              </Button>
-            </TooltipProvider>
-          )}
-          {isVerifying || isMetaLoading ? <LoadingOutlined /> : null}
-        </Space>
-        <Space gap=".5x">
-          <TooltipProvider title="Reset the query">
+  const topBar = useMemo(() => (
+    <Space placeContent="space-between" gap="1x">
+      <Space gap="1x">
+        {showEditQueryButton ? editQueryButton : null}
+        {!usedCubes.length ? (
+          <Title preset="h6">All members</Title>
+        ) : (
+          <TooltipProvider
+            title="Toggle between all members and only those that are used in the query"
+            placement="top"
+          >
             <Button
-              qa="ResetQuery"
-              aria-label="Reset the query"
+              qa="ToggleMembersButton"
+              qaVal={viewMode === 'all' ? 'all' : 'used'}
+              type={viewMode === 'all' ? 'outline' : 'primary'}
               size="small"
-              type="secondary"
-              theme="danger"
-              icon={<ClearIcon />}
-              onPress={() => {
-                clearQuery();
-                setOpenCubes(
-                  cubesOrViews.length === 1 ? new Set([cubesOrViews[0].name]) : new Set()
-                );
-                resetScrollAndContentSize();
-              }}
+              icon={viewMode === 'all' ? <StarOutlined /> : <StarFilled />}
+              onPress={() => setViewMode(viewMode === 'all' ? 'query' : 'all')}
             >
-              Reset
+              {viewMode === 'all' ? 'All members' : 'Used only'}
             </Button>
           </TooltipProvider>
-        </Space>
+        )}
+        {isVerifying || isMetaLoading ? <LoadingOutlined /> : null}
       </Space>
-    );
-  }, [viewMode, isQueryEmpty, isMetaLoading, usedMembers.length, appliedFilterString, isVerifying]);
+      <Space gap=".5x">
+        <TooltipProvider title="Reset the query">
+          <Button
+            qa="ResetQuery"
+            aria-label="Reset the query"
+            size="small"
+            type="secondary"
+            theme="danger"
+            icon={<ClearIcon />}
+            onPress={() => {
+              clearQuery();
+              setOpenCubes(
+                cubesOrViews.length === 1 ? new Set([cubesOrViews[0].name]) : new Set()
+              );
+              resetScrollAndContentSize();
+            }}
+          >
+            Reset
+          </Button>
+        </TooltipProvider>
+      </Space>
+    </Space>
+  ),
+  [viewMode, isQueryEmpty, isMetaLoading, usedMembers.length, appliedFilterString, isVerifying]);
 
   const content = (
     <>
       <DialogContainer isOpen={isPasteDialogOpen} onDismiss={() => setIsPasteDialogOpen(false)}>
         <EditQueryDialogForm
           query={query}
-          defaultType={'json'}
+          defaultType="json"
           apiVersion={apiVersion}
           onSubmit={onApplyQuery}
         />

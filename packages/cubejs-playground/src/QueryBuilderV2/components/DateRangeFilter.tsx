@@ -47,7 +47,6 @@ export function DateRangeFilter(props: TimeDimensionFilterProps) {
     member,
     isCompact,
     isMissing,
-    name,
     cubeName,
     cubeTitle,
     memberName,
@@ -132,31 +131,29 @@ export function DateRangeFilter(props: TimeDimensionFilterProps) {
         onSelectionChange={onDateRangeChange}
         onOpenChange={onOpenChange}
       >
-        {DATA_RANGES.map((range) => {
-          return (
-            <Item key={range} textValue={capitalize(range)}>
-              <Text preset="t3m">{capitalize(range)}</Text>
-            </Item>
-          );
-        })}
+        {DATA_RANGES.map((range) => (
+          <Item key={range} textValue={capitalize(range)}>
+            <Text preset="t3m">{capitalize(range)}</Text>
+          </Item>
+        ))}
       </Select>
       {Array.isArray(member.dateRange) ? (
         <TimeDateRangeSelector value={member.dateRange} onChange={onDataRangeChangeInPicker} />
       ) : undefined}
-      {/*<Text>by</Text>*/}
-      {/*<Select*/}
-      {/*  size="small"*/}
-      {/*  selectedKey={member.granularity || GRANULARITIES[0]}*/}
-      {/*  onSelectionChange={onGranularityChange}*/}
-      {/*>*/}
-      {/*  {GRANULARITIES.map((key) => {*/}
-      {/*    return (*/}
-      {/*      <Item key={key} textValue={capitalize(key)}>*/}
-      {/*        <Text preset="t3m">{capitalize(key)}</Text>*/}
-      {/*      </Item>*/}
-      {/*    );*/}
-      {/*  })}*/}
-      {/*</Select>*/}
+      {/* <Text>by</Text> */}
+      {/* <Select */}
+      {/*  size="small" */}
+      {/*  selectedKey={member.granularity || GRANULARITIES[0]} */}
+      {/*  onSelectionChange={onGranularityChange} */}
+      {/* > */}
+      {/*  {GRANULARITIES.map((key) => { */}
+      {/*    return ( */}
+      {/*      <Item key={key} textValue={capitalize(key)}> */}
+      {/*        <Text preset="t3m">{capitalize(key)}</Text> */}
+      {/*      </Item> */}
+      {/*    ); */}
+      {/*  })} */}
+      {/* </Select> */}
     </DateRangeFilterWrapper>
   );
 }

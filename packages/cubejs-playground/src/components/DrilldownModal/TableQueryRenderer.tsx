@@ -16,9 +16,9 @@ const formatTableData = (columns, data) => {
     }, []);
   }
 
-  const typeByIndex = flatten(columns).reduce((memo, column) => {
-    return { ...memo, [column.dataIndex]: column };
-  }, {});
+  const typeByIndex = flatten(columns).reduce((memo, column) => (
+    { ...memo, [column.dataIndex]: column }
+  ), {});
 
   function formatValue(value, { type, format }: any = {}) {
     if (value == undefined) {
@@ -44,9 +44,7 @@ const formatTableData = (columns, data) => {
 
   function format(row) {
     return Object.fromEntries(
-      Object.entries(row).map(([dataIndex, value]) => {
-        return [dataIndex, formatValue(value, typeByIndex[dataIndex])];
-      })
+      Object.entries(row).map(([dataIndex, value]) => [dataIndex, formatValue(value, typeByIndex[dataIndex])])
     );
   }
 

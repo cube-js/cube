@@ -31,8 +31,8 @@ export default function Base64Upload({ onInput, ...props }) {
           console.error(e);
         }
 
-        onInput &&
-          onInput({
+        onInput
+          && onInput({
             encoded: base64text,
             raw: JSON.parse(fileContent),
           });

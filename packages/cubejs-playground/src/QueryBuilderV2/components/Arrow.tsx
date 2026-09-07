@@ -11,7 +11,7 @@ export type ArrowProps = {
 
 type Direction = 'left' | 'right' | 'top' | 'bottom';
 
-export const Arrow = memo(function Arrow(props: ArrowProps) {
+export const Arrow = memo((props: ArrowProps) => {
   const { direction = 'bottom', ...iconProps } = props;
   const rotate = rotationByDirection[direction];
 

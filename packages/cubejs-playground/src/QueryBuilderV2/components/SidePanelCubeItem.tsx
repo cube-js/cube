@@ -146,16 +146,13 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
   const [openFolders, setOpenFolders] = useState<string[]>([]);
   const [openHierarchies, setOpenHierarchies] = useState<string[]>([]);
 
-  const folderMembers = folders.reduce((acc, folder) => {
-    return acc.concat(folder.members);
-  }, [] as string[]);
-  const hierarchyMembers = hierarchies.reduce((acc, hierarchy) => {
-    return acc.concat(hierarchy.levels);
-  }, [] as string[]);
+  const folderMembers = folders.reduce((acc, folder) => acc.concat(folder.members),
+    [] as string[]);
+  const hierarchyMembers = hierarchies.reduce((acc, hierarchy) => acc.concat(hierarchy.levels),
+    [] as string[]);
   const importedDimensionsInHierarchies = hierarchies
-    .reduce((acc, hierarchy) => {
-      return acc.concat(hierarchy.levels.filter((level) => cube && !level.startsWith(cube?.name)));
-    }, [] as string[])
+    .reduce((acc, hierarchy) => acc.concat(hierarchy.levels.filter((level) => cube && !level.startsWith(cube?.name))),
+      [] as string[])
     .map((member) => members.dimensions[member])
     .filter(Boolean);
   const importedDimensionsInHierarchiesNames = importedDimensionsInHierarchies.map((d) => d.name);
@@ -213,10 +210,9 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
 
   function filterMembers(members: string[]) {
     return members.filter(
-      (m) =>
-        (mode === 'all' && isOpen) ||
-        filterString ||
-        usedMembers.filter((m) => m.startsWith(`${cubeName}.`)).includes(m)
+      (m) => (mode === 'all' && isOpen)
+        || filterString
+        || usedMembers.filter((m) => m.startsWith(`${cubeName}.`)).includes(m)
     );
   }
 
@@ -254,7 +250,7 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
   }
 
   // Opens folders that contain specific member
-  const openContainingFolder = function (name: string) {
+  const openContainingFolder = function openContainingFolder(name: string) {
     const foldersToOpen = folders.filter((folder) => folder.members.includes(name));
 
     if (foldersToOpen.length) {
@@ -291,88 +287,53 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
     }
   });
 
-  const dimensionsElementMap = useMemo(() => {
-    return cubeDimensions.reduce(
-      (map, memberName) => {
-        const member = members.dimensions[memberName];
-        const timeDimension = usedGranularities.find((td) => td.dimension === memberName);
-        const isSelected = query?.dimensions?.includes(memberName) ?? false;
-        const isImported = importedDimensionsInHierarchiesNames.includes(memberName);
+  const dimensionsElementMap = useMemo(() => cubeDimensions.reduce(
+    (map, memberName) => {
+      const member = members.dimensions[memberName];
+      const timeDimension = usedGranularities.find((td) => td.dimension === memberName);
+      const isSelected = query?.dimensions?.includes(memberName) ?? false;
+      const isImported = importedDimensionsInHierarchiesNames.includes(memberName);
 
-        if (!member || !cube) {
-          const missingMember = missingMembers.find((m) => m.name === memberName);
+      if (!member || !cube) {
+        const missingMember = missingMembers.find((m) => m.name === memberName);
 
-          if (
-            !missingMember ||
-            (missingMember.category !== 'dimensions' && missingMember.category !== 'timeDimensions')
-          ) {
-            return map;
-          }
+        if (
+          !missingMember
+            || (missingMember.category !== 'dimensions' && missingMember.category !== 'timeDimensions')
+        ) {
+          return map;
+        }
 
-          if (missingMember.category === 'dimensions') {
-            map[memberName] = (
-              <ListMember
-                key={memberName}
-                cube={cube ?? { name: cubeName }}
-                member={{ name: memberName, type: undefined }}
-                category="dimensions"
-                filterString={filterString}
-                memberViewType={memberViewType}
-                isImported={isImported}
-                isMissing={true}
-                isSelected={isSelected}
-                isFiltered={usedMembersInFilters.includes(memberName)}
-                onRemoveFilter={removeFilter}
-                onToggle={() => {
-                  dimensionsUpdater?.toggle(memberName);
-                  onMemberToggle?.(memberName);
-                }}
-              />
-            );
-          } else {
-            map[memberName] = (
-              <TimeListMember
-                key={memberName}
-                isMissing
-                cube={cube ?? { name: cubeName }}
-                member={{ name: memberName, type: 'time' }}
-                filterString={filterString}
-                selectedGranularities={timeDimension?.granularities}
-                memberViewType={memberViewType}
-                isSelected={(granularity) => {
-                  if (granularity) {
-                    return timeDimension?.granularities.includes(granularity) ?? false;
-                  }
-
-                  return isSelected;
-                }}
-                isFiltered={usedMembersInFilters.includes(memberName)}
-                isDateRangeFiltered={dateRanges.list.includes(memberName)}
-                onDimensionToggle={(dimension) => {
-                  dimensionsUpdater?.toggle(dimension);
-                  onMemberToggle?.(dimension);
-                }}
-                onGranularityToggle={(name, granularity) => {
-                  grouping.toggle(name, granularity);
-                }}
-                onAddDataRange={addDateRange}
-                onRemoveDataRange={removeDateRange}
-                onAddFilter={addFilter}
-                onRemoveFilter={removeFilter}
-                onToggle={toggleTimeDimension}
-              />
-            );
-          }
-        } else if (cube && member?.type === 'time') {
+        if (missingMember.category === 'dimensions') {
+          map[memberName] = (
+            <ListMember
+              key={memberName}
+              cube={cube ?? { name: cubeName }}
+              member={{ name: memberName, type: undefined }}
+              category="dimensions"
+              filterString={filterString}
+              memberViewType={memberViewType}
+              isImported={isImported}
+              isMissing
+              isSelected={isSelected}
+              isFiltered={usedMembersInFilters.includes(memberName)}
+              onRemoveFilter={removeFilter}
+              onToggle={() => {
+                dimensionsUpdater?.toggle(memberName);
+                onMemberToggle?.(memberName);
+              }}
+            />
+          );
+        } else {
           map[memberName] = (
             <TimeListMember
               key={memberName}
-              isOpen={!filterString && mode === 'all' && openTimeDimensions.includes(memberName)}
-              cube={cube}
-              member={member}
+              isMissing
+              cube={cube ?? { name: cubeName }}
+              member={{ name: memberName, type: 'time' }}
               filterString={filterString}
-              memberViewType={memberViewType}
               selectedGranularities={timeDimension?.granularities}
+              memberViewType={memberViewType}
               isSelected={(granularity) => {
                 if (granularity) {
                   return timeDimension?.granularities.includes(granularity) ?? false;
@@ -380,8 +341,8 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
 
                 return isSelected;
               }}
-              isDateRangeFiltered={dateRanges.list.includes(memberName)}
               isFiltered={usedMembersInFilters.includes(memberName)}
+              isDateRangeFiltered={dateRanges.list.includes(memberName)}
               onDimensionToggle={(dimension) => {
                 dimensionsUpdater?.toggle(dimension);
                 onMemberToggle?.(dimension);
@@ -396,33 +357,67 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
               onToggle={toggleTimeDimension}
             />
           );
-        } else {
-          map[memberName] = (
-            <ListMember
-              key={memberName}
-              cube={cube}
-              member={member}
-              category="dimensions"
-              filterString={filterString}
-              memberViewType={memberViewType}
-              isImported={isImported}
-              isSelected={isSelected}
-              isFiltered={usedMembersInFilters.includes(memberName)}
-              onAddFilter={addFilter}
-              onRemoveFilter={removeFilter}
-              onToggle={() => {
-                dimensionsUpdater?.toggle(memberName);
-                onMemberToggle?.(memberName);
-              }}
-            />
-          );
         }
+      } else if (cube && member?.type === 'time') {
+        map[memberName] = (
+          <TimeListMember
+            key={memberName}
+            isOpen={!filterString && mode === 'all' && openTimeDimensions.includes(memberName)}
+            cube={cube}
+            member={member}
+            filterString={filterString}
+            memberViewType={memberViewType}
+            selectedGranularities={timeDimension?.granularities}
+            isSelected={(granularity) => {
+              if (granularity) {
+                return timeDimension?.granularities.includes(granularity) ?? false;
+              }
 
-        return map;
-      },
-      {} as Record<string, ReactElement>
-    );
-  }, [
+              return isSelected;
+            }}
+            isDateRangeFiltered={dateRanges.list.includes(memberName)}
+            isFiltered={usedMembersInFilters.includes(memberName)}
+            onDimensionToggle={(dimension) => {
+              dimensionsUpdater?.toggle(dimension);
+              onMemberToggle?.(dimension);
+            }}
+            onGranularityToggle={(name, granularity) => {
+              grouping.toggle(name, granularity);
+            }}
+            onAddDataRange={addDateRange}
+            onRemoveDataRange={removeDateRange}
+            onAddFilter={addFilter}
+            onRemoveFilter={removeFilter}
+            onToggle={toggleTimeDimension}
+          />
+        );
+      } else {
+        map[memberName] = (
+          <ListMember
+            key={memberName}
+            cube={cube}
+            member={member}
+            category="dimensions"
+            filterString={filterString}
+            memberViewType={memberViewType}
+            isImported={isImported}
+            isSelected={isSelected}
+            isFiltered={usedMembersInFilters.includes(memberName)}
+            onAddFilter={addFilter}
+            onRemoveFilter={removeFilter}
+            onToggle={() => {
+              dimensionsUpdater?.toggle(memberName);
+              onMemberToggle?.(memberName);
+            }}
+          />
+        );
+      }
+
+      return map;
+    },
+    {} as Record<string, ReactElement>
+  ),
+  [
     cacheOfMembers(query.dimensions, importedDimensionsInHierarchiesNames),
     cacheOfMembers(usedMembersInFilters),
     cacheOfMembers(dateRanges.list),
@@ -467,62 +462,61 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
     }
   });
 
-  const measuresElementMap = useMemo(() => {
-    return cubeMeasures.reduce(
-      (map, memberName) => {
-        const member = cube?.measures?.find((m) => m.name === memberName);
+  const measuresElementMap = useMemo(() => cubeMeasures.reduce(
+    (map, memberName) => {
+      const member = cube?.measures?.find((m) => m.name === memberName);
 
-        if (!member || !cube) {
-          const missingMember = missingMembers.find((m) => m.name === memberName);
+      if (!member || !cube) {
+        const missingMember = missingMembers.find((m) => m.name === memberName);
 
-          if (!missingMember || missingMember.category !== 'measures') {
-            return map;
-          }
-
-          map[memberName] = (
-            <ListMember
-              key={memberName}
-              cube={cube ?? { name: cubeName }}
-              member={{ name: memberName, type: 'number' }}
-              category="measures"
-              filterString={filterString}
-              memberViewType={memberViewType}
-              isMissing={true}
-              isSelected={query.measures?.includes(memberName) ?? false}
-              isFiltered={usedMembersInFilters.includes(memberName)}
-              onRemoveFilter={removeFilter}
-              onToggle={() => {
-                measuresUpdater?.toggle(memberName);
-                onMemberToggle?.(memberName);
-              }}
-            />
-          );
-        } else {
-          map[memberName] = (
-            <ListMember
-              key={memberName}
-              cube={cube}
-              member={member}
-              category="measures"
-              filterString={filterString}
-              memberViewType={memberViewType}
-              isSelected={query.measures?.includes(memberName) ?? false}
-              isFiltered={usedMembersInFilters.includes(memberName)}
-              onAddFilter={addFilter}
-              onRemoveFilter={removeFilter}
-              onToggle={() => {
-                measuresUpdater?.toggle(memberName);
-                onMemberToggle?.(memberName);
-              }}
-            />
-          );
+        if (!missingMember || missingMember.category !== 'measures') {
+          return map;
         }
 
-        return map;
-      },
-      {} as Record<string, ReactElement>
-    );
-  }, [
+        map[memberName] = (
+          <ListMember
+            key={memberName}
+            cube={cube ?? { name: cubeName }}
+            member={{ name: memberName, type: 'number' }}
+            category="measures"
+            filterString={filterString}
+            memberViewType={memberViewType}
+            isMissing
+            isSelected={query.measures?.includes(memberName) ?? false}
+            isFiltered={usedMembersInFilters.includes(memberName)}
+            onRemoveFilter={removeFilter}
+            onToggle={() => {
+              measuresUpdater?.toggle(memberName);
+              onMemberToggle?.(memberName);
+            }}
+          />
+        );
+      } else {
+        map[memberName] = (
+          <ListMember
+            key={memberName}
+            cube={cube}
+            member={member}
+            category="measures"
+            filterString={filterString}
+            memberViewType={memberViewType}
+            isSelected={query.measures?.includes(memberName) ?? false}
+            isFiltered={usedMembersInFilters.includes(memberName)}
+            onAddFilter={addFilter}
+            onRemoveFilter={removeFilter}
+            onToggle={() => {
+              measuresUpdater?.toggle(memberName);
+              onMemberToggle?.(memberName);
+            }}
+          />
+        );
+      }
+
+      return map;
+    },
+    {} as Record<string, ReactElement>
+  ),
+  [
     cacheOfMembers(query.measures),
     cacheOfMembers(usedMembersInFilters),
     meta,
@@ -530,55 +524,54 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
     filterString,
   ]);
 
-  const segmentElementMap = useMemo(() => {
-    return cubeSegments.reduce(
-      (map, memberName) => {
-        const member = cube?.segments?.find((s) => s.name === memberName);
+  const segmentElementMap = useMemo(() => cubeSegments.reduce(
+    (map, memberName) => {
+      const member = cube?.segments?.find((s) => s.name === memberName);
 
-        if (!member || !cube) {
-          const missingMember = missingMembers.find((m) => m.name === memberName);
+      if (!member || !cube) {
+        const missingMember = missingMembers.find((m) => m.name === memberName);
 
-          if (!missingMember || missingMember.category !== 'segments') {
-            return map;
-          }
-
-          map[memberName] = (
-            <ListMember
-              key={memberName}
-              cube={cube ?? { name: cubeName }}
-              member={{ name: memberName }}
-              category="segments"
-              filterString={filterString}
-              memberViewType={memberViewType}
-              isMissing={true}
-              isSelected={true}
-              onToggle={() => {
-                dimensionsUpdater?.toggle(memberName);
-                onMemberToggle?.(memberName);
-              }}
-            />
-          );
-        } else {
-          map[memberName] = (
-            <ListMember
-              key={memberName}
-              cube={cube}
-              member={member}
-              category="segments"
-              memberViewType={memberViewType}
-              isSelected={usedMembers.includes(memberName)}
-              onToggle={() => {
-                segmentsUpdater?.toggle(memberName);
-              }}
-            />
-          );
+        if (!missingMember || missingMember.category !== 'segments') {
+          return map;
         }
 
-        return map;
-      },
-      {} as Record<string, ReactElement>
-    );
-  }, [cacheOfMembers(query.segments), meta, memberViewType, filterString]);
+        map[memberName] = (
+          <ListMember
+            key={memberName}
+            cube={cube ?? { name: cubeName }}
+            member={{ name: memberName }}
+            category="segments"
+            filterString={filterString}
+            memberViewType={memberViewType}
+            isMissing
+            isSelected
+            onToggle={() => {
+              dimensionsUpdater?.toggle(memberName);
+              onMemberToggle?.(memberName);
+            }}
+          />
+        );
+      } else {
+        map[memberName] = (
+          <ListMember
+            key={memberName}
+            cube={cube}
+            member={member}
+            category="segments"
+            memberViewType={memberViewType}
+            isSelected={usedMembers.includes(memberName)}
+            onToggle={() => {
+              segmentsUpdater?.toggle(memberName);
+            }}
+          />
+        );
+      }
+
+      return map;
+    },
+    {} as Record<string, ReactElement>
+  ),
+  [cacheOfMembers(query.segments), meta, memberViewType, filterString]);
 
   const membersByFolderMap = folders.reduce(
     (acc, folder) => {
@@ -629,11 +622,9 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
 
     if (mode === 'all') {
       setOpenFolders(
-        folderNames.filter((folderName) =>
-          membersByFolderMap[folderName].some(
-            (memberName) => usedMembers.includes(memberName) || usedHierarchies.includes(memberName)
-          )
-        )
+        folderNames.filter((folderName) => membersByFolderMap[folderName].some(
+          (memberName) => usedMembers.includes(memberName) || usedHierarchies.includes(memberName)
+        ))
       );
     } else {
       setOpenFolders([]);
@@ -651,20 +642,15 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
   }, [isOpen]);
 
   useEffect(() => {
-    const closeHiddenMembers = (openMembers: string[]) => {
-      return openMembers.filter((memberName) => {
-        return (
-          // if the hierarchy on the top level
-          membersByFolderMap[''].includes(memberName) ||
+    const closeHiddenMembers = (openMembers: string[]) => openMembers.filter((memberName) => (
+      // if the hierarchy on the top level
+      membersByFolderMap[''].includes(memberName)
           // or if an open folder contains it
-          openFolders.some((folderName) => {
-            return folders
-              .find((folder) => folder.name === folderName)
-              ?.members.includes(memberName);
-          })
-        );
-      });
-    };
+          || openFolders.some((folderName) => folders
+            .find((folder) => folder.name === folderName)
+            ?.members.includes(memberName))
+    ))
+    ;
 
     // When open folders changes, close all open hierarchies within closed folders
     setOpenHierarchies(closeHiddenMembers);
@@ -672,52 +658,48 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
     setOpenTimeDimensions(closeHiddenMembers);
   }, [openFolders]);
 
-  let mapElements = (members: string[], skipHierarchies = false) =>
-    members
-      .map(
-        (memberName: string) =>
-          dimensionsElementMap[memberName] ??
-          measuresElementMap[memberName] ??
-          segmentElementMap[memberName] ??
-          (!skipHierarchies && hierarchiesElementMap[memberName])
-      )
-      .filter((el) => el);
+  const mapElements = (members: string[], skipHierarchies = false) => members
+    .map(
+      (memberName: string) => dimensionsElementMap[memberName]
+          ?? measuresElementMap[memberName]
+          ?? segmentElementMap[memberName]
+          ?? (!skipHierarchies && hierarchiesElementMap[memberName])
+    )
+    .filter((el) => el);
 
-  const hierarchiesElementMap = useMemo(() => {
-    return hierarchies.reduce(
-      (map: Record<string, ReactElement | null>, hierarchy: TCubeHierarchy) => {
-        const isHierarchyOpen = openHierarchies.includes(hierarchy.name);
-        const shownDimensions: string[] = hierarchy.levels.filter((dimensionName: string) =>
-          // Show all members if open and used ones when it's closed
-          !filterString
-            ? isHierarchyOpen || usedMembers?.includes(dimensionName)
-            : filteredDimensionNames.includes(dimensionName)
-        );
-        const children = mapElements(shownDimensions, true);
-        const isFiltered = filterString && filteredHierarchyNames.includes(hierarchy.name);
+  const hierarchiesElementMap = useMemo(() => hierarchies.reduce(
+    (map: Record<string, ReactElement | null>, hierarchy: TCubeHierarchy) => {
+      const isHierarchyOpen = openHierarchies.includes(hierarchy.name);
+      const shownDimensions: string[] = hierarchy.levels.filter((dimensionName: string) =>
+      // Show all members if open and used ones when it's closed
+        (!filterString
+          ? isHierarchyOpen || usedMembers?.includes(dimensionName)
+          : filteredDimensionNames.includes(dimensionName)));
+      const children = mapElements(shownDimensions, true);
+      const isFiltered = filterString && filteredHierarchyNames.includes(hierarchy.name);
 
-        map[hierarchy.name] =
-          // That the place where we also hide the hierarchy if we show only used member
-          // and there are none of the inside this hierarchy
-          (!filterString && (mode === 'all' || shownDimensions.length) && isOpen) || isFiltered ? (
-            <HierarchyMember
-              key={hierarchy.name}
-              cube={cube as Cube}
-              isOpen={isHierarchyOpen && mode === 'all' && !filterString}
-              member={hierarchy}
-              memberViewType={memberViewType}
-              filterString={filterString}
-              onToggle={toggleHierarchy}
-            >
-              {children}
-            </HierarchyMember>
-          ) : null;
+      map[hierarchy.name] =
+      // That the place where we also hide the hierarchy if we show only used member
+      // and there are none of the inside this hierarchy
+        (!filterString && (mode === 'all' || shownDimensions.length) && isOpen) || isFiltered ? (
+          <HierarchyMember
+            key={hierarchy.name}
+            cube={cube as Cube}
+            isOpen={isHierarchyOpen && mode === 'all' && !filterString}
+            member={hierarchy}
+            memberViewType={memberViewType}
+            filterString={filterString}
+            onToggle={toggleHierarchy}
+          >
+            {children}
+          </HierarchyMember>
+        ) : null;
 
-        return map;
-      },
-      {} as Record<string, ReactElement | null>
-    );
-  }, [
+      return map;
+    },
+    {} as Record<string, ReactElement | null>
+  ),
+  [
     openHierarchies.join(),
     dimensionsElementMap,
     meta,
@@ -732,9 +714,7 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
   }
 
   const usedHierarchies = hierarchies
-    .filter((hierarchy) => {
-      return hierarchy.levels.find((member) => usedMembers.includes(member));
-    })
+    .filter((hierarchy) => hierarchy.levels.find((member) => usedMembers.includes(member)))
     .map((hierarchy) => hierarchy.name);
 
   const memberList = (() => {
@@ -744,14 +724,12 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
           <Space flow="column" gap="1bw" padding="1ow 1ow 0 2.5x">
             {folders.map((folder) => {
               const isFolderOpen = openFolders.includes(folder.name);
-              const shownMembers = membersByFolderMap[folder.name].filter((memberName) =>
-                !filterString
-                  ? isFolderOpen
-                    ? true
-                    : usedMembers.includes(memberName) || usedHierarchies.includes(memberName)
-                  : filteredMemberNames.includes(memberName) ||
-                    filteredHierarchyNames.includes(memberName)
-              );
+              const shownMembers = membersByFolderMap[folder.name].filter((memberName) => (!filterString
+                ? isFolderOpen
+                  ? true
+                  : usedMembers.includes(memberName) || usedHierarchies.includes(memberName)
+                : filteredMemberNames.includes(memberName)
+                    || filteredHierarchyNames.includes(memberName)));
               const children = mapElements(shownMembers);
 
               return (
@@ -759,26 +737,24 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
                   ? (mode === 'all' || shownMembers.length) && isOpen
                   : filteredFolderNames.includes(folder.name)
               ) ? (
-                <Folder
-                  key={folder.name}
-                  name={folder.name}
-                  isOpen={!filterString && mode === 'all' && isFolderOpen}
-                  filterString={filterString}
-                  onToggle={toggleFolder}
-                >
-                  {children}
-                </Folder>
-              ) : null;
+                  <Folder
+                    key={folder.name}
+                    name={folder.name}
+                    isOpen={!filterString && mode === 'all' && isFolderOpen}
+                    filterString={filterString}
+                    onToggle={toggleFolder}
+                  >
+                    {children}
+                  </Folder>
+                ) : null;
             })}
             {mapElements(
-              membersByFolderMap[''].filter((memberName) =>
-                !filterString
-                  ? mode === 'all' ||
-                    usedMembers.includes(memberName) ||
-                    usedHierarchies.includes(memberName)
-                  : filteredMemberNames.includes(memberName) ||
-                    filteredHierarchyNames.includes(memberName)
-              )
+              membersByFolderMap[''].filter((memberName) => (!filterString
+                ? mode === 'all'
+                    || usedMembers.includes(memberName)
+                    || usedHierarchies.includes(memberName)
+                : filteredMemberNames.includes(memberName)
+                    || filteredHierarchyNames.includes(memberName)))
             )}
             {mode === 'query' && !isMissing && onToggle && queryStats[cube?.name]?.isUsed ? (
               <Button

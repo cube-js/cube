@@ -49,12 +49,12 @@ export function ListCube({
 }: CubeListItemProps) {
   return (
     <TooltipProvider
-      title={
+      title={(
         <>
           <b>{title || name}</b>
           {description ? <> – {description}</> : undefined}
         </>
-      }
+      )}
       width="max-content"
       placement="right"
     >

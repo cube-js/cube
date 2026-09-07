@@ -8,8 +8,7 @@ export function getUsedCubesAndMembers(query: Query, additionalMembers: string[]
     ...(query?.timeDimensions?.filter((td) => td.dateRange).map((td) => td.dimension) || []),
   ];
 
-  let usedMembersInGrouping =
-    query?.timeDimensions?.filter((td) => td.granularity).map((td) => td.dimension) || [];
+  let usedMembersInGrouping = query?.timeDimensions?.filter((td) => td.granularity).map((td) => td.dimension) || [];
 
   usedMembersInGrouping = usedMembersInGrouping.filter(
     (member, i) => usedMembersInGrouping.indexOf(member) === i
@@ -24,7 +23,7 @@ export function getUsedCubesAndMembers(query: Query, additionalMembers: string[]
   const usedGranularities = [] as { dimension: string; granularities: string[] }[];
 
   query?.timeDimensions?.forEach((td) => {
-    const dimension = td.dimension;
+    const { dimension } = td;
 
     if (!td.granularity) {
       return;

@@ -44,7 +44,7 @@ export function RunOnCubeCloud() {
 
   return (
     <Dropdown
-      overlay={
+      overlay={(
         <LivePreviewOverlay
           livePreviewStatus={livePreviewContext.statusLivePreview}
           apiUrl={livePreviewContext.credentials?.apiUrl || ''}
@@ -55,7 +55,7 @@ export function RunOnCubeCloud() {
             setLoading(false);
           }}
         />
-      }
+      )}
       trigger={['click']}
     >
       {button}

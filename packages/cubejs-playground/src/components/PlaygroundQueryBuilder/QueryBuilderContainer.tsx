@@ -60,8 +60,8 @@ type QueryBuilderContainerProps = Pick<
   | 'extra'
   | 'onSchemaChange'
   | 'onQueryChange'
-> &
-  Pick<QueryTabsProps, 'onTabChange'>;
+>
+  & Pick<QueryTabsProps, 'onTabChange'>;
 
 export function QueryBuilderContainer(props: QueryBuilderContainerProps) {
   const { apiUrl } = useAppContext();
@@ -118,8 +118,8 @@ type QueryTabsRendererProps = {
 } & Pick<
   QueryBuilderProps,
   'schemaVersion' | 'onSchemaChange' | 'onQueryChange' | 'extra'
-> &
-  Pick<QueryTabsProps, 'onTabChange'>;
+>
+  & Pick<QueryTabsProps, 'onTabChange'>;
 
 function QueryTabsRenderer({
   apiUrl,
@@ -139,7 +139,7 @@ function QueryTabsRenderer({
   return (
     <QueryTabs
       query={query}
-      sidebar={
+      sidebar={(
         <Space direction="horizontal">
           <Button
             data-testid="security-context-btn"
@@ -164,7 +164,7 @@ function QueryTabsRenderer({
             </Button>
           ) : null}
         </Space>
-      }
+      )}
       onTabChange={(tab) => {
         props.onTabChange?.(tab);
         setQuery(tab.query);

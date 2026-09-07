@@ -54,7 +54,6 @@ export const StyledTabs = styled(Tabs)`
   }
 `;
 
-
 type QueryTab = {
   id: string;
   query: Query;
@@ -166,7 +165,7 @@ export function QueryTabs({
               const preAggregationType = Object.values(
                 result.usedPreAggregations || {}
               )[0]?.type;
-              const transformedQuery = result.transformedQuery;
+              const { transformedQuery } = result;
 
               setQueryStatus(queryId, {
                 resultSet,
@@ -194,9 +193,8 @@ export function QueryTabs({
               Boolean(progress?.stage?.stage.includes('pre-aggregation'))
             );
 
-            const isQuerySlow =
-              progress?.stage?.stage.includes('Executing query') &&
-              (progress.stage.timeElapsed || 0) >= 5000;
+            const isQuerySlow = progress?.stage?.stage.includes('Executing query')
+              && (progress.stage.timeElapsed || 0) >= 5000;
 
             setSlowQuery(queryId, isQuerySlow);
             isQuerySlow && setSlowQueryFromCache(queryId, false);
@@ -222,8 +220,8 @@ export function QueryTabs({
     );
 
     if (
-      query &&
-      !equals(validateQuery(currentTab?.query), validateQuery(query))
+      query
+      && !equals(validateQuery(currentTab?.query), validateQuery(query))
     ) {
       const id = getNextId();
 
@@ -262,28 +260,24 @@ export function QueryTabs({
   function handleTabSave(tab: Omit<QueryTab, 'id'>) {
     saveTabs({
       ...queryTabs,
-      tabs: tabs.map((currentTab) => {
-        return activeId === currentTab.id
-          ? {
-              ...currentTab,
-              ...tab,
-            }
-          : currentTab;
-      }),
+      tabs: tabs.map((currentTab) => (activeId === currentTab.id
+        ? {
+          ...currentTab,
+          ...tab,
+        }
+        : currentTab)),
     });
   }
 
   function setTabName(tabId: string, name: string) {
     saveTabs({
       ...queryTabs,
-      tabs: tabs.map((currentTab) => {
-        return tabId === currentTab.id
-          ? {
-              ...currentTab,
-              name
-            }
-          : currentTab;
-      }),
+      tabs: tabs.map((currentTab) => (tabId === currentTab.id
+        ? {
+          ...currentTab,
+          name
+        }
+        : currentTab)),
     });
   }
 

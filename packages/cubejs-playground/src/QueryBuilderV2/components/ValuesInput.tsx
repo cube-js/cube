@@ -219,108 +219,107 @@ export function ValuesInput(props: ValuesInputProps) {
     />
   );
 
-  const input =
-    type === 'string' ? (
-      memberType === 'dimension' && allowSuggestions && showSuggestions ? (
-        <ComboBox
-          allowsCustomValue
-          aria-label="Text value input"
-          inputRef={inputRef}
-          size="small"
-          inputValue={textValue}
-          placeholder={
-            isSuggestionLoading
-              ? 'Loading values...'
-              : (placeholder ?? `Type ${suggestions.length ? 'or select ' : ''}value to add...`)
-          }
-          validationState={hasError ? 'invalid' : undefined}
-          suffix={
-            suggestionError ? (
+  const input = type === 'string' ? (
+    memberType === 'dimension' && allowSuggestions && showSuggestions ? (
+      <ComboBox
+        allowsCustomValue
+        aria-label="Text value input"
+        inputRef={inputRef}
+        size="small"
+        inputValue={textValue}
+        placeholder={
+          isSuggestionLoading
+            ? 'Loading values...'
+            : (placeholder ?? `Type ${suggestions.length ? 'or select ' : ''}value to add...`)
+        }
+        validationState={hasError ? 'invalid' : undefined}
+        suffix={
+          suggestionError ? (
+            <TooltipProvider activeWrap title={`Unable to load values.\n${suggestionError}`}>
+              <InfoCircleIcon color="#danger" styles={{ cursor: 'default' }} />
+            </TooltipProvider>
+          ) : null
+        }
+        suffixPosition="after"
+        width="30x"
+        menuTrigger="focus"
+        isLoading={isSuggestionLoading && !suggestions.length}
+        disabledKeys={suggestions.length ? undefined : ['no-suggestions']}
+        onSelectionChange={(key: Key | null) => {
+          key && onTextChange(key as string);
+          addValueLazy();
+        }}
+        onInputChange={(key: Key | null) => {
+          onTextChange(key as string);
+        }}
+        onKeyDown={onKeyDown}
+        onFocus={onFocus}
+      >
+        {suggestions.length ? (
+          suggestions.map((suggestion) => (
+            <ComboBox.Item key={suggestion} textValue={suggestion}>
+              {suggestion}
+            </ComboBox.Item>
+          ))
+        ) : (
+          <ComboBox.Item key="no-suggestions">No values loaded</ComboBox.Item>
+        )}
+      </ComboBox>
+    ) : (
+      <TextInput
+        aria-label="Text value input"
+        inputRef={inputRef}
+        size="small"
+        value={textValue}
+        placeholder={placeholder || `Type ${allowSuggestions ? 'or select ' : ''}value to add...`}
+        validationState={hasError ? 'invalid' : undefined}
+        isLoading={isSuggestionLoading}
+        suffix={
+          allowSuggestions && !suggestionError ? (
+            !isSuggestionLoading ? (
+              <TooltipProvider title="Load values...">
+                <Button
+                  icon={<CaretDownIcon />}
+                  type="neutral"
+                  size="small"
+                  height="(4x - 2bw)"
+                  radius="right"
+                  onPress={() => setShowSuggestions(true)}
+                />
+              </TooltipProvider>
+            ) : null
+          ) : suggestionError && !hasError ? (
+            <Grid width="4x" placeContent="center">
               <TooltipProvider activeWrap title={`Unable to load values.\n${suggestionError}`}>
                 <InfoCircleIcon color="#danger" styles={{ cursor: 'default' }} />
               </TooltipProvider>
-            ) : null
-          }
-          suffixPosition="after"
-          width="30x"
-          menuTrigger="focus"
-          isLoading={isSuggestionLoading && !suggestions.length}
-          disabledKeys={suggestions.length ? undefined : ['no-suggestions']}
-          onSelectionChange={(key: Key | null) => {
-            key && onTextChange(key as string);
-            addValueLazy();
-          }}
-          onInputChange={(key: Key | null) => {
-            onTextChange(key as string);
-          }}
-          onKeyDown={onKeyDown}
-          onFocus={onFocus}
-        >
-          {suggestions.length ? (
-            suggestions.map((suggestion) => (
-              <ComboBox.Item key={suggestion} textValue={suggestion}>
-                {suggestion}
-              </ComboBox.Item>
-            ))
-          ) : (
-            <ComboBox.Item key="no-suggestions">No values loaded</ComboBox.Item>
-          )}
-        </ComboBox>
-      ) : (
-        <TextInput
-          aria-label="Text value input"
-          inputRef={inputRef}
-          size="small"
-          value={textValue}
-          placeholder={placeholder || `Type ${allowSuggestions ? 'or select ' : ''}value to add...`}
-          validationState={hasError ? 'invalid' : undefined}
-          isLoading={isSuggestionLoading}
-          suffix={
-            allowSuggestions && !suggestionError ? (
-              !isSuggestionLoading ? (
-                <TooltipProvider title="Load values...">
-                  <Button
-                    icon={<CaretDownIcon />}
-                    type="neutral"
-                    size="small"
-                    height="(4x - 2bw)"
-                    radius="right"
-                    onPress={() => setShowSuggestions(true)}
-                  />
-                </TooltipProvider>
-              ) : null
-            ) : suggestionError && !hasError ? (
-              <Grid width="4x" placeContent="center">
-                <TooltipProvider activeWrap title={`Unable to load values.\n${suggestionError}`}>
-                  <InfoCircleIcon color="#danger" styles={{ cursor: 'default' }} />
-                </TooltipProvider>
-              </Grid>
-            ) : null
-          }
-          suffixPosition="after"
-          wrapperStyles={{ width: '30x' }}
-          onChange={onTextChange}
-          onKeyDown={onKeyDown}
-          onFocus={onFocus}
-        />
-      )
-    ) : (
-      <NumberInput
-        aria-label="Number value input"
-        inputRef={inputRef}
-        size="small"
-        value={parseFloat(textValue)}
-        placeholder={placeholder || 'Type value to add...'}
-        suffix={addButton}
-        validationState={hasError ? 'invalid' : undefined}
+            </Grid>
+          ) : null
+        }
         suffixPosition="after"
-        wrapperStyles={{ width: '20x' }}
-        onInput={onInput}
+        wrapperStyles={{ width: '30x' }}
         onChange={onTextChange}
         onKeyDown={onKeyDown}
         onFocus={onFocus}
       />
-    );
+    )
+  ) : (
+    <NumberInput
+      aria-label="Number value input"
+      inputRef={inputRef}
+      size="small"
+      value={parseFloat(textValue)}
+      placeholder={placeholder || 'Type value to add...'}
+      suffix={addButton}
+      validationState={hasError ? 'invalid' : undefined}
+      suffixPosition="after"
+      wrapperStyles={{ width: '20x' }}
+      onInput={onInput}
+      onChange={onTextChange}
+      onKeyDown={onKeyDown}
+      onFocus={onFocus}
+    />
+  );
 
   const Element = useCallback(
     ({ children }: React.PropsWithChildren<{}>) => {
@@ -339,13 +338,11 @@ export function ValuesInput(props: ValuesInputProps) {
 
   return (
     <Element>
-      {values.map((value, i) => {
-        return (
-          <TooltipProvider key={i} activeWrap title={value}>
-            <StyledTag onClose={() => onRemove(value)}>{value}</StyledTag>
-          </TooltipProvider>
-        );
-      })}
+      {values.map((value, i) => (
+        <TooltipProvider key={i} activeWrap title={value}>
+          <StyledTag onClose={() => onRemove(value)}>{value}</StyledTag>
+        </TooltipProvider>
+      ))}
       <Space gap={0} placeContent="baseline">
         {isOpen ? input : <ButtonWrapper>{addButton}</ButtonWrapper>}
       </Space>

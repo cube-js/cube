@@ -59,7 +59,7 @@ export const trackImpl = async (event) => {
       if (result.status !== 200 && retries > 0) {
         return flush(toFlush, retries - 1);
       }
-    } catch (e: any) {
+    } catch {
       if (retries > 0) {
         return flush(toFlush, retries - 1);
       }

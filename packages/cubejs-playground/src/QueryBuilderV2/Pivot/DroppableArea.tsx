@@ -18,9 +18,7 @@ const HeaderElement = tasty({
   },
 });
 
-const Header = memo(({ axis }: { axis: string }) => {
-  return <HeaderElement>{axis.toUpperCase()} axis</HeaderElement>;
-});
+const Header = memo(({ axis }: { axis: string }) => <HeaderElement>{axis.toUpperCase()} axis</HeaderElement>);
 
 export function PivotDroppableArea({
   pivotConfig,
@@ -44,7 +42,7 @@ export function PivotDroppableArea({
             <Flow ref={provided.innerRef} {...provided.droppableProps} gap="1ow">
               {/* @ts-ignore */}
               {pivotConfig[axis].map((id, index) => {
-                let type: 'timeDimension' | 'dimension' | 'measure' = id.includes('.')
+                const type: 'timeDimension' | 'dimension' | 'measure' = id.includes('.')
                   ? id.split('.').length === 3
                     ? 'timeDimension'
                     : 'dimension'

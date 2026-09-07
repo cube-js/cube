@@ -233,20 +233,18 @@ export function Tabs(props: TabsProps) {
         <div data-element="Container">{children}</div>
         {extra ? <div data-element="Extra">{extra}</div> : null}
       </TabsElement>
-      {[...contentMap.entries()].map(([id, { content, prerender, keepMounted }]) =>
-        prerender || id === activeKey || keepMounted ? (
-          <div
-            key={id}
-            data-qa="TabPanel"
-            data-qaval={id}
-            style={{
-              display: id === activeKey ? 'contents' : 'none',
-            }}
-          >
-            {content}
-          </div>
-        ) : null
-      )}
+      {[...contentMap.entries()].map(([id, { content, prerender, keepMounted }]) => (prerender || id === activeKey || keepMounted ? (
+        <div
+          key={id}
+          data-qa="TabPanel"
+          data-qaval={id}
+          style={{
+            display: id === activeKey ? 'contents' : 'none',
+          }}
+        >
+          {content}
+        </div>
+      ) : null))}
     </TabsContext.Provider>
   );
 }
@@ -256,8 +254,7 @@ export function Tab(props: TabProps) {
 
   const ref = useRef<FocusableRefValue>(null);
 
-  const { activeKey, size, type, onChange, onDelete, setTabContent, ...contextProps } =
-    useContext(TabsContext) || ({} as TabsContextValue);
+  const { activeKey, size, type, onChange, onDelete, setTabContent, ...contextProps } = useContext(TabsContext) || ({} as TabsContextValue);
 
   prerender = prerender ?? contextProps.prerender;
   keepMounted = keepMounted ?? contextProps.keepMounted;
@@ -286,11 +283,10 @@ export function Tab(props: TabProps) {
     }
   }, [children, isActive, keepMounted, prerender, setTabContent]);
 
-  useLayoutEffect(() => {
-    return () => {
-      setTabContent?.(id, null);
-    };
-  }, []);
+  useLayoutEffect(() => () => {
+    setTabContent?.(id, null);
+  },
+  []);
 
   const mods = useMemo(
     () => ({ card: isCardType, active: isActive, deletable: isDeletable, disabled: isDisabled }),

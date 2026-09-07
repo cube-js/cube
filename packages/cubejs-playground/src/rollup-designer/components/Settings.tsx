@@ -237,8 +237,8 @@ export function Settings({
                         {
                           validator: (_, value, callback) => {
                             if (
-                              value &&
-                              !isValidCron(value, { seconds: true })
+                              value
+                              && !isValidCron(value, { seconds: true })
                             ) {
                               onCronExpressionValidityChange(false);
                               callback('Cron expression is invalid');

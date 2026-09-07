@@ -13,7 +13,7 @@ const storage = new (class Storage {
 
         try {
           value = JSON.parse(event.newValue || '');
-        } catch (error: any) {
+        } catch {
           value = event.newValue;
         }
         this.emit(event.key, value);
@@ -54,7 +54,7 @@ const storage = new (class Storage {
       }
 
       return parsed !== undefined ? parsed : defaultValue;
-    } catch (error: any) {
+    } catch {
       return typeof defaultValue === 'function'
         ? defaultValue(null)
         : defaultValue;
@@ -82,7 +82,7 @@ export function useLocalStorage<T = any>(
 
     storage.subscribe(key, (value) => {
       // @ts-ignore
-      setValue(typeof defaultValue === 'function' ? defaultValue(value) : value || defaultValue)
+      setValue(typeof defaultValue === 'function' ? defaultValue(value) : value || defaultValue);
     });
 
     return () => {

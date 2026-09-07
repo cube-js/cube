@@ -29,7 +29,7 @@ function flipRotation(rotation: number) {
   return (rotation + 180) % 360;
 }
 
-export const ChevronIcon = memo(function ChevronIcon(props: ChevronIconProps) {
+export const ChevronIcon = memo((props: ChevronIconProps) => {
   const { direction = 'bottom', color, ...iconProps } = props;
   const [rotate, setRotate] = useState(rotationByDirection[direction]);
   const [flipScale, setFlipScale] = useState(1); // Tracks flipping: 1 (normal) or -1 (flipped)

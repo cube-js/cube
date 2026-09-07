@@ -62,7 +62,7 @@ export default function Settings({
         show={orderShown}
         disabled={!isQueryPresent || disabled}
         style={{ border: 0 }}
-        overlay={
+        overlay={(
           <div
             style={{
               padding: '8px',
@@ -77,7 +77,7 @@ export default function Settings({
               onOrderChange={onOrderChange}
             />
           </div>
-        }
+        )}
         onOverlayOpen={() => setOrderShown(true)}
         onOverlayClose={() => setOrderShown(false)}
       >
@@ -89,7 +89,7 @@ export default function Settings({
         show={limitShown}
         disabled={!isQueryPresent || disabled}
         style={{ border: 0 }}
-        overlay={
+        overlay={(
           <div
             style={{
               padding: '8px',
@@ -111,7 +111,7 @@ export default function Settings({
               />
             </label>
           </div>
-        }
+        )}
         onOverlayOpen={() => setLimitShown(true)}
         onOverlayClose={() => setLimitShown(false)}
       >

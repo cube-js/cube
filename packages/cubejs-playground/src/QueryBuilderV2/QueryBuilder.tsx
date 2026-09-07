@@ -36,13 +36,12 @@ export function QueryBuilder(
     disableSidebarResizing,
   } = props;
 
-  const cubeApi = useMemo(() => {
-    return apiUrl && apiToken && apiToken !== 'undefined'
-      ? cube(apiToken, {
-          apiUrl,
-        })
-      : undefined;
-  }, [apiUrl, apiToken]);
+  const cubeApi = useMemo(() => (apiUrl && apiToken && apiToken !== 'undefined'
+    ? cube(apiToken, {
+      apiUrl,
+    })
+    : undefined),
+  [apiUrl, apiToken]);
 
   const [storedTimezones] = useLocalStorage<string[]>('QueryBuilder:timezones', []);
 
@@ -89,9 +88,8 @@ export function QueryBuilder(
     }
   }, [shouldRunDefaultQuery, meta]);
 
-  useCommitPress(() => {
-    return runQuery();
-  }, true);
+  useCommitPress(() => runQuery(),
+    true);
 
   if (!apiToken || !cubeApi || !apiUrl) {
     return null;

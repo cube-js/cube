@@ -24,8 +24,7 @@ export type LivePreviewContextProps = {
   startLivePreview: () => Promise<Boolean>;
 };
 
-export const LivePreviewContextContext =
-  createContext<LivePreviewContextProps | null>(null);
+export const LivePreviewContextContext = createContext<LivePreviewContextProps | null>(null);
 
 const useLivePreview = (disabled = false) => {
   const activeRef = useRef<boolean>(false);
@@ -69,17 +68,14 @@ const useLivePreview = (disabled = false) => {
   //   }
   // }, [status]);
 
-  const fetchStatus = () => {
-    return fetch('playground/live-preview/status')
-      .then((res) => res.json())
-      .then((status) => {
-        setStatus({
-          loading: false,
-          ...status,
-        });
+  const fetchStatus = () => fetch('playground/live-preview/status')
+    .then((res) => res.json())
+    .then((status) => {
+      setStatus({
+        loading: false,
+        ...status,
       });
-  };
-
+    });
   const createTokenWithPayload = async (payload): Promise<any> => {
     const res = await fetch('playground/live-preview/token', {
       method: 'POST',
@@ -112,34 +108,31 @@ const useLivePreview = (disabled = false) => {
       await fetchStatus();
       return true;
     },
-    startLivePreview: (): Promise<Boolean> => {
-      return new Promise((resolve, reject) => {
-        const callbackUrl = encodeURIComponent(window.location.origin);
-        const params: any =
-          window.location.origin !== 'http://localhost:4000' &&
-          new URLSearchParams({ callbackUrl }).toString();
+    startLivePreview: (): Promise<Boolean> => new Promise((resolve, reject) => {
+      const callbackUrl = encodeURIComponent(window.location.origin);
+      const params: any = window.location.origin !== 'http://localhost:4000'
+          && new URLSearchParams({ callbackUrl }).toString();
 
-        const wn = openWindow({
-          url: `https://cubecloud.dev/auth/live-preview${
-            params ? `?${params}` : ''
-          }`,
-        });
-
-        if (!wn) {
-          console.error('The popup was blocked by the browser');
-          reject();
-          return;
-        }
-
-        const interval = setInterval(() => {
-          if (wn.closed) {
-            clearInterval(interval);
-            resolve(true);
-            fetchStatus();
-          }
-        }, 1000);
+      const wn = openWindow({
+        url: `https://cubecloud.dev/auth/live-preview${
+          params ? `?${params}` : ''
+        }`,
       });
-    },
+
+      if (!wn) {
+        console.error('The popup was blocked by the browser');
+        reject();
+        return;
+      }
+
+      const interval = setInterval(() => {
+        if (wn.closed) {
+          clearInterval(interval);
+          resolve(true);
+          fetchStatus();
+        }
+      }, 1000);
+    }),
   };
 };
 

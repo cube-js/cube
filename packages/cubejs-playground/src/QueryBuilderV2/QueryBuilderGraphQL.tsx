@@ -104,18 +104,17 @@ export function QueryBuilderGraphQL() {
   }, [queryHash]);
 
   return useMemo(() => {
-    let fetchButton =
-      !rawData && !queryError ? (
-        <Button
-          isLoading={isLoading}
-          isDisabled={hasPrivateMembers}
-          icon={hasPrivateMembers ? <LockIcon /> : <PlayCircleOutlined />}
-          size="small"
-          onPress={() => setIsFetching(true)}
-        >
-          {isFetching && !rawData && !queryError ? 'Fetching...' : 'Fetch Raw Response'}
-        </Button>
-      ) : null;
+    let fetchButton = !rawData && !queryError ? (
+      <Button
+        isLoading={isLoading}
+        isDisabled={hasPrivateMembers}
+        icon={hasPrivateMembers ? <LockIcon /> : <PlayCircleOutlined />}
+        size="small"
+        onPress={() => setIsFetching(true)}
+      >
+        {isFetching && !rawData && !queryError ? 'Fetching...' : 'Fetch Raw Response'}
+      </Button>
+    ) : null;
 
     if (hasPrivateMembers && fetchButton) {
       fetchButton = (
@@ -135,11 +134,11 @@ export function QueryBuilderGraphQL() {
       </Block>
     ) : (
       <TabPaneWithToolbar
-        actions={
+        actions={(
           <CopyButton type="secondary" value={gqlQuery || ''}>
             Copy
           </CopyButton>
-        }
+        )}
         extraActions={fetchButton}
       >
         <Grid
@@ -157,7 +156,7 @@ export function QueryBuilderGraphQL() {
                 value={
                   queryError
                     ? // @ts-ignore
-                      (queryError?.networkError?.result?.error ?? queryError.toString())
+                    (queryError?.networkError?.result?.error ?? queryError.toString())
                     : JSON.stringify(cleanedRawData, null, 2)
                 }
               />

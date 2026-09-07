@@ -205,13 +205,11 @@ function Pagination(props: PaginationProps) {
         width="min 15x"
         onSelectionChange={onSelectionChange}
       >
-        {[...Array(numberOfPages)].map((a, i) => {
-          return (
-            <Select.Item key={i + 1} textValue={String(i + 1)}>
-              {getPaginationOptionLabel({ page: i + 1, perPage, total })}
-            </Select.Item>
-          );
-        })}
+        {[...Array(numberOfPages)].map((a, i) => (
+          <Select.Item key={i + 1} textValue={String(i + 1)}>
+            {getPaginationOptionLabel({ page: i + 1, perPage, total })}
+          </Select.Item>
+        ))}
       </Select>
       <Button
         aria-label="Next page"
@@ -236,8 +234,7 @@ interface OptionsButtonProps extends Omit<CubeButtonProps, 'order'> {
 }
 
 function OptionsButton(props: OptionsButtonProps) {
-  const { name, member, type, order, onAddFilter, onOrderChange, onMemberRemove, ...otherProps } =
-    props;
+  const { name, member, type, order, onAddFilter, onOrderChange, onMemberRemove, ...otherProps } = props;
 
   const onAction = useCallback(
     (key: Key) => {
@@ -280,26 +277,26 @@ function OptionsButton(props: OptionsButtonProps) {
         {[
           ...(onOrderChange
             ? [
-                <Menu.Section key="sorting" title="Sorting">
-                  <Menu.Item key="none" icon={<ClearOutlined style={{ fontSize: 16 }} />}>
-                    Do not sort
-                  </Menu.Item>
-                  <Menu.Item
-                    key="asc"
-                    icon={<ArrowDownOutlined style={{ fontSize: 16 }} />}
-                    textValue="Sort ASC"
-                  >
-                    Sort <Text.Strong>{ORDER_LABEL_BY_TYPE[type]?.[0] || 'ASC'}</Text.Strong>
-                  </Menu.Item>
-                  <Menu.Item
-                    key="desc"
-                    icon={<ArrowUpOutlined style={{ fontSize: 16 }} />}
-                    textValue="Sort DESC"
-                  >
-                    Sort <Text.Strong>{ORDER_LABEL_BY_TYPE[type]?.[1] || 'DESC'}</Text.Strong>
-                  </Menu.Item>
-                </Menu.Section>,
-              ]
+              <Menu.Section key="sorting" title="Sorting">
+                <Menu.Item key="none" icon={<ClearOutlined style={{ fontSize: 16 }} />}>
+                  Do not sort
+                </Menu.Item>
+                <Menu.Item
+                  key="asc"
+                  icon={<ArrowDownOutlined style={{ fontSize: 16 }} />}
+                  textValue="Sort ASC"
+                >
+                  Sort <Text.Strong>{ORDER_LABEL_BY_TYPE[type]?.[0] || 'ASC'}</Text.Strong>
+                </Menu.Item>
+                <Menu.Item
+                  key="desc"
+                  icon={<ArrowUpOutlined style={{ fontSize: 16 }} />}
+                  textValue="Sort DESC"
+                >
+                  Sort <Text.Strong>{ORDER_LABEL_BY_TYPE[type]?.[1] || 'DESC'}</Text.Strong>
+                </Menu.Item>
+              </Menu.Section>,
+            ]
             : []),
           <Menu.Section key="actions" title="Actions">
             {onAddFilter && (
@@ -436,10 +433,10 @@ interface ReorderableMemberListProps extends ListProps<MemberItem> {
 }
 
 function ReorderableMemberList(props: ReorderableMemberListProps) {
-  let { onMove, ...itemProps } = props;
-  let state = useListState(props);
-  let ref = useRef(null);
-  let { listBoxProps } = useListBox(
+  const { onMove, ...itemProps } = props;
+  const state = useListState(props);
+  const ref = useRef(null);
+  const { listBoxProps } = useListBox(
     {
       ...itemProps,
       // Prevent dragging from changing selection.
@@ -459,38 +456,37 @@ function ReorderableMemberList(props: ReorderableMemberListProps) {
     const targetIndex = originalKeys.indexOf(targetKey as string);
 
     // reorder keys
-    const newKeys =
-      movableIndex !== targetIndex
-        ? originalKeys.reduce((arr, key, i) => {
-            // if key is the same as the one we are moving, skip it
-            if (i === movableIndex) {
-              return arr;
-            }
+    const newKeys = movableIndex !== targetIndex
+      ? originalKeys.reduce((arr, key, i) => {
+        // if key is the same as the one we are moving, skip it
+        if (i === movableIndex) {
+          return arr;
+        }
 
-            // if key is the same as the target, add the movable key
-            if (i === targetIndex) {
-              if (dropPosition === 'before') {
-                arr.push(movableKey as string);
-                arr.push(key);
-              } else if (dropPosition === 'after') {
-                arr.push(key);
-                arr.push(movableKey as string);
-              } else {
-                arr.push(key);
-              }
-            } else {
-              arr.push(key);
-            }
+        // if key is the same as the target, add the movable key
+        if (i === targetIndex) {
+          if (dropPosition === 'before') {
+            arr.push(movableKey as string);
+            arr.push(key);
+          } else if (dropPosition === 'after') {
+            arr.push(key);
+            arr.push(movableKey as string);
+          } else {
+            arr.push(key);
+          }
+        } else {
+          arr.push(key);
+        }
 
-            return arr;
-          }, [] as string[])
-        : originalKeys;
+        return arr;
+      }, [] as string[])
+      : originalKeys;
 
     onMove(newKeys);
   };
 
   // Setup drag state for the collection.
-  let dragState = useDraggableCollectionState({
+  const dragState = useDraggableCollectionState({
     // Pass through events from props.
     ...itemProps,
 
@@ -500,28 +496,26 @@ function ReorderableMemberList(props: ReorderableMemberListProps) {
 
     // Provide data for each dragged item. This function could
     // also be provided by the user of the component.
-    getItems: (keys: Set<Key>) => {
-      return [...keys].map((key: any) => {
-        let item = state.collection.getItem(key);
+    getItems: (keys: Set<Key>) => [...keys].map((key: any) => {
+      const item = state.collection.getItem(key);
 
-        return {
-          'text/plain': item?.textValue || '',
-        };
-      });
-    },
+      return {
+        'text/plain': item?.textValue || '',
+      };
+    }),
     getAllowedDropOperations: () => ['move'],
   });
 
   useDraggableCollection(props, dragState, ref);
 
-  let dropState = useDroppableCollectionState({
+  const dropState = useDroppableCollectionState({
     ...itemProps,
     onReorder,
     collection: state.collection,
     selectionManager: state.selectionManager,
   });
 
-  let { collectionProps } = useDroppableCollection(
+  const { collectionProps } = useDroppableCollection(
     {
       ...itemProps,
       // Provide drop targets for keyboard and pointer-based drag and drop.
@@ -570,12 +564,12 @@ interface ReorderableMemberProps {
 
 function ReorderableMember({ item, state, dragState, dropState }: ReorderableMemberProps) {
   // Setup listbox option as normal. See useListBox docs for details.
-  let ref = useRef(null);
-  let { optionProps } = useOption({ key: item.key }, state, ref);
-  let { isFocusVisible, focusProps } = useFocusRing();
+  const ref = useRef(null);
+  const { optionProps } = useOption({ key: item.key }, state, ref);
+  const { isFocusVisible, focusProps } = useFocusRing();
 
   // Register the item as a drag source.
-  let { dragProps } = useDraggableItem(
+  const { dragProps } = useDraggableItem(
     {
       key: item.key,
     },
@@ -643,8 +637,8 @@ interface DropIndicatorProps {
 function DropIndicator(props: DropIndicatorProps) {
   const { position, target } = props;
 
-  let ref = useRef(null);
-  let { dropIndicatorProps, isHidden, isDropTarget } = useDropIndicator(
+  const ref = useRef(null);
+  const { dropIndicatorProps, isHidden, isDropTarget } = useDropIndicator(
     { target },
     props.dropState,
     ref
@@ -765,7 +759,7 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
       return [value, 'unknown'];
     }
 
-    let member = [...cube.dimensions, ...cube.measures].find(
+    const member = [...cube.dimensions, ...cube.measures].find(
       (member) => member.name === dimensionName
     );
 
@@ -799,7 +793,7 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
           } else {
             return [formatDateByGranularity(new Date(value), 'second'), 'time'];
           }
-        } catch (e: any) {
+        } catch {
           return [value, 'unknown'];
         }
       case 'boolean':
@@ -832,99 +826,89 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
     [selectedCell, isLoading]
   );
 
-  const tableData = useMemo(() => {
-    return (
-      <>
-        {data?.slice((page - 1) * 100, (page - 1) * 100 + 100).map((row, rowId) => {
-          return (
-            <div key={rowId} data-element="Row" data-qa={`QueryBuilderResult-row_${rowId}`}>
-              {dimensions.map((dimension) => {
-                const isSelected =
-                  selectedCell && selectedCell[0] === rowId && selectedCell[1] === dimension;
-                const [value, type] = formatCellData(dimension, row[dimension]);
-                const copyButton =
-                  isSelected &&
-                  value !== '–' &&
-                  (typeof value !== 'string' || !value.startsWith('{{')) ? (
-                    <StyledCopyButton value={String(value)} />
-                  ) : null;
+  const tableData = useMemo(() => (
+    <>
+      {data?.slice((page - 1) * 100, (page - 1) * 100 + 100).map((row, rowId) => (
+        <div key={rowId} data-element="Row" data-qa={`QueryBuilderResult-row_${rowId}`}>
+          {dimensions.map((dimension) => {
+            const isSelected = selectedCell && selectedCell[0] === rowId && selectedCell[1] === dimension;
+            const [value, type] = formatCellData(dimension, row[dimension]);
+            const copyButton = isSelected
+                  && value !== '–'
+                  && (typeof value !== 'string' || !value.startsWith('{{')) ? (
+                <StyledCopyButton value={String(value)} />
+              ) : null;
 
-                const renderedValue = renderValue(value);
+            const renderedValue = renderValue(value);
 
-                return (
-                  <div
-                    key={dimension}
-                    data-row={rowId}
-                    data-name={dimension}
-                    data-element={`${isSelected ? 'Selected' : ''}${
-                      type === 'number' || type === 'percent' ? 'Number' : ''
-                    }Cell`}
-                  >
-                    <div data-element="CellValue">{renderedValue}</div>
-                    {copyButton}
-                  </div>
-                );
-              })}
-              {timeDimensions.map((timeDimension) => {
-                const isSelected =
-                  selectedCell &&
-                  selectedCell[0] === rowId &&
-                  selectedCell[1] === timeDimension.dimension;
-                const rawValue = row[timeDimension.dimension + '.' + timeDimension.granularity];
-                let value = rawValue ? String(rawValue) : undefined;
+            return (
+              <div
+                key={dimension}
+                data-row={rowId}
+                data-name={dimension}
+                data-element={`${isSelected ? 'Selected' : ''}${
+                  type === 'number' || type === 'percent' ? 'Number' : ''
+                }Cell`}
+              >
+                <div data-element="CellValue">{renderedValue}</div>
+                {copyButton}
+              </div>
+            );
+          })}
+          {timeDimensions.map((timeDimension) => {
+            const isSelected = selectedCell
+                  && selectedCell[0] === rowId
+                  && selectedCell[1] === timeDimension.dimension;
+            const rawValue = row[`${timeDimension.dimension}.${timeDimension.granularity}`];
+            let value = rawValue ? String(rawValue) : undefined;
 
-                try {
-                  value =
-                    value != null
-                      ? formatDateByGranularity(new Date(value), timeDimension.granularity)
-                      : '–';
-                } catch (e: any) {}
+            try {
+              value = value != null
+                ? formatDateByGranularity(new Date(value), timeDimension.granularity)
+                : '–';
+            } catch {}
 
-                const copyButton =
-                  isSelected && value !== '–' ? <StyledCopyButton value={value} /> : null;
+            const copyButton = isSelected && value !== '–' ? <StyledCopyButton value={value} /> : null;
 
-                const renderedValue = renderValue(value, 'NULL');
+            const renderedValue = renderValue(value, 'NULL');
 
-                return (
-                  <div
-                    key={`time-dimension.${timeDimension.dimension}`}
-                    data-row={rowId}
-                    data-name={timeDimension.dimension}
-                    data-element={`${isSelected ? 'Selected' : ''}Cell`}
-                  >
-                    <div data-element="CellValue">{renderedValue}</div>
-                    {copyButton}
-                  </div>
-                );
-              })}
-              {measures.map((measure) => {
-                const isSelected =
-                  selectedCell && selectedCell[0] === rowId && selectedCell[1] === measure;
-                const [value, type] = formatCellData(measure, row[measure]);
-                const copyButton =
-                  isSelected && value !== '–' ? <StyledCopyButton value={String(value)} /> : null;
-                const renderedValue = renderValue(value);
+            return (
+              <div
+                key={`time-dimension.${timeDimension.dimension}`}
+                data-row={rowId}
+                data-name={timeDimension.dimension}
+                data-element={`${isSelected ? 'Selected' : ''}Cell`}
+              >
+                <div data-element="CellValue">{renderedValue}</div>
+                {copyButton}
+              </div>
+            );
+          })}
+          {measures.map((measure) => {
+            const isSelected = selectedCell && selectedCell[0] === rowId && selectedCell[1] === measure;
+            const [value, type] = formatCellData(measure, row[measure]);
+            const copyButton = isSelected && value !== '–' ? <StyledCopyButton value={String(value)} /> : null;
+            const renderedValue = renderValue(value);
 
-                return (
-                  <div
-                    key={measure}
-                    data-row={rowId}
-                    data-name={measure}
-                    data-element={`${isSelected ? 'Selected' : ''}${
-                      type === 'number' || type === 'percent' ? 'Number' : ''
-                    }Cell`}
-                  >
-                    <div data-element="CellValue">{renderedValue}</div>
-                    {copyButton}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-      </>
-    );
-  }, [
+            return (
+              <div
+                key={measure}
+                data-row={rowId}
+                data-name={measure}
+                data-element={`${isSelected ? 'Selected' : ''}${
+                  type === 'number' || type === 'percent' ? 'Number' : ''
+                }Cell`}
+              >
+                <div data-element="CellValue">{renderedValue}</div>
+                {copyButton}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </>
+  ),
+  [
     isLoading,
     JSON.stringify(measures),
     JSON.stringify(dimensions),
@@ -982,12 +966,12 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
               onOrderChange={
                 member
                   ? (ord?: QueryOrder) => {
-                      if (ord) {
-                        order.set(dimension, ord);
-                      } else {
-                        order.remove(dimension);
-                      }
+                    if (ord) {
+                      order.set(dimension, ord);
+                    } else {
+                      order.remove(dimension);
                     }
+                  }
                   : undefined
               }
               onMemberRemove={(name) => dimensionsUpdater?.remove(name)}
@@ -1060,12 +1044,12 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
               onOrderChange={
                 member
                   ? (ord?: QueryOrder) => {
-                      if (ord) {
-                        order.set(measure, ord);
-                      } else {
-                        order.remove(measure);
-                      }
+                    if (ord) {
+                      order.set(measure, ord);
+                    } else {
+                      order.remove(measure);
                     }
+                  }
                   : undefined
               }
               onMemberRemove={(name) => measuresUpdater?.remove(name)}
@@ -1104,17 +1088,16 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
       const member = members.dimensions[timeDimension.dimension];
       const ordering = order.get(timeDimension.dimension);
       const availableGranularities = [
-        ...((member && 'granularities' in member && member?.granularities?.map((g) => g.name)) ||
-          []),
+        ...((member && 'granularities' in member && member?.granularities?.map((g) => g.name))
+          || []),
         ...PREDEFINED_GRANULARITIES,
       ];
       const cubeName = timeDimension.dimension.split('.')[0];
       const cube = cubes.find((cube) => cube.name === cubeName);
-      const granularity =
-        timeDimension.granularity &&
-        member &&
-        'granularities' in member &&
-        member?.granularities?.find((g) => g.name === timeDimension.granularity);
+      const granularity = timeDimension.granularity
+        && member
+        && 'granularities' in member
+        && member?.granularities?.find((g) => g.name === timeDimension.granularity);
 
       return {
         id: timeDimension.dimension,
@@ -1162,12 +1145,12 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
               onOrderChange={
                 member
                   ? (ord?: QueryOrder) => {
-                      if (ord) {
-                        order.set(timeDimension.dimension, ord);
-                      } else {
-                        order.remove(timeDimension.dimension);
-                      }
+                    if (ord) {
+                      order.set(timeDimension.dimension, ord);
+                    } else {
+                      order.remove(timeDimension.dimension);
                     }
+                  }
                   : undefined
               }
               onMemberRemove={(name) => grouping.remove(name)}
@@ -1195,9 +1178,8 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
     );
   }, [timeDimensions, JSON.stringify(query.order), meta, memberViewType, isCompact]);
 
-  const timestamp = useMemo(() => {
-    return new Date();
-  }, [tableData]);
+  const timestamp = useMemo(() => new Date(),
+    [tableData]);
 
   const [timeDistance, setTimeDistance] = useState(
     formatDistance(timestamp, new Date(), { addSuffix: true })
@@ -1251,12 +1233,12 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
               <Text preset="t3m">
                 {data.length
                   ? `${data.length} result${data.length > 1 ? 's' : ''}${
-                      totalRows
-                        ? totalRows === data.length
-                          ? ' in total'
-                          : ` out of ${totalRows} in total`
-                        : ''
-                    }`
+                    totalRows
+                      ? totalRows === data.length
+                        ? ' in total'
+                        : ` out of ${totalRows} in total`
+                      : ''
+                  }`
                   : 'No results'}
               </Text>
               <Text preset="t3">received {timeDistance}</Text>
