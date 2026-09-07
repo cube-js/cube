@@ -7,9 +7,9 @@ declare namespace Cypress {
   };
 
   interface Chainable {
-    getByTestId(dataTestAttribute: string, args?: any): Chainable<Element>;
+    getByTestId(dataTestAttribute: string, args?: any): Chainable<JQuery<HTMLElement>>;
 
-    getByQa(dataTestAttribute: string, args?: any): Chainable<Element>;
+    getByQa(dataTestAttribute: string, args?: any): Chainable<JQuery<HTMLElement>>;
 
     setQuery(query: Object, args?: any): void;
 
@@ -36,3 +36,5 @@ declare namespace Cypress {
     getLocalStorage(item: string): Chainable<string | null>;
   }
 }
+
+declare module 'cypress-image-snapshot/command';
