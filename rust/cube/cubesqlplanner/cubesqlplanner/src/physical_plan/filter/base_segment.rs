@@ -1,3 +1,4 @@
+use super::filter_params_binding::{reject_segment_shifts, reject_shifted_string_columns};
 use super::ToSql;
 use crate::cube_bridge::member_sql::FilterParamsColumn;
 use crate::physical_plan::sql_nodes::SqlNode;
@@ -19,7 +20,16 @@ impl ToSql for BaseSegment {
         templates: &PlanSqlTemplates,
         filters_ctx: &FiltersContext,
     ) -> Result<String, CubeError> {
-        if let Some(item) = self.matching_filter_params_column(filters_ctx) {
+        if let Some(items) = self.matching_filter_params_columns(filters_ctx) {
+            // Both checked here as well as on the dimension path, so the same
+            // modelling mistake reads the same whichever kind of member the
+            // group binds. Nothing shifts a segment, so past them every binding
+            // of this member states the same thing.
+            reject_shifted_string_columns(items)?;
+            reject_segment_shifts(items)?;
+            let Some(item) = items.first() else {
+                return templates.always_true();
+            };
             return self.filter_params_column_sql(
                 item,
                 visitor,
@@ -45,10 +55,10 @@ impl BaseSegment {
     // meant. A view re-exporting a segment leaves only the underlying cube's
     // path to match, which takes a scan; the name breaks the tie when a group
     // binds both paths, since the map is unordered.
-    fn matching_filter_params_column<'a>(
+    fn matching_filter_params_columns<'a>(
         &self,
         filters_ctx: &'a FiltersContext,
-    ) -> Option<&'a SqlCallFilterParamsItem> {
+    ) -> Option<&'a Vec<SqlCallFilterParamsItem>> {
         if let Some(item) = filters_ctx.filter_params_columns.get(&self.full_name()) {
             return Some(item);
         }
