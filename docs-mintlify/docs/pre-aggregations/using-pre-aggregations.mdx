@@ -53,6 +53,29 @@ Refresh strategy can be customized by setting the
 [`refresh_key`][ref-schema-ref-preaggs-refresh-key] property for the
 pre-aggregation.
 
+<Warning>
+
+Beyond the refresh key, a pre-aggregation is also keyed on the
+[SQL preamble](/reference/configuration/environment-variables#cubejs_db_sql_preamble)
+its data source is configured with, so **changing the preamble rebuilds every
+pre-aggregation on that data source**. That is deliberate — a preamble can define a
+function the pre-aggregation's SQL calls, so the same SQL under a different preamble
+can return different rows, and serving a table built under the old one would be
+wrong. Plan for the rebuild before changing a preamble on a deployment with large
+pre-aggregations.
+
+Only a preamble set through an environment variable is keyed this way. One set with
+the `sqlPreamble` driver option from a custom
+[`driver_factory`](/reference/configuration/config#driver_factory) does not
+participate, so changing it does not rebuild anything — rebuild explicitly if you
+change it.
+
+The variable must also be set identically on every instance. A refresh worker that
+has it and an API instance that does not compute different versions, and the API
+then finds no pre-aggregation matching the tables the worker built.
+
+</Warning>
+
 The default value of [`refresh_key`][ref-schema-ref-preaggs-refresh-key] is
 `every: 1 hour`, if neither of the cubes overrides it's `refreshKey` parameter. 
 It can be redefined either by overriding the default value of

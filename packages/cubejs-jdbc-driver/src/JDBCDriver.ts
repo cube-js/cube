@@ -17,6 +17,9 @@ import {
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
   StreamOptions,
+  normalizeSqlPreamble,
+  splitSqlPreamble,
+  applySqlPreambleStatements,
 } from '@cubejs-backend/base-driver';
 import { promisify } from 'util';
 import path from 'path';
@@ -75,6 +78,10 @@ export class JDBCDriver extends BaseDriver {
   protected readonly config: JDBCDriverConfiguration;
 
   protected pool: Pool<any>;
+
+  // prepareConnectionQueries() runs per query, so the deprecation notice is
+  // latched to one line per driver instead of one per query.
+  private deprecationWarned = false;
 
   protected jdbcProps: any;
 
@@ -228,11 +235,109 @@ export class JDBCDriver extends BaseDriver {
     }
   }
 
-  protected prepareConnectionQueries() {
+  /**
+   * This driver applies `sql_preamble`.
+   *
+   * Inherited by every JDBC-based driver — Databricks among them — which reuse
+   * the replay this class performs on each acquired connection.
+   */
+  public override supportsSqlPreamble(): boolean {
+    return true;
+  }
+
+  /**
+   * Resolved here rather than in BaseDriver, so the base accessor would
+   * otherwise report no preamble to the pre-aggregation version key. Only the
+   * user-configured value, not the per-dbType built-ins — those are fixed for a
+   * driver and would add a constant to every key.
+   */
+  public override effectiveSqlPreamble(): string | undefined {
+    return normalizeSqlPreamble(this.config.sqlPreamble) ?? getEnv('dbSqlPreamble', {
+      dataSource: this.config.dataSource ?? 'default',
+      preAggregations: this.config.preAggregationsSqlPreamble ?? this.config.preAggregations,
+    });
+  }
+
+  /**
+   * Statements replayed on a connection before the primary query.
+   *
+   * A `sqlPreamble` is appended to the per-dbType built-ins, built-ins first:
+   * `supported-drivers.ts` ships `SET time_zone` for MySQL, and dropping it
+   * would silently change how timestamps are read.
+   *
+   * The deprecated `prepareConnectionQueries` keeps *replacing* those built-ins,
+   * which is what it has always done — someone who set it to override the
+   * timezone still gets that, and only that, until the option is removed.
+   */
+  protected prepareConnectionQueries(): string[] {
     const dbTypeDescription = JDBCDriver.dbTypeDescription(this.config.dbType);
-    return this.config.prepareConnectionQueries ||
-      dbTypeDescription && dbTypeDescription.prepareConnectionQueries ||
-      [];
+    const builtIn = dbTypeDescription && dbTypeDescription.prepareConnectionQueries || [];
+
+    const preamble = normalizeSqlPreamble(this.config.sqlPreamble) ?? getEnv('dbSqlPreamble', {
+      dataSource: this.config.dataSource ?? 'default',
+      // Not `this.config.preAggregations`: a build resolves the preamble from
+      // the pre-aggregation namespace even when its credentials do not.
+      preAggregations: this.config.preAggregationsSqlPreamble ?? this.config.preAggregations,
+    });
+
+    // Only fall back to the deprecated option when no preamble is configured by
+    // either the new option or the env var, so migrating to `sqlPreamble` is
+    // never silently overridden by a value left behind in the old one.
+    if (!preamble && this.config.prepareConnectionQueries?.length) {
+      if (!this.deprecationWarned) {
+        this.deprecationWarned = true;
+        this.logger?.('Deprecated driver option', {
+          warning: 'The prepareConnectionQueries driver option is deprecated and will be removed in a future release. Use sqlPreamble instead — note it appends to the built-in connection queries rather than replacing them.',
+        });
+      }
+
+      return this.config.prepareConnectionQueries;
+    }
+
+    return [...builtIn, ...splitSqlPreamble(preamble)];
+  }
+
+  /**
+   * The same statements as `prepareConnectionQueries`, split by origin.
+   *
+   * The two halves need different failure postures. This driver pools
+   * connections, so the preamble is replayed on every acquire and a `CREATE …` —
+   * the feature's headline use case — raises "already exists" the second time a
+   * connection is reused; that has to be tolerated. The per-dbType built-ins are
+   * only `SET`s, are idempotent, and stay raw so a genuine failure in them still
+   * surfaces. Same for the deprecated `prepareConnectionQueries`, whose contents
+   * are the user's own and whose semantics must not change.
+   */
+  protected splitConnectionQueries(): { builtIn: string[], preamble: string[] } {
+    const all = this.prepareConnectionQueries();
+    const preamble = splitSqlPreamble(this.effectiveSqlPreamble());
+    // A preamble is only appended, never mixed in, so the last N entries are it —
+    // but only when the merged list actually ends with them: the deprecated
+    // option replaces the built-ins instead of appending, and then no entry is a
+    // `sqlPreamble` statement.
+    const appended = preamble.length > 0
+      && all.length >= preamble.length
+      && all.slice(all.length - preamble.length).every((statement, i) => statement === preamble[i]);
+
+    return appended
+      ? { builtIn: all.slice(0, all.length - preamble.length), preamble }
+      : { builtIn: all, preamble: [] };
+  }
+
+  /**
+   * Replays the connection queries on a freshly acquired connection.
+   */
+  protected async applyConnectionQueries(conn: any): Promise<void> {
+    const { builtIn, preamble } = this.splitConnectionQueries();
+
+    for (const statementSql of builtIn) {
+      await this.executeStatement(conn, statementSql);
+    }
+
+    await applySqlPreambleStatements(
+      preamble,
+      statement => this.executeStatement(conn, statement),
+    );
   }
 
   protected escapeDialect(): EscapeDialect {
@@ -253,7 +358,10 @@ export class JDBCDriver extends BaseDriver {
   public async query<R = unknown>(query: string, values: unknown[]): Promise<R[]> {
     const queryWithParams = this.prepareQueryWithParams(query, values);
     const cancelObj: {cancel?: Function} = {};
-    const promise = this.queryPromised(queryWithParams, cancelObj, this.prepareConnectionQueries());
+    // No `prepareConnectionQueries` override: `queryPromised` replays them
+    // itself, splitting the user preamble from the built-ins so a pooled
+    // connection tolerates an already-applied `CREATE …`.
+    const promise = this.queryPromised(queryWithParams, cancelObj, {});
     (promise as CancelablePromise<any>).cancel =
       () => cancelObj.cancel && cancelObj.cancel() ||
       Promise.reject(new Error('Statement is not ready'));
@@ -276,9 +384,16 @@ export class JDBCDriver extends BaseDriver {
     try {
       const conn = await this.pool.acquire();
       try {
-        const prepareConnectionQueries = options.prepareConnectionQueries || [];
-        for (let i = 0; i < prepareConnectionQueries.length; i++) {
-          await this.executeStatement(conn, prepareConnectionQueries[i]);
+        // `options.prepareConnectionQueries` stays honoured for callers that pass
+        // their own list, but it is a flat merged list with no way to tell a
+        // built-in from user preamble, so only the default path gets the
+        // already-applied tolerance the pool requires.
+        if (options.prepareConnectionQueries) {
+          for (const statementSql of options.prepareConnectionQueries) {
+            await this.executeStatement(conn, statementSql);
+          }
+        } else {
+          await this.applyConnectionQueries(conn);
         }
         return await this.executeStatement(conn, query, cancelObj);
       } finally {
@@ -299,6 +414,10 @@ export class JDBCDriver extends BaseDriver {
     try {
       const query = this.prepareQueryWithParams(sql, values);
       const cancelObj: {cancel?: Function} = {};
+
+      // A streamed query has to run in the preamble's context too; this path
+      // used to skip the connection queries the query path replays.
+      await this.applyConnectionQueries(conn);
 
       const createStatement = promisify(conn.createStatement.bind(conn));
       const statement = await createStatement();

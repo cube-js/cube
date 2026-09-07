@@ -12,6 +12,8 @@ export class CrateDriver extends PostgresDriver {
     // await conn.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
     // await conn.query(`SET statement_timeout TO ${options.executionTimeout}`);
 
+    await this.applySqlPreamble(conn);
+
     await this.loadUserDefinedTypes(conn);
   }
 

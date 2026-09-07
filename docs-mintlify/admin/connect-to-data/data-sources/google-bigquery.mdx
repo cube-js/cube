@@ -90,6 +90,39 @@ if [single-tenant infrastructure][ref-dedicated-infra] is used. Check out the
 
 [ref-dedicated-infra]: /admin/deployment/infrastructure#dedicated-infrastructure
 [ref-cloud-conf-vpc]: /admin/deployment/dedicated
+### SQL preamble
+
+BigQuery is stateless: a [temporary UDF][bq-docs-temp-udf] exists only for the
+duration of a single query, so there is no connection to install one on ahead of
+time. Set [`CUBEJS_DB_SQL_PREAMBLE`](/reference/configuration/environment-variables#cubejs_db_sql_preamble)
+and Cube prepends it to each query it sends, putting the function in scope for
+the query that calls it:
+
+```dotenv
+CUBEJS_DB_SQL_PREAMBLE=CREATE TEMP FUNCTION median(x ARRAY<FLOAT64>) AS (x[OFFSET(ARRAY_LENGTH(x) DIV 2)])
+```
+
+The same value can be set as the `sqlPreamble` driver option from a custom
+[`driver_factory`][ref-driver-factory], which takes precedence over the
+environment variable.
+
+<Warning>
+
+BigQuery treats a request containing several statements as a
+[script][bq-docs-multi-statement], and a script ignores job configuration such as
+the destination table. The one exception is `CREATE TEMP FUNCTION` statements
+followed by a single query, which BigQuery still runs as a normal query.
+
+Because pre-aggregation builds set a destination table, Cube rejects a build
+whose preamble falls outside that exempt shape rather than letting it report
+success while writing an empty table. A preamble that only defines temporary
+functions is unaffected.
+
+</Warning>
+
+[bq-docs-temp-udf]: https://cloud.google.com/bigquery/docs/user-defined-functions#temporary-udf-syntax
+[bq-docs-multi-statement]: https://cloud.google.com/bigquery/docs/multi-statement-queries
+[ref-driver-factory]: /reference/configuration/config#driver_factory
 ## Environment Variables
 
 | Environment Variable           | Description                                                                                                                                                                                     | Possible Values                                                         | Required |
@@ -102,6 +135,7 @@ if [single-tenant infrastructure][ref-dedicated-infra] is used. Check out the
 | [`CUBEJS_DB_EXPORT_BUCKET_TYPE`](/reference/configuration/environment-variables#cubejs_db_export_bucket_type) | The cloud provider where the bucket is hosted                                                                                                                                                   | `gcp`                                                                   |    ❌    |
 | [`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool)           | The maximum number of concurrent database connections to pool. Default is `40`                                                                                                                  | A valid number                                                          |    ❌    |
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+| [`CUBEJS_DB_SQL_PREAMBLE`](/reference/configuration/environment-variables#cubejs_db_sql_preamble) | SQL run in the context of every query, typically to define temporary UDFs | A valid SQL statement or batch |    ❌    |
 
 <sup>1</sup> Not required when authenticating with [OIDC workload identity
 federation][ref-oidc-gcp-bigquery] in Cube Cloud, or when providing the key

@@ -13,6 +13,31 @@ class BaseDriverImplementedMock extends BaseDriver {
   }
 }
 
+// The capability is inherited on purpose: a hand-maintained list of supporting
+// dbTypes would be a second source of truth that goes stale silently whenever a
+// driver is subclassed. RedshiftDriver extends PostgresDriver, and every
+// JDBC-based driver extends JDBCDriver, so both must answer without listing
+// themselves anywhere.
+describe('BaseDriver.supportsSqlPreamble', () => {
+  test('defaults to false, so an unwired driver is never claimed to support it', () => {
+    expect(new BaseDriverImplementedMock([]).supportsSqlPreamble()).toBe(false);
+  });
+
+  test('an override propagates to a subclass that does not restate it', () => {
+    class Supporting extends BaseDriverImplementedMock {
+      public override supportsSqlPreamble(): boolean {
+        return true;
+      }
+    }
+    // Stands in for RedshiftDriver extends PostgresDriver, and Databricks
+    // extends JDBCDriver.
+    class InheritsIt extends Supporting {}
+
+    expect(new Supporting([]).supportsSqlPreamble()).toBe(true);
+    expect(new InheritsIt([]).supportsSqlPreamble()).toBe(true);
+  });
+});
+
 describe('BaseDriver', () => {
   test('downloadQueryResults - test type detection', async () => {
     const rows = [{

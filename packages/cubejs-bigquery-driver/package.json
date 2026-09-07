@@ -15,9 +15,10 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "test": "yarn integration",
+    "test": "yarn unit && yarn integration",
+    "unit": "jest --verbose dist/test/*.unit.test.js",
     "integration": "npm run integration:bigquery",
-    "integration:bigquery": "jest --verbose dist/test",
+    "integration:bigquery": "jest --verbose dist/test/BigQueryDriver.test.js",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
