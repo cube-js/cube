@@ -152,8 +152,8 @@ describe('type mapping', () => {
 });
 
 // Without the flag every decimal collapses to a bare `decimal`, so this is the only place the
-// width to precision table above is observable. Decimal256's 76 digits are clamped to 38: Cube
-// Store would otherwise build a Decimal128 past Arrow's maximum precision.
+// width to precision table above is observable, and the only place the clamp to 38 digits shows:
+// Cube Store would otherwise build a Decimal128 past Arrow's maximum precision.
 describe('type mapping with CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE', () => {
   const driver = new TypeProbe({ host: 'localhost', port: '8123', dataSource: 'default' });
   let previous: string | undefined;
@@ -173,11 +173,16 @@ describe('type mapping with CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE', () => {
 
   const DECIMALS: Array<[type: string, generic: string]> = [
     ['Decimal(9, 2)', 'decimal(9, 2)'],
-    ['Decimal(76, 10)', 'decimal(76, 10)'],
     ['Decimal32(2)', 'decimal(9, 2)'],
     ['Decimal64(2)', 'decimal(18, 2)'],
     ['Decimal128(4)', 'decimal(38, 4)'],
+    // Decimal(76, 10) and Decimal256(10) are the same column, so both clamp to the same DDL.
+    ['Decimal(76, 10)', 'decimal(38, 10)'],
+    ['Decimal256(10)', 'decimal(38, 10)'],
     ['Decimal256(4)', 'decimal(38, 4)'],
+    // Cube Store widens a precision back up to the scale, so a scale past 38 is clamped too.
+    ['Decimal(76, 40)', 'decimal(38, 38)'],
+    ['Decimal256(40)', 'decimal(38, 38)'],
     ['Nullable(Decimal128(4))', 'decimal(38, 4)'],
     ['LowCardinality(Decimal64(2))', 'decimal(18, 2)'],
     ['SimpleAggregateFunction(sum, Decimal64(2))', 'decimal(18, 2)'],

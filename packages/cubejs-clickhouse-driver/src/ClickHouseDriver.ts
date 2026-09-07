@@ -85,15 +85,17 @@ const ClickhouseTypeToGeneric: Record<string, string> = {
   time64: 'string',
 };
 
-// Decimal32/64/128/256 name their precision by width and take only a scale argument. Cube Store
-// keeps a decimal in a Decimal128, so Decimal256's own 76 digits are clamped to the 38 Arrow allows
-// rather than passed on to fail the CREATE TABLE.
+// Decimal32/64/128/256 name their precision by width and take only a scale argument.
 const DECIMAL_WIDTH_PRECISION: Record<string, number> = {
   decimal32: 9,
   decimal64: 18,
   decimal128: 38,
-  decimal256: 38,
+  decimal256: 76,
 };
+
+// Cube Store keeps a decimal in a Decimal128, and Arrow allows it no more than 38 digits, so a
+// wider ClickHouse precision is clamped rather than passed on to fail the CREATE TABLE.
+const MAX_DECIMAL_PRECISION = 38;
 
 export interface ClickHouseDriverOptions {
   host?: string,
@@ -545,6 +547,17 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   /**
+   * `Decimal(76, 10)` and `Decimal256(10)` are the same ClickHouse column, so both spellings clamp
+   * here. Cube Store widens a precision back up to the scale, so the scale is clamped along with
+   * it. A NaN or zero part falls through to a bare `decimal`, the same as an argument-less Decimal.
+   */
+  private toGenericDecimal(precision: number, scale: number): GenericDataBaseType {
+    const clamped = Math.min(precision, MAX_DECIMAL_PRECISION);
+
+    return super.toGenericType('decimal', clamped, Math.min(scale, clamped));
+  }
+
+  /**
    * Example of types:
    *
    * Int64
@@ -571,7 +584,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       case 'array':
         return args.length > 0 ? `${this.toGenericType(args[0])}[]` : 'text';
       case 'decimal':
-        return super.toGenericType(name, Number(args[0]), Number(args[1]));
+        return this.toGenericDecimal(Number(args[0]), Number(args[1]));
       default:
         break;
     }
@@ -581,7 +594,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     }
 
     if (Object.hasOwn(DECIMAL_WIDTH_PRECISION, name)) {
-      return super.toGenericType('decimal', DECIMAL_WIDTH_PRECISION[name], Number(args[0]));
+      return this.toGenericDecimal(DECIMAL_WIDTH_PRECISION[name], Number(args[0]));
     }
 
     if (Object.hasOwn(ClickhouseTypeToGeneric, name)) {
