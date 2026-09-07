@@ -65,10 +65,7 @@ const ClickhouseTypeToGeneric: Record<string, string> = {
   // We don't support enums
   enum8: 'text',
   enum16: 'text',
-  // Without an entry here these reach Cube Store as their raw ClickHouse name and fail the
-  // CREATE TABLE. Bool is the exception, already covered by the base driver's own mapping.
   date32: 'date',
-  bool: 'boolean',
   uuid: 'uuid',
   fixedstring: 'text',
   ipv4: 'text',
