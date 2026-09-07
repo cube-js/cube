@@ -5,7 +5,7 @@
     "target": "es2020",
     "module": "esnext",
     "moduleResolution": "bundler",
-    "types": ["*"],
+    "types": [],
     "jsx": "react",
     "declaration": true,
     "declarationMap": true,

@@ -5,6 +5,7 @@
     "test"
   ],
   "compilerOptions": {
+    "types": ["node", "jest"],
     "outDir": "dist",
     "rootDir": ".",
     "allowJs": true

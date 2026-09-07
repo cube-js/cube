@@ -9,7 +9,7 @@
     "lib": ["dom", "dom.iterable", "ES2022"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "types": ["*"],
+    "types": ["vitest/globals"],
     "composite": true,
     "noEmitOnError": true,
     "declaration": true,

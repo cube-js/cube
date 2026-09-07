@@ -6,8 +6,7 @@
   ],
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": ".",
-    "typeRoots": ["./node_modules/@types", "./src/types"]
+    "rootDir": "."
   },
   "references": [
     { "path": "../cubejs-backend-shared" },

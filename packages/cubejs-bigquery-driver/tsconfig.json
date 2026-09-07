@@ -6,6 +6,7 @@
     "package.json"
   ],
   "compilerOptions": {
+    "types": ["node", "jest"],
     "outDir": "dist",
     "rootDir": ".",
     "resolveJsonModule": true

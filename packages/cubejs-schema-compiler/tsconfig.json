@@ -2,6 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "include": ["src", "test"],
   "compilerOptions": {
+    "types": ["node", "jest"],
     // antlr4's `types` is a .d.cts re-exporting `.d.ts` files that are ESM under antlr4's own
     // `type: module`, so under node16/nodenext their extensionless specifiers fail (TS2834) and
     // the module resolves to nothing. A `paths` redirect cannot help — the failing specifiers are

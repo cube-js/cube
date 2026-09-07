@@ -34,6 +34,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@cubejs-backend/linter": "1.7.35",
+    "@types/node": "^22",
     "typescript": "~6.0.3"
   },
   "publishConfig": {

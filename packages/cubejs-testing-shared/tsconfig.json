@@ -4,6 +4,7 @@
     "src"
   ],
   "compilerOptions": {
+    "types": ["node", "jest"],
     "outDir": "dist",
     "rootDir": ".",
   },

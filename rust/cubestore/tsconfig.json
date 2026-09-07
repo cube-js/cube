@@ -20,7 +20,7 @@
     "noImplicitThis": true,
     "alwaysStrict": true,
     "moduleResolution": "nodenext",
-    "types": ["*"],
+    "types": ["node", "jest"],
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
