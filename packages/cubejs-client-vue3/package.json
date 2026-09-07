@@ -28,11 +28,11 @@
   ],
   "dependencies": {
     "@cubejs-client/core": "1.7.35",
-    "ramda": "^0.27.0"
+    "ramda": "^0.27.2"
   },
   "devDependencies": {
-    "@babel/core": "^7",
-    "@babel/preset-env": "^7",
+    "@babel/core": "^7.24.5",
+    "@babel/preset-env": "^7.24.5",
     "@vue/test-utils": "^2.4",
     "babel-jest": "^29",
     "eslint": "^7.21.0",

@@ -29,7 +29,7 @@
     "dist/src/*"
   ],
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.49.0",
+    "@aws-sdk/client-s3": "^3.726.0",
     "@aws-sdk/s3-request-presigner": "^3.49.0",
     "@azure/identity": "^4.4.1",
     "@azure/storage-blob": "^12.9.0",
