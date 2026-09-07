@@ -31,7 +31,7 @@ jobs:
         node-version: [24.x]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -42,11 +42,11 @@ jobs:
           target: x86_64-unknown-linux-gnu
           cache: false
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
@@ -60,7 +60,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.22
       - name: Yarn install
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -105,13 +105,13 @@ jobs:
         target: ['postgresql', 'postgresql-cubestore', 'postgresql-pre-aggregations']
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Node.js 24.x
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.x
       - name: Restore lerna
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
@@ -125,7 +125,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.22
       - name: Yarn install
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -169,13 +169,13 @@ jobs:
             container: cypress/browsers:node18.12.0-chrome107
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Node.js 24.x
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.x
       - name: Restore lerna
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
@@ -189,7 +189,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.22
       - name: Yarn install
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
