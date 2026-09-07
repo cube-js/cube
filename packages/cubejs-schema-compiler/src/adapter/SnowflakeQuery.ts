@@ -93,9 +93,13 @@ export class SnowflakeQuery extends BaseQuery {
    * actually expressed in. `diffTimeUnitForInterval` answers a different
    * question - it degrades WEEK to DAY and QUARTER to MONTH, which DATEADD would
    * then step by, producing seven or three times as many periods as asked for.
+   *
+   * Multi-unit intervals reach this through calendar granularities, which read
+   * the interval and ignore the unit, so an unrecognized one falls back rather
+   * than throwing.
    */
   public override intervalAndMinimalTimeUnit(interval: string): [string, string] {
-    const unit = INTERVAL_UNITS.find(u => new RegExp(u, 'i').test(interval));
+    const unit = INTERVAL_UNITS.find(u => new RegExp(`\\b${u}s?\\b`, 'i').test(interval));
 
     return [interval, unit || 'year'];
   }
@@ -162,26 +166,29 @@ export class SnowflakeQuery extends BaseQuery {
     // the same reason described there.
     templates.tesseract.ilike = '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }} ESCAPE \'\\\\\'';
     templates.tesseract.join_types_full = 'FULL';
-    // Snowflake has no generate_series, and GENERATOR only takes a literal row
-    // count. ARRAY_GENERATE_RANGE does accept arbitrary expressions for its
-    // bounds, so the series covers whatever range the query turns out to need;
-    // the only ceiling is the maximum size of a single ARRAY value.
+    // ARRAY_GENERATE_RANGE is the only Snowflake row generator whose bounds may
+    // be expressions rather than a literal count. Its row number counts whole
+    // time units, all DATEADD can step by, so `supportGeneratedSeriesForCustomTd`
+    // stays off.
     //
-    // Its row number is a count of whole time units, which is all DATEADD can
-    // step by. A custom granularity's interval carries no such count, so
-    // `supportGeneratedSeriesForCustomTd` stays off and those queries keep
-    // asking for an explicit date range.
+    // DATEDIFF counts unit boundaries crossed, so it over-allocates rows for a
+    // range that does not begin on one; the trailing WHERE, not the count, is
+    // what ends the series where the range does.
     //
-    // Snowflake folds unquoted identifiers to upper case while the planner reads
-    // the series back by lower-case name, so the two output columns are quoted.
+    // Unquoted identifiers fold to upper case here, so both output columns are
+    // quoted. The series stays timestamp_ntz to match the time dimension, which
+    // `timeStampCast` would not - hence the unused date_from/date_to arguments.
     templates.statements.generated_time_series_select = 'SELECT series_date AS "date_from",\n' +
       'DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, series_date)) AS "date_to"\n' +
       'FROM (SELECT DATEADD({{ minimal_time_unit }}, series_index.value::int, {{ start }}::timestamp_ntz) AS series_date\n' +
-      'FROM TABLE(FLATTEN(input => ARRAY_GENERATE_RANGE(0, DATEDIFF({{ minimal_time_unit }}, {{ start }}::timestamp_ntz, {{ end }}::timestamp_ntz) + 1))) AS series_index) AS series';
+      'FROM TABLE(FLATTEN(input => ARRAY_GENERATE_RANGE(0, DATEDIFF({{ minimal_time_unit }}, {{ start }}::timestamp_ntz, {{ end }}::timestamp_ntz) + 1))) AS series_index) AS series\n' +
+      'WHERE series_date <= {{ end }}::timestamp_ntz';
     templates.statements.generated_time_series_with_cte_range_source = 'SELECT series_date AS "date_from",\n' +
       'DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, series_date)) AS "date_to"\n' +
-      'FROM (SELECT DATEADD({{ minimal_time_unit }}, series_index.value::int, {{ range_source }}."{{ min_name }}") AS series_date\n' +
-      'FROM {{ range_source }}, LATERAL FLATTEN(input => ARRAY_GENERATE_RANGE(0, DATEDIFF({{ minimal_time_unit }}, {{ range_source }}."{{ min_name }}", {{ range_source }}."{{ max_name }}") + 1)) AS series_index) AS series';
+      'FROM (SELECT DATEADD({{ minimal_time_unit }}, series_index.value::int, {{ range_source }}."{{ min_name }}") AS series_date,\n' +
+      '{{ range_source }}."{{ max_name }}" AS series_end\n' +
+      'FROM {{ range_source }}, LATERAL FLATTEN(input => ARRAY_GENERATE_RANGE(0, DATEDIFF({{ minimal_time_unit }}, {{ range_source }}."{{ min_name }}", {{ range_source }}."{{ max_name }}") + 1)) AS series_index) AS series\n' +
+      'WHERE series_date <= series_end';
     delete templates.types.interval;
     return templates;
   }

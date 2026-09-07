@@ -59,31 +59,33 @@ cubes:
   };
 
   // Every dialect that generates the series in SQL has to accept the same query,
-  // so the guard is stated once over all of them rather than per dialect.
-  const GENERATING_DIALECTS: [string, any][] = [
-    ['Postgres', PostgresQuery],
-    ['Snowflake', SnowflakeQuery],
+  // so the guard is stated once over all of them rather than per dialect. Each
+  // is paired with the row generator its template has to reach for, since the
+  // `time_series` CTE is named the same on the path that does not generate.
+  const GENERATING_DIALECTS: [string, any, string][] = [
+    ['Postgres', PostgresQuery, 'generate_series'],
+    ['Snowflake', SnowflakeQuery, 'ARRAY_GENERATE_RANGE'],
   ];
 
   const PREDEFINED_GRANULARITIES = ['second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year'];
 
-  describe.each(GENERATING_DIALECTS)('%s', (_name, QueryClass) => {
+  describe.each(GENERATING_DIALECTS)('%s', (_name, QueryClass, generator) => {
     it.each(PREDEFINED_GRANULARITIES)('plans a rolling window at %s granularity with no date range', async (granularity) => {
       const sql = await buildSql(QueryClass, { granularity });
 
-      expect(sql).toContain('time_series');
+      expect(sql).toContain(generator);
     });
 
     it('keeps planning a rolling window with an explicit date range', async () => {
       const sql = await buildSql(QueryClass, { dateRange: ['2024-01-01', '2024-12-31'] });
 
-      expect(sql).toContain('time_series');
+      expect(sql).toContain(generator);
     });
 
     it('plans a bounded rolling window with no date range', async () => {
       const sql = await buildSql(QueryClass, { measure: 'events.rolling_30d_users' });
 
-      expect(sql).toContain('time_series');
+      expect(sql).toContain(generator);
     });
   });
 
@@ -101,6 +103,20 @@ cubes:
 
       expect(sql).toContain('"date_from"');
       expect(sql).toContain('"date_to"');
+    });
+
+    // A predefined granularity takes the requested range verbatim, so the series
+    // can start off the granularity boundary. DATEDIFF counts boundaries crossed
+    // rather than whole periods and then hands back one row too many, whose
+    // period starts past the end of the range.
+    it('ends the series at the end of the range even when the range starts mid-period', async () => {
+      const ranged = await buildSql(SnowflakeQuery, { dateRange: ['2024-01-15', '2024-02-05'] });
+
+      expect(ranged).toContain('WHERE series_date <= \'2024-02-05\'::timestamp_ntz');
+
+      const derived = await buildSql(SnowflakeQuery);
+
+      expect(derived).toContain('WHERE series_date <= series_end');
     });
 
     // Snowflake cannot multiply an arbitrary interval by a row number, so a
