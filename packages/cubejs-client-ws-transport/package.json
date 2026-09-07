@@ -34,6 +34,7 @@
     "@babel/preset-env": "^7.3.1",
     "@babel/preset-typescript": "^7.12.1",
     "@cubejs-backend/linter": "1.7.35",
+    "@types/node": "^22",
     "@types/ws": "^7.2.9",
     "typescript": "~6.0.3"
   },
