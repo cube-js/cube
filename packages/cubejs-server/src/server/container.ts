@@ -1,4 +1,5 @@
 import path from 'path';
+import { pathToFileURL } from 'url';
 import fs from 'fs';
 import fsAsync from 'fs/promises';
 import color from '@oclif/color';
@@ -309,15 +310,18 @@ export class ServerContainer {
   }
 
   protected async loadConfigurationFromFile(): Promise<CreateOptions> {
-    // `module: nodenext` emits import() verbatim, handing an absolute path to the ESM loader.
-    // eslint-disable-next-line global-require, import/no-dynamic-require
-    const file = require(path.join(process.cwd(), 'cube.js'));
+    // A file URL, because `module: nodenext` emits import() verbatim and the ESM loader rejects
+    // a bare absolute path on Windows.
+    const file = await import(pathToFileURL(path.join(process.cwd(), 'cube.js')).href);
 
     if (this.configuration.debug) {
       console.log('Loaded js configuration file', file);
     }
 
-    const config = file?.__esModule ? file.default : file;
+    // For a CommonJS `cube.js` the namespace carries `module.exports` on `default`, so a
+    // transpiled `exports.default` arrives one level deeper.
+    const exported = file.default;
+    const config = exported?.__esModule ? exported.default : exported;
 
     if (config) {
       return config;
