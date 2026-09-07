@@ -49,7 +49,7 @@
     "@typescript-eslint/eslint-plugin": "^8.46.0",
     "@typescript-eslint/parser": "^8.46.0",
     "eslint": "^8.57.1",
-    "@types/fs-extra": "^9.0.8",
+    "@types/fs-extra": "^11.0.4",
     "@types/jest": "^29",
     "husky": "^5.0.4",
     "is-ci": "^2.0.0",

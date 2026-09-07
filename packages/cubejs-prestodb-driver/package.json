@@ -30,7 +30,7 @@
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.35",
     "@cubejs-backend/shared": "1.7.35",
-    "presto-client": "1.2.0",
+    "presto-client": "^1.2.0",
     "ramda": "^0.27.2"
   },
   "license": "Apache-2.0",

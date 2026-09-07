@@ -55,7 +55,7 @@
     "@oclif/command": "^1.8.13",
     "@types/cli-progress": "^3.9.1",
     "@types/cross-spawn": "^6.0.2",
-    "@types/fs-extra": "^9.0.8",
+    "@types/fs-extra": "^11.0.4",
     "@types/inquirer": "^7.3.1",
     "@types/jest": "^29",
     "@types/jsonwebtoken": "^9.0.2",
