@@ -8,8 +8,6 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts",
     "unit": "jest --coverage"
   },
   "files": [
@@ -60,9 +58,6 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   },
   "resolutions": {
     "colors": "1.4.0"

@@ -29,8 +29,11 @@ yarn tsc:watch
 # Clean build artifacts
 yarn clean
 
-# Run linting across all packages
+# Run linting (oxlint over the whole repo) plus the package.json linter
 yarn lint
+
+# oxlint only
+yarn lint:js
 
 # Fix linting issues
 yarn lint:fix

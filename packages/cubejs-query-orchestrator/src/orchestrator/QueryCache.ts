@@ -879,7 +879,7 @@ export class QueryCache {
   /**
    * Returns registered queries queues hash table.
    */
-  public getQueues(): {[dataSource: string]: QueryQueue} {
+  public getQueues(): { [dataSource: string]: QueryQueue } {
     return this.queue;
   }
 

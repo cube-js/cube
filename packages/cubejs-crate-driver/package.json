@@ -24,9 +24,7 @@
     "test": "yarn integration",
     "integration": "npm run integration:crate",
     "integration:crate": "jest --verbose dist/test",
-    "unit": "jest --forceExit --verbose dist/test/CrateDriver.unit.test.js",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "unit": "jest --forceExit --verbose dist/test/CrateDriver.unit.test.js"
   },
   "dependencies": {
     "@cubejs-backend/postgres-driver": "1.7.35",
@@ -46,8 +44,5 @@
   },
   "jest": {
     "testEnvironment": "node"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

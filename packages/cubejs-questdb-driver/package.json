@@ -22,9 +22,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "integration": "npm run integration:questdb",
-    "integration:questdb": "jest --verbose dist/test",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "integration:questdb": "jest --verbose dist/test"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.35",
@@ -49,8 +47,5 @@
   },
   "jest": {
     "testEnvironment": "node"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

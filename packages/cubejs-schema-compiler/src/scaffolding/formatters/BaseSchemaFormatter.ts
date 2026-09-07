@@ -35,9 +35,9 @@ export abstract class BaseSchemaFormatter {
   protected readonly scaffoldingSchema: ScaffoldingSchema;
 
   public constructor(
-      protected readonly dbSchema: DatabaseSchema,
-      protected readonly driver: any,
-      protected readonly options: SchemaFormatterOptions
+    protected readonly dbSchema: DatabaseSchema,
+    protected readonly driver: any,
+    protected readonly options: SchemaFormatterOptions
   ) {
     this.scaffoldingSchema = new ScaffoldingSchema(dbSchema, this.options);
   }

@@ -8,7 +8,6 @@ const prepareCompiler = (content: string) => originalPrepareCompiler({
 });
 
 describe('DremioQuery', () => {
-
   jest.setTimeout(10 * 60 * 1000); // Engine needs to spin up
 
   const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(

@@ -21,8 +21,6 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts",
     "integration": "jest dist/test",
     "integration:mongobi": "jest dist/test"
   },
@@ -45,8 +43,5 @@
   },
   "jest": {
     "testEnvironment": "node"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

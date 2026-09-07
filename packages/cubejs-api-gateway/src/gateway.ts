@@ -112,11 +112,11 @@ import {
 } from './helpers/transform-meta-extended';
 
 type HandleErrorOptions = {
-    e: any,
-    res: ResponseResultFn,
-    context?: any,
-    query?: any,
-    requestStarted?: Date
+  e: any,
+  res: ResponseResultFn,
+  context?: any,
+  query?: any,
+  requestStarted?: Date
 };
 
 function userAsyncHandler(handler: (req: Request & { context: ExtendedRequestContext }, res: ExpressResponse) => Promise<void>) {
@@ -1525,7 +1525,7 @@ class ApiGateway {
     disablePostProcessing,
     context,
     res,
-  }: {query: string, disablePostProcessing: boolean} & BaseRequest) {
+  }: { query: string, disablePostProcessing: boolean } & BaseRequest) {
     try {
       await this.assertApiScope('sql', context.securityContext);
 

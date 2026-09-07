@@ -22,8 +22,6 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint src/*.ts test/*.ts",
-    "lint:fix": "eslint --fix src/*.ts test/*.ts",
     "unit": "jest --coverage"
   },
   "dependencies": {
@@ -52,8 +50,5 @@
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

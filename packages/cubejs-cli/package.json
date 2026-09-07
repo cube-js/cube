@@ -19,9 +19,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit",
-    "unit": "jest dist/test",
-    "lint": "eslint src/* --ext .ts,.js",
-    "lint:fix": "eslint --fix src/* --ext .ts,.js"
+    "unit": "jest dist/test"
   },
   "files": [
     "dist/src/*",
@@ -64,8 +62,5 @@
     "jest": "^29",
     "typescript": "~6.0.3"
   },
-  "license": "Apache-2.0",
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
-  }
+  "license": "Apache-2.0"
 }

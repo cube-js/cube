@@ -40,7 +40,7 @@ interface JWTOptions {
 }
 
 type CheckAuthResponse = {
-  'security_context'?: unknown,
+  security_context?: unknown,
 };
 
 /**
@@ -87,7 +87,7 @@ type CanSwitchSQLUserFn =
  */
 type ContextToApiScopesFn =
   (securityContext?: any, scopes?: ApiScopesTuple) =>
-    Promise<ApiScopesTuple>;
+  Promise<ApiScopesTuple>;
 
 export {
   CheckAuthInternalOptions,

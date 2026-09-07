@@ -23,9 +23,7 @@
     "watch": "tsc -w",
     "unit": "jest --verbose dist/test/unit",
     "integration": "npm run integration:duckdb",
-    "integration:duckdb": "jest --verbose dist/test",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "integration:duckdb": "jest --verbose dist/test"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.35",
@@ -44,8 +42,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

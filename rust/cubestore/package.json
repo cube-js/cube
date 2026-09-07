@@ -14,8 +14,6 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint js-wrapper/* --ext .ts,.js",
-    "lint:fix": "eslint --fix js-wrapper/* --ext .ts,js",
     "unit": "jest",
     "unit:debug": "jest --runInBand",
     "version": "node scripts/sync-cargo-version.js",
@@ -46,9 +44,6 @@
     "@cubejs-backend/shared": "1.7.35",
     "@octokit/core": "^3.2.5",
     "source-map-support": "^0.5.19"
-  },
-  "eslintConfig": {
-    "extends": "../../packages/cubejs-linter"
   },
   "jest": {
     "roots": [

@@ -1,0 +1,58 @@
+// Cube's shared oxlint configuration, extended by the repo-root .oxlintrc.json.
+//
+// airbnb-base.json is the mechanical port of the airbnb-base + typescript-eslint rule set
+// this package used to export as an ESLint config. Everything in this file is a deliberate
+// departure from that port, with the reason stated.
+//
+// Note that oxlint's `extends` merges `rules`, `plugins`, `jsPlugins` and `overrides`, but
+// NOT `env` or `ignorePatterns` -- those are per-config-file and have to be restated by
+// whoever extends this. An `overrides` entry's own `env` does carry across, though.
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": ["./airbnb-base.json"],
+  "rules": {
+    // eslint-plugin-import never had a TypeScript resolver configured here
+    // (import/no-unresolved was off), so it could not resolve most imports and these four
+    // silently passed. oxlint resolves natively, which turns them on for the first time.
+    // Enabling them is separate work: as of this migration they report 173 dependency
+    // cycles, 366 hits on the `import R from 'ramda'; R.unnest()` idiom, and 2 genuine
+    // duplicate exports in client-core.
+    "import/no-cycle": "off",
+    "import/no-named-as-default": "off",
+    "import/no-named-as-default-member": "off",
+    "import/export": "off",
+    // Two additions to what the ESLint config asked for, both about what `--fix` does to
+    // strings that contain quotes. `avoidEscape` is airbnb's default and was lost when this
+    // package downgraded `quotes` to a warning. `allowTemplateLiterals` matters more: the
+    // codebase uses backticks deliberately for SQL and JSON literals, and "fixing" those
+    // into single quotes turns e.g. the driver parameter-escaping tests into backslash
+    // soup -- which is precisely the code where quoting has to stay readable.
+    "@stylistic/quotes": [
+      "warn",
+      "single",
+      { "avoidEscape": true, "allowTemplateLiterals": "always" }
+    ],
+    // oxlint's built-in fallthrough comment pattern is stricter than ESLint's default and
+    // rejected the existing `// falls through, trick from 90x ...` comments.
+    "no-fallthrough": ["error", { "commentPattern": "falls?\\s?through" }]
+  },
+  "overrides": [
+    {
+      // oxlint honours neither `/* globals ... */` nor `/* eslint-env jest */`, which is how
+      // the .js test suites used to declare the jest globals.
+      "files": [
+        "**/test/**",
+        "**/tests/**",
+        "**/__mocks__/**",
+        "**/*.test.js",
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.js",
+        "**/*.spec.ts",
+        "**/*.integration.js",
+        "**/*.integration.ts"
+      ],
+      "env": { "jest": true }
+    }
+  ]
+}

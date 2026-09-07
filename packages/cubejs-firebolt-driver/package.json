@@ -23,9 +23,7 @@
     "watch": "tsc -w",
     "test": "yarn integration",
     "integration": "npm run integration:firebolt",
-    "integration:firebolt": "jest --verbose dist/test --runInBand",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "integration:firebolt": "jest --verbose dist/test --runInBand"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.35",
@@ -49,8 +47,5 @@
     "setupFiles": [
       "./test/test-env.js"
     ]
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

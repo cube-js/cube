@@ -1,0 +1,31 @@
+// Delta from the repo-root config. This package predates the shared linter config and
+// its own ESLint setup pinned eslint-config-airbnb-base 13 while everything else was on
+// 14; extending the root config normalises it onto 14. Only the divergences this
+// package actually asked for are restated below.
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../.oxlintrc.json"],
+  // env and ignorePatterns are not inherited through `extends`
+  "env": {
+    "node": true,
+    "es6": true
+  },
+  "ignorePatterns": ["dist/", "lib/", "coverage/", "**/*.d.ts"],
+  "rules": {
+    "@stylistic/max-len": [
+      "error",
+      120,
+      2,
+      {
+        "ignoreUrls": true,
+        "ignoreComments": false,
+        "ignoreRegExpLiterals": true,
+        "ignoreStrings": true,
+        "ignoreTemplateLiterals": true
+      }
+    ],
+    "import/prefer-default-export": "error",
+    "no-underscore-dangle": "error",
+    "no-useless-constructor": "error"
+  }
+}

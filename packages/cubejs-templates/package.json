@@ -17,18 +17,13 @@
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
-    "watch": "tsc -w",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "watch": "tsc -w"
   },
   "files": [
     "dist"
   ],
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   },
   "dependencies": {
     "@cubejs-backend/shared": "1.7.35",

@@ -206,10 +206,13 @@ Following these guidelines is not a requirement, but you can save some time for 
 
 ### Code
 
-1. Run `yarn lint` in package before committing your changes.
-If package doesn't have lint script, please add it and run.
-There's one root `.eslintrc.js` file for all packages except client ones.
-Client packages has it's own `.eslintrc.js` files.
+1. Run `yarn lint` from the repository root before committing your changes.
+Linting is a whole-repo operation now (oxlint covers every package in about a second),
+so packages don't carry their own lint scripts.
+The shared rule set lives in `packages/cubejs-linter/.oxlintrc.json` and is wired up by the
+root `.oxlintrc.json`. A package that needs to diverge gets its own `.oxlintrc.json`
+extending the root one - see `packages/cubejs-client-react` for an example.
+Use `yarn lint:fix` to apply the fixable violations.
 2. Run `yarn test` before committing if package has tests.
 3. Please use [conventional commits name](https://www.conventionalcommits.org/) for your PR.
 It'll be used to build change logs.

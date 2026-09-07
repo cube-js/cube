@@ -635,7 +635,7 @@ export abstract class BaseDriver implements DriverInterface {
     return Date.now();
   }
 
-  public wrapQueryWithLimit(query: { query: string, limit: number}) {
+  public wrapQueryWithLimit(query: { query: string, limit: number }) {
     query.query = `SELECT * FROM (${query.query}) AS t LIMIT ${query.limit}`;
   }
 

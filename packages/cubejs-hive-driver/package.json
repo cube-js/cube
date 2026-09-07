@@ -12,10 +12,7 @@
     "node": ">=20.0.0"
   },
   "main": "src/HiveDriver.js",
-  "scripts": {
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
-  },
+  "scripts": {},
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.35",
     "@cubejs-backend/shared": "1.7.35",
@@ -34,8 +31,5 @@
   },
   "jest": {
     "testEnvironment": "node"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

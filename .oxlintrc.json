@@ -1,0 +1,46 @@
+// Repo-wide oxlint configuration. The rule set lives in the @cubejs-backend/linter
+// package so it stays a publishable, reviewable unit; this file adds the ignores.
+//
+// `yarn lint` runs bare `oxlint`: passing -c/--config would disable nested config
+// discovery, and packages/cubejs-client-{dx,react} rely on it.
+//
+// `extends` merges `rules`, `plugins` and `jsPlugins`, but NOT `env` or `ignorePatterns`
+// -- those are per-config-file, which is why they are restated in every nested config
+// rather than inherited from the linter package.
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "extends": ["./packages/cubejs-linter/.oxlintrc.json"],
+  "env": {
+    "node": true,
+    "es6": true
+  },
+  "ignorePatterns": [
+    "dist/",
+    "lib/",
+    "build/",
+    "coverage/",
+    "gen/",
+    "**/*.d.ts",
+    "docs/",
+    "docs-mintlify/",
+    "examples/",
+    "rust/cubesql/",
+    // still on ESLint: oxlint cannot parse Vue SFCs
+    "packages/cubejs-client-vue3/",
+    // never covered by the ESLint setup this replaced
+    "packages/cubejs-client-ngx/",
+    "packages/cubejs-playground/",
+    "packages/cubejs-testing/cypress/",
+    "packages/cubejs-testing/birdbox-fixtures/",
+    // a mongosh script, not Node: `db` is a shell global
+    "packages/cubejs-mongobi-driver/test/mongo-init.js",
+    // vendored Thrift output
+    "packages/cubejs-hive-driver/idl/",
+    // generated flatbuffers accessors
+    "packages/cubejs-cubestore-driver/codegen/",
+    // generated ANTLR parsers and SQL fixtures
+    "packages/cubejs-schema-compiler/src/parser/GenericSql*.ts",
+    "packages/cubejs-schema-compiler/src/parser/Python3*.ts",
+    "packages/cubejs-schema-compiler/test/unit/fixtures/"
+  ]
+}

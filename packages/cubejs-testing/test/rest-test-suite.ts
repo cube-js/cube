@@ -99,7 +99,7 @@ export function executeTestSuite({ type, config = {}, driver }: TestSuite) {
          */
         async function preAggregationsJob(selector: any): Promise<any> {
           type PostResponse = string[];
-          type GetResponse = {[token: string]: {
+          type GetResponse = { [token: string]: {
             status: string;
             table: string;
             selector: {
@@ -109,7 +109,7 @@ export function executeTestSuite({ type, config = {}, driver }: TestSuite) {
               cubes?: string[],
               preAggregations?: string[],
             };
-          }};
+          } };
     
           const url = `${systemUrl}/pre-aggregations/jobs`;
           let response;

@@ -14,9 +14,7 @@
   "scripts": {
     "build": "npm run tsc",
     "tsc": "tsc && rm -rf temp",
-    "watch": "tsc -w",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "watch": "tsc -w"
   },
   "dependencies": {
     "@babel/runtime": "^7.13.9",
@@ -40,8 +38,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

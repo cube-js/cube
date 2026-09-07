@@ -14,7 +14,6 @@
   "main": "driver/SqliteDriver.js",
   "typings": "driver/index.d.ts",
   "scripts": {
-    "lint": "eslint **/*.js",
     "unit": "jest"
   },
   "dependencies": {
@@ -29,8 +28,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

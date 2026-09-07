@@ -19,9 +19,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "integration": "jest dist/test/*.js",
-    "integration:druid": "jest dist/test/*.js",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "integration:druid": "jest dist/test/*.js"
   },
   "files": [
     "README.md",
@@ -43,8 +41,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

@@ -86,6 +86,7 @@ describe('extractArchive', () => {
       // producer capable of recording a symlink emits — with the default 0 (MS-DOS)
       // the external-attributes field is formally DOS attribute bits and the unix
       // mode below is not meant to be read at all.
+      // eslint-disable-next-line no-bitwise
       cdh.writeUInt16LE((3 << 8) | 20, 4);
       cdh.writeUInt16LE(10, 6); // version needed
       cdh.writeUInt16LE(0, 10); // method: stored
@@ -96,6 +97,7 @@ describe('extractArchive', () => {
       // External attributes carry the unix mode in the high 16 bits, which is how a
       // zip records a symlink (`0o120000`). `>>> 0` because the shift overflows into a
       // negative signed int32 otherwise.
+      // eslint-disable-next-line no-bitwise
       cdh.writeUInt32LE((((entry.mode ?? 0o100644) << 16) >>> 0), 38);
       cdh.writeUInt32LE(offset, 42); // relative offset of local header
       central.push(cdh, name);

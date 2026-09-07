@@ -26,7 +26,7 @@ const OracleTypeToGenericType = {
   binary_float: 'float',
   binary_double: 'double',
   date: 'timestamp',
-  'number': 'decimal',
+  number: 'decimal',
 };
 
 const sortByKeys = (unordered) => {
@@ -40,12 +40,12 @@ const sortByKeys = (unordered) => {
 };
 
 const reduceCb = (result, i) => {
-  let schema = (result[i.table_schema] || {});
-  let tables = (schema[i.table_name] || []);
-  let attributes = new Array();
+  const schema = (result[i.table_schema] || {});
+  const tables = (schema[i.table_name] || []);
+  const attributes = [];
 
-  if (i.key_type === "P" || i.key_type === "U") {
-    attributes.push(["primaryKey"]);
+  if (i.key_type === 'P' || i.key_type === 'U') {
+    attributes.push(['primaryKey']);
   }
 
   tables.push({

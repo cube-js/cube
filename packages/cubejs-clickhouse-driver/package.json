@@ -21,8 +21,6 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint src/* test/* --ext .ts",
-    "lint:fix": "eslint --fix src/* test/* --ext .ts",
     "unit": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/unit",
     "integration": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/integration",
     "integration:clickhouse": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/integration"
@@ -45,8 +43,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }
