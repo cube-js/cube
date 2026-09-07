@@ -10,6 +10,17 @@
 //   consistent-return, dot-notation, no-return-await
 //                         -- exist only as typescript/* rules needing options.typeAware
 //   import/order, import/no-extraneous-dependencies, import/no-useless-path-segments
+//
+// One rule is remapped rather than dropped: the ESLint config set `no-shadow: 'off'` plus
+// `@typescript-eslint/no-shadow: ['error', { ignoreTypeValueShadow: true }]` in its *.ts
+// override, and oxlint has no typescript/no-shadow -- configuring that key just routes to
+// core no-shadow. Core no-shadow is used unqualified here because it already behaves the
+// way ignoreTypeValueShadow asked for. A/B against eslint 8.57.1 + typescript-eslint
+// 8.46.0 agrees on every shape tried: both ignore a type shadowing a value (`type Foo` +
+// `const Foo`, a local `type X` or `<X>` type parameter over an outer `const X`, a
+// function-type parameter name over an outer value) and both report a type shadowing a
+// type (`<T>` or a local `interface T` over an outer `type T`) and an enum member
+// shadowing an imported binding, at identical positions.
 //   no-dupe-args, no-octal, no-octal-escape
 //                         -- parse errors under ESM/strict, so unreachable in practice
 {

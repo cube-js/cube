@@ -12,12 +12,22 @@
   "extends": ["./airbnb-base.json"],
   "rules": {
     // eslint-plugin-import never had a TypeScript resolver configured here
-    // (import/no-unresolved was off), so it could not resolve most imports and these four
+    // (import/no-unresolved was off), so it could not resolve most imports and these five
     // silently passed. oxlint resolves natively, which turns them on for the first time.
     // Enabling them is separate work: as of this migration they report 173 dependency
     // cycles, 366 hits on the `import R from 'ramda'; R.unnest()` idiom, and 2 genuine
     // duplicate exports in client-core.
+    //
+    // import/named is off for a second reason: its verdict depends on build state, so it
+    // cannot gate anything. oxlint does not follow `export * from './time.js'` across a
+    // package boundary, so `import { GRANULARITIES } from '@cubejs-client/core'` reports
+    // "named import not found" once cubejs-client-core/dist exists and reports nothing
+    // before -- measured both ways on the same file. GRANULARITIES is genuinely exported
+    // (client-core src/time.ts:55, re-exported at src/index.ts:1026), so the warm-tree
+    // finding is a false positive; and CI is the cold case, since the lint job goes
+    // `yarn install` -> lint:npm -> lint:js with no build in between.
     "import/no-cycle": "off",
+    "import/named": "off",
     "import/no-named-as-default": "off",
     "import/no-named-as-default-member": "off",
     "import/export": "off",
