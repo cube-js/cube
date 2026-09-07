@@ -49,7 +49,7 @@ export function FrontendIntegrationsPage() {
       title: 'Docs',
       dataIndex: 'docsUrl',
       key: 'docsUrl',
-      render: (text) => <a href={text} target="_blank">Docs</a>
+      render: (text) => <a href={text} target="_blank" rel="noreferrer">Docs</a>
     }
   ];
 

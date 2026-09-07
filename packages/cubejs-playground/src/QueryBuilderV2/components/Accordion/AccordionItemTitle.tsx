@@ -78,6 +78,31 @@ const ExpandArrowSection = tasty({
   },
 });
 
+const AccordionItemIcon = memo((props: { isExpanded: boolean }) => {
+  const { isExpanded } = props;
+
+  return (
+    <ExpandArrowSection mods={{ expanded: isExpanded }}>
+      <Arrow direction="right" />
+    </ExpandArrowSection>
+  );
+});
+
+const AccordionItemContent = memo((props: {
+  id: string;
+  title: ReactText;
+}) => {
+  const { id, title } = props;
+
+  return (
+    <TitleSection id={id}>
+      <Text key="text" ellipsis preset="h6">
+        {title}
+      </Text>
+    </TitleSection>
+  );
+});
+
 export function AccordionItemTitle(props: AccordionItemTitleProps) {
   const {
     qa,
@@ -136,31 +161,6 @@ export function AccordionItemTitle(props: AccordionItemTitleProps) {
     </StyledAccordionItemTitleWrap>
   );
 }
-
-const AccordionItemIcon = memo((props: { isExpanded: boolean }) => {
-  const { isExpanded } = props;
-
-  return (
-    <ExpandArrowSection mods={{ expanded: isExpanded }}>
-      <Arrow direction="right" />
-    </ExpandArrowSection>
-  );
-});
-
-const AccordionItemContent = memo((props: {
-  id: string;
-  title: ReactText;
-}) => {
-  const { id, title } = props;
-
-  return (
-    <TitleSection id={id}>
-      <Text key="text" ellipsis preset="h6">
-        {title}
-      </Text>
-    </TitleSection>
-  );
-});
 
 function AccordionItemExtra(
   props: PropsWithChildren<{

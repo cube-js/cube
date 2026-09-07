@@ -126,7 +126,7 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
     queryStats,
   } = useQueryBuilderContext();
 
-  const cube = cubes.find((cube) => cube.name === cubeName);
+  const cube = cubes.find((candidateCube) => candidateCube.name === cubeName);
   // @ts-ignore
   const type = cube?.type || 'cube';
   const isUsed = usedCubes.includes(cubeName);
@@ -181,6 +181,7 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
           cubeDimensions.push(name);
         }
         break;
+      // no default
     }
   });
 
@@ -208,11 +209,11 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
   const filteredHierarchyNames = filteredHierarchies.map((hierarchy) => hierarchy.name);
   const filteredMemberNames = filteredMembers.map((member) => member.name);
 
-  function filterMembers(members: string[]) {
-    return members.filter(
+  function filterMembers(memberNames: string[]) {
+    return memberNames.filter(
       (m) => (mode === 'all' && isOpen)
         || filterString
-        || usedMembers.filter((m) => m.startsWith(`${cubeName}.`)).includes(m)
+        || usedMembers.filter((usedMemberName) => usedMemberName.startsWith(`${cubeName}.`)).includes(m)
     );
   }
 
@@ -240,9 +241,9 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
 
   const showMembers = (isOpen || mode === 'query' || isUsed || !!filterString) && !isNonJoinable;
 
-  function cacheOfMembers(members?: string[], ignore?: string[]) {
+  function cacheOfMembers(memberNames?: string[], ignore?: string[]) {
     return (
-      members
+      memberNames
         ?.filter((dim) => dim.startsWith(`${cubeName}.`) || ignore?.includes(dim))
         .sort()
         .join() || ''
@@ -270,20 +271,18 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
     }
   };
 
-  const toggleTimeDimension = useEvent((isOpen: boolean, name: string) => {
+  const toggleTimeDimension = useEvent((shouldOpenTimeDimension: boolean, name: string) => {
     if (mode === 'query' || !!filterString) {
       onMemberToggle?.(name);
-      if (isOpen) {
+      if (shouldOpenTimeDimension) {
         setOpenTimeDimensions([name]);
         openContainingFolder(name);
         setOpenHierarchies([]);
       }
+    } else if (!shouldOpenTimeDimension) {
+      setOpenTimeDimensions((timeDimensions) => timeDimensions.filter((f) => f !== name));
     } else {
-      if (!isOpen) {
-        setOpenTimeDimensions((timeDimensions) => timeDimensions.filter((f) => f !== name));
-      } else {
-        setOpenTimeDimensions((timeDimensions) => timeDimensions.concat([name]));
-      }
+      setOpenTimeDimensions((timeDimensions) => timeDimensions.concat([name]));
     }
   });
 
@@ -428,37 +427,33 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
     filterString,
   ]);
 
-  const toggleFolder = useEvent((isOpen: boolean, name: string) => {
+  const toggleFolder = useEvent((shouldOpenFolder: boolean, name: string) => {
     if (mode === 'query' || !!filterString) {
       onHierarchyToggle?.(cube?.name);
-      if (isOpen) {
+      if (shouldOpenFolder) {
         setOpenFolders([name]);
         setOpenTimeDimensions([]);
         setOpenHierarchies([]);
       }
+    } else if (!shouldOpenFolder) {
+      setOpenFolders((prevOpenFolders) => prevOpenFolders.filter((f) => f !== name));
     } else {
-      if (!isOpen) {
-        setOpenFolders((openFolders) => openFolders.filter((f) => f !== name));
-      } else {
-        setOpenFolders((openFolders) => openFolders.concat([name]));
-      }
+      setOpenFolders((prevOpenFolders) => prevOpenFolders.concat([name]));
     }
   });
 
-  const toggleHierarchy = useEvent((isOpen: boolean, name: string) => {
+  const toggleHierarchy = useEvent((shouldOpenHierarchy: boolean, name: string) => {
     if (mode === 'query' || !!filterString) {
       onHierarchyToggle?.(cube?.name);
-      if (isOpen) {
+      if (shouldOpenHierarchy) {
         setOpenHierarchies([name]);
         setOpenTimeDimensions([]);
         openContainingFolder(name);
       }
+    } else if (!shouldOpenHierarchy) {
+      setOpenHierarchies((prevOpenHierarchies) => prevOpenHierarchies.filter((f) => f !== name));
     } else {
-      if (!isOpen) {
-        setOpenHierarchies((openHierarchies) => openHierarchies.filter((f) => f !== name));
-      } else {
-        setOpenHierarchies((openHierarchies) => openHierarchies.concat([name]));
-      }
+      setOpenHierarchies((prevOpenHierarchies) => prevOpenHierarchies.concat([name]));
     }
   });
 
@@ -617,6 +612,10 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
     }
   }, [filterString]);
 
+  const usedHierarchies = hierarchies
+    .filter((hierarchy) => hierarchy.levels.find((member) => usedMembers.includes(member)))
+    .map((hierarchy) => hierarchy.name);
+
   useEffect(() => {
     const folderNames = folders.map((folder) => folder.name);
 
@@ -649,8 +648,7 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
           || openFolders.some((folderName) => folders
             .find((folder) => folder.name === folderName)
             ?.members.includes(memberName))
-    ))
-    ;
+    ));
 
     // When open folders changes, close all open hierarchies within closed folders
     setOpenHierarchies(closeHiddenMembers);
@@ -658,30 +656,20 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
     setOpenTimeDimensions(closeHiddenMembers);
   }, [openFolders]);
 
-  const mapElements = (members: string[], skipHierarchies = false) => members
-    .map(
-      (memberName: string) => dimensionsElementMap[memberName]
-          ?? measuresElementMap[memberName]
-          ?? segmentElementMap[memberName]
-          ?? (!skipHierarchies && hierarchiesElementMap[memberName])
-    )
-    .filter((el) => el);
-
   const hierarchiesElementMap = useMemo(() => hierarchies.reduce(
     (map: Record<string, ReactElement | null>, hierarchy: TCubeHierarchy) => {
       const isHierarchyOpen = openHierarchies.includes(hierarchy.name);
-      const shownDimensions: string[] = hierarchy.levels.filter((dimensionName: string) =>
       // Show all members if open and used ones when it's closed
-        (!filterString
-          ? isHierarchyOpen || usedMembers?.includes(dimensionName)
-          : filteredDimensionNames.includes(dimensionName)));
+      const shownDimensions: string[] = hierarchy.levels.filter((dimensionName: string) => (!filterString
+        ? isHierarchyOpen || usedMembers?.includes(dimensionName)
+        : filteredDimensionNames.includes(dimensionName)));
       const children = mapElements(shownDimensions, true);
       const isFiltered = filterString && filteredHierarchyNames.includes(hierarchy.name);
 
-      map[hierarchy.name] =
       // That the place where we also hide the hierarchy if we show only used member
       // and there are none of the inside this hierarchy
-        (!filterString && (mode === 'all' || shownDimensions.length) && isOpen) || isFiltered ? (
+      map[hierarchy.name] = (!filterString && (mode === 'all' || shownDimensions.length) && isOpen)
+        || isFiltered ? (
           <HierarchyMember
             key={hierarchy.name}
             cube={cube as Cube}
@@ -709,13 +697,19 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
     isOpen,
   ]);
 
+  function mapElements(memberNames: string[], skipHierarchies = false) {
+    return memberNames
+      .map(
+        (memberName: string) => dimensionsElementMap[memberName]
+            ?? measuresElementMap[memberName]
+            ?? segmentElementMap[memberName]
+            ?? (!skipHierarchies && hierarchiesElementMap[memberName])
+      )
+      .filter((el) => el);
+  }
   if (filterString && isNonJoinable) {
     return null;
   }
-
-  const usedHierarchies = hierarchies
-    .filter((hierarchy) => hierarchy.levels.find((member) => usedMembers.includes(member)))
-    .map((hierarchy) => hierarchy.name);
 
   const memberList = (() => {
     if (showMembers) {
@@ -726,8 +720,8 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
               const isFolderOpen = openFolders.includes(folder.name);
               const shownMembers = membersByFolderMap[folder.name].filter((memberName) => (!filterString
                 ? isFolderOpen
-                  ? true
-                  : usedMembers.includes(memberName) || usedHierarchies.includes(memberName)
+                  || usedMembers.includes(memberName)
+                  || usedHierarchies.includes(memberName)
                 : filteredMemberNames.includes(memberName)
                     || filteredHierarchyNames.includes(memberName)));
               const children = mapElements(shownMembers);
@@ -783,6 +777,12 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
 
   const isLocked = isOpen && type === 'view' && !isQueryEmpty;
   const isCollapsable = isNonJoinable || !!filterString;
+  let arrowDirection: 'top' | 'bottom' | 'right' = 'right';
+
+  if (!isCollapsable) {
+    arrowDirection = isOpen ? 'top' : 'bottom';
+  }
+
   const cubeButton = (
     <CubeButton
       qaVal={cubeName}
@@ -797,7 +797,7 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
         mode === 'all' && !isNonJoinable && !isLocked ? (
           <ArrowIconWrapper>
             <ChevronIcon
-              direction={!isCollapsable ? (isOpen ? 'top' : 'bottom') : 'right'}
+              direction={arrowDirection}
               style={{ color: 'var(--purple-color)' }}
             />
           </ArrowIconWrapper>

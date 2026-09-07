@@ -24,12 +24,12 @@ export const Flex = styled.div<FlexProps>`
   margin: ${margin};
 `;
 
-function gap({ gap, direction }: FlexProps) {
-  if (gap) {
+function gap({ gap: gapValue, direction }: FlexProps) {
+  if (gapValue) {
     if (direction === 'column') {
       return css`
         & > div {
-          margin-bottom: ${gap * STEP}px};
+          margin-bottom: ${gapValue * STEP}px};
         }
 
         & > div:last-child {
@@ -40,7 +40,7 @@ function gap({ gap, direction }: FlexProps) {
 
     return css`
       & > div {
-        margin-right: ${gap * STEP}px};
+        margin-right: ${gapValue * STEP}px};
       }
 
       & > div:last-child {
@@ -78,12 +78,14 @@ function margin(props: FlexProps) {
   }
 
   if (value && Object.keys(value || {}).length) {
-    return Object.entries(value).map(([key, value]) => {
+    return Object.entries(value).map(([key, sideValue]) => {
       if (key === 'top') {
-        return `${margin({ margin: value })} 0 0 0`;
+        return `${margin({ margin: sideValue })} 0 0 0`;
       } else if (key === 'bottom') {
-        return `0 0 ${margin({ margin: value })} 0`;
+        return `0 0 ${margin({ margin: sideValue })} 0`;
       }
+
+      return undefined;
     });
   }
 

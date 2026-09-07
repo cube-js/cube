@@ -66,7 +66,7 @@ export function LocalhostTipBox({ onHostnameCopy }: TLocalhostTipBoxProps) {
                   href="https://docs.docker.com/network/host/"
                   target="_blank"
                 >
-                  network mode "host"
+                  network mode &quot;host&quot;
                 </Typography.Link>{' '}
                 to be able to connect to the database running on localhost.
               </Typography.Text>

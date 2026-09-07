@@ -147,24 +147,24 @@ export function ConnectionWizardPage({ history }) {
     setHostname('');
   }, [db?.driver]);
 
-  function handleDatabaseSelect(db: Database) {
+  function handleDatabaseSelect(selectedDb: Database) {
     return async () => {
       if (playgroundContext?.isDocker) {
-        return selectDatabase(db);
+        return selectDatabase(selectedDb);
       }
 
       {
         const response = await fetch(
-          `/playground/driver?driver=${db.driver || ''}`
+          `/playground/driver?driver=${selectedDb.driver || ''}`
         );
         const { status, error } = await response.json();
 
         if (response.ok) {
           if (status === STATUS.INSTALLED) {
-            return selectDatabase(db);
+            return selectDatabase(selectedDb);
           } else if (status === STATUS.INSTALLING) {
             setDriverInstallationInProgress(true);
-            selectDatabase(db);
+            selectDatabase(selectedDb);
           }
         } else {
           setInstallationError(error);
@@ -178,7 +178,7 @@ export function ConnectionWizardPage({ history }) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            driver: db.driver,
+            driver: selectedDb.driver,
           }),
         });
 
@@ -187,7 +187,7 @@ export function ConnectionWizardPage({ history }) {
         if (response.ok) {
           setDependencyName(dependency);
           setDriverInstallationInProgress(true);
-          selectDatabase(db);
+          selectDatabase(selectedDb);
         } else {
           setInstallationError(error);
         }
@@ -243,9 +243,7 @@ export function ConnectionWizardPage({ history }) {
               ) : (
                 <Typography.Paragraph>
                   Enter database credentials to connect to your database. <br />
-                  Cube will store your credentials into the <code>
-                    .env
-                  </code>{' '}
+                  Cube will store your credentials into the <code>.env</code>{' '}
                   file for future use.
                 </Typography.Paragraph>
               )}
@@ -349,10 +347,10 @@ export function ConnectionWizardPage({ history }) {
           <Paragraph>Select a database type</Paragraph>
 
           <Row gutter={[12, 12]}>
-            {databases.map((db) => (
-              <Col xl={8} lg={8} md={12} sm={24} xs={24} key={db.title}>
-                <DatabaseCardWrapper onClick={handleDatabaseSelect(db)}>
-                  <DatabaseCard db={db} />
+            {databases.map((databaseOption) => (
+              <Col xl={8} lg={8} md={12} sm={24} xs={24} key={databaseOption.title}>
+                <DatabaseCardWrapper onClick={handleDatabaseSelect(databaseOption)}>
+                  <DatabaseCard db={databaseOption} />
                 </DatabaseCardWrapper>
               </Col>
             ))}

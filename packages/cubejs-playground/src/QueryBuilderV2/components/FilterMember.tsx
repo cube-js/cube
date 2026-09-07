@@ -158,8 +158,8 @@ export function FilterMember(props: FilterMemberProps) {
     onChange({ ...filter, values } as Filter);
   });
 
-  const wrapFilter = useEvent((type: 'and' | 'or') => {
-    onChange({ [type]: [filter] } as LogicalAndFilter | LogicalOrFilter);
+  const wrapFilter = useEvent((wrapType: 'and' | 'or') => {
+    onChange({ [wrapType]: [filter] } as LogicalAndFilter | LogicalOrFilter);
   });
 
   const inputs = useDeepMemo(() => {
@@ -232,7 +232,7 @@ export function FilterMember(props: FilterMemberProps) {
           );
         }
       default:
-        return filter.values?.map((value: string, i: number) => <ValueTag key={i}>{value}</ValueTag>);
+        return filter.values?.map((value: string) => <ValueTag key={value}>{value}</ValueTag>);
     }
   }, [filter, type]);
 
@@ -274,6 +274,7 @@ export function FilterMember(props: FilterMemberProps) {
       case 'wrapWithOr':
         wrapFilter('or');
         break;
+      // no default
     }
   });
 

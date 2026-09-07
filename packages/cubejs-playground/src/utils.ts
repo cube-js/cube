@@ -268,5 +268,7 @@ export function containsPrivateFields(queryMembers: string[], meta: any) {
         ...config.segments,
       ].some((m) => m.name === member && m.isVisible === false);
     }
+
+    return false;
   });
 }

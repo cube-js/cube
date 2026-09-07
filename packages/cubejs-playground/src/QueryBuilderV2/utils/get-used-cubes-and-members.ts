@@ -29,7 +29,7 @@ export function getUsedCubesAndMembers(query: Query, additionalMembers: string[]
       return;
     }
 
-    const timeDimension = usedGranularities.find((td) => td.dimension === dimension);
+    const timeDimension = usedGranularities.find((usedGranularity) => usedGranularity.dimension === dimension);
 
     if (timeDimension) {
       timeDimension.granularities.push(td.granularity);

@@ -56,13 +56,13 @@ export default function DatabaseForm({
           label={param.title || param.env}
           name={param.env}
         >
-          {param.title ? (
-            param.env === 'CUBEJS_DB_PASS' ? (
-              <Input.Password data-testid={param.env} />
-            ) : (
-              <Input data-testid={param.env} />
-            )
-          ) : (
+          {param.title && param.env === 'CUBEJS_DB_PASS' && (
+            <Input.Password data-testid={param.env} />
+          )}
+          {param.title && param.env !== 'CUBEJS_DB_PASS' && (
+            <Input data-testid={param.env} />
+          )}
+          {!param.title && (
             <Input.TextArea
               data-testid={param.env}
               rows={1}

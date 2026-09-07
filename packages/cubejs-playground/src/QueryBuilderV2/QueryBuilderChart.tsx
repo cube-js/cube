@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, ReactElement } from 'react';
 import {
   Button,
   Dialog,
@@ -27,7 +27,6 @@ import { ChevronIcon } from './icons/ChevronIcon';
 import { AccordionCard } from './components/AccordionCard';
 import { OutdatedLabel } from './components/OutdatedLabel';
 import { QueryBuilderChartResults } from './QueryBuilderChartResults';
-
 
 interface QueryBuilderChartProps {
   maxHeight?: number;
@@ -124,20 +123,20 @@ export function QueryBuilderChart(props: QueryBuilderChartProps) {
   ) : undefined),
   [pivotConfig, onMove, onUpdate]);
 
+  let subtitle: ReactElement | undefined;
+
+  if (isLoading && isExpanded) {
+    subtitle = <LoadingOutlined />;
+  } else if (!isLoading && isResultOutdated) {
+    subtitle = <OutdatedLabel />;
+  }
+
   return (
     <AccordionCard
       qa="QueryBuilderChart"
       isExpanded={isExpanded}
       title="Chart"
-      subtitle={
-        isLoading ? (
-          isExpanded ? (
-            <LoadingOutlined />
-          ) : undefined
-        ) : isResultOutdated ? (
-          <OutdatedLabel />
-        ) : undefined
-      }
+      subtitle={subtitle}
       extra={
         isExpanded ? (
           <Space>

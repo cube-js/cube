@@ -47,16 +47,8 @@ export function openWindow({
   const dualScreenLeft = window.screenLeft !== undefined ? window.screenLeft : window.screenX;
   const dualScreenTop = window.screenTop !== undefined ? window.screenTop : window.screenY;
 
-  const w = window.innerWidth
-    ? window.innerWidth
-    : document.documentElement.clientWidth
-      ? document.documentElement.clientWidth
-      : screen.width;
-  const h = window.innerHeight
-    ? window.innerHeight
-    : document.documentElement.clientHeight
-      ? document.documentElement.clientHeight
-      : screen.height;
+  const w = window.innerWidth || document.documentElement.clientWidth || screen.width;
+  const h = window.innerHeight || document.documentElement.clientHeight || screen.height;
 
   const systemZoom = w / window.screen.availWidth;
   const left = (w - width) / 2 / systemZoom + dualScreenLeft;

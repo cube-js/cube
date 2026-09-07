@@ -504,7 +504,7 @@ export class CubeGraphQLConverter {
 
         // eslint-disable-next-line
         const currentField = this.cubes[cubeName].fields.find(
-          ({ name }) => name === field
+          ({ name: fieldName }) => fieldName === field
         );
 
         this.cubes[cubeName].fields.push({

@@ -42,11 +42,11 @@ export function PivotDroppableArea({
             <Flow ref={provided.innerRef} {...provided.droppableProps} gap="1ow">
               {/* @ts-ignore */}
               {pivotConfig[axis].map((id, index) => {
-                const type: 'timeDimension' | 'dimension' | 'measure' = id.includes('.')
-                  ? id.split('.').length === 3
-                    ? 'timeDimension'
-                    : 'dimension'
-                  : 'measure';
+                let type: 'timeDimension' | 'dimension' | 'measure' = 'measure';
+
+                if (id.includes('.')) {
+                  type = id.split('.').length === 3 ? 'timeDimension' : 'dimension';
+                }
 
                 return <PivotItem key={id} type={type} id={id} index={index} />;
               })}

@@ -100,7 +100,8 @@ function CartesianChart({
   let granularity = granularityField?.split('.')[2];
 
   if (!isPredefinedGranularity(granularity)) {
-    const granularityInfo = resultSet?.loadResponse.results[0]?.annotation.timeDimensions[granularityField]?.granularity;
+    const granularityInfo = resultSet?.loadResponse.results[0]
+      ?.annotation.timeDimensions[granularityField]?.granularity;
     if (granularityInfo) {
       granularity = minGranularityForIntervals(
         granularityInfo.interval,
@@ -133,12 +134,12 @@ function CartesianChart({
   );
 
   const chartPivot = useMemo(() => {
-    let chartPivot = resultSet.chartPivot(pivotConfig);
+    let pivotedRows = resultSet.chartPivot(pivotConfig);
     if (dataTransformer) {
-      chartPivot = dataTransformer(chartPivot, { granularity });
+      pivotedRows = dataTransformer(pivotedRows, { granularity });
     }
 
-    return chartPivot.map((series: any) => {
+    return pivotedRows.map((series: any) => {
       series.x = series.xValues
         .map((value: string) => formatDate(value))
         .join(',');
@@ -381,7 +382,7 @@ const TypeToChartComponent = {
 
               return (
                 <Cell
-                  key={index}
+                  key={e.x}
                   stroke={stroke?.[i] ?? getChartSolidColorByIndex(i)}
                   fill={fill?.[i] ?? getChartSolidColorByIndex(i)}
                 />
@@ -412,7 +413,9 @@ const TypeToChartComponent = {
 
     columnData.forEach((field: any, i: number) => {
       if (field.key && typeof field.key === 'string') {
-        granularityMap[field.key] = field.key.split('.')[2];
+        const [, , granularity] = field.key.split('.');
+
+        granularityMap[field.key] = granularity;
       } else {
         field.key = `key${i}`; // fallback index
       }
@@ -497,7 +500,7 @@ const TypeToMemoChartComponent = Object.keys(TypeToChartComponent)
   }))
   .reduce((a: any, b: any) => ({ ...a, ...b }));
 
-const renderChart = (Component: ComponentType<any>) => function renderChart(
+const renderChart = (Component: ComponentType<any>) => function renderChartComponent(
   {
     resultSet,
     error,

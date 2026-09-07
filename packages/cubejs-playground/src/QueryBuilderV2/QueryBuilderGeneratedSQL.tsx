@@ -43,8 +43,8 @@ export function QueryBuilderGeneratedSQL() {
             }
 
             // in the case of a compareDateRange query the SQL will be the same
-            const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
-            const value = query && sqlFormatter.format(query.sql());
+            const [firstSqlQuery] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
+            const value = firstSqlQuery && sqlFormatter.format(firstSqlQuery.sql());
 
             return (
               <TabPaneWithToolbar

@@ -157,14 +157,12 @@ export function updateQuery(
         },
       ];
     }
+  } else if (updatedQuery[memberType]?.includes(key)) {
+    updatedQuery[memberType] = updatedQuery[memberType]!.filter(
+      (k) => key !== k
+    );
   } else {
-    if (updatedQuery[memberType]?.includes(key)) {
-      updatedQuery[memberType] = updatedQuery[memberType]!.filter(
-        (k) => key !== k
-      );
-    } else {
-      updatedQuery[memberType] = [...(updatedQuery[memberType] || []), key];
-    }
+    updatedQuery[memberType] = [...(updatedQuery[memberType] || []), key];
   }
 
   return updatedQuery;

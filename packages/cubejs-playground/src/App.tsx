@@ -44,12 +44,16 @@ class App extends Component<PropsWithChildren<RouteComponentProps>, AppState> {
     return { fatalError: error };
   }
 
-  state: AppState = {
-    fatalError: null,
-    context: null,
-    showLoader: false,
-    isAppContextSet: false,
-  };
+  constructor(props: PropsWithChildren<RouteComponentProps>) {
+    super(props);
+
+    this.state = {
+      fatalError: null,
+      context: null,
+      showLoader: false,
+      isAppContextSet: false,
+    };
+  }
 
   async componentDidMount() {
     setTimeout(() => this.setState({ showLoader: true }), 700);

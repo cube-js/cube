@@ -115,7 +115,7 @@ const TimeGroup = ({
         );
 
         return (
-          <Fragment key={index}>
+          <Fragment key={m.dimension.name}>
             {isMissing ? (
               <MissingMemberTooltip>{buttonGroup}</MissingMemberTooltip>
             ) : (
@@ -160,7 +160,9 @@ const TimeGroup = ({
             <ButtonDropdown
               show={granularityShown}
               disabled={disabled}
-              overlay={granularityMenu(m.dimension, (granularity) => updateMethods.update(m, { ...m, granularity: granularity.name }))}
+              overlay={granularityMenu(m.dimension, (granularity) => (
+                updateMethods.update(m, { ...m, granularity: granularity.name })
+              ))}
               onOverlayOpen={() => setGranularityShown(true)}
               onOverlayClose={() => setGranularityShown(false)}
               onItemClick={() => setGranularityShown(false)}

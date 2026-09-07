@@ -333,13 +333,19 @@ export function QueryBuilderSidePanel({
           />
         ))}
       {cubesOrViews
-        .filter((cube) => (appliedFilterString
-          ? // If filter is applied, show only filtered cubes
-          filteredCubes.includes(cube.name)
-          : viewMode === 'query'
-            ? // In query mode, show only used cubes
-            usedCubes.includes(cube.name)
-            : true))
+        .filter((cube) => {
+          // If filter is applied, show only filtered cubes
+          if (appliedFilterString) {
+            return filteredCubes.includes(cube.name);
+          }
+
+          // In query mode, show only used cubes
+          if (viewMode === 'query') {
+            return usedCubes.includes(cube.name);
+          }
+
+          return true;
+        })
         .map((cube) => (
           <SidePanelCubeItem
             key={cube.name}
@@ -369,13 +375,13 @@ export function QueryBuilderSidePanel({
     selectedType,
   ]);
 
-  const onApplyQuery = useCallback(async (query) => {
+  const onApplyQuery = useCallback(async (appliedQuery) => {
     try {
-      const validatedQuery = validateQuery(query);
+      const validatedQuery = validateQuery(appliedQuery);
 
       setQuery(validatedQuery);
     } catch {
-      throw 'Invalid query';
+      throw new Error('Invalid query');
     }
   }, []);
 

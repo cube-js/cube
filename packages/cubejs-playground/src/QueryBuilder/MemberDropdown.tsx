@@ -170,7 +170,7 @@ export default function MemberMenu({
               setShow(false);
             }}
           >
-            {hasMembers ? (
+            {hasMembers && (
               <>
                 <SearchMenuItem id="hhhh" className="ant-menu-item ant-menu-item-active ant-menu-item-disabled ant-menu-item-only-child">
                   <Input
@@ -239,11 +239,12 @@ export default function MemberMenu({
                   );
                 })}
               </>
-            ) : showNoMembersPlaceholder ? (
+            )}
+            {!hasMembers && showNoMembersPlaceholder && (
               <Menu.Item key="__not-found__" disabled>
                 No members found
               </Menu.Item>
-            ) : null}
+            )}
           </Menu>
         </div>
       )}

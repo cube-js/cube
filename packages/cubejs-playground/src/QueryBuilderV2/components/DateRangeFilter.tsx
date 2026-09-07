@@ -91,8 +91,8 @@ export function DateRangeFilter(props: TimeDimensionFilterProps) {
     [onChange]
   );
 
-  const onOpenChange = (open: boolean) => {
-    setOpen(open);
+  const onOpenChange = (isOpening: boolean) => {
+    setOpen(isOpening);
   };
 
   const onAction = useEvent((key: FilterOptionsAction) => {

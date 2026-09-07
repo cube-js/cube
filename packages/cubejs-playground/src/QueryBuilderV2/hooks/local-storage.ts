@@ -22,7 +22,9 @@ const storage = new (class Storage {
         } catch {
           value = event.newValue;
         }
-        event.key && this.emit(event.key, value);
+        if (event.key) {
+          this.emit(event.key, value);
+        }
       }
     });
   }
@@ -89,9 +91,9 @@ export function useLocalStorage<T = any>(
   useEffect(() => {
     setValue(getter);
 
-    storage.subscribe(key, (value: T) => {
+    storage.subscribe(key, (nextValue: T) => {
       // @ts-ignore
-      setValue(typeof defaultValue === 'function' ? defaultValue(value) : (value ?? defaultValue));
+      setValue(typeof defaultValue === 'function' ? defaultValue(nextValue) : (nextValue ?? defaultValue));
     });
 
     return () => {

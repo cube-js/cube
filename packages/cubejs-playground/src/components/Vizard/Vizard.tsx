@@ -26,6 +26,7 @@ export default function Vizard(props: VizardProps) {
 
   return (
     <iframe
+      title="Vizard"
       src={`/vizard/index.html#${configHash}`}
       style={{ height: 'calc(90vw - 80px)', border: 'none' }}
     />

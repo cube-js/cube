@@ -420,10 +420,10 @@ export function QueryBuilderExtras() {
                     return;
                   }
 
-                  const timezone = val as string;
+                  const nextTimezone = val as string;
 
                   updateQuery(() => ({
-                    timezone: timezone === '' ? undefined : timezone,
+                    timezone: nextTimezone === '' ? undefined : nextTimezone,
                   }));
 
                   close();

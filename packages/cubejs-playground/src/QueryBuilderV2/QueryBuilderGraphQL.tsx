@@ -155,8 +155,8 @@ export function QueryBuilderGraphQL() {
               <ScrollableCodeContainer
                 value={
                   queryError
-                    ? // @ts-ignore
-                    (queryError?.networkError?.result?.error ?? queryError.toString())
+                    // @ts-ignore
+                    ? (queryError?.networkError?.result?.error ?? queryError.toString())
                     : JSON.stringify(cleanedRawData, null, 2)
                 }
               />

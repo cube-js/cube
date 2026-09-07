@@ -331,7 +331,7 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
           )}
 
           <AppContextConsumer
-            onReady={({ playgroundContext }) => this.setState({ isDocker: playgroundContext?.isDocker })}
+            onReady={({ playgroundContext: readyContext }) => this.setState({ isDocker: readyContext?.isDocker })}
           />
         </Content>
       </Layout>

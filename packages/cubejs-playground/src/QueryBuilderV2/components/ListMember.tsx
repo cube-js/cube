@@ -90,7 +90,7 @@ export function ListMember(props: ListMemberProps) {
                 onRemoveFilter?.(member.name);
                 break;
               default:
-                return;
+                break;
             }
           }}
         >
@@ -162,18 +162,15 @@ export function ListMember(props: ListMemberProps) {
                 {'public' in member && member.public === false ? <NonPublicIcon /> : undefined}
               </Space>
             ) : null}
-          {onAddFilter || onRemoveFilter ? (
-            isFiltered && !isMissing ? (
-              filterMenu
-            ) : (
-              <FilterByMemberButton
-                isAngular
-                isFiltered={isFiltered || false}
-                type={category.replace(/s$/, '')}
-                onPress={onFilterPress}
-              />
-            )
-          ) : undefined}
+          {(onAddFilter || onRemoveFilter) && isFiltered && !isMissing && filterMenu}
+          {(onAddFilter || onRemoveFilter) && !(isFiltered && !isMissing) && (
+            <FilterByMemberButton
+              isAngular
+              isFiltered={isFiltered || false}
+              type={category.replace(/s$/, '')}
+              onPress={onFilterPress}
+            />
+          )}
         </Space>
       </ListMemberButton>
     </InstanceTooltipProvider>

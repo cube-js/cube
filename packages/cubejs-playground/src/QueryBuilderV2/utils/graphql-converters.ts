@@ -49,18 +49,6 @@ function metaToTypes(meta: Meta) {
   return types;
 }
 
-export function convertJsonQueryToGraphQL({ meta, query }: { meta?: Meta | null; query: Query }) {
-  const types = meta ? metaToTypes(meta) : null;
-
-  if (!types) {
-    return '';
-  }
-
-  const converter = new CubeGraphQLConverter(query, types);
-
-  return converter.convert();
-}
-
 const singleValueOperators = ['gt', 'gte', 'lt', 'lte'];
 
 const OPERATORS_MAP = {
@@ -68,6 +56,17 @@ const OPERATORS_MAP = {
   notEquals: 'notIn',
   notSet: 'set',
 } as const;
+
+// A single value for `equals` stays `equals`; anything else maps through OPERATORS_MAP
+function graphQLOperator(filter: { operator: string; values?: string[] }) {
+  if (filter.operator === 'equals' && (filter.values || []).length <= 1) {
+    return 'equals';
+  }
+
+  return filter.operator in OPERATORS_MAP
+    ? OPERATORS_MAP[filter.operator as keyof typeof OPERATORS_MAP]
+    : filter.operator;
+}
 
 enum FilterKind {
   AND = 'AND',
@@ -337,12 +336,7 @@ export class CubeGraphQLConverter {
                     // A single value maps to "equals"
                     // Whereas multiple values for "equals" operator maps to "in"
                     // value: operatorsMap[f.operator] || f.operator,
-                    value:
-                        f.operator === 'equals' && (f.values || []).length <= 1
-                          ? 'equals'
-                          : f.operator in OPERATORS_MAP
-                            ? OPERATORS_MAP[f.operator as keyof typeof OPERATORS_MAP]
-                            : f.operator,
+                    value: graphQLOperator(f),
                   },
                   value: value(f),
                 },
@@ -623,4 +617,16 @@ export class CubeGraphQLConverter {
       });
     }
   }
+}
+
+export function convertJsonQueryToGraphQL({ meta, query }: { meta?: Meta | null; query: Query }) {
+  const types = meta ? metaToTypes(meta) : null;
+
+  if (!types) {
+    return '';
+  }
+
+  const converter = new CubeGraphQLConverter(query, types);
+
+  return converter.convert();
 }

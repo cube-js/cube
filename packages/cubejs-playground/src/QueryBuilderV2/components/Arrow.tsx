@@ -11,6 +11,13 @@ export type ArrowProps = {
 
 type Direction = 'left' | 'right' | 'top' | 'bottom';
 
+const rotationByDirection: Record<Direction, number> = {
+  bottom: -180,
+  left: -90,
+  top: 0,
+  right: 90,
+};
+
 export const Arrow = memo((props: ArrowProps) => {
   const { direction = 'bottom', ...iconProps } = props;
   const rotate = rotationByDirection[direction];
@@ -26,10 +33,3 @@ export const Arrow = memo((props: ArrowProps) => {
     </Icon>
   );
 });
-
-const rotationByDirection: Record<Direction, number> = {
-  bottom: -180,
-  left: -90,
-  top: 0,
-  right: 90,
-};

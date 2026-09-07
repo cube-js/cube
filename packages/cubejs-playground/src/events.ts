@@ -11,7 +11,9 @@ let track:
   | null
   | ((event: Record<string, any>, telemetry?: boolean) => Promise<any>) = null;
 
-export const setTelemetry = (isAllowed) => (telemetry = isAllowed);
+export const setTelemetry = (isAllowed) => {
+  telemetry = isAllowed;
+};
 
 export const trackImpl = async (event) => {
   if (telemetry !== true) {
@@ -82,7 +84,9 @@ export const trackImpl = async (event) => {
 
 export const setTracker = (
   tracker: (props: Record<string, any>) => Promise<any>
-) => (track = tracker);
+) => {
+  track = tracker;
+};
 
 export const setAnonymousId = (anonymousId, props) => {
   baseProps = {

@@ -14,7 +14,7 @@ export default function Base64Upload({ onInput, ...props }) {
       authorization: 'authorization-text',
     },
     accept: 'application/json, .json',
-    beforeUpload(file) {
+    beforeUpload(uploadedFile) {
       const reader = new FileReader();
 
       reader.onload = (event: any) => {
@@ -31,14 +31,15 @@ export default function Base64Upload({ onInput, ...props }) {
           console.error(e);
         }
 
-        onInput
-          && onInput({
+        if (onInput) {
+          onInput({
             encoded: base64text,
             raw: JSON.parse(fileContent),
           });
+        }
       };
 
-      reader.readAsText(file);
+      reader.readAsText(uploadedFile);
       return false;
     },
     onChange(info) {

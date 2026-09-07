@@ -80,8 +80,8 @@ export const SecurityContextProvider = memo(({
   useEffect(() => {
     if (token) {
       try {
-        const payload = jwtDecode(token);
-        setPayload(JSON.stringify(payload, null, 2));
+        const decodedPayload = jwtDecode(token);
+        setPayload(JSON.stringify(decodedPayload, null, 2));
       } catch {
         setPayload('');
         console.error('Invalid JWT token', token);
@@ -99,12 +99,12 @@ export const SecurityContextProvider = memo(({
         payload,
         isModalOpen,
         setIsModalOpen,
-        async saveToken(token) {
-          if (!token) {
+        async saveToken(nextToken) {
+          if (!nextToken) {
             await refreshToken(true);
             removeToken();
           } else {
-            setToken(token);
+            setToken(nextToken);
           }
         },
         refreshToken,

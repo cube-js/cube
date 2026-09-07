@@ -168,13 +168,15 @@ function renderValue(value: string | number | null | undefined, fallback?: strin
     }
   }
 
-  return typeof value === 'string' && value.startsWith('{{') && value.endsWith('}}') ? (
-    <StyledTag>{value.replaceAll(/[{}]+/g, '')}</StyledTag>
-  ) : fallback ? (
-    value || <StyledTag>{fallback}</StyledTag>
-  ) : (
-    value
-  );
+  if (typeof value === 'string' && value.startsWith('{{') && value.endsWith('}}')) {
+    return <StyledTag>{value.replaceAll(/[{}]+/g, '')}</StyledTag>;
+  }
+
+  if (fallback) {
+    return value || <StyledTag>{fallback}</StyledTag>;
+  }
+
+  return value;
 }
 
 function Pagination(props: PaginationProps) {
@@ -206,6 +208,8 @@ function Pagination(props: PaginationProps) {
         onSelectionChange={onSelectionChange}
       >
         {[...Array(numberOfPages)].map((a, i) => (
+          // the list is a bare [...Array(n)] range, so `i + 1` is the page number itself
+          // eslint-disable-next-line react/no-array-index-key
           <Select.Item key={i + 1} textValue={String(i + 1)}>
             {getPaginationOptionLabel({ page: i + 1, perPage, total })}
           </Select.Item>
@@ -250,6 +254,7 @@ function OptionsButton(props: OptionsButtonProps) {
         case 'filter':
           onAddFilter?.(name);
           break;
+        // no default
       }
     },
     [onOrderChange, onMemberRemove, onAddFilter, name]
@@ -651,6 +656,7 @@ function DropIndicator(props: DropIndicatorProps) {
     <DropIndicatorElement
       ref={ref}
       role="option"
+      aria-selected={false}
       {...dropIndicatorProps}
       mods={{
         'drop-target': isDropTarget,
@@ -753,14 +759,14 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
     }
 
     const cubeName = dimensionName.split('.')[0];
-    const cube = cubes.find((cube) => cube.name === cubeName);
+    const cube = cubes.find((candidateCube) => candidateCube.name === cubeName);
 
     if (!cube) {
       return [value, 'unknown'];
     }
 
     const member = [...cube.dimensions, ...cube.measures].find(
-      (member) => member.name === dimensionName
+      (candidateMember) => candidateMember.name === dimensionName
     );
 
     if (!member) {
@@ -829,6 +835,8 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
   const tableData = useMemo(() => (
     <>
       {data?.slice((page - 1) * 100, (page - 1) * 100 + 100).map((row, rowId) => (
+        // rowId identifies the row within the page and is what selectedCell stores
+        // eslint-disable-next-line react/no-array-index-key
         <div key={rowId} data-element="Row" data-qa={`QueryBuilderResult-row_${rowId}`}>
           {dimensions.map((dimension) => {
             const isSelected = selectedCell && selectedCell[0] === rowId && selectedCell[1] === dimension;
@@ -866,7 +874,9 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
               value = value != null
                 ? formatDateByGranularity(new Date(value), timeDimension.granularity)
                 : '–';
-            } catch {}
+            } catch {
+              // an unparseable date is left as the raw value
+            }
 
             const copyButton = isSelected && value !== '–' ? <StyledCopyButton value={value} /> : null;
 
@@ -931,7 +941,7 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
     const items = dimensions.map((dimension) => {
       const member = members.dimensions[dimension];
       const cubeName = dimension.split('.')[0];
-      const cube = cubes.find((cube) => cube.name === cubeName);
+      const cube = cubes.find((candidateCube) => candidateCube.name === cubeName);
 
       return {
         id: dimension,
@@ -1009,7 +1019,7 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
     const items = measures.map((measure) => {
       const member = members.measures[measure];
       const cubeName = measure.split('.')[0];
-      const cube = cubes.find((cube) => cube.name === cubeName);
+      const cube = cubes.find((candidateCube) => candidateCube.name === cubeName);
 
       return {
         id: measure,
@@ -1093,7 +1103,7 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
         ...PREDEFINED_GRANULARITIES,
       ];
       const cubeName = timeDimension.dimension.split('.')[0];
-      const cube = cubes.find((cube) => cube.name === cubeName);
+      const cube = cubes.find((candidateCube) => candidateCube.name === cubeName);
       const granularity = timeDimension.granularity
         && member
         && 'granularities' in member
@@ -1189,6 +1199,18 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
     setTimeDistance(formatDistance(timestamp, new Date(), { addSuffix: true }));
   }, 60 * 1000);
 
+  let resultCountLabel = 'No results';
+
+  if (data.length) {
+    let totalSuffix = '';
+
+    if (totalRows) {
+      totalSuffix = totalRows === data.length ? ' in total' : ` out of ${totalRows} in total`;
+    }
+
+    resultCountLabel = `${data.length} result${data.length > 1 ? 's' : ''}${totalSuffix}`;
+  }
+
   const noResultsDisclaimer = (
     <DisclaimerContainer>
       <Title level={4} gridArea={false}>
@@ -1227,20 +1249,11 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
 
       <TableFooter>
         <Space>
-          {isLoading ? <LoadingOutlined /> : isResultOutdated ? <OutdatedLabel /> : undefined}
+          {isLoading && <LoadingOutlined />}
+          {!isLoading && isResultOutdated && <OutdatedLabel />}
           {executedQuery && !isLoading && isColumnsSelected && queryRelated && (
             <Space gap=".75x">
-              <Text preset="t3m">
-                {data.length
-                  ? `${data.length} result${data.length > 1 ? 's' : ''}${
-                    totalRows
-                      ? totalRows === data.length
-                        ? ' in total'
-                        : ` out of ${totalRows} in total`
-                      : ''
-                  }`
-                  : 'No results'}
-              </Text>
+              <Text preset="t3m">{resultCountLabel}</Text>
               <Text preset="t3">received {timeDistance}</Text>
             </Space>
           )}

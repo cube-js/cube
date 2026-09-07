@@ -311,6 +311,7 @@ function DropIndicator(props: DropIndicatorProps) {
     <DropIndicatorElement
       ref={ref}
       role="option"
+      aria-selected={false}
       {...dropIndicatorProps}
       mods={{
         'drop-target': isDropTarget,

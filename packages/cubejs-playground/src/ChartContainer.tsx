@@ -457,8 +457,8 @@ class ChartContainer extends Component<
           >
             <SqlQueryTab
               query={query}
-              onChange={(sql) => {
-                this.setState({ sql });
+              onChange={(nextSql) => {
+                this.setState({ sql: nextSql });
               }}
             />
           </Suspense>

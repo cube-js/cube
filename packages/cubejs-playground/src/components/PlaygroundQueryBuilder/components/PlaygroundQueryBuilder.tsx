@@ -320,8 +320,8 @@ export function PlaygroundQueryBuilder({
         let parsedDateRange;
 
         if (dryRunResponse) {
-          const { timeDimensions = [] } = dryRunResponse.pivotQuery || {};
-          parsedDateRange = timeDimensions[0]?.dateRange;
+          const { timeDimensions: pivotTimeDimensions = [] } = dryRunResponse.pivotQuery || {};
+          parsedDateRange = pivotTimeDimensions[0]?.dateRange;
         } else if (Array.isArray(query.timeDimensions?.[0]?.dateRange)) {
           // @ts-ignore
           parsedDateRange = query.timeDimensions[0].dateRange;
@@ -561,7 +561,7 @@ export function PlaygroundQueryBuilder({
                     }}
                     chartLibraries={frameworkChartLibraries}
                     isFetchingMeta={isFetchingMeta}
-                    render={({ framework }) => {
+                    render={({ framework: renderFramework }) => {
                       if (richMetaError) {
                         return (
                           <FatalError
@@ -577,7 +577,7 @@ export function PlaygroundQueryBuilder({
                           areQueriesEqual={queriesEqual}
                           isFetchingMeta={isFetchingMeta}
                           queryError={queryError}
-                          framework={framework}
+                          framework={renderFramework}
                           chartType={chartType || 'line'}
                           query={query}
                           pivotConfig={pivotConfig}

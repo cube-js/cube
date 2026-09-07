@@ -96,20 +96,19 @@ export default function Settings({
               background: 'white',
             }}
           >
-            <label>
-              <InputNumber
-                prefix="Limit"
-                type="number"
-                value={limit}
-                step={500}
-                min={0}
-                onChange={setLimit}
-                onPressEnter={() => {
-                  onUpdate({ limit });
-                  setLimitShown(false);
-                }}
-              />
-            </label>
+            <InputNumber
+              aria-label="Limit"
+              prefix="Limit"
+              type="number"
+              value={limit}
+              step={500}
+              min={0}
+              onChange={setLimit}
+              onPressEnter={() => {
+                onUpdate({ limit });
+                setLimitShown(false);
+              }}
+            />
           </div>
         )}
         onOverlayOpen={() => setLimitShown(true)}

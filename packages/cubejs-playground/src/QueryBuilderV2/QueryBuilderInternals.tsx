@@ -28,7 +28,7 @@ const Divider = tasty({
   },
 });
 
-type Tab = 'results' | 'generated-sql' | 'json' | 'graphql' | 'sql';
+type TabId = 'results' | 'generated-sql' | 'json' | 'graphql' | 'sql';
 
 const QueryBuilderPanel = tasty(Panel, {
   isFlex: true,
@@ -47,7 +47,7 @@ const QueryBuilderInternals = memo(() => {
     'QueryBuilder:Chart:expanded',
     false
   );
-  const [tab, setTab] = useState<Tab>('results');
+  const [tab, setTab] = useState<TabId>('results');
   const ref = useRef<HTMLDivElement>(null);
   const chartRef = useRef<HTMLDivElement>(null);
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(true);
@@ -61,7 +61,7 @@ const QueryBuilderInternals = memo(() => {
         activeKey={tab}
         extra={<QueryBuilderExtras />}
         styles={{ padding: '0 1x' }}
-        onChange={(tab: string) => setTab(tab as Tab)}
+        onChange={(nextTab: string) => setTab(nextTab as TabId)}
       >
         <Tab keepMounted id="results" title="Results">
           <QueryBuilderResults forceMinHeight={!isChartExpanded} />

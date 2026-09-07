@@ -170,12 +170,12 @@ function QueryTabsRenderer({
         setQuery(tab.query);
       }}
     >
-      {({ id, query, chartType }, saveTab) => (
+      {({ id, query: tabQuery, chartType }, saveTab) => (
         <Panel key={id} height="(100vh - 12.5x) (100vh - 12.5x)" fill="#white">
           <QueryBuilder
             apiUrl={apiUrl}
             apiToken={token}
-            defaultQuery={query}
+            defaultQuery={tabQuery}
             defaultChartType={chartType}
             schemaVersion={props.schemaVersion}
             extra={props.extra ?? null}

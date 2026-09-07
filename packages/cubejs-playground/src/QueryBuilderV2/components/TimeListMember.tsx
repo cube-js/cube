@@ -92,7 +92,9 @@ export function TimeListMember(props: TimeListMemberProps) {
   // @ts-ignore
   const { description } = member;
   const isTimestampSelected = isSelected();
-  const definedGranularities = (member.type === 'time' ? ('granularities' in member ? member?.granularities : []) : []) ?? [];
+  const definedGranularities = (member.type === 'time' && 'granularities' in member
+    ? member?.granularities
+    : []) ?? [];
   const definedGranularityNames = definedGranularities.map((g) => g.name);
   const nonPredefinedGranularityNames = [...definedGranularityNames];
   const { shownMemberName } = useShownMemberName({
@@ -144,7 +146,7 @@ export function TimeListMember(props: TimeListMemberProps) {
       return null;
     }
 
-    const title = definedGranularitiesTitleMap
+    const granularityTitle = definedGranularitiesTitleMap
       ? definedGranularitiesTitleMap[granularity]
       : titleize(granularity);
 
@@ -152,7 +154,7 @@ export function TimeListMember(props: TimeListMemberProps) {
       <GranularityListMember
         key={`${name}.${granularity}`}
         name={granularity}
-        title={title}
+        title={granularityTitle}
         memberViewType={memberViewType}
         isMissing={missingGranularities.includes(granularity)}
         isCustom={isCustom}
@@ -206,7 +208,7 @@ export function TimeListMember(props: TimeListMemberProps) {
                 onRemoveDataRange?.(member.name);
                 break;
               default:
-                return;
+                break;
             }
           }}
         >

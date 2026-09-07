@@ -63,25 +63,25 @@ export function RollupDesignerContext({
   });
 
   useEffect(() => {
-    const { isLoading, error, response } = metaResult;
+    const { isLoading, error: metaError, response } = metaResult;
 
     if (!isLoading) {
       if (response) {
         setMemberTypeCubeMap(response.membersGroupedByCube());
-      } else if (error) {
-        setError(error);
+      } else if (metaError) {
+        setError(metaError);
       }
     }
   }, [metaResult.isLoading]);
 
   useEffect(() => {
-    const { isLoading, error, response } = dryRunResult;
+    const { isLoading, error: dryRunError, response } = dryRunResult;
 
     if (!isLoading) {
       if (response) {
         setTransformedQuery(response.transformedQueries[0]);
-      } else if (error) {
-        setError(error);
+      } else if (dryRunError) {
+        setError(dryRunError);
       }
     }
   }, [dryRunResult.isLoading]);

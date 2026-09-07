@@ -80,9 +80,9 @@ export function useLocalStorage<T = any>(
   useEffect(() => {
     setValue(getter);
 
-    storage.subscribe(key, (value) => {
+    storage.subscribe(key, (nextValue) => {
       // @ts-ignore
-      setValue(typeof defaultValue === 'function' ? defaultValue(value) : value || defaultValue);
+      setValue(typeof defaultValue === 'function' ? defaultValue(nextValue) : nextValue || defaultValue);
     });
 
     return () => {

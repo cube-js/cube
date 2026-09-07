@@ -35,6 +35,38 @@ const useLivePreview = (disabled = false) => {
     deploymentUrl: null,
   });
 
+  const fetchStatus = () => fetch('playground/live-preview/status')
+    .then((res) => res.json())
+    .then((nextStatus) => {
+      setStatus({
+        loading: false,
+        ...nextStatus,
+      });
+    });
+
+  const createTokenWithPayload = async (payload): Promise<any> => {
+    const res = await fetch('playground/live-preview/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  };
+
+  const handleChange = async () => {
+    if (status?.active) {
+      const { token } = await createTokenWithPayload({});
+      setCredentials({
+        token: token?.token || null,
+        apiUrl: status?.deploymentUrl || null,
+      });
+    } else {
+      setCredentials(null);
+    }
+  };
+
   useEffect(() => {
     if (disabled) {
       return;
@@ -67,37 +99,6 @@ const useLivePreview = (disabled = false) => {
   //     handleChange();
   //   }
   // }, [status]);
-
-  const fetchStatus = () => fetch('playground/live-preview/status')
-    .then((res) => res.json())
-    .then((status) => {
-      setStatus({
-        loading: false,
-        ...status,
-      });
-    });
-  const createTokenWithPayload = async (payload): Promise<any> => {
-    const res = await fetch('playground/live-preview/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-    return res.json();
-  };
-
-  const handleChange = async () => {
-    if (status?.active) {
-      const { token } = await createTokenWithPayload({});
-      setCredentials({
-        token: token?.token || null,
-        apiUrl: status?.deploymentUrl || null,
-      });
-    } else {
-      setCredentials(null);
-    }
-  };
 
   return {
     credentials,

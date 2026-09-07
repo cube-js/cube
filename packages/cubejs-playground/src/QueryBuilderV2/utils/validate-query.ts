@@ -59,7 +59,7 @@ const sanitizeLogicalFilter = (filter: any): LogicalAndFilter | LogicalOrFilter 
   return { [key]: sanitizedSubFilters } as LogicalAndFilter | LogicalOrFilter;
 };
 
-const sanitizeFilter = (filter: any): Filter | null => {
+function sanitizeFilter(filter: any): Filter | null {
   if (isValidUnaryFilter(filter)) {
     return filter;
   }
@@ -69,9 +69,11 @@ const sanitizeFilter = (filter: any): Filter | null => {
   }
 
   return sanitizeLogicalFilter(filter);
-};
+}
 
-const sanitizeFilters = (filters: any): Filter[] => (Array.isArray(filters) ? (filters.map(sanitizeFilter).filter(Boolean) as Filter[]) : []);
+const sanitizeFilters = (filters: any): Filter[] => (
+  Array.isArray(filters) ? (filters.map(sanitizeFilter).filter(Boolean) as Filter[]) : []
+);
 
 const isValidTimeDimension = (td: any): td is TimeDimension => typeof td === 'object'
   && 'dimension' in td
@@ -83,7 +85,9 @@ const isValidTimeDimension = (td: any): td is TimeDimension => typeof td === 'ob
       && td.dateRange.length === 2
       && td.dateRange.every((date: any) => typeof date === 'string')));
 
-const sanitizeTimeDimensions = (timeDimensions: any): TimeDimension[] => (Array.isArray(timeDimensions) ? timeDimensions.filter(isValidTimeDimension) : []);
+const sanitizeTimeDimensions = (timeDimensions: any): TimeDimension[] => (
+  Array.isArray(timeDimensions) ? timeDimensions.filter(isValidTimeDimension) : []
+);
 
 export function validateQuery(query: Record<string, any>): Query {
   const sanitizedQuery: Partial<Query> = {};

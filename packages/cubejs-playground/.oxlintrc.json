@@ -46,7 +46,20 @@
         // purely cosmetic, and its autofix makes JSX harder to read rather than easier:
         // splitting `{cubeName} <b>{name}</b>` onto separate lines forces a literal
         // `{' '}` line in to preserve the space, 61 times across this package
-        "@stylistic/jsx-one-expression-per-line": "off"
+        "@stylistic/jsx-one-expression-per-line": "off",
+        // airbnb lists `Link` here for react-router's, which this package does use --
+        // always with `to`, so the rule has nothing to catch there. What it did catch is
+        // @cube-dev/ui-kit's unrelated `Link`, typed `Omit<CubeButtonProps, 'ref'>`: a
+        // Button alias driven by `onPress`, not an anchor. The rule cannot tell the two
+        // apart by import, and it still checks real `<a>` elements with the list empty.
+        "jsx-a11y/anchor-is-valid": [
+          "error",
+          {
+            "components": [],
+            "specialLink": ["to"],
+            "aspects": ["noHref", "invalidHref", "preferButton"]
+          }
+        ]
       }
     }
   ]
