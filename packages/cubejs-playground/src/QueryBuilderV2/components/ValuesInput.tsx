@@ -17,6 +17,7 @@ import { PlusOutlined } from '@ant-design/icons';
 
 import { useQueryBuilderContext } from '../context';
 import { useEvent, useOutsideFocus, useDimensionValues } from '../hooks';
+import { uniqArray } from '../utils';
 
 const ButtonWrapper = tasty({
   styles: {
@@ -356,7 +357,7 @@ export function ValuesInput(props: ValuesInputProps) {
 
   return (
     <Element>
-      {[...new Set(values)].map((value) => (
+      {uniqArray(values).map((value) => (
         <TooltipProvider key={value} activeWrap title={value}>
           <StyledTag onClose={() => onRemove(value)}>{value}</StyledTag>
         </TooltipProvider>

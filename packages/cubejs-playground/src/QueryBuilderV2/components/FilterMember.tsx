@@ -24,6 +24,7 @@ import {
 import { useDeepMemo, useEvent } from '../hooks';
 import { OPERATOR_LABELS, OPERATORS, OPERATORS_BY_TYPE, UNARY_OPERATORS } from '../values';
 import { MemberViewType } from '../types';
+import { uniqArray } from '../utils';
 
 import { ValuesInput } from './ValuesInput';
 import { TimeDateRangeSelector } from './TimeDateRangeSelector';
@@ -232,9 +233,8 @@ export function FilterMember(props: FilterMemberProps) {
           );
         }
       default:
-        return filter.values && [...new Set(filter.values)].map(
-          (value: string) => <ValueTag key={value}>{value}</ValueTag>
-        );
+        return filter.values
+          && uniqArray(filter.values).map((value: string) => <ValueTag key={value}>{value}</ValueTag>);
     }
   }, [filter, type]);
 
