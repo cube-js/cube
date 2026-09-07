@@ -135,7 +135,7 @@ export function QueryBuilder(
           )}
         </Block>
       )}
-      {!!meta && (props.children ?? <QueryBuilderInternals />)}
+      {!!meta && (props.children || <QueryBuilderInternals />)}
     </QueryBuilderContext.Provider>
   );
 }

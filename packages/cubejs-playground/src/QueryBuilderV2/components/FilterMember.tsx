@@ -232,7 +232,9 @@ export function FilterMember(props: FilterMemberProps) {
           );
         }
       default:
-        return filter.values?.map((value: string) => <ValueTag key={value}>{value}</ValueTag>);
+        return filter.values && [...new Set(filter.values)].map(
+          (value: string) => <ValueTag key={value}>{value}</ValueTag>
+        );
     }
   }, [filter, type]);
 

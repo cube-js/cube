@@ -356,7 +356,7 @@ export function ValuesInput(props: ValuesInputProps) {
 
   return (
     <Element>
-      {values.map((value, i) => (
+      {[...new Set(values)].map((value) => (
         <TooltipProvider key={value} activeWrap title={value}>
           <StyledTag onClose={() => onRemove(value)}>{value}</StyledTag>
         </TooltipProvider>

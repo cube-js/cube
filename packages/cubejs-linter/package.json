@@ -17,7 +17,8 @@
   },
   "files": [
     ".oxlintrc.json",
-    "airbnb-base.json"
+    "airbnb-base.json",
+    "airbnb-react.json"
   ],
   "license": "Apache-2.0",
   "publishConfig": {

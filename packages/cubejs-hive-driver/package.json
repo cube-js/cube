@@ -12,7 +12,6 @@
     "node": ">=20.0.0"
   },
   "main": "src/HiveDriver.js",
-  "scripts": {},
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.35",
     "@cubejs-backend/shared": "1.7.35",
