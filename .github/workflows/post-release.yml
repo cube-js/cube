@@ -87,7 +87,7 @@ jobs:
           yarn run birdbox:cli:postgresql
       - name: Slack Failure
         if: failure()
-        uses: voxmedia/github-action-slack-notify-build@v1
+        uses: voxmedia/github-action-slack-notify-build@v2
         with:
           channel: oss-ci
           status: FAILED
@@ -147,7 +147,7 @@ jobs:
           yarn run birdbox:${{ matrix.target }}
       - name: Slack Failure
         if: failure()
-        uses: voxmedia/github-action-slack-notify-build@v1
+        uses: voxmedia/github-action-slack-notify-build@v2
         with:
           channel: oss-ci
           status: FAILED
@@ -213,7 +213,7 @@ jobs:
           yarn run cypress:birdbox
       - name: Slack Failure
         if: failure()
-        uses: voxmedia/github-action-slack-notify-build@v1
+        uses: voxmedia/github-action-slack-notify-build@v2
         with:
           channel: oss-ci
           status: FAILED
