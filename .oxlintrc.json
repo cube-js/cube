@@ -1,12 +1,8 @@
-// Repo-wide oxlint configuration. The rule set lives in the @cubejs-backend/linter
-// package so it stays a publishable, reviewable unit; this file adds the ignores.
+// The rule set lives in the @cubejs-backend/linter package so it stays a publishable,
+// reviewable unit; this file adds the repo-wide ignores.
 //
 // `yarn lint` runs bare `oxlint`: passing -c/--config would disable nested config
 // discovery, and packages/cubejs-client-{dx,react} rely on it.
-//
-// `extends` merges `rules`, `plugins` and `jsPlugins`, but NOT `env` or `ignorePatterns`
-// -- those are per-config-file, which is why they are restated in every nested config
-// rather than inherited from the linter package.
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "extends": ["./packages/cubejs-linter/.oxlintrc.json"],

@@ -1,13 +1,9 @@
-// cubejs-playground's lint config: the shared React rule set plus this package's own
-// environment. The rules themselves live in @cubejs-backend/linter/airbnb-react.json,
-// which cubejs-client-react extends too.
 {
   "$schema": "../../node_modules/oxlint/configuration_schema.json",
   "extends": [
     "../../.oxlintrc.json",
     "../cubejs-linter/airbnb-react.json"
   ],
-  // env and ignorePatterns are not inherited through `extends`
   "env": {
     "node": true,
     "browser": true,

@@ -7,9 +7,6 @@
 // react/no-access-state-in-setstate, and the PropTypes family (no-unused-prop-types,
 // require-default-props, forbid-foreign-prop-types, default-props-match-prop-types) --
 // all legacy class-component rules, and both consumers are TS + hooks.
-//
-// `env` and `ignorePatterns` are deliberately absent: oxlint does not inherit them through
-// `extends`, so each consumer restates its own.
 {
   "$schema": "../../node_modules/oxlint/configuration_schema.json",
   "plugins": [

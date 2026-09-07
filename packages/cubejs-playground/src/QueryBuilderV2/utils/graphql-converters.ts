@@ -57,7 +57,6 @@ const OPERATORS_MAP = {
   notSet: 'set',
 } as const;
 
-// A single value for `equals` stays `equals`; anything else maps through OPERATORS_MAP
 function graphQLOperator(filter: { operator: string; values?: string[] }) {
   if (filter.operator === 'equals' && (filter.values || []).length <= 1) {
     return 'equals';

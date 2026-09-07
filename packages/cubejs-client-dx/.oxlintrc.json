@@ -5,7 +5,6 @@
 {
   "$schema": "../../node_modules/oxlint/configuration_schema.json",
   "extends": ["../../.oxlintrc.json"],
-  // env and ignorePatterns are not inherited through `extends`
   "env": {
     "node": true,
     "es6": true

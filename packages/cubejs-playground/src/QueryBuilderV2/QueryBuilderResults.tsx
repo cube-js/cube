@@ -208,7 +208,6 @@ function Pagination(props: PaginationProps) {
         onSelectionChange={onSelectionChange}
       >
         {[...Array(numberOfPages)].map((a, i) => (
-          // the list is a bare [...Array(n)] range, so `i + 1` is the page number itself
           // eslint-disable-next-line react/no-array-index-key
           <Select.Item key={i + 1} textValue={String(i + 1)}>
             {getPaginationOptionLabel({ page: i + 1, perPage, total })}
@@ -835,7 +834,6 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
   const tableData = useMemo(() => (
     <>
       {data?.slice((page - 1) * 100, (page - 1) * 100 + 100).map((row, rowId) => (
-        // rowId identifies the row within the page and is what selectedCell stores
         // eslint-disable-next-line react/no-array-index-key
         <div key={rowId} data-element="Row" data-qa={`QueryBuilderResult-row_${rowId}`}>
           {dimensions.map((dimension) => {

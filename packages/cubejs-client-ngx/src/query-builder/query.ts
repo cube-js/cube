@@ -9,8 +9,7 @@ export enum MemberType {
   Segments = 'segments',
   TimeDimensions = 'timeDimensions',
   Filters = 'filters',
-  // enum members are not bindings, so this does not actually shadow the
-  // imported `Order` class
+  // an enum member is not a binding, so this does not shadow the imported `Order`
   // eslint-disable-next-line no-shadow
   Order = 'order',
 }

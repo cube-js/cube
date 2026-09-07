@@ -38,8 +38,7 @@ function getGraphQLValidator(apiUrl: string, apiToken: string | null) {
         }).then(
           (json) => validateJsonQuery(json),
           () => {
-            // async-validator only reads `.message` when truthy, so an empty-message
-            // Error would surface the Error object instead of no message at all
+            // async-validator only reads `.message` when truthy: '' means no message shown
             // eslint-disable-next-line no-throw-literal
             throw '';
           }
@@ -61,10 +60,9 @@ const JSON_VALIDATOR = {
     try {
       BestEffortJsonParse(value);
     } catch {
-      // async-validator only reads `.message` when truthy, so an empty-message
-      // Error would surface the Error object instead of no message at all
+      // async-validator only reads `.message` when truthy: '' means no message shown
       // eslint-disable-next-line no-throw-literal
-      throw ''; // do not show any error message
+      throw '';
     }
   },
 };

@@ -165,8 +165,7 @@ export function LogicalFilter(props: LogicalFilterProps) {
           if ('and' in filter) {
             return (
               <LogicalFilter
-                // the filters array carries no stable id, and a content-derived key would remount the
-                // filter's inputs on every keystroke. Giving filters ids is the real fix.
+                // filters have no stable id, and a content-derived key would remount their inputs
                 // eslint-disable-next-line react/no-array-index-key
                 key={index}
                 type="and"
@@ -189,8 +188,7 @@ export function LogicalFilter(props: LogicalFilterProps) {
           if ('or' in filter) {
             return (
               <LogicalFilter
-                // the filters array carries no stable id, and a content-derived key would remount the
-                // filter's inputs on every keystroke. Giving filters ids is the real fix.
+                // filters have no stable id, and a content-derived key would remount their inputs
                 // eslint-disable-next-line react/no-array-index-key
                 key={index}
                 type="or"
@@ -222,8 +220,7 @@ export function LogicalFilter(props: LogicalFilterProps) {
 
           return (
             <FilterMember
-              // the filters array carries no stable id, and a content-derived key would remount the
-              // filter's inputs on every keystroke. Giving filters ids is the real fix.
+              // filters have no stable id, and a content-derived key would remount their inputs
               // eslint-disable-next-line react/no-array-index-key
               key={index}
               isMissing={!member}
