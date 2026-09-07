@@ -130,6 +130,7 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
           - Layout
             - Spacer
             - Divider
+            - Stack
     - **Dashboard**
       - Scheduled refresh
     - **Semantic Model**
