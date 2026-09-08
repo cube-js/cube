@@ -5,8 +5,8 @@ ARG LLVM_VERSION=18
 
 RUN apt-get update && apt-get -y upgrade \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y pkg-config wget curl git ca-certificates \
-    && wget -O /etc/apt/trusted.gpg.d/llvm-snapshot.asc https://apt.llvm.org/llvm-snapshot.gpg.key \
-    && echo "deb https://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-${LLVM_VERSION} main" > /etc/apt/sources.list.d/llvm.list \
+    && wget -O /etc/apt/keyrings/llvm-snapshot.asc https://apt.llvm.org/llvm-snapshot.gpg.key \
+    && echo "deb [signed-by=/etc/apt/keyrings/llvm-snapshot.asc] https://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-${LLVM_VERSION} main" > /etc/apt/sources.list.d/llvm.list \
     && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-${LLVM_VERSION} lld-${LLVM_VERSION} clang-${LLVM_VERSION} libclang-${LLVM_VERSION}-dev make cmake \
       lzma-dev liblzma-dev libpython3-dev \
