@@ -9,6 +9,7 @@ import {
   TableName,
   TableSchema,
 } from '../ScaffoldingSchema';
+import { MemberReference } from '../descriptors/MemberReference';
 import { ValueWithComments } from '../descriptors/ValueWithComments';
 import { toSnakeCase } from '../utils';
 
@@ -125,6 +126,59 @@ export abstract class BaseSchemaFormatter {
     return !!name.match(/^[a-z0-9_]+$/);
   }
 
+  /**
+   * The members that identify one source row: every dimension the cube defines, with the
+   * primary key first and the time dimensions last.
+   *
+   * Every dimension, deliberately. Which columns are meaningful to drill into is not
+   * recoverable from a warehouse schema — the generator would have to guess from column
+   * names, and a name is not evidence of meaning. So the set isn't narrowed at all: a
+   * member the user doesn't want is one they delete from generated output they were
+   * going to review anyway, whereas one that was never emitted is one they must know to
+   * add. Ordering is the only editorial judgement here, and it costs nothing to be wrong
+   * about — key first because it identifies the row, time last because it reads as
+   * "when".
+   *
+   * Derived from the dimensions actually being rendered rather than from the ones
+   * ScaffoldingSchema computed: the cube-descriptor path lets the caller drop members,
+   * and a drill member the cube doesn't define dead-ends at click time.
+   */
+  protected drillMembers(dimensions: Dimension[]): Dimension[] {
+    const isTime = (d: Dimension) => (d.type ?? d.types?.[0]) === 'time';
+
+    // Deduped because dimensions render into an object keyed by member name: two columns
+    // that collapse to one name must not repeat in the drill list.
+    const candidates = this.dedupeByMemberName(dimensions);
+
+    const primaryKeys = candidates.filter((d) => d.isPrimaryKey);
+    const attributes = candidates.filter((d) => !d.isPrimaryKey && !isTime(d));
+    // All of them, in the order they render. Picking one "main" timestamp would mean
+    // ranking `created_at` above `deleted_at` by what the names suggest.
+    const timeDimensions = candidates.filter((d) => !d.isPrimaryKey && isTime(d));
+
+    return [...primaryKeys, ...attributes, ...timeDimensions];
+  }
+
+  /**
+   * Dimensions are rendered into an object keyed by member name, so columns that
+   * collapse to the same name yield one dimension — the drill list must collapse too,
+   * or the drill-down repeats a column.
+   *
+   * Last-wins, matching the spread-reduce that renders `dimensions`: on a collision the
+   * cube keeps the later definition, so classifying off the earlier one would read
+   * `isPrimaryKey` / `isTime` from a definition the cube discarded.
+   */
+  private dedupeByMemberName(dimensions: Dimension[]): Dimension[] {
+    return [
+      ...dimensions
+        .reduce(
+          (memo, d) => memo.set(this.memberName(d), d),
+          new Map<string, Dimension>()
+        )
+        .values(),
+    ];
+  }
+
   protected schemaDescriptorForTable(tableSchema: TableSchema, schemaContext: SchemaContext = {}) {
     let table = `${
       tableSchema.schema?.length ? `${this.escapeName(tableSchema.schema)}.` : ''
@@ -176,13 +230,24 @@ export abstract class BaseSchemaFormatter {
       })
       .reduce((a, b) => ({ ...a, ...b }), {});
 
+    const sortedDimensions = tableSchema.dimensions.sort((a) => (a.isPrimaryKey ? -1 : 0));
+
+    const drillMembers = this.drillMembers(sortedDimensions);
+    const drillMembersProp = drillMembers.length
+      ? {
+        [this.options.snakeCase ? 'drill_members' : 'drillMembers']: drillMembers.map(
+          (m) => new MemberReference(this.memberName(m))
+        ),
+      }
+      : {};
+
     return {
       cube: tableSchema.cube,
       ...sqlOption,
       ...dataSourceProp,
 
       joins,
-      dimensions: tableSchema.dimensions.sort((a) => (a.isPrimaryKey ? -1 : 0))
+      dimensions: sortedDimensions
         .map((m) => ({
           [this.memberName(m)]: {
             sql: this.sqlForMember(m),
@@ -200,11 +265,13 @@ export abstract class BaseSchemaFormatter {
             sql: this.sqlForMember(m),
             type: m.type ?? m.types[0],
             title: this.memberTitle(m),
+            ...drillMembersProp,
           },
         }))
         .reduce((a, b) => ({ ...a, ...b }), {
           count: {
             type: 'count',
+            ...drillMembersProp,
           },
         }),
 
