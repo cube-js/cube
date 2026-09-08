@@ -1387,3 +1387,22 @@ where
         .join()
         .unwrap();
 }
+
+pub fn mssql_boolean_templates() -> Vec<(String, String)> {
+    [
+        ("expressions/true", "CAST(1 AS BIT)"),
+        ("expressions/false", "CAST(0 AS BIT)"),
+        ("types/boolean", "BIT"),
+        (
+            "expressions/scalar_to_predicate",
+            "({{ expr }} = CAST(1 AS BIT))",
+        ),
+        (
+            "expressions/predicate_to_scalar",
+            "CAST(CASE WHEN {{ expr }} THEN 1 WHEN NOT ({{ expr }}) THEN 0 ELSE NULL END AS BIT)",
+        ),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect()
+}
