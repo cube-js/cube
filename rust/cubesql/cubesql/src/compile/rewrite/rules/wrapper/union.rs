@@ -3,7 +3,7 @@ use crate::{
         cube_scan_wrapper, distinct, rewrite,
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
-        transforming_list_rewrite_with_lists_and_vars, union, wrapped_union,
+        transforming_list_rewrite_per_elem_with_lists_and_vars, union, wrapped_union,
         wrapper_pullup_replacer, wrapper_replacer_context, ListApplierListPattern, ListPattern,
         ListType, LogicalPlanLanguage, UnionAlias, WrappedUnionAlias,
         WrapperReplacerContextAliasToCube, WrapperReplacerContextGroupedSubqueries,
@@ -16,34 +16,42 @@ use egg::Subst;
 
 impl WrapperRules {
     pub fn union_rules(&self, rules: &mut Vec<CubeRewrite>) {
+        // A query of the union, pulled up and ready: there is nothing left to push into it
+        let query = cube_scan_wrapper(
+            wrapper_pullup_replacer(
+                "?elem",
+                wrapper_replacer_context(
+                    "?elem_alias_to_cube",
+                    "?elem_push_to_cube",
+                    "?elem_in_projection",
+                    "?elem_cube_members",
+                    "?elem_grouped_subqueries",
+                    "?elem_ungrouped_scan",
+                    "?input_data_source",
+                ),
+            ),
+            "CubeScanWrapperFinalized:false",
+        );
         rules.extend(vec![
             // The queries of a union arrive already pulled up, so there is nothing to push
-            // into them: the whole list is matched at once and every query is unwrapped into
-            // the set operation. `?input_data_source` is a top level element variable, so
-            // every query has to reach the same data source for this to match at all — a
-            // union spanning two of them is left to post processing without a check of its
-            // own.
-            transforming_list_rewrite_with_lists_and_vars(
+            // into them: the whole list is matched at once and the set operation is built
+            // over them. `?input_data_source` is a top level element variable, so every
+            // query has to reach the same data source for this to match at all: a union
+            // spanning two of them is left to post processing without a check of its own.
+            //
+            // The element pattern of the new list is the matched query itself, so each
+            // element resolves to the query's class whichever of its pulled up forms
+            // matched, and the union is one node rather than one per combination of forms.
+            // Extraction picks the form of each query, in the wrapper's state (see
+            // `plan_nodes_inside_wrapper` in `cost.rs`), and SQL generation reads the
+            // nested wrapper as the query it holds.
+            transforming_list_rewrite_per_elem_with_lists_and_vars(
                 "wrapper-pull-up-union",
                 ListType::UnionInputs,
                 ListPattern {
                     pattern: union("?list", "?union_alias"),
                     list_var: "?list".to_string(),
-                    elem: cube_scan_wrapper(
-                        wrapper_pullup_replacer(
-                            "?elem",
-                            wrapper_replacer_context(
-                                "?elem_alias_to_cube",
-                                "?elem_push_to_cube",
-                                "?elem_in_projection",
-                                "?elem_cube_members",
-                                "?elem_grouped_subqueries",
-                                "?elem_ungrouped_scan",
-                                "?input_data_source",
-                            ),
-                        ),
-                        "CubeScanWrapperFinalized:false",
-                    ),
+                    elem: query.clone(),
                 },
                 &cube_scan_wrapper(
                     wrapper_pullup_replacer(
@@ -69,7 +77,7 @@ impl WrapperRules {
                 [ListApplierListPattern {
                     list_type: ListType::WrappedUnionInputs,
                     new_list_var: "?new_list".to_string(),
-                    elem_pattern: "?elem".to_string(),
+                    elem_pattern: query,
                 }],
                 &["?input_data_source"],
                 // One query is not a union, and folding a `Distinct` into a single query

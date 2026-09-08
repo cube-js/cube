@@ -4202,3 +4202,97 @@ async fn test_wrapper_multi_arg_aggregate_function_without_template() {
         error
     );
 }
+
+/// A pivot with subtotals on both axes: a four-way union of
+/// aggregations, one per grouping set, each filtered before and after aggregating and
+/// projected with literals, under a grouping, sort and limit that read the union. Every
+/// query has several pushed down forms, and a union that spelled out every combination of
+/// them would blow past the node limit of the rewrite before rules on top of the union even
+/// start multiplying it.
+#[tokio::test]
+async fn test_wrapper_union_of_many_form_queries_stays_within_node_limit() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query = |gender: bool, note: bool| {
+        let group_by = match (gender, note) {
+            (true, true) => "GROUP BY 1, 2",
+            (true, false) | (false, true) => "GROUP BY 1",
+            (false, false) => "",
+        };
+        format!(
+            "SELECT {gender_expr} AS market, {note_expr} AS note, \
+             {gender_total} AS is_market_total, {note_total} AS is_note_total, s AS total \
+             FROM (\
+               SELECT {gender_col}{note_col}SUM(sumPrice) AS s FROM KibanaSampleDataEcommerce \
+               WHERE order_date >= '2024-01-01' {group_by}\
+             ) q WHERE s IS NOT NULL",
+            gender_expr = if gender {
+                "customer_gender"
+            } else {
+                "CAST(NULL AS TEXT)"
+            },
+            note_expr = if note { "notes" } else { "CAST(NULL AS TEXT)" },
+            gender_total = if gender { "FALSE" } else { "TRUE" },
+            note_total = if note { "FALSE" } else { "TRUE" },
+            gender_col = if gender { "customer_gender, " } else { "" },
+            note_col = if note { "notes, " } else { "" },
+        )
+    };
+    let sql = format!(
+        "SELECT note, is_note_total FROM ({} UNION ALL {} UNION ALL {} UNION ALL {}) core \
+         GROUP BY 1, 2 ORDER BY 2, 1 LIMIT 102",
+        query(true, true),
+        query(true, false),
+        query(false, true),
+        query(false, false),
+    );
+
+    let sql = convert_select_to_query_plan(sql, DatabaseProtocol::PostgreSQL)
+        .await
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+
+    assert_eq!(
+        sql.matches("UNION ALL").count(),
+        3,
+        "all four queries are pushed down in one union: {}",
+        sql
+    );
+    // Each query keeps its own grouping: the subtotal queries stand in a NULL for the
+    // column they roll up, two for each column and none twice over
+    assert_eq!(
+        sql.matches("CAST(NULL AS STRING) \"market\"").count(),
+        2,
+        "two queries roll up the market: {}",
+        sql
+    );
+    assert_eq!(
+        sql.matches("CAST(NULL AS STRING) \"note\"").count(),
+        2,
+        "two queries roll up the note: {}",
+        sql
+    );
+    // Each query keeps both of its filters: the one before aggregating and the one after
+    assert_eq!(
+        sql.matches("afterOrOnDate").count(),
+        4,
+        "every query filters by date before aggregating: {}",
+        sql
+    );
+    assert_eq!(
+        sql.matches("\"operator\": \"set\"").count(),
+        4,
+        "every query drops empty totals after aggregating: {}",
+        sql
+    );
+    assert!(
+        sql.contains("GROUP BY 1, 2") && sql.contains("LIMIT 102"),
+        "the grouping and limit above the union are pushed down with it: {}",
+        sql
+    );
+}
