@@ -288,12 +288,23 @@ impl RemoteFs for QueueRemoteFs {
                             return Ok(f);
                         }
                         Err(err) => {
-                            //Check if file doesn't exists in remoteFs
-                            if self.remote_fs.list(file.clone()).await?.is_empty() {
-                                return Err(CubeError::corrupt_data(format!(
-                                    "File {} doesn't exist in remote file system",
-                                    file
-                                )));
+                            // A listing is the only way to tell an absent object from a remote
+                            // that can't be reached at all: object stores answer 404 for both a
+                            // missing key and a missing bucket. A listing that fails itself leaves
+                            // the download error to speak for both, rather than replacing it.
+                            match self.remote_fs.list(file.clone()).await {
+                                Ok(listing) if listing.is_empty() => {
+                                    return Err(CubeError::file_not_found(format!(
+                                        "File {} doesn't exist in remote file system",
+                                        file
+                                    )));
+                                }
+                                Ok(_) => {}
+                                Err(list_err) => log::warn!(
+                                    "Could not check whether {} exists in remote fs: {}",
+                                    file,
+                                    list_err
+                                ),
                             }
                             return Err(err);
                         }

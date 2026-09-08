@@ -118,6 +118,22 @@ impl GCSRemoteFs {
 
 di_service!(GCSRemoteFs, [RemoteFs, ExtendedRemoteFs]);
 
+/// GCS answers 404 for an object that is already gone where S3 answers 204. Absent is the state a
+/// caller of `delete_file` asked for and none of them can act on the difference, so it is reported
+/// as done rather than as a failure they have to log.
+///
+/// A missing bucket carries the same reason, and the client crate keeps the message and the code
+/// private, so the two cannot be told apart here. A bucket that is not there fails every upload and
+/// download loudly, which is the signal to go by.
+fn is_absent_object(e: &cloud_storage::Error) -> bool {
+    match e {
+        cloud_storage::Error::Google(response) => {
+            response.errors_has_reason(&cloud_storage::Reason::NotFound)
+        }
+        _ => false,
+    }
+}
+
 #[async_trait]
 impl RemoteFs for GCSRemoteFs {
     async fn temp_upload_path(&self, remote_path: String) -> Result<String, CubeError> {
@@ -247,8 +263,13 @@ impl RemoteFs for GCSRemoteFs {
         );
         let time = SystemTime::now();
         debug!("Deleting {}", remote_path);
-        Object::delete(self.bucket.as_str(), self.gcs_path(&remote_path).as_str()).await?;
-        info!("Deleting {} ({:?})", remote_path, time.elapsed()?);
+        match Object::delete(self.bucket.as_str(), self.gcs_path(&remote_path).as_str()).await {
+            Ok(()) => info!("Deleting {} ({:?})", remote_path, time.elapsed()?),
+            Err(e) if is_absent_object(&e) => {
+                debug!("File {} is already absent in remote fs", remote_path);
+            }
+            Err(e) => return Err(e.into()),
+        }
 
         let _guard = acquire_lock("delete file", self.delete_mut.lock()).await?;
         let local = self.dir.as_path().join(remote_path);
@@ -351,5 +372,36 @@ impl GCSRemoteFs {
                 .unwrap_or_else(|| "".to_string()),
             remote_path
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The payload a bucket really answers with, so a change in how the crate maps reasons shows
+    /// up here instead of as a returning flood of errors from the scheduler.
+    const NOT_FOUND_RESPONSE: &str = r#"{"error":{"errors":[{"domain":"global",
+        "reason":"notFound","message":"No such object: bucket/1829139-ihr4wfxi.parquet"}],
+        "code":404,"message":"No such object: bucket/1829139-ihr4wfxi.parquet"}}"#;
+
+    const FORBIDDEN_RESPONSE: &str = r#"{"error":{"errors":[{"domain":"global",
+        "reason":"forbidden","message":"Access denied"}],"code":403,"message":"Access denied"}}"#;
+
+    fn google_error(payload: &str) -> cloud_storage::Error {
+        cloud_storage::Error::Google(serde_json::from_str(payload).unwrap())
+    }
+
+    #[test]
+    fn absent_object_is_recognized() {
+        assert!(is_absent_object(&google_error(NOT_FOUND_RESPONSE)));
+    }
+
+    #[test]
+    fn other_failures_are_not_absent_objects() {
+        assert!(!is_absent_object(&google_error(FORBIDDEN_RESPONSE)));
+        assert!(!is_absent_object(&cloud_storage::Error::Other(
+            "connection reset".to_string()
+        )));
     }
 }

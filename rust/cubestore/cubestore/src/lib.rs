@@ -15,6 +15,7 @@ use datafusion::cube_ext::catch_unwind::PanicError;
 use datafusion::parquet::errors::ParquetError;
 use flexbuffers::{DeserializationError, ReaderError};
 use log::SetLoggerError;
+use serde::Serializer;
 use serde_derive::{Deserialize, Serialize};
 use sqlparser::parser::ParserError;
 use std::any::Any;
@@ -62,13 +63,41 @@ pub struct CubeError {
 
 impl std::error::Error for CubeError {}
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub enum CubeErrorCauseType {
     User,
     Internal,
     CorruptData,
     WrongConnection,
     Panic,
+    /// A remote object is absent rather than temporarily unreachable.
+    FileNotFound,
+}
+
+impl CubeErrorCauseType {
+    /// How the cause looks to everything outside the process that produced it: peers reading a
+    /// serialized [CubeError] and [crate::scheduler] matching the job error strings that
+    /// [CubeError::to_string] produced. [CubeErrorCauseType::FileNotFound] is a refinement of
+    /// [CubeErrorCauseType::CorruptData] that only the local process acts on, so it takes the same
+    /// name and index and stays readable by a node or a stored job row of any version.
+    fn external_repr(&self) -> (u32, &'static str) {
+        match self {
+            CubeErrorCauseType::User => (0, "User"),
+            CubeErrorCauseType::Internal => (1, "Internal"),
+            CubeErrorCauseType::CorruptData | CubeErrorCauseType::FileNotFound => {
+                (2, "CorruptData")
+            }
+            CubeErrorCauseType::WrongConnection => (3, "WrongConnection"),
+            CubeErrorCauseType::Panic => (4, "Panic"),
+        }
+    }
+}
+
+impl serde::Serialize for CubeErrorCauseType {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let (index, name) = self.external_repr();
+        serializer.serialize_unit_variant("CubeErrorCauseType", index, name)
+    }
 }
 
 impl CubeError {
@@ -135,9 +164,24 @@ impl CubeError {
         }
     }
 
+    pub fn file_not_found(message: String) -> CubeError {
+        CubeError {
+            message,
+            backtrace: String::new(),
+            cause: CubeErrorCauseType::FileNotFound,
+        }
+    }
+
     pub fn is_corrupt_data(&self) -> bool {
         match self.cause {
-            CubeErrorCauseType::CorruptData => true,
+            CubeErrorCauseType::CorruptData | CubeErrorCauseType::FileNotFound => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_file_not_found(&self) -> bool {
+        match self.cause {
+            CubeErrorCauseType::FileNotFound => true,
             _ => false,
         }
     }
@@ -180,7 +224,11 @@ impl fmt::Display for CubeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.cause {
             CubeErrorCauseType::User => f.write_fmt(format_args!("{}", self.message)),
-            _ => f.write_fmt(format_args!("{:?}: {}", self.cause, self.message)),
+            _ => f.write_fmt(format_args!(
+                "{}: {}",
+                self.cause.external_repr().1,
+                self.message
+            )),
         }
     }
 }
@@ -517,5 +565,55 @@ impl From<tokio_tungstenite::tungstenite::Error> for CubeError {
 impl Into<ArrowError> for CubeError {
     fn into(self) -> ArrowError {
         ArrowError::ExternalError(Box::new(self))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::{Deserialize as _, Serialize as _};
+
+    fn to_flexbuffer(e: &CubeError) -> Vec<u8> {
+        let mut ser = flexbuffers::FlexbufferSerializer::new();
+        e.serialize(&mut ser).unwrap();
+        ser.take_buffer()
+    }
+
+    #[test]
+    fn file_not_found_travels_as_corrupt_data() {
+        let not_found = CubeError::file_not_found("f.parquet is gone".to_string());
+        let corrupt_data = CubeError::corrupt_data("f.parquet is gone".to_string());
+
+        // A node running any other version has to be able to read the result.
+        assert_eq!(to_flexbuffer(&not_found), to_flexbuffer(&corrupt_data));
+
+        let buffer = to_flexbuffer(&not_found);
+        let reader = flexbuffers::Reader::get_root(buffer.as_slice()).unwrap();
+        assert_eq!(CubeError::deserialize(reader).unwrap(), corrupt_data);
+    }
+
+    #[test]
+    fn file_not_found_reads_as_corrupt_data() {
+        // `scheduler` classifies a failed job by looking for "CorruptData" in the error string a
+        // worker stored via `to_string`, so the rendering has to stay the same.
+        let not_found = CubeError::file_not_found("f.parquet is gone".to_string());
+        assert_eq!(
+            not_found.to_string(),
+            CubeError::corrupt_data("f.parquet is gone".to_string()).to_string()
+        );
+        assert!(not_found.to_string().contains("CorruptData"));
+    }
+
+    #[test]
+    fn file_not_found_is_corrupt_data_locally() {
+        let not_found = CubeError::file_not_found("f.parquet is gone".to_string());
+        assert!(not_found.is_file_not_found());
+        assert!(not_found.is_corrupt_data());
+
+        let corrupt_data = CubeError::corrupt_data("f.parquet is gone".to_string());
+        assert!(!corrupt_data.is_file_not_found());
+        assert!(corrupt_data.is_corrupt_data());
+
+        assert!(!CubeError::internal("nope".to_string()).is_file_not_found());
     }
 }

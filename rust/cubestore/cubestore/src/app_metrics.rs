@@ -148,6 +148,10 @@ pub static REMOTE_FS_FILES_TO_REMOVE: Gauge = metrics::gauge("cs.remote_fs.files
 pub static REMOTE_FS_FILES_SIZE_TO_REMOVE: Gauge =
     metrics::gauge("cs.remote_fs.files_to_remove.size");
 
+/// Startup warmup files that were gone by the time the pass reached them, which says how far
+/// behind its snapshot a pass ran rather than that anything is wrong.
+pub static WARMUP_MISSING: Counter = metrics::counter("cs.warmup.missing");
+
 /// Cache Store Cache
 pub static CACHESTORE_TTL_PERSIST: Counter = metrics::counter("cs.cachestore.ttl.persist");
 pub static CACHESTORE_TTL_BUFFER: Gauge = metrics::gauge("cs.cachestore.ttl.buffer");
