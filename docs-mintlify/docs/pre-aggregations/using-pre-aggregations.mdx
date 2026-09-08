@@ -1095,11 +1095,16 @@ workers: each worker processing the query receives all of them.
 
 A few things to keep in mind:
 
-- Only single-value (equality) filters prune this way. Range filters, including
-  time dimension filters, do not.
+- Only single-value (equality) filters let the filtered dimension sit ahead of
+  the join key. A range filter, including a time dimension filter, won't make
+  such an index eligible for the join — though a range filter on an index's
+  leading column does prune partitions normally.
 - The join key must still be part of the index's leading columns, together with
   the filtered dimension. Listing the filtered dimension alone, without the join
   key, makes the index unusable for the join.
+- Queries that hit the rollup join without the equality filter are planned on a
+  join-key-leading scan instead, so keep one available — the default index
+  serves that as long as the join key is the rollup's first dimension.
 - The other side of the join — typically the large rollup carrying the time
   dimension — still needs to be scanned in join-key order, and its time
   dimension filter will not prune partitions there.
