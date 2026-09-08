@@ -45,8 +45,10 @@ export type PreAggregationForQuery = {
   references: PreAggregationReferences;
   preAggregationsToJoin?: PreAggregationForQuery[];
   referencedPreAggregations?: PreAggregationForQuery[];
+  // Resolved on demand: only rendering the pre-aggregation's own SQL needs the
+  // join, and the native planner resolves its own.
   // eslint-disable-next-line no-use-before-define
-  rollupJoin?: RollupJoin;
+  resolveRollupJoin?: () => RollupJoin;
   sqlAlias?: string;
 };
 
@@ -1046,7 +1048,7 @@ export class PreAggregations {
       () => {
         // It's not enough to call buildJoin() directly on cubesFromPreAggregation()
         // because transitive joins won't be collected in that case.
-        const builtJoinTree = this.query.joinTreeForHints(this.cubesHintsToJoin(preAggObj), true);
+        const builtJoinTree = this.query.joinTreeForHints(this.cubesHintsFromPreAggregation(preAggObj), true);
 
         if (!builtJoinTree) {
           throw new UserError(`Can't build join tree for pre-aggregation ${preAggObj.cube}.${preAggObj.preAggregationName}`);
@@ -1057,7 +1059,7 @@ export class PreAggregations {
         // TODO join hints?
         const existingJoins = preAggObjsToJoin
           .map(p => this.resolveJoinMembers(
-            this.query.joinTreeForHints(this.cubesHintsAlreadyJoined(p), true)
+            this.query.joinTreeForHints(this.cubesHintsFromPreAggregation(p), true)
           ))
           .flat();
 
@@ -1154,32 +1156,11 @@ export class PreAggregations {
     });
   }
 
-  private cubesHints(memberPaths: string[]): string[][] {
-    return R.uniq(memberPaths.map(p => p.split('.').slice(0, -1)));
-  }
-
-  /**
-   * Cubes the pre-aggregation's join tree has to span, including one reached
-   * only through a time dimension.
-   */
-  private cubesHintsToJoin(preAggObj: PreAggregationForQuery): string[][] {
-    return this.cubesHints(
+  private cubesHintsFromPreAggregation(preAggObj: PreAggregationForQuery): string[][] {
+    return R.uniq(
       preAggObj.references.measures.concat(
-        preAggObj.references.dimensions,
-        preAggObj.references.timeDimensions.map(td => td.dimension)
-      )
-    );
-  }
-
-  /**
-   * Cubes a rollup already stores members of, so that joins between them are
-   * not repeated at query time. Time dimensions are deliberately left out: a
-   * rollup storing a joined time dimension carries that one column, not the
-   * far cube's measures, so the join to reach them is still needed.
-   */
-  private cubesHintsAlreadyJoined(preAggObj: PreAggregationForQuery): string[][] {
-    return this.cubesHints(
-      preAggObj.references.measures.concat(preAggObj.references.dimensions)
+        preAggObj.references.dimensions
+      ).map(p => p.split('.').slice(0, -1))
     );
   }
 
@@ -1221,7 +1202,6 @@ export class PreAggregations {
       preAggregationsToJoin.forEach(preAgg => {
         references.rollupsReferences.push(preAgg.references);
       });
-      const rollupJoin = this.buildRollupJoin(preAggObj, preAggregationsToJoin);
       const joinResult = canUsePreAggregation(references);
 
       return {
@@ -1229,7 +1209,7 @@ export class PreAggregations {
         canUsePreAggregation: joinResult.canUse,
         leafMeasureMatch: joinResult.leafMeasureMatch,
         preAggregationsToJoin,
-        rollupJoin,
+        resolveRollupJoin: () => this.buildRollupJoin(preAggObj, preAggregationsToJoin),
       };
     } else if (preAggregation.type === 'rollupLambda') {
       // TODO evaluation optimizations. Should be cached or moved to compile time.
@@ -1616,7 +1596,7 @@ export class PreAggregations {
     });
 
     if (preAggregationForQuery.preAggregation.type === 'rollupJoin') {
-      const join = preAggregationForQuery.rollupJoin!;
+      const join = preAggregationForQuery.resolveRollupJoin!();
 
       toJoin = [
         sqlAndAlias(join[0].fromPreAggObj),
