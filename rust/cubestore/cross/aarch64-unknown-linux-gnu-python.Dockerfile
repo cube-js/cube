@@ -9,7 +9,7 @@ ARG PYTHON_VERSION_SUFFIX
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
-    && apt-get install -y build-essential wget ca-certificates \
+    && apt-get install -y build-essential wget ca-certificates zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*;
 
 RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}${PYTHON_VERSION_SUFFIX}.tgz -O - | tar -xz \
