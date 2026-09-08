@@ -320,6 +320,14 @@ export class MssqlQuery extends BaseQuery {
     templates.expressions.timestamp_literal = 'CONVERT(DATETIME2, \'{{ value }}\', 127)';
     templates.types.string = 'VARCHAR';
     templates.types.boolean = 'BIT';
+    templates.expressions.true = 'CAST(1 AS BIT)';
+    templates.expressions.false = 'CAST(0 AS BIT)';
+    // SQL API expressions distinguish stored BIT values from SQL predicates.
+    // Keep UNKNOWN when a predicate is projected or used as a scalar operand.
+    Object.assign(templates.expressions, {
+      scalar_to_predicate: '({{ expr }} = CAST(1 AS BIT))',
+      predicate_to_scalar: 'CAST(CASE WHEN {{ expr }} THEN 1 WHEN NOT ({{ expr }}) THEN 0 ELSE NULL END AS BIT)',
+    });
     templates.types.integer = 'INT';
     templates.types.float = 'FLOAT(24)';
     templates.types.double = 'FLOAT(53)';
