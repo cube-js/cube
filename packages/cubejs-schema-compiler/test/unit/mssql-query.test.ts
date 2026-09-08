@@ -4,6 +4,16 @@ import { prepareJsCompiler } from './PrepareCompiler';
 import { createJoinedCubesSchema } from './utils';
 
 describe('MssqlQuery', () => {
+  it('provides NULL-preserving SQL API boolean context templates', () => {
+    const templates = MssqlQuery.prototype.sqlTemplates();
+    expect(templates.expressions).toMatchObject({
+      true: 'CAST(1 AS BIT)',
+      false: 'CAST(0 AS BIT)',
+      scalar_to_predicate: '({{ expr }} = CAST(1 AS BIT))',
+      predicate_to_scalar: 'CAST(CASE WHEN {{ expr }} THEN 1 WHEN NOT ({{ expr }}) THEN 0 ELSE NULL END AS BIT)',
+    });
+    expect(templates.types.boolean).toBe('BIT');
+  });
   const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
