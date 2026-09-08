@@ -112,15 +112,28 @@ fn sort_push_down(
             // Sort can be pushed down Filter, and while it may seem weird to do that
             // after doing the exact opposite in `FilterPushDown`, this may allow the sort
             // to push through some complex filters, ultimately reaching CubeScan.
-            Ok(LogicalPlan::Filter(Filter {
-                predicate: predicate.clone(),
-                input: Arc::new(sort_push_down(
-                    optimizer,
-                    input,
+            // Only do that when the sort can actually reach a scan: a sort stuck above
+            // a Join does not guarantee result order once pushed down to SQL, so it
+            // must stay above the filter instead.
+            if sort_expr.is_none() || sort_can_reach_scan(input) {
+                Ok(LogicalPlan::Filter(Filter {
+                    predicate: predicate.clone(),
+                    input: Arc::new(sort_push_down(
+                        optimizer,
+                        input,
+                        sort_expr,
+                        optimizer_config,
+                    )?),
+                }))
+            } else {
+                issue_sort(
                     sort_expr,
-                    optimizer_config,
-                )?),
-            }))
+                    LogicalPlan::Filter(Filter {
+                        predicate: predicate.clone(),
+                        input: Arc::new(sort_push_down(optimizer, input, None, optimizer_config)?),
+                    }),
+                )
+            }
         }
         LogicalPlan::Window(Window {
             input,
@@ -269,6 +282,36 @@ fn rewrite_map_for_projection(
             ]
         })
         .collect()
+}
+
+/// Whether pushing a sort expression down this plan is useful: the sort must not
+/// get stuck above a Join. A sort in a subquery under a filter does not guarantee
+/// result order once the query is pushed down to SQL, and a sort above a Join -
+/// including a Join buried under Aggregate, Window, Limit or similar nodes - can't
+/// be absorbed into a CubeScan. Plans without a Join on their input spine keep the
+/// pre-existing behavior: the sort is pushed down and later absorbed into a CubeScan
+/// (grouped CubeScans absorb ORDER BY even through Aggregate). In grouped join shapes
+/// like Sort(Filter(Aggregate(Join(..)))) both placements preserve order;
+/// above-the-filter is the safer one.
+fn sort_can_reach_scan(plan: &LogicalPlan) -> bool {
+    match plan {
+        LogicalPlan::Projection(Projection { input, .. })
+        | LogicalPlan::Filter(Filter { input, .. })
+        | LogicalPlan::Sort(Sort { input, .. })
+        | LogicalPlan::Aggregate(Aggregate { input, .. })
+        | LogicalPlan::Window(Window { input, .. })
+        | LogicalPlan::Limit(Limit { input, .. })
+        | LogicalPlan::Distinct(Distinct { input }) => sort_can_reach_scan(input),
+        LogicalPlan::Union(Union { inputs, .. }) => {
+            // Vacuously true for a unionless Union; such plans don't survive planning
+            inputs.iter().all(|input| sort_can_reach_scan(input))
+        }
+        LogicalPlan::Join(_) | LogicalPlan::CrossJoin(_) => false,
+        // Optimistic by design: a stricter allow-list demonstrably loses push down
+        // (grouped scans regress to post-processing plans), while over-permitting
+        // costs at most a pushed sort that is not absorbed
+        _ => true,
+    }
 }
 
 /// Issues a Sort containing the provided input if the provided `sort_expr` is `Some`;
@@ -421,6 +464,34 @@ mod tests {
         )?
         .project(vec![col("j1.c1"), col("j2.c2")])?
         .sort(vec![sort(col("j2.c2"), true, false)])?
+        .build()?;
+
+        insta::assert_debug_snapshot!(optimize(&plan));
+        Ok(())
+    }
+
+    #[test]
+    fn test_sort_stays_above_filter_over_join() -> Result<()> {
+        // Sort must not be pushed below a Filter when it would get stuck above a Join:
+        // a sort in a subquery under a filter does not guarantee result order once the
+        // query is pushed down to SQL.
+        let plan = LogicalPlanBuilder::from(
+            LogicalPlanBuilder::from(make_sample_table("j1", vec!["key", "c1"], vec![])?)
+                .project(vec![col("key"), col("c1")])?
+                .build()?,
+        )
+        .join(
+            &LogicalPlanBuilder::from(make_sample_table("j2", vec!["key", "c2"], vec![])?)
+                .project(vec![col("key"), col("c2")])?
+                .build()?,
+            JoinType::Inner,
+            (
+                vec![Column::from_name("key")],
+                vec![Column::from_name("key")],
+            ),
+        )?
+        .filter(col("j1.c1").gt_eq(col("j2.c2")))?
+        .sort(vec![sort(col("j1.c1"), true, false)])?
         .build()?;
 
         insta::assert_debug_snapshot!(optimize(&plan));

@@ -220,7 +220,11 @@ impl WrapperRules {
                 };
                 sql_generator
             }
-            // TODO is it correct?
+            // Data source is not pinned down at rewrite time, but SQL generation will
+            // resolve a specific one. Optimistically assume the resolved generator will
+            // support the template: a miss surfaces as a generation-time error, never
+            // broken SQL. Callers that must not commit to an unrenderable shape should
+            // use `is_template_available_on_every_data_source` instead.
             DataSource::Unrestricted => return true,
         };
 
@@ -228,5 +232,75 @@ impl WrapperRules {
             .get_sql_templates()
             .templates
             .contains_key(template)
+    }
+
+    /// Whether every registered SQL generator supports `template`. Used for template
+    /// checks on plans whose data source is not pinned down at rewrite time
+    /// ([`DataSource::Unrestricted`]): whichever generator the plan resolves to must be
+    /// able to render the committed shape. An empty generator registry refuses: there
+    /// is nothing that could render the template.
+    fn is_template_available_on_every_data_source(meta: &MetaContext, template: &str) -> bool {
+        !meta.data_source_to_sql_generator.is_empty()
+            && meta
+                .data_source_to_sql_generator
+                .values()
+                .all(|sql_generator| {
+                    sql_generator
+                        .get_sql_templates()
+                        .templates
+                        .contains_key(template)
+                })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::WrapperRules;
+    use crate::{compile::test::sql_generator, transport::MetaContext};
+    use std::{collections::HashMap, sync::Arc};
+    use uuid::Uuid;
+
+    fn meta_with_generators(generators: Vec<(&str, Vec<(String, String)>)>) -> Arc<MetaContext> {
+        Arc::new(MetaContext::new(
+            vec![],
+            HashMap::new(),
+            generators
+                .into_iter()
+                .map(|(data_source, custom_templates)| {
+                    (data_source.to_string(), sql_generator(custom_templates))
+                })
+                .collect(),
+            Uuid::new_v4(),
+        ))
+    }
+
+    /// A template counts as available for an unrestricted data source only when every
+    /// registered generator supports it: whichever generator the plan resolves to must
+    /// be able to render the committed shape.
+    #[test]
+    fn test_template_available_on_every_data_source() {
+        // Custom template with an empty value removes the base template
+        let meta = meta_with_generators(vec![
+            ("default", vec![]),
+            (
+                "no_full_join",
+                vec![("join_types/full".to_string(), "".to_string())],
+            ),
+        ]);
+        assert!(WrapperRules::is_template_available_on_every_data_source(
+            &meta,
+            "join_types/inner"
+        ));
+        assert!(!WrapperRules::is_template_available_on_every_data_source(
+            &meta,
+            "join_types/full"
+        ));
+
+        // An empty generator registry refuses: nothing could render the template
+        let empty_meta = meta_with_generators(vec![]);
+        assert!(!WrapperRules::is_template_available_on_every_data_source(
+            &empty_meta,
+            "join_types/inner"
+        ));
     }
 }
