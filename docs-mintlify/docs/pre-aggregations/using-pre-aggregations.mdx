@@ -1033,13 +1033,14 @@ With all of the above set up, making a query such as the following will now use
 
 ### Indexing the joined rollup for partition pruning
 
-A `rollup_join` can only be planned if the rollup on each side of the join has
-an index whose leading columns cover the join key — that's what `user_index`
-above is for. However, an index that *starts* with the join key gives you no
-partition pruning: Cube Store partitions are ranged by index order, so a filter
-only prunes partitions when it constrains the index's leading column. A filter
-on the second column of an index prunes nothing unless a partition happens to
-cover a single value of the first column.
+A `rollup_join` can only be planned if each side of the join can be scanned in
+join-key order — either from the rollup's default index, where dimensions come
+first, or from an explicit index whose leading columns cover the join key, like
+`user_index` above. However, an index that *starts* with the join key gives you
+no partition pruning: Cube Store partitions are ranged by index order, so a
+filter only prunes partitions when it constrains the index's leading column. A
+filter on the second column of an index prunes nothing unless a partition
+happens to cover a single value of the first column.
 
 **When queries filter the joined rollup by a highly selective, single-value
 dimension, define an index that puts that dimension before the join key.** In
@@ -1100,7 +1101,7 @@ A few things to keep in mind:
   the filtered dimension. Listing the filtered dimension alone, without the join
   key, makes the index unusable for the join.
 - The other side of the join — typically the large rollup carrying the time
-  dimension — still needs an index that starts with the join key, and its time
+  dimension — still needs to be scanned in join-key order, and its time
   dimension filter will not prune partitions there.
 - Each extra index adds build time and storage, so add one when the filter is
   both common and selective.
