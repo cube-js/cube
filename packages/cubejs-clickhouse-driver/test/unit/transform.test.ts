@@ -102,7 +102,6 @@ describe('getColumnConverter', () => {
     expect(convert('Array(Nullable(Int64))', [null, '3'])).toEqual([null, '3']);
   });
 
-  // These are reported as text by toGenericType, so the value is rendered as text as well.
   it('renders a keyed container as JSON text', () => {
     for (const type of [
       'Map(String, Int64)', 'Map(String, DateTime)', 'Map(Int64, Array(Decimal(38, 2)))',
@@ -117,7 +116,6 @@ describe('getColumnConverter', () => {
     expect(convert('Map(String, Int64)', { a: '1' })).toEqual('{"a":"1"}');
     expect(convert('Tuple(Int64, String)', ['1', 'a'])).toEqual('["1","a"]');
     expect(convert('Point', [1.5, 2.5])).toEqual('[1.5,2.5]');
-    // A Dynamic or Variant column holding a string is already text; requoting it would change it.
     expect(convert('Dynamic', 'x')).toEqual('x');
     expect(convert('Dynamic', 42)).toEqual('42');
   });

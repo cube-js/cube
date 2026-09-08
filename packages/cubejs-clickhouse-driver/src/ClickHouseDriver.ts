@@ -563,10 +563,6 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
    * LowCardinality(Nullable(String))
    * Array(DateTime) -> timestamp[]
    * Map(String, Int32) / Tuple(Int32, String)
-   *
-   * An unrecognized name is passed on to the base driver, which returns it unchanged, and then fails
-   * the Cube Store CREATE TABLE. That is deliberate: guessing `text` for something numeric would
-   * corrupt the column quietly instead.
    */
   protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): GenericDataBaseType {
     const { name, args } = parseType(columnType);
@@ -602,8 +598,9 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       return 'text';
     }
 
-    // The unmapped name is passed on with its arguments and original casing, so that the Cube Store
-    // CREATE TABLE error names the type ClickHouse reported rather than a truncated form of it.
+    // An unmapped name is passed on with its arguments and original casing: the base driver returns
+    // it unchanged and the Cube Store CREATE TABLE then fails, naming the type ClickHouse reported.
+    // That is deliberate — guessing `text` for something numeric would corrupt the column quietly.
     return super.toGenericType(columnType.trim(), precision, scale);
   }
 

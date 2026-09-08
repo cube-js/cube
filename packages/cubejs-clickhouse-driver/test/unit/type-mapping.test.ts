@@ -76,10 +76,10 @@ const TYPES: Array<[type: string, converter: string, generic: string]> = [
   ['DateTime64(10)', 'moment', 'timestamp'],
   ['Time', 'none', 'string'],
   ['Time64(3)', 'none', 'string'],
-  // enums, including one naming other types in its values
   ['Enum(\'hello\' = 1, \'world\' = 2)', 'none', 'text'],
   ['Enum8(\'hello\' = 1)', 'none', 'text'],
   ['Enum16(\'hello\' = 1000)', 'none', 'text'],
+  // An enum whose values name other types must not select their converter.
   ['Enum8(\'Date\' = 1, \'Int\' = 2)', 'none', 'text'],
   ['Nullable(Int64)', 'number', 'bigint'],
   ['Nullable(String)', 'none', 'text'],
@@ -87,7 +87,6 @@ const TYPES: Array<[type: string, converter: string, generic: string]> = [
   ['LowCardinality(String)', 'none', 'text'],
   ['LowCardinality(Nullable(String))', 'none', 'text'],
   ['LowCardinality(Nullable(DateTime64(6)))', 'dt6', 'timestamp'],
-  // containers keep their element type in the generic type, but pass values through untouched
   ['Array(Int32)', 'none', 'int[]'],
   ['Array(DateTime)', 'none', 'timestamp[]'],
   ['Array(Nullable(String))', 'none', 'text[]'],
@@ -176,11 +175,9 @@ describe('type mapping with CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE', () => {
     ['Decimal32(2)', 'decimal(9, 2)'],
     ['Decimal64(2)', 'decimal(18, 2)'],
     ['Decimal128(4)', 'decimal(38, 4)'],
-    // Decimal(76, 10) and Decimal256(10) are the same column, so both clamp to the same DDL.
     ['Decimal(76, 10)', 'decimal(38, 10)'],
     ['Decimal256(10)', 'decimal(38, 10)'],
     ['Decimal256(4)', 'decimal(38, 4)'],
-    // Cube Store widens a precision back up to the scale, so a scale past 38 is clamped too.
     ['Decimal(76, 40)', 'decimal(38, 38)'],
     ['Decimal256(40)', 'decimal(38, 38)'],
     ['Nullable(Decimal128(4))', 'decimal(38, 4)'],
@@ -191,7 +188,7 @@ describe('type mapping with CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE', () => {
     // argument-less or zero-scale decimal still reaches Cube Store as its default 18, 5.
     ['Decimal', 'decimal'],
     ['Decimal32(0)', 'decimal'],
-    // The 128 and 256 bit integers map to decimal by name, without a precision of their own.
+    // Mapped to decimal by name, so they carry no precision of their own.
     ['Int128', 'decimal'],
     ['UInt256', 'decimal'],
   ];

@@ -110,9 +110,6 @@ const TRANSPARENT_WRAPPERS = new Map<string, number>([
 
 const MAX_UNWRAP_DEPTH = 32;
 
-/**
- * Resolves the type a value actually reads back as.
- */
 export function unwrapScalarType(type: string): ParsedType {
   let parsed = parseType(type);
 
