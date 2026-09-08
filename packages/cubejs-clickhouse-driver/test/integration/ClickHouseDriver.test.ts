@@ -98,10 +98,7 @@ describe('ClickHouseDriver', () => {
               nullable_uuid Nullable(UUID),
               array_date32 Array(Date32),
               array_uuid Array(UUID),
-              map_str_date32 Map(String, Date32),
-              simple_agg_int64 SimpleAggregateFunction(sum, Int64),
-              simple_agg_datetime64 SimpleAggregateFunction(max, DateTime64(3)),
-              simple_agg_map SimpleAggregateFunction(anyLast, Map(String, Int64))
+              map_str_date32 Map(String, Date32)
             ) ENGINE Log
         `
       );
@@ -111,9 +108,27 @@ describe('ClickHouseDriver', () => {
           '2020-01-01', true, '00000000-0000-0000-0000-000000000001', 'abcd', '1.2.3.4', '::1',
           '1', '2', '3', '4', '1.01', 'abcd', null,
           ['2020-01-01'], ['00000000-0000-0000-0000-000000000001'], { a: '2020-01-01' },
-          5, '2020-01-02 00:00:00.123', { a: 1 },
         ]
       ]);
+
+      // An aggregate state has no generic type, so this table is only ever read through `query`.
+      await driver.command(
+        `
+            CREATE TABLE test.agg_types_test (
+              agg_uniq AggregateFunction(uniq, String),
+              simple_agg_int64 SimpleAggregateFunction(sum, Int64),
+              simple_agg_datetime64 SimpleAggregateFunction(max, DateTime64(3)),
+              simple_agg_map SimpleAggregateFunction(anyLast, Map(String, Int64))
+            ) ENGINE AggregatingMergeTree ORDER BY tuple()
+        `
+      );
+
+      await driver.command(
+        `
+            INSERT INTO test.agg_types_test
+            SELECT uniqState('x'), 5, '2020-01-02 00:00:00.123', map('a', 1::Int64)
+        `
+      );
     });
   }, 30 * 1000);
 
@@ -465,9 +480,6 @@ describe('ClickHouseDriver', () => {
           { name: 'array_date32', type: 'date[]' },
           { name: 'array_uuid', type: 'uuid[]' },
           { name: 'map_str_date32', type: 'text' },
-          { name: 'simple_agg_int64', type: 'bigint' },
-          { name: 'simple_agg_datetime64', type: 'timestamp' },
-          { name: 'simple_agg_map', type: 'text' },
         ]);
         expect(await streamToArray(tableData.rowStream as any)).toEqual([
           {
@@ -487,18 +499,39 @@ describe('ClickHouseDriver', () => {
             array_date32: ['2020-01-01'],
             array_uuid: ['00000000-0000-0000-0000-000000000001'],
             map_str_date32: '{"a":"2020-01-01"}',
-            simple_agg_int64: '5',
-            simple_agg_datetime64: '2020-01-02T00:00:00.123',
-            // A container behind SimpleAggregateFunction used to be stringified into
-            // "[object Object]" by the substring based converter lookup. Int64 inside the map is
-            // quoted by ClickHouse itself, output_format_json_quote_64bit_integers is on by default.
-            simple_agg_map: '{"a":"1"}',
           },
         ]);
       } finally {
         // @ts-ignore
         await tableData.release();
       }
+    });
+  });
+
+  it('refuses an aggregate state as a column type', async () => {
+    await doWithDriver(async (driver) => {
+      await expect(driver.queryColumnTypes('test.agg_types_test', []))
+        .rejects.toThrow('ClickHouse type AggregateFunction(uniq, String) is not supported');
+      await expect(driver.queryColumnTypes('(SELECT simple_agg_int64 FROM test.agg_types_test)', []))
+        .rejects.toThrow('ClickHouse type SimpleAggregateFunction(sum, Int64) is not supported');
+    });
+  });
+
+  // A container behind SimpleAggregateFunction used to be stringified into "[object Object]" by the
+  // substring based converter lookup. Int64 inside the map is quoted by ClickHouse itself,
+  // output_format_json_quote_64bit_integers is on by default.
+  it('still converts a value read out of a SimpleAggregateFunction column', async () => {
+    await doWithDriver(async (driver) => {
+      const rows = await driver.query(
+        'SELECT simple_agg_int64, simple_agg_datetime64, simple_agg_map FROM test.agg_types_test',
+        [],
+      );
+
+      expect(rows).toEqual([{
+        simple_agg_int64: '5',
+        simple_agg_datetime64: '2020-01-02T00:00:00.123',
+        simple_agg_map: '{"a":"1"}',
+      }]);
     });
   });
 });

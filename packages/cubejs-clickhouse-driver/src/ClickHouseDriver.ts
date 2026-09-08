@@ -571,9 +571,16 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       case 'nullable':
       case 'lowcardinality':
         return args.length > 0 ? this.toGenericType(args[0], precision, scale) : 'text';
-      // SimpleAggregateFunction stores and reads back a plain value of its argument type
+      // Refused rather than mapped to the argument type, because Cube does not support aggregate
+      // state columns. `unwrapScalarType` still sees through SimpleAggregateFunction, so a plain
+      // query over such a column keeps converting its value correctly.
+      case 'aggregatefunction':
       case 'simpleaggregatefunction':
-        return args.length > 1 ? this.toGenericType(args[1]) : 'text';
+        throw new Error(
+          `ClickHouse type ${columnType.trim()} is not supported. Finalize the column in the ` +
+          'query instead: `sumMerge(col)` for AggregateFunction, `CAST(col AS UInt64)` for ' +
+          'SimpleAggregateFunction.'
+        );
       case 'array':
         return args.length > 0 ? `${this.toGenericType(args[0])}[]` : 'text';
       case 'decimal':

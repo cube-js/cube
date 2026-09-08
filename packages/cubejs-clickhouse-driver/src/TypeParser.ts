@@ -101,7 +101,8 @@ export function parseType(type: string): ParsedType {
 }
 
 // Index of the argument the wrapper reads back as. AggregateFunction is absent on purpose: it
-// returns an opaque state rather than a value of its argument type.
+// returns an opaque state rather than a value of its argument type. SimpleAggregateFunction is
+// present only so a plain query converts its value; as a column type it is refused upstream.
 const TRANSPARENT_WRAPPERS = new Map<string, number>([
   ['nullable', 0],
   ['lowcardinality', 0],
