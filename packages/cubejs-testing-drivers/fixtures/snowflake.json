@@ -321,11 +321,6 @@
     "SQL API: Extended nested Rollup over asterisk",
     "SQL API: SQL push down push to cube quoted alias",
 
-
-
-    "querying BigECommerce: rolling window by 2 day without date range",
-    "querying BigECommerce: rolling window by 2 month without date range",
-    "querying BigECommerce: rolling window YTD without date range",
     "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension",
 
     "---- Different results comparing to baseQuery version. Need to investigate ----",
