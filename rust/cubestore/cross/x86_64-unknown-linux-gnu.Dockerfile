@@ -4,7 +4,7 @@ FROM debian:bookworm-slim
 ARG LLVM_VERSION=18
 
 RUN apt-get update && apt-get -y upgrade \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y pkg-config wget curl git ca-certificates \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y pkg-config wget curl git gnupg ca-certificates \
     && wget -O /etc/apt/keyrings/llvm-snapshot.asc https://apt.llvm.org/llvm-snapshot.gpg.key \
     && echo "deb [signed-by=/etc/apt/keyrings/llvm-snapshot.asc] https://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-${LLVM_VERSION} main" > /etc/apt/sources.list.d/llvm.list \
     && apt-get update \
