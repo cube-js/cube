@@ -10,7 +10,6 @@ RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget curl apt-transport-https ca-certificates \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
     && add-apt-repository "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-$LLVM_VERSION main"  \
-    && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y libffi-dev binutils-multiarch binutils-aarch64-linux-gnu gcc-multilib g++-multilib \
     # llvm14-dev will install python 3.8 as bin/python3
