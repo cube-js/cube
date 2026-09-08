@@ -1043,8 +1043,9 @@ filter on the second column of an index prunes nothing unless a partition
 happens to cover a single value of the first column.
 
 **When queries filter the joined rollup by a highly selective, single-value
-dimension, define an index that puts that dimension before the join key.** In
-the example above, if queries commonly filter users by `alt_key`, add:
+dimension, define an index that puts that dimension before the join key.**
+Suppose `users` has such a dimension, `alt_key`, and queries commonly filter on
+it. Add it to `users_rollup` and index it ahead of the join key:
 
 <CodeGroup>
 
@@ -1089,9 +1090,13 @@ cube(`users`, {
 
 Cube Store will pick `alt_key_index` for the joined side of such a query — the
 join key is still covered by the index's leading columns, it just doesn't come
-first — and prune every partition whose range excludes the filtered value. This
-pays off twice over, because the joined rollup's partitions are not split across
-workers: each worker processing the query receives all of them.
+first — and prune every partition whose range excludes the filtered value.
+
+This pays off twice over, because the joined rollup's partitions are never split
+up: only the left-most rollup is divided into batches, and every batch carries
+all partitions of the joined one. Those partitions also consume the per-batch
+join budget that bounds how large the right side of a rollup join can be, so
+pruning them can be what keeps a query planning at all.
 
 A few things to keep in mind:
 
