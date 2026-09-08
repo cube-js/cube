@@ -1489,6 +1489,16 @@ cube(`orders`, {
 
 </CodeGroup>
 
+<Info>
+
+A measure with no `drill_members` offers no drill down at all. Set
+[`CUBEJS_AUTO_DRILL_MEMBERS`][ref-auto-drill-members] to give such measures a
+default set — the cube's own dimensions, primary key first. Measures that
+declare `drill_members` keep exactly what they declare, and `drill_members: []`
+suppresses the default for a single measure.
+
+</Info>
+
 
 [ref-ai-context]: /docs/data-modeling/ai-context
 [ref-ref-cubes]: /reference/data-modeling/cube
@@ -1510,3 +1520,4 @@ cube(`orders`, {
 [link-iso-4217]: https://en.wikipedia.org/wiki/ISO_4217
 [ref-calculated-measures]: /docs/data-modeling/measures#calculated-measures
 [ref-schema-ref-preaggs-rollup]: /reference/data-modeling/pre-aggregations#rollup
+[ref-auto-drill-members]: /reference/configuration/environment-variables#cubejs_auto_drill_members
