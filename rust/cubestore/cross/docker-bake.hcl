@@ -1,6 +1,6 @@
 variable "CROSS_VERSION" {
   // dmY
-  default = "31072025"
+  default = "08092026"
 }
 
 variable "LLVM_VERSION" {

@@ -38,8 +38,8 @@ ENV ARCH=arm \
     LD=aarch64-linux-gnu-ld \
     RUNLIB=aarch64-linux-gnu-ranlib
 
-ENV ZLIB_VERSION=1.3.1
-RUN wget https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz -O - | tar -xz && \
+ENV ZLIB_VERSION=1.3.2
+RUN wget https://github.com/madler/zlib/releases/download/v${ZLIB_VERSION}/zlib-${ZLIB_VERSION}.tar.gz -O - | tar -xz && \
     cd zlib-${ZLIB_VERSION} && \
     ./configure --prefix=/usr/aarch64-linux-gnu && \
     make -j $(nproc) && \
