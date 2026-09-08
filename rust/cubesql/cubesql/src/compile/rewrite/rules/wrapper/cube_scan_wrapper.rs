@@ -3,22 +3,20 @@ use crate::{
         cube_scan, cube_scan_wrapper, rewrite,
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
-        transforming_rewrite, wrapper_pullup_replacer, wrapper_replacer_context,
+        transforming_rewrite_multi, wrapper_pullup_replacer, wrapper_replacer_context,
         CubeScanAliasToCube, CubeScanLimit, CubeScanOffset, CubeScanUngrouped, LogicalPlanLanguage,
         WrapperReplacerContextAliasToCube, WrapperReplacerContextGroupedSubqueries,
         WrapperReplacerContextInputDataSource, WrapperReplacerContextPushToCube,
         WrapperReplacerContextUngroupedScan,
     },
-    copy_flag,
-    transport::DataSource,
-    var, var_iter,
+    copy_flag, var, var_iter,
 };
 use egg::Subst;
 
 impl WrapperRules {
     pub fn cube_scan_wrapper_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
-            transforming_rewrite(
+            transforming_rewrite_multi(
                 "wrapper-cube-scan-wrap",
                 cube_scan(
                     "?alias_to_cube",
@@ -96,7 +94,7 @@ impl WrapperRules {
         grouped_subqueries_out_var: &'static str,
         ungrouped_scan_out_var: &'static str,
         input_data_source_out_var: &'static str,
-    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &Subst) -> Vec<Subst> {
         let members_var = var!(members_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let limit_var = var!(limit_var);
@@ -109,6 +107,8 @@ impl WrapperRules {
         let input_data_source_out_var = var!(input_data_source_out_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
+            let mut subst = subst.clone();
+
             let mut has_no_limit_or_offset = true;
             for limit in var_iter!(egraph[subst[limit_var]], CubeScanLimit).cloned() {
                 has_no_limit_or_offset &= limit.is_none();
@@ -125,25 +125,33 @@ impl WrapperRules {
                 ungrouped_scan_out_var,
                 WrapperReplacerContextUngroupedScan
             ) {
-                return false;
+                return vec![];
             }
+
+            let Some(alias_to_cube) =
+                var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube)
+                    .next()
+                    .cloned()
+            else {
+                return vec![];
+            };
+            let Some(ungrouped) = var_iter!(egraph[subst[ungrouped_cube_var]], CubeScanUngrouped)
+                .next()
+                .cloned()
+            else {
+                return vec![];
+            };
+            // When CubeScan already has limit or offset, it's unsafe to allow to push
+            // anything on top to Cube.
+            // Especially aggregation: aggregate does not commute with limit,
+            // so it would be incorrect to join them to single CubeScan
+            let push_to_cube_out = ungrouped && has_no_limit_or_offset;
 
             // This rule would wrap CubeScan, which would try to generate data source SQL for it
             // This means that CubeScan should allow for this
-            // View can reference cubes from different data sources, and should be disallowed here
-            // But
-            // During rewrites we can generate representations like CubeScan(AllMembers(view))
-            // And that would be an issue for representations like this: Aggregate(CSW(CubeScan(AllMembers(view), ungrouped=true)))
-            // In this plan aggregate can be pushed into wrapper, and it would limit members
-            // that would be actually referenced later, during SQL generation
-            // But this rule would see only AllMembers, and disallow SQL pushdown for views like that
-            // Rewriting views like this would require further limiting data sources during later rewrtie stages
-            // And, probably, penalizing multi-datasource representations in cost
-            // TODO find a clever-er way to allow SQL pushdown for multi-datasource views
-
-            let data_source = {
+            let data_sources = {
                 let Some(members) = &egraph[subst[members_var]].data.member_name_to_expr else {
-                    return false;
+                    return vec![];
                 };
 
                 let member_names = members
@@ -153,61 +161,60 @@ impl WrapperRules {
                 // TODO get all referenced members (from members, filters, order etc.)
                 let every_member_name = member_names;
 
-                meta.data_source_for_member_names(every_member_name)
+                let Ok(data_sources) = meta.data_sources_for_member_names(every_member_name) else {
+                    return vec![];
+                };
+                data_sources
             };
-            // See comment above about wrapping CubeScan(AllMembers(view), ungrouped=true)
-            let Ok(data_source) = data_source else {
-                return false;
+            // A scan that nothing is pushed into is rendered as is, so several data sources
+            // among its members cannot be resolved to one. A scan that is pushed into is
+            // narrowed later, so each data source gets its own context (`member_fits_data_source`)
+            if data_sources.len() > 1 && !push_to_cube_out {
+                return vec![];
+            }
+            let data_sources_out: Vec<Option<String>> = if data_sources.is_empty() {
+                vec![None]
+            } else {
+                data_sources
+                    .iter()
+                    .map(|data_source| Some(data_source.to_string()))
+                    .collect()
             };
 
-            for alias_to_cube in
-                var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
-            {
-                for ungrouped in
-                    var_iter!(egraph[subst[ungrouped_cube_var]], CubeScanUngrouped).cloned()
-                {
-                    // When CubeScan already has limit or offset, it's unsafe to allow to push
-                    // anything on top to Cube.
-                    // Especially aggregation: aggregate does not commute with limit,
-                    // so it would be incorrect to join them to single CubeScan
-                    let push_to_cube_out = ungrouped && has_no_limit_or_offset;
+            subst.insert(
+                push_to_cube_out_var,
+                egraph.add(LogicalPlanLanguage::WrapperReplacerContextPushToCube(
+                    WrapperReplacerContextPushToCube(push_to_cube_out),
+                )),
+            );
+            subst.insert(
+                alias_to_cube_var_out,
+                egraph.add(LogicalPlanLanguage::WrapperReplacerContextAliasToCube(
+                    WrapperReplacerContextAliasToCube(alias_to_cube),
+                )),
+            );
+            subst.insert(
+                grouped_subqueries_out_var,
+                egraph.add(
+                    LogicalPlanLanguage::WrapperReplacerContextGroupedSubqueries(
+                        WrapperReplacerContextGroupedSubqueries(vec![]),
+                    ),
+                ),
+            );
 
-                    let data_source_out = match data_source {
-                        DataSource::Unrestricted => None,
-                        DataSource::Specific(data_source) => Some(data_source.to_string()),
-                    };
-
+            data_sources_out
+                .into_iter()
+                .map(|data_source_out| {
+                    let mut subst = subst.clone();
                     subst.insert(
                         input_data_source_out_var,
                         egraph.add(LogicalPlanLanguage::WrapperReplacerContextInputDataSource(
                             WrapperReplacerContextInputDataSource(data_source_out),
                         )),
                     );
-                    subst.insert(
-                        push_to_cube_out_var,
-                        egraph.add(LogicalPlanLanguage::WrapperReplacerContextPushToCube(
-                            WrapperReplacerContextPushToCube(push_to_cube_out),
-                        )),
-                    );
-                    subst.insert(
-                        alias_to_cube_var_out,
-                        egraph.add(LogicalPlanLanguage::WrapperReplacerContextAliasToCube(
-                            WrapperReplacerContextAliasToCube(alias_to_cube),
-                        )),
-                    );
-                    subst.insert(
-                        grouped_subqueries_out_var,
-                        egraph.add(
-                            LogicalPlanLanguage::WrapperReplacerContextGroupedSubqueries(
-                                WrapperReplacerContextGroupedSubqueries(vec![]),
-                            ),
-                        ),
-                    );
-                    return true;
-                }
-            }
-
-            false
+                    subst
+                })
+                .collect()
         }
     }
 }

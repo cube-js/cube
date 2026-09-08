@@ -491,6 +491,8 @@ crate::plan_to_language! {
             // Data source restriction for SQL generation imposed by `input` of LP node being rewritten
             // Will be provided from top, when wrapping new LP node, and for initial CubeScan wrap
             // `None` means it is not restricted yet, any data source could work here
+            // A scan over a view spanning data sources gets one context per data source it
+            // reaches, and only members of that data source are pushed into each of them
             input_data_source: Option<String>,
         },
         WrapperPushdownReplacer {
@@ -823,6 +825,27 @@ where
         TransformingPattern::new(applier.as_str(), move |egraph, _, subst| {
             transform_fn(egraph, subst)
         }),
+    )
+    .unwrap()
+}
+
+/// [`transforming_rewrite`] whose transform yields any number of substitutions, each applied
+/// as its own instance of the applier pattern and unioned with the matched class. For a
+/// match that has several valid outcomes at once, like a scan over a view spanning data
+/// sources that gets one wrapper context per data source.
+pub fn transforming_rewrite_multi<T>(
+    name: &str,
+    searcher: String,
+    applier: String,
+    transform_fn: T,
+) -> CubeRewrite
+where
+    T: Fn(&mut CubeEGraph, &Subst) -> Vec<Subst> + Sync + Send + 'static,
+{
+    Rewrite::new(
+        name.to_string(),
+        searcher.parse::<Pattern<LogicalPlanLanguage>>().unwrap(),
+        MultiTransformingPattern::new(applier.as_str(), transform_fn),
     )
     .unwrap()
 }
@@ -2693,6 +2716,48 @@ where
         } else {
             Vec::new()
         }
+    }
+}
+
+pub struct MultiTransformingPattern<T>
+where
+    T: Fn(&mut CubeEGraph, &Subst) -> Vec<Subst>,
+{
+    pattern: Pattern<LogicalPlanLanguage>,
+    substitutions: T,
+}
+
+impl<T> MultiTransformingPattern<T>
+where
+    T: Fn(&mut CubeEGraph, &Subst) -> Vec<Subst>,
+{
+    pub fn new(pattern: &str, substitutions: T) -> Self {
+        Self {
+            pattern: pattern.parse().unwrap(),
+            substitutions,
+        }
+    }
+}
+
+impl<T> Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for MultiTransformingPattern<T>
+where
+    T: Fn(&mut CubeEGraph, &Subst) -> Vec<Subst>,
+{
+    fn apply_one(
+        &self,
+        egraph: &mut CubeEGraph,
+        eclass: Id,
+        subst: &Subst,
+        searcher_ast: Option<&PatternAst<LogicalPlanLanguage>>,
+        rule_name: Symbol,
+    ) -> Vec<Id> {
+        (self.substitutions)(egraph, subst)
+            .iter()
+            .flat_map(|subst| {
+                self.pattern
+                    .apply_one(egraph, eclass, subst, searcher_ast, rule_name)
+            })
+            .collect()
     }
 }
 
