@@ -17687,6 +17687,40 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
     }
 
     #[tokio::test]
+    async fn test_sort_by_projected_literal_alias_push_to_cube() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT customer_gender, 19 AS hour_slot, taxful_total_price
+            FROM KibanaSampleDataEcommerce
+            ORDER BY hour_slot ASC
+            LIMIT 100
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let request = logical_plan.find_cube_scan_wrapped_sql().request;
+        assert_eq!(
+            request.order,
+            Some(vec![vec!["hour_slot".to_string(), "asc".to_string()]])
+        );
+        assert_eq!(request.limit, Some(100));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
     async fn test_date_filter_with_or_and() {
         init_testing_logger();
 

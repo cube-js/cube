@@ -2048,16 +2048,21 @@ impl WrappedSelectNode {
             }
             expr
         }
-        let literal_aliases = self
-            .projection_expr
-            .iter()
-            .zip(projection.iter())
-            .chain(flat_group_expr.iter().zip(group_by.iter()))
-            .filter_map(|(selected_expr, (aliased_column, _))| {
-                let expr = unalias(selected_expr);
-                matches!(expr, Expr::Literal(_)).then(|| (expr, &aliased_column.alias))
-            })
-            .collect::<Vec<_>>();
+        // Push-to-Cube builds its order separately from self.order_expr. Generated SQL
+        // aliases are not scan members and cannot be resolved on that path.
+        let literal_aliases = if push_to_cube_context.is_some() {
+            vec![]
+        } else {
+            self.projection_expr
+                .iter()
+                .zip(projection.iter())
+                .chain(flat_group_expr.iter().zip(group_by.iter()))
+                .filter_map(|(selected_expr, (aliased_column, _))| {
+                    let expr = unalias(selected_expr);
+                    matches!(expr, Expr::Literal(_)).then(|| (expr, &aliased_column.alias))
+                })
+                .collect::<Vec<_>>()
+        };
         let order_expr = if literal_aliases.is_empty() {
             self.order_expr.clone()
         } else {
