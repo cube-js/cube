@@ -567,6 +567,12 @@ crate::plan_to_language! {
 
 // trace_macros!(false);
 
+/// Positions of `WrappedSelect` children, for the rules that reach into the node instead of
+/// matching it with a pattern. Keep in sync with the `WrappedSelect` definition above.
+pub const WRAPPED_SELECT_SELECT_TYPE: usize = 0;
+pub const WRAPPED_SELECT_FROM: usize = 6;
+pub const WRAPPED_SELECT_JOINS: usize = 7;
+
 #[macro_export]
 macro_rules! var_iter {
     ($eclass:expr, $field_variant:ident) => {{
@@ -935,6 +941,7 @@ pub enum ListType {
     WrappedSelectGroupExpr,
     WrappedSelectAggrExpr,
     WrappedSelectWindowExpr,
+    WrappedSelectJoins,
     CubeScanMembers,
     UnionInputs,
     WrappedUnionInputs,
@@ -958,6 +965,7 @@ impl ListType {
             Self::WrappedSelectGroupExpr => wrapped_select_group_expr_empty_tail(),
             Self::WrappedSelectAggrExpr => wrapped_select_aggr_expr_empty_tail(),
             Self::WrappedSelectWindowExpr => wrapped_select_window_expr_empty_tail(),
+            Self::WrappedSelectJoins => wrapped_select_joins_empty_tail(),
             Self::CubeScanMembers => cube_scan_members_empty_tail(),
             Self::UnionInputs => union_inputs_empty_tail(),
             Self::WrappedUnionInputs => wrapped_union_inputs_empty_tail(),
@@ -1053,6 +1061,9 @@ impl ListNodeSearcher {
             }
             ListType::WrappedSelectWindowExpr => {
                 matches!(node, LogicalPlanLanguage::WrappedSelectWindowExpr(_))
+            }
+            ListType::WrappedSelectJoins => {
+                matches!(node, LogicalPlanLanguage::WrappedSelectJoins(_))
             }
             ListType::CubeScanMembers => {
                 matches!(node, LogicalPlanLanguage::CubeScanMembers(_))
@@ -1194,6 +1205,11 @@ struct ListNodeApplierList {
     list_type: ListType,
     new_list_var: Var,
     elem_pattern: PatternAst<LogicalPlanLanguage>,
+    /// Elements put after the ones the searcher matched. They are instantiated from the
+    /// outer substitution alone, so they can only mention variables the list walk does not
+    /// bind. This is what lets a rule append to a list it matched: the pattern language can
+    /// name a list, but not spell out a list with one more element than another one.
+    appended_elem_patterns: Vec<PatternAst<LogicalPlanLanguage>>,
 }
 
 impl ListNodeApplierList {
@@ -1224,6 +1240,7 @@ impl ListNodeApplierList {
             ListType::WrappedSelectGroupExpr => LogicalPlanLanguage::WrappedSelectGroupExpr(list),
             ListType::WrappedSelectAggrExpr => LogicalPlanLanguage::WrappedSelectAggrExpr(list),
             ListType::WrappedSelectWindowExpr => LogicalPlanLanguage::WrappedSelectWindowExpr(list),
+            ListType::WrappedSelectJoins => LogicalPlanLanguage::WrappedSelectJoins(list),
             ListType::CubeScanMembers => LogicalPlanLanguage::CubeScanMembers(list),
             ListType::UnionInputs => LogicalPlanLanguage::UnionInputs(list),
             ListType::WrappedUnionInputs => LogicalPlanLanguage::WrappedUnionInputs(list),
@@ -1235,6 +1252,23 @@ pub struct ListApplierListPattern {
     list_type: ListType,
     new_list_var: String,
     elem_pattern: String,
+    appended_elem_patterns: Vec<String>,
+}
+
+impl ListApplierListPattern {
+    pub fn new(list_type: ListType, new_list_var: &str, elem_pattern: &str) -> Self {
+        Self {
+            list_type,
+            new_list_var: new_list_var.to_string(),
+            elem_pattern: elem_pattern.to_string(),
+            appended_elem_patterns: vec![],
+        }
+    }
+
+    pub fn with_appended(mut self, elem_patterns: impl IntoIterator<Item = String>) -> Self {
+        self.appended_elem_patterns = elem_patterns.into_iter().collect();
+        self
+    }
 }
 
 type ListNodeTransform = Box<dyn Fn(&mut CubeEGraph, &mut Subst) -> bool + Sync + Send>;
@@ -1268,11 +1302,11 @@ impl ListNodeApplier {
     ) -> Self {
         Self::from_lists(
             list_pattern,
-            [ListApplierListPattern {
+            [ListApplierListPattern::new(
                 list_type,
-                new_list_var: new_list_var.to_string(),
-                elem_pattern: elem_pattern.to_string(),
-            }],
+                new_list_var,
+                elem_pattern,
+            )],
         )
     }
 
@@ -1290,6 +1324,11 @@ impl ListNodeApplier {
                     list_type: list.list_type,
                     new_list_var: list.new_list_var.parse().unwrap(),
                     elem_pattern: list.elem_pattern.parse().unwrap(),
+                    appended_elem_patterns: list
+                        .appended_elem_patterns
+                        .iter()
+                        .map(|pattern| pattern.parse().unwrap())
+                        .collect(),
                 })
                 .collect(),
         }
@@ -1311,11 +1350,29 @@ impl Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeApplier {
             .expect("no data, did you use ListNodeSearcher?");
         let list_matches = data.downcast_ref::<ListMatches>().expect("wrong data type");
 
-        let mut subst = subst.clone();
+        let outer_subst = subst.clone();
         let mut result_ids = vec![];
         list_matches.for_each(|list_substs| {
+            // The transform runs before the lists are built, so an element the applier adds
+            // can be spelled out in terms of what the transform binds. It sees the first
+            // element of the list, the way the applier pattern does - but only what it binds
+            // itself is carried on from here: `Subst` keeps the first value of a variable, so
+            // leaving the element's own bindings in place would shadow the other elements.
+            let mut subst = outer_subst.clone();
+            if let Some(transform) = &self.transform {
+                let mut transform_subst = outer_subst.clone();
+                transform_subst.extend(list_substs[0].iter());
+                if !transform(egraph, &mut transform_subst) {
+                    return;
+                }
+                for var in &self.transform_vars {
+                    if let Some(id) = transform_subst.get(*var) {
+                        subst.insert(*var, *id);
+                    }
+                }
+            }
             for list in &self.lists {
-                let new_list = list_substs
+                let mut new_list: Vec<Id> = list_substs
                     .iter()
                     .map(|list_subst| {
                         let mut subst = subst.clone();
@@ -1323,16 +1380,13 @@ impl Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeApplier {
                         egraph.add_instantiation(&list.elem_pattern, &subst)
                     })
                     .collect();
+                for appended in &list.appended_elem_patterns {
+                    new_list.push(egraph.add_instantiation(appended, &subst));
+                }
 
                 subst.insert(list.new_list_var, egraph.add(list.make_node(new_list)));
             }
-            let mut subst = subst.clone();
             subst.extend(list_substs[0].iter());
-            if let Some(transform) = &self.transform {
-                if !transform(egraph, &mut subst) {
-                    return;
-                }
-            }
             let new_id = egraph.add_instantiation(&self.list_pattern, &subst);
             if egraph.union(eclass, new_id) {
                 result_ids.push(new_id);
@@ -1347,6 +1401,9 @@ impl Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeApplier {
         let mut vars = self.list_pattern.vars();
         for list in &self.lists {
             vars.extend(list.elem_pattern.vars());
+            for appended in &list.appended_elem_patterns {
+                vars.extend(appended.vars());
+            }
             vars.retain(|v| *v != list.new_list_var); // this is bound by the applier itself
         }
         vars.retain(|v| !self.transform_vars.contains(v)); // and these by the transform
@@ -1715,13 +1772,16 @@ fn wrapped_select_join(input: impl Display, expr: impl Display, join_type: impl 
     format!("(WrappedSelectJoin {} {} {})", input, expr, join_type)
 }
 
-#[allow(dead_code)]
-fn wrapped_select_joins(left: impl Display, right: impl Display) -> String {
-    format!("(WrappedSelectJoins {} {})", left, right)
+/// A join list of a `WrappedSelect`, holding the joins in the order the query joins them in:
+/// a condition can refer to a subquery joined earlier, so the order is part of the meaning.
+/// The list is flat, so a rule that adds a join matches the whole list and rebuilds it with
+/// the new join at the end.
+fn wrapped_select_joins(joins: Vec<impl Display>) -> String {
+    flat_list_expr("WrappedSelectJoins", joins, true)
 }
 
 fn wrapped_select_joins_empty_tail() -> String {
-    "WrappedSelectJoins".to_string()
+    wrapped_select_joins(Vec::<String>::new())
 }
 
 fn wrapped_union(inputs: impl Display, distinct: impl Display, alias: impl Display) -> String {
@@ -2538,6 +2598,10 @@ where
 /// substitution carries the list's own variables — including the `top_level_elem_vars`
 /// every element agreed on — so it can build what a pattern cannot: a cleared replacer
 /// context, an alias converted to another node type.
+///
+/// It runs *before* the lists are built, so an element the applier appends can be spelled
+/// out in terms of what the transform binds. Only the variables named in `transform_vars`
+/// are carried on from it, and it cannot read a `new_list_var`.
 pub fn transforming_list_rewrite_with_lists_and_vars<T>(
     name: &str,
     list_type: ListType,
