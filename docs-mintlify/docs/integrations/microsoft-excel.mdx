@@ -59,11 +59,9 @@ Search for `Cube for Excel (add-in)` and click **Add**:
 
 You need to authenticate Cube for Excel to retrieve data from Cube.
 To do so, open the sidebar by clicking on the **Cube** button in
-the **Home** ribbon. Then, click **Sign in**.
+the **Home** ribbon. Then, click **Log in to Cube**.
 
-<Frame>
-  <img src="https://ucarecdn.com/bdf82477-02d3-4686-9c8f-8d6384c3e7f3/" />
-</Frame>
+{/* TODO: screenshot — sign-in screen redesign, headline "Log in to continue" and a "Log in to Cube" button */}
 
 A modal window with an authentication prompt will appear. Choose the deployments
 that you want to work with in Microsoft Excel and click **Authorize**.
@@ -114,6 +112,10 @@ cell and then confirm with the target button under **Result location**.
 With every change to your query, Cube for Excel will update the exploration on
 the sheet after a slight delay. If you'd like to minimize it, consider
 implementing [pre-aggregations][ref-pre-aggs].
+
+Writing a large result to the sheet can take a few seconds. When it does, a
+progress bar appears above the run controls, tracking the write itself rather
+than the query.
 
 ### Measure position and order
 

@@ -9,7 +9,7 @@ use super::{
 use crate::physical_plan::cube_ref_evaluator::CubeRefEvaluator;
 use crate::physical_plan::sql_nodes::calendar_time_shift::CalendarTimeShiftSqlNode;
 use crate::physical_plan::sql_nodes::RenderReferences;
-use crate::planner::planners::multi_stage::TimeShiftState;
+use crate::planner::planners::multi_stage::{FilterParamsTimeShifts, TimeShiftState};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::symbols::CalendarDimensionTimeShift;
 use std::collections::{HashMap, HashSet};
@@ -23,6 +23,7 @@ use std::rc::Rc;
 pub struct SqlNodesFactory {
     time_shifts: TimeShiftState,
     calendar_time_shifts: HashMap<String, CalendarDimensionTimeShift>,
+    filter_params_time_shifts: FilterParamsTimeShifts,
     render_references: RenderReferences,
     pre_aggregation_dimensions_references: RenderReferences,
     pre_aggregation_measures_references: RenderReferences,
@@ -47,6 +48,14 @@ impl SqlNodesFactory {
 
     pub fn time_shifts(&self) -> &TimeShiftState {
         &self.time_shifts
+    }
+
+    pub fn set_filter_params_time_shifts(&mut self, shifts: FilterParamsTimeShifts) {
+        self.filter_params_time_shifts = shifts;
+    }
+
+    pub fn filter_params_time_shifts(&self) -> &FilterParamsTimeShifts {
+        &self.filter_params_time_shifts
     }
 
     pub fn set_calendar_time_shifts(

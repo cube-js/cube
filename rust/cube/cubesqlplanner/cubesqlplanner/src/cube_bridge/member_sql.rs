@@ -178,6 +178,11 @@ impl std::fmt::Debug for FilterParamsColumn {
 pub struct FilterParamsItem {
     pub cube_name: String,
     pub name: String,
+    /// The time shift this binding addresses, from
+    /// `FILTER_PARAMS.<cube>.<member>.time_shifts.<name>.filter(...)`. A
+    /// binding naming a shift renders only in a stage where that shift is
+    /// active; one naming none renders only where no calendar shift is.
+    pub time_shift_name: Option<String>,
     pub column: FilterParamsColumn,
 }
 
@@ -189,6 +194,7 @@ impl FilterParamsItem {
         Ok(Self {
             cube_name: self.cube_name.clone(),
             name: self.name.clone(),
+            time_shift_name: self.time_shift_name.clone(),
             column: self.column.clone_to_context(context_ref)?,
         })
     }
@@ -202,6 +208,10 @@ impl<IT: InnerTypes> NativeSerialize<IT> for FilterParamsItem {
         let result = context.empty_struct()?;
         result.set_field("cube_name", self.cube_name.to_native(context.clone())?)?;
         result.set_field("name", self.name.to_native(context.clone())?)?;
+        result.set_field(
+            "time_shift_name",
+            self.time_shift_name.to_native(context.clone())?,
+        )?;
         result.set_field("column", self.column.to_native(context.clone())?)?;
 
         Ok(NativeObjectHandle::new(result.into_object()))
@@ -212,11 +222,20 @@ impl<IT: InnerTypes> NativeDeserialize<IT> for FilterParamsItem {
         let object = native_object.to_struct()?;
         let cube_name = String::from_native(object.get_field("cube_name")?)?;
         let name = String::from_native(object.get_field("name")?)?;
+        // Absent for a binding that addresses no time shift, which is how
+        // every `FILTER_PARAMS` binding was written before shifts became
+        // addressable.
+        let time_shift_name = object
+            .get_field("time_shift_name")
+            .ok()
+            .and_then(|v| Option::<String>::from_native(v).ok())
+            .flatten();
         let native_column = object.get_field("column")?;
         let column = FilterParamsColumn::from_native(native_column)?;
         let result = Self {
             cube_name,
             name,
+            time_shift_name,
             column,
         };
         Ok(result)
