@@ -1,6 +1,24 @@
-/* globals describe,test,expect,jest,beforeEach,afterEach */
-
 import { normalizeQuery, normalizeDateFilterValues, resolveDateRange } from '../src/query';
+
+// The tests below walk the normalized filter tree, including the OR/AND group
+// nodes that `NormalizedQuery.filters` (typed as a flat leaf array) does not
+// model. This mirrors what the untyped resolver in src/query.js really returns.
+// Fields are non-optional on purpose: a test that reaches for `.or` on a node
+// that has none should fail on the assertion, not be nudged into a guard here.
+type FilterNode = {
+  values: any[];
+  or: FilterNode[];
+  and: FilterNode[];
+};
+
+type NormalizedResult = {
+  filters: FilterNode[];
+  timeDimensions: { dateRange: string[] }[];
+};
+
+function normalized(query: any, persistent = false): NormalizedResult {
+  return normalizeQuery(query, persistent) as unknown as NormalizedResult;
+}
 
 // Tests for filter-leaf date-range resolution at the gateway. This mirrors
 // what `timeDimensions.dateRange` has always done: a single relative string
@@ -285,7 +303,7 @@ describe('normalizeQuery: date-range filter resolution', () => {
   test('top-level inDateRange filter with relative string is resolved', () => {
     // Why: even without an OR wrapper, a filter leaf with a relative date
     // value must be resolved at the gateway.
-    const result = normalizeQuery({
+    const result = normalized({
       ...baseQuery,
       filters: [
         { member: 'Orders.createdAt', operator: 'inDateRange', values: ['last 2 weeks'] },
@@ -301,7 +319,7 @@ describe('normalizeQuery: date-range filter resolution', () => {
   test('inDateRange leaf nested inside OR is resolved (the actual feature)', () => {
     // Why: this is the whole point. The recursive walker must reach leaves
     // inside groups and apply the helper there too.
-    const result = normalizeQuery({
+    const result = normalized({
       ...baseQuery,
       filters: [{
         or: [
@@ -319,7 +337,7 @@ describe('normalizeQuery: date-range filter resolution', () => {
 
   test('inDateRange leaf nested inside AND is resolved', () => {
     // Why: AND must work symmetrically with OR.
-    const result = normalizeQuery({
+    const result = normalized({
       ...baseQuery,
       filters: [{
         and: [
@@ -334,7 +352,7 @@ describe('normalizeQuery: date-range filter resolution', () => {
 
   test('deeply nested date filter (OR inside AND) is resolved', () => {
     // Why: the walker must recurse to arbitrary depth, not just one level.
-    const result = normalizeQuery({
+    const result = normalized({
       ...baseQuery,
       filters: [{
         and: [
@@ -358,7 +376,7 @@ describe('normalizeQuery: date-range filter resolution', () => {
     // Why: invariant — existing queries that only use top-level timeDimensions
     // must produce the same shape they always did. Both paths share
     // resolveDateRange so they cannot diverge.
-    const result = normalizeQuery({
+    const result = normalized({
       ...baseQuery,
       timeDimensions: [
         { dimension: 'Orders.createdAt', dateRange: 'last 2 weeks' },
@@ -374,7 +392,7 @@ describe('normalizeQuery: date-range filter resolution', () => {
   test('invalid relative date inside OR raises UserError at gateway', () => {
     // Why: a malformed relative date must fail at the API boundary with a
     // clear message, not deep in the SQL planner.
-    expect(() => normalizeQuery({
+    expect(() => normalized({
       ...baseQuery,
       filters: [{
         or: [
@@ -391,20 +409,20 @@ describe('normalizeQuery: date-range filter resolution', () => {
     const dayBoundaryNow = new Date(Date.UTC(2026, 5, 25, 2, 0, 0, 0));
     jest.spyOn(Date, 'now').mockReturnValue(dayBoundaryNow.getTime());
 
-    const utc = normalizeQuery({
+    const utc = normalized({
       ...baseQuery,
       timezone: 'UTC',
       filters: [{ or: [
         { member: 'Orders.createdAt', operator: 'inDateRange', values: ['today'] },
-      ]}],
+      ] }],
     }, false);
 
-    const la = normalizeQuery({
+    const la = normalized({
       ...baseQuery,
       timezone: 'America/Los_Angeles',
       filters: [{ or: [
         { member: 'Orders.createdAt', operator: 'inDateRange', values: ['today'] },
-      ]}],
+      ] }],
     }, false);
 
     expect(utc.filters[0].or[0].values[0]).toMatch(/^2026-06-25T/);
@@ -413,7 +431,7 @@ describe('normalizeQuery: date-range filter resolution', () => {
 
   test('non-date filters inside OR are untouched', () => {
     // Why: regression guard — equals/contains/etc. must not be modified.
-    const result = normalizeQuery({
+    const result = normalized({
       ...baseQuery,
       filters: [{
         or: [
