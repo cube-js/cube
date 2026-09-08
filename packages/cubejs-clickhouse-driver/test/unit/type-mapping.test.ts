@@ -30,8 +30,6 @@ function converterLabel(type: string): string {
   return label ?? 'unknown';
 }
 
-// Written out inline rather than snapshotted, so a change to either seam shows up as a reviewable
-// diff.
 const TYPES: Array<[type: string, converter: string, generic: string]> = [
   ['Int8', 'number', 'int'],
   ['Int16', 'number', 'int'],
@@ -107,6 +105,11 @@ const TYPES: Array<[type: string, converter: string, generic: string]> = [
   ['MultiLineString', 'json', 'text'],
   ['Polygon', 'json', 'text'],
   ['MultiPolygon', 'json', 'text'],
+  ['SimpleAggregateFunction(sum, Int64)', 'number', 'bigint'],
+  ['SimpleAggregateFunction(max, DateTime64(3))', 'dt3', 'timestamp'],
+  ['SimpleAggregateFunction(anyLast, Map(String, Int64))', 'json', 'text'],
+  ['SimpleAggregateFunction(groupArrayArray, Array(Int64))', 'none', 'bigint[]'],
+  ['SimpleAggregateFunction(anyLast, Map(String, Enum8(\'a,b\' = 1)))', 'json', 'text'],
   ['IntervalDay', 'none', 'text'],
   ['IntervalMonth', 'none', 'text'],
   // unbalanced or unknown input must not throw; an unknown name is reported as is, so that it fails
@@ -117,16 +120,11 @@ const TYPES: Array<[type: string, converter: string, generic: string]> = [
   ['', 'none', ''],
 ];
 
-// An aggregate state has no generic type, but a value read out of one still needs the converter its
-// argument type would get, because a plain query over such a column returns that plain value.
+// An AggregateFunction state is refused as a column type, and no converter sees through it either:
+// the state bytes are not a value of the argument type.
 const AGGREGATE_TYPES: Array<[type: string, converter: string]> = [
   ['AggregateFunction(sum, Int64)', 'none'],
   ['AggregateFunction(quantiles(0.5, 0.9), UInt64)', 'none'],
-  ['SimpleAggregateFunction(sum, Int64)', 'number'],
-  ['SimpleAggregateFunction(max, DateTime64(3))', 'dt3'],
-  ['SimpleAggregateFunction(anyLast, Map(String, Int64))', 'json'],
-  ['SimpleAggregateFunction(groupArrayArray, Array(Int64))', 'none'],
-  ['SimpleAggregateFunction(anyLast, Map(String, Enum8(\'a,b\' = 1)))', 'json'],
 ];
 
 describe('type mapping', () => {
@@ -190,6 +188,7 @@ describe('type mapping with CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE', () => {
     ['Decimal256(40)', 'decimal(38, 38)'],
     ['Nullable(Decimal128(4))', 'decimal(38, 4)'],
     ['LowCardinality(Decimal64(2))', 'decimal(18, 2)'],
+    ['SimpleAggregateFunction(sum, Decimal64(2))', 'decimal(18, 2)'],
     ['Array(Decimal(9, 2))', 'decimal(9, 2)[]'],
     // The base driver only renders a precision when both parts are present and non-zero, so an
     // argument-less or zero-scale decimal still reaches Cube Store as its default 18, 5.

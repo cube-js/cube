@@ -1,8 +1,8 @@
 /**
- * ClickHouse type string parsing. Every raw type string in the driver is read through here.
+ * Every raw ClickHouse type string in the driver is read through here.
  *
- * TODO: replace with `@clickhouse/datatype-parser`, ClickHouse's own parser, once this package is
- * ESM. It is ESM only, so reaching it from CommonJS needs `await import()`, which turns every parse
+ * TODO: replace with ClickHouse's own `@clickhouse/datatype-parser` once this package is ESM. The
+ * parser is ESM only, so reaching it from CommonJS needs `await import()`, which turns every parse
  * site async.
  */
 
@@ -101,8 +101,7 @@ export function parseType(type: string): ParsedType {
 }
 
 // Index of the argument the wrapper reads back as. AggregateFunction is absent on purpose: it
-// returns an opaque state rather than a value of its argument type. SimpleAggregateFunction is
-// present only so a plain query converts its value; as a column type it is refused upstream.
+// returns an opaque state rather than a value of its argument type.
 const TRANSPARENT_WRAPPERS = new Map<string, number>([
   ['nullable', 0],
   ['lowcardinality', 0],
@@ -184,8 +183,8 @@ export function isNumericTypeName(name: string): boolean {
   return NUMERIC_TYPE_NAMES.has(name);
 }
 
-// Containers and opaque types have no scalar equivalent; a value of one is handed over as its JSON
-// rendering. Geo types are Point/Ring/Polygon and friends, all of them tuples of coordinates.
+// Types with no scalar equivalent; a value of one is handed over as its JSON rendering. The geo
+// types are in here because they are tuples of coordinates.
 const OPAQUE_TYPE_NAMES = new Set([
   'map', 'tuple', 'nested', 'variant', 'dynamic', 'json', 'object',
   'point', 'ring', 'polygon', 'multipolygon', 'linestring', 'multilinestring',
