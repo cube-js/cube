@@ -1031,6 +1031,84 @@ With all of the above set up, making a query such as the following will now use
 }
 ```
 
+### Indexing the joined rollup for partition pruning
+
+A `rollup_join` can only be planned if the rollup on each side of the join has
+an index whose leading columns cover the join key — that's what `user_index`
+above is for. However, an index that *starts* with the join key gives you no
+partition pruning: Cube Store partitions are ranged by index order, so a filter
+only prunes partitions when it constrains the index's leading column. A filter
+on the second column of an index prunes nothing unless a partition happens to
+cover a single value of the first column.
+
+**When queries filter the joined rollup by a highly selective, single-value
+dimension, define an index that puts that dimension before the join key.** In
+the example above, if queries commonly filter users by `alt_key`, add:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: users
+    # ...
+
+    pre_aggregations:
+      - name: users_rollup
+        dimensions:
+          - CUBE.id
+          - CUBE.name
+          - CUBE.alt_key
+
+        indexes:
+          - name: alt_key_index
+            columns:
+              - CUBE.alt_key
+              - CUBE.id
+```
+
+```javascript title="JavaScript"
+cube(`users`, {
+  // ...
+
+  pre_aggregations: {
+    users_rollup: {
+      dimensions: [CUBE.id, CUBE.name, CUBE.alt_key],
+
+      indexes: {
+        alt_key_index: {
+          columns: [CUBE.alt_key, CUBE.id]
+        }
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+Cube Store will pick `alt_key_index` for the joined side of such a query — the
+join key is still covered by the index's leading columns, it just doesn't come
+first — and prune every partition whose range excludes the filtered value. This
+pays off twice over, because the joined rollup's partitions are not split across
+workers: each worker processing the query receives all of them.
+
+A few things to keep in mind:
+
+- Only single-value (equality) filters prune this way. Range filters, including
+  time dimension filters, do not.
+- The join key must still be part of the index's leading columns, together with
+  the filtered dimension. Listing the filtered dimension alone, without the join
+  key, makes the index unusable for the join.
+- The other side of the join — typically the large rollup carrying the time
+  dimension — still needs an index that starts with the join key, and its time
+  dimension filter will not prune partitions there.
+- Each extra index adds build time and storage, so add one when the filter is
+  both common and selective.
+
+As always,
+[use `EXPLAIN` and `EXPLAIN ANALYZE`][ref-cubestore-sql-commands] to confirm
+which index was picked and how many partitions were scanned.
+
 ## Pre-Aggregation build strategies
 
 <Info>
