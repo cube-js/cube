@@ -1046,7 +1046,7 @@ export class PreAggregations {
       () => {
         // It's not enough to call buildJoin() directly on cubesFromPreAggregation()
         // because transitive joins won't be collected in that case.
-        const builtJoinTree = this.query.joinTreeForHints(this.cubesHintsFromPreAggregation(preAggObj), true);
+        const builtJoinTree = this.query.joinTreeForHints(this.cubesHintsToJoin(preAggObj), true);
 
         if (!builtJoinTree) {
           throw new UserError(`Can't build join tree for pre-aggregation ${preAggObj.cube}.${preAggObj.preAggregationName}`);
@@ -1057,7 +1057,7 @@ export class PreAggregations {
         // TODO join hints?
         const existingJoins = preAggObjsToJoin
           .map(p => this.resolveJoinMembers(
-            this.query.joinTreeForHints(this.cubesHintsFromPreAggregation(p), true)
+            this.query.joinTreeForHints(this.cubesHintsAlreadyJoined(p), true)
           ))
           .flat();
 
@@ -1136,12 +1136,32 @@ export class PreAggregations {
     });
   }
 
-  private cubesHintsFromPreAggregation(preAggObj: PreAggregationForQuery): string[][] {
-    return R.uniq(
+  private cubesHints(memberPaths: string[]): string[][] {
+    return R.uniq(memberPaths.map(p => p.split('.').slice(0, -1)));
+  }
+
+  /**
+   * Cubes the pre-aggregation's join tree has to span, including one reached
+   * only through a time dimension.
+   */
+  private cubesHintsToJoin(preAggObj: PreAggregationForQuery): string[][] {
+    return this.cubesHints(
       preAggObj.references.measures.concat(
         preAggObj.references.dimensions,
-        (preAggObj.references.timeDimensions || []).map(td => td.dimension)
-      ).map(p => p.split('.').slice(0, -1))
+        preAggObj.references.timeDimensions.map(td => td.dimension)
+      )
+    );
+  }
+
+  /**
+   * Cubes a rollup already stores members of, so that joins between them are
+   * not repeated at query time. Time dimensions are deliberately left out: a
+   * rollup storing a joined time dimension carries that one column, not the
+   * far cube's measures, so the join to reach them is still needed.
+   */
+  private cubesHintsAlreadyJoined(preAggObj: PreAggregationForQuery): string[][] {
+    return this.cubesHints(
+      preAggObj.references.measures.concat(preAggObj.references.dimensions)
     );
   }
 
