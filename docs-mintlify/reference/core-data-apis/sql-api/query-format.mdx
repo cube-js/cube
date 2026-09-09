@@ -140,57 +140,71 @@ is supported and whether it can be used in [selection][link-selection-projection
 (e.g., `WHERE`) or [projection][link-selection-projection] (e.g., `SELECT`) parts
 of SQL queries.
 
-For example, the following query won't work because the SQL API can't push down the
-`CASE` expression to Cube for processing. It is not possible to translate `CASE`
-expressions in measures.
+Expressions over dimensions, such as a `CASE` expression used as a grouping key,
+can't be translated into a [regular query][ref-regular-queries] or
+[post-processing][ref-queries-wpp]; they are handled by
+[query pushdown](#query-pushdown) instead. For example, the following query
+derives a fiscal year that starts in April and groups a measure by it:
 
 ```sql
 SELECT
-  city,
-  MAX(CASE
-    WHEN status = 'shipped'
-    THEN '2-done'
-    ELSE '1-in-progress'
-  END) AS real_status,
-  SUM(number)
+  CASE
+    WHEN EXTRACT(MONTH FROM created_at) >= 4
+    THEN EXTRACT(YEAR FROM created_at)
+    ELSE EXTRACT(YEAR FROM created_at) - 1
+  END AS fiscal_year,
+  MEASURE(count)
 FROM orders
-CROSS JOIN users
-GROUP BY 1;
+GROUP BY 1
+ORDER BY 1;
 ```
 
-You can leverage nested queries in cases like this. You can wrap your `SELECT`
-statement from a cube table (**inner query**) into another `SELECT` statement
-(**outer query**) to perform calculations with expressions like `CASE`.
-This outer `SELECT` is **not** part of the SQL query that being rewritten and
-thus allows you to use more SQL functions, operators and expressions.
+Query pushdown is enabled by default. Queries like the one above can't be
+rewritten and fail with the following error if pushdown is disabled via the
+[`CUBESQL_SQL_PUSH_DOWN`][ref-env-var-push-down] environment variable, or if the
+data source doesn't support pushing down one of the expressions used:
 
-You can rewrite the above query as follows, making sure to wrap the original
-`SELECT` statement:
+```text
+Can't detect Cube query and it may be not supported yet
+```
+
+If you hit this error, check that query pushdown is enabled and that every
+expression in the query is supported for your data source. Alternatively, you
+can leverage nested queries: wrap your `SELECT` statement from a cube table
+(**inner query**) into another `SELECT` statement (**outer query**) to perform
+calculations with expressions like `CASE`. The outer `SELECT` is applied as
+post-processing on top of the cube query rather than being rewritten into it,
+which allows you to use more SQL functions, operators, and expressions.
+
+Keep the inner query to shapes that a [regular query][ref-regular-queries]
+supports, and move every expression to the outer query:
 
 ```sql
 SELECT
-  city,
-  MAX(CASE
-    WHEN status = 'shipped' THEN '2-done'
-    ELSE '1-in-progress'
-  END) real_status,
-  SUM(amount) AS total
+  CASE
+    WHEN EXTRACT(MONTH FROM month) >= 4
+    THEN EXTRACT(YEAR FROM month)
+    ELSE EXTRACT(YEAR FROM month) - 1
+  END AS fiscal_year,
+  SUM(orders_count) AS total
 FROM (
   SELECT
-    users.city AS city,
-    SUM(number) AS amount,
-    orders.status
+    DATE_TRUNC('month', created_at) AS month,
+    MEASURE(count) AS orders_count
   FROM orders
-  CROSS JOIN users
-  GROUP BY 1, 3
-) AS inner
-GROUP BY 1, 2
+  GROUP BY 1
+) AS inner_query
+GROUP BY 1
 ORDER BY 1;
 --- You can also use CTEs to achieve the same result
 ```
 
-The above query works because the `CASE` expression is supported in `SELECT`
-queries **not** querying cube tables.
+This works because `count` is additive, so monthly values can be re-aggregated
+with `SUM`. For non-additive measures, such as `count_distinct` or `avg`, group
+the inner query by the same granularity you need in the output — re-aggregating
+their partial results would produce incorrect values. If no supported
+granularity matches that grouping, as is the case for a fiscal year, enable
+query pushdown or define the grouping as a dimension in your data model.
 
 ### Query pushdown
 
@@ -449,5 +463,6 @@ If a query of yours has that shape, you can:
 [ref-env-cubesql-stream-mode]: /reference/configuration/environment-variables#cubesql_stream_mode
 [ref-env-non-streaming-limit]: /reference/configuration/environment-variables#cubesql_non_streaming_query_max_row_limit
 [ref-ref-sql-api]: /reference/core-data-apis/sql-api/reference
+[ref-env-var-push-down]: /reference/configuration/environment-variables#cubesql_sql_push_down
 [link-postgres-boolean]: https://www.postgresql.org/docs/current/datatype-boolean.html
 [link-selection-projection]: https://stackoverflow.com/a/1031101
