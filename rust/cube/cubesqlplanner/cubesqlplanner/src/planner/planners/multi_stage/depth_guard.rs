@@ -5,9 +5,10 @@
 //! caller's thread, so a long enough chain exhausts that thread's stack and the process aborts —
 //! a crash no error handler sees, on either side of the native boundary.
 //!
-//! The guard turns that into a reportable error. It measures only multi-stage members: reference
-//! and calculation chains recurse as well, but cost a fraction of a stage per level, and models
-//! built over views reach depths a stage budget would refuse.
+//! The guard turns that into a reportable error. It measures only multi-stage members that are
+//! planned as a stage: calculation chains recurse as well, but cost a fraction of a stage per
+//! level, and a reference -- a view member proxying one, say -- inherits `multi_stage` from what
+//! it resolves to while planning collapses it into that member and opens no stage of its own.
 
 use crate::planner::symbols::MemberSymbol;
 use cubenativeutils::CubeError;
@@ -77,7 +78,8 @@ fn multi_stage_depth(root: &Rc<MemberSymbol>) -> usize {
                 .copied()
                 .max()
                 .unwrap_or(0);
-            depth_below.insert(key, below + usize::from(symbol.is_multi_stage()));
+            let opens_a_stage = symbol.is_multi_stage() && !symbol.is_reference();
+            depth_below.insert(key, below + usize::from(opens_a_stage));
             on_path.remove(&key);
             measured.push(symbol);
             continue;
