@@ -44,9 +44,10 @@ A typical use case would be:
 <Warning>
 
 **In development mode, the token is not required for authorization.** JWT
-verification on this API is enforced only when `NODE_ENV=production` or a custom
-[`check_auth`](/reference/configuration/config#check_auth) is configured, so with
-`NODE_ENV` unset the API accepts requests with no token at all — regardless of
+verification on this API is enforced only when `NODE_ENV=production`, or when a custom
+[`check_auth`](/reference/configuration/config#check_auth) itself rejects
+unauthenticated requests. With `NODE_ENV` unset and no such `check_auth`, the API
+accepts requests with no token at all — regardless of
 [`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode).
 
 Enabling `CUBEJS_DEV_MODE` bypasses authentication even under
