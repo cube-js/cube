@@ -2313,6 +2313,16 @@ is able to determine its position within a Cube Store cluster.
 This allows each worker to know which pre-aggregation partitions it owns
 and how the load is distributed across all workers.
 
+## `CURL_CA_BUNDLE`
+
+A path to a PEM file with additional CA certificates that curl/libcurl should
+trust, e.g., for a `cube.py` configuration file that shells out to curl. Not
+used by [Semantic Layer Sync][ref-sls].
+
+| Possible Values   | Default in Development | Default in Production |
+| ------------------ | ---------------------- | --------------------- |
+| A valid file path | N/A                     | N/A                    |
+
 ## `DEBUG_LOG`
 
 If `true`, enables debug logging.
@@ -2321,6 +2331,19 @@ If `true`, enables debug logging.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |
 
+## `NODE_EXTRA_CA_CERTS`
+
+A path to a PEM file with CA certificates that Node.js should trust in
+addition to its built-in bundle — additive, it doesn't replace the public CA
+bundle. Read once at process start, so the deployment must restart after this
+is set for it to take effect. Used by [Semantic Layer Sync][ref-sls] (whose
+outbound requests to a BI tool run in Node.js) when that BI tool is served
+with a certificate from a private or internal CA.
+
+| Possible Values   | Default in Development | Default in Production |
+| ------------------ | ---------------------- | --------------------- |
+| A valid file path | N/A                     | N/A                    |
+
 ## `PORT`
 
 The port for a Cube deployment to listen to API connections on.
@@ -2328,6 +2351,17 @@ The port for a Cube deployment to listen to API connections on.
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
 | A valid port number | `4000`                 | `4000`                |
+
+## `REQUESTS_CA_BUNDLE`
+
+A path to a PEM file with additional CA certificates that Python's `requests`
+library should trust, e.g., for a `cube.py` configuration file making its own
+HTTPS calls. Not used by [Semantic Layer Sync][ref-sls], which runs in
+Node.js, not in the Python config.
+
+| Possible Values   | Default in Development | Default in Production |
+| ------------------ | ---------------------- | --------------------- |
+| A valid file path | N/A                     | N/A                    |
 
 [aws-athena]: https://aws.amazon.com/athena
 [aws-athena-workgroup]:
@@ -2400,3 +2434,4 @@ The port for a Cube deployment to listen to API connections on.
 [ref-time-zone]: /reference/core-data-apis/queries#time-zone
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
 [nodejs-docs-tls-options]: https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
+[ref-sls]: /docs/integrations/semantic-layer-sync

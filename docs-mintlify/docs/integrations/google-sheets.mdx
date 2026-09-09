@@ -57,7 +57,7 @@ To do so, open the sidebar by going to the **Extensions** menu and choosing
 
 A modal window with an authentication prompt will appear. Choose the deployments
 that you want to work with in Google Sheets and click **Authorize**.
-Once you see the `Access Granted` message, close the modal window.
+Once you see the `Access Granted` message, the window will close automatically.
 
 <Warning>
 
@@ -106,8 +106,17 @@ Click on **×** to remove members from a query.
 Use **Order** and **Filters** panes below to sort and filter the
 data in the exploration.
 
+Above the query editor, a **cursor row** (`● Sheet1 · A1` next to **+ New**)
+shows the cell you last selected in the sheet. Google Sheets gives the add-on
+no event when your selection changes, so it polls for it, and the readout can
+lag your click by a second or two. Press the target button in that row to
+re-read your selection right away — it only updates what the row shows; it
+doesn't move or write anything. This button is Google Sheets only: the Excel
+add-in has a real selection event and doesn't show it.
+
 If you'd like to move the exploration to a new location, click on the desired top-left
-cell and then confirm with the target button under **Result location**.
+cell and then confirm with the target button under **Result location** — a
+different control from the one in the cursor row above.
 
 <Frame>
   <img src="https://ucarecdn.com/5a8d2b6a-b415-46ee-9e03-57ea5eeb693a/" />

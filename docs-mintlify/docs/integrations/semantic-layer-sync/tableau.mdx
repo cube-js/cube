@@ -43,6 +43,19 @@ your personal access token before it expires.
 
 </Info>
 
+<Note>
+
+If your Tableau Server instance is served with a certificate from a private
+or internal CA, the sync fails at the connection step with `self-signed
+certificate in certificate chain`. Commit the CA certificate (PEM) to your
+data model's Git repository and set the
+[`NODE_EXTRA_CA_CERTS`][ref-node-extra-ca-certs] environment variable to its
+path — the sync's outbound requests run in Node.js, so this is what makes it
+trust the certificate. This doesn't apply to Tableau Cloud, which Tableau
+itself serves with a publicly trusted certificate.
+
+</Note>
+
 ### Tableau Cloud
 
 For Tableau Cloud, you need to specify a `region` and a `site` name. Consider the
@@ -232,6 +245,7 @@ per cube or view. You can open these files in Tableau to create data sources.
 
 
 [tds]: https://help.tableau.com/current/pro/desktop/en-us/export_connection.htm
+[ref-node-extra-ca-certs]: /reference/configuration/environment-variables#node_extra_ca_certs
 [tableau-api]: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api.htm
 [tableau-api-authentication]: https://help.tableau.com/current/server/en-us/security_personal_access_tokens.htm#create-personal-access-tokens
 [tableau-pat]: https://help.tableau.com/current/server/en-us/security_personal_access_tokens.htm
