@@ -7,7 +7,11 @@ REST (JSON) and GraphQL APIs — and whenever `NODE_ENV` is not
 `production`. Playground's endpoints are served with no authentication too: anyone who
 can reach the instance is handed a ready-to-use API token, can mint others carrying any
 security context, can read your data model files, and can overwrite your data model and
-your `.env`. Use it only on a local development machine, never in production. See
+your `.env`. With `CUBEJS_DEV_MODE=true` and no
+[`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password)
+set, the SQL API accepts any credentials as well, allowing arbitrary SQL against
+connected data sources. Use it only on a local development machine, never in
+production. See
 [`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode).
 
 </Warning>
