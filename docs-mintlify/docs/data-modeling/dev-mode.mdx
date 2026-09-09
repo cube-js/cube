@@ -9,9 +9,9 @@ Development mode allows to test and debug the data model in an isolated
 <Warning>
 
 This page describes development mode in the Cube cloud platform. It is unrelated to
-Cube Core's development mode, which is enabled with
-[`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode) and
-is an **authentication bypass**: it serves Playground's endpoints with no
+Cube Core's development mode — which is on whenever `NODE_ENV` is not `production` or
+[`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode) is
+`true` — and which is an **authentication bypass**: it serves Playground's endpoints with no
 authentication, so anyone who can reach the instance can mint an API token carrying
 any security context (signed with the API secret), read the data model, overwrite it
 and `.env`, and — unless

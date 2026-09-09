@@ -1,6 +1,8 @@
 <Warning>
 
-Development mode is an authentication bypass: Playground's endpoints are served with
+Development mode is an authentication bypass — and Cube is in development mode
+whenever `NODE_ENV` is not `production` or `CUBEJS_DEV_MODE=true`. Playground's
+endpoints are then served with
 no authentication, so anyone who can reach the instance is handed a ready-to-use API
 token (and can mint others carrying any security context), read your data model,
 overwrite it and your `.env`, and — unless

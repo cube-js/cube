@@ -1,8 +1,9 @@
 <Warning>
 
-**Development mode is an authentication bypass.** With `CUBEJS_DEV_MODE=true`, Cube
-mounts [Playground](/docs/explore-analyze/playground) and its supporting endpoints
-with no authentication whatsoever. Anyone who can reach the instance is handed a
+**Development mode is an authentication bypass.** Cube is in development mode whenever
+`NODE_ENV` is not `production` or `CUBEJS_DEV_MODE=true`, and in that state it mounts
+[Playground](/docs/explore-analyze/playground) and its supporting endpoints with no
+authentication whatsoever. Anyone who can reach the instance is handed a
 ready-to-use API token, and can mint further ones carrying any security context signed
 with your API secret — and so query every data API as any user, bypassing
 [member-level access control](/docs/data-modeling/access-control/member-level-security)
@@ -19,13 +20,13 @@ never expose it to the internet, and never use it in production. Using developme
 mode in the Cube cloud platform is highly discouraged — it bypasses the platform's
 security model.
 
-`CUBEJS_DEV_MODE` is not the only switch. Cube treats any instance where `NODE_ENV`
-is not `production` as being in development mode, whatever the flag is set to, so
-`CUBEJS_DEV_MODE=false` on its own does not turn it off — set `NODE_ENV=production`
-too. Once development mode is genuinely off, JWT verification on the REST (JSON) and
-GraphQL APIs is enforced, because `NODE_ENV=production` is exactly what enables it. A
-custom [`check_auth`](/reference/configuration/config#check_auth) that rejects
-unauthenticated requests enforces it as well, whatever `NODE_ENV` is. The official
-Docker images set `NODE_ENV=production`.
+Turning development mode off takes both: `CUBEJS_DEV_MODE` not set to `true` (its
+default) **and** `NODE_ENV=production`. Setting the flag alone leaves you in
+development mode, with everything above still exposed. Once it is genuinely off, JWT
+verification on the REST (JSON) and GraphQL APIs is enforced, because
+`NODE_ENV=production` is exactly what enables it; a custom
+[`check_auth`](/reference/configuration/config#check_auth) that rejects unauthenticated
+requests enforces it as well, whatever `NODE_ENV` is. The official Docker images set
+`NODE_ENV=production`.
 
 </Warning>

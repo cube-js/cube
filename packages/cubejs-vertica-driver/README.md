@@ -26,11 +26,13 @@ use env instead.
 ```
 if `CUBEJS_DB_TYPE=vertica` then the vertica driver is loaded automatically.
 
-> **`CUBEJS_DEV_MODE=true` is an authentication bypass.** Playground and its
-> supporting endpoints are served with no authentication, so anyone who can reach the
-> instance is handed a ready-to-use API token (and can mint others carrying any
-> security context, signed with your API secret), read your data model, overwrite it
-> and your `.env`, and — unless `CUBEJS_SQL_PASSWORD` is set — run arbitrary SQL
+> **Development mode is an authentication bypass.** Cube is in development mode with
+> `CUBEJS_DEV_MODE=true`, and also whenever `NODE_ENV` is not `production` — so
+> `CUBEJS_DEV_MODE=false` alone does not take you out of it. In that state Playground
+> and its supporting endpoints are served with no authentication, so anyone who can
+> reach the instance is handed a ready-to-use API token (and can mint others carrying
+> any security context, signed with your API secret), read your data model, overwrite
+> it and your `.env`, and — unless `CUBEJS_SQL_PASSWORD` is set — run arbitrary SQL
 > through the SQL API. This is intentional — development mode is designed to run on a
 > developer's local machine for ease of use and debugging. Never use it in production, and using it
 > in the Cube cloud platform is highly discouraged, as it bypasses the platform's
