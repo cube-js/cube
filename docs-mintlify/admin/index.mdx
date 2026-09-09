@@ -189,11 +189,6 @@ Cube can be run in an insecure, development mode by setting the
 [`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode) environment variable to `true`. Putting Cube in development
 mode does the following:
 
-- Serves Playground and its supporting endpoints with no authentication, which hands
-  anyone who can reach the instance a signed API token (and the ability to mint others
-  carrying any security context), lets them read the data model, and lets them
-  overwrite the data model and `.env`.
-- Skips the SQL API password check when no `CUBEJS_SQL_PASSWORD` is configured.
 - Disables [member-level access control][ref-mls] when listing the data model.
 - Enables Cube Store in single instance mode.
 - Enables background refresh for in-memory cache and [scheduled
