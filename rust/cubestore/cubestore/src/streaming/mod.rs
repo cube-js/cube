@@ -944,6 +944,7 @@ mod tests {
     use super::*;
     use crate::metastore::chunks::chunk_file_name;
     use crate::scheduler::SchedulerImpl;
+    use crate::sql::parser::sql_parser_recursion_limit;
     use crate::sql::MySqlDialectWithBackTicks;
     use crate::streaming::kafka::KafkaMessage;
     use crate::streaming::{KSqlQuery, KSqlQuerySchema, KsqlClient, KsqlResponse};
@@ -974,7 +975,10 @@ mod tests {
             let dialect = &MySqlDialectWithBackTicks {};
             let mut tokenizer = Tokenizer::new(dialect, query.sql.as_str());
             let tokens = tokenizer.tokenize().unwrap();
-            let statement = Parser::new(dialect).with_tokens(tokens).parse_statement()?;
+            let statement = Parser::new(dialect)
+                .with_recursion_limit(sql_parser_recursion_limit())
+                .with_tokens(tokens)
+                .parse_statement()?;
 
             fn find_filter(expr: &Expr, col: &str, binary_op: &BinaryOperator) -> Option<String> {
                 match expr {
