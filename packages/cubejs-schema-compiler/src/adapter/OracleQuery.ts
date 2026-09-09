@@ -280,6 +280,8 @@ export class OracleQuery extends BaseQuery {
     // e.g. the multi-column count() concatenation). CAST to VARCHAR2 requires a
     // length, so use the max standard VARCHAR2 size.
     templates.types.string = 'VARCHAR2(4000)';
+    templates.types.float = 'BINARY_FLOAT';
+    templates.types.double = 'BINARY_DOUBLE';
 
     return templates;
   }

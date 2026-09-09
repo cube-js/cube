@@ -916,6 +916,31 @@ impl SqlTemplates {
         )
     }
 
+    pub fn float_literal_expr(
+        &self,
+        value: Option<f64>,
+        data_type: DataType,
+    ) -> Result<String, CubeError> {
+        if self.contains_template("expressions/float_literal") {
+            // Scientific notation preserves floating-point semantics on MySQL versions
+            // that cannot CAST to FLOAT/DOUBLE. Widen Float32 before formatting so its
+            // value is preserved when the source evaluates literals as doubles.
+            return self.render_template(
+                "expressions/float_literal",
+                context! { value => value.map(|value| format!("{value:e}")) },
+            );
+        }
+
+        let expr = value.map_or_else(
+            || "NULL".to_string(),
+            |value| match data_type {
+                DataType::Float32 => (value as f32).to_string(),
+                _ => value.to_string(),
+            },
+        );
+        self.cast_expr(expr, self.sql_type(data_type)?)
+    }
+
     pub fn in_list_expr(
         &self,
         expr: String,
@@ -1141,6 +1166,30 @@ impl SqlTemplates {
 mod tests {
     use super::*;
     use chrono::TimeZone;
+
+    #[test]
+    fn float_literal_override_does_not_require_cast_templates() {
+        let templates = SqlTemplates::new(
+            HashMap::from([(
+                "expressions/float_literal".to_string(),
+                "{% if value is none %}(NULL + 0e0){% else %}{{ value }}{% endif %}".to_string(),
+            )]),
+            false,
+        )
+        .unwrap();
+        for data_type in [DataType::Float32, DataType::Float64] {
+            assert_eq!(
+                templates
+                    .float_literal_expr(Some(100.0), data_type.clone())
+                    .unwrap(),
+                "1e2"
+            );
+            assert_eq!(
+                templates.float_literal_expr(None, data_type).unwrap(),
+                "(NULL + 0e0)"
+            );
+        }
+    }
 
     #[tokio::test]
     async fn span_id_last_refresh_time_keeps_oldest() {

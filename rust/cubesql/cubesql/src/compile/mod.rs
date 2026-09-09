@@ -15536,11 +15536,30 @@ ORDER BY "source"."str0" ASC
 
     #[tokio::test]
     async fn test_float_literal_percentage_pushdown() {
-        for (constant, rendered) in [
-            ("100.0", "CAST(100 AS FLOAT(53))"),
-            ("CAST(100 AS DOUBLE)", "CAST(100 AS FLOAT(53))"),
-            ("100.1", "CAST(100.1 AS FLOAT(53))"),
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        for (constant, rendered, mysql) in [
+            ("100.0", "CAST(100 AS FLOAT(53))", false),
+            ("CAST(100 AS DOUBLE)", "CAST(100 AS FLOAT(53))", false),
+            ("100.1", "CAST(100.1 AS FLOAT(53))", false),
+            ("100.0", "1e2", true),
+            ("CAST(100 AS DOUBLE)", "1e2", true),
+            ("100.1", "1.001e2", true),
         ] {
+            let mut templates = vec![
+                ("types/double".into(), "FLOAT(53)".into()),
+                (
+                    "expressions/int_division".into(),
+                    "UNEXPECTED_INT_DIVISION({{ left }}, {{ right }})".into(),
+                ),
+            ];
+            if mysql {
+                templates.push((
+                    "expressions/float_literal".into(),
+                    "{% if value is none %}(NULL + 0e0){% else %}{{ value }}{% endif %}".into(),
+                ));
+            }
             let query_plan = convert_select_to_query_plan_customized(
                 format!(
                     "SELECT customer_gender, {constant} * COUNT(*) / NULLIF(COUNT(DISTINCT notes), 0) AS ratio
@@ -15549,19 +15568,20 @@ ORDER BY "source"."str0" ASC
                      GROUP BY 1 ORDER BY 2 DESC LIMIT 100"
                 ),
                 DatabaseProtocol::PostgreSQL,
-                vec![
-                    ("types/double".into(), "FLOAT(53)".into()),
-                    ("expressions/int_division".into(), "UNEXPECTED_INT_DIVISION({{ left }}, {{ right }})".into()),
-                ],
-            ).await;
+                templates,
+            )
+            .await;
             let sql = query_plan
                 .as_logical_plan()
                 .find_cube_scan_wrapped_sql()
                 .wrapped_sql
                 .sql;
-            assert!(sql.contains(rendered), "{}: {}", constant, sql);
-            assert!(!sql.contains("UNEXPECTED_INT_DIVISION"), "{}", sql);
-            assert!(sql.contains("NULLIF("), "{}", sql);
+            assert!(sql.contains(rendered), "{constant}, mysql={mysql}: {sql}");
+            assert!(
+                !sql.contains("UNEXPECTED_INT_DIVISION"),
+                "{constant}, mysql={mysql}: {sql}"
+            );
+            assert!(sql.contains("NULLIF("), "{constant}, mysql={mysql}: {sql}");
         }
     }
 

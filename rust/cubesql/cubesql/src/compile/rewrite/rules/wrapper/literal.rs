@@ -90,8 +90,24 @@ impl WrapperRules {
                 return false;
             };
 
+            let supports_float_literal = |type_template| {
+                Self::can_rewrite_template(&data_source, &meta, "expressions/float_literal")
+                    || (Self::can_rewrite_template(&data_source, &meta, type_template)
+                        && Self::can_rewrite_template(&data_source, &meta, "expressions/cast"))
+            };
+
             for literal in var_iter!(egraph[subst[value_var]], LiteralExprValue) {
                 match literal {
+                    // NaN and infinity need dialect-specific syntax; neither a bare
+                    // identifier in a cast nor an exponent literal can represent them.
+                    ScalarValue::Float32(value) => {
+                        return value.map_or(true, |value| value.is_finite())
+                            && supports_float_literal("types/float");
+                    }
+                    ScalarValue::Float64(value) => {
+                        return value.map_or(true, |value| value.is_finite())
+                            && supports_float_literal("types/double");
+                    }
                     ScalarValue::TimestampNanosecond(_, _)
                     | ScalarValue::TimestampMillisecond(_, _)
                     | ScalarValue::TimestampMicrosecond(_, _)

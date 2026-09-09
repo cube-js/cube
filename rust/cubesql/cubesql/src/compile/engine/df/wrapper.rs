@@ -3101,35 +3101,19 @@ impl WrappedSelectNode {
                 sql_query,
             ),
             ScalarValue::Float32(f) => (
-                f.map_or_else(
-                    || Self::generate_null_for_literal(sql_generator.clone(), &literal),
-                    |f| {
-                        let data_type =
-                            Self::generate_sql_type(sql_generator.clone(), DataType::Float32)?;
-                        Self::generate_sql_cast_expr(
-                            sql_generator.clone(),
-                            format!("{f}"),
-                            data_type,
-                        )
-                    },
-                )?,
+                sql_generator
+                    .get_sql_templates()
+                    .float_literal_expr(f.map(f64::from), DataType::Float32)
+                    .map_err(|e| DataFusionError::Internal(e.to_string()))?,
                 sql_query,
             ),
             ScalarValue::Float64(f) => (
                 // Display formats integral floats without a decimal point. Keep the
                 // scalar type so the source does not infer integer arithmetic.
-                f.map_or_else(
-                    || Self::generate_null_for_literal(sql_generator.clone(), &literal),
-                    |f| {
-                        let data_type =
-                            Self::generate_sql_type(sql_generator.clone(), DataType::Float64)?;
-                        Self::generate_sql_cast_expr(
-                            sql_generator.clone(),
-                            format!("{f}"),
-                            data_type,
-                        )
-                    },
-                )?,
+                sql_generator
+                    .get_sql_templates()
+                    .float_literal_expr(f, DataType::Float64)
+                    .map_err(|e| DataFusionError::Internal(e.to_string()))?,
                 sql_query,
             ),
             ScalarValue::Decimal128(x, precision, scale) => {
@@ -4780,6 +4764,14 @@ impl<'ctx, 'mem> ExpressionVisitor for CollectMembersVisitor<'ctx, 'mem> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        compile::engine::df::scan::CubeScanOptions,
+        sql::HttpAuthContext,
+        transport::{CubeMeta, CubeMetaDimension, CubeMetaType},
+    };
+    use datafusion::logical_plan::DFField;
+    use std::collections::HashMap;
+
     #[test]
     fn test_float_literal_preserves_sql_type() {
         let generator = crate::compile::test::sql_generator(vec![
@@ -4812,13 +4804,53 @@ mod tests {
         }
     }
 
-    use crate::{
-        compile::engine::df::scan::CubeScanOptions,
-        sql::HttpAuthContext,
-        transport::{CubeMeta, CubeMetaDimension, CubeMetaType},
-    };
-    use datafusion::logical_plan::DFField;
-    use std::collections::HashMap;
+    #[test]
+    fn test_mysql_float_literal_without_cast() {
+        let generator = crate::compile::test::sql_generator(vec![
+            (
+                "expressions/float_literal".into(),
+                "{% if value is none %}(NULL + 0e0){% else %}{{ value }}{% endif %}".into(),
+            ),
+            ("types/float".into(), "UNSUPPORTED_FLOAT".into()),
+            ("types/double".into(), "UNSUPPORTED_DOUBLE".into()),
+        ]);
+        for literal in [
+            ScalarValue::Float32(Some(100.0)),
+            ScalarValue::Float32(Some(0.1)),
+            ScalarValue::Float32(Some(f32::MAX)),
+            ScalarValue::Float32(Some(f32::from_bits(1))),
+            ScalarValue::Float64(Some(100.0)),
+            ScalarValue::Float64(Some(100.1)),
+            ScalarValue::Float64(Some(-0.0)),
+            ScalarValue::Float64(Some(-100.0)),
+            ScalarValue::Float64(Some(f64::MAX)),
+            ScalarValue::Float64(Some(f64::from_bits(1))),
+            ScalarValue::Float32(None),
+            ScalarValue::Float64(None),
+        ] {
+            let expected = match literal {
+                ScalarValue::Float32(value) => value.map(f64::from),
+                ScalarValue::Float64(value) => value,
+                _ => unreachable!(),
+            };
+            let (sql, _) = WrappedSelectNode::generate_sql_for_literal(
+                SqlQuery::new(String::new(), vec![]),
+                generator.clone(),
+                literal.clone(),
+            )
+            .unwrap();
+            if let Some(expected) = expected {
+                assert!(sql.contains('e'), "{literal:?}: {sql}");
+                assert_eq!(
+                    sql.parse::<f64>().unwrap().to_bits(),
+                    expected.to_bits(),
+                    "{literal:?}: {sql}"
+                );
+            } else {
+                assert_eq!(sql, "(NULL + 0e0)", "{literal:?}");
+            }
+        }
+    }
 
     /// Each entry is a cube with one dimension, on a data source of its own.
     fn meta_context_with_cubes(cubes: &[(&str, &str, &str)]) -> MetaContext {
