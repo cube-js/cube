@@ -24,6 +24,7 @@
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
+use itertools::Itertools;
 
 fn create_context() -> TestContext {
     let schema = MockSchema::from_yaml_file("common/integration_rolling_window_fanout.yaml");
@@ -90,16 +91,28 @@ async fn test_rolling_join_restricts_by_dimension() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "reproduces #11770: base scan bound is a scalar sub-select over time_series"]
 async fn test_base_scan_date_bound_is_literal() {
     let ctx = create_context();
-    let sql = ctx.build_sql(QUERY).unwrap();
+    let (sql, params) = ctx.build_sql_and_params(QUERY).unwrap();
 
-    // The legacy planner emitted literals here (`BaseQuery.dateFromStartToEndConditionSql`),
-    // so engines could use the bound to eliminate partitions. Tesseract emits
-    // `(SELECT min("date_from") FROM time_series)`, which is opaque to partition pruning.
+    // A bound read back off the series with a scalar sub-select is opaque to
+    // partition elimination, and every base scan carries one.
     assert!(
         !sql.contains("min(\"date_from\")"),
         "base scan date bound is a scalar sub-select over time_series:\n{sql}"
+    );
+
+    // The literals span the series: the day the range opens on, through the day
+    // after the one it closes on. The trailing interval is subtracted from the
+    // lower bound in SQL, and the rolling join applies the exact frame on top.
+    let bounds = params
+        .iter()
+        .filter_map(|value| value.to_param_string())
+        .unique()
+        .collect_vec();
+    assert_eq!(
+        bounds,
+        vec!["2026-08-01T00:00:00.000", "2026-09-03T23:59:59.999"],
+        "unexpected base scan bounds in:\n{sql}"
     );
 }
