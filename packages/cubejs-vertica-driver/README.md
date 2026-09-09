@@ -32,8 +32,9 @@ if `CUBEJS_DB_TYPE=vertica` then the vertica driver is loaded automatically.
 > and its supporting endpoints are served with no authentication, so anyone who can
 > reach the instance is handed a ready-to-use API token (and can mint others carrying
 > any security context, signed with your API secret), read your data model, overwrite
-> it and your `.env`, and — unless `CUBEJS_SQL_PASSWORD` is set — run arbitrary SQL
-> through the SQL API. This is intentional — development mode is designed to run on a
+> it and your `.env`. With `CUBEJS_DEV_MODE=true` specifically and no
+> `CUBEJS_SQL_PASSWORD` set, the SQL API also accepts any credentials, allowing
+> arbitrary SQL against connected data sources. This is intentional — development mode is designed to run on a
 > developer's local machine for ease of use and debugging. Never use it in production, and using it
 > in the Cube cloud platform is highly discouraged, as it bypasses the platform's
 > security model. See

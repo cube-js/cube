@@ -9,10 +9,12 @@ with your API secret — and so query every data API as any user, bypassing
 [member-level access control](/docs/data-modeling/access-control/member-level-security)
 and [row-level security](/docs/data-modeling/access-control/row-level-security). The
 same endpoints also read your data model files and the table schema of every connected
-data source, and overwrite your data model and your `.env`. Unless
+data source, and overwrite your data model and your `.env`. On top of that, with
+`CUBEJS_DEV_MODE=true` specifically — the SQL API's password check follows that flag
+alone, not `NODE_ENV` — and no
 [`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password)
-is set, the SQL API also accepts any credentials, allowing arbitrary SQL against
-connected data sources.
+set, the SQL API accepts any credentials, allowing arbitrary SQL against connected
+data sources.
 
 This is intentional. Development mode is designed to run on a developer's local
 machine for ease of use and debugging. Never run it where anyone else can reach it,

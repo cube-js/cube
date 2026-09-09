@@ -14,9 +14,10 @@ Cube Core's development mode — which is on whenever `NODE_ENV` is not `product
 `true` — and which is an **authentication bypass**: it serves Playground's endpoints with no
 authentication, so anyone who can reach the instance can mint an API token carrying
 any security context (signed with the API secret), read the data model, overwrite it
-and `.env`, and — unless
+and `.env`. With `CUBEJS_DEV_MODE=true` specifically and no
 [`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password)
-is set — run arbitrary SQL through the SQL API. That is intentional — it is designed
+set, the SQL API also accepts any credentials, allowing arbitrary SQL. That is
+intentional — it is designed
 to run on a developer's local machine for ease of use and debugging. Never use it in
 production, and using it in the Cube cloud platform is highly discouraged because it
 bypasses the platform's security model.
