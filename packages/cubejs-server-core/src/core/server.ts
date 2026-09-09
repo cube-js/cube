@@ -130,6 +130,21 @@ export class CubejsServerCore {
 
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
 
+  /**
+   * Orchestrator apis that are being built right now, by id, so that concurrent
+   * callers of one id end up on a single api instead of one each.
+   *
+   * Building is asynchronous and the cache is only written at the end of it, so
+   * without this every caller of a cold id misses the cache together and caches
+   * an api of its own. Each of those writes replaces the entry, and a replaced
+   * entry is released -- which closes the Cube Store connection of the api the
+   * previous caller is about to run its query on, failing that query with
+   * `Cube Store connection is closed`. Concurrency of two is the everyday case
+   * rather than a rarity: one `/v1/load` with `total: true` fetches the api
+   * once for its data query and once for its count query.
+   */
+  protected readonly buildingOrchestratorApis: Map<string, Promise<OrchestratorApi>> = new Map();
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
 
@@ -576,6 +591,31 @@ export class CubejsServerCore {
       return this.orchestratorStorage.get(orchestratorId);
     }
 
+    const building = this.buildingOrchestratorApis.get(orchestratorId);
+
+    if (building) {
+      return building;
+    }
+
+    // Registered before the first `await` inside the build, so nothing can run
+    // between the miss above and this line and take the same branch.
+    const pending = this.buildOrchestratorApi(orchestratorId, context)
+      .finally(() => {
+        // A build that failed must not be left behind to fail every later
+        // request for this id, and the one that succeeded is in the cache by
+        // now, so both are dropped here. Guarded because a build started after
+        // this one finished owns the entry.
+        if (this.buildingOrchestratorApis.get(orchestratorId) === pending) {
+          this.buildingOrchestratorApis.delete(orchestratorId);
+        }
+      });
+
+    this.buildingOrchestratorApis.set(orchestratorId, pending);
+
+    return pending;
+  }
+
+  protected async buildOrchestratorApi(orchestratorId: string, context: RequestContext): Promise<OrchestratorApi> {
     /**
      * Hash table to store promises which will be resolved with the
      * datasource drivers. DriverFactoryByDataSource function is closure
