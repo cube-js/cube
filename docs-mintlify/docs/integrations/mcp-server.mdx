@@ -220,8 +220,8 @@ Each tool is annotated as read-only or destructive. MCP clients that honor these
 annotations — including Claude — run read-only tools automatically and **always ask for
 confirmation** before any of the six destructive ones: `updateReport`, `deleteReport`,
 `updateDashboard`, `publishDashboard`, `writeDataModelFile`, and `deleteDataModelFile`.
-Nothing that changes a report, a dashboard, or your data model happens without an explicit
-approval.
+Nothing that changes a workbook report, an exploration, a dashboard, or your data model
+happens without an explicit approval.
 
 ### Deployments and chat
 
@@ -259,10 +259,10 @@ programmatically. Creating and editing workbooks requires the Explorer role or h
 | --- | --- | --- |
 | `readWorkbook` | Reads a workbook — its name and its current dashboard draft and published configs. | Read-only |
 | `createWorkbook` | Creates a new empty workbook, the container that holds reports and a dashboard. | Write |
-| `createReport` | Saves a query plus its visualization as a report. Pass `workbookId` to file it inside a workbook and get the `reportId` a chart widget references; omit `workbookId` to save a standalone [exploration](/docs/explore-analyze/explore#saving-explorations) instead. | Write |
-| `readReport` | Reads one saved report by id — its title, SQL, chart spec, placement, and a shareable URL. | Read-only |
-| `updateReport` | Edits an existing report in place, keeping its `reportId`. Send only the fields you want to change. | Destructive — prompts |
-| `deleteReport` | Deletes a report. | Destructive — prompts |
+| `createReport` | Saves a query plus its visualization. Pass `workbookId` to create a report inside a workbook and get the `reportId` a chart widget references; omit `workbookId` to save a standalone [exploration](/docs/explore-analyze/explore#saving-explorations) instead. | Write |
+| `readReport` | Reads one workbook report or standalone exploration by id — its title, SQL, chart spec, placement, and a shareable URL. | Read-only |
+| `updateReport` | Edits an existing workbook report or exploration in place, keeping its `reportId`. Send only the fields you want to change. | Destructive — prompts |
+| `deleteReport` | Deletes a workbook report or exploration. | Destructive — prompts |
 | `updateDashboard` | Saves the dashboard layout to the workbook **draft**. Replaces the full widget set and does not go live. | Destructive — prompts |
 | `publishDashboard` | Publishes the current draft to make it live. Idempotent — republishing an unchanged draft is a no-op. | Destructive — prompts |
 

@@ -670,7 +670,7 @@ export class PreAggregationLoader {
         const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
         const mappedActualTables = actualTables.map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`);
         if (mappedActualTables.includes(targetTableName)) {
-          await client.dropTable(targetTableName);
+          await client.dropTable(targetTableName, queryOptions);
         }
       });
     }
@@ -794,14 +794,16 @@ export class PreAggregationLoader {
   protected getUnloadOptions(): UnloadOptions {
     return {
       // Default: 16mb for Snowflake, Should be specified in MBs, because drivers convert it
-      maxFileSize: 64
+      maxFileSize: 64,
+      requestId: this.requestId,
     };
   }
 
   protected getStreamingOptions(): StreamOptions {
     return {
       // Default: 16384 (16KB), or 16 for objectMode streams. PostgreSQL/MySQL use object streams
-      highWaterMark: 10000
+      highWaterMark: 10000,
+      requestId: this.requestId,
     };
   }
 
@@ -915,11 +917,11 @@ export class PreAggregationLoader {
         tableData.rowStream = stream;
       }
     } else {
-      tableData = { rows: await saveCancelFn(client.query(sql, params)) };
+      tableData = { rows: await saveCancelFn(client.query(sql, params, queryOptions)) };
     }
 
     if (!tableData.types && client.queryColumnTypes) {
-      tableData.types = await saveCancelFn(client.queryColumnTypes(sql, params));
+      tableData.types = await saveCancelFn(client.queryColumnTypes(sql, params, queryOptions));
     }
 
     return tableData;
@@ -966,7 +968,7 @@ export class PreAggregationLoader {
     const indexesSql = this.prepareIndexesSql(newVersionEntry, queryOptions);
     for (let i = 0; i < indexesSql.length; i++) {
       const [query, params] = indexesSql[i].sql;
-      await saveCancelFn(driver.query(query, params));
+      await saveCancelFn(driver.query(query, params, queryOptions));
     }
   }
 
@@ -1070,7 +1072,7 @@ export class PreAggregationLoader {
         .map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`)
         .filter(t => toSave.indexOf(t) === -1);
 
-      await Promise.all(toDrop.map(table => saveCancelFn(client.dropTable(table))));
+      await Promise.all(toDrop.map(table => saveCancelFn(client.dropTable(table, queryOptions))));
       this.logger('Dropping orphaned tables completed', {
         ...queryOptions,
         external,

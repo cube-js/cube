@@ -1,0 +1,13 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/filter_params_time_shifts.rs
+expression: pushed_down
+---
+fpts_calendar__report_d_day | fpts_sales__amount | fpts_sales__amount_prev_fy | fpts_sales__amount_prev_two_fy | fpts_sales__amount_prev_fy_by_interval | fpts_sales__amount_prev_nominal_year
+----------------------------+--------------------+----------------------------+--------------------------------+----------------------------------------+-------------------------------------
+2024-12-29 00:00:00         | 729                | 365                        | 1                              | 365                                    | 363                                 
+2024-12-30 00:00:00         | 730                | 366                        | 2                              | 366                                    | 364                                 
+2024-12-31 00:00:00         | 731                | 367                        | 3                              | 367                                    | 365                                 
+2025-01-01 00:00:00         | 732                | 368                        | 4                              | 368                                    | 366                                 
+2025-01-02 00:00:00         | 733                | 369                        | 5                              | 369                                    | 367                                 
+2025-01-03 00:00:00         | 734                | 370                        | 6                              | 370                                    | 368                                 
+2025-01-04 00:00:00         | 735                | 371                        | 7                              | 371                                    | 369

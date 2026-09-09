@@ -9,9 +9,12 @@
     "test/snapshotResolver.js"
   ],
   "compilerOptions": {
+    "types": ["node", "jest"],
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": ".",
     "allowJs": true,
-  }
+  },
+  "references": [
+    { "path": "../cubejs-backend-shared" }
+  ]
 }

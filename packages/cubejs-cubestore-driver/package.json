@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/cubestore-driver",
   "description": "Cube Store driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.7.32",
+  "version": "1.7.35",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -27,27 +27,27 @@
     "unit": "jest --coverage"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.7.32",
-    "@cubejs-backend/cubestore": "1.7.32",
-    "@cubejs-backend/native": "1.7.32",
-    "@cubejs-backend/shared": "1.7.32",
+    "@cubejs-backend/base-driver": "1.7.35",
+    "@cubejs-backend/cubestore": "1.7.35",
+    "@cubejs-backend/native": "1.7.35",
+    "@cubejs-backend/shared": "1.7.35",
     "csv-write-stream": "^2.0.0",
     "flatbuffers": "25.9.23",
-    "fs-extra": "^9.1.0",
-    "node-fetch": "^2.6.1",
+    "fs-extra": "^11.1.1",
+    "node-fetch": "^2.7.0",
     "sqlstring": "^2.3.3",
     "tempy": "^1.0.1",
     "uuid": "^11.1.1",
-    "ws": "^7.4.3"
+    "ws": "^7.5.3"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.32",
+    "@cubejs-backend/linter": "1.7.35",
     "@types/csv-write-stream": "^2.0.0",
     "@types/jest": "^29",
     "@types/node": "^22",
     "@types/ws": "^7.4.0",
     "jest": "^29",
-    "typescript": "~5.2.2"
+    "typescript": "~6.0.3"
   },
   "license": "Apache-2.0",
   "publishConfig": {

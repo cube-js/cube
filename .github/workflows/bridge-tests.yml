@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -34,7 +34,7 @@ jobs:
           key: bridge-tests-${{ runner.OS }}-x86_64-unknown-linux-gnu
           shared-key: bridge-tests-${{ runner.OS }}-x86_64-unknown-linux-gnu
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.x
       - name: Set Yarn version
@@ -43,14 +43,14 @@ jobs:
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
       - name: Restore yarn cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Yarn install
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:

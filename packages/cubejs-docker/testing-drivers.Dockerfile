@@ -72,9 +72,9 @@ COPY packages/cubejs-ksql-driver/package.json packages/cubejs-ksql-driver/packag
 COPY packages/cubejs-dbt-schema-extension/package.json packages/cubejs-dbt-schema-extension/package.json
 COPY packages/cubejs-jdbc-driver/package.json packages/cubejs-jdbc-driver/package.json
 COPY packages/cubejs-vertica-driver/package.json packages/cubejs-vertica-driver/package.json
+COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.json
 
 # We dont need client libraries
-#COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.json
 #COPY packages/cubejs-client-core/package.json packages/cubejs-client-core/package.json
 #COPY packages/cubejs-client-react/package.json packages/cubejs-client-react/package.json
 #COPY packages/cubejs-client-vue3/package.json packages/cubejs-client-vue3/package.json
@@ -147,9 +147,9 @@ COPY packages/cubejs-dbt-schema-extension/ packages/cubejs-dbt-schema-extension/
 COPY packages/cubejs-jdbc-driver/ packages/cubejs-jdbc-driver/
 COPY packages/cubejs-databricks-jdbc-driver/ packages/cubejs-databricks-jdbc-driver/
 COPY packages/cubejs-vertica-driver/ packages/cubejs-vertica-driver/
+COPY packages/cubejs-templates/ packages/cubejs-templates/
 
 # We dont need client libraries
-#COPY packages/cubejs-templates/ packages/cubejs-templates/
 #COPY packages/cubejs-client-core/ packages/cubejs-client-core/
 #COPY packages/cubejs-client-react/ packages/cubejs-client-react/
 #COPY packages/cubejs-client-vue3/ packages/cubejs-client-vue3/

@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/prestodb-driver",
   "description": "Cube.js Presto database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.7.32",
+  "version": "1.7.35",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -21,29 +21,30 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "unit": "jest dist/test/unit",
-    "integration": "jest dist/test/integration",
-    "integration:presto": "jest dist/test/integration",
+    "unit": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/unit",
+    "integration": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/integration",
+    "integration:presto": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/integration",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.7.32",
-    "@cubejs-backend/shared": "1.7.32",
-    "presto-client": "1.2.0",
-    "ramda": "^0.27.0"
+    "@cubejs-backend/base-driver": "1.7.35",
+    "@cubejs-backend/shared": "1.7.35",
+    "presto-client": "^1.2.0",
+    "ramda": "^0.27.2"
   },
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.32",
+    "@cubejs-backend/linter": "1.7.35",
     "@types/jest": "^29",
+    "@types/node": "^22",
     "jest": "^29",
     "should": "^13.2.3",
     "testcontainers": "^10.28.0",
-    "typescript": "~5.2.2"
+    "typescript": "~6.0.3"
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"

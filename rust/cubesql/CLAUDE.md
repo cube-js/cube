@@ -130,6 +130,15 @@ that match the list node itself — never by a transform that walks it.
   takes `top_level_elem_vars`, which is how a fact that must hold across every element —
   all queries reaching the same data source — is enforced: name the variable there and
   unification does the rest, with no comparison of your own.
+- When the elements of a list each have many alternatives (the pulled up forms of a
+  query) and the rewrite builds one list node from them, the combinations of the
+  alternatives are the product of their counts, and so is the number of list nodes; every
+  rule above the list multiplies it again. Use
+  `transforming_list_rewrite_per_elem_with_lists_and_vars` there, with the searcher's own
+  element pattern as the applier's element pattern: each element then resolves to the class
+  it was matched in, whichever alternative matched, so the list is one node and extraction
+  picks between the alternatives. Where that class also holds forms the parent cannot use,
+  the cost model has to rule them out in the parent's state (`plan_nodes_inside_wrapper`).
 - Generate the traversal with the existing helpers rather than by hand:
   `WrapperRules::list_pushdown_pullup_rules` / `flat_list_pushdown_pullup_rules`
   (or `replacer_push_down_node` / `replacer_pull_up_node` underneath them). They emit

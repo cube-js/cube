@@ -1234,7 +1234,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     // arrayOrSingle is of type `T`, and we just checked that it is an array
     // Which means that both `T` and result must be arrays
     // For any branch of return type that can contain array it's OK to return array
-    return options.originalSorting ? references : R.sortBy(R.identity, references) as any;
+    return (options.originalSorting ? references : R.sortBy(R.identity, references)) as any;
   }
 
   public evaluateReference(
@@ -1366,7 +1366,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
   }
 
   protected filtersProxyDep() {
-    return new Proxy({}, {
+    return new Proxy({} as CubeSymbolsDefinition, {
       get: (target, name) => {
         if (name === '_objectWithResolvedProperties') {
           return true;
@@ -1447,13 +1447,13 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     return cube || this.symbols[cubeName]?.[name];
   }
 
-  protected cubeReferenceProxy(cubeName, joinHints?: any[], refProperty?: any) {
+  protected cubeReferenceProxy(cubeName, joinHints?: any[], refProperty?: any): CubeSymbolsDefinition {
     if (joinHints) {
       joinHints = joinHints.concat(cubeName);
     }
     const self = this;
     const { sqlResolveFn, cubeAliasFn, query, cubeReferencesUsed } = self.resolveSymbolsCallContext || {};
-    return new Proxy({}, {
+    return new Proxy({} as CubeSymbolsDefinition, {
       get: (v, propertyName) => {
         if (propertyName === '_objectWithResolvedProperties') {
           return true;
@@ -1548,10 +1548,10 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     return cube?.[dimName]?.[gr]?.[granName];
   }
 
-  protected cubeDependenciesProxy(parentIndex, cubeName) {
+  protected cubeDependenciesProxy(parentIndex, cubeName): CubeSymbolsDefinition {
     const self = this;
     const { depsResolveFn } = self.resolveSymbolsCallContext || {};
-    return new Proxy({}, {
+    return new Proxy({} as CubeSymbolsDefinition, {
       get: (v, propertyName) => {
         if (propertyName === '__cubeName') {
           depsResolveFn('__cubeName', parentIndex);
@@ -1593,7 +1593,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
   protected timeDimDependenciesProxy(parentIndex) {
     const self = this;
     const { depsResolveFn } = self.resolveSymbolsCallContext || {};
-    return new Proxy({}, {
+    return new Proxy({} as CubeSymbolsDefinition, {
       get: (v, propertyName) => {
         if (propertyName === '_objectWithResolvedProperties') {
           return true;

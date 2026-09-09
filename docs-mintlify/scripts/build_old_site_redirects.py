@@ -103,7 +103,7 @@ OVERRIDES = {
     "/product/administration/workspace/maintenance-window": "/admin",
     "/product/administration/workspace/semantic-catalog": "/admin",
     "/product/administration/workspace/integrations": "/admin/connect-to-data/visualization-tools",
-    "/product/administration/workspace/saved-reports": "/docs/explore-analyze/workbooks",
+    "/product/administration/workspace/saved-reports": "/docs/explore-analyze/explore#saving-explorations",
 
     # Auth methods moved under the Embedding tab's authentication section;
     # provider-specific pages without a dedicated new page go to the SSO/auth
@@ -137,6 +137,11 @@ OVERRIDES = {
     # Metabase semantic-layer sync was removed; send to the sync overview.
     "/product/apis-integrations/semantic-layer-sync/metabase": "/docs/integrations/semantic-layer-sync",
 }
+
+# Legacy redirects normally take precedence over canonical page mappings. This
+# page was renamed rather than consolidated into the workspace landing, so its
+# old redirect must follow the canonical override above.
+LEGACY_SOURCE_WINS = {"/product/administration/workspace/saved-reports"}
 
 # Where to send any /product/* URL that matches nothing else.
 PRODUCT_CATCH_ALL = "/docs/introduction"
@@ -268,7 +273,11 @@ def build_redirects(old_redirects: list, page_map: dict) -> list:
 
     # 1. Legacy aliases from the old redirects.json.
     for r in old_redirects:
-        add(r.get("source", ""), resolve_destination(r.get("destination", ""), page_map))
+        source = r.get("source", "")
+        if source in LEGACY_SOURCE_WINS:
+            add(source, to_absolute(OVERRIDES[source]))
+        else:
+            add(source, resolve_destination(r.get("destination", ""), page_map))
 
     # 2. Direct redirects for every canonical old /product page.
     for old_url, new_url in sorted(page_map.items()):

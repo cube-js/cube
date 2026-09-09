@@ -1,0 +1,13 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/filter_params_rolling_window.rs
+expression: pushed_down
+---
+fprw_sales__day_d_day | fprw_sales__amount | fprw_sales__amount_trailing_30d
+----------------------+--------------------+--------------------------------
+2024-03-01 00:00:00   | 1                  | 1                              
+2024-03-02 00:00:00   | 1                  | 2                              
+2024-03-03 00:00:00   | 1                  | 3                              
+2024-03-04 00:00:00   | 1                  | 4                              
+2024-03-05 00:00:00   | 1                  | 5                              
+2024-03-06 00:00:00   | 1                  | 6                              
+2024-03-07 00:00:00   | 1                  | 7

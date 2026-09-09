@@ -1096,7 +1096,9 @@ dimension][ref-proxy-granularity] that references it.
 
 For each custom granularity, the `interval` parameter is required. It specifies
 the duration of the time interval and has the following format:
-`quantity unit [quantity unit...]`, e.g., `5 days` or `1 year 6 months`.
+`quantity unit [quantity unit...]`, e.g., `5 days` or `1 year 6 months`. The only
+exception is a granularity that overrides a default granularity with `sql`, described
+[below](#calendar-cubes).
 
 Optionally, a custom granularity might use the `offset` parameter to specify how
 the time interval is shifted forward or backward in time. It has the same
@@ -1174,14 +1176,19 @@ cube(`orders`, {
 
 </CodeGroup>
 
-{/*
 #### Calendar cubes
 
-When the `granularities` parameter is used in time dimensions within [calendar
-cubes][ref-calendar-cubes], you can still use it to define custom granularities.
+The `granularities` parameter can also override the _default granularities_ by mapping
+them to pre-calculated columns with the `sql` parameter. This is most useful in
+[calendar cubes][ref-calendar-cubes], for modeling custom calendars such as fiscal
+calendars.
 
-Additionally, you can override the _default granularities_. This can be useful for
-modeling custom calendars, such as fiscal calendars.
+A granularity defined with `sql` must be named after a default granularity:
+`second`, `minute`, `hour`, `day`, `week`, `month`, `quarter`, or `year`. Names are
+matched case-insensitively. Use `sql` to change what an existing unit of time means,
+not to introduce a new one. A granularity under a name of your own, such as
+`fiscal_week`, must be defined with `interval` instead. See [overriding
+granularities][ref-calendar-cubes-granularities] for when to use each style.
 
 <CodeGroup>
 
@@ -1259,7 +1266,13 @@ cube(`fiscal_calendar`, {
 ```
 
 </CodeGroup>
-*/}
+
+<Info>
+
+**A pre-aggregation over an overridden granularity must declare that granularity.**
+A rollup at another granularity will not serve those queries correctly.
+
+</Info>
 
 ### `time_shift`
 
@@ -1402,3 +1415,4 @@ cube(`fiscal_calendar`, {
 [ref-filter-params]: /reference/data-modeling/context-variables#filter_params
 [link-encode-uri-component]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent
 [ref-rest-filters]: /reference/core-data-apis/rest-api/query-format#query-properties
+[ref-calendar-cubes-granularities]: /docs/data-modeling/concepts/calendar-cubes#overriding-granularities

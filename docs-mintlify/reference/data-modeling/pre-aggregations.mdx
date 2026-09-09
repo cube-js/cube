@@ -471,6 +471,16 @@ cube(`orders`, {
 
 </CodeGroup>
 
+<Info>
+
+Each referenced rollup needs an [index][self-indexes] whose leading columns
+cover the join key. For queries that also filter the joined rollup by a
+selective, single-value dimension, put that dimension before the join key in
+the index so that Cube Store can prune partitions — see
+[indexing the joined rollup for partition pruning][ref-rollup-join-indexing].
+
+</Info>
+
 #### `rollup_lambda`
 
 <Warning>
@@ -1828,6 +1838,7 @@ cube(`orders`, {
 [self-refreshkey-sql]: #sql
 [self-rollup]: #rollup
 [self-rollupjoin]: #rollup_join
+[self-indexes]: #indexes
 [self-rolluplambda]: #rollup_lambda
 [self-timedimension]: #time_dimension
 [self-buildrange]: #build_range_start-and-build_range_end
@@ -1840,3 +1851,4 @@ cube(`orders`, {
 [ref-ref-cubes]: /reference/data-modeling/cube
 [ref-custom-granularity]: /reference/data-modeling/dimensions#granularities
 [ref-env-allow-non-strict]: /reference/configuration/environment-variables#cubejs-pre-aggregations-allow-non-strict-date-range-match
+[ref-rollup-join-indexing]: /docs/pre-aggregations/using-pre-aggregations#indexing-the-joined-rollup-for-partition-pruning

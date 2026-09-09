@@ -23,21 +23,21 @@
     "lint:fix": "lerna run lint:fix",
     "tsc": "tsc --build",
     "tsc:watch": "tsc --build --watch",
-    "clean": "rimraf packages/*/{tsconfig.tsbuildinfo,lib,dist}"
+    "clean": "rimraf packages/*/{tsconfig.tsbuildinfo,lib,dist} packages/cubejs-testing/cypress/{tsconfig.tsbuildinfo,dist}"
   },
   "author": "Cube Dev, Inc.",
   "dependencies": {
     "core-js": "^3.34.0",
-    "lerna": "^9.0.7"
+    "lerna": "^10.0.1"
   },
   "files": [
     "src",
     "dist"
   ],
   "devDependencies": {
-    "@babel/core": "^7.13.8",
+    "@babel/core": "^7.24.5",
     "@babel/plugin-transform-runtime": "^7.13.9",
-    "@babel/preset-env": "^7.13.9",
+    "@babel/preset-env": "^7.24.5",
     "@babel/preset-react": "^7.12.13",
     "@babel/preset-typescript": "^7.13.0",
     "@babel/runtime": "^7.13.9",
@@ -46,12 +46,13 @@
     "@rollup/plugin-commonjs": "^17.1.0",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^11.2.0",
-    "@typescript-eslint/eslint-plugin": "^6.12.0",
-    "@types/fs-extra": "^9.0.1",
+    "@typescript-eslint/eslint-plugin": "^8.46.0",
+    "@typescript-eslint/parser": "^8.46.0",
+    "eslint": "^8.57.1",
+    "@types/fs-extra": "^11.0.4",
     "@types/jest": "^29",
     "husky": "^5.0.4",
     "is-ci": "^2.0.0",
-    "less": "^3.13.1",
     "npm-package-json-lint": "^5.1.0",
     "postcss": "^8.2.8",
     "prettier": "^2.0.5",
@@ -59,7 +60,7 @@
     "rollup": "2.80.0",
     "rollup-plugin-peer-deps-external": "^2.2.4",
     "rollup-plugin-tsconfig-paths": "^1.5.2",
-    "typescript": "~5.2.2"
+    "typescript": "~6.0.3"
   },
   "repository": {
     "type": "git",

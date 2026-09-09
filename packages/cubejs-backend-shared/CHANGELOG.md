@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.35](https://github.com/cube-js/cube/compare/v1.7.34...v1.7.35) (2026-09-07)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.7.34](https://github.com/cube-js/cube/compare/v1.7.33...v1.7.34) (2026-09-04)
+
+### Bug Fixes
+
+- **tesseract:** honour a custom granularity origin on single-unit intervals ([#11742](https://github.com/cube-js/cube/issues/11742)) ([4335ea5](https://github.com/cube-js/cube/commit/4335ea512069d6ec6603a5b81cfa71fd23f4c801))
+
+### Performance Improvements
+
+- **clickhouse-driver:** keep transformed rows in fast-properties mode ([#11755](https://github.com/cube-js/cube/issues/11755)) ([bb15ec5](https://github.com/cube-js/cube/commit/bb15ec578e9cd6cefe38083d74e22ff5d36ea5db))
+
+## [1.7.33](https://github.com/cube-js/cube/compare/v1.7.32...v1.7.33) (2026-09-03)
+
+### Features
+
+- **clickhouse-driver:** Pass the X-Request-ID as ClickHouse query_id ([#11739](https://github.com/cube-js/cube/issues/11739)) ([01abee3](https://github.com/cube-js/cube/commit/01abee39b12d0662f47e80dca614cd0f5c8cfc81))
+- **server-core:** size the data model compiler cache from `CUBEJS_COMPILER_CACHE_SIZE` ([#11732](https://github.com/cube-js/cube/issues/11732)) ([6c75c60](https://github.com/cube-js/cube/commit/6c75c601a2e2ba07b376d26950d5844a480cc1a5))
+
 ## [1.7.32](https://github.com/cube-js/cube/compare/v1.7.31...v1.7.32) (2026-09-01)
 
 **Note:** Version bump only for package @cubejs-backend/shared

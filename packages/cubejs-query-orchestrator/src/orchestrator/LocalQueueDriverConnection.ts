@@ -138,22 +138,18 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     return null;
   }
 
+  private orderedQueueItems(queueObj: Record<QueryKeyHash, QueueItem>, orderFilterLessThan?: number): QueueItem[] {
+    return Object.values(queueObj)
+      .filter((q) => !orderFilterLessThan || q.order < orderFilterLessThan)
+      .sort((a, b) => a.order - b.order);
+  }
+
   protected queueArray(queueObj: Record<QueryKeyHash, QueueItem>, orderFilterLessThan?: number): string[] {
-    return R.pipe(
-      R.values,
-      R.filter(orderFilterLessThan ? (q: QueueItem) => q.order < orderFilterLessThan : R.identity),
-      R.sortBy((q: QueueItem) => q.order),
-      R.map((q: QueueItem) => q.key)
-    )(queueObj);
+    return this.orderedQueueItems(queueObj, orderFilterLessThan).map((q) => q.key);
   }
 
   protected queueArrayAsTuple(queueObj: Record<QueryKeyHash, QueueItem>, orderFilterLessThan?: number): QueryKeysTuple[] {
-    return R.pipe(
-      R.values,
-      R.filter(orderFilterLessThan ? (q: QueueItem) => q.order < orderFilterLessThan : R.identity),
-      R.sortBy((q: QueueItem) => q.order),
-      R.map((q: QueueItem): QueryKeysTuple => [q.key, q.queueId])
-    )(queueObj);
+    return this.orderedQueueItems(queueObj, orderFilterLessThan).map((q) => [q.key, q.queueId]);
   }
 
   public async addToQueue(queryKey: QueryKey, queryHandler: string, query: AddToQueueQuery, priority: QueuePriority, options: AddToQueueOptions): Promise<AddToQueueResponse> {

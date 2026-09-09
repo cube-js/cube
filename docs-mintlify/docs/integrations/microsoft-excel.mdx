@@ -1,12 +1,12 @@
 ---
-title: Cube Cloud for Excel
-description: "Cube Cloud for Excel is the native Microsoft Excel add-in for Cube Cloud."
+title: Cube for Excel
+description: "Cube for Excel is the native Microsoft Excel add-in for Cube."
 ---
 
 it works with Excel on all operating systems,
 including macOS, and all platforms, including web and mobile. It doesn't integrate
 with the native [PivotTable][link-pivottable] in Excel but provides a custom
-[pivot table](#create-reports-via-pivot-table) UI.
+[pivot table](#create-explorations-via-pivot-table) UI.
 
 <Note>
 
@@ -16,8 +16,8 @@ Available on [Enterprise plan](https://cube.dev/pricing).
 
 After [configuring](#configuration), [installing](#installation), and
 [authenticating](#authentication) this add-in, you will be able to [create
-reports via pivot table](#create-reports-via-pivot-table) and work with
-[saved reports](#work-with-saved-reports).
+explorations via pivot table](#create-explorations-via-pivot-table) and work with
+[explorations](#work-with-explorations).
 
 <iframe
   width="100%"
@@ -31,12 +31,12 @@ reports via pivot table](#create-reports-via-pivot-table) and work with
 
 ## Configuration
 
-Cube Cloud for Excel uses the SQL API internally. So, the SQL API has to be
-[enabled][ref-sql-api-enabled] in the Cube Cloud deployment settings.
+Cube for Excel uses the SQL API internally. So, the SQL API has to be
+[enabled][ref-sql-api-enabled] in the Cube deployment settings.
 
 ## Installation
 
-You have to install Cube Cloud for Excel into your Microsoft 365 organization.
+You have to install Cube for Excel into your Microsoft 365 organization.
 To do so, navigate to its [page in the Microsoft AppSource][link-ms-appsource]
 and click **Get it now**:
 
@@ -49,7 +49,7 @@ button. Where this button is located depends on the [Excel version][link-excel-a
 For example, in Excel for the web, it's located on the rightmost side of the
 **Home** ribbon.
 
-Search for `Cube Cloud for Excel (add-in)` and click **Add**:
+Search for `Cube for Excel (add-in)` and click **Add**:
 
 <Frame>
   <img src="https://ucarecdn.com/83ab1e1f-e7d0-4c9c-bea1-f12c193d5e94/" />
@@ -57,13 +57,11 @@ Search for `Cube Cloud for Excel (add-in)` and click **Add**:
 
 ## Authentication
 
-You need to authenticate Cube Cloud for Excel to retrieve data from Cube Cloud.
-To do so, open the sidebar by clicking on the **Cube Cloud** button in
-the **Home** ribbon. Then, click **Sign in**.
+You need to authenticate Cube for Excel to retrieve data from Cube.
+To do so, open the sidebar by clicking on the **Cube** button in
+the **Home** ribbon. Then, click **Log in to Cube**.
 
-<Frame>
-  <img src="https://ucarecdn.com/bdf82477-02d3-4686-9c8f-8d6384c3e7f3/" />
-</Frame>
+{/* TODO: screenshot — sign-in screen redesign, headline "Log in to continue" and a "Log in to Cube" button */}
 
 A modal window with an authentication prompt will appear. Choose the deployments
 that you want to work with in Microsoft Excel and click **Authorize**.
@@ -72,16 +70,16 @@ Once you see the `Access Granted` message, close the modal window.
 If you want to revoke the authentication, open the add-in menu and click
 **Sign out**.
 
-## Create reports via pivot table
+## Create explorations via pivot table
 
-To create a report, go to the add-in menu and click **Create report via pivot
-table**. Then, select a Cube Cloud deployment from the drop-down. Finally,
+To create an exploration, open the add-in and click **Create exploration**.
+Then, select a Cube deployment from the drop-down. Finally,
 you can start building a query by selecting a view and its members in the UI that
 looks and feels like [Playground][ref-playground].
 
 <Info>
 
-Cube Cloud for Excel works only with [views][ref-views], not cubes.
+Cube for Excel works only with [views][ref-views], not cubes.
 
 </Info>
 
@@ -90,28 +88,34 @@ filters are pre-populated as soon as you select the view — the same way they
 are in workbooks. They are a starting point, not enforcement: you can change
 their values, switch operators, or remove them.
 
-Click on members to add them to **Rows** and **Measures**.
-If needed, drag dimensions from **Rows** to **Columns**. Click on
-the funnel buttons to add members to **Filters**. Click on **×** to
-remove members from a query.
+Click on members to add them to **Rows** and **Measures**, or drag a member from
+the list straight onto **Rows**, **Columns**, **Measures**, or **Filters**. You
+can also drag members between zones to rearrange them, or click the funnel
+buttons to add members to **Filters**. A member dropped onto **Filters** has no
+value yet, so it appears greyed until you set one in the **Filters** pane.
+Click on **×** to remove members from a query.
 
 <Frame>
   <img src="https://ucarecdn.com/670fda9d-358a-4345-9242-7888d8aaedd8/" />
 </Frame>
 
 Use **Order** and **Filters** panes below to sort and filter the
-data in the report.
+data in the exploration.
 
-If you'd like to move the report to a new location, click on the desired top-left
+If you'd like to move the exploration to a new location, click on the desired top-left
 cell and then confirm with the target button under **Result location**.
 
 <Frame>
   <img src="https://ucarecdn.com/4c3af7b9-4ef6-4f7f-8d0f-6d579609482e/" />
 </Frame>
 
-With every change to your query, Cube Cloud for Excel will update the report on
+With every change to your query, Cube for Excel will update the exploration on
 the sheet after a slight delay. If you'd like to minimize it, consider
 implementing [pre-aggregations][ref-pre-aggs].
+
+Writing a large result to the sheet can take a few seconds. When it does, a
+progress bar appears above the run controls, tracking the write itself rather
+than the query.
 
 ### Measure position and order
 
@@ -136,18 +140,30 @@ with **Measures on**, in the same tab) — there it's labeled **After rows** /
 
 To change the order measures appear in within their group, drag them within
 the **Measures** pane on the **Pivot** tab. Position and order are saved with
-the report and survive **Refresh**.
+the exploration and survive **Refresh**.
 
-When your report is ready, you can optionally move it to [saved reports](#work-with-saved-reports)
-by clicking **Save**.
+When your exploration is ready, click **Save** to add it to your workspace. You
+can then [work with the exploration](#work-with-explorations) from the add-in.
+To discard an unsaved exploration instead, choose **Delete exploration** from
+the editor's **⋮** menu.
 
-## Work with saved reports
+## Work with explorations
 
-Go to the add-in menu and click **View saved reports** to see a list of
-reports. Use the search box above the list to quickly find a folder or
-exploration by name across your whole deployment, not just the current
-folder — results are grouped by type and show each item's folder location,
-and selecting one navigates you straight to it.
+Opening the add-in shows the current workbook's home: every exploration
+placed in this workbook, grouped by sheet — a sheet isn't limited to one
+placement — with each placement's range and how long ago it last refreshed.
+A placement shows **Out of date** when its source exploration has been
+edited since that copy was written to the sheet. Running an exploration
+keeps its progress even if you close the pane before saving: it's listed
+under its sheet with a **Not saved** label; if it has no sheet or anchor
+yet, it appears under a top-level **Unsaved** heading instead. Reopening it
+resumes exactly where you left off. The pane can also hold more than one
+exploration open at once, switchable from a picker at the top.
+
+Click **Browse all explorations** to search by name across your whole
+deployment, not just the current folder — results are grouped by type and
+show each item's folder location, and selecting one navigates you straight to
+it.
 
 An exploration can be placed more than once — on different sheets or at
 different anchors in the same workbook, and in more than one document at
@@ -156,6 +172,20 @@ Hovering a row in this list shows every placement it has in the **current**
 document under **Location** / **Locations**. Click **Refresh** to update all
 of that exploration's placements in the current document at once; click its
 title to open it and change the query, which applies to every placement.
+
+**Refresh all**, at the top of the workbook home, refreshes every placement
+in the document as a tracked run: a footer at the bottom of the pane tracks
+overall progress (**N of M refreshed**) with a **Stop** button, while each
+row shows **Queued**, **Refreshing…**, or **Not refreshed** with a reason if
+it failed. The run keeps going if you navigate away and back; refreshes are
+written one sheet at a time, so a workbook with many sheets refreshes
+noticeably slower than a single placement.
+
+If you've edited a placement's cells by hand since it last refreshed, a
+banner names the affected rows and warns that the next **Refresh** will
+overwrite them — its **Locate** button jumps straight to them.
+
+{/* TODO: screenshot — the hand-edit overwrite banner with its Locate button */}
 
 A placement survives renaming the sheet it's on or the workbook it's in —
 it's tracked by the sheet's and workbook's own stable ids, not by name. A
@@ -168,14 +198,14 @@ targets the wrong cell.
   <img src="https://ucarecdn.com/167abe25-635c-4fa6-b4a2-c090aa533f3c/" />
 </Frame>
 
-If a report has filters applied, an admin can turn on **Show applied filters
+If an exploration has filters applied, an admin can turn on **Show applied filters
 in reports** (Settings → Spreadsheet Add-ins) to make the filter state
 visible on the sheet itself. When enabled, a summary of active filters is
 added above the table, and filtered columns are marked "(filtered)" in
-their header, both when the report is inserted and after **Refresh**.
+their header, both when the exploration is inserted and after **Refresh**.
 
-You can also manage saved reports in the **[Saved Reports][ref-saved-reports]** page
-in Cube Cloud.
+Saved explorations also appear in the Cube workspace. See
+[Saving explorations][ref-explorations] for details.
 
 
 [ref-excel]: /admin/connect-to-data/visualization-tools/excel
@@ -187,4 +217,4 @@ in Cube Cloud.
 [ref-sql-api-enabled]: /reference/core-data-apis/sql-api#cube-cloud
 [link-excel-addins]: https://support.microsoft.com/en-us/office/add-or-remove-add-ins-in-excel-0af570c4-5cf3-4fa9-9b88-403625a0b460
 [link-ms-appsource]: https://appsource.microsoft.com/en-us/product/office/WA200008486
-[ref-saved-reports]: /docs/workspace/saved-reports
+[ref-explorations]: /docs/explore-analyze/explore#saving-explorations

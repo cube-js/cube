@@ -1271,6 +1271,78 @@ describe('PreAggregations', () => {
       },
     });
 
+    // A rollupJoin whose join key is declared as each leg rollup's time dimension, so the
+    // key is stored truncated and under a granularity-suffixed column name.
+    cube('td_dates', {
+      sql: \`SELECT '2017-01-02'::timestamp as day, 'Q1' as quarter_label UNION ALL SELECT '2017-01-05'::timestamp, 'Q1'\`,
+
+      joins: {
+        td_facts: {
+          relationship: 'one_to_many',
+          sql: \`\${CUBE.day} = \${td_facts.day}\`
+        }
+      },
+
+      dimensions: {
+        day: {
+          sql: 'day',
+          type: 'time',
+          primary_key: true
+        },
+        quarter_label: {
+          sql: 'quarter_label',
+          type: 'string'
+        },
+      },
+
+      pre_aggregations: {
+        td_dates_rollup: {
+          dimensions: [quarter_label],
+          timeDimension: day,
+          granularity: 'day'
+        },
+        td_rollup_join: {
+          type: 'rollupJoin',
+          measures: [td_facts.total_amount],
+          dimensions: [quarter_label],
+          timeDimension: td_facts.day,
+          granularity: 'day',
+          rollups: [td_dates_rollup, td_facts.td_facts_rollup]
+        }
+      }
+    });
+
+    cube('td_facts', {
+      sql: \`SELECT 1 as id, '2017-01-02'::timestamp as day, 10 as amount UNION ALL SELECT 2, '2017-01-05'::timestamp, 32\`,
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'number',
+          primary_key: true
+        },
+        day: {
+          sql: 'day',
+          type: 'time'
+        },
+      },
+
+      measures: {
+        total_amount: {
+          sql: 'amount',
+          type: 'sum'
+        },
+      },
+
+      pre_aggregations: {
+        td_facts_rollup: {
+          measures: [total_amount],
+          timeDimension: day,
+          granularity: 'day'
+        }
+      }
+    });
+
   `);
 
   it('simple pre-aggregation', async () => {
@@ -3538,6 +3610,47 @@ describe('PreAggregations', () => {
       );
     });
   });
+
+  // A join key declared as each leg rollup's time dimension lives in a granularity-suffixed
+  // column, so the ON clause has to read that column rather than the bare member alias —
+  // otherwise the join names columns no rollup materializes and the query can't run.
+  if (getEnv('nativeSqlPlanner')) {
+    it('rollupJoin pre-aggregation on a time dimension join key', async () => {
+      await compiler.compile();
+
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['td_facts.total_amount'],
+        dimensions: ['td_dates.quarter_label'],
+        timeDimensions: [{
+          dimension: 'td_facts.day',
+          granularity: 'day',
+        }],
+        timezone: 'UTC',
+        order: [{ id: 'td_facts.day' }],
+        preAggregationsSchema: ''
+      });
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      expect(preAggregationsDescription.map((p: any) => p.preAggregationId).sort()).toEqual(
+        ['td_dates.td_dates_rollup', 'td_facts.td_facts_rollup']
+      );
+      expect(query.preAggregations?.preAggregationForQuery?.preAggregationName).toEqual('td_rollup_join');
+
+      return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+        expect(res).toEqual(
+          [{
+            td_dates__quarter_label: 'Q1',
+            td_facts__day_day: '2017-01-02T00:00:00.000Z',
+            td_facts__total_amount: '10',
+          }, {
+            td_dates__quarter_label: 'Q1',
+            td_facts__day_day: '2017-01-05T00:00:00.000Z',
+            td_facts__total_amount: '32',
+          }]
+        );
+      });
+    });
+  }
 
   it('rollupJoin pre-aggregation with nested joins via view (A->B->C)', async () => {
     await compiler.compile();

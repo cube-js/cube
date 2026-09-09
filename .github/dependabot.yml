@@ -11,3 +11,10 @@ updates:
     labels: [ ]
     ignore:
       - dependency-name: "*"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns: [ "*" ]

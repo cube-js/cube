@@ -1,6 +1,6 @@
 ---
-title: Cube Cloud for Sheets
-description: "Cube Cloud for Sheets is the native Google Sheets add-on for Cube Cloud."
+title: Cube for Sheets
+description: "Cube for Sheets is the native Google Sheets add-on for Cube."
 ---
 
 <Note>
@@ -11,8 +11,8 @@ Available on [Premium and above plans](https://cube.dev/pricing).
 
 After [configuring](#configuration), [installing](#installation), and
 [authenticating](#authentication) this add-on, you will be able to [create
-reports via pivot table](#create-reports-via-pivot-table) and work with [saved
-reports](#work-with-saved-reports).
+explorations via pivot table](#create-explorations-via-pivot-table) and work with
+[explorations](#work-with-explorations).
 
 <iframe
   width="100%"
@@ -26,12 +26,12 @@ reports](#work-with-saved-reports).
 
 ## Configuration
 
-Cube Cloud for Sheets uses the SQL API internally. So, the SQL API has to be
-[enabled][ref-sql-api-enabled] in the Cube Cloud deployment settings.
+Cube for Sheets uses the SQL API internally. So, the SQL API has to be
+[enabled][ref-sql-api-enabled] in the Cube deployment settings.
 
 ## Installation
 
-You have to install Cube Cloud for Sheets into your Google Workspace organization.
+You have to install Cube for Sheets into your Google Workspace organization.
 To do so, navigate to its [page in the Google Workspace
 Marketplace][link-marketplace-listing] and click **Install**:
 
@@ -49,31 +49,41 @@ document, open the **Extensions** menu, and check that there is the
 
 ## Authentication
 
-You need to authenticate Cube Cloud for Sheets to retrieve data from Cube Cloud.
+You need to authenticate Cube for Sheets to retrieve data from Cube.
 To do so, open the sidebar by going to the **Extensions** menu and choosing
-**Cube Cloud for Sheets → Open Sidebar**. Then, click **Sign in**.
+**Cube Cloud for Sheets → Show Sidebar**. Then, click **Log in to Cube**.
 
-<Frame>
-  <img src="https://ucarecdn.com/d47c8faa-97ed-4ce1-ba0e-99b7add1ab61/" />
-</Frame>
+{/* TODO: screenshot — sign-in screen redesign, headline "Log in to continue" and a "Log in to Cube" button */}
 
 A modal window with an authentication prompt will appear. Choose the deployments
 that you want to work with in Google Sheets and click **Authorize**.
 Once you see the `Access Granted` message, close the modal window.
 
+<Warning>
+
+Google Apps Script authenticates the add-on as whichever Google account you
+signed in to first in the browser, not necessarily one with access to the
+open spreadsheet. If they differ, the add-on can't reach the spreadsheet and
+the cursor status reads **Cannot read your selection**. Sign in to only one
+Google account per browser profile (or use a private/incognito window) to
+avoid this — or sign out of every Google account and sign back in with an
+account that has access to the file first.
+
+</Warning>
+
 If you want to revoke the authentication, open the add-on menu and click
 **Sign out**.
 
-## Create reports via pivot table
+## Create explorations via pivot table
 
-To create a report, go to the add-on menu and click **Create report via pivot
-table**. Then, select a Cube Cloud deployment from the drop-down. Finally,
+To create an exploration, open the add-on and click **Create exploration**.
+Then, select a Cube deployment from the drop-down. Finally,
 you can start building a query by selecting a view and its members in the UI that
 looks and feels like [Playground][ref-playground].
 
 <Info>
 
-Cube Cloud for Sheets works only with [views][ref-views], not cubes.
+Cube for Sheets works only with [views][ref-views], not cubes.
 
 </Info>
 
@@ -82,28 +92,34 @@ filters are pre-populated as soon as you select the view — the same way they
 are in workbooks. They are a starting point, not enforcement: you can change
 their values, switch operators, or remove them.
 
-Click on members to add them to **Rows** and **Measures**.
-If needed, drag dimensions from **Rows** to **Columns**. Click on
-the funnel buttons to add members to **Filters**. Click on **×** to
-remove members from a query.
+Click on members to add them to **Rows** and **Measures**, or drag a member from
+the list straight onto **Rows**, **Columns**, **Measures**, or **Filters**. You
+can also drag members between zones to rearrange them, or click the funnel
+buttons to add members to **Filters**. A member dropped onto **Filters** has no
+value yet, so it appears greyed until you set one in the **Filters** pane.
+Click on **×** to remove members from a query.
 
 <Frame>
   <img src="https://ucarecdn.com/acc8e133-f237-4aa7-a725-f32dd4a2ebdb/" />
 </Frame>
 
 Use **Order** and **Filters** panes below to sort and filter the
-data in the report.
+data in the exploration.
 
-If you'd like to move the report to a new location, click on the desired top-left
+If you'd like to move the exploration to a new location, click on the desired top-left
 cell and then confirm with the target button under **Result location**.
 
 <Frame>
   <img src="https://ucarecdn.com/5a8d2b6a-b415-46ee-9e03-57ea5eeb693a/" />
 </Frame>
 
-With every change to your query, Cube Cloud for Sheets will update the report on
+With every change to your query, Cube for Sheets will update the exploration on
 the sheet after a slight delay. If you'd like to minimize it, consider
 implementing [pre-aggregations][ref-pre-aggs].
+
+Writing a large result to the sheet can take a few seconds. When it does, a
+progress bar appears above the run controls, tracking the write itself rather
+than the query.
 
 ### Measure position and order
 
@@ -128,18 +144,30 @@ with **Measures on**, in the same tab) — there it's labeled **After rows** /
 
 To change the order measures appear in within their group, drag them within
 the **Measures** pane on the **Pivot** tab. Position and order are saved with
-the report and survive **Refresh**.
+the exploration and survive **Refresh**.
 
-When your report is ready, you can optionally move it to [saved reports](#work-with-saved-reports)
-by clicking **Save**.
+When your exploration is ready, click **Save** to add it to your workspace. You
+can then [work with the exploration](#work-with-explorations) from the add-on.
+To discard an unsaved exploration instead, choose **Delete exploration** from
+the editor's **⋮** menu.
 
-## Work with saved reports
+## Work with explorations
 
-Go to the add-on menu and click **View saved reports** to see a list of
-reports. Use the search box above the list to quickly find a folder or
-exploration by name across your whole deployment, not just the current
-folder — results are grouped by type and show each item's folder location,
-and selecting one navigates you straight to it.
+Opening the add-on shows the current spreadsheet's home: every exploration
+placed in this spreadsheet, grouped by sheet — a sheet isn't limited to one
+placement — with each placement's range and how long ago it last refreshed.
+A placement shows **Out of date** when its source exploration has been
+edited since that copy was written to the sheet. Running an exploration
+keeps its progress even if you close the pane before saving: it's listed
+under its sheet with a **Not saved** label; if it has no sheet or anchor
+yet, it appears under a top-level **Unsaved** heading instead. Reopening it
+resumes exactly where you left off. The pane can also hold more than one
+exploration open at once, switchable from a picker at the top.
+
+Click **Browse all explorations** to search by name across your whole
+deployment, not just the current folder — results are grouped by type and
+show each item's folder location, and selecting one navigates you straight to
+it.
 
 An exploration can be placed more than once — on different sheets or at
 different anchors in the same spreadsheet, and in more than one document at
@@ -148,6 +176,20 @@ Hovering a row in this list shows every placement it has in the **current**
 document under **Location** / **Locations**. Click **Refresh** to update all
 of that exploration's placements in the current document at once; click its
 title to open it and change the query, which applies to every placement.
+
+**Refresh all**, at the top of the spreadsheet home, refreshes every
+placement in the document as a tracked run: a footer at the bottom of the
+pane tracks overall progress (**N of M refreshed**) with a **Stop** button,
+while each row shows **Queued**, **Refreshing…**, or **Not refreshed** with a
+reason if it failed. The run keeps going if you navigate away and back;
+refreshes are written one sheet at a time, so a spreadsheet with many
+sheets refreshes noticeably slower than a single placement.
+
+If you've edited a placement's cells by hand since it last refreshed, a
+banner names the affected rows and warns that the next **Refresh** will
+overwrite them — its **Locate** button jumps straight to them.
+
+{/* TODO: screenshot — the hand-edit overwrite banner with its Locate button */}
 
 A placement survives renaming the sheet it's on or the spreadsheet it's in —
 it's tracked by the sheet's and spreadsheet's own stable ids, not by name. A
@@ -160,14 +202,14 @@ targets the wrong cell.
   <img src="https://ucarecdn.com/c8d490c6-80bf-44fe-9233-45121a7c4088/" />
 </Frame>
 
-If a report has filters applied, an admin can turn on **Show applied filters
+If an exploration has filters applied, an admin can turn on **Show applied filters
 in reports** (Settings → Spreadsheet Add-ins) to make the filter state
 visible on the sheet itself. When enabled, a summary of active filters is
 added above the table, and filtered columns are marked "(filtered)" in
-their header, both when the report is inserted and after **Refresh**.
+their header, both when the exploration is inserted and after **Refresh**.
 
-You can also manage saved reports in the **[Saved Reports][ref-saved-reports]** page
-in Cube Cloud.
+Saved explorations also appear in the Cube workspace. See
+[Saving explorations][ref-explorations] for details.
 
 
 [link-google-sheets]: https://workspace.google.com/products/sheets/
@@ -177,4 +219,4 @@ in Cube Cloud.
 [ref-pre-aggs]: /docs/pre-aggregations/using-pre-aggregations
 [ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
 [ref-sql-api-enabled]: /reference/core-data-apis/sql-api#cube-cloud
-[ref-saved-reports]: /docs/workspace/saved-reports
+[ref-explorations]: /docs/explore-analyze/explore#saving-explorations

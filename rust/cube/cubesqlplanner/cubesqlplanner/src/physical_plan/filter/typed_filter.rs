@@ -57,6 +57,22 @@ impl TypedFilter {
         plan_templates: &PlanSqlTemplates,
         filters_context: &FiltersContext,
     ) -> Result<String, CubeError> {
+        // A binding written for a time shift restates a band the stage reads,
+        // which takes both of its bounds. An operator supplying fewer describes
+        // no band to restate, and the binding would emit a predicate holding
+        // whatever its unfilled bounds happened to render as.
+        if let Some(shift_name) = &item.time_shift_name {
+            if !matches!(self.operation(), FilterOp::DateRange(_)) {
+                return Err(CubeError::user(format!(
+                    "FILTER_PARAMS binding for time shift `{}` of `{}` needs a date-range filter, \
+                     but the query filters that member with `{:?}`",
+                    shift_name,
+                    item.filter_symbol_name,
+                    self.operator()
+                )));
+            }
+        }
+
         let use_db_time_zone = !filters_context.use_local_tz;
 
         match &item.column {
