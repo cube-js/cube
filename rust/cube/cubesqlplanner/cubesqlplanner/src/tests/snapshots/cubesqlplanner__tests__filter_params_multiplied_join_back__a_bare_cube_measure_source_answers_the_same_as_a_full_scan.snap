@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/filter_params_multiplied_join_back.rs
+expression: result
+---
+fpmjb_order_tags__tag | fpmjb_orders__orders_per_buyer
+----------------------+-------------------------------
+a                     | 2                             
+b                     | 1
