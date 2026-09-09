@@ -1,9 +1,9 @@
 <Warning>
 
 Development mode is an authentication bypass: Playground's endpoints are served with
-no authentication, so anyone who can reach the instance can mint an API token carrying
-any security context (signed with your API secret), read and overwrite your data model
-and `.env`, and — unless
+no authentication, so anyone who can reach the instance is handed a ready-to-use API
+token (and can mint others carrying any security context), read your data model,
+overwrite it and your `.env`, and — unless
 [`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password)
 is set — run arbitrary SQL through the SQL API. Use it only on a local development
 machine, never in production. See
