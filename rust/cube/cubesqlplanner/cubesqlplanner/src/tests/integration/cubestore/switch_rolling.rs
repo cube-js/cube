@@ -6,8 +6,6 @@
 //! Requires `--features integration-cubestore` and a `cubestored` binary;
 //! without them both paths return `None` and only matching is asserted.
 //!
-//! One shape is `#[ignore]`d for a CubeStore limitation unrelated to the
-//! calc-group grain — see the note on it; run it with `--ignored` to reproduce.
 //! Two defects these tests were originally written against are fixed: the
 //! rolling-rewrite schema widening in #11410 and the aggregating-index decimal
 //! cast in #11413.
