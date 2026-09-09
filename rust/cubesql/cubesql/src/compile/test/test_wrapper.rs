@@ -1091,6 +1091,51 @@ async fn test_case_wrapper_escaping() {
         .contains("\\\\\\\\\\\\`"));
 }
 
+/// A NULL is pushed down as a cast that gives it a type. Where the dialect's types hold no
+/// NULL of their own, that cast has to name the nullable form instead, or the data source
+/// rejects the query it is handed.
+#[tokio::test]
+async fn wrapper_typed_null_casts_to_the_nullable_type_of_the_dialect() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan_customized(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            dim_str0,
+            AVG(avgPrice),
+            CASE
+                WHEN SUM((NULLIF(0.0, 0.0))) IS NOT NULL THEN SUM((NULLIF(0.0, 0.0)))
+                ELSE 0
+                END
+        FROM MultiTypeCube
+        GROUP BY 1
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        vec![(
+            "types/nullable".to_string(),
+            "Nullable({{ data_type }})".to_string(),
+        )],
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+
+    assert!(
+        sql.contains("SUM(CAST(NULL AS Nullable(DOUBLE)))"),
+        "the NULL names the nullable form of its type: {}",
+        sql
+    );
+}
+
 #[tokio::test]
 async fn test_wrapper_ilike_lowered_pushdown() {
     if !Rewriter::sql_push_down_enabled() {
