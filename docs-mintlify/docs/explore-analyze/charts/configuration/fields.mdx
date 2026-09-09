@@ -7,7 +7,7 @@ The **Fields** tab of the chart configuration panel builds the chart out of your
 bar, line, area, or scatter chart it reads top to bottom in the order you build: one section per
 measure, then the shared dimension, then **Small multiples**, then **Tooltips**.
 
-{/* TODO screenshot: Fields tab open showing drag targets for X, Y, Color, Size, Tooltip (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+{/* TODO screenshot: Fields tab open on a bar chart showing the Measure section, Dimension, Small multiples and Tooltips rows (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ## Measure sections
 
@@ -40,7 +40,7 @@ as bars on the left, revenue per order as a line on the right.
 Bar measures on one side are drawn side by side inside each category band, in list order. Lines and
 points are drawn over them against the same scale.
 
-{/* TODO screenshot: dragging a field from available fields into the Color channel (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+{/* TODO screenshot: two measure sections, one on each axis side, the second with its mark set to Line (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ### Break down by
 
@@ -60,11 +60,8 @@ each other. It is disabled until a dimension is picked, and its options depend o
 Side by side is unavailable when two bar measures already share the axis, since each measure already
 occupies its own bar in the band.
 
-A measure with no break-down is drawn as a single series in a color picked automatically: the next
-palette color after every break-down's values, so it never collides with them.
-
-Two measures broken down by the *same* dimension share that dimension's color scale. They keep one
-legend row each, and a palette change on either applies to both.
+A break-down decides what a color stands for, so it also decides how the measure is colored — see
+[color scales](/docs/explore-analyze/charts/configuration/color-and-stacking#color-scales).
 
 ## Dimension
 
@@ -105,6 +102,10 @@ A scatter chart plots measures against each other, so it takes a different set o
 **X-Axis** and **Y-Axis** (both measures), **Series** to color the points by a dimension, and
 **Size** to scale each point's radius by a measure. There is no orientation switch and no break-down
 row.
+
+A **Scatter** mark and the scatter chart type are separate things. Any measure can take the scatter
+mark to draw its values as points against the shared dimension, alongside a bar or a line. The scatter
+*chart type* is the one that replaces the measure sections with the slots above.
 
 ## The chart type follows the fields
 
