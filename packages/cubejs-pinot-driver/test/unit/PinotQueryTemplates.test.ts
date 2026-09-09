@@ -8,6 +8,62 @@ const prepareCompiler = (content: string) => originalPrepareCompiler({
   ])
 }, { adapter: 'postgres' });
 
+const FILTER_MODEL = `
+  cube('orders', {
+    sql_table: 'orders',
+
+    measures: {
+      count: {
+        type: 'count',
+      },
+    },
+
+    dimensions: {
+      id: {
+        sql: 'id',
+        type: 'number',
+        primary_key: true,
+      },
+      status: {
+        sql: 'status',
+        type: 'string',
+      },
+    },
+  });
+`;
+
+const buildFilter = async (operator: string, useNativeSqlPlanner: boolean) => {
+  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(FILTER_MODEL);
+
+  await compiler.compile();
+
+  const query = new PinotQuery({ joinGraph, cubeEvaluator, compiler }, {
+    measures: ['orders.count'],
+    filters: [{ member: 'orders.status', operator, values: ['%'] }],
+    useNativeSqlPlanner,
+  });
+
+  const [sql, params] = query.buildSqlAndParams();
+
+  return { sql: sql.replace(/\s+/g, ' '), params };
+};
+
+// Pinot has no default LIKE escape character, so the value escaping both
+// planners apply is only meaningful if the clause that interprets it is
+// attached to the predicate - which is why these pin the whole predicate.
+/* eslint-disable quotes -- double quotes keep the expected SQL readable */
+const PREDICATES: [string, string, boolean, string][] = [
+  ['contains', 'legacy', false, "LOWER(\"orders\".status) LIKE CONCAT('%', LOWER(?) , '%') ESCAPE '\\'"],
+  ['notContains', 'legacy', false, "LOWER(\"orders\".status) NOT LIKE CONCAT('%', LOWER(?) , '%') ESCAPE '\\'"],
+  ['startsWith', 'legacy', false, "LOWER(\"orders\".status) LIKE CONCAT('', LOWER(?) , '%') ESCAPE '\\'"],
+  ['endsWith', 'legacy', false, "LOWER(\"orders\".status) LIKE CONCAT('%', LOWER(?) , '') ESCAPE '\\'"],
+  ['contains', 'tesseract', true, "LOWER(\"orders\".status) LIKE CONCAT('%', LOWER(?), '%') ESCAPE '\\'"],
+  ['notContains', 'tesseract', true, "LOWER(\"orders\".status) NOT LIKE CONCAT('%', LOWER(?), '%') ESCAPE '\\'"],
+  ['startsWith', 'tesseract', true, "LOWER(\"orders\".status) LIKE CONCAT('', LOWER(?), '%') ESCAPE '\\'"],
+  ['endsWith', 'tesseract', true, "LOWER(\"orders\".status) LIKE CONCAT('%', LOWER(?), '') ESCAPE '\\'"],
+];
+/* eslint-enable quotes */
+
 describe('PinotQuery SQL templates', () => {
   it('renders Tesseract sql_table queries with a prepared FROM source', async () => {
     const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
@@ -50,51 +106,13 @@ describe('PinotQuery SQL templates', () => {
     expect(sql.indexOf('LIMIT 10')).toBeLessThan(sql.indexOf('OFFSET 5'));
   });
 
-  // Pinot has no default LIKE escape character, so the value escaping both
-  // planners apply (BaseQuery's `like_escape_char`, mirroring
-  // `BaseFilter.escapeWildcardChars`) only means anything if the statement
-  // carries the clause that interprets it. Without one a user searching for a
-  // literal `%` matches nothing instead of the rows containing a percent sign.
-  it.each([['legacy', false], ['tesseract', true]])(
-    'escapes LIKE wildcards in filter values and interprets them on the %s planner',
-    async (_name, useNativeSqlPlanner) => {
-      const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
-        cube('orders', {
-          sql_table: 'orders',
-
-          measures: {
-            count: {
-              type: 'count',
-            },
-          },
-
-          dimensions: {
-            id: {
-              sql: 'id',
-              type: 'number',
-              primary_key: true,
-            },
-            status: {
-              sql: 'status',
-              type: 'string',
-            },
-          },
-        });
-      `);
-
-      await compiler.compile();
-
-      const query = new PinotQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: ['orders.count'],
-        filters: [{ member: 'orders.status', operator: 'contains', values: ['%'] }],
-        useNativeSqlPlanner,
-      });
-
-      const [sql, params] = query.buildSqlAndParams();
+  it.each(PREDICATES)(
+    'escapes and interprets LIKE wildcards for %s on the %s planner',
+    async (operator, _name, useNativeSqlPlanner, predicate) => {
+      const { sql, params } = await buildFilter(operator, useNativeSqlPlanner);
 
       expect(params).toEqual(['\\%']);
-      // eslint-disable-next-line quotes -- double quotes keep the SQL readable
-      expect(sql).toContain("ESCAPE '\\'");
+      expect(sql).toContain(predicate);
     }
   );
 });
