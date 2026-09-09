@@ -47,6 +47,7 @@ tags:
   - name: Dashboard Embed Access
   - name: Usage Analytics
   - name: OpenAPI Spec
+  - name: Dashboard Exports
 paths:
   /api/v1/app-config:
     get:
@@ -268,6 +269,156 @@ paths:
       summary: Reset a deployment to the first onboarding step (project)
       tags:
         - Deployments
+  /api/v1/deployments/{deploymentId}/dashboard-exports:
+    post:
+      operationId: startExport
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the dashboard.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartDashboardExportInput'
+        description: StartDashboardExportInput
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardExportJobResponse'
+          description: ''
+      summary: Export a dashboard as PNG or PDF
+      tags:
+        - Dashboard Exports
+      x-mint:
+        content: >-
+          Submit a render of a published dashboard. Identify it with either `dashboardId` (numeric)
+          or `dashboardPublicId` (string) — supply exactly one; it must belong to this deployment,
+          otherwise `404` is returned.
+
+
+          Returns as soon as the job is accepted, because a render waits for every widget to finish
+          querying. Poll `GET /dashboard-exports/{jobId}` until `status` is `completed`, then fetch
+          the file from `GET /dashboard-exports/{jobId}/download`. The job and its file are dropped
+          at `expiresAt` (5 minutes) — download before then or submit again.
+
+
+          Pass `filters`, `timeGrains` and `memberSwitchers` to render the board with specific
+          control values, exactly as a scheduled notification does; omit them to render its saved
+          defaults.
+
+
+          By default the dashboard renders under the calling user's own security context, so the
+          file shows what that user would see. Requires **manage** access to the dashboard's
+          workbook — the same permission the console's own "Download as PNG / PDF" actions require,
+          because a whole-dashboard render is a bulk data export.
+
+
+          To export on someone else's behalf, pass `renderAs`: the queries behind the image then run
+          under that user's security context instead of yours. **Requires the caller to be a tenant
+          administrator.** Name a console user by `userId` or `email` (`type: USER`), or an embed
+          user by `embedTenantName` + `externalId` (`type: EMBED_USER`). A deactivated console user
+          is not a valid subject and returns `404`; an email is matched case-insensitively.
+
+
+          An embed subject is provisioned if it does not exist yet, and `groups`, `userAttributes`
+          and `securityContext` apply to **this render only** — they are carried on the render's own
+          session and are NOT written to the user's stored context, so exporting for someone never
+          changes what their live embedded sessions see. (Use the embed-tenant users API to change a
+          user's stored context.) An embed subject additionally requires the dashboard's workbook to
+          be shared with that embed tenant, otherwise `403` is returned.
+
+
+          Returns `403` when the workspace has data downloads restricted — including for an
+          on-behalf-of export, which deliberately does **not** bypass that setting the way a
+          built-in scheduled notification does — and `429` when there are already too many exports
+          in flight for the identity being rendered as.
+  /api/v1/deployments/{deploymentId}/dashboard-exports/{jobId}:
+    get:
+      operationId: getExportStatus
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the dashboard.
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: string
+          description: Job id returned when the export was submitted.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardExportStatusResponse'
+          description: ''
+      summary: Get the status of a dashboard export
+      tags:
+        - Dashboard Exports
+      x-mint:
+        content: >-
+          Progress of a submitted render. Poll until `status` is `completed` (then download it) or
+          `failed` (then read `error`); `pending` and `processing` both mean keep waiting.
+
+
+          Returns `404` once the job has expired, and for a job submitted by a different user — a
+          job is only ever visible to whoever started it.
+  /api/v1/deployments/{deploymentId}/dashboard-exports/{jobId}/download:
+    get:
+      operationId: downloadExport
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          description: Numeric id of the deployment that owns the dashboard.
+          schema:
+            type: integer
+        - in: path
+          name: jobId
+          required: true
+          description: Job id returned when the export was submitted.
+          schema:
+            type: string
+        - in: query
+          name: filename
+          required: false
+          description: Filename stem for the attachment, without extension. Defaults to `dashboard`.
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/pdf:
+              schema:
+                format: binary
+                type: string
+            image/png:
+              schema:
+                format: binary
+                type: string
+          description: The rendered dashboard.
+      summary: Download a completed dashboard export
+      tags:
+        - Dashboard Exports
+      x-mint:
+        content: >-
+          Stream the rendered file as an attachment, named `dashboard.png` / `dashboard.pdf` unless
+          `?filename=` supplies a different stem (the extension always follows the rendered format).
+
+
+          Returns `409` while the job is still rendering — poll `GET /dashboard-exports/{jobId}`
+          first — `422` if the render failed (terminal: submit a new export rather than retrying
+          this one), and `404` once the job has expired or if it belongs to a different user.
   /api/v1/deployments/{deploymentId}/dbt-sync:
     get:
       operationId: listDbtSyncs
@@ -5355,6 +5506,10 @@ components:
       type: object
     ConnectReportToWorkbookInput:
       properties:
+        addressOnly:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         anchorCell:
           oneOf:
             - type: string
@@ -5372,6 +5527,10 @@ components:
         placementId:
           oneOf:
             - type: string
+            - type: 'null'
+        resultChecksum:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementResultChecksumInput'
             - type: 'null'
         resultLocation:
           type: string
@@ -5630,6 +5789,13 @@ components:
             - type: integer
             - type: 'null'
           description: Hour of the day (0-23)
+        memberSwitchers:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardMemberSwitcherInput'
+              type: array
+            - type: 'null'
+          description: Field-switcher selections applied to the dashboard when the notification is rendered.
         minute:
           oneOf:
             - type: integer
@@ -5778,7 +5944,8 @@ components:
             - type: 'null'
         name:
           oneOf:
-            - type: string
+            - maxLength: 255
+              type: string
             - type: 'null'
         pivotItems:
           oneOf:
@@ -5790,6 +5957,10 @@ components:
               type: string
               minLength: 12
               maxLength: 12
+            - type: 'null'
+        resultChecksum:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementResultChecksumInput'
             - type: 'null'
         resultLocation:
           oneOf:
@@ -5809,7 +5980,8 @@ components:
             - type: 'null'
         title:
           oneOf:
-            - type: string
+            - maxLength: 255
+              type: string
             - type: 'null'
         workbookId:
           oneOf:
@@ -6258,6 +6430,49 @@ components:
               type: array
             - type: 'null'
       type: object
+    DashboardConfigDraftInput:
+      properties:
+        app:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardAppSourceInput'
+            - type: 'null'
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        kind:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardConfigDraftInputKind'
+            - type: 'null'
+        layout:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardLayoutInput'
+            - type: 'null'
+        settings:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        theme:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardThemeInput'
+            - type: 'null'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        widgets:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardWidgetDraftInput'
+              type: array
+            - type: 'null'
+      type: object
+    DashboardConfigDraftInputKind:
+      enum:
+        - CLASSIC
+        - APP
+      type: string
     DashboardConfigInput:
       properties:
         app:
@@ -6322,6 +6537,50 @@ components:
         - publicId
         - allowEmbed
       type: object
+    DashboardExportJobResponse:
+      properties:
+        expiresAt:
+          description: >-
+            When the job (and its rendered file) is evicted from the renderer cache. Download before
+            this, or submit a new export.
+          format: date-time
+          type: string
+        jobId:
+          description: Job id to poll for status and to download the finished file with.
+          type: string
+      required:
+        - jobId
+        - expiresAt
+      type: object
+    DashboardExportStatusResponse:
+      properties:
+        contentType:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: MIME type of the rendered file. Present once `status` is `completed`.
+        error:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: Why the render failed. Present only when `status` is `failed`.
+        progress:
+          oneOf:
+            - type: number
+            - type: 'null'
+          description: Rendering progress, 0-100, when the renderer reports one.
+        status:
+          $ref: '#/components/schemas/DashboardExportStatusResponseStatus'
+      required:
+        - status
+      type: object
+    DashboardExportStatusResponseStatus:
+      enum:
+        - pending
+        - processing
+        - completed
+        - failed
+      type: string
     DashboardFilter:
       properties:
         caseSensitive:
@@ -6490,6 +6749,29 @@ components:
             - type: integer
             - type: 'null'
       type: object
+    DashboardMemberSwitcher:
+      properties:
+        member:
+          type: string
+        selected:
+          type: string
+      required:
+        - member
+        - selected
+      type: object
+    DashboardMemberSwitcherInput:
+      properties:
+        member:
+          description: Path of the member the control replaces, e.g. "Orders.status"
+          pattern: .+\..+
+          type: string
+        selected:
+          description: Name of the member to show in its place, e.g. "city" (no view prefix)
+          type: string
+      required:
+        - member
+        - selected
+      type: object
     DashboardResponsiveLayouts:
       properties:
         lg:
@@ -6628,6 +6910,48 @@ components:
         - type
         - position
       type: object
+    DashboardWidgetDraftInput:
+      properties:
+        config:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        id:
+          oneOf:
+            - maxLength: 128
+              type: string
+            - type: 'null'
+        position:
+          $ref: '#/components/schemas/DashboardWidgetPositionInput'
+        responsiveLayouts:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardResponsiveLayoutsInput'
+            - type: 'null'
+        style:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        type:
+          $ref: '#/components/schemas/DashboardWidgetDraftInputType'
+      required:
+        - type
+        - position
+      type: object
+    DashboardWidgetDraftInputType:
+      enum:
+        - CHART
+        - TEXT
+        - FILTER
+        - AI
+        - TIME_GRAIN
+        - FIELD
+        - PARENT
+        - SPACER
+        - DIVIDER
+        - CONTAINER
+      type: string
     DashboardWidgetDtoType:
       enum:
         - CHART
@@ -8009,6 +8333,70 @@ components:
         - items
         - data
       type: object
+    ExportSubjectInput:
+      properties:
+        email:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            Main user email (for type=USER; provide this OR userId). For type=EMBED_USER it is the
+            email recorded on the provisioned embed user, and the externalId is used when it is
+            omitted.
+        embedTenantName:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: Embed tenant name (for type=EMBED_USER)
+        externalId:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            Embed user external id (for type=EMBED_USER). The user is provisioned if it does not
+            exist yet.
+        groups:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+          description: >-
+            Embed user groups (type=EMBED_USER). Must reference groups that already exist; drives
+            what the rendered dashboard is allowed to show.
+        securityContext:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+          description: >-
+            Security context applied to the embed user before rendering (type=EMBED_USER) — the same
+            object a generate-session call takes. Row-level rules in the data model see exactly
+            this.
+        type:
+          $ref: '#/components/schemas/ExportSubjectInputType'
+        userAttributes:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/UserAttributeInput'
+              type: array
+            - type: 'null'
+          description: >-
+            Embed user attribute values (type=EMBED_USER). Names must reference attribute
+            definitions that already exist.
+        userId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: Main user id (for type=USER; provide this OR email)
+      required:
+        - type
+      type: object
+    ExportSubjectInputType:
+      enum:
+        - USER
+        - EMBED_USER
+      type: string
     FileHash:
       properties:
         hash:
@@ -8559,6 +8947,13 @@ components:
           type: integer
         isEnabled:
           type: boolean
+        memberSwitchers:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardMemberSwitcher'
+              type: array
+            - type: 'null'
+          description: Field-switcher selections applied when the notification is rendered.
         notificationAiSummary:
           description: Whether this notification carries an AI-generated "what changed" summary in its body.
           type: boolean
@@ -8901,6 +9296,10 @@ components:
           items:
             type: string
           type: array
+        displayScale:
+          oneOf:
+            - $ref: '#/components/schemas/PivotItemsDisplayScale'
+            - type: 'null'
         filters:
           items:
             type: string
@@ -8921,18 +9320,34 @@ components:
           items:
             type: string
           type: array
+        showColumnTotals:
+          oneOf:
+            - type: boolean
+            - type: 'null'
       required:
         - columns
         - measures
         - rows
         - filters
       type: object
+    PivotItemsDisplayScale:
+      enum:
+        - model
+        - absolute
+        - thousands
+        - millions
+        - billions
+      type: string
     PivotItemsInput:
       properties:
         columns:
           items:
             type: string
           type: array
+        displayScale:
+          oneOf:
+            - $ref: '#/components/schemas/PivotItemsInputDisplayScale'
+            - type: 'null'
         filters:
           items:
             type: string
@@ -8953,12 +9368,24 @@ components:
           items:
             type: string
           type: array
+        showColumnTotals:
+          oneOf:
+            - type: boolean
+            - type: 'null'
       required:
         - columns
         - measures
         - rows
         - filters
       type: object
+    PivotItemsInputDisplayScale:
+      enum:
+        - model
+        - absolute
+        - thousands
+        - millions
+        - billions
+      type: string
     PivotItemsInputMeasuresAxis:
       enum:
         - columns
@@ -9239,6 +9666,10 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        resultChecksum:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementResultChecksumInput'
+            - type: 'null'
         resultLocation:
           oneOf:
             - type: string
@@ -9434,6 +9865,7 @@ components:
               additionalProperties: true
             - type: 'null'
         name:
+          maxLength: 255
           type: string
         pivotItems:
           oneOf:
@@ -9555,6 +9987,10 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        resultChecksum:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementResultChecksum'
+            - type: 'null'
         resultLocation:
           type: string
         sheetId:
@@ -9584,6 +10020,72 @@ components:
         - GOOGLE_SHEETS
         - EXCEL
       type: string
+    ReportPlacementResultChecksum:
+      properties:
+        chunks:
+          items:
+            $ref: '#/components/schemas/ReportPlacementResultChunk'
+          maxItems: 2000
+          type: array
+        v:
+          minimum: 1
+          type: integer
+      required:
+        - v
+        - chunks
+      type: object
+    ReportPlacementResultChecksumInput:
+      properties:
+        chunks:
+          items:
+            $ref: '#/components/schemas/ReportPlacementResultChunkInput'
+          maxItems: 2000
+          type: array
+        v:
+          minimum: 1
+          type: integer
+      required:
+        - v
+        - chunks
+      type: object
+    ReportPlacementResultChunk:
+      properties:
+        from:
+          minimum: 0
+          type: integer
+        hash:
+          maxLength: 64
+          minLength: 1
+          type: string
+        to:
+          oneOf:
+            - minimum: 0
+              type: integer
+            - type: 'null'
+          deprecated: true
+      required:
+        - from
+        - hash
+      type: object
+    ReportPlacementResultChunkInput:
+      properties:
+        from:
+          minimum: 0
+          type: integer
+        hash:
+          maxLength: 64
+          minLength: 1
+          type: string
+        to:
+          oneOf:
+            - minimum: 0
+              type: integer
+            - type: 'null'
+          deprecated: true
+      required:
+        - from
+        - hash
+      type: object
     ReportPlacementSyncStatus:
       enum:
         - UP_TO_DATE
@@ -9872,6 +10374,61 @@ components:
         - items
         - data
       type: object
+    StartDashboardExportInput:
+      properties:
+        dashboardId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: >-
+            Numeric id of the dashboard to export. Provide either this or `dashboardPublicId`, not
+            both.
+        dashboardPublicId:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: Public id of the dashboard to export. Provide either this or `dashboardId`, not both.
+        filters:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardFilterInput'
+              type: array
+            - type: 'null'
+          description: >-
+            Dimension filters applied to the dashboard while it renders. Same shape the
+            scheduled-notification API uses.
+        format:
+          $ref: '#/components/schemas/StartDashboardExportInputFormat'
+        memberSwitchers:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardMemberSwitcherInput'
+              type: array
+            - type: 'null'
+          description: Field-switcher selections applied to the dashboard while it renders.
+        renderAs:
+          oneOf:
+            - $ref: '#/components/schemas/ExportSubjectInput'
+            - type: 'null'
+          description: >-
+            Render the dashboard as this user instead of the caller — the queries behind the image
+            run under THEIR security context. Requires the caller to be a tenant admin. Omit to
+            render as the API key's own user.
+        timeGrains:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardTimeGrainInput'
+              type: array
+            - type: 'null'
+          description: Time-grain overrides applied to the dashboard while it renders.
+      required:
+        - format
+      type: object
+    StartDashboardExportInputFormat:
+      enum:
+        - png
+        - pdf
+      type: string
     StartDbtSyncInput:
       properties:
         branchName:
@@ -10212,6 +10769,15 @@ components:
             - type: boolean
             - type: 'null'
           description: Enable or disable the schedule
+        memberSwitchers:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardMemberSwitcherInput'
+              type: array
+            - type: 'null'
+          description: >-
+            Field-switcher selections applied to the dashboard when the notification is rendered.
+            Replaces the existing set when provided.
         minute:
           oneOf:
             - type: integer
@@ -10371,7 +10937,8 @@ components:
             - type: 'null'
         name:
           oneOf:
-            - type: string
+            - maxLength: 255
+              type: string
             - type: 'null'
         pivotItems:
           oneOf:
@@ -10388,6 +10955,10 @@ components:
               minLength: 12
               maxLength: 12
             - type: 'null'
+        resultChecksum:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementResultChecksumInput'
+            - type: 'null'
         resultLocation:
           oneOf:
             - type: string
@@ -10402,7 +10973,8 @@ components:
             - type: 'null'
         title:
           oneOf:
-            - type: string
+            - maxLength: 255
+              type: string
             - type: 'null'
         workbookId:
           oneOf:
@@ -11252,7 +11824,7 @@ components:
       properties:
         dashboardDraft:
           oneOf:
-            - $ref: '#/components/schemas/DashboardConfigInput'
+            - $ref: '#/components/schemas/DashboardConfigDraftInput'
             - type: 'null'
       type: object
     WorkbookDtoType:
