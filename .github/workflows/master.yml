@@ -21,7 +21,7 @@ jobs:
     outputs:
       sha: ${{ steps.get-tag.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - id: git-log
@@ -45,11 +45,11 @@ jobs:
     timeout-minutes: 60
     name: Build Linux Native backend for Dev image
     container:
-      image: cubejs/rust-cross:x86_64-unknown-linux-gnu-31072025-python-3.13
+      image: cubejs/rust-cross:x86_64-unknown-linux-gnu-08092026-python-3.13
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -65,7 +65,7 @@ jobs:
           key: cubesql-x86_64-unknown-linux-gnu
           shared-key: cubesql-x86_64-unknown-linux-gnu
       - name: Install Node.js 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
       - name: Install Yarn
@@ -82,7 +82,7 @@ jobs:
         working-directory: ./packages/cubejs-backend-native
         run: yarn run native:build-debug-python
       - name: Store build artifact for dev image
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: "native-linux-x64-glibc-3.13.node"    # this name is referenced below in docker-image-dev
           path: ./packages/cubejs-backend-native/index.node
@@ -95,26 +95,26 @@ jobs:
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Download backend-native artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: "native-linux-x64-glibc-3.13.node"    # this name is referenced in above in native_linux
           path: ./packages/cubejs-backend-native/
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
       # current .dockerignore prevents use of native build
       - name: Unignore native from .dockerignore
         run: |
           grep -v -E "packages/cubejs-backend-native/((native)|(index.node))" .dockerignore > .dockerignore.tmp
           mv .dockerignore.tmp .dockerignore
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./
           file: ./packages/cubejs-docker/dev.Dockerfile
@@ -122,7 +122,7 @@ jobs:
           push: true
           tags: cubejs/cube:dev
       - name: Update repo description
-        uses: peter-evans/dockerhub-description@v2
+        uses: peter-evans/dockerhub-description@v5
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -136,9 +136,9 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Dispatch event
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GH_TRIGGER_TOKEN }}
           script: |

@@ -3,6 +3,32 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.35](https://github.com/cube-js/cube/compare/v1.7.34...v1.7.35) (2026-09-07)
+
+### Bug Fixes
+
+- **tesseract:** resolve rollup-join keys kept as a rollup's time dimension ([#11747](https://github.com/cube-js/cube/issues/11747)) ([1d08fc0](https://github.com/cube-js/cube/commit/1d08fc0ea3c1af0b5030641ea482303fce41092d)), closes [#11362](https://github.com/cube-js/cube/issues/11362)
+
+### Features
+
+- **tesseract:** address a calendar time shift from FILTER_PARAMS ([#11787](https://github.com/cube-js/cube/issues/11787)) ([3cd88a6](https://github.com/cube-js/cube/commit/3cd88a6a156069e81d299048a5d1425437d71b24))
+
+## [1.7.34](https://github.com/cube-js/cube/compare/v1.7.33...v1.7.34) (2026-09-04)
+
+### Bug Fixes
+
+- **tesseract:** honour a custom granularity origin on single-unit intervals ([#11742](https://github.com/cube-js/cube/issues/11742)) ([4335ea5](https://github.com/cube-js/cube/commit/4335ea512069d6ec6603a5b81cfa71fd23f4c801))
+
+### Features
+
+- **clickhouse-driver:** Upgrade @clickhouse/client to 1.23.1 ([#11751](https://github.com/cube-js/cube/issues/11751)) ([843128e](https://github.com/cube-js/cube/commit/843128ef7ea4bc92a405669183b601ece94323e2))
+
+## [1.7.33](https://github.com/cube-js/cube/compare/v1.7.32...v1.7.33) (2026-09-03)
+
+### Bug Fixes
+
+- **cubesql:** Push `LIMIT 0` down to CubeScan ([#11589](https://github.com/cube-js/cube/issues/11589)) ([f923b0e](https://github.com/cube-js/cube/commit/f923b0ec998d0e8413b3fd33cbea0d5ef65c1651))
+
 ## [1.7.32](https://github.com/cube-js/cube/compare/v1.7.31...v1.7.32) (2026-09-01)
 
 ### Bug Fixes

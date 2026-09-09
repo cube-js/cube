@@ -4,20 +4,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { internalExceptions } from '@cubejs-backend/shared';
 
-const devPackages = [
-  'typescript',
-];
-
 export function isCubeNotServerPackage(pkgName: string): boolean {
   return pkgName !== '@cubejs-backend/server' && pkgName.toLowerCase().startsWith('@cubejs-backend/');
 }
 
 export function isCubePackage(pkgName: string): boolean {
   return pkgName.toLowerCase().startsWith('@cubejs-backend/');
-}
-
-export function isDevPackage(pkgName: string): boolean {
-  return isCubePackage(pkgName) || devPackages.includes(pkgName.toLowerCase());
 }
 
 export function isSimilarPackageRelease(pkg: SemVer, core: SemVer): boolean {

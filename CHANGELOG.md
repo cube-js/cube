@@ -3,6 +3,56 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.35](https://github.com/cube-js/cube/compare/v1.7.34...v1.7.35) (2026-09-07)
+
+### Bug Fixes
+
+- **tesseract:** resolve rollup-join keys kept as a rollup's time dimension ([#11747](https://github.com/cube-js/cube/issues/11747)) ([1d08fc0](https://github.com/cube-js/cube/commit/1d08fc0ea3c1af0b5030641ea482303fce41092d)), closes [#11362](https://github.com/cube-js/cube/issues/11362)
+
+### Features
+
+- **tesseract:** address a calendar time shift from FILTER_PARAMS ([#11787](https://github.com/cube-js/cube/issues/11787)) ([3cd88a6](https://github.com/cube-js/cube/commit/3cd88a6a156069e81d299048a5d1425437d71b24))
+
+## [1.7.34](https://github.com/cube-js/cube/compare/v1.7.33...v1.7.34) (2026-09-04)
+
+### Bug Fixes
+
+- **tesseract:** honour a custom granularity origin on single-unit intervals ([#11742](https://github.com/cube-js/cube/issues/11742)) ([4335ea5](https://github.com/cube-js/cube/commit/4335ea512069d6ec6603a5b81cfa71fd23f4c801))
+
+### Features
+
+- **clickhouse-driver:** Upgrade @clickhouse/client to 1.23.1 ([#11751](https://github.com/cube-js/cube/issues/11751)) ([843128e](https://github.com/cube-js/cube/commit/843128ef7ea4bc92a405669183b601ece94323e2))
+- **server:** Remove support for cube.ts configuration file ([#11763](https://github.com/cube-js/cube/issues/11763)) ([2da5a6a](https://github.com/cube-js/cube/commit/2da5a6a8796b470716acd43eb182e9fe77d40b47))
+
+### Performance Improvements
+
+- **clickhouse-driver:** keep transformed rows in fast-properties mode ([#11755](https://github.com/cube-js/cube/issues/11755)) ([bb15ec5](https://github.com/cube-js/cube/commit/bb15ec578e9cd6cefe38083d74e22ff5d36ea5db))
+- **clickhouse-driver:** Optimize result transformation ([#11752](https://github.com/cube-js/cube/issues/11752)) ([ef09196](https://github.com/cube-js/cube/commit/ef09196a8fb05c5338493e51a9ba340396fcb9cd))
+- **clickhouse-driver:** Stream rows up to 2.2x faster by honouring highWaterMark ([#11756](https://github.com/cube-js/cube/issues/11756)) ([d5490c9](https://github.com/cube-js/cube/commit/d5490c9ec489695293596473994d6581e932252c))
+
+## [1.7.33](https://github.com/cube-js/cube/compare/v1.7.32...v1.7.33) (2026-09-03)
+
+### Bug Fixes
+
+- **cubesql:** Coerce `CASE` branch types to a common type ([#11724](https://github.com/cube-js/cube/issues/11724)) ([1842d93](https://github.com/cube-js/cube/commit/1842d93a305a4fe0a4923c64be0aefe852dcef3a))
+- **cubesql:** Keep distinct count pushdown grouped ([#11737](https://github.com/cube-js/cube/issues/11737)) ([9015e04](https://github.com/cube-js/cube/commit/9015e0473a77b3ed131cbe5971e9e2b8fa887629))
+- **cubesql:** Push `LIMIT 0` down to CubeScan ([#11589](https://github.com/cube-js/cube/issues/11589)) ([f923b0e](https://github.com/cube-js/cube/commit/f923b0ec998d0e8413b3fd33cbea0d5ef65c1651))
+- **cubesql:** stop reporting `Continue wait` as a SQL API error ([#11717](https://github.com/cube-js/cube/issues/11717)) ([221e83e](https://github.com/cube-js/cube/commit/221e83e213088a479a0ae7639aa406ab3216b091)), closes [#10649](https://github.com/cube-js/cube/issues/10649)
+- **query-orchestrator:** drop duplicate `preAggregationId`/`type` declarations ([#11726](https://github.com/cube-js/cube/issues/11726)) ([596571c](https://github.com/cube-js/cube/commit/596571ca39308422aec84f22020ca5ae149f3d62))
+
+### Features
+
+- **api-gateway:** Expose `usedPreAggregations` on data responses ([#11591](https://github.com/cube-js/cube/issues/11591)) ([4931901](https://github.com/cube-js/cube/commit/49319017f5ecc556f38859f008c478d8799a4aa9))
+- **clickhouse-driver:** Pass the X-Request-ID as ClickHouse query_id ([#11739](https://github.com/cube-js/cube/issues/11739)) ([01abee3](https://github.com/cube-js/cube/commit/01abee39b12d0662f47e80dca614cd0f5c8cfc81))
+- **client-core:** Drop usage of cross-fetch, migrate to fetch API ([#11736](https://github.com/cube-js/cube/issues/11736)) ([66210e3](https://github.com/cube-js/cube/commit/66210e3c6ff068707e44b07e10929956b54c5b3a))
+- **client-core:** forward `usedPreAggregations` on `cubeSql` results ([#11735](https://github.com/cube-js/cube/issues/11735)) ([fca1d73](https://github.com/cube-js/cube/commit/fca1d73001de88f5092516af33748e037913d00e)), closes [#11591](https://github.com/cube-js/cube/issues/11591)
+- **cube-cli:** list dbt sync history and read one sync's logs ([#11625](https://github.com/cube-js/cube/issues/11625)) ([16d360e](https://github.com/cube-js/cube/commit/16d360eed6a80a9c68a0eae3ebf14ea64a64b67f))
+- **server-core:** size the data model compiler cache from `CUBEJS_COMPILER_CACHE_SIZE` ([#11732](https://github.com/cube-js/cube/issues/11732)) ([6c75c60](https://github.com/cube-js/cube/commit/6c75c601a2e2ba07b376d26950d5844a480cc1a5))
+
+### Performance Improvements
+
+- **clickhouse-driver:** Drop the per-query ping ([#11741](https://github.com/cube-js/cube/issues/11741)) ([6c66e2d](https://github.com/cube-js/cube/commit/6c66e2d1d5e03c5b7c69d17b5df0fd092026ca95))
+
 ## [1.7.32](https://github.com/cube-js/cube/compare/v1.7.31...v1.7.32) (2026-09-01)
 
 ### Bug Fixes

@@ -7,6 +7,7 @@
 import {
   getEnv,
   assertDataSource,
+  extractRequestUUID,
   pausePromise,
   Required,
 } from '@cubejs-backend/shared';
@@ -432,9 +433,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       return undefined;
     }
 
-    const rawId = String(requestId);
-    const spanIdx = rawId.lastIndexOf('-span-');
-    const queryUuid = spanIdx !== -1 ? rawId.substring(0, spanIdx) : rawId;
+    const queryUuid = extractRequestUUID(String(requestId));
 
     const value = queryUuid.toLowerCase().replace(/[^a-z0-9_-]/g, '_').slice(0, 63);
     if (!value) {

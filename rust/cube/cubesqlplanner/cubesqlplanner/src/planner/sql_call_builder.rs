@@ -113,6 +113,7 @@ impl<'a> SqlCallBuilder<'a> {
 
         Ok(SqlCallFilterParamsItem {
             filter_symbol_name: format!("{}.{}", item.cube_name, item.name),
+            time_shift_name: item.time_shift_name.clone(),
             column: item.column.clone(),
             compiled_call,
             // Turned on per query, and again per subquery, once the filters are

@@ -85,7 +85,7 @@ def semantic_layer_sync(ctx: dict) -> list[dict]:
         'user': 'mail@example.com',
         'password': '4dceae-606a03-93ae6dc7',
         'url': 'superset.example.com',
-        'database': 'Cube Cloud: staging-deployment'
+        'database': 'Cube: staging-deployment'
       }
     }
   ]
@@ -103,7 +103,7 @@ module.exports = {
           user: "mail@example.com",
           password: "4dceae-606a03-93ae6dc7",
           url: "superset.example.com",
-          database: "Cube Cloud: staging-deployment"
+          database: "Cube: staging-deployment"
         }
       }
     ]
@@ -123,7 +123,7 @@ If multiple security contexts are defined via the
 
 By default, multitenancy support in `semanticLayerSync` is disabled. Please
 contact support to enable multitenancy support in `semanticLayerSync` for your
-Cube Cloud account.
+Cube account.
 
 </Warning>
 
@@ -151,7 +151,7 @@ def semantic_layer_sync(ctx: dict) -> list[dict]:
         'user': 'mail@example.com',
         'password': '4dceae-606a03-93ae6dc7',
         'url': 'superset.example.com',
-        'database': f"Cube Cloud: {department}",
+        'database': f"Cube: {department}",
       }
     }
   ]
@@ -170,7 +170,7 @@ module.exports = {
           user: "mail@example.com",
           password: "4dceae-606a03-93ae6dc7",
           url: "superset.example.com",
-          database: `Cube Cloud: ${department}`
+          database: `Cube: ${department}`
         }
       }
     ]
@@ -199,7 +199,7 @@ def semantic_layer_sync(ctx: dict) -> list[dict]:
           'user': 'mail@example.com',
           'password': '4dceae-606a03-93ae6dc7',
           'url': 'superset.example.com',
-          'database': 'Cube Cloud: sls-test (admin)'
+          'database': 'Cube: sls-test (admin)'
         }
       },
       {
@@ -209,7 +209,7 @@ def semantic_layer_sync(ctx: dict) -> list[dict]:
           'api_token': '07988f63-c200-499e-97c9-ba137d8918aa',
           'api_secret': 'c19fbab4fd4945899795d32898f2e1165bef8e5ee653',
           'workspace_url': '12345678.us1a.app.preset.io',
-          'database': 'Cube Cloud: sls-test (admin)'
+          'database': 'Cube: sls-test (admin)'
         }
       }
     ]
@@ -231,7 +231,7 @@ module.exports = {
             user: "mail@example.com",
             password: "4dceae-606a03-93ae6dc7",
             url: "superset.example.com",
-            database: "Cube Cloud: sls-test (admin)"
+            database: "Cube: sls-test (admin)"
           }
         },
         {
@@ -241,7 +241,7 @@ module.exports = {
             api_token: "07988f63-c200-499e-97c9-ba137d8918aa",
             api_secret: "c19fbab4fd4945899795d32898f2e1165bef8e5ee653",
             workspace_url: "12345678.us1a.app.preset.io",
-            database: "Cube Cloud: sls-test (admin)"
+            database: "Cube: sls-test (admin)"
           }
         }
             ]
@@ -276,7 +276,7 @@ If data model is updated dynamically and the
 [`schema_version`][ref-config-schemaversion] configuration option is used to
 track data model changes, syncs will not automatically run. This behavior is
 disabled by default. Please contact support to enable running syncs when the
-data model is updated dynamically for your Cube Cloud account.
+data model is updated dynamically for your Cube account.
 
 </Warning>
 
@@ -303,7 +303,7 @@ def semantic_layer_sync(ctx: dict) -> list[dict]:
         'user': 'mail@example.com',
         'password': '4dceae-606a03-93ae6dc7',
         'url': 'superset.example.com',
-        'database': 'Cube Cloud: staging-deployment',
+        'database': 'Cube: staging-deployment',
         'scheduleInterval': 'every 10 minutes'
       }
     }
@@ -322,7 +322,7 @@ module.exports = {
           user: "mail@example.com",
           password: "4dceae-606a03-93ae6dc7",
           url: "superset.example.com",
-          database: "Cube Cloud: staging-deployment",
+          database: "Cube: staging-deployment",
           scheduleInterval: "every 10 minutes"
         }
       }

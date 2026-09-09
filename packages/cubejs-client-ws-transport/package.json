@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/ws-transport",
-  "version": "1.7.32",
+  "version": "1.7.35",
   "engines": {},
   "repository": {
     "type": "git",
@@ -19,23 +19,24 @@
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "dependencies": {
-    "@babel/runtime": "^7.1.2",
-    "@cubejs-client/core": "1.7.32",
-    "core-js": "^3.6.5",
+    "@babel/runtime": "^7.13.9",
+    "@cubejs-client/core": "1.7.35",
+    "core-js": "^3.34.0",
     "isomorphic-ws": "^4.0.1",
-    "ws": "^7.3.1"
+    "ws": "^7.5.3"
   },
   "files": [
     "dist"
   ],
   "license": "MIT",
   "devDependencies": {
-    "@babel/core": "^7.3.3",
-    "@babel/preset-env": "^7.3.1",
-    "@babel/preset-typescript": "^7.12.1",
-    "@cubejs-backend/linter": "1.7.32",
-    "@types/ws": "^7.2.9",
-    "typescript": "~5.2.2"
+    "@babel/core": "^7.24.5",
+    "@babel/preset-env": "^7.24.5",
+    "@babel/preset-typescript": "^7.13.0",
+    "@cubejs-backend/linter": "1.7.35",
+    "@types/node": "^22",
+    "@types/ws": "^7.4.0",
+    "typescript": "~6.0.3"
   },
   "publishConfig": {
     "access": "public"

@@ -274,6 +274,10 @@
     "---------------------------------------",
     "Requires Tesseract.                    ",
     "---------------------------------------",
+    "    A custom granularity origin on a single-unit interval only reaches the grouping under Tesseract.",
+    "querying custom granularities ECommerce: count by fiscal_year_by_1st_april + no dimension",
+    "querying custom granularities ECommerce: count by fiscal_year_by_15th_april + no dimension",
+    "querying custom granularities ECommerce: count by monthly_from_15th + no dimension",
     "querying BigECommerce: rolling window by 2 day without date range",
     "querying BigECommerce: rolling window by 2 month without date range",
     "querying BigECommerce: rolling window YTD without date range",
@@ -317,11 +321,6 @@
     "SQL API: Extended nested Rollup over asterisk",
     "SQL API: SQL push down push to cube quoted alias",
 
-
-
-    "querying BigECommerce: rolling window by 2 day without date range",
-    "querying BigECommerce: rolling window by 2 month without date range",
-    "querying BigECommerce: rolling window YTD without date range",
     "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension",
 
     "---- Different results comparing to baseQuery version. Need to investigate ----",

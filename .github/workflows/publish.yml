@@ -19,7 +19,7 @@ jobs:
       id-token: write  # Required for OIDC trusted publishing
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -28,7 +28,7 @@ jobs:
           rustflags: ""
           components: rustfmt
       - name: Install Node.js 24.x
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.x
           registry-url: 'https://registry.npmjs.org/'
@@ -39,7 +39,7 @@ jobs:
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Restore yarn cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
@@ -48,7 +48,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.22
       - name: Yarn install
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -64,7 +64,7 @@ jobs:
         env:
           NODE_OPTIONS: --max_old_space_size=4096
       - name: NPM publish
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         env:
           NPM_CONFIG_PROVENANCE: false
         with:
@@ -95,12 +95,12 @@ jobs:
             package_target_libc: glibc
       fail-fast: false
     container:
-      image: cubejs/rust-cross:${{ matrix.target }}-31072025${{ matrix.python-version != 'fallback' && format('-python-{0}', matrix.python-version) || '' }}
+      image: cubejs/rust-cross:${{ matrix.target }}-08092026${{ matrix.python-version != 'fallback' && format('-python-{0}', matrix.python-version) || '' }}
     permissions:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -110,7 +110,7 @@ jobs:
           components: rustfmt
           target: ${{ matrix.target }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install Yarn
@@ -127,9 +127,7 @@ jobs:
         run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Setup cross compilation
         if: (matrix.target == 'aarch64-unknown-linux-gnu')
-        uses: allenevans/set-env@v4.0.0
-        with:
-          PYO3_CROSS_PYTHON_VERSION: ${{ matrix.python-version }}
+        run: echo "PYO3_CROSS_PYTHON_VERSION=${{ matrix.python-version }}" >> "$GITHUB_ENV"
       - name: Build native (with Python)
         if: (matrix.python-version != 'fallback')
         env:
@@ -191,7 +189,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -201,12 +199,12 @@ jobs:
           components: rustfmt
           target: ${{ matrix.target }}
       - name: Install Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         if: (matrix.python-version != 'fallback')
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
       - name: Set Yarn version
@@ -263,7 +261,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Disable rustup update (issue workaround for Windows)
         run: rustup set auto-self-update disable
         shell: bash
@@ -275,12 +273,12 @@ jobs:
           rustflags: ""
           components: rustfmt
       - name: Install Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         if: (matrix.python-version != 'fallback')
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
       - name: Set Yarn version
@@ -328,10 +326,10 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Repo metadata
         id: repo
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const { data } = await github.rest.repos.get(context.repo)
@@ -368,18 +366,18 @@ jobs:
             echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           } >> "$GITHUB_OUTPUT"
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./packages/cubejs-docker
           file: ./packages/cubejs-docker/latest.Dockerfile
@@ -407,10 +405,10 @@ jobs:
       contents: write
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Repo metadata
         id: repo
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const { data } = await github.rest.repos.get(context.repo)
@@ -449,18 +447,18 @@ jobs:
             echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           } >> "$GITHUB_OUTPUT"
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./packages/cubejs-docker
           file: ./packages/cubejs-docker/latest-debian-jdk.Dockerfile
@@ -511,10 +509,10 @@ jobs:
       contents: write
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Repo metadata
         id: repo
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const { data } = await github.rest.repos.get(context.repo)
@@ -553,14 +551,14 @@ jobs:
             echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           } >> "$GITHUB_OUTPUT"
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./rust/
           file: ./rust/cubestore/Dockerfile
@@ -580,7 +578,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
       - name: Update repo description
-        uses: peter-evans/dockerhub-description@v2
+        uses: peter-evans/dockerhub-description@v5
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -602,13 +600,13 @@ jobs:
           # Please use minimal possible version of ubuntu, because it produces constraint on glibc
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            image: cubejs/rust-cross:x86_64-unknown-linux-gnu-31072025
+            image: cubejs/rust-cross:x86_64-unknown-linux-gnu-08092026
             executable_name: cubestored
             strip: true
             compress: false
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-musl
-            image: cubejs/rust-cross:x86_64-unknown-linux-musl-31072025
+            image: cubejs/rust-cross:x86_64-unknown-linux-musl-08092026
             executable_name: cubestored
             strip: true
             # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890
@@ -627,7 +625,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Setup Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -645,10 +643,10 @@ jobs:
         run: |
           cd rust/cubestore && cargo build --release --target=${{ matrix.target }} -p cubestore
       - name: Compress binaries
-        uses: svenstaro/upx-action@v2
+        uses: svenstaro/upx-action@v3
         if: ${{ matrix.compress }}
         with:
-          file: rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
+          files: rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
           args: --lzma
           strip: ${{ matrix.strip }}
       - name: Create folder for archive
@@ -710,7 +708,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Disable rustup update (issue workaround for Windows)
         run: rustup set auto-self-update disable
         if: contains(runner.os, 'windows')
@@ -737,22 +735,24 @@ jobs:
         if: ${{ startsWith(matrix.os, 'windows') }}
         run: choco install -y --force llvm --version 22.1.0
       - name: Set Env Variables for Windows
-        uses: allenevans/set-env@v4.0.0
         if: ${{ startsWith(matrix.os, 'windows') }}
-        with:
-          OPENSSL_DIR: 'C:/vcpkg/packages/openssl_x64-windows'
-          # This paths are required to work with static linking
-          OPENSSL_LIB_DIR: 'C:/vcpkg/packages/openssl_x64-windows/lib'
-          OPENSSL_INCLUDE_DIR: 'C:/vcpkg/packages/openssl_x64-windows/include'
-          LIBCLANG_PATH: 'C:\Program Files\LLVM\bin'
+        shell: bash
+        run: |
+          {
+            echo "OPENSSL_DIR=C:/vcpkg/packages/openssl_x64-windows"
+            # This paths are required to work with static linking
+            echo "OPENSSL_LIB_DIR=C:/vcpkg/packages/openssl_x64-windows/lib"
+            echo "OPENSSL_INCLUDE_DIR=C:/vcpkg/packages/openssl_x64-windows/include"
+            printf '%s\n' 'LIBCLANG_PATH=C:\Program Files\LLVM\bin'
+          } >> "$GITHUB_ENV"
       - name: Build with Cargo
         run: |
           cd rust/cubestore && cargo build --release --target=${{ matrix.target }} -p cubestore
       - name: Compress binaries
-        uses: svenstaro/upx-action@v2
+        uses: svenstaro/upx-action@v3
         if: ${{ matrix.compress }}
         with:
-          file: rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
+          files: rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
           args: --lzma
           strip: ${{ matrix.strip }}
       - name: Create folder for archive
@@ -800,7 +800,7 @@ jobs:
           - os: windows-2022
             target: x86_64-pc-windows-msvc
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install musl tools
         if: endsWith(matrix.target, '-musl')
         run: sudo apt-get update && sudo apt-get install -y musl-tools
@@ -847,9 +847,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Dispatch event
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GH_TRIGGER_TOKEN }}
           script: |
@@ -877,7 +877,7 @@ jobs:
       branch: ${{ steps.detect_branch.outputs.branch }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Detect branch name
         id: detect_branch
         run: |
@@ -892,9 +892,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Trigger runtime
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GH_TRIGGER_TOKEN }}
           script: |

@@ -87,8 +87,9 @@ the same way.
 
 You can also bucket an existing dimension without writing SQL. Open its menu in
 the field picker sidebar and choose **Create bins…** on a number dimension, or
-**Group values…** on a string one. Time dimensions have granularities instead,
-and an already derived field cannot be bucketed again.
+**Group values…** on a string or boolean one (grouping a boolean dimension is
+how you rename its `true`/`false` values). Time dimensions have granularities
+instead, and an already derived field cannot be bucketed again.
 
 <Frame>
   <img
@@ -98,18 +99,24 @@ and an already derived field cannot be bucketed again.
 </Frame>
 
 **Bins** take their boundaries either as a list (**Custom ranges**) or from a
-**Start**, **Width**, and number of **Ranges** (**Equal width**). Each boundary
-opens a bucket that includes its lower bound and excludes the upper one, and two
-open-ended buckets are added at the edges—so `0, 18, 25` yields `< 0`, `[0, 18)`,
-`[18, 25)`, `>= 25`, and no row is dropped. **Label style** renders a bucket as
-`[10, 20)`, `>= 10 and < 20`, or `10 to 19`; the last is offered only while every
-boundary is a whole number. Rows where the dimension is `NULL` are reported as
-`Unknown`.
+**Range start** and **Range end** (**Equal intervals**), which are prefilled
+from the column's own minimum and maximum. For equal intervals, choose whether
+the range is split by **Number of bins** or by a fixed **Bin size**. Each
+boundary opens a bucket that includes its lower bound and excludes the upper
+one, and two open-ended buckets are added at the edges—so `0, 18, 25` yields
+`< 0`, `[0, 18)`, `[18, 25)`, `>= 25`, and no row is dropped. **Label style**
+renders a bucket as `[10, 20)`, `>= 10 and < 20`, `10 to 19` (offered only while
+every boundary is a whole number), or **Custom**, which lets you type your own
+label for each bucket. Turn off **Label empty values separately** to fold rows
+where the dimension is `NULL` into the last bucket instead of reporting them
+under their own label (`Unknown` by default).
 
 **Value groups** collect the dimension's values into named sets: pick values, name
-the group, and choose **Add group**. A value belongs to one group at a time.
-Whatever you did not pick—including empty values—falls under **Everything else**,
-which defaults to `Other`.
+the group, and choose **Add group**. A value belongs to one group at a time, and
+an existing group's picked values can be changed later via **Edit group**. By
+default, whatever you did not pick—including empty values—falls under
+**Everything else**, which defaults to `Other`; turn off **Group remaining
+values** to have those rows return `NULL` instead.
 
 Bucket labels carry their position as a prefix (`1.`, `2.`, zero-padded past nine
 buckets) so that sorting the column sorts it by value rather than alphabetically,
@@ -134,7 +141,7 @@ CASE WHEN orders_view.age IS NULL THEN 'Unknown'
 
 <Info>
 
-**Equal width** ranges are resolved into boundaries when the field is created, not
+**Equal intervals** ranges are resolved into boundaries when the field is created, not
 recomputed from the data. Values arriving later outside the range join the first
 and last buckets instead of extending them.
 

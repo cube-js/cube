@@ -3,7 +3,7 @@ title: Color & stacking
 description: Configure color palettes, stacking behavior, stacked segment sorting, and legend placement for charts.
 ---
 
-The **Color** section in the Style tab controls two related things: how series are colored, and how they are stacked or grouped relative to each other. These settings apply across bar, line, area, scatter, and heatmap charts.
+The **Color** section in the Style tab controls two related things: how series are colored, and how they are stacked or grouped relative to each other. These settings apply to charts that color by a Color channel: bar, line, area, scatter, and heatmap. Chart types that color some other way, such as pie, funnel and sankey, pick their palette from a **Palette** dropdown of their own — but the [palettes](#palettes) below are the same ones they offer.
 
 {/* TODO screenshot: color and stacking section of the Style tab (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -86,7 +86,7 @@ The **Value** sorting option is only available for bar and column charts. For ar
 
 ## Legend
 
-The legend appears when a Color channel is assigned. Configure it in the **Legend** section:
+The legend appears when a Color channel is assigned. A chart type without a Color channel decides for itself: a pie carries a legend regardless, a funnel starts without one, and a sankey has none to configure. Where a legend is offered, it uses the same **Legend** section:
 
 | Option | Description |
 |---|---|

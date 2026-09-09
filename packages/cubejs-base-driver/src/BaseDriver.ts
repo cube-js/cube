@@ -552,7 +552,7 @@ export abstract class BaseDriver implements DriverInterface {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public async queryColumnTypes(sql: string, params: unknown[]): Promise<{ name: any; type: string; }[]> {
+  public async queryColumnTypes(sql: string, params: unknown[], options?: QueryOptions): Promise<{ name: any; type: string; }[]> {
     return [];
   }
 
@@ -686,7 +686,7 @@ export abstract class BaseDriver implements DriverInterface {
     prefix: string
   ): Promise<string[]> {
     // Lazy loading, because it's using azure SDK, which is quite heavy.
-    return (await import('./storage-fs/aws.fs')).extractUnloadedFilesFromS3(clientOptions, bucketName, prefix);
+    return (await import('./storage-fs/aws.fs.js')).extractUnloadedFilesFromS3(clientOptions, bucketName, prefix);
   }
 
   /**
@@ -698,7 +698,7 @@ export abstract class BaseDriver implements DriverInterface {
     tableName: string
   ): Promise<string[]> {
     // Lazy loading, because it's using azure SDK, which is quite heavy.
-    return (await import('./storage-fs/gcs.fs')).extractFilesFromGCS(gcsConfig, bucketName, tableName);
+    return (await import('./storage-fs/gcs.fs.js')).extractFilesFromGCS(gcsConfig, bucketName, tableName);
   }
 
   protected async extractFilesFromAzure(
@@ -707,6 +707,6 @@ export abstract class BaseDriver implements DriverInterface {
     tableName: string
   ): Promise<string[]> {
     // Lazy loading, because it's using azure SDK, which is quite (extremely) heavy.
-    return (await import('./storage-fs/azure.fs')).extractFilesFromAzure(azureConfig, bucketName, tableName);
+    return (await import('./storage-fs/azure.fs.js')).extractFilesFromAzure(azureConfig, bucketName, tableName);
   }
 }

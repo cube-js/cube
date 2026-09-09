@@ -484,7 +484,34 @@ for it and retry.
 A signed embed's token is usable for about 23 hours (see [Session
 lifecycle](/embedding/iframe/auth/signed#how-it-works)) and can't refresh
 itself — left alone, a tab open that long drops to a "Session expired"
-message. Renew it in place instead, using the events and action above:
+message. Renew it in place instead.
+
+If you're using `@cube-dev/embed-sdk`, call `autoRenewSession` on the
+connection instead of hand-rolling the listener below — it drives renewal
+from all three triggers (both events plus the tab returning to the
+foreground, which catches a renewal that timers missed while the tab was
+hidden), and collapses concurrent triggers into one in-flight renewal:
+
+```js
+import { connectCubeEmbed } from "@cube-dev/embed-sdk";
+
+const cube = connectCubeEmbed(iframe);
+
+cube.autoRenewSession({
+  // must resolve to the new session id
+  mintSession: () =>
+    fetch("/api/cube-embed-session", { method: "POST" })
+      .then((r) => r.json())
+      .then(({ sessionId }) => sessionId),
+});
+```
+
+`mintSession` is your own backend endpoint, calling [Generate
+Session](/reference/embed-apis/generate-session) — an API key that must never
+reach the browser. Each id is single-use and expires 5 minutes after minting,
+so mint a fresh one on every call rather than caching one ahead of time.
+
+Without the SDK, drive the same renewal by hand from the raw events and action:
 
 ```js
 let renewing = false;
@@ -509,12 +536,6 @@ window.addEventListener("message", (event) => {
   }
 });
 ```
-
-Mint the replacement session on your own backend — [Generate
-Session](/reference/embed-apis/generate-session) needs an API key that must
-never reach the browser. Each id is single-use and expires 5 minutes after
-minting, so mint it in response to the event rather than caching one ahead of
-time.
 
 ## Surfaces
 

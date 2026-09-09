@@ -52,7 +52,7 @@ jobs:
             --silent
 
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # A fork PR's head branch doesn't exist in the base repo, so checking it
           # out by branch name fails. GitHub mirrors every PR head into the base
