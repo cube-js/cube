@@ -127,6 +127,12 @@ export class JoinGraph implements CompilerInterface {
 
     return cube.joins
       .filter(join => {
+        // Already reported when the cube was validated. Which of the conflicting
+        // declarations was meant is unknowable, so none of them is used
+        if (this.cubeValidator.isDuplicateJoin(cube.name, join.name)) {
+          return false;
+        }
+
         if (!this.cubeEvaluator.cubeExists(join.name)) {
           errorReporter.error(`Cube ${join.name} doesn't exist`);
           return false;

@@ -237,9 +237,10 @@ ${usersCube}
     expect(sql).not.toContain('"orders".user_id = "users".id');
   });
 
-  // With errors omitted the cube compiles anyway, so the check has to also mark
-  // it invalid, or the collapsed join graph would keep serving the wrong path.
-  it('keeps the cube out of the join graph when compile errors are omitted', async () => {
+  // With errors omitted the model compiles anyway, so none of the conflicting
+  // declarations may reach the join graph: the cube keeps working on its own,
+  // only the ambiguous join is gone.
+  it('drops the conflicting joins instead of picking one when compile errors are omitted', async () => {
     const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
@@ -257,11 +258,52 @@ ${usersCube}
 
     await compilers.compiler.compile();
 
+    const ownSql = new PostgresQuery(compilers, {
+      measures: ['orders.count'],
+      timezone: 'UTC',
+    }).buildSqlAndParams()[0];
+    expect(ownSql).toContain('orders_tbl');
+
     expect(() => new PostgresQuery(compilers, {
       measures: ['orders.count'],
       dimensions: ['users.name'],
       timezone: 'UTC',
-    }).buildSqlAndParams()).toThrow(/orders/);
+    }).buildSqlAndParams()).toThrow(/Can't find join path to join/);
+  });
+
+  // Invalidating the cube would make every other cube joining to it report
+  // `Cube orders doesn't exist`, which is both false and unrelated to the defect.
+  it('does not make cubes joining to it report that it does not exist', async () => {
+    const message = await compileError(`
+cubes:
+  - name: orders
+    sql_table: orders_tbl
+    joins:
+      - name: users
+        sql: "{CUBE}.user_id = {users}.id"
+        relationship: many_to_one
+      - name: users
+        sql: "{CUBE}.manager_id = {users}.id"
+        relationship: many_to_one
+${ordersMembers}
+  - name: users
+    sql_table: users_tbl
+    joins:
+      - name: orders
+        sql: "{CUBE}.id = {orders}.user_id"
+        relationship: one_to_many
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: name
+        sql: name
+        type: string
+`);
+
+    expect(message).toContain('Cube \'orders\' declares 2 joins to \'users\'');
+    expect(message).not.toContain('doesn\'t exist');
   });
 
   it('blames the cube that declares the duplicates, not the one inheriting them', async () => {

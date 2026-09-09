@@ -1402,6 +1402,9 @@ export function functionFieldsPatterns(): string[] {
 export class CubeValidator implements CompilerInterface {
   protected readonly validCubes: Map<string, boolean> = new Map();
 
+  // cube name -> names of the cubes it declares more than one join to
+  protected readonly duplicateJoins: Map<string, Set<string>> = new Map();
+
   public constructor(
     protected readonly cubeSymbols: CubeSymbols
   ) {
@@ -1429,9 +1432,7 @@ export class CubeValidator implements CompilerInterface {
       if (!this.validateGranularitySql(cube, errorReporter)) {
         valid = false;
       }
-      if (!this.validateUniqueJoins(cube, errorReporter)) {
-        valid = false;
-      }
+      this.validateUniqueJoins(cube, errorReporter);
     }
 
     if (result.error != null) {
@@ -1483,24 +1484,18 @@ export class CubeValidator implements CompilerInterface {
     return result;
   }
 
-  // Only one join per joined cube survives into the join graph, so any extra
-  // declaration would be dropped and the model would resolve through a path its
-  // author did not write.
-  //
-  // Read from the raw definition, which holds only the joins the cube declares
-  // itself: `extends` appends a child's joins to the inherited ones, and a child
-  // redeclaring an inherited join is a supported way to replace it. Reporting
-  // over the merged list would blame the child for the replacement and point at
-  // positions it never wrote.
-  private validateUniqueJoins(cube, errorReporter: ErrorReporter): boolean {
+  private validateUniqueJoins(cube, errorReporter: ErrorReporter) {
+    // The raw definition, not `cube.joins`: `extends` merges the parent's joins
+    // in, and a child redeclaring one of them is a supported override
     const ownJoins = this.cubeSymbols.cubeDefinitions[cube.name]?.joins;
+    const duplicates = new Set<string>();
+    this.duplicateJoins.set(cube.name, duplicates);
 
     // The map form is keyed by the joined cube name and can not hold duplicates
     if (!Array.isArray(ownJoins)) {
-      return true;
+      return;
     }
 
-    let valid = true;
     const declarationsByCube = new Map<string, number[]>();
 
     ownJoins.forEach((join, index) => {
@@ -1514,16 +1509,14 @@ export class CubeValidator implements CompilerInterface {
 
     for (const [joinedCube, indexes] of declarationsByCube.entries()) {
       if (indexes.length > 1) {
+        duplicates.add(joinedCube);
         const declarations = indexes.map(index => `joins[${index}]`).join(', ');
         errorReporter.error(
-          `Cube '${cube.name}' declares ${indexes.length} joins to '${joinedCube}' (${declarations}). Only one of them can be used, the rest are ignored. Keep a single join to '${joinedCube}', or use extends to create a child cube of '${joinedCube}' and join that instead`,
+          `Cube '${cube.name}' declares ${indexes.length} joins to '${joinedCube}' (${declarations}). Only one join per pair of cubes is supported. Keep a single join to '${joinedCube}', or use extends to create a child cube of '${joinedCube}' and join that instead`,
           cube.fileName
         );
-        valid = false;
       }
     }
-
-    return valid;
   }
 
   /**
@@ -1577,5 +1570,9 @@ export class CubeValidator implements CompilerInterface {
 
   public isCubeValid(cube: CubeDefinition): boolean {
     return this.validCubes.get(cube.name) ?? cube.isSplitView ?? false;
+  }
+
+  public isDuplicateJoin(cubeName: string, joinName: string): boolean {
+    return this.duplicateJoins.get(cubeName)?.has(joinName) ?? false;
   }
 }
