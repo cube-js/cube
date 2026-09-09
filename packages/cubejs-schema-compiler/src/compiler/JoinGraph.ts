@@ -125,11 +125,13 @@ export class JoinGraph implements CompilerInterface {
     const joinRequired =
       (v) => `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
 
+    const duplicates = this.duplicateJoinTargets(cube, errorReporter);
+
     return cube.joins
       .filter(join => {
-        // Already reported when the cube was validated. Which of the conflicting
-        // declarations was meant is unknowable, so none of them is used
-        if (this.cubeValidator.isDuplicateJoin(cube.name, join.name)) {
+        // Which of the conflicting declarations was meant is unknowable, so none
+        // of them becomes an edge
+        if (duplicates.has(join.name)) {
           return false;
         }
 
@@ -163,6 +165,48 @@ export class JoinGraph implements CompilerInterface {
 
         return [`${cube.name}-${join.name}`, joinEdge] as [string, JoinEdge];
       });
+  }
+
+  /**
+   * The cubes a cube declares more than one join to. Only one edge per pair of
+   * cubes fits into the graph, so several declarations for the same pair would
+   * leave the join path ambiguous.
+   */
+  protected duplicateJoinTargets(cube: CubeDefinition, errorReporter: ErrorReporter): Set<string> {
+    const duplicates = new Set<string>();
+    // The raw definition, not `cube.joins`: `extends` merges the parent's joins
+    // in, and a child redeclaring one of them is a supported override. Duplicates
+    // a parent declares are reported and dropped on the parent itself
+    const ownJoins = this.cubeEvaluator.cubeDefinitions[cube.name]?.joins;
+
+    // The map form is keyed by the joined cube name and can not hold duplicates
+    if (!Array.isArray(ownJoins)) {
+      return duplicates;
+    }
+
+    const declarationsByCube = new Map<string, number[]>();
+
+    ownJoins.forEach((join, index) => {
+      if (!join?.name) {
+        return;
+      }
+      const declarations = declarationsByCube.get(join.name) ?? [];
+      declarations.push(index);
+      declarationsByCube.set(join.name, declarations);
+    });
+
+    for (const [joinedCube, indexes] of declarationsByCube.entries()) {
+      if (indexes.length > 1) {
+        duplicates.add(joinedCube);
+        const declarations = indexes.map(index => `joins[${index}]`).join(', ');
+        errorReporter.error(
+          `Cube '${cube.name}' declares ${indexes.length} joins to '${joinedCube}' (${declarations}). Only one join per pair of cubes is supported. Keep a single join to '${joinedCube}', or use extends to create a child cube of '${joinedCube}' and join that instead`,
+          cube.fileName
+        );
+      }
+    }
+
+    return duplicates;
   }
 
   protected buildJoinNode(cube: CubeDefinition): Record<string, 1> {
