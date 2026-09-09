@@ -1425,8 +1425,13 @@ export class CubeValidator implements CompilerInterface {
     if (cube.isView) {
       // We need to verify that leaf cubes in view are present only once
       this.validateUniqueLeafCubes(cube.name, cube.cubes, errorReporter);
-    } else if (!this.validateGranularitySql(cube, errorReporter)) {
-      valid = false;
+    } else {
+      if (!this.validateGranularitySql(cube, errorReporter)) {
+        valid = false;
+      }
+      if (!this.validateUniqueJoins(cube, errorReporter)) {
+        valid = false;
+      }
     }
 
     if (result.error != null) {
@@ -1476,6 +1481,49 @@ export class CubeValidator implements CompilerInterface {
     }
 
     return result;
+  }
+
+  // Only one join per joined cube survives into the join graph, so any extra
+  // declaration would be dropped and the model would resolve through a path its
+  // author did not write.
+  //
+  // Read from the raw definition, which holds only the joins the cube declares
+  // itself: `extends` appends a child's joins to the inherited ones, and a child
+  // redeclaring an inherited join is a supported way to replace it. Reporting
+  // over the merged list would blame the child for the replacement and point at
+  // positions it never wrote.
+  private validateUniqueJoins(cube, errorReporter: ErrorReporter): boolean {
+    const ownJoins = this.cubeSymbols.cubeDefinitions[cube.name]?.joins;
+
+    // The map form is keyed by the joined cube name and can not hold duplicates
+    if (!Array.isArray(ownJoins)) {
+      return true;
+    }
+
+    let valid = true;
+    const declarationsByCube = new Map<string, number[]>();
+
+    ownJoins.forEach((join, index) => {
+      if (!join?.name) {
+        return;
+      }
+      const declarations = declarationsByCube.get(join.name) ?? [];
+      declarations.push(index);
+      declarationsByCube.set(join.name, declarations);
+    });
+
+    for (const [joinedCube, indexes] of declarationsByCube.entries()) {
+      if (indexes.length > 1) {
+        const declarations = indexes.map(index => `joins[${index}]`).join(', ');
+        errorReporter.error(
+          `Cube '${cube.name}' declares ${indexes.length} joins to '${joinedCube}' (${declarations}). Only one of them can be used, the rest are ignored. Keep a single join to '${joinedCube}', or use extends to create a child cube of '${joinedCube}' and join that instead`,
+          cube.fileName
+        );
+        valid = false;
+      }
+    }
+
+    return valid;
   }
 
   /**
