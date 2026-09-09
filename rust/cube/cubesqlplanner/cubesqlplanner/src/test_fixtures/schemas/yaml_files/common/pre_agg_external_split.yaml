@@ -1,0 +1,62 @@
+# A share measure whose two stages need different pre-aggregations: the
+# numerator filters by brand, the denominator lifts that filter and totals
+# every brand. `by_day` is declared first so the matcher reaches it before
+# `by_brand_day`, and the two live in different external types.
+cubes:
+    - name: sales
+      sql: "SELECT * FROM pa_sales"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: brand
+            type: string
+            sql: brand
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: revenue
+            type: sum
+            sql: amount
+
+          # Denominator: the brand filter is lifted and brand is dropped from
+          # the grain, so this totals every brand in the queried range.
+          - name: revenue_all_brands
+            type: number
+            sql: "{CUBE.revenue}"
+            multi_stage: true
+            reduce_by:
+                - brand
+            filter:
+                exclude:
+                    - brand
+
+          - name: brand_share
+            type: number
+            sql: "{CUBE.revenue} / NULLIF({CUBE.revenue_all_brands}, 0)"
+            multi_stage: true
+
+      pre_aggregations:
+          # Serves the brand-free denominator, and is the precise choice for
+          # plain day-grain queries. Cannot serve the brand-filtered numerator.
+          - name: by_day
+            type: rollup
+            external: false
+            measures:
+                - revenue
+            time_dimension: created_at
+            granularity: day
+
+          # The only candidate that carries brand, so the only one that can
+          # serve the numerator.
+          - name: by_brand_day
+            type: rollup
+            external: true
+            measures:
+                - revenue
+            dimensions:
+                - brand
+            time_dimension: created_at
+            granularity: day
