@@ -2274,6 +2274,12 @@ impl WrappedSelectNode {
         };
 
         let sql_type = Self::generate_sql_type(sql_generator.clone(), data_type)?;
+        let sql_type = sql_generator
+            .get_sql_templates()
+            .nullable_type(sql_type)
+            .map_err(|e| {
+                DataFusionError::Internal(format!("Can't generate SQL for nullable type: {}", e))
+            })?;
         let result = Self::generate_sql_cast_expr(sql_generator, "NULL".to_string(), sql_type)?;
         Ok(result)
     }

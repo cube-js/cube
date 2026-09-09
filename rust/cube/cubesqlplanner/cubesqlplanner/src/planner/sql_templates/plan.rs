@@ -310,6 +310,18 @@ impl PlanSqlTemplates {
         )
     }
 
+    /// The type a cast has to name to produce a NULL of `sql_type`. Most dialects hold a
+    /// NULL in any type and name nothing; one whose types reject it names the nullable
+    /// form under `types/nullable`.
+    pub fn nullable_type(&self, sql_type: &str) -> Result<String, CubeError> {
+        if !self.render.contains_template("types/nullable") {
+            return Ok(sql_type.to_string());
+        }
+
+        self.render
+            .render_template("types/nullable", context! { data_type => sql_type })
+    }
+
     pub fn cast_to_string(&self, expr: &str) -> Result<String, CubeError> {
         let string_type = self.render.render_template("types/string", context! {})?;
         self.cast(expr, &string_type)
@@ -918,6 +930,23 @@ mod tests {
         let render = MockSqlTemplatesRender::try_new(t).unwrap();
         let driver_tools = Rc::new(MockDriverTools::with_sql_templates(render));
         PlanSqlTemplates::try_new(driver_tools, false).unwrap()
+    }
+
+    #[test]
+    fn test_nullable_type_is_the_type_itself_where_the_dialect_names_nothing() {
+        let templates = plan_templates_with(vec![]);
+
+        assert_eq!(templates.nullable_type("integer").unwrap(), "integer");
+    }
+
+    #[test]
+    fn test_nullable_type_is_the_form_the_dialect_names() {
+        let templates = plan_templates_with(vec![("types/nullable", "Nullable({{ data_type }})")]);
+
+        assert_eq!(
+            templates.nullable_type("integer").unwrap(),
+            "Nullable(integer)"
+        );
     }
 
     #[test]
