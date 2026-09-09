@@ -13,12 +13,11 @@
 //!   7-day window over 4.7K entities × 33 anchors (~3.6M for the 30-day one)
 //!   before the `GROUP BY` separates the entities again.
 //!
-//! The dimension is in the `GROUP BY` of both sides of that join, so it is
-//! known at plan time and could restrict the join instead of being applied
-//! after it.
-//!
-//! These tests assert the wanted plan shape and therefore fail today; they are
-//! ignored so CI stays green. Run them with
+//! The per-measure scan is fixed, and so is the third observation below — the
+//! base scan's date bound. The join shape is not: restricting it by the
+//! dimension would first mean giving the series side a dimension column to
+//! restrict against, since it carries none. The test asserting the restricted
+//! shape therefore stays ignored — run it with
 //! `cargo test rolling_window::fanout_repro -- --ignored`.
 
 use crate::test_fixtures::cube_bridge::MockSchema;
@@ -101,9 +100,10 @@ async fn test_base_scan_date_bound_is_literal() {
         "base scan date bound is a scalar sub-select over time_series:\n{sql}"
     );
 
-    // The literals span the series: the day the range opens on, through the day
-    // after the one it closes on. The trailing interval is subtracted from the
-    // lower bound in SQL, and the rolling join applies the exact frame on top.
+    // The literals span the series exactly here — the range is whole days at
+    // day granularity, so both ends land on a bucket boundary. The trailing
+    // interval is subtracted from the lower bound in SQL, and the rolling join
+    // applies the exact frame on top.
     let bounds = params
         .iter()
         .filter_map(|value| value.to_param_string())
@@ -111,7 +111,46 @@ async fn test_base_scan_date_bound_is_literal() {
         .collect_vec();
     assert_eq!(
         bounds,
-        vec!["2026-08-01T00:00:00.000", "2026-09-03T23:59:59.999"],
+        vec!["2026-08-01T00:00:00.000", "2026-09-02T23:59:59.999"],
         "unexpected base scan bounds in:\n{sql}"
+    );
+}
+
+// Sharing a base scan must not cost pre-aggregation coverage: a rollup carrying
+// one of the shared measures cannot answer for a scan carrying both, so a model
+// storing one rollup per rolling measure would silently fall to the fact table.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_sharing_yields_to_a_rollup_per_rolling_measure() {
+    let schema = MockSchema::from_yaml_file("common/integration_rolling_window_fanout_preagg.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {r#"
+        measures:
+          - daily_activity.events_7d
+          - daily_activity.minutes_7d
+        dimensions:
+          - daily_activity.entity_id
+        time_dimensions:
+          - dimension: daily_activity.activity_date
+            granularity: day
+            dateRange:
+              - "2026-08-01"
+              - "2026-09-02"
+    "#};
+
+    let (sql, used) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    let mut names = used
+        .iter()
+        .map(|pa| format!("{}.{}", pa.cube_name(), pa.name()))
+        .collect_vec();
+    names.sort();
+
+    assert_eq!(
+        names,
+        vec![
+            "daily_activity.rolling_events",
+            "daily_activity.rolling_minutes"
+        ],
+        "{sql}"
     );
 }
