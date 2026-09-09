@@ -2849,6 +2849,22 @@ from
       expect(plan).toContain('CubeScanWrappedSql');
       expect(plan).not.toMatch(/Projection:[^\n]*[*/]/);
 
+      // Inspect the source SQL, not local projections that could supply the constants.
+      const pushedSql = plan.match(/CubeScanExecutionPlan, SQL:\s*([\s\S]*)/)?.[1] ?? '';
+      expect(pushedSql).not.toBe('');
+      if (type === 'mysql') {
+        expect(pushedSql.match(/(?<![-\w.])1e2\b/g)?.length).toBeGreaterThanOrEqual(2);
+        expect(pushedSql).toContain('1.001e2');
+        expect(pushedSql).toContain('-1e2');
+        expect(pushedSql.match(/\(NULL \+ 0e0\)/g)).toHaveLength(2);
+      } else {
+        // Dialects choose their own FLOAT/DOUBLE spellings, including precision.
+        expect(pushedSql.match(/CAST\(100 AS [\w ()]+\)/g)?.length).toBeGreaterThanOrEqual(2);
+        expect(pushedSql).toMatch(/CAST\(100\.1 AS [\w ()]+\)/);
+        expect(pushedSql).toMatch(/CAST\(-100 AS [\w ()]+\)/);
+        expect(pushedSql.match(/CAST\(NULL AS [\w ()]+\)/g)).toHaveLength(2);
+      }
+
       const { rows } = await connection.query(query);
       expect(rows).toHaveLength(1);
       expect(Number(rows[0].float64_ratio)).toBeCloseTo(0.5, 10);

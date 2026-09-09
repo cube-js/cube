@@ -923,14 +923,18 @@ impl SqlTemplates {
     ) -> Result<String, CubeError> {
         if self.contains_template("expressions/float_literal") {
             // Scientific notation preserves floating-point semantics on MySQL versions
-            // that cannot CAST to FLOAT/DOUBLE. Widen Float32 before formatting so its
-            // value is preserved when the source evaluates literals as doubles.
+            // that cannot CAST to FLOAT/DOUBLE. Keep the caller's widened Float32 value:
+            // MySQL evaluates exponent literals as doubles, so formatting 0.1f32 as 1e-1
+            // would lose its exact widened value, 1.0000000149011612e-1.
             return self.render_template(
                 "expressions/float_literal",
                 context! { value => value.map(|value| format!("{value:e}")) },
             );
         }
 
+        // Keep the existing readable Display formatting on the cast path. Format Float32
+        // at its original precision; the dialect's cast supplies the target SQL type.
+        // Unlike the override above, this intentionally retains positional notation.
         let expr = value.map_or_else(
             || "NULL".to_string(),
             |value| match data_type {
