@@ -1,6 +1,7 @@
 /* globals describe, it, expect */
 const { prepareCompiler } = require('@cubejs-backend/schema-compiler');
 const VerticaQuery = require('../src/VerticaQuery.js');
+const VerticaDriver = require('../src/VerticaDriver.js');
 
 const testCompiler = (content, options) => prepareCompiler({
   localPath: () => __dirname,
@@ -10,6 +11,14 @@ const testCompiler = (content, options) => prepareCompiler({
 }, { adapter: 'vertica', ...options });
 
 describe('VerticaQuery', () => {
+  it('uses valid float cast targets in the runtime dialect', () => {
+    const QueryClass = VerticaDriver.dialectClass();
+    expect(QueryClass).toBe(VerticaQuery);
+    const templates = QueryClass.prototype.sqlTemplates.call(Object.create(QueryClass.prototype));
+    expect(templates.types.float).toBe('FLOAT');
+    expect(templates.types.double).toBe('DOUBLE PRECISION');
+  });
+
   const { compiler, joinGraph, cubeEvaluator } = testCompiler(`
     cube(\`visitors\`, {
       sql: \`
