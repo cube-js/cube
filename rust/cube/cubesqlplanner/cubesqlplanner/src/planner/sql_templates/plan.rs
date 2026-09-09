@@ -324,6 +324,9 @@ impl PlanSqlTemplates {
 
     pub fn cast_to_string(&self, expr: &str) -> Result<String, CubeError> {
         let string_type = self.render.render_template("types/string", context! {})?;
+        // The keys this counts may hold NULLs, and a dialect whose types reject one would
+        // fail the whole query over a key it should simply not count
+        let string_type = self.nullable_type(&string_type)?;
         self.cast(expr, &string_type)
     }
 
