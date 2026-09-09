@@ -32,6 +32,12 @@ jobs:
         with:
           node-version: 24.x
           registry-url: 'https://registry.npmjs.org/'
+      # Publishing goes through OIDC trusted publishing, so no token is needed, but
+      # setup-node still writes _authToken=${NODE_AUTH_TOKEN} and since v7 no longer
+      # exports a placeholder value for it, which makes every yarn 1 command fail
+      # TODO: drop this once we move to a modern package manager (yarn 4 / pnpm)
+      - name: Drop unused _authToken from generated .npmrc
+        run: sed -i '/_authToken/d' "$NPM_CONFIG_USERCONFIG"
       - name: Upgrade npm for OIDC support
         run: npm install -g npm@11.7.0
       - name: Get yarn cache directory path
