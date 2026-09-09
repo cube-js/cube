@@ -85,7 +85,9 @@ fn main() {
     // Parsing, planning and plan serialization all recurse once per level of query nesting on
     // this runtime's threads, so the depth a query may reach is bounded by their stack. Tokio
     // would otherwise leave it at the 2 MiB platform default, which holds only a few dozen
-    // levels of nested subqueries; select workers already size theirs explicitly.
+    // levels of nested subqueries. Select workers size theirs through
+    // CUBESTORE_SELECT_WORKER_STACK_SIZE, and deserializing a plan has to fit that one too --
+    // see DEFAULT_MAX_QUERY_PLAN_DEPTH.
     tokio_builder.thread_stack_size(env_parse_lenient(
         "CUBESTORE_MAIN_STACK_SIZE",
         8 * 1024 * 1024,

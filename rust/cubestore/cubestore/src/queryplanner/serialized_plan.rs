@@ -38,13 +38,14 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, OnceLock};
 
-/// Depth a serialized query plan may reach, counted in logical-plan nodes along the longest
-/// root-to-leaf path.
+/// Nesting a serialized query plan may reach along its longest path, counting plan nodes,
+/// expression nodes and the plans of subqueries carried in expressions alike -- the protobuf
+/// encoding nests two message levels for each of them.
 ///
-/// The protobuf encoding nests two message levels per plan node, and every level of decoding
-/// is a recursive call, so the budget is really a stack budget: a release build decodes around
-/// 360 levels per 2 MiB of thread stack. This default stays well inside what the runtime
-/// stacks allow, and unlike a stack overflow it can be reported.
+/// Every level of decoding is a recursive call, so the budget is really a stack budget, and the
+/// smallest stack that decodes is the select worker's (`CUBESTORE_SELECT_WORKER_STACK_SIZE`,
+/// 4 MiB), which a release build takes past 600 levels. This default stays well inside that,
+/// and unlike a stack overflow it can be reported.
 ///
 /// Cube Store inlines a CTE body at each of its references, so a query built from N chained
 /// stages arrives here as roughly 2N nodes.
@@ -65,36 +66,74 @@ fn max_query_plan_depth() -> usize {
     })
 }
 
-/// Longest root-to-leaf path in `plan`, in nodes. Walks an explicit stack: the plans this
-/// guards against are exactly the ones a recursive walk could not survive.
-fn logical_plan_depth(plan: &LogicalPlan) -> usize {
-    let mut max_depth = 0;
-    let mut pending = vec![(plan, 1usize)];
-    while let Some((node, depth)) = pending.pop() {
-        max_depth = max_depth.max(depth);
-        for input in node.inputs() {
-            pending.push((input, depth + 1));
-        }
-        // Subqueries carried in expressions are separate plans that nest just as deep. This
-        // arm does recurse, but once per level of subquery nesting, which the parser caps.
-        let mut subquery_depth = 0;
-        let _ = node.apply_expressions(|expr| {
-            expr.apply(|e| {
-                match e {
-                    Expr::ScalarSubquery(subquery)
-                    | Expr::Exists(Exists { subquery, .. })
-                    | Expr::InSubquery(InSubquery { subquery, .. }) => {
-                        subquery_depth =
-                            subquery_depth.max(logical_plan_depth(subquery.subquery.as_ref()));
-                    }
-                    _ => {}
+/// Deepest expression tree carried by `node`, and the deepest plan reached through a subquery
+/// one of those expressions carries, both measured from `node`'s expressions.
+fn expression_depths(node: &LogicalPlan) -> (usize, usize) {
+    let mut deepest_expression = 0;
+    let mut deepest_subquery = 0;
+
+    let _ = node.apply_expressions(|root| {
+        let mut pending = vec![(root, 1usize)];
+        while let Some((expr, depth)) = pending.pop() {
+            deepest_expression = deepest_expression.max(depth);
+            // A subquery is a whole plan hanging off the expression that carries it. This is
+            // the one recursive step here, taken once per level of subquery nesting.
+            match expr {
+                Expr::ScalarSubquery(subquery)
+                | Expr::Exists(Exists { subquery, .. })
+                | Expr::InSubquery(InSubquery { subquery, .. }) => {
+                    deepest_subquery = deepest_subquery
+                        .max(depth + logical_plan_depth(subquery.subquery.as_ref()));
                 }
+                _ => {}
+            }
+            let _ = expr.apply_children(|child| {
+                pending.push((child, depth + 1));
                 Ok(TreeNodeRecursion::Continue)
-            })
-        });
-        max_depth = max_depth.max(depth + subquery_depth);
+            });
+        }
+        Ok(TreeNodeRecursion::Continue)
+    });
+
+    (deepest_expression, deepest_subquery)
+}
+
+/// Longest root-to-leaf path in `plan`, counting a plan node, an expression node and a
+/// subquery's root alike, because the encoding nests all three the same way.
+///
+/// Walks an explicit stack and memoizes per node address: the plans this guards against are
+/// exactly the ones a recursive walk could not survive, and inputs are shared `Arc`s, so a
+/// node reachable by many paths must not be re-expanded per path.
+fn logical_plan_depth(plan: &LogicalPlan) -> usize {
+    let mut depth_below: HashMap<*const LogicalPlan, usize> = HashMap::new();
+    let mut pending: Vec<(&LogicalPlan, bool)> = vec![(plan, false)];
+
+    while let Some((node, inputs_visited)) = pending.pop() {
+        let key = node as *const LogicalPlan;
+        if !inputs_visited {
+            if depth_below.contains_key(&key) {
+                continue;
+            }
+            pending.push((node, true));
+            pending.extend(node.inputs().into_iter().map(|input| (input, false)));
+            continue;
+        }
+
+        let below = node
+            .inputs()
+            .into_iter()
+            .filter_map(|input| depth_below.get(&(input as *const LogicalPlan)))
+            .copied()
+            .max()
+            .unwrap_or(0);
+        let (in_expression, in_subquery) = expression_depths(node);
+        depth_below.insert(key, 1 + below.max(in_expression).max(in_subquery));
     }
-    max_depth
+
+    depth_below
+        .get(&(plan as *const LogicalPlan))
+        .copied()
+        .unwrap_or(1)
 }
 
 fn check_query_plan_depth(plan: &LogicalPlan) -> Result<(), CubeError> {
@@ -103,8 +142,8 @@ fn check_query_plan_depth(plan: &LogicalPlan) -> Result<(), CubeError> {
     if depth > limit {
         return Err(CubeError::user(format!(
             "Query plan is nested too deeply to execute: {} levels against a limit of {}. \
-             Reduce the number of chained stages, nested subqueries and joined CTEs in the \
-             query, or raise CUBESTORE_MAX_QUERY_PLAN_DEPTH.",
+             Reduce the nesting the query asks for -- chained stages, nested subqueries and \
+             expressions all count -- or raise CUBESTORE_MAX_QUERY_PLAN_DEPTH.",
             depth, limit
         )));
     }

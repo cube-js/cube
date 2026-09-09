@@ -278,9 +278,10 @@ macro_rules! parse_sql_options {
 /// generated query with a few dozen nested expressions is rejected outright.
 ///
 /// Every level is a recursive descent on the calling thread's stack and the parser has no
-/// stack-growth protection, so the real ceiling is the stack a statement is parsed on. The
-/// costliest shape is nested subqueries, at roughly 33 KiB a level in a release build, which
-/// the 8 MiB `cubestore-main` stack takes past 200 levels; this default stays inside that.
+/// stack-growth protection, so the real ceiling is the stack a statement is parsed on.
+/// Statements are parsed on the `cubestore-main` runtime, whose threads get 8 MiB
+/// (`CUBESTORE_MAIN_STACK_SIZE`). The costliest shape is nested subqueries, at roughly 33 KiB a
+/// level in a release build, which that stack takes past 200; this default stays inside it.
 const DEFAULT_SQL_PARSER_RECURSION_LIMIT: usize = 128;
 
 pub(crate) fn sql_parser_recursion_limit() -> usize {
