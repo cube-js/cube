@@ -4768,23 +4768,15 @@ export class BaseQuery {
         lt: '{{ column }} < {{ param }}',
         lte: '{{ column }} <= {{ param }}',
         like_pattern: '{% if start_wild %}\'%\' || {% endif %}{{ value }}{% if end_wild %}|| \'%\'{% endif %}',
-        // Character the native planner uses to escape `%`, `_` and itself inside
-        // a user-supplied LIKE value, mirroring what BaseFilter.escapeWildcardChars
-        // does on the legacy path. Without it the planner skips escaping entirely
-        // and a user searching for a literal `%` gets a wildcard instead, matching
-        // every row. Backslash is the default LIKE escape character in Postgres,
-        // MySQL, BigQuery, ClickHouse and Cube Store, so no ESCAPE clause is
-        // needed here - and Cube Store's parser rejects one outright, which is
-        // why this must stay a bare escape character. Dialects whose LIKE has no
-        // default escape character add the explicit clause themselves: Presto and
-        // Trino in `like_pattern`, MSSQL, Oracle and Snowflake in
-        // `tesseract.ilike` (their pattern is wrapped, so the clause cannot go
-        // inside it), and DuckDB, Pinot, Dremio and Druid likewise in
-        // `tesseract.ilike` - those four live in their driver packages rather
-        // than in this directory, so a sweep of only this directory will miss
-        // them. ksqlDB is the one dialect this character is wrong for: its LIKE
-        // accepts no ESCAPE clause at all, so the backslashes are matched as
-        // data and no clause can rescue them.
+        // Character the native planner uses to escape `%`, `_` and itself inside a
+        // user-supplied LIKE value, mirroring BaseFilter.escapeWildcardChars. It
+        // stays a bare character: Cube Store's parser rejects an ESCAPE clause.
+        // Dialects whose LIKE has no default escape character add the clause
+        // themselves - Presto and Trino in `like_pattern`; MSSQL, Oracle,
+        // Snowflake and, in their own driver packages, DuckDB, Pinot, Dremio and
+        // Druid in `tesseract.ilike`, whose pattern is wrapped and cannot hold it.
+        // ksqlDB is the exception this character is wrong for: its LIKE takes no
+        // ESCAPE clause at all, so the backslashes are matched as data.
         like_escape_char: '\\',
         always_true: '1 = 1'
 

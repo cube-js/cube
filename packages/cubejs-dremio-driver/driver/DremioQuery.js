@@ -13,11 +13,9 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class DremioFilter extends BaseFilter {
-  // Dremio's `ILIKE(expr, pattern)` function takes no escape argument, so the
-  // case folding goes on LOWER(...) and the matching on LIKE, which does. The
-  // clause is what makes the wildcard escaping applied to the value mean
-  // anything: Dremio has no default escape character, and without it a search
-  // for a literal `%` matches nothing.
+  // Dremio's `ILIKE(expr, pattern)` is a function and takes no escape argument,
+  // so case folding goes on LOWER(...) and matching on LIKE, which takes one.
+  // Dremio has no default escape character, so the clause is not optional.
   likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
@@ -172,14 +170,8 @@ class DremioQuery extends BaseQuery {
     templates.expressions.interval_single_date_part = 'CAST({{ num }} as INTERVAL {{ date_part }})';
     templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     delete templates.expressions.ilike;
-    // Dremio spells case-insensitive matching as the `ILIKE(expr, pattern)`
-    // function rather than as an infix operator, which is what deleting
-    // `expressions.ilike` above records, and the native filter path renders
-    // `tesseract.ilike` instead of that template. The function takes no escape
-    // argument, so the case folding moves onto LIKE, which does: Dremio has no
-    // default escape character, and without the clause the escaping the planner
-    // applies to the value (BaseQuery's `like_escape_char`) turns a search for a
-    // literal `%` into one that matches nothing.
+    // Dremio's ILIKE is a function (see DremioFilter.likeIgnoreCase), not an
+    // infix operator, and takes no escape argument - so match with LOWER + LIKE.
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }}) ESCAPE \'\\\'';
     delete templates.functions.WIDTH_BUCKET;
     templates.quotes.identifiers = '"';
