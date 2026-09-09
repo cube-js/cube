@@ -46,9 +46,9 @@ A typical use case would be:
 **In development mode, the token is not required for authorization.** Cube is in
 development mode whenever `NODE_ENV` is not `production`, whatever
 [`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode) is
-set to — and in that state this API accepts requests with no token at all. Setting
-`NODE_ENV=production` both takes the instance out of development mode and turns JWT
-verification on; a custom
+set to — and in that state this API accepts requests with no token at all.
+`NODE_ENV=production` turns JWT verification on, and — unless `CUBEJS_DEV_MODE=true` —
+also takes the instance out of development mode; a custom
 [`check_auth`](/reference/configuration/config#check_auth) that rejects
 unauthenticated requests enforces it too, whatever `NODE_ENV` is.
 
