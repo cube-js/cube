@@ -27,6 +27,7 @@ use crate::planner::MemberSymbol;
 use crate::planner::MultiStageFilter;
 use crate::planner::MultiStageFilterMode;
 use crate::planner::MultiStageGrain;
+use crate::planner::QueryDateTimeHelper;
 use crate::planner::QueryProperties;
 use crate::planner::QueryTimeSeries;
 use crate::planner::TimeDimensionSymbol;
@@ -1245,8 +1246,10 @@ impl MultiStageQueryPlanner {
     /// literals instead of reading them back off the series.
     ///
     /// `None` where the series is not derivable at plan time: without a date
-    /// range the range itself is a query, and a granularity whose periods come
-    /// off a calendar cube has boundaries no interval math reproduces.
+    /// range the range itself is a query, a granularity whose periods come off
+    /// a calendar cube has boundaries no interval math reproduces, and a range
+    /// standing for a pre-aggregation's partition holds placeholders rather
+    /// than dates.
     fn rolling_series_bounds(
         time_dimension: &Rc<TimeDimensionSymbol>,
     ) -> Result<Option<(String, String)>, CubeError> {
@@ -1259,6 +1262,12 @@ impl MultiStageQueryPlanner {
         let Some(date_range) = time_dimension.date_range_vec() else {
             return Ok(None);
         };
+        if date_range
+            .iter()
+            .any(|bound| QueryDateTimeHelper::parse_native_date_time(bound).is_err())
+        {
+            return Ok(None);
+        }
         let range = [date_range[0].clone(), date_range[1].clone()];
         // Millisecond bounds; the filter pads them to the dialect's precision
         // when it renders them.
