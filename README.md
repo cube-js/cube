@@ -47,9 +47,10 @@ docker run -p 4000:4000 \
 Then open http://localhost:4000 in your browser to continue setup.
 
 > **`CUBEJS_DEV_MODE=true` disables authentication completely.** All data access
-> endpoints are served without any authentication or authorization verification, and
-> anyone who can reach the instance can execute arbitrary SQL against connected data
-> sources. This is intentional — development mode is designed to run on a developer's
+> endpoints are served without any authentication or authorization verification, so
+> anyone who can reach the instance can read all of your data, and the SQL API accepts
+> any credentials unless `CUBEJS_SQL_PASSWORD` is set, allowing arbitrary SQL against
+> connected data sources. This is intentional — development mode is designed to run on a developer's
 > local machine for ease of use and debugging. Never expose it to the internet or use
 > it in production. Using development mode in the Cube cloud platform is highly
 > discouraged, as it bypasses the platform's security model. See

@@ -74,9 +74,10 @@ You don't need to set up any `CUBEJS_EXT_DB_*` environment variables or
 `externalDriverFactory` inside your `cube.js` configuration file.
 
 > **`CUBEJS_DEV_MODE=true` disables authentication completely.** All data access
-> endpoints are served without any authentication or authorization verification, and
-> anyone who can reach the instance can execute arbitrary SQL against connected data
-> sources. This is intentional — development mode is designed to run on a developer's
+> endpoints are served without any authentication or authorization verification, so
+> anyone who can reach the instance can read all of your data, and the SQL API accepts
+> any credentials unless `CUBEJS_SQL_PASSWORD` is set, allowing arbitrary SQL against
+> connected data sources. This is intentional — development mode is designed to run on a developer's
 > local machine for ease of use and debugging. Never use it in production, and using it
 > in the Cube cloud platform is highly discouraged, as it bypasses the platform's
 > security model. See

@@ -1204,11 +1204,14 @@ data access endpoint of the Cube instance — the
 [GraphQL API](/reference/core-data-apis/graphql-api),
 [SQL API](/reference/core-data-apis/sql-api), and
 [Playground](/docs/explore-analyze/playground) — is served without any authentication
-or authorization verification: no JWT is required and
-[member-level access control](/docs/data-modeling/access-control/member-level-security)
-is not enforced. The data model and configuration are also readable and writable
-through those unauthenticated endpoints, so anyone who can reach the instance can
-execute arbitrary SQL against every connected data source.
+or authorization verification: requests with a missing or invalid token are accepted,
+and [member-level access control](/docs/data-modeling/access-control/member-level-security)
+is not enforced. The SQL API additionally accepts any user name and password unless
+[`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password)
+is set, so anyone who can reach the instance can execute arbitrary SQL against every
+connected data source. Playground's own endpoints are unauthenticated as well: they
+read and write your data model files and `.env`, and mint tokens carrying any security
+context, signed with your API secret.
 
 This is intentional. Development mode is designed to run on a developer's local
 machine for ease of use and debugging. Never run it where anyone else can reach it,
