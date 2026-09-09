@@ -31,14 +31,14 @@ const MODEL = `
   });
 `;
 
-const buildContainsFilter = async (useNativeSqlPlanner: boolean) => {
+const buildFilter = async (operator: string, useNativeSqlPlanner: boolean) => {
   const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(MODEL);
 
   await compiler.compile();
 
   const query = new DremioQuery({ joinGraph, cubeEvaluator, compiler }, {
     measures: ['orders.count'],
-    filters: [{ member: 'orders.status', operator: 'contains', values: ['%'] }],
+    filters: [{ member: 'orders.status', operator, values: ['%'] }],
     useNativeSqlPlanner,
   });
 
@@ -47,6 +47,8 @@ const buildContainsFilter = async (useNativeSqlPlanner: boolean) => {
   return { sql: sql.replace(/\s+/g, ' '), params };
 };
 
+const PLANNERS: [string, boolean][] = [['legacy', false], ['tesseract', true]];
+
 describe('DremioQuery SQL templates', () => {
   // Dremio has no default LIKE escape character - the `default_escape` gate on
   // its `expressions.like` template is the repo's own record of that. Both
@@ -54,26 +56,34 @@ describe('DremioQuery SQL templates', () => {
   // `like_escape_char`), so the statement has to carry the clause that
   // interprets that escaping; without one a user searching for a literal `%`
   // matches nothing instead of the rows containing a percent sign.
-  it('escapes LIKE wildcards in filter values on both planners', async () => {
-    expect((await buildContainsFilter(false)).params).toEqual(['\\%']);
-    expect((await buildContainsFilter(true)).params).toEqual(['\\%']);
-  });
+  it.each(PLANNERS)(
+    'escapes LIKE wildcards in filter values and interprets them on the %s planner',
+    async (_name, useNativeSqlPlanner) => {
+      const { sql, params } = await buildFilter('contains', useNativeSqlPlanner);
 
-  it('interprets that escaping with an explicit ESCAPE clause on the native planner', async () => {
-    const { sql } = await buildContainsFilter(true);
-
-    // eslint-disable-next-line quotes -- double quotes keep the SQL readable
-    expect(sql).toContain("ESCAPE '\\'");
-  });
+      expect(params).toEqual(['\\%']);
+      // eslint-disable-next-line quotes -- double quotes keep the SQL readable
+      expect(sql).toContain("ESCAPE '\\'");
+    }
+  );
 
   // Dremio spells case-insensitive matching as the `ILIKE(expr, pattern)`
   // function, not as an infix operator - `sqlTemplates` deleting
-  // `expressions.ilike` is what records that here. The native filter path
-  // renders `tesseract.ilike`, which is a separate template from the one that
-  // delete covers, so it has to avoid the operator on its own.
-  it('does not render ILIKE as an infix operator on the native planner', async () => {
-    const { sql } = await buildContainsFilter(true);
+  // `expressions.ilike` is what records that here. The function also takes no
+  // escape argument, so neither planner can use it and still say how the value
+  // was escaped.
+  it.each(PLANNERS)('does not render ILIKE on the %s planner', async (_name, useNativeSqlPlanner) => {
+    const { sql } = await buildFilter('contains', useNativeSqlPlanner);
 
-    expect(sql).not.toMatch(/"orders"\.status\s+(NOT\s+)?ILIKE/i);
+    expect(sql).not.toMatch(/ILIKE/i);
+  });
+
+  // A negation belongs beside the operator. Spliced into the first argument of
+  // a function call instead, it is a parse error rather than a filter.
+  it.each(PLANNERS)('negates beside the operator on the %s planner', async (_name, useNativeSqlPlanner) => {
+    const { sql } = await buildFilter('notContains', useNativeSqlPlanner);
+
+    expect(sql).toContain('NOT LIKE');
+    expect(sql).not.toMatch(/"orders"\.status\s+NOT\s*[,)]/i);
   });
 });
