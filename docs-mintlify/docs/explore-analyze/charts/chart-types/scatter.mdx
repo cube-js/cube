@@ -15,7 +15,7 @@ Two measures on the X and Y axes. Each row in your result set becomes one point.
 
 ### With color grouping
 
-Map a dimension to the **Color** channel to assign each point a color by category. Use this to compare how different groups distribute across the same two measures.
+Pick a dimension in the **Series** slot to color the points by category. Use this to compare how different groups distribute across the same two measures.
 
 {/* Screenshot: scatter chart — same axes, points colored by traffic source (4–5 colors). Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -27,12 +27,18 @@ Map a third numeric measure to the **Size** channel to scale each point's radius
 
 ## Size encoding
 
-Assign a measure to the **Size** channel in the Fields tab. Points scale proportionally to the measure value. Configure the minimum and maximum radius in the Style tab.
+Assign a measure to the **Size** slot in the Fields tab. Points scale proportionally to the measure value. Configure the minimum and maximum radius in the Style tab.
+
+A scatter chart takes **X-Axis**, **Y-Axis**, **Series** and **Size** rather than the measure sections the other cartesian charts use, and has no orientation switch. See [Fields](/docs/explore-analyze/charts/configuration/fields#scatter-charts).
 
 {/* Screenshot: Fields tab with Size channel assigned — showing the size field token. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
+## Point appearance
+
+The measure's row in its axis section on the Style tab carries a **Shape** picker — **Circle**, **Square**, **Triangle**, **Diamond**, or **None** — and a **Trend line** toggle that draws a dashed least-squares regression line through the points.
+
 ## Tooltips
 
-All mapped fields appear in the tooltip by default. Add or remove fields in the **Tooltips** section of the Fields tab.
+The fields the chart draws appear in the tooltip by default. Check or uncheck the query's columns in the **Tooltips** row of the Fields tab.
 
 See [Tooltips](/docs/explore-analyze/charts/configuration/tooltips) for details.

@@ -86,11 +86,10 @@
                     "group": "Configure charts",
                     "root": "docs/explore-analyze/charts/configuration/index",
                     "pages": [
-                      "docs/explore-analyze/charts/configuration/series-mapping",
-                      "docs/explore-analyze/charts/configuration/series-configuration",
+                      "docs/explore-analyze/charts/configuration/fields",
+                      "docs/explore-analyze/charts/configuration/axes",
                       "docs/explore-analyze/charts/configuration/color-and-stacking",
                       "docs/explore-analyze/charts/configuration/small-multiples",
-                      "docs/explore-analyze/charts/configuration/axes",
                       "docs/explore-analyze/charts/configuration/tooltips",
                       "docs/explore-analyze/charts/configuration/data-labels"
                     ]
@@ -1288,6 +1287,14 @@
     {
       "source": "/api-reference/workbooks/update-published-dashboard-ai-widget-thread",
       "destination": "/api-reference/workbooks/update-workbook-dashboard"
+    },
+    {
+      "source": "/docs/explore-analyze/charts/configuration/series-mapping",
+      "destination": "/docs/explore-analyze/charts/configuration/fields"
+    },
+    {
+      "source": "/docs/explore-analyze/charts/configuration/series-configuration",
+      "destination": "/docs/explore-analyze/charts/configuration/fields"
     }
   ]
 }

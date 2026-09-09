@@ -1,22 +1,27 @@
 ---
 title: Data labels
-description: Display totals directly on stacked bar charts with configurable positioning and formatting.
+description: Write values directly onto chart marks, with configurable position, format, and font size.
 ---
 
-Data labels show the aggregate total value above each full stack on stacked bar charts. They let users read exact values without cross-referencing the Y axis.
+Data labels write values onto the chart itself, so a reader gets exact numbers without
+cross-referencing an axis.
 
 {/* Screenshot: stacked bar chart with total labels visible above each stack, Fields tab open showing Data Labels enabled. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ## Enabling data labels
 
-Open the **Fields** tab and enable the **Data Labels** toggle.
+Open the **Style** tab and turn on **Show data labels** in the **Data labels** section. Labels are
+off by default.
+
+The setting covers the whole chart rather than one measure: every measure drawn is labeled. A bar
+labels its total at the end of the bar; a line or an area labels each point's value above the point.
 
 ## Label settings
 
 | Setting | Description |
 |---|---|
-| **Format** | Number format applied to the label value (e.g. `,.0f` for integers, `$,.2f` for currency) |
+| **Data label position** | **Inside the bar end** or **Outside the bar end** — offered while the chart draws a bar |
+| **Label format** | **Number**, **Percentage**, **Currency**, or **Date** |
 | **Font size** | Size of the label text |
-| **Position** | Outside end, Inside end, Inside center, or Inside base |
 
 {/* Screenshot: Fields tab with Data Labels toggle on and Position dropdown open showing the four options. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}

@@ -3,32 +3,37 @@ title: Tooltips
 description: Control which fields appear when a user hovers over a chart mark.
 ---
 
-Tooltips appear when a user hovers over a data point in a chart. By default, Cube automatically populates the tooltip with all fields mapped to chart channels. You can customize which fields are shown and in what order.
+Tooltips appear when a user hovers over a data point in a chart. By default, Cube populates the
+tooltip with the fields the chart draws. You can pick which of the query's columns are shown.
 
 {/* TODO screenshot: tooltip displayed on a bar chart showing multiple fields (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ## Default behavior
 
-When a chart is first created, all fields assigned to the chart (X, Y, color, size) are included in the tooltip automatically. The tooltip is enabled by default on all Vega-based chart types (bar, line, area, scatter, heatmap, boxplot), on map charts, and on sankey charts.
+When a chart is first created, the fields it draws are included in the tooltip automatically.
+Tooltips are enabled by default on bar, line, area, scatter, heatmap, and boxplot charts, on map
+charts, and on sankey charts.
 
-[Sankey](/docs/explore-analyze/charts/chart-types/sankey) is the exception to the first rule: it seeds the tooltip with every column *except* the source, target and value it already draws.
+[Sankey](/docs/explore-analyze/charts/chart-types/sankey) is the exception to the first rule: it seeds
+the tooltip with every column *except* the source, target and value it already draws.
 
 ## Configuring tooltip fields
 
-Open the **Fields** tab of the chart configuration panel. The **Tooltip** section shows the list of fields currently included in the tooltip.
+Open the **Fields** tab. The **Tooltips** row summarizes the current selection — *All fields*, *N
+fields*, or *None*. Open it for a checkable list of the query's columns, dimensions first, and check
+or uncheck the ones you want.
 
-| Action | How |
-|---|---|
-| **Add a field** | Drag a field from **Available fields** into the Tooltip slot |
-| **Remove a field** | Click the **×** on a field token in the Tooltip list |
-| **Reorder fields** | Drag field tokens within the Tooltip list |
+On a bar, line, area, or scatter chart the selection applies to the whole chart, not to one measure.
 
 {/* TODO screenshot: Tooltip section in the Fields tab with field list (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ## Disabling tooltips
 
-To turn off tooltips entirely, remove all fields from the Tooltip slot. When the Tooltip slot is empty, no tooltip is shown on hover.
+Uncheck every field to turn tooltips off. No tooltip is shown on hover while the list is empty.
 
 ## Tooltip behavior on stacked charts
 
-On stacked bar charts, the tooltip is scoped to the individual stack segment under the cursor — it shows the value for that specific series at that X position, not the total stack value. To display the stack total, use [data labels](/docs/explore-analyze/charts/configuration/data-labels) with the **Simple totals** option.
+On stacked bars, the tooltip is scoped to the individual stack segment under the cursor — it shows
+the value for that series at that position, not the total. To show the total, turn on
+[data labels](/docs/explore-analyze/charts/configuration/data-labels), which label a bar with its
+total at the end of the bar.

@@ -1,64 +1,109 @@
 ---
-title: Axes
-description: Configure axis titles, grid lines, label formatting, dual Y-axis, and reference lines.
+title: Axes & series style
+description: Configure axis sections in the Style tab — measure appearance, titles, grid lines, label formatting, scale, and reference lines.
 ---
 
-The **Axes** section in the Style tab controls the appearance and behavior of the X axis and Y axis (or left and right Y axes in dual-axis charts). Most axis settings are available for all Vega-based chart types (bar, line, area, scatter, heatmap).
+The **Style** tab of a bar, line, area, or scatter chart is a flat list of sections in chart order:
+one section per axis in use, then [data labels](/docs/explore-analyze/charts/configuration/data-labels),
+then the [legend](/docs/explore-analyze/charts/configuration/color-and-stacking#legend).
 
 {/* TODO screenshot: axes configuration panel open in Style tab (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
-## X axis
+## Axis sections
 
-| Setting | Description |
+A measure axis gets a section for each side a measure uses. Its title names the side:
+
+| Title | When |
 |---|---|
-| **Show axis** | Toggle the X axis on or off |
-| **Title** | Custom axis label — leave blank to hide the axis title |
-| **Grid lines** | Toggle grid lines perpendicular to the X axis |
-| **Labels** | Toggle axis tick labels |
-| **Label angle** | Rotate axis labels (useful for long category names) |
-| **Label format** | Number or date format applied to axis labels |
+| **Y-Axis** | Every measure is on one side of a vertical chart |
+| **Left Y-Axis**, **Right Y-Axis** | Both sides of a vertical chart are in use |
+| **X-Axis** | Every measure is on one side of a horizontal chart |
+| **Bottom X-Axis**, **Top X-Axis** | Both sides of a horizontal chart are in use |
 
-## Y axis (left)
+Below the measure axes comes the dimension axis — **X-Axis** on a vertical chart, **Y-Axis** on a
+horizontal one.
 
-| Setting | Description |
-|---|---|
-| **Show axis** | Toggle the Y axis on or off |
-| **Title** | Custom axis label |
-| **Grid lines** | Toggle horizontal grid lines |
-| **Labels** | Toggle axis tick labels |
-| **Label format** | Number format applied to axis labels (e.g. `$,.0f` for currency) |
-| **Min / Max** | Override the axis scale minimum and maximum values |
+Each section holds one row per measure drawn against that axis, then the axis's own settings.
+
+## Measure appearance
+
+A measure's row inside its axis section is labeled with its mark glyph and name, followed by the
+controls that apply to that mark:
+
+| Control | Applies to | Options |
+|---|---|---|
+| **Palette** | A measure broken down by a dimension | The built-in palettes and a custom one — see [palettes](/docs/explore-analyze/charts/configuration/color-and-stacking#palettes) |
+| **Color** | A measure with no break-down | A single color swatch |
+| **Line style** | Line marks | **Solid**, **Dashed**, **Dotted** |
+| **Point shape** | Line marks | **Circle**, **Square**, **Triangle**, **Diamond**, **None** |
+| **Shape** | Scatter marks | The same five shapes |
+| **Interpolation** | Line and area marks | **Linear**, **Step**, **Smooth** |
+| **Trend line** | Any measure on a time or numeric dimension | On or off |
+
+Line style and point shape both default to **Auto**. Auto line style assigns styles by list order, so
+measures sharing a color scale can still be told apart. Auto point shape draws a marker-free line;
+on a scatter mark it assigns shapes by list order.
+
+A **Trend line** adds a dashed least-squares regression line in the measure's color — one per series
+when the measure is broken down. It needs a time or numeric dimension to regress against, and is
+disabled with a reason on an ordinal one.
 
 {/* TODO screenshot: Y-axis settings panel with title and grid controls (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
-## Dual Y axis (right axis)
+## Axis settings
 
-Add a second Y axis on the right side of the chart to plot a series on a different scale. This is useful for combining measures with different units or magnitudes — for example, showing order count on the left axis and average order value on the right.
+Every axis section carries the same two rows of controls:
 
-To use the right axis:
-1. In the **Series configuration** for a specific series, change the **Y axis** assignment from **Left** to **Right**.
-2. The right axis settings appear in the Style tab — configure its title, labels, and scale independently from the left axis.
+| Setting | Description |
+|---|---|
+| **Show the axis** | Draw the axis or hide it |
+| **Grid lines** | Draw grid lines perpendicular to the axis |
+| **Tick labels** | Draw the axis tick labels |
+| **Axis title** | Override the title — the default is the measures' names |
+| **Label angle** | **Horizontal labels**, **Labels at 45°**, or **Vertical labels** |
+| **Label format** | **Number**, **Percentage**, **Currency**, or **Date** |
+| **Thin out overlapping labels** | Drop labels rather than let them collide |
+
+A measure axis adds a third row for its scale:
+
+| Setting | Description |
+|---|---|
+| **Logarithmic scale** | Draw the axis on a log scale. Needs values above zero, and is disabled with a reason when the side's data holds a zero or a negative |
+| **Min** / **Max** | Pin the scale's ends. Leave either empty to let it scale to the data |
+
+Min and Max are not offered on a side stacked to 100%, whose scale is fixed by definition.
+
+### The same scale on both sides
+
+When both sides of a chart are in use, the second section's header carries a **Same scale as the left
+axis** toggle — **Same scale as the bottom axis** on a horizontal chart. Turning it on draws both
+sides against one shared scale, so the two series are directly comparable rather than each filling
+the plot height.
+
+A [period-over-period comparison](/docs/explore-analyze/workbooks/querying-data#period-over-period-comparison)
+column of a measure already on the chart takes the shared scale by default: comparing a measure with
+its own earlier values is only meaningful on one scale.
 
 {/* TODO screenshot: dual-axis chart with bar on left axis and line on right axis (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ## Reference lines
 
-Add horizontal reference lines to mark a target, threshold, or benchmark value. Reference lines appear at a fixed Y value across the full width of the chart.
+A reference line marks a target, threshold, or benchmark. Add one from the **Axis actions** menu (⋮)
+in any axis header: **Add reference line**. Every axis with a scale can carry them, measure axes and
+the dimension axis alike, and each axis can carry several, configured independently.
 
-To add a reference line:
-1. In the **Y axis** section of the Style tab, click **Add reference line**.
-2. Set the **Value** — the Y position of the line.
-3. Optionally set a **Label** that appears next to the line.
-4. Configure **Color** and **Style** (solid, dashed, or dotted).
+A reference line takes:
+
+1. A **Value** — where the line sits on that axis.
+2. An optional **Label** naming it, for example `Target 18k`.
+3. A **Color**, **Line width**, and **Line style** (solid, dashed, or dotted).
 
 {/* TODO screenshot: chart with a dashed reference line and label (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
-
-You can add multiple reference lines to the same axis. Each is configured independently.
 
 ### Reference line labels
 
 A reference line with no label renders as a bare rule — the reader has to already know what it
-means. Type text into **Label** to name it, for example `Target 18k`.
+means. Type text into **Label** to name it.
 
 Once a label is set, two alignment controls appear next to it:
 
@@ -76,6 +121,8 @@ A label on a line near the top or bottom edge of the plot flips to the other sid
 automatically, so the text stays inside the chart area.
 </Tip>
 
-<Note>
-Reference lines are only available on the left Y axis. For right-axis reference lines, use a [custom Vega-Lite spec](/docs/explore-analyze/charts/custom).
-</Note>
+## Style settings survive Fields edits
+
+Axis settings belong to the axis side, not to the measure that happens to be drawn against it. An
+axis title, a log scale, a pinned Min and Max, or a legend position set on the Style tab is unchanged
+when you reorder the measures, change a mark, or add a measure on the Fields tab.
