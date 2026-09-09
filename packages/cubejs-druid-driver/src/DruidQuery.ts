@@ -12,10 +12,14 @@ const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
 };
 
 class DruidFilter extends BaseFilter {
+  // Druid's LIKE has no default escape character, so the clause is what makes
+  // the wildcard escaping applied to the value mean anything; without it a
+  // search for a literal `%` matches nothing instead of the rows containing a
+  // percent sign.
   public likeIgnoreCase(column, not, param, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
-    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}), '${s}')`;
+    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}), '${s}') ESCAPE '\\'`;
   }
 }
 
@@ -64,7 +68,10 @@ export class DruidQuery extends BaseQuery {
     templates.expressions.timestamp_literal = 'TIME_PARSE(\'{{ value }}\')';
     delete templates.expressions.like_escape;
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
-    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }}';
+    // Carries the same escape clause DruidFilter.likeIgnoreCase emits on the
+    // legacy path. It cannot go inside `like_pattern` because the pattern is
+    // wrapped in CONCAT(...) here.
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }} ESCAPE \'\\\'';
     // Druid evaluates CURRENT_TIMESTAMP in the sqlTimeZone query context, which
     // defaults to UTC — assumes the connection does not override sqlTimeZone
     templates.functions.UTCTIMESTAMP = 'CURRENT_TIMESTAMP';

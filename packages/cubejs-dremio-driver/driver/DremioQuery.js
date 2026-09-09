@@ -13,10 +13,15 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class DremioFilter extends BaseFilter {
+  // Dremio's `ILIKE(expr, pattern)` function takes no escape argument, so the
+  // case folding goes on LOWER(...) and the matching on LIKE, which does. The
+  // clause is what makes the wildcard escaping applied to the value mean
+  // anything: Dremio has no default escape character, and without it a search
+  // for a literal `%` matches nothing.
   likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
-    return ` ILIKE (${column}${not ? ' NOT' : ''}, CONCAT('${p}', ${this.allocateParam(param)}, '${s}'))`;
+    return `LOWER(${column})${not ? ' NOT' : ''} LIKE LOWER(CONCAT('${p}', ${this.allocateParam(param)}, '${s}')) ESCAPE '\\'`;
   }
 
   castParameter() {

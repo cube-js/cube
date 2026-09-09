@@ -4779,9 +4779,12 @@ export class BaseQuery {
         // default escape character add the explicit clause themselves: Presto and
         // Trino in `like_pattern`, MSSQL, Oracle and Snowflake in
         // `tesseract.ilike` (their pattern is wrapped, so the clause cannot go
-        // inside it), and DuckDB, Pinot and Dremio likewise in `tesseract.ilike`
-        // - those three live in their driver packages rather than in this
-        // directory, so a sweep of only this directory will miss them.
+        // inside it), and DuckDB, Pinot, Dremio and Druid likewise in
+        // `tesseract.ilike` - those four live in their driver packages rather
+        // than in this directory, so a sweep of only this directory will miss
+        // them. ksqlDB is the one dialect this character is wrong for: its LIKE
+        // accepts no ESCAPE clause at all, so the backslashes are matched as
+        // data and no clause can rescue them.
         like_escape_char: '\\',
         always_true: '1 = 1'
 
