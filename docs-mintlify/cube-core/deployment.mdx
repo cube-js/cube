@@ -404,11 +404,12 @@ official Docker images already set `NODE_ENV=production`.
 </Info>
 
 ```dotenv
-# Set this to false or leave unset to disable development mode
+# Both are required: Cube is in development mode unless NODE_ENV is
+# production AND this flag is not true, so setting this alone is not enough
 CUBEJS_DEV_MODE=false
 
-# Required to enforce JWT verification on the REST (JSON) and GraphQL APIs;
-# without it those APIs accept unauthenticated requests
+# Takes the instance out of development mode, which is also what enables JWT
+# verification on the REST (JSON) and GraphQL APIs
 NODE_ENV=production
 ```
 

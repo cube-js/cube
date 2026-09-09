@@ -19,11 +19,13 @@ never expose it to the internet, and never use it in production. Using developme
 mode in the Cube cloud platform is highly discouraged — it bypasses the platform's
 security model.
 
-Disabling development mode is necessary but not sufficient. JWT verification on the
-REST (JSON) and GraphQL APIs is turned on by `NODE_ENV=production`, or by a custom
-[`check_auth`](/reference/configuration/config#check_auth) that rejects unauthenticated
-requests — **not** by `CUBEJS_DEV_MODE`. With `NODE_ENV` unset, those APIs accept
-unauthenticated requests even when `CUBEJS_DEV_MODE=false`. The official Docker images
-set `NODE_ENV=production`.
+`CUBEJS_DEV_MODE` is not the only switch. Cube treats any instance where `NODE_ENV`
+is not `production` as being in development mode, whatever the flag is set to, so
+`CUBEJS_DEV_MODE=false` on its own does not turn it off — set `NODE_ENV=production`
+too. Once development mode is genuinely off, JWT verification on the REST (JSON) and
+GraphQL APIs is enforced, because `NODE_ENV=production` is exactly what enables it. A
+custom [`check_auth`](/reference/configuration/config#check_auth) that rejects
+unauthenticated requests enforces it as well, whatever `NODE_ENV` is. The official
+Docker images set `NODE_ENV=production`.
 
 </Warning>
