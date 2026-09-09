@@ -1508,4 +1508,54 @@ mod tests {
 
         Ok(())
     }
+
+    /// Nesting a generated query easily reaches, and well past `sqlparser`'s own default of 50.
+    fn nested_expression_query(levels: usize) -> String {
+        let mut expr = String::from("sum(amount)");
+        for _ in 0..levels {
+            expr = format!("({} + 1)", expr);
+        }
+        format!("SELECT category, {} FROM s.t GROUP BY 1", expr)
+    }
+
+    /// Recursive descent means the budget is only usable on a stack that fits it, so parse on
+    /// the size `cubestore-main` gives its threads rather than whatever the harness provides.
+    fn parse_on_a_main_sized_stack(query: String) -> Result<(), CubeError> {
+        std::thread::Builder::new()
+            .stack_size(8 * 1024 * 1024)
+            .spawn(move || parse_stmt(&query).map(|_| ()))
+            .unwrap()
+            .join()
+            .expect("parsing must not exhaust the stack")
+    }
+
+    /// A nesting depth `sqlparser`'s own default of 50 rejects outright.
+    #[test]
+    fn parse_deeply_nested_expression() {
+        parse_on_a_main_sized_stack(nested_expression_query(100)).unwrap();
+    }
+
+    /// Past the budget the message has to say so: depth is the one thing the caller can act on.
+    #[test]
+    fn parse_over_recursion_limit_names_nesting() {
+        let err = parse_on_a_main_sized_stack(nested_expression_query(200))
+            .expect_err("200 levels is past any budget this node accepts");
+
+        let message = err.to_string();
+        assert!(
+            message.contains("nested too deeply"),
+            "message must name nesting as the cause, got: {}",
+            message
+        );
+        assert!(
+            message.contains("CUBESTORE_SQL_PARSER_RECURSION_LIMIT"),
+            "message must name the knob that raises the budget, got: {}",
+            message
+        );
+        assert_eq!(
+            err.cause,
+            crate::CubeErrorCauseType::User,
+            "a query the user has to flatten is not an internal error"
+        );
+    }
 }
