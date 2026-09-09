@@ -12,13 +12,13 @@ this is to use the official Docker images for Cube and Cube Store.
 
 <Warning>
 
-Development mode disables authentication completely: data access endpoints are served
-without any authentication or authorization verification, so anyone who can reach the
-instance can read all of your data. Unless
+Development mode is an authentication bypass: Playground's endpoints are served with
+no authentication, so anyone who can reach the instance can mint an API token carrying
+any security context (signed with your API secret), read and overwrite your data model
+and `.env`, and — unless
 [`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password)
-is set, the SQL API also accepts any credentials, allowing arbitrary SQL against
-connected data sources. Use it only on a local development machine, never in
-production. See
+is set — run arbitrary SQL through the SQL API. Use it only on a local development
+machine, never in production. See
 [`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode).
 
 </Warning>

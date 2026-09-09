@@ -43,17 +43,18 @@ A typical use case would be:
 
 <Warning>
 
-**In development mode, the token is not required for authorization.** Cube Core
-disables authentication completely when
-[`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode)
-is enabled: all data access endpoints are served without any authentication or
-authorization verification, so anyone who can reach the instance can read all of your
-data, and the SQL API accepts any credentials unless
-[`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password)
-is set, allowing arbitrary SQL against connected data sources. This is intentional — development mode
-is designed for local development machines only. Never use it in production, and
-using it in the Cube cloud platform is highly discouraged because it bypasses the
-platform's security model.
+**In development mode, the token is not required for authorization.** JWT
+verification on this API is enforced only when `NODE_ENV=production` or a custom
+[`check_auth`](/reference/configuration/config#check_auth) is configured, so with
+`NODE_ENV` unset the API accepts requests with no token at all — regardless of
+[`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode).
+
+Enabling `CUBEJS_DEV_MODE` bypasses authentication even under
+`NODE_ENV=production`, because Playground's unauthenticated endpoints will mint a
+valid token carrying any security context, signed with your API secret. This is
+intentional — development mode is designed for local development machines only. Never
+use it in production, and using it in the Cube cloud platform is highly discouraged
+because it bypasses the platform's security model.
 
 You can still pass a token in development mode to [set a security
 context][ref-sec-ctx].

@@ -56,13 +56,10 @@ Response
   including browsers holding a public embedding token. Fields that describe
   storage layout or query results stay behind
   [`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode)
+  (a local-development-only setting that [bypasses
+  authentication](/reference/configuration/environment-variables#cubejs_dev_mode))
   and the Playground: `targetTableName` (the physical table of one specific build,
   version hashes included) and `refreshKeyValues`.
-
-  Development mode itself disables authentication completely — all data access
-  endpoints are served without any authentication or authorization verification, so
-  anyone who can reach the instance can read all of your data — so use it only on
-  local development machines, never in production.
 
   </Note>
 - `total` - The total number of rows returned for the query. Useful for

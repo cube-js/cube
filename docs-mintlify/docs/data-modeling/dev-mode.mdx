@@ -11,14 +11,15 @@ Development mode allows to test and debug the data model in an isolated
 This page describes development mode in the Cube cloud platform. It is unrelated to
 Cube Core's development mode, which is enabled with
 [`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode) and
-**disables authentication completely**: all data access endpoints are served without
-any authentication or authorization verification, so anyone who can reach the instance
-can read all of the data, and the SQL API accepts any credentials unless
+is an **authentication bypass**: it serves Playground's endpoints with no
+authentication, so anyone who can reach the instance can mint an API token carrying
+any security context (signed with the API secret), read and overwrite the data model
+and `.env`, and — unless
 [`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password)
-is set, allowing arbitrary SQL against connected data sources. That is
-intentional — it is designed to run on a developer's local machine for ease of use and
-debugging. Never use it in production, and using it in the Cube cloud platform is
-highly discouraged because it bypasses the platform's security model.
+is set — run arbitrary SQL through the SQL API. That is intentional — it is designed to
+run on a developer's local machine for ease of use and debugging. Never use it in
+production, and using it in the Cube cloud platform is highly discouraged because it
+bypasses the platform's security model.
 
 </Warning>
 

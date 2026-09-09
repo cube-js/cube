@@ -183,20 +183,18 @@ Cube Cloud automatically installs dependencies from `requirements.txt` and
 
 <Warning>
 
-**Development mode disables authentication completely.** While it is enabled, every
-data access endpoint of the Cube instance — the
-[REST (JSON) API](/reference/core-data-apis/rest-api),
-[GraphQL API](/reference/core-data-apis/graphql-api),
-[SQL API](/reference/core-data-apis/sql-api), and
-[Playground](/docs/explore-analyze/playground) — is served without any authentication
-or authorization verification: requests with a missing or invalid token are accepted,
-and [member-level access control](/docs/data-modeling/access-control/member-level-security)
-is not enforced. The SQL API additionally accepts any user name and password unless
+**Development mode is an authentication bypass.** With `CUBEJS_DEV_MODE=true`, Cube
+mounts [Playground](/docs/explore-analyze/playground) and its supporting endpoints
+with no authentication whatsoever, so anyone who can reach the instance can mint a
+valid API token carrying any security context — signed with your API secret — and then
+query every data API as any user, bypassing [member-level access
+control](/docs/data-modeling/access-control/member-level-security) and [row-level
+security](/docs/data-modeling/access-control/row-level-security). The same endpoints
+read and overwrite your data model files and your `.env` (secrets included), and read
+the table schema of every connected data source. Unless
 [`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password)
-is set, so anyone who can reach the instance can execute arbitrary SQL against every
-connected data source. Playground's own endpoints are unauthenticated as well: they
-read and write your data model files and `.env`, and mint tokens carrying any security
-context, signed with your API secret.
+is set, the SQL API also accepts any credentials, allowing arbitrary SQL against
+connected data sources.
 
 This is intentional. Development mode is designed to run on a developer's local
 machine for ease of use and debugging. Never run it where anyone else can reach it,
@@ -204,15 +202,24 @@ never expose it to the internet, and never use it in production. Using developme
 mode in the Cube cloud platform is highly discouraged — it bypasses the platform's
 security model.
 
+Disabling development mode is necessary but not sufficient. JWT verification on the
+REST (JSON) and GraphQL APIs is turned on by `NODE_ENV=production` or by a custom
+[`check_auth`](/reference/configuration/config#check_auth) — **not** by
+`CUBEJS_DEV_MODE`. With `NODE_ENV` unset, those APIs accept unauthenticated requests
+even when `CUBEJS_DEV_MODE=false`. The official Docker images set
+`NODE_ENV=production`.
+
 </Warning>
 
 Cube can be run in an insecure, development mode by setting the
 [`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode) environment variable to `true`. Putting Cube in development
 mode does the following:
 
-- Disables authentication checks completely, serving all data access endpoints
-  without any authentication or authorization verification.
-- Disables [member-level access control][ref-mls].
+- Serves Playground and its supporting endpoints with no authentication, which lets
+  anyone who can reach the instance mint an API token carrying any security context,
+  and read or overwrite the data model and `.env`.
+- Skips the SQL API password check when no `CUBEJS_SQL_PASSWORD` is configured.
+- Disables [member-level access control][ref-mls] when listing the data model.
 - Enables Cube Store in single instance mode.
 - Enables background refresh for in-memory cache and [scheduled
   pre-aggregations][link-scheduled-refresh].

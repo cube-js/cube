@@ -629,8 +629,8 @@ Either string or function can be passed. Providing a function allows to set
 the schema name dynamically depending on the security context.
 
 Defaults to `dev_pre_aggregations` in [development mode][ref-development-mode]
-and `prod_pre_aggregations` in production. Development mode [disables
-authentication completely](/reference/configuration/environment-variables#cubejs_dev_mode)
+and `prod_pre_aggregations` in production. Development mode [bypasses
+authentication](/reference/configuration/environment-variables#cubejs_dev_mode)
 and is intended for local development machines only.
 
 <Info>
@@ -1513,8 +1513,8 @@ See also the [`CUBEJS_LOG_LEVEL`](/reference/configuration/environment-variables
 ### `telemetry`
 
 Cube collects high-level anonymous usage statistics for servers started in
-[development mode][ref-development-mode] (which [disables authentication
-completely](/reference/configuration/environment-variables#cubejs_dev_mode) and is
+[development mode][ref-development-mode] (which [bypasses
+authentication](/reference/configuration/environment-variables#cubejs_dev_mode) and is
 intended for local development machines only). It doesn't track any credentials,
 data model contents or queries issued. This statistics is used solely for the
 purpose of constant cube.js improvement.
