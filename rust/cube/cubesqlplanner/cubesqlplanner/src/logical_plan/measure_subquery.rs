@@ -7,6 +7,12 @@ use std::rc::Rc;
 /// variants (the other being a raw `Cube`).
 pub struct MeasureSubquery {
     pub schema: Rc<LogicalSchema>,
+    // The enclosing keys subquery's filter, for the `FILTER_PARAMS` and
+    // `FILTER_GROUP` bindings of `source` to bind against. Not a WHERE
+    // clause of its own: the keys subquery already restricts the rows, and
+    // both sides have to render the same predicate for the join back to
+    // keep matching.
+    pub filter: Rc<LogicalFilter>,
     pub source: Rc<LogicalJoin>,
 }
 
@@ -24,6 +30,7 @@ impl LogicalNode for MeasureSubquery {
         let source = &inputs[0];
         Ok(Rc::new(Self {
             schema: self.schema.clone(),
+            filter: self.filter.clone(),
             source: source.clone().into_logical_node()?,
         }))
     }
@@ -45,6 +52,8 @@ impl PrettyPrint for MeasureSubquery {
         let details_state = state.new_level();
         result.println("schema:", &state);
         self.schema.pretty_print(result, &details_state);
+        result.println("filter:", &state);
+        self.filter.pretty_print(result, &details_state);
         result.println("source:", state);
         self.source.pretty_print(result, &details_state);
     }
