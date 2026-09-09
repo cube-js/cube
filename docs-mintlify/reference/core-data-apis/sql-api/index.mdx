@@ -3,6 +3,8 @@ title: Cube Core
 description: "Connect any Postgres-compatible client or BI tool to Cube using the Postgres-protocol SQL API."
 ---
 
+import DevModeWarningShort from '/snippets/dev-mode-warning-short.mdx';
+
  SQL API
 
 The SQL API enables Cube to deliver data over the [Postgres-compatible
@@ -178,18 +180,7 @@ services:
 After running it with `docker compose up`, you can finally connect and execute
 an [example request](#transport).
 
-<Warning>
-
-Development mode is an authentication bypass: Playground's endpoints are served with
-no authentication, so anyone who can reach the instance can mint an API token carrying
-any security context (signed with your API secret), read and overwrite your data model
-and `.env`, and — unless
-[`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password)
-is set — run arbitrary SQL through the SQL API. Use it only on a local development
-machine, never in production. See
-[`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode).
-
-</Warning>
+<DevModeWarningShort />
 
 ### Cube Cloud
 

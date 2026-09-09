@@ -3,6 +3,8 @@ title: Running in production
 description: "Cube makes use of two different kinds of cache:"
 ---
 
+import DevModeWarningShort from '/snippets/dev-mode-warning-short.mdx';
+
 - In-memory storage of query results
 - Pre-aggregations
 
@@ -10,18 +12,7 @@ Cube Store is enabled by default when running Cube in development mode. In
 production, Cube Store **must** run as a separate process. The easiest way to do
 this is to use the official Docker images for Cube and Cube Store.
 
-<Warning>
-
-Development mode is an authentication bypass: Playground's endpoints are served with
-no authentication, so anyone who can reach the instance can mint an API token carrying
-any security context (signed with your API secret), read and overwrite your data model
-and `.env`, and — unless
-[`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password)
-is set — run arbitrary SQL through the SQL API. Use it only on a local development
-machine, never in production. See
-[`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode).
-
-</Warning>
+<DevModeWarningShort />
 
 <Info>
 

@@ -3,6 +3,8 @@ title: QuestDB
 description: "QuestDB is a high-performance time-series database which helps you overcome ingestion bottlenecks."
 ---
 
+import DevModeWarningShort from '/snippets/dev-mode-warning-short.mdx';
+
 [QuestDB][questdb] is a high-performance [time-series database][time-series-database-glossary] which helps you overcome ingestion bottlenecks.
 
 <Warning>
@@ -43,19 +45,6 @@ services:
       - "8812:8812"
 ```
 
-<Warning>
-
-Development mode is an authentication bypass: Playground's endpoints are served with
-no authentication, so anyone who can reach the instance can mint an API token carrying
-any security context (signed with your API secret), read and overwrite your data model
-and `.env`, and — unless
-[`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password)
-is set — run arbitrary SQL through the SQL API. Use it only on a local development
-machine, never in production. See
-[`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode).
-
-</Warning>
-
 Within your project directory, create an `.env` file:
 
 ```dotenv
@@ -74,6 +63,8 @@ docker-compose up -d
 ```
 
 Access Cube at http://localhost:4000 & QuestDB at http://localhost:9000
+
+<DevModeWarningShort />
 
 ## Environment Variables
 

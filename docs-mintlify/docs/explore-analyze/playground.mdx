@@ -3,6 +3,8 @@ title: Playground
 description: Browser-based workspace to inspect cubes and views, run ad hoc queries, and copy API-ready examples while developing the semantic model.
 ---
 
+import DevModeWarningShort from '/snippets/dev-mode-warning-short.mdx';
+
 Playground is a web-based tool that helps validate the data model by executing
 [queries][ref-queries] and previewing their results. It is supposed to be used
 by data engineers and developers while building the [data model][ref-data-modeling].
@@ -19,18 +21,7 @@ when it's run in the [development mode][ref-dev-mode].
 
 </Info>
 
-<Warning>
-
-Development mode is an authentication bypass: Playground's endpoints are served with
-no authentication, so anyone who can reach the instance can mint an API token carrying
-any security context (signed with your API secret), read and overwrite your data model
-and `.env`, and — unless
-[`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password)
-is set — run arbitrary SQL through the SQL API. Use it only on a local development
-machine, never in production. See
-[`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode).
-
-</Warning>
+<DevModeWarningShort />
 
 You can [view](#viewing-the-data-model) the data model entities or [search](#searching-the-data-model)
 for them, [compose](#composing-queries) a query from scratch or [paste](#pasting-a-query)
@@ -204,7 +195,7 @@ manually.
 
 */}
 
-[ref-dev-mode]: /docs/data-modeling/dev-mode
+[ref-dev-mode]: /reference/configuration/environment-variables#cubejs_dev_mode
 [ref-dataviz-tools]: /admin/connect-to-data/visualization-tools
 [ref-js-sdk]: /reference/javascript-sdk
 [ref-data-model]: /docs/data-modeling/data-model-ide#generating-data-model-files

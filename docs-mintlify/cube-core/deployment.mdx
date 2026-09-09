@@ -3,6 +3,8 @@ title: Deploying Cube Core with Docker
 description: This guide walks you through deploying Cube with Docker.
 ---
 
+import DevModeWarning from '/snippets/dev-mode-warning.mdx';
+
 <Warning>
 
 This is an example of a production-ready deployment, but real-world deployments
@@ -388,39 +390,10 @@ deployment.
 ### Disable Development Mode
 
 When running Cube in production environments, make sure development mode is
-disabled both on API Instances and Refresh Worker. You can read more on the
-differences between [production and development mode
-here][link-cubejs-dev-vs-prod].
+disabled both on API Instances and Refresh Worker. You can read more about what
+development mode changes [here][link-cubejs-dev-vs-prod].
 
-<Warning>
-
-**Development mode is an authentication bypass.** With `CUBEJS_DEV_MODE=true`, Cube
-mounts [Playground](/docs/explore-analyze/playground) and its supporting endpoints
-with no authentication whatsoever, so anyone who can reach the instance can mint a
-valid API token carrying any security context — signed with your API secret — and then
-query every data API as any user, bypassing [member-level access
-control](/docs/data-modeling/access-control/member-level-security) and [row-level
-security](/docs/data-modeling/access-control/row-level-security). The same endpoints
-read and overwrite your data model files and your `.env` (secrets included), and read
-the table schema of every connected data source. Unless
-[`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password)
-is set, the SQL API also accepts any credentials, allowing arbitrary SQL against
-connected data sources.
-
-This is intentional. Development mode is designed to run on a developer's local
-machine for ease of use and debugging. Never run it where anyone else can reach it,
-never expose it to the internet, and never use it in production. Using development
-mode in the Cube cloud platform is highly discouraged — it bypasses the platform's
-security model.
-
-Disabling development mode is necessary but not sufficient. JWT verification on the
-REST (JSON) and GraphQL APIs is turned on by `NODE_ENV=production` or by a custom
-[`check_auth`](/reference/configuration/config#check_auth) — **not** by
-`CUBEJS_DEV_MODE`. With `NODE_ENV` unset, those APIs accept unauthenticated requests
-even when `CUBEJS_DEV_MODE=false`. The official Docker images set
-`NODE_ENV=production`.
-
-</Warning>
+<DevModeWarning />
 
 <Info>
 
@@ -554,7 +527,7 @@ data source usage.
 [blog-migrate-to-cube-cloud]:
   https://cube.dev/blog/migrating-from-self-hosted-to-cube-cloud/
 [link-cube-cloud]: https://cubecloud.dev
-[link-cubejs-dev-vs-prod]: /docs/data-modeling/dev-mode
+[link-cubejs-dev-vs-prod]: /reference/configuration/environment-variables#cubejs_dev_mode
 [link-k8s-healthcheck-api]:
   https://kubernetes.io/docs/reference/using-api/health-checks/
 [ref-config-connect-db]: /admin/connect-to-data/data-sources
