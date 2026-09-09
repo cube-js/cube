@@ -2048,8 +2048,8 @@ impl WrappedSelectNode {
             }
             expr
         }
-        // Push-to-Cube builds its order separately from self.order_expr. Generated SQL
-        // aliases are not scan members and cannot be resolved on that path.
+        // Push-to-Cube discards this `order` and builds its own from `self.order_expr`, so
+        // there is nothing to fix there, and a generated alias is not a scan member.
         let literal_aliases = if push_to_cube_context.is_some() {
             vec![]
         } else {
