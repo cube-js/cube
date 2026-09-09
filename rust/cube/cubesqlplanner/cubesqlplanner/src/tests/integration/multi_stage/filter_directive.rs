@@ -567,3 +567,35 @@ async fn test_group_by_outside_query_grain_keeps_query_row_set() {
         insta::assert_snapshot!(result);
     }
 }
+
+// Same denominator, this time with a query grain the `group_by` partially
+// keeps: the time dimension survives the intersection while `status` does not,
+// so the widened key grid is non-empty and the share varies per partition.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_group_by_partially_kept_keeps_query_row_set() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_category_day_share_percent
+          - orders.total_amount
+        dimensions:
+          - orders.status
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+        filters:
+          - dimension: orders.status
+            operator: equals
+            values:
+              - completed
+        order:
+          - id: orders.created_at
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

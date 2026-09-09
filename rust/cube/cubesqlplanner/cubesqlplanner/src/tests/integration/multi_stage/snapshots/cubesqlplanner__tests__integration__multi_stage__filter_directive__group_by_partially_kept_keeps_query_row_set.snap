@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/filter_directive.rs
+expression: result
+---
+orders__status | orders__created_at_month | orders__amount_category_day_share_percent | orders__total_amount
+---------------+--------------------------+-------------------------------------------+---------------------
+completed      | 2024-01-01 00:00:00      | 60.0000000000000000                       | 300.00              
+completed      | 2024-02-01 00:00:00      | 66.6666666666666667                       | 500.00              
+completed      | 2024-03-01 00:00:00      | 60.0000000000000000                       | 600.00
