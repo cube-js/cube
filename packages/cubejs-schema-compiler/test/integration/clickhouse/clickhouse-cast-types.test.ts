@@ -38,6 +38,20 @@ cubes:
     measures:
       - name: count
         type: count
+  - name: nullable_key_orders
+    sql: "SELECT CAST(NULL AS Nullable(String)) AS id, 'x' AS product_id UNION ALL SELECT 'k', 'y'"
+    dimensions:
+      - name: id
+        sql: "{CUBE}.id"
+        type: string
+        primary_key: true
+      - name: product_id
+        sql: "{CUBE}.product_id"
+        type: string
+        primary_key: true
+    measures:
+      - name: count
+        type: count
   - name: payments
     sql: "SELECT 1 AS id, 1 AS order_id, 10 AS amount"
     dimensions:
@@ -118,5 +132,14 @@ cubes:
     const [row] = await dbRunner.testQuery([sql, params], noDataSet);
 
     expect(Number(row.orders__count)).toEqual(1);
+  });
+
+  it('counts the keys it can build where one of them holds a NULL', async () => {
+    const [sql, params] = query({ measures: ['nullable_key_orders.count'] }).buildSqlAndParams();
+
+    const [row] = await dbRunner.testQuery([sql, params], noDataSet);
+
+    // Of the two rows one has no key to count, the way every other dialect reads it
+    expect(Number(row.nullable_key_orders__count)).toEqual(1);
   });
 });
