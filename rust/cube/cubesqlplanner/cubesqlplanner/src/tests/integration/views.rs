@@ -302,24 +302,36 @@ async fn test_view_independent_root_query_does_not_walk_the_dotted_path() {
     assert_eq!(pre_aggregations[0].name(), "boards_rollup");
 }
 
+/// The other side of the same rule. `scrap_pct` is declared under
+/// `locations.boards`, and its components resolve to bare `boards` hints -
+/// exactly the hints the rule above leaves alone. They must not pull the
+/// measure off the path it is declared on: it still fans out over `locations`,
+/// which is what forces the deduplicating keys subquery.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_view_dotted_path_query_still_walks_it() {
     let ctx = independent_roots_context();
 
     let query = indoc! {"
         measures:
-          - kpi.count
+          - kpi.scrap_pct
         dimensions:
-          - kpi.product
+          - kpi.board_id
         order:
-          - id: kpi.product
+          - id: kpi.board_id
     "};
 
-    let sql = ctx.build_sql(query).unwrap();
+    let (sql, pre_aggregations) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
 
     assert!(
         sql.contains("locations"),
-        "the query counts locations rows, got: {sql}"
+        "the measure is declared under locations.boards, got: {sql}"
     );
-    assert!(sql.contains("boards"), "got: {sql}");
+    assert!(
+        sql.contains(r#" AS "keys""#),
+        "the fan-out has to be deduplicated, got: {sql}"
+    );
+    assert!(
+        pre_aggregations.is_empty(),
+        "a multiplied query does not match the rollup on boards, got: {sql}"
+    );
 }

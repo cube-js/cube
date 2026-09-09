@@ -208,3 +208,15 @@ fn test_join_hints_view_dotted_path_dimension() {
     // The member the view declares under `locations.boards` still walks it.
     assert_eq!(hints.items(), &[v(&["locations", "boards"])]);
 }
+
+#[test]
+fn test_join_hints_view_dotted_path_measure() {
+    let ctx = independent_roots_ctx();
+    let measure = ctx.create_measure("kpi.scrap_pct").unwrap();
+    let hints = collect_join_hints(&measure).unwrap();
+    // The measure is declared under `locations.boards`, and its components
+    // resolve to a bare `boards` hint - the hint the rule above leaves alone.
+    // The declared path has to come along all the same, or the member would be
+    // planned as if it sat on the view's `boards` root.
+    assert_eq!(hints.items(), &[v(&["locations", "boards"]), s("boards")]);
+}

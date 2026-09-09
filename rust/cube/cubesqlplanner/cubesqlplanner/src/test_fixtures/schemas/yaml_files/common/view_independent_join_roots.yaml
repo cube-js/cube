@@ -41,6 +41,12 @@ cubes:
       - name: yield_pct
         type: number
         sql: "{good_count} / NULLIF({total_count}, 0) * 100"
+      # Same shape as `yield_pct`, so its components also resolve to bare
+      # `boards` hints. The view includes it under the longer path instead, to
+      # hold that those hints do not pull it off that path.
+      - name: scrap_pct
+        type: number
+        sql: "({total_count} - {good_count}) / NULLIF({total_count}, 0) * 100"
     pre_aggregations:
       # Carries one dimension more than the query below asks for, which only the
       # additive matching path allows. A query taken for a multiplied one is
@@ -65,6 +71,7 @@ views:
       - join_path: locations.boards
         includes:
           - product
+          - scrap_pct
       - join_path: boards
         includes:
           - yield_pct

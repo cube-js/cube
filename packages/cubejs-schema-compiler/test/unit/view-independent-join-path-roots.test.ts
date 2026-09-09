@@ -100,6 +100,8 @@ views:
         includes:
           - name: product
             alias: loc_product
+          - name: yield_pct
+            alias: loc_yield_pct
       - join_path: boards
         includes:
           - yield_pct
@@ -151,17 +153,24 @@ describe('View with independent join_path roots', () => {
     expect(query.buildSqlAndParams()[0]).toContain('boards_daily');
   });
 
-  // The other side of the same rule: the member the view declares under
-  // `locations.boards` still reaches `boards` by walking that path.
+  // The other side of the same rule. `loc_yield_pct` is declared under
+  // `locations.boards`, and its own components resolve to bare `boards` hints -
+  // exactly the hints the rule above leaves alone. They must not pull the
+  // member off the path it is declared on: it still fans out over `locations`,
+  // still counts as multiplied, and still resolves to the dotted leaves.
   it('still walks the dotted path for the member declared under it', async () => {
-    const { query } = await compile(withDottedPath, {
-      measures: ['kpi.count'],
-      dimensions: ['kpi.loc_product'],
+    const { query, transformed } = await compile(withDottedPath, {
+      measures: ['kpi.loc_yield_pct'],
+      dimensions: ['kpi.board_id'],
       timezone: 'UTC',
     });
 
-    const sql = query.buildSqlAndParams()[0];
-    expect(sql).toContain('AS board_id, \'p1\' AS product');
-    expect(sql).toContain('AS id, \'A\' AS board_id');
+    expect(query.allJoinHints).toEqual([['locations'], ['locations', 'boards'], 'boards']);
+    expect(query.join.root).toBe('locations');
+    expect(transformed.leafMeasuresFullPaths).toEqual([
+      'locations.boards.good_count',
+      'locations.boards.total_count',
+    ]);
+    expect(transformed.hasMultipliedMeasures).toBe(true);
   });
 });
