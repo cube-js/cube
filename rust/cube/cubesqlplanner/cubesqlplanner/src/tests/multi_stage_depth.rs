@@ -64,6 +64,17 @@ fn chained_plain_schema(members: usize) -> String {
     yaml
 }
 
+/// The same chain, plus a view re-exporting its deepest measure. A view member is a proxy that
+/// inherits `multi_stage` from what it resolves to and adds a dependency level of its own.
+fn chained_stages_view_schema(stages: usize) -> String {
+    let mut yaml = chained_stages_schema(stages);
+    yaml.push_str(&format!(
+        "views:\n    - name: orders_view\n      cubes:\n          - join_path: orders\n            includes:\n                - category\n                - stage_{}\n",
+        stages - 1
+    ));
+    yaml
+}
+
 fn query_for(measure: &str) -> String {
     format!(
         indoc! {r#"
@@ -81,6 +92,14 @@ fn build(yaml: &str, measure: &str) -> Result<String, cubenativeutils::CubeError
     TestContext::new(schema)
         .unwrap()
         .build_sql(&query_for(measure))
+}
+
+fn build_on_view(yaml: &str, measure: &str) -> Result<String, cubenativeutils::CubeError> {
+    let schema = MockSchema::from_yaml(yaml).unwrap();
+    TestContext::new(schema).unwrap().build_sql(&format!(
+        "measures:\n  - orders_view.{}\ndimensions:\n  - orders_view.category\n",
+        measure
+    ))
 }
 
 #[test]
@@ -133,6 +152,18 @@ fn a_plain_member_chain_is_not_a_multi_stage_chain() {
     build(
         &chained_plain_schema(members),
         &format!("plain_{}", members - 1),
+    )
+    .unwrap();
+}
+
+/// A proxy is collapsed before planning and becomes no stage of its own, so the same chain must
+/// not be refused merely because a view re-exports it.
+#[test]
+fn a_view_proxy_is_not_an_extra_stage() {
+    let stages = DEFAULT_LIMIT;
+    build_on_view(
+        &chained_stages_view_schema(stages),
+        &format!("stage_{}", stages - 1),
     )
     .unwrap();
 }
