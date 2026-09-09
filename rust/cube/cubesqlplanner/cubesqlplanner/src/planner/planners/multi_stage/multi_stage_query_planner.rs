@@ -6,6 +6,7 @@ use super::{
 use crate::cube_bridge::base_query_options::FilterValue;
 use crate::cube_bridge::measure_definition::RollingWindow;
 use crate::logical_plan::*;
+use crate::planner::collectors::collect_cube_names;
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::collectors::member_childs;
 use crate::planner::filter::base_filter::FilterType;
@@ -1198,12 +1199,28 @@ impl MultiStageQueryPlanner {
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
         scope: &mut PlanningScope,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
+        let is_ungrouped = self.query_properties.ungrouped() || ungrouped;
+        // Windows differing only in the measure they aggregate read the same
+        // rows, so they ride on one scan rather than one each. A measure
+        // reading cubes the scan does not already read is left alone: it would
+        // widen the scan's join tree, and that is a different scan.
+        let member_cubes = Self::sorted_cube_names(&member)?;
+        for existing in descriptions.iter() {
+            if !existing.is_match_rolling_window_base(&state, is_ungrouped)
+                || Self::sorted_cube_names(existing.member_node())? != member_cubes
+            {
+                continue;
+            }
+            existing.add_co_measure(member);
+            return Ok(existing.clone());
+        }
+
         let alias = scope.next_cte_name();
         let description = MultiStageQueryDescription::new(
             MultiStageMember::new(
                 MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),
                 member,
-                self.query_properties.ungrouped() || ungrouped,
+                is_ungrouped,
                 true,
             ),
             state,
@@ -1213,6 +1230,13 @@ impl MultiStageQueryPlanner {
         );
         descriptions.push(description.clone());
         Ok(description)
+    }
+
+    fn sorted_cube_names(member: &Rc<MemberSymbol>) -> Result<Vec<String>, CubeError> {
+        Ok(collect_cube_names(member)?
+            .into_iter()
+            .sorted()
+            .collect_vec())
     }
 
     /// Outer bounds of the series a rolling window over `time_dimension` walks.

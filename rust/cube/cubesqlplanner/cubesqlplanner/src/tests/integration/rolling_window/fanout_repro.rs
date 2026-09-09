@@ -60,7 +60,6 @@ fn rolling_join_conditions(sql: &str) -> Vec<String> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "reproduces #11770: one base scan per rolling measure"]
 async fn test_base_table_is_not_rescanned_per_rolling_measure() {
     let ctx = create_context();
     let sql = ctx.build_sql(QUERY).unwrap();
