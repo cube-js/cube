@@ -3,8 +3,9 @@ description: Comprehensive PR review — inline comments, stale-thread resolutio
 argument-hint: "[<pr-number>]"
 ---
 
-**Target:** the `cube-js/cube` PR whose number was passed as an argument.
-Without an argument, resolve the PR for the current branch with `gh pr view`.
+**Target:** the `cube-js/cube` PR whose number was passed as an argument or
+given in a `PR NUMBER:` line above. Without either, resolve the PR for the
+current branch with `gh pr view`.
 
 If the PR references an issue, read it with `gh issue view` — the reported
 symptom is what the fix has to actually cover. `gh issue list` / `gh search

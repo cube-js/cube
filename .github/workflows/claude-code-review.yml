@@ -65,6 +65,24 @@ jobs:
       - name: Configure gh aliases for review-thread operations
         run: bash .github/actions/setup-claude-code-review.sh
 
+      # `track_progress: true` puts the action in tag mode, where `prompt:` is
+      # embedded inside the action's own prompt — a slash command there would
+      # never expand, so inline the command body instead. Also inlines the file
+      # the command @-references, which only the CLI knows how to expand.
+      - name: Assemble review prompt
+        run: |
+          strip_frontmatter() {
+            awk 'NR == 1 && /^---$/ { fm = 1; next } fm && /^---$/ { fm = 0; next } !fm' "$1"
+          }
+          {
+            echo 'REVIEW_PROMPT<<CUBE_REVIEW_EOF'
+            strip_frontmatter .claude/commands/cube-review.md \
+              | sed 's|@\.claude/docs/review-threads\.md|the "Review threads" section below.|'
+            echo
+            strip_frontmatter .claude/docs/review-threads.md
+            echo 'CUBE_REVIEW_EOF'
+          } >> "$GITHUB_ENV"
+
       - name: Review
         id: review
         uses: anthropics/claude-code-action@v1
@@ -73,7 +91,10 @@ jobs:
           track_progress: true
           # Allow PRs opened by coding-agent bots (e.g. cursor) to trigger reviews.
           allowed_bots: "cursor[bot]"
-          prompt: "/cube-review ${{ env.PR_NUMBER }}"
+          prompt: |
+            PR NUMBER: ${{ env.PR_NUMBER }}
+
+            ${{ env.REVIEW_PROMPT }}
 
           # Tools for comprehensive PR review
           claude_args: |
