@@ -286,6 +286,8 @@ export class ClickHouseQuery extends BaseQuery {
     delete templates.expressions.like_escape;
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
+    // ClickHouse spells its string type `String`, and case-sensitively so
+    templates.types.string = 'String';
     templates.types.boolean = 'BOOL';
     templates.types.timestamp = 'DATETIME';
     delete templates.types.time;
