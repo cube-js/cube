@@ -46,7 +46,8 @@ docker run -p 4000:4000 \
 
 Then open http://localhost:4000 in your browser to continue setup.
 
-> **Development mode is an authentication bypass.** `CUBEJS_DEV_MODE=true` also forces
+> **Development mode is an authentication bypass.** In the official images — whose
+> entrypoint is the `cubejs` CLI — `CUBEJS_DEV_MODE=true` also forces
 > `NODE_ENV=development`, which switches off JWT verification on the REST (JSON) and
 > GraphQL APIs, so they accept requests with no token at all. Playground and its
 > supporting endpoints are served with no authentication either, so anyone who can

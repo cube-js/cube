@@ -1,8 +1,9 @@
 <Warning>
 
 Development mode is an authentication bypass. Cube is in development mode when
-`CUBEJS_DEV_MODE=true` — which also forces `NODE_ENV=development` and so switches off
-JWT verification on the REST (JSON) and GraphQL APIs — and whenever `NODE_ENV` is not
+`CUBEJS_DEV_MODE=true` — which, under the `cubejs` CLI and the official Docker images,
+also forces `NODE_ENV=development` and so switches off JWT verification on the
+REST (JSON) and GraphQL APIs — and whenever `NODE_ENV` is not
 `production`. Playground's endpoints are served with no authentication too: anyone who
 can reach the instance is handed a ready-to-use API token, can mint others carrying any
 security context, can read your data model files, and can overwrite your data model and

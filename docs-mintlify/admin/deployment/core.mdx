@@ -406,8 +406,9 @@ it matters only if you embed `@cubejs-backend/server-core` directly, where an un
 </Info>
 
 ```dotenv
-# Keep development mode off. Note that setting this to `true` would also force
-# NODE_ENV=development, switching off JWT verification on the data APIs
+# Keep development mode off. Under the `cubejs` CLI and the official images,
+# setting this to `true` also forces NODE_ENV=development, switching off JWT
+# verification on the data APIs
 CUBEJS_DEV_MODE=false
 
 # Already set by the official images and by `cubejs server`; set it explicitly if

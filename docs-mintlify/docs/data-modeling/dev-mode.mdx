@@ -12,8 +12,9 @@ This page describes development mode in the Cube cloud platform. It is unrelated
 Cube Core's development mode — which is on when
 [`CUBEJS_DEV_MODE=true`](/reference/configuration/environment-variables#cubejs_dev_mode)
 or whenever `NODE_ENV` is not `production` — and which is an **authentication bypass**.
-Setting the flag also forces `NODE_ENV=development`, switching off JWT verification on
-the data APIs, and Playground's endpoints are served with no authentication at all, so
+Under the `cubejs` CLI and the official Docker images, setting the flag also forces
+`NODE_ENV=development`, switching off JWT verification on the data APIs. Playground's
+endpoints are served with no authentication at all, so
 anyone who can reach the instance can mint an API token carrying any security context
 (signed with the API secret), read the data model, and overwrite it and `.env`. With
 `CUBEJS_DEV_MODE=true` and no

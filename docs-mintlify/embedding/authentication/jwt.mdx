@@ -45,9 +45,10 @@ A typical use case would be:
 
 **In development mode, the token is not required for authorization.** JWT
 verification on this API is enabled by `NODE_ENV=production`, so it is off whenever
-`NODE_ENV` is anything else — and setting
+`NODE_ENV` is anything else. Under the `cubejs` CLI and the official Docker images,
+setting
 [`CUBEJS_DEV_MODE=true`](/reference/configuration/environment-variables#cubejs_dev_mode)
-forces `NODE_ENV=development`, which switches verification off even where it was
+also forces `NODE_ENV=development`, which switches verification off even where it was
 otherwise on. A custom [`check_auth`](/reference/configuration/config#check_auth) that
 rejects unauthenticated requests enforces it whatever `NODE_ENV` is.
 
