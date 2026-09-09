@@ -203,6 +203,7 @@ impl MultipliedMeasuresQueryPlanner {
                 key_join.clone(),
                 &measures,
                 &primary_keys_dimensions,
+                keys_subquery.filter().clone(),
                 scope,
             )?;
             measure_subquery.into()
@@ -217,6 +218,17 @@ impl MultipliedMeasuresQueryPlanner {
             evaluation_context: scope.evaluation_context().clone(),
             pre_aggregation_override: None,
         }))
+    }
+
+    // The query's WHERE-side filters, as every subquery of this flow sees
+    // them. HAVING-style measure filters are applied by the enclosing query.
+    fn query_filter(&self) -> Rc<LogicalFilter> {
+        Rc::new(LogicalFilter {
+            dimensions_filters: self.query_properties.dimensions_filters().clone(),
+            time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
+            measures_filter: vec![],
+            segments: self.query_properties.segments().clone(),
+        })
     }
 
     fn check_should_build_join_for_measure_select(
@@ -262,6 +274,7 @@ impl MultipliedMeasuresQueryPlanner {
         key_join: Rc<JoinTree>,
         measures: &Vec<Rc<MemberSymbol>>,
         primary_keys_dimensions: &Vec<Rc<MemberSymbol>>,
+        filter: Rc<LogicalFilter>,
         scope: &mut PlanningScope,
     ) -> Result<Rc<MeasureSubquery>, CubeError> {
         let subquery_dimensions = collect_sub_query_dimensions_from_members(&measures, &key_join)?;
@@ -283,7 +296,11 @@ impl MultipliedMeasuresQueryPlanner {
             .set_measures(measures.clone())
             .into_rc();
 
-        let result = MeasureSubquery { schema, source };
+        let result = MeasureSubquery {
+            schema,
+            filter,
+            source,
+        };
         Ok(Rc::new(result))
     }
 
@@ -317,12 +334,7 @@ impl MultipliedMeasuresQueryPlanner {
             .set_measures(measures.clone())
             .into_rc();
 
-        let logical_filter = Rc::new(LogicalFilter {
-            dimensions_filters: self.query_properties.dimensions_filters().clone(),
-            time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
-            measures_filter: vec![],
-            segments: self.query_properties.segments().clone(),
-        });
+        let logical_filter = self.query_filter();
 
         let query = Query::builder()
             .schema(schema)
@@ -364,12 +376,7 @@ impl MultipliedMeasuresQueryPlanner {
             .join_planner
             .make_join_logical_plan(&key_join, subquery_dimension_queries);
 
-        let logical_filter = Rc::new(LogicalFilter {
-            dimensions_filters: self.query_properties.dimensions_filters().clone(),
-            time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
-            measures_filter: vec![],
-            segments: self.query_properties.segments().clone(),
-        });
+        let logical_filter = self.query_filter();
 
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
