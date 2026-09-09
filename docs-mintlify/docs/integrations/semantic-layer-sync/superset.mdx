@@ -26,10 +26,10 @@ your Superset workspace.
 If your Superset instance is served with a certificate from a private or
 internal CA, the sync fails at the connection step with `self-signed
 certificate in certificate chain`. Commit the CA certificate (PEM) to your
-data model's Git repository and set the
-[`NODE_EXTRA_CA_CERTS`][ref-node-extra-ca-certs] environment variable to its
-path — the sync's outbound requests run in Node.js, so this is what makes it
-trust the certificate.
+data model's Git repository, e.g., as `certs/my-ca.pem`, and set the
+[`NODE_EXTRA_CA_CERTS`][ref-node-extra-ca-certs] environment variable to that
+path relative to your project root — the sync's outbound requests run in
+Node.js, so this is what makes it trust the certificate.
 
 </Note>
 
