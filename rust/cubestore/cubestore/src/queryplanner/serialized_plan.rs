@@ -1519,35 +1519,31 @@ mod tests {
         )?)
     }
 
-    /// 30 chained stages is 61 plan nodes, which the protobuf encoding nests over prost's own
-    /// 100-level decode budget.
+    /// A plan of exactly the budget is served all the way through the roundtrip. The boundary is
+    /// the budget itself, not one short of it, and this is the deepest plan the budget admits,
+    /// so it is the one whose decoding has to fit the smallest stack that decodes.
+    ///
+    /// It also nests the encoding far past prost's own 100-level decode budget, which is what
+    /// used to refuse it.
     #[test]
-    fn deep_plan_survives_the_serialization_roundtrip() {
-        let plan = chained_stage_plan(30);
+    fn plan_at_the_depth_limit_survives_the_serialization_roundtrip() {
+        let plan = chained_stage_plan(74); // the values leaf plus 2 nodes a stage
+        assert_eq!(logical_plan_depth(&plan), DEFAULT_LIMIT);
         let decoded = on_a_deep_enough_stack(move || roundtrip(&plan)).unwrap();
-        assert_eq!(decoded.inputs().len(), 1);
         assert_eq!(
             format!("{}", decoded.display_indent()).lines().count(),
-            61,
+            149,
             "the decoded plan must be the one that was encoded"
         );
-    }
-
-    /// Right up to the budget a plan is still served.
-    #[test]
-    fn plan_at_the_depth_limit_is_serialized() {
-        let stages = (DEFAULT_LIMIT - 1) / 2; // 2 nodes per stage, plus the values leaf
-        let plan = chained_stage_plan(stages);
-        on_a_deep_enough_stack(move || pre_serialized(plan).to_serialized_plan())
-            .expect("a plan inside the budget must be serialized");
     }
 
     /// Past the budget the query has to be refused with depth named, rather than crash the node
     /// somewhere inside the protobuf recursion.
     #[test]
     fn plan_over_the_depth_limit_names_depth() {
-        let stages = DEFAULT_LIMIT;
-        let plan = chained_stage_plan(stages);
+        let plan = chained_stage_plan(75);
+        let depth = logical_plan_depth(&plan);
+        assert!(depth > DEFAULT_LIMIT);
         let err = on_a_deep_enough_stack(move || pre_serialized(plan).to_serialized_plan())
             .map(|_| ())
             .expect_err("a plan past the depth limit must not be serialized");
@@ -1556,8 +1552,7 @@ mod tests {
         assert!(
             message.contains(&format!(
                 "{} levels against a limit of {}",
-                stages * 2 + 1,
-                DEFAULT_LIMIT
+                depth, DEFAULT_LIMIT
             )),
             "message must name the depth reached and the budget, got: {}",
             message
@@ -1571,6 +1566,33 @@ mod tests {
             err.cause,
             crate::CubeErrorCauseType::User,
             "a query the user has to flatten is not an internal error"
+        );
+    }
+
+    /// A nested expression nests the encoding the same way a chain of plan nodes does, on a
+    /// plan of two nodes that counting nodes alone reads as trivially shallow. Nothing bounds
+    /// the decoding of it any more, so the budget has to.
+    #[test]
+    fn depth_counts_nested_expressions() {
+        let mut deep = col("column1");
+        for _ in 0..DEFAULT_LIMIT {
+            deep = deep + lit(1i64);
+        }
+        let plan = LogicalPlanBuilder::values(vec![vec![lit(1i64)]])
+            .unwrap()
+            .project(vec![deep.alias("deep")])
+            .unwrap()
+            .build()
+            .unwrap();
+        assert_eq!(plan.inputs().len(), 1);
+
+        let err = on_a_deep_enough_stack(move || pre_serialized(plan).to_serialized_plan())
+            .map(|_| ())
+            .expect_err("an expression past the depth limit must not be serialized");
+        assert!(
+            err.to_string().contains("nested too deeply to execute"),
+            "message must name depth as the cause, got: {}",
+            err
         );
     }
 
