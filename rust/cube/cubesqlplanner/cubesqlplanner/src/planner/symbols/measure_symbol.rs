@@ -9,7 +9,7 @@ use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::collectors::find_owned_by_cube_child;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::SqlInterval;
-use crate::planner::{Compiler, SqlCall};
+use crate::planner::{Compiler, SqlCall, ViewJoinMap};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cmp::{Eq, PartialEq};
@@ -369,7 +369,7 @@ impl MeasureSymbol {
         self.compiled_path.cube_name().clone()
     }
 
-    pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
+    pub fn join_map(&self) -> &Option<ViewJoinMap> {
         self.compiled_path.join_map()
     }
 

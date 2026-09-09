@@ -419,7 +419,7 @@ export class BaseQuery {
    * @return {import('../compiler/JoinGraph').FinishedJoinTree}
    */
   joinTreeForHints(hints, skipQueryJoinMap = false) {
-    const queryJoinMaps = skipQueryJoinMap ? {} : this.queryJoinMap();
+    const queryJoinMaps = skipQueryJoinMap ? { joinMaps: {}, rootCubes: new Set() } : this.queryJoinMap();
     let newCollectedHints = [];
 
     const constructJH = () => R.uniq(this.enrichHintsWithJoinMap([
@@ -516,21 +516,26 @@ export class BaseQuery {
   }
 
   /**
+   * Join paths and root cubes declared by the views the query's members belong to.
    * @private
-   * @return { Record<string, string[][]>}
+   * @return {{ joinMaps: Record<string, string[][]>, rootCubes: Set<string> }}
    */
   queryJoinMap() {
     const queryMembers = this.allMembersConcat(false);
     const joinMaps = {};
+    const rootCubes = new Set();
 
     for (const member of queryMembers) {
       const memberCube = member.cube?.();
       if (memberCube?.isView && !joinMaps[memberCube.name] && memberCube.joinMap) {
         joinMaps[memberCube.name] = memberCube.joinMap;
+        for (const rootCube of memberCube.rootCubes ?? []) {
+          rootCubes.add(rootCube);
+        }
       }
     }
 
-    return joinMaps;
+    return { joinMaps, rootCubes };
   }
 
   /**
@@ -564,13 +569,13 @@ export class BaseQuery {
   /**
    * @private
    * @param { (string|string[])[] } hints
-   * @param { Record<string, string[][]>} joinMap
+   * @param {{ joinMaps: Record<string, string[][]>, rootCubes: Set<string> }} queryJoinMap
    * @return {(string|string[])[]}
    */
-  enrichHintsWithJoinMap(hints, joinMap) {
+  enrichHintsWithJoinMap(hints, queryJoinMap) {
     // Potentially, if joins between views would take place, we need to distinguish
     // join maps on per view basis.
-    const allPaths = Object.values(joinMap).flat();
+    const allPaths = Object.values(queryJoinMap.joinMaps).flat();
 
     return hints.map(hint => {
       if (Array.isArray(hint)) {
@@ -580,6 +585,12 @@ export class BaseQuery {
       for (const path of allPaths) {
         const hintIndex = path.indexOf(hint);
         if (hintIndex !== -1) {
+          // A cube the view also includes at the root of its join tree is
+          // reachable on its own, so a bare hint into it must not be moved onto
+          // a longer path - that path serves the members included under it.
+          if (hintIndex > 0 && queryJoinMap.rootCubes.has(hint)) {
+            return hint;
+          }
           return path.slice(0, hintIndex + 1);
         }
       }

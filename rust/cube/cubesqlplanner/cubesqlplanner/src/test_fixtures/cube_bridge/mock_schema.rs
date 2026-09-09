@@ -660,7 +660,7 @@ impl MockViewBuilder {
         // does differently is evaluate the join path as a reference instead of
         // splitting the raw string, so a fixture would only diverge with a join
         // path that is not a literal.
-        let join_map = self
+        let join_paths = self
             .view_cubes
             .iter()
             .map(|view_cube| {
@@ -670,13 +670,28 @@ impl MockViewBuilder {
                     .map(|part| part.to_string())
                     .collect::<Vec<_>>()
             })
+            .collect::<Vec<_>>();
+
+        let join_map = join_paths
+            .iter()
             .filter(|path| path.len() > 1)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        // The other half of the same split: a single-segment join path names a
+        // cube the view reaches at the root of its join tree, and such a cube
+        // keeps a longer path of the same view off a bare hint into it.
+        let root_cubes = join_paths
+            .iter()
+            .filter(|path| path.len() == 1)
+            .map(|path| path[0].clone())
             .collect::<Vec<_>>();
 
         let view_def = MockCubeDefinition::builder()
             .name(self.view_name.clone())
             .is_view(Some(true))
             .join_map(Some(join_map))
+            .root_cubes(Some(root_cubes))
             .default_filters(self.default_filters)
             .build();
 

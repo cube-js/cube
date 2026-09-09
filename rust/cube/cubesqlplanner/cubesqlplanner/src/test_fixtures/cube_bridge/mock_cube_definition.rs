@@ -21,6 +21,8 @@ pub struct MockCubeDefinition {
     is_calendar: Option<bool>,
     #[builder(default)]
     join_map: Option<Vec<Vec<String>>>,
+    #[builder(default)]
+    root_cubes: Option<Vec<String>>,
 
     #[builder(default, setter(strip_option(fallback = sql_table_opt)))]
     sql_table: Option<String>,
@@ -41,7 +43,8 @@ impl_static_data!(
     sql_alias,
     is_view,
     is_calendar,
-    join_map
+    join_map,
+    root_cubes
 );
 
 impl CubeDefinition for MockCubeDefinition {

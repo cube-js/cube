@@ -1,4 +1,4 @@
-use crate::planner::{CubeNameSymbol, CubeTableSymbol};
+use crate::planner::{CubeNameSymbol, CubeTableSymbol, ViewJoinMap};
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
@@ -40,7 +40,7 @@ impl CompiledMemberPath {
         &self.cube
     }
 
-    pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
+    pub fn join_map(&self) -> &Option<ViewJoinMap> {
         self.cube.join_map()
     }
 

@@ -101,18 +101,13 @@ pub fn collect_join_hints(node: &Rc<MemberSymbol>) -> Result<JoinHints, CubeErro
     visitor.apply(node, &())?;
     let mut collected_hints = visitor.extract_result();
 
-    let join_map = node.join_map();
-
-    if let Some(join_map) = join_map {
+    if let Some(join_map) = node.join_map() {
         for hint in collected_hints.iter_mut() {
             match hint {
                 // If hints array has single element, check if it can be enriched with join hints
-                JoinHintItem::Single(hints) => {
-                    for path in join_map.iter() {
-                        if let Some(hint_index) = path.iter().position(|p| p == hints) {
-                            *hint = JoinHintItem::Vector(path[0..=hint_index].to_vec());
-                            break;
-                        }
+                JoinHintItem::Single(cube_name) => {
+                    if let Some(path) = join_map.path_to(cube_name) {
+                        *hint = JoinHintItem::Vector(path.to_vec());
                     }
                 }
                 // If hints is an array with multiple elements, it means it already
