@@ -184,6 +184,22 @@ export class QueryOrchestrator {
   }
 
   /**
+   * In rollup only mode a query that matched no pre-aggregation must fail rather
+   * than fall through to the source database, so that losing acceleration is
+   * loud instead of silently expensive. Both query entry points enforce it.
+   *
+   * @throw Error
+   */
+  private checkRollupOnlyMode(preAggregationsTablesToTempTables: PreAggTableToTempTable[]): void {
+    if (this.rollupOnlyMode && preAggregationsTablesToTempTables.length === 0) {
+      throw new Error(
+        'No pre-aggregation table has been built for this query yet. ' +
+        'Please check your refresh worker configuration if it persists.'
+      );
+    }
+  }
+
+  /**
    * Returns stream object which will be used to stream results from
    * the data source if applicable. Throw otherwise.
    *
@@ -194,6 +210,10 @@ export class QueryOrchestrator {
       preAggregationsTablesToTempTables,
       values,
     } = await this.preAggregations.loadAllPreAggregationsIfNeeded(query);
+
+    // Before the stream is created, so a miss can still be returned as an error.
+    this.checkRollupOnlyMode(preAggregationsTablesToTempTables);
+
     query.values = values || query.values;
     const _stream = await this.queryCache.cachedQueryResult(
       query,
@@ -214,6 +234,8 @@ export class QueryOrchestrator {
       preAggregationsTablesToTempTables,
       values,
     } = await this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody);
+
+    this.checkRollupOnlyMode(preAggregationsTablesToTempTables);
 
     if (values) {
       queryBody = {
@@ -236,13 +258,6 @@ export class QueryOrchestrator {
         type: pa.type,
       })),
     )(preAggregationsTablesToTempTables);
-
-    if (this.rollupOnlyMode && Object.keys(usedPreAggregations).length === 0) {
-      throw new Error(
-        'No pre-aggregation table has been built for this query yet. ' +
-        'Please check your refresh worker configuration if it persists.'
-      );
-    }
 
     let lastRefreshTimestamp = getLastUpdatedAtTimestamp(
       preAggregationsTablesToTempTables.map(pa => pa[1].lastUpdatedAt)
