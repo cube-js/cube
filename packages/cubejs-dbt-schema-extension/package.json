@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/dbt-schema-extension",
   "description": "Cube.js dbt Schema Extension",
   "author": "Cube Dev, Inc.",
-  "version": "1.7.35",
+  "version": "1.7.36",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -25,14 +25,14 @@
     "lint:fix": "eslint --fix src/* --ext .ts,.js"
   },
   "dependencies": {
-    "@cubejs-backend/schema-compiler": "1.7.35",
+    "@cubejs-backend/schema-compiler": "1.7.36",
     "fs-extra": "^11.1.1",
     "inflection": "^1.12.0",
     "node-fetch": "^2.7.0"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.35",
-    "@cubejs-backend/testing": "1.7.35",
+    "@cubejs-backend/linter": "1.7.36",
+    "@cubejs-backend/testing": "1.7.36",
     "@types/jest": "^29",
     "@types/node": "^22",
     "jest": "^29",

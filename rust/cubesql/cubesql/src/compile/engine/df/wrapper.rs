@@ -867,6 +867,9 @@ impl CubeScanWrapperNode {
                         .inputs
                         .iter()
                         .any(|input| Self::has_ungrouped_wrapped_node(input))
+                } else if let Some(wrapper) = node.as_any().downcast_ref::<CubeScanWrapperNode>() {
+                    // A query of a pushed down union
+                    Self::has_ungrouped_wrapped_node(wrapper.wrapped_plan.as_ref())
                 } else {
                     false
                 }
@@ -1244,6 +1247,20 @@ impl CubeScanWrapperNode {
                             parent_data_source,
                         )
                         .await
+                } else if let Some(wrapper) = node_any.downcast_ref::<CubeScanWrapperNode>() {
+                    // The queries of a pushed down union are the wrappers they were pulled
+                    // up into, and each renders as the query it holds
+                    Self::generate_sql_for_node_rec(
+                        meta,
+                        transport,
+                        load_request_meta,
+                        state,
+                        wrapper.wrapped_plan.clone(),
+                        can_rename_columns,
+                        values,
+                        parent_data_source,
+                    )
+                    .await
                 } else {
                     return Err(CubeError::internal(format!(
                         "Can't generate SQL for node: {node:?}"

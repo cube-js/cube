@@ -57,7 +57,19 @@ To do so, open the sidebar by going to the **Extensions** menu and choosing
 
 A modal window with an authentication prompt will appear. Choose the deployments
 that you want to work with in Google Sheets and click **Authorize**.
-Once you see the `Access Granted` message, close the modal window.
+Once you see the `Access Granted` message, the window will close automatically.
+
+<Warning>
+
+Google Apps Script authenticates the add-on as whichever Google account you
+signed in to first in the browser, not necessarily one with access to the
+open spreadsheet. If they differ, the add-on can't reach the spreadsheet and
+the cursor status reads **Cannot read your selection**. Sign in to only one
+Google account per browser profile (or use a private/incognito window) to
+avoid this — or sign out of every Google account and sign back in with an
+account that has access to the file first.
+
+</Warning>
 
 If you want to revoke the authentication, open the add-on menu and click
 **Sign out**.
@@ -94,8 +106,15 @@ Click on **×** to remove members from a query.
 Use **Order** and **Filters** panes below to sort and filter the
 data in the exploration.
 
-If you'd like to move the exploration to a new location, click on the desired top-left
-cell and then confirm with the target button under **Result location**.
+Above the query editor, a **cursor row** (`● Sheet1 · A1` next to **+ New**)
+shows the cell you last selected in the sheet. It can briefly lag your click;
+press the target button in that row to re-read your selection. It only
+refreshes the readout — it doesn't move or write anything.
+
+If you'd like to move the exploration to a new location, click on the desired
+top-left cell and then confirm with the target button under
+**Result location**. Unlike the cursor row's button, this one moves the
+exploration.
 
 <Frame>
   <img src="https://ucarecdn.com/5a8d2b6a-b415-46ee-9e03-57ea5eeb693a/" />

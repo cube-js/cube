@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.36](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.36) (2026-09-09)
+
+### Bug Fixes
+
+- **cubesql:** Build a pushed down union over its queries' classes, not their forms ([#11801](https://github.com/cube-js/cube/issues/11801)) ([7b24714](https://github.com/cube-js/cube/commit/7b24714522d0bb22cb239512fbf3866cddce38ef))
+
 ## [1.7.35](https://github.com/cube-js/cube/compare/v1.7.34...v1.7.35) (2026-09-07)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

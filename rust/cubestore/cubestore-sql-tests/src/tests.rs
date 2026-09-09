@@ -1,4 +1,4 @@
-use crate::files::write_tmp_file;
+use crate::files::{serve_file, write_tmp_file};
 use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
@@ -2469,8 +2469,15 @@ async fn create_table_with_csv_no_header_and_quotes(
 }
 
 async fn create_table_with_url(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
-    // TODO serve this data ourselves
-    let url = "https://data.wprdc.org/dataset/0b584c84-7e35-4f4d-a5a2-b01697470c0f/resource/e95dd941-8e47-4460-9bd8-1e51c194370b/download/bikepghpublic.csv";
+    let mut csv = "Response ID,Start Date,End Date\n".to_string();
+    for id in 0..813 {
+        csv += &format!("{},2020-01-01T00:00:00.000Z,2020-01-02T00:00:00.000Z\n", id);
+    }
+    // The body is held back because the query below has to run against a table
+    // whose import has not finished: only ready tables are visible to the
+    // planner.
+    let server = serve_file(csv, Duration::from_millis(500)).await?;
+    let url = server.url("bikepghpublic.csv");
 
     service
         .exec_query("CREATE SCHEMA IF NOT EXISTS foo")
