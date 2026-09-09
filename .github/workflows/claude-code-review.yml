@@ -72,9 +72,7 @@ jobs:
           track_progress: true
           # Allow PRs opened by coding-agent bots (e.g. cursor) to trigger reviews.
           allowed_bots: "cursor[bot]"
-          # Review instructions live in .claude/commands/cube-review.md so the
-          # same review can be run locally with /cube-review.
-          prompt: "/cube-review ${{ github.repository }} ${{ env.PR_NUMBER }}"
+          prompt: "/cube-review ${{ env.PR_NUMBER }}"
 
           # Tools for comprehensive PR review
           claude_args: |

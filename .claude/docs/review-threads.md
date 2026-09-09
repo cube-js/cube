@@ -8,7 +8,7 @@ Rules for handling your own prior review threads on a PR. Referenced by
 Before posting new comments, list existing review threads on this PR using the
 preconfigured alias:
 
-  gh list-review-threads <owner> <repo> <pr-number>
+  gh list-review-threads cube-js cube <pr-number>
 
 For each thread where ALL of the following hold:
   - `isResolved` is false

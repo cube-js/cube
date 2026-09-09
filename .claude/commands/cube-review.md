@@ -1,10 +1,10 @@
 ---
 description: Comprehensive PR review — inline comments, stale-thread resolution, collapsed tracking comment
-argument-hint: "[<owner>/<repo> <pr-number>]"
+argument-hint: "[<pr-number>]"
 ---
 
-**Target:** the repo slug and PR number passed as arguments, if any. Without
-arguments, resolve the PR for the current branch with `gh pr view`.
+**Target:** the `cube-js/cube` PR whose number was passed as an argument.
+Without an argument, resolve the PR for the current branch with `gh pr view`.
 
 Perform a comprehensive code review with the following focus areas:
 
