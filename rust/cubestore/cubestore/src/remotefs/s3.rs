@@ -172,7 +172,9 @@ fn credentials_expiration(credentials: &Credentials) -> Option<SystemTime> {
     Some(SystemTime::UNIX_EPOCH + Duration::from_secs(unix_seconds as u64))
 }
 
-/// State the web identity refresh loop carries between iterations.
+/// State the web identity refresh loop carries between iterations. Only a
+/// refresh that actually reached the live bucket updates it, so a failed STS
+/// exchange is retried on the next poll instead of being treated as done.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct WebIdentityCredsState {
     token_file_modified: Option<SystemTime>,
@@ -181,16 +183,34 @@ struct WebIdentityCredsState {
 }
 
 /// Whether web identity credentials have to be exchanged again, and why.
+///
+/// The token file mtime is only one of the triggers: Kubernetes rotates the
+/// projected service account token on its own schedule, which is unrelated to
+/// the STS session TTL, and some projected volume implementations keep the
+/// mtime when rewriting the contents. Expiry therefore has to be checked
+/// independently, and credentials with an unknown expiry cannot be assumed
+/// valid either.
 fn web_identity_refresh_reason(
     state: &WebIdentityCredsState,
     token_file_modified: Option<SystemTime>,
-    _now: SystemTime,
-    _expiry_margin: Duration,
+    now: SystemTime,
+    expiry_margin: Duration,
 ) -> Option<&'static str> {
     if token_file_modified != state.token_file_modified {
         return Some("web identity token file changed");
     }
-    None
+    match state.expiration {
+        // Nothing says how long these are good for, so re-exchange them, but
+        // no more often than the margin to keep STS calls bounded.
+        None if now >= state.last_refreshed + expiry_margin => {
+            Some("credentials expiration is unknown")
+        }
+        None => None,
+        Some(expiration) if now + expiry_margin >= expiration => {
+            Some("credentials are about to expire")
+        }
+        Some(_) => None,
+    }
 }
 
 fn spawn_creds_refresh_loop(
@@ -222,6 +242,8 @@ fn spawn_creds_refresh_loop(
         return;
     }
 
+    // A refresh has to be triggered at least one poll before the credentials
+    // actually expire, otherwise the loop wakes up when they are already dead.
     let expiry_margin = std::cmp::max(WEB_IDENTITY_EXPIRY_MARGIN, refresh_every);
 
     let fs = Arc::downgrade(fs);
@@ -248,6 +270,7 @@ fn spawn_creds_refresh_loop(
                 Some(fs) => fs,
             };
 
+            let mut observed_token_file_modified = None;
             if let (Some(ref file), Some(_)) = (&token_file, &role_arn) {
                 let token_file_modified =
                     std::fs::metadata(file).ok().and_then(|m| m.modified().ok());
@@ -260,7 +283,7 @@ fn spawn_creds_refresh_loop(
                     None => continue,
                     Some(reason) => {
                         info!("Refreshing S3 credentials: {}", reason);
-                        state.token_file_modified = token_file_modified;
+                        observed_token_file_modified = Some(token_file_modified);
                     }
                 }
             }
@@ -290,7 +313,7 @@ fn spawn_creds_refresh_loop(
                     continue;
                 }
             };
-            state.expiration = credentials_expiration(&c);
+            let expiration = credentials_expiration(&c);
             let b = match new_bucket(&bucket_name, region.clone(), c, &server_side_encryption) {
                 Ok(b) => b,
                 Err(e) => {
@@ -299,7 +322,13 @@ fn spawn_creds_refresh_loop(
                 }
             };
             fs.bucket.swap(Arc::new(b));
-            state.last_refreshed = SystemTime::now();
+            if is_web_identity {
+                if let Some(token_file_modified) = observed_token_file_modified {
+                    state.token_file_modified = token_file_modified;
+                }
+                state.expiration = expiration;
+                state.last_refreshed = SystemTime::now();
+            }
             log::debug!("Successfully refreshed S3 credentials")
         }
     });
