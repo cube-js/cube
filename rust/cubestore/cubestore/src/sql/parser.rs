@@ -1,4 +1,5 @@
 use crate::cachestore::{QueueItemStatus, QueueKey, QUEUE_ITEM_EXTERNAL_ID_MAX_LEN};
+use crate::config::env_parse_lenient;
 use crate::sql::{QueryParameter, QueryParameters};
 use sqlparser::ast::{
     ColumnDef, CreateIndex, CreateTable, HiveDistributionStyle, Ident, ObjectName, Query,
@@ -8,6 +9,7 @@ use sqlparser::dialect::keywords::Keyword;
 use sqlparser::dialect::Dialect;
 use sqlparser::parser::{Parser, ParserError};
 use sqlparser::tokenizer::{Span, Token, Tokenizer};
+use std::sync::OnceLock;
 
 #[derive(Debug)]
 pub struct MySqlDialectWithBackTicks {}
@@ -271,6 +273,31 @@ macro_rules! parse_sql_options {
     }};
 }
 
+/// Nesting the parser accepts inside a single statement: one level per nested expression,
+/// subquery and parenthesised group. `sqlparser`'s own default is 50, low enough that a
+/// generated query with a few dozen nested expressions is rejected outright.
+///
+/// Every level is a recursive descent on the calling thread's stack and the parser has no
+/// stack-growth protection, so the real ceiling is the stack a statement is parsed on. The
+/// costliest shape is nested subqueries, at roughly 33 KiB a level in a release build, which
+/// the 8 MiB `cubestore-main` stack takes past 200 levels; this default stays inside that.
+const DEFAULT_SQL_PARSER_RECURSION_LIMIT: usize = 128;
+
+pub(crate) fn sql_parser_recursion_limit() -> usize {
+    static LIMIT: OnceLock<usize> = OnceLock::new();
+    *LIMIT.get_or_init(|| {
+        let limit = env_parse_lenient(
+            "CUBESTORE_SQL_PARSER_RECURSION_LIMIT",
+            DEFAULT_SQL_PARSER_RECURSION_LIMIT,
+        );
+        if limit == 0 {
+            DEFAULT_SQL_PARSER_RECURSION_LIMIT
+        } else {
+            limit
+        }
+    })
+}
+
 impl<'a> CubeStoreParser<'a> {
     pub fn new(sql: &str, parameters: Option<QueryParameters>) -> Result<Self, ParserError> {
         let dialect = &MySqlDialectWithBackTicks {};
@@ -278,7 +305,9 @@ impl<'a> CubeStoreParser<'a> {
         let tokens = tokenizer.tokenize()?;
 
         Ok(CubeStoreParser {
-            parser: Parser::new(dialect).with_tokens(tokens),
+            parser: Parser::new(dialect)
+                .with_recursion_limit(sql_parser_recursion_limit())
+                .with_tokens(tokens),
             parameters: parameters
                 .map(|parameters| parameters.into_iter().map(|p| Some(p)).collect()),
             placeholder_index: 0,

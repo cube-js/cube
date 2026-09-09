@@ -1,3 +1,4 @@
+use crate::config::env_parse_lenient;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
 use crate::queryplanner::panic::PanicWorkerNode;
@@ -23,6 +24,8 @@ use datafusion::common::TableReference;
 use datafusion::datasource::physical_plan::ParquetFileReaderFactory;
 use datafusion::datasource::DefaultTableSource;
 use datafusion::error::DataFusionError;
+use datafusion::logical_expr::expr::{Exists, InSubquery};
+use datafusion::logical_expr::Expr;
 use datafusion::logical_expr::{
     Aggregate, Distinct, DistinctOn, EmptyRelation, Extension, Filter, Join, Limit, LogicalPlan,
     Projection, RecursiveQuery, Repartition, Sort, Subquery, SubqueryAlias, TableScan, Union,
@@ -33,7 +36,80 @@ use datafusion_proto::bytes::logical_plan_from_bytes_with_extension_codec;
 use datafusion_proto::logical_plan::LogicalExtensionCodec;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
+
+/// Depth a serialized query plan may reach, counted in logical-plan nodes along the longest
+/// root-to-leaf path.
+///
+/// The protobuf encoding nests two message levels per plan node, and every level of decoding
+/// is a recursive call, so the budget is really a stack budget: a release build decodes around
+/// 360 levels per 2 MiB of thread stack. This default stays well inside what the runtime
+/// stacks allow, and unlike a stack overflow it can be reported.
+///
+/// Cube Store inlines a CTE body at each of its references, so a query built from N chained
+/// stages arrives here as roughly 2N nodes.
+const DEFAULT_MAX_QUERY_PLAN_DEPTH: usize = 150;
+
+fn max_query_plan_depth() -> usize {
+    static MAX_DEPTH: OnceLock<usize> = OnceLock::new();
+    *MAX_DEPTH.get_or_init(|| {
+        let depth = env_parse_lenient(
+            "CUBESTORE_MAX_QUERY_PLAN_DEPTH",
+            DEFAULT_MAX_QUERY_PLAN_DEPTH,
+        );
+        if depth == 0 {
+            DEFAULT_MAX_QUERY_PLAN_DEPTH
+        } else {
+            depth
+        }
+    })
+}
+
+/// Longest root-to-leaf path in `plan`, in nodes. Walks an explicit stack: the plans this
+/// guards against are exactly the ones a recursive walk could not survive.
+fn logical_plan_depth(plan: &LogicalPlan) -> usize {
+    let mut max_depth = 0;
+    let mut pending = vec![(plan, 1usize)];
+    while let Some((node, depth)) = pending.pop() {
+        max_depth = max_depth.max(depth);
+        for input in node.inputs() {
+            pending.push((input, depth + 1));
+        }
+        // Subqueries carried in expressions are separate plans that nest just as deep. This
+        // arm does recurse, but once per level of subquery nesting, which the parser caps.
+        let mut subquery_depth = 0;
+        let _ = node.apply_expressions(|expr| {
+            expr.apply(|e| {
+                match e {
+                    Expr::ScalarSubquery(subquery)
+                    | Expr::Exists(Exists { subquery, .. })
+                    | Expr::InSubquery(InSubquery { subquery, .. }) => {
+                        subquery_depth =
+                            subquery_depth.max(logical_plan_depth(subquery.subquery.as_ref()));
+                    }
+                    _ => {}
+                }
+                Ok(TreeNodeRecursion::Continue)
+            })
+        });
+        max_depth = max_depth.max(depth + subquery_depth);
+    }
+    max_depth
+}
+
+fn check_query_plan_depth(plan: &LogicalPlan) -> Result<(), CubeError> {
+    let limit = max_query_plan_depth();
+    let depth = logical_plan_depth(plan);
+    if depth > limit {
+        return Err(CubeError::user(format!(
+            "Query plan is nested too deeply to execute: {} levels against a limit of {}. \
+             Reduce the number of chained stages, nested subqueries and joined CTEs in the \
+             query, or raise CUBESTORE_MAX_QUERY_PLAN_DEPTH.",
+            depth, limit
+        )));
+    }
+    Ok(())
+}
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
 pub struct RowRange {
@@ -857,6 +933,7 @@ pub enum SerializedTableSource {
 
 impl PreSerializedPlan {
     pub fn to_serialized_plan(&self) -> Result<SerializedPlan, CubeError> {
+        check_query_plan_depth(&self.logical_plan)?;
         let serialized_logical_plan =
             datafusion_proto::bytes::logical_plan_to_bytes_with_extension_codec(
                 &self.logical_plan,
@@ -1389,8 +1466,7 @@ pub enum SerializedTableProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use datafusion::logical_expr::expr::Exists;
-    use datafusion::logical_expr::{col, lit, Expr, LogicalPlanBuilder};
+    use datafusion::logical_expr::{col, lit, LogicalPlanBuilder};
 
     /// The documented default of `CUBESTORE_MAX_QUERY_PLAN_DEPTH`, spelled out so that changing
     /// the default has to come with a decision about these cases.
