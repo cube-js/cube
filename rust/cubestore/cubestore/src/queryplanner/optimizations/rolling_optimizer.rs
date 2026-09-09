@@ -2,7 +2,9 @@ use crate::queryplanner::rolling::RollingWindowAggregate;
 use datafusion::arrow::array::Array;
 use datafusion::arrow::datatypes::DataType;
 use datafusion::common::tree_node::Transformed;
-use datafusion::common::{Column, DataFusionError, JoinType, ScalarValue, TableReference};
+use datafusion::common::{
+    Column, DFSchema, DataFusionError, JoinType, ScalarValue, TableReference,
+};
 use datafusion::functions::datetime::date_part::DatePartFunc;
 use datafusion::functions::datetime::date_trunc::DateTruncFunc;
 use datafusion::logical_expr::expr::{
@@ -90,26 +92,28 @@ impl RollingOptimizerRule {
                     from,
                     to,
                     every,
-                    rolling_aggs_alias: expr
+                    // The schema pairs these names with `rolling_aggs` positionally, so resolve each
+                    // one from the aggregate it belongs to rather than from the order the
+                    // projection happens to list them in. An aggregate the projection does not
+                    // read under its own name has no name to output, so decline the rewrite
+                    // instead of building a node that cannot describe its own output.
+                    rolling_aggs_alias: rolling_aggs
                         .iter()
-                        .flat_map(|e| match e {
-                            Expr::Alias(Alias {
-                                expr,
-                                relation: _,
-                                name,
-                            }) => match expr.as_ref() {
-                                Expr::Column(col)
-                                    if &col.name != &from_col.name
-                                        && &col.name != &to_col.name
-                                        && !partition_by.iter().any(|p| &p.name == &col.name) =>
-                                {
-                                    Some(name.clone())
-                                }
+                        .map(|agg| {
+                            let agg_name = agg.schema_name().to_string();
+                            expr.iter().find_map(|e| match e {
+                                Expr::Alias(Alias {
+                                    expr,
+                                    relation: _,
+                                    name,
+                                }) => match expr.as_ref() {
+                                    Expr::Column(col) if col.name == agg_name => Some(name.clone()),
+                                    _ => None,
+                                },
                                 _ => None,
-                            },
-                            _ => None,
+                            })
                         })
-                        .collect(),
+                        .collect::<Option<Vec<_>>>()?,
                     partition_by,
                     rolling_aggs,
                     group_by_dimension,
@@ -165,6 +169,13 @@ impl RollingOptimizerRule {
         }
     }
 
+    fn output_columns(schema: &DFSchema) -> Vec<Column> {
+        schema
+            .iter()
+            .map(|(relation, field)| Column::new(relation.cloned(), field.name()))
+            .collect()
+    }
+
     pub fn extract_rolling_window_aggregate(
         node: &LogicalPlan,
     ) -> Option<RollingWindowAggregateExtractorResult> {
@@ -178,19 +189,35 @@ impl RollingOptimizerRule {
                 let rolling_aggs = aggr_expr
                     .iter()
                     .map(|e| match e {
-                        Expr::AggregateFunction(AggregateFunction {
-                            func,
-                            params: AggregateFunctionParams { args, .. },
-                        }) => Some(Expr::AggregateFunction(AggregateFunction {
-                            func: func.clone(),
-                            params: AggregateFunctionParams {
-                                args: args.clone(),
-                                distinct: false,
-                                filter: None,
-                                order_by: None,
-                                null_treatment: None,
-                            },
-                        })),
+                        Expr::AggregateFunction(AggregateFunction { func, params }) => {
+                            let AggregateFunctionParams {
+                                args,
+                                distinct,
+                                filter,
+                                order_by,
+                                null_treatment,
+                            } = params;
+                            // The rolling executor evaluates the aggregate over its own window and
+                            // honours none of these, so rebuilding without them would silently
+                            // answer a different question.
+                            if *distinct
+                                || filter.is_some()
+                                || order_by.is_some()
+                                || null_treatment.is_some()
+                            {
+                                return None;
+                            }
+                            Some(Expr::AggregateFunction(AggregateFunction {
+                                func: func.clone(),
+                                params: AggregateFunctionParams {
+                                    args: args.clone(),
+                                    distinct: false,
+                                    filter: None,
+                                    order_by: None,
+                                    null_treatment: None,
+                                },
+                            }))
+                        }
                         _ => None,
                     })
                     .collect::<Option<Vec<_>>>()?;
@@ -203,6 +230,15 @@ impl RollingOptimizerRule {
                 // indexes out of bounds. Leave it as a plain aggregate/range-join, which
                 // produces the same dimension keys.
                 if rolling_aggs.is_empty() {
+                    return None;
+                }
+
+                // The executor advances one shared group counter per (aggregate, dimension point),
+                // while each aggregate accumulates into its own group space. With more than one
+                // aggregate they interleave, so every aggregate past the first reads the slots the
+                // others left empty and comes back null. Serve these as a plain aggregate until
+                // that accounting is fixed.
+                if rolling_aggs.len() > 1 {
                     return None;
                 }
 
@@ -840,16 +876,27 @@ impl OptimizerRule for RollingOptimizerRule {
         _config: &dyn OptimizerConfig,
     ) -> datafusion::common::Result<Transformed<LogicalPlan>, DataFusionError> {
         if let Some(rolling) = Self::extract_rolling_window_projection(&plan) {
+            let projection_output = Self::output_columns(plan.schema());
+            let schema = match RollingWindowAggregate::schema_from(
+                &rolling.input,
+                &rolling.dimension,
+                &rolling.partition_by,
+                &rolling.rolling_aggs,
+                &rolling.dimension_alias,
+                &rolling.rolling_aggs_alias,
+                &rolling.from,
+            ) {
+                Ok(schema) => schema,
+                Err(e) => {
+                    // The rolling node cannot describe its own output for this shape (colliding
+                    // aliases, say). Run the query as a plain aggregate/range-join rather than
+                    // failing to plan it.
+                    log::debug!("Not rewriting a rolling window, no schema for it: {}", e);
+                    return Ok(Transformed::no(plan));
+                }
+            };
             let rolling_window = RollingWindowAggregate {
-                schema: RollingWindowAggregate::schema_from(
-                    &rolling.input,
-                    &rolling.dimension,
-                    &rolling.partition_by,
-                    &rolling.rolling_aggs,
-                    &rolling.dimension_alias,
-                    &rolling.rolling_aggs_alias,
-                    &rolling.from,
-                )?,
+                schema,
                 input: rolling.input,
                 dimension: rolling.dimension,
                 dimension_alias: rolling.dimension_alias,
@@ -865,9 +912,39 @@ impl OptimizerRule for RollingOptimizerRule {
                 upper_bound: rolling.upper_bound,
                 offset_to_end: rolling.offset_to_end,
             };
-            Ok(Transformed::yes(LogicalPlan::Extension(Extension {
+            let rolling_output = Self::output_columns(&rolling_window.schema);
+            let rolling_plan = LogicalPlan::Extension(Extension {
                 node: Arc::new(rolling_window),
-            })))
+            });
+
+            if rolling_output == projection_output {
+                return Ok(Transformed::yes(rolling_plan));
+            }
+
+            // The rolling node always emits dimension + partition_by + rolling aggregates, so a
+            // GROUP BY column the replaced projection did not select reappears in the output.
+            // A rewrite must not change the schema of the node it replaces: ancestors keep
+            // resolving their columns by position against the old one. Restore the original
+            // output with a projection on top, and leave the plan alone when it cannot be
+            // expressed from the rolling node's output.
+            let rolling_schema = rolling_plan.schema();
+            if let Some(missing) = projection_output
+                .iter()
+                .find(|c| rolling_schema.maybe_index_of_column(c).is_none())
+            {
+                log::debug!(
+                    "Not rewriting a rolling window, it does not output {}",
+                    missing
+                );
+                return Ok(Transformed::no(plan));
+            }
+            let exprs = projection_output
+                .into_iter()
+                .map(Expr::Column)
+                .collect_vec();
+            Ok(Transformed::yes(LogicalPlan::Projection(
+                Projection::try_new(exprs, Arc::new(rolling_plan))?,
+            )))
         } else {
             Ok(Transformed::no(plan))
         }
@@ -944,4 +1021,246 @@ pub struct RollingWindowSeriesProjectionResult {
     pub to: ScalarValue,
     pub from_col: Column,
     pub to_col: Column,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use datafusion::arrow::datatypes::Field;
+    use datafusion::common::DFSchema;
+    use datafusion::functions_aggregate::sum::sum_udaf;
+    use datafusion::logical_expr::expr::AggregateFunctionParams;
+    use datafusion::logical_expr::{build_join_schema, col, lit, EmptyRelation, JoinConstraint};
+    use datafusion::optimizer::OptimizerContext;
+    use std::collections::HashMap;
+
+    /// A stand-in for the rolling source: only its schema matters to the rule.
+    fn source() -> LogicalPlan {
+        let schema = DFSchema::new_with_metadata(
+            ["d", "win", "n"]
+                .iter()
+                .map(|name| {
+                    (
+                        Some(TableReference::bare("rs")),
+                        Arc::new(Field::new(*name, DataType::Int64, true)),
+                    )
+                })
+                .collect(),
+            HashMap::new(),
+        )
+        .unwrap();
+        LogicalPlan::EmptyRelation(EmptyRelation {
+            produce_one_row: false,
+            schema: Arc::new(schema),
+        })
+    }
+
+    /// `UNION ALL` of literal `date_from`/`date_to` pairs, the shape the series extractor accepts.
+    fn series() -> LogicalPlan {
+        let point = |from: i64| {
+            let exprs = vec![lit(from).alias("date_from"), lit(from + 1).alias("date_to")];
+            Arc::new(LogicalPlan::Projection(
+                Projection::try_new(
+                    exprs,
+                    Arc::new(LogicalPlan::EmptyRelation(EmptyRelation {
+                        produce_one_row: true,
+                        schema: Arc::new(DFSchema::empty()),
+                    })),
+                )
+                .unwrap(),
+            ))
+        };
+        let inputs = vec![point(1), point(2)];
+        let schema = Arc::clone(inputs[0].schema());
+        let union = LogicalPlan::Union(Union { inputs, schema });
+        LogicalPlan::SubqueryAlias(
+            SubqueryAlias::try_new(Arc::new(union), TableReference::bare("s0")).unwrap(),
+        )
+    }
+
+    fn sum_of(column: &str, distinct: bool, filter: Option<Expr>) -> Expr {
+        Expr::AggregateFunction(AggregateFunction {
+            func: sum_udaf(),
+            params: AggregateFunctionParams {
+                args: vec![col(Column::new(Some(TableReference::bare("rs")), column))],
+                distinct,
+                filter: filter.map(Box::new),
+                order_by: None,
+                null_treatment: None,
+            },
+        })
+    }
+
+    /// `Projection(projection) -> Aggregate(group_by, [agg]) -> series LEFT JOIN source`, the shape
+    /// `RollingOptimizerRule` is meant to rewrite.
+    fn rolling_plan(agg: Expr, group_by: Vec<Expr>, projection: Vec<Expr>) -> LogicalPlan {
+        rolling_plan_with_aggs(vec![agg], group_by, projection)
+    }
+
+    fn rolling_plan_with_aggs(
+        aggs: Vec<Expr>,
+        group_by: Vec<Expr>,
+        projection: Vec<Expr>,
+    ) -> LogicalPlan {
+        let (left, right) = (series(), source());
+        let join_schema =
+            build_join_schema(left.schema(), right.schema(), &JoinType::Left).unwrap();
+        let dim = col(Column::new(Some(TableReference::bare("rs")), "d"));
+        let date_to = col(Column::new(Some(TableReference::bare("s0")), "date_to"));
+        let join = LogicalPlan::Join(datafusion::logical_expr::Join {
+            left: Arc::new(left),
+            right: Arc::new(right),
+            on: vec![],
+            filter: Some(
+                dim.clone()
+                    .gt(date_to.clone() - lit(1))
+                    .and(dim.lt_eq(date_to)),
+            ),
+            join_type: JoinType::Left,
+            join_constraint: JoinConstraint::On,
+            schema: Arc::new(join_schema),
+            null_equals_null: false,
+        });
+        let aggregate =
+            Aggregate::try_new(Arc::new(join), group_by, aggs).map(LogicalPlan::Aggregate);
+        LogicalPlan::Projection(
+            Projection::try_new(projection, Arc::new(aggregate.unwrap())).unwrap(),
+        )
+    }
+
+    /// The column an aggregate is read back as. Derived rather than written out, because a
+    /// hardcoded name that does not match makes every "declines" case pass for the wrong reason.
+    fn agg_col(agg: &Expr) -> Expr {
+        col(agg.schema_name().to_string())
+    }
+
+    fn date_from() -> Expr {
+        col(Column::new(Some(TableReference::bare("s0")), "date_from"))
+    }
+
+    fn win() -> Expr {
+        col(Column::new(Some(TableReference::bare("rs")), "win"))
+    }
+
+    fn rewrite(plan: LogicalPlan) -> Transformed<LogicalPlan> {
+        RollingOptimizerRule {}
+            .rewrite(plan, &OptimizerContext::new())
+            .unwrap()
+    }
+
+    fn is_rolling(plan: &LogicalPlan) -> bool {
+        matches!(plan, LogicalPlan::Extension(e) if e.node.name() == "RollingWindowAggregate")
+    }
+
+    /// Whatever the rule does, the node it produces has to answer to the same column names as the
+    /// projection it replaced -- ancestors keep resolving against their own cached schema.
+    fn assert_output_preserved(before: &LogicalPlan, after: &LogicalPlan) {
+        let names = |plan: &LogicalPlan| {
+            plan.schema()
+                .iter()
+                .map(|(q, f)| format!("{:?}.{}", q.map(|q| q.to_string()), f.name()))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(names(before), names(after));
+    }
+
+    #[test]
+    fn rewrites_when_the_projection_keeps_every_group_by_column() {
+        let agg = sum_of("n", false, None);
+        let plan = rolling_plan(
+            agg.clone(),
+            vec![date_from(), win()],
+            vec![date_from().alias("mon"), win(), agg_col(&agg).alias("num")],
+        );
+        let rewritten = rewrite(plan.clone());
+        assert!(rewritten.transformed);
+        assert!(
+            is_rolling(&rewritten.data),
+            "expected a bare rolling node, got {}",
+            rewritten.data.display_indent()
+        );
+        assert_output_preserved(&plan, &rewritten.data);
+    }
+
+    #[test]
+    fn restores_the_output_when_a_group_by_column_is_not_projected() {
+        let agg = sum_of("n", false, None);
+        let plan = rolling_plan(
+            agg.clone(),
+            vec![date_from(), win()],
+            vec![date_from().alias("mon"), agg_col(&agg).alias("num")],
+        );
+        let rewritten = rewrite(plan.clone());
+        assert!(rewritten.transformed);
+        // `win` is grouped by, so the rolling node emits it; a projection has to take it back out.
+        match &rewritten.data {
+            LogicalPlan::Projection(p) => assert!(
+                is_rolling(&p.input),
+                "expected the projection to sit on the rolling node, got {}",
+                p.input.display_indent()
+            ),
+            other => panic!("expected a projection, got {}", other.display_indent()),
+        }
+        assert_output_preserved(&plan, &rewritten.data);
+    }
+
+    // Two independent things decline the next two shapes: the explicit modifier guard, and the
+    // fact that stripping a modifier changes the aggregate's name, so the projection no longer
+    // reads it under the name the rolling node would emit. The tests pin the behaviour, not which
+    // of the two gets there first.
+
+    #[test]
+    fn declines_a_distinct_aggregate() {
+        // The executor evaluates the aggregate over its own window and cannot honour DISTINCT.
+        let agg = sum_of("n", true, None);
+        let plan = rolling_plan(
+            agg.clone(),
+            vec![date_from(), win()],
+            vec![date_from().alias("mon"), win(), agg_col(&agg).alias("num")],
+        );
+        assert!(!rewrite(plan).transformed);
+    }
+
+    #[test]
+    fn declines_a_filtered_aggregate() {
+        let agg = sum_of("n", false, Some(win().gt(lit(0))));
+        let plan = rolling_plan(
+            agg.clone(),
+            vec![date_from(), win()],
+            vec![date_from().alias("mon"), win(), agg_col(&agg).alias("num")],
+        );
+        assert!(!rewrite(plan).transformed);
+    }
+
+    #[test]
+    fn declines_more_than_one_rolling_aggregate() {
+        // The executor shares one group counter across the aggregates, so the second one reads
+        // empty slots and answers null. Two aggregates also make the shape where positional and
+        // name-based alias pairing could disagree, so declining keeps that question unobservable.
+        let n_total = sum_of("n", false, None);
+        let d_total = sum_of("d", false, None);
+        let plan = rolling_plan_with_aggs(
+            vec![n_total.clone(), d_total.clone()],
+            vec![date_from(), win()],
+            vec![
+                date_from().alias("mon"),
+                win(),
+                agg_col(&n_total).alias("n_total"),
+                agg_col(&d_total).alias("d_total"),
+            ],
+        );
+        assert!(!rewrite(plan).transformed);
+    }
+
+    #[test]
+    fn declines_when_an_aggregate_has_no_name_in_the_projection() {
+        // Nothing reads the aggregate under its own name, so the rolling node would have no name
+        // to give the column and would silently drop it from its schema.
+        let plan = rolling_plan(
+            sum_of("n", false, None),
+            vec![date_from(), win()],
+            vec![date_from().alias("mon"), win()],
+        );
+        assert!(!rewrite(plan).transformed);
+    }
 }
