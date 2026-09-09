@@ -92,6 +92,8 @@ impl S3RemoteFs {
             .map_err(|e| CubeError::internal(format!("Failed to create S3 credentials: {}", e)))?
         };
 
+        let initial_expiration = credentials_expiration(&credentials);
+
         let region = region.parse::<Region>().map_err(|e| {
             CubeError::internal(format!("Failed to parse Region '{}': {}", region, e))
         })?;
@@ -111,7 +113,14 @@ impl S3RemoteFs {
             web_identity_role_arn: role_arn,
             server_side_encryption,
         });
-        spawn_creds_refresh_loop(access_key, secret_key, bucket_name, region, &fs);
+        spawn_creds_refresh_loop(
+            access_key,
+            secret_key,
+            bucket_name,
+            region,
+            initial_expiration,
+            &fs,
+        );
 
         Ok(fs)
     }
@@ -150,11 +159,46 @@ fn new_bucket(
     Ok(bucket)
 }
 
+/// How long before the STS expiration timestamp credentials are considered
+/// stale, so a request never starts with a nearly-dead session token.
+const WEB_IDENTITY_EXPIRY_MARGIN: Duration = Duration::from_secs(5 * 60);
+
+/// STS `Expiration` of the credentials, if the issuer reported one.
+fn credentials_expiration(credentials: &Credentials) -> Option<SystemTime> {
+    let unix_seconds = credentials.expiration.as_ref()?.unix_timestamp();
+    if unix_seconds < 0 {
+        return None;
+    }
+    Some(SystemTime::UNIX_EPOCH + Duration::from_secs(unix_seconds as u64))
+}
+
+/// State the web identity refresh loop carries between iterations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct WebIdentityCredsState {
+    token_file_modified: Option<SystemTime>,
+    expiration: Option<SystemTime>,
+    last_refreshed: SystemTime,
+}
+
+/// Whether web identity credentials have to be exchanged again, and why.
+fn web_identity_refresh_reason(
+    state: &WebIdentityCredsState,
+    token_file_modified: Option<SystemTime>,
+    _now: SystemTime,
+    _expiry_margin: Duration,
+) -> Option<&'static str> {
+    if token_file_modified != state.token_file_modified {
+        return Some("web identity token file changed");
+    }
+    None
+}
+
 fn spawn_creds_refresh_loop(
     access_key: Option<String>,
     secret_key: Option<String>,
     bucket_name: String,
     region: Region,
+    initial_expiration: Option<SystemTime>,
     fs: &Arc<S3RemoteFs>,
 ) {
     let token_file = fs.web_identity_token_file.clone();
@@ -178,10 +222,16 @@ fn spawn_creds_refresh_loop(
         return;
     }
 
+    let expiry_margin = std::cmp::max(WEB_IDENTITY_EXPIRY_MARGIN, refresh_every);
+
     let fs = Arc::downgrade(fs);
-    let mut last_modified = token_file
-        .as_ref()
-        .and_then(|f| std::fs::metadata(f).ok()?.modified().ok());
+    let mut state = WebIdentityCredsState {
+        token_file_modified: token_file
+            .as_ref()
+            .and_then(|f| std::fs::metadata(f).ok()?.modified().ok()),
+        expiration: initial_expiration,
+        last_refreshed: SystemTime::now(),
+    };
 
     std::thread::spawn(move || {
         log::debug!(
@@ -198,14 +248,21 @@ fn spawn_creds_refresh_loop(
                 Some(fs) => fs,
             };
 
-            // In web identity mode, only refresh when the token file changed.
             if let (Some(ref file), Some(_)) = (&token_file, &role_arn) {
-                let current_modified = std::fs::metadata(file).ok().and_then(|m| m.modified().ok());
-                if current_modified == last_modified {
-                    continue;
+                let token_file_modified =
+                    std::fs::metadata(file).ok().and_then(|m| m.modified().ok());
+                match web_identity_refresh_reason(
+                    &state,
+                    token_file_modified,
+                    SystemTime::now(),
+                    expiry_margin,
+                ) {
+                    None => continue,
+                    Some(reason) => {
+                        info!("Refreshing S3 credentials: {}", reason);
+                        state.token_file_modified = token_file_modified;
+                    }
                 }
-                last_modified = current_modified;
-                info!("Web identity token file changed, refreshing S3 credentials");
             }
 
             let c = if let (Some(ref file), Some(ref arn)) = (&token_file, &role_arn) {
@@ -233,6 +290,7 @@ fn spawn_creds_refresh_loop(
                     continue;
                 }
             };
+            state.expiration = credentials_expiration(&c);
             let b = match new_bucket(&bucket_name, region.clone(), c, &server_side_encryption) {
                 Ok(b) => b,
                 Err(e) => {
@@ -241,6 +299,7 @@ fn spawn_creds_refresh_loop(
                 }
             };
             fs.bucket.swap(Arc::new(b));
+            state.last_refreshed = SystemTime::now();
             log::debug!("Successfully refreshed S3 credentials")
         }
     });
@@ -564,6 +623,141 @@ impl S3RemoteFs {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const NOW: Duration = Duration::from_secs(1_800_000_000);
+    const TOKEN_FILE_MTIME: Duration = Duration::from_secs(1_000);
+
+    fn now() -> SystemTime {
+        SystemTime::UNIX_EPOCH + NOW
+    }
+
+    /// Credentials exchanged just now, expiring in a full STS session.
+    fn fresh_state() -> WebIdentityCredsState {
+        WebIdentityCredsState {
+            token_file_modified: Some(SystemTime::UNIX_EPOCH + TOKEN_FILE_MTIME),
+            expiration: Some(now() + Duration::from_secs(60 * 60)),
+            last_refreshed: now(),
+        }
+    }
+
+    #[test]
+    fn refresh_not_needed_while_credentials_are_fresh() {
+        let state = fresh_state();
+        assert_eq!(
+            web_identity_refresh_reason(
+                &state,
+                state.token_file_modified,
+                now(),
+                WEB_IDENTITY_EXPIRY_MARGIN
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn refresh_needed_when_token_file_changed() {
+        let state = fresh_state();
+        let touched = Some(SystemTime::UNIX_EPOCH + TOKEN_FILE_MTIME + Duration::from_secs(1));
+        assert!(
+            web_identity_refresh_reason(&state, touched, now(), WEB_IDENTITY_EXPIRY_MARGIN)
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn refresh_needed_near_expiry_with_unchanged_token_file() {
+        let state = WebIdentityCredsState {
+            expiration: Some(now() + Duration::from_secs(60)),
+            ..fresh_state()
+        };
+        assert!(web_identity_refresh_reason(
+            &state,
+            state.token_file_modified,
+            now(),
+            WEB_IDENTITY_EXPIRY_MARGIN
+        )
+        .is_some());
+    }
+
+    #[test]
+    fn refresh_needed_after_expiry_with_unchanged_token_file() {
+        let state = WebIdentityCredsState {
+            expiration: Some(now() - Duration::from_secs(60)),
+            ..fresh_state()
+        };
+        assert!(web_identity_refresh_reason(
+            &state,
+            state.token_file_modified,
+            now(),
+            WEB_IDENTITY_EXPIRY_MARGIN
+        )
+        .is_some());
+    }
+
+    #[test]
+    fn refresh_needed_when_expiry_is_unknown() {
+        let state = WebIdentityCredsState {
+            expiration: None,
+            last_refreshed: now() - WEB_IDENTITY_EXPIRY_MARGIN,
+            ..fresh_state()
+        };
+        assert!(web_identity_refresh_reason(
+            &state,
+            state.token_file_modified,
+            now(),
+            WEB_IDENTITY_EXPIRY_MARGIN
+        )
+        .is_some());
+    }
+
+    #[test]
+    fn unknown_expiry_does_not_re_exchange_on_every_poll() {
+        let state = WebIdentityCredsState {
+            expiration: None,
+            last_refreshed: now() - Duration::from_secs(30),
+            ..fresh_state()
+        };
+        assert_eq!(
+            web_identity_refresh_reason(
+                &state,
+                state.token_file_modified,
+                now(),
+                WEB_IDENTITY_EXPIRY_MARGIN
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn refresh_needed_when_token_file_disappeared() {
+        // An unreadable token file reads as "no mtime", which must not look
+        // like an unchanged file and silence the refresh.
+        let state = fresh_state();
+        assert!(
+            web_identity_refresh_reason(&state, None, now(), WEB_IDENTITY_EXPIRY_MARGIN).is_some()
+        );
+    }
+
+    #[test]
+    fn expiry_margin_scales_with_a_long_poll_interval() {
+        // Credentials that die within one poll interval must be refreshed on
+        // the current wake-up, not on the next one.
+        let poll_every = Duration::from_secs(60 * 60);
+        let state = WebIdentityCredsState {
+            expiration: Some(now() + Duration::from_secs(30 * 60)),
+            ..fresh_state()
+        };
+        let margin = std::cmp::max(WEB_IDENTITY_EXPIRY_MARGIN, poll_every);
+        assert!(
+            web_identity_refresh_reason(&state, state.token_file_modified, now(), margin).is_some()
+        );
+    }
+
+    #[test]
+    fn credentials_expiration_is_none_for_static_credentials() {
+        let credentials = Credentials::new(Some("key"), Some("secret"), None, None, None).unwrap();
+        assert_eq!(credentials_expiration(&credentials), None);
+    }
 
     #[test]
     fn parse_sse_value_accepts_allowed_values() {
