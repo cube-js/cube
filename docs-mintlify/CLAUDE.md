@@ -131,6 +131,7 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
             - Spacer
             - Divider
             - Stack
+            - Grid
     - **Dashboard**
       - Scheduled refresh
     - **Semantic Model**

@@ -1,9 +1,9 @@
 ---
-title: Spacer, Divider & Stack
-description: Non-data layout elements — a spacer for whitespace, a divider line, and stack containers that group widgets — to help you structure a dashboard.
+title: Spacer, Divider, Stack & Grid
+description: Non-data layout elements — a spacer for whitespace, a divider line, stack containers that group widgets evenly, and grid containers that give widgets their own fixed position — to help you structure a dashboard.
 ---
 
-Spacers, dividers, and stacks are non-data **layout** widgets. They carry no data of their own; you place them on the canvas alongside charts, text, and controls to add whitespace, visual structure, and grouping to a dashboard.
+Spacers, dividers, stacks, and grids are non-data **layout** widgets. They carry no data of their own; you place them on the canvas alongside charts, text, and controls to add whitespace, visual structure, and grouping to a dashboard.
 
 ## Spacer
 
@@ -28,9 +28,23 @@ Add a widget to a stack by dragging it in — from the canvas, the **Add Widgets
 
 Because a stack owns its children's layout, you work with the **container as a unit**: select, move, resize, or delete the stack itself and it carries its children with it. Individual widgets inside a stack are not separately selectable on the board — a marquee drawn over a stack selects the container, not its children. To rearrange children, drag one to a new position **within** the stack; to take one out, drag it onto the canvas or into another container.
 
+## Grid
+
+A **grid** is a container whose children each keep their own fixed cell position and size, arranged in the container's own `columns × rows` grid — unlike a stack, a grid never redistributes, resizes, or moves a child to make room for another. Use a grid when you want to group widgets and arrange them precisely relative to one another, independent of the rest of the dashboard.
+
+A grid is added at a square footprint matching the board's column count (for example, `12 × 12` on a 12-column dashboard), and its inner grid always uses the same cell size as the board that holds it — a widget keeps the exact same footprint whether it sits on the root canvas or inside a grid.
+
+Drag a widget into a grid from the canvas, the **Add Widgets** menu, or another container. A widget keeps its size on arrival, landing in the cell you drop it on if that cell is free. Dragging, resizing, or dropping a widget onto a cell that is already occupied is refused rather than pushing, swapping, or resizing anything else — you'll need to make room first.
+
+Click a grid's header (or open its **⋯** menu and choose **Resize**) to select it and reveal its own resize grip. A grid can only be shrunk down to the cells its children already occupy — it crops empty rows off the bottom and empty columns off the right, down to a minimum of 2 × 2 cells.
+
+Give a grid a name by clicking its header once it's selected and typing a title; the title is shown on the published dashboard.
+
+Grids can be nested inside the root canvas or inside another grid, but not inside a stack.
+
 ## Adding a layout widget
 
-In the [dashboard builder][ref-workbooks], open the **Add Widgets** menu in the toolbar and choose **Spacer**, **Divider**, **Horizontal Stack**, or **Vertical Stack**. The widget is added to the canvas, where you can drag it into place and resize it (a divider resizes horizontally only).
+In the [dashboard builder][ref-workbooks], open the **Add Widgets** menu in the toolbar and choose **Spacer**, **Divider**, **Horizontal Stack**, **Vertical Stack**, or **Grid**. The widget is added to the canvas, where you can drag it into place and resize it (a divider resizes horizontally only).
 
 ## Styling
 
@@ -39,6 +53,6 @@ The **spacer** and **divider** follow the dashboard's [widget styling settings](
 - The **divider** draws its line using the widget **border** width, style, and color.
 - A **spacer** picks up the same border and background settings while you are editing, so its bounds are easy to see.
 
-A **stack** draws no card of its own — it only groups and sizes its children, each of which keeps its own styling.
+A **stack** or **grid** draws no card of its own on the published dashboard — it only arranges its children, each of which keeps its own styling.
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
