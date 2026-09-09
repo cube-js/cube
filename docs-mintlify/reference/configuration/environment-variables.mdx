@@ -2326,11 +2326,10 @@ If `true`, enables debug logging.
 A path to a PEM file with CA certificates that Node.js should trust in
 addition to its built-in bundle — additive, it doesn't replace the public CA
 bundle. Read once at process start, so the deployment must restart after this
-is set for it to take effect. Used by [Semantic Layer Sync][ref-sls] (whose
-outbound requests to a BI tool run in Node.js) when that BI tool is served
-with a certificate from a private or internal CA. Semantic Layer Sync runs
-in Node.js, so `CURL_CA_BUNDLE` and `REQUESTS_CA_BUNDLE` have no effect on
-it.
+is set for it to take effect. Used by [Semantic Layer Sync][ref-sls] when the
+BI tool is served with a certificate from a private or internal CA — the
+sync's outbound requests run in Node.js, so `CURL_CA_BUNDLE` and
+`REQUESTS_CA_BUNDLE` have no effect on it.
 
 | Possible Values   | Default in Development | Default in Production |
 | ----------------- | ---------------------- | --------------------- |
