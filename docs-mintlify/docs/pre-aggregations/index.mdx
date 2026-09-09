@@ -22,7 +22,8 @@ when there's a burst of requests hitting the same data from multiple concurrent
 users. [Pre-aggregations](#pre-aggregations) are designed to provide the
 right balance between time to insight and querying performance.
 
-To reset the **in-memory** cache in development mode, just restart the server.
+To reset the **in-memory** cache in [development mode][ref-development-mode], just
+restart the server.
 
 The second level of caching is called **pre-aggregations**, and requires
 explicit configuration to activate.
@@ -291,7 +292,7 @@ cache types.
 [link-cube-cloud]: https://cube.dev/cloud
 [ref-config-preagg-schema]: /reference/configuration/config#preaggregationsschema
 [ref-dev-playground]: /docs/explore-analyze/playground
-[ref-development-mode]: /docs/data-modeling/dev-mode
+[ref-development-mode]: /reference/configuration/environment-variables#cubejs_dev_mode
 [ref-production-checklist]: /cube-core/running-in-production
 [ref-production-checklist-refresh]: /cube-core/running-in-production#set-up-refresh-worker
 [ref-schema-ref-cube-refresh-key]: /reference/data-modeling/cube#refresh_key

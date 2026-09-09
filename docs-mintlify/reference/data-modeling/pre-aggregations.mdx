@@ -1285,8 +1285,9 @@ starting with most recent ones in time and checks if the
 [`refresh_key`][self-refreshkey] has changed. If a change was detected, then
 that partition will be refreshed.
 
-In development mode, Cube runs the background refresh by default and will
-refresh all pre-aggregations which have `scheduled_refresh: true`.
+In [development mode](/reference/configuration/environment-variables#cubejs_dev_mode),
+Cube runs the background refresh by default and will refresh all pre-aggregations
+which have `scheduled_refresh: true`.
 
 Please consult [Production Checklist][ref-production-checklist-refresh] for best
 practices on running background refresh in production environments.

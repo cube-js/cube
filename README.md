@@ -46,6 +46,24 @@ docker run -p 4000:4000 \
 
 Then open http://localhost:4000 in your browser to continue setup.
 
+> **Development mode is an authentication bypass.** In the official images — whose
+> entrypoint is the `cubejs` CLI — `CUBEJS_DEV_MODE=true` also forces
+> `NODE_ENV=development`, which switches off JWT verification on the REST (JSON) and
+> GraphQL APIs, so they accept requests with no token at all. Playground and its
+> supporting endpoints are served with no authentication either, so anyone who can
+> reach the instance is handed a ready-to-use API token (and can mint others carrying
+> any security context, signed with your API secret), can read your data model, and can
+> overwrite it and your `.env`. With no `CUBEJS_SQL_PASSWORD` set, the SQL API accepts
+> any credentials as well, allowing arbitrary SQL against connected data sources.
+>
+> This is intentional — development mode is designed to run on a developer's local
+> machine for ease of use and debugging. Never expose it to the internet or use it in
+> production. Using development mode in the Cube cloud platform is highly discouraged,
+> as it bypasses the platform's security model. Cube is also in development mode
+> whenever `NODE_ENV` is not `production`, but `cubejs server` and the official images
+> already set it to `production`. See
+> [`CUBEJS_DEV_MODE`](https://docs.cube.dev/reference/configuration/environment-variables#cubejs_dev_mode).
+
 For a step-by-step guide, [see the docs](https://docs.cube.dev/cube-core/getting-started/create-a-project?ref=github-readme).
 
 ## Cube Core vs. Cube

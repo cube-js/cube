@@ -1511,9 +1511,9 @@ See also the [`CUBEJS_LOG_LEVEL`](/reference/configuration/environment-variables
 ### `telemetry`
 
 Cube collects high-level anonymous usage statistics for servers started in
-development mode. It doesn't track any credentials, data model contents or
-queries issued. This statistics is used solely for the purpose of constant
-cube.js improvement.
+[development mode][ref-development-mode]. It doesn't track any credentials, data
+model contents or queries issued. This statistics is used solely for the purpose of
+constant cube.js improvement.
 
 You can opt out of it any time by setting `telemetry` option to `False` or,
 alternatively, by setting [`CUBEJS_TELEMETRY`](/reference/configuration/environment-variables#cubejs_telemetry) environment variable to `false`.
@@ -1543,7 +1543,7 @@ module.exports = {
 [link-jwt-ref-sub]: https://tools.ietf.org/html/rfc7519#section-4.1.2
 [link-jwt-ref-aud]: https://tools.ietf.org/html/rfc7519#section-4.1.3
 [link-wiki-tz]: https://en.wikipedia.org/wiki/Tz_database
-[ref-development-mode]: /docs/data-modeling/dev-mode
+[ref-development-mode]: /reference/configuration/environment-variables#cubejs_dev_mode
 [ref-multitenancy]: /embedding/multitenancy
 [ref-preagg-data-source]: /docs/pre-aggregations/refreshing-pre-aggregations#pre-aggregation-data-source
 [ref-rest-api]: /reference/core-data-apis/rest-api
