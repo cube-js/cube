@@ -91,35 +91,6 @@ impl QueryTimeSeries {
         Ok((first.start_str, past_last.end_str))
     }
 
-    /// [`covering_bounds_predefined`] for a custom granularity, whose buckets
-    /// are placed by stepping `interval_str` from `origin_str`.
-    ///
-    /// [`covering_bounds_predefined`]: Self::covering_bounds_predefined
-    pub fn covering_bounds_custom(
-        interval_str: &str,
-        date_range: &[String; 2],
-        origin_str: &str,
-        timestamp_precision: u32,
-    ) -> Result<(String, String), CubeError> {
-        check_precision(timestamp_precision)?;
-        let interval = SqlInterval::from_str(interval_str)?;
-        if is_zero_interval(&interval) {
-            return Err(CubeError::user("Custom interval can't be zero".to_string()));
-        }
-        let range_start = QueryDateTimeHelper::parse_native_date_time(&date_range[0])?;
-        let range_end = QueryDateTimeHelper::parse_native_date_time(&date_range[1])?;
-        let origin = QueryDateTimeHelper::parse_native_date_time(origin_str)?;
-        let zeros = "0".repeat(timestamp_precision as usize);
-        let nines = "9".repeat(timestamp_precision as usize);
-        let first = align_to_origin(range_start, &interval, origin)?;
-        let last = align_to_origin(range_end, &interval, origin)?;
-        let past_last = add_interval_to_dt(add_interval_to_dt(last, &interval)?, &interval)?;
-        Ok((
-            format_with_padding(first, &zeros),
-            format_with_padding(past_last - Duration::seconds(1), &nines),
-        ))
-    }
-
     /// Walks buckets by repeatedly adding the parsed interval starting from the
     /// position aligned to `origin`. Each bucket's end is `next_start - 1s`,
     /// formatted with the sub-second `'9'` padding.
@@ -678,16 +649,6 @@ mod tests {
         // Stepping weeks from Aug 1 (a Saturday) puts the last point on Sep 5,
         // whose week runs to Sep 11.
         assert!(to.as_str() > "2026-09-11T23:59:59.999", "{to}");
-    }
-
-    #[test]
-    fn covering_bounds_custom_start_where_the_walked_series_does() {
-        let range = dr("2024-01-04", "2024-01-10T12:00:00");
-        let series = QueryTimeSeries::generate_custom("2 days", &range, "2024-01-01", 3).unwrap();
-        let (from, to) =
-            QueryTimeSeries::covering_bounds_custom("2 days", &range, "2024-01-01", 3).unwrap();
-        assert_eq!(from, series[0][0]);
-        assert!(to > series[series.len() - 1][1], "{to}");
     }
 
     // ---- custom ----

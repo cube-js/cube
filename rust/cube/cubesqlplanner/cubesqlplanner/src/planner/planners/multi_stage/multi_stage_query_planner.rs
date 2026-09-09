@@ -21,16 +21,19 @@ use crate::planner::symbols::AggregationType;
 use crate::planner::Case;
 use crate::planner::CaseSwitchDefinition;
 use crate::planner::CaseSwitchItem;
+use crate::planner::Granularity;
 use crate::planner::GranularityHelper;
 use crate::planner::MeasureKind;
 use crate::planner::MemberSymbol;
 use crate::planner::MultiStageFilter;
 use crate::planner::MultiStageFilterMode;
 use crate::planner::MultiStageGrain;
+use crate::planner::QueryDateTime;
 use crate::planner::QueryDateTimeHelper;
 use crate::planner::QueryProperties;
 use crate::planner::QueryTimeSeries;
 use crate::planner::TimeDimensionSymbol;
+use chrono::Duration;
 use cubenativeutils::CubeError;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -923,6 +926,7 @@ impl MultiStageQueryPlanner {
                             base_member,
                             base_state,
                             false,
+                            false,
                             descriptions,
                             scope,
                         )?
@@ -1026,6 +1030,7 @@ impl MultiStageQueryPlanner {
                         base_member,
                         base_rolling_state,
                         ungrouped,
+                        true,
                         descriptions,
                         scope,
                     )?
@@ -1197,6 +1202,10 @@ impl MultiStageQueryPlanner {
         member: Rc<MemberSymbol>,
         state: Rc<QueryProperties>,
         ungrouped: bool,
+        // Whether a rolling-window stage consumes this CTE. A caller taking the
+        // CTE as the requested member's own result registers it under that
+        // member, which one shared between measures cannot answer for.
+        feeds_window_stage: bool,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
         scope: &mut PlanningScope,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
@@ -1205,15 +1214,17 @@ impl MultiStageQueryPlanner {
         // rows, so they ride on one scan rather than one each. A measure
         // reading cubes the scan does not already read is left alone: it would
         // widen the scan's join tree, and that is a different scan.
-        let member_cubes = Self::sorted_cube_names(&member)?;
-        for existing in descriptions.iter() {
-            if !existing.is_match_rolling_window_base(&state, is_ungrouped)
-                || Self::sorted_cube_names(existing.member_node())? != member_cubes
-            {
-                continue;
+        if feeds_window_stage {
+            let member_cubes = Self::sorted_cube_names(&member)?;
+            for existing in descriptions.iter() {
+                if !existing.is_match_rolling_window_base(&state, is_ungrouped)
+                    || Self::sorted_cube_names(existing.member_node())? != member_cubes
+                {
+                    continue;
+                }
+                existing.add_co_measure(member);
+                return Ok(existing.clone());
             }
-            existing.add_co_measure(member);
-            return Ok(existing.clone());
         }
 
         let alias = scope.next_cte_name();
@@ -1251,6 +1262,7 @@ impl MultiStageQueryPlanner {
     /// standing for a pre-aggregation's partition holds placeholders rather
     /// than dates.
     fn rolling_series_bounds(
+        &self,
         time_dimension: &Rc<TimeDimensionSymbol>,
     ) -> Result<Option<(String, String)>, CubeError> {
         let Some(granularity) = time_dimension.granularity_obj() else {
@@ -1268,25 +1280,43 @@ impl MultiStageQueryPlanner {
         {
             return Ok(None);
         }
-        let range = [date_range[0].clone(), date_range[1].clone()];
         // Millisecond bounds; the filter pads them to the dialect's precision
         // when it renders them.
         let precision = 3;
         let bounds = if granularity.is_predefined_granularity() {
             QueryTimeSeries::covering_bounds_predefined(
                 granularity.granularity(),
-                &range,
+                &[date_range[0].clone(), date_range[1].clone()],
                 precision,
             )?
         } else {
-            QueryTimeSeries::covering_bounds_custom(
-                &granularity.granularity_interval().to_sql(),
-                &range,
-                &granularity.origin_local_formatted(),
-                precision,
-            )?
+            self.custom_series_bounds(&granularity, &date_range)?
         };
         Ok(Some(bounds))
+    }
+
+    /// [`Self::rolling_series_bounds`] for a custom granularity, whose buckets
+    /// are placed by stepping its interval from its origin. Both ends are found
+    /// by aligning to that origin, the same way the series itself is placed.
+    fn custom_series_bounds(
+        &self,
+        granularity: &Granularity,
+        date_range: &[String],
+    ) -> Result<(String, String), CubeError> {
+        let tz = self.query_tools.query_tools().timezone();
+        let interval = granularity.granularity_interval();
+        let align = |bound: &String| -> Result<QueryDateTime, CubeError> {
+            granularity.align_date_to_origin(QueryDateTime::from_date_str(tz, bound)?)
+        };
+        let first = align(&date_range[0])?;
+        let past_last = align(&date_range[1])?
+            .add_interval(interval)?
+            .add_interval(interval)?
+            .add_duration(Duration::seconds(-1))?;
+        Ok((
+            format!("{}.000", first.format("%Y-%m-%dT%H:%M:%S")),
+            format!("{}.999", past_last.format("%Y-%m-%dT%H:%M:%S")),
+        ))
     }
 
     /// The granularity of a `to_date` rolling window whose period boundary is
@@ -1432,7 +1462,7 @@ impl MultiStageQueryPlanner {
                 &time_dimension_base_name,
                 rolling_window.trailing.clone(),
                 rolling_window.leading.clone(),
-                Self::rolling_series_bounds(&time_dimension_symbol)?,
+                self.rolling_series_bounds(&time_dimension_symbol)?,
             )?;
         }
 

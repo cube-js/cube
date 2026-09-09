@@ -184,9 +184,8 @@ impl<'a> FilterSqlContext<'a> {
     /// The rolling window's series bounds as literal parameters, or `None`
     /// when they can only be read back off the series itself.
     ///
-    /// Values standing for a pre-aggregation's partition range, and raw values
-    /// substituted into pre-aggregation SQL, are placeholders rather than
-    /// dates, and carry no bounds to render.
+    /// Raw values are spliced into pre-aggregation SQL verbatim rather than
+    /// allocated as parameters, which a bound cannot be rendered as.
     pub fn date_range_literals(
         &self,
         range: &Option<(String, String)>,
@@ -194,7 +193,7 @@ impl<'a> FilterSqlContext<'a> {
         let Some((from, to)) = range else {
             return Ok(None);
         };
-        if self.use_raw_values || self.is_partition_range(from) || self.is_partition_range(to) {
+        if self.use_raw_values {
             return Ok(None);
         }
         Ok(Some((
