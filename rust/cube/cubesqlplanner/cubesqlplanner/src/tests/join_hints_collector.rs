@@ -169,3 +169,42 @@ async fn test_many_to_one_view_build_sql() {
         insta::assert_snapshot!(result);
     }
 }
+
+// --- independent join_path root tests ---
+
+fn independent_roots_ctx() -> TestContext {
+    TestContext::new(MockSchema::from_yaml_file(
+        "common/view_independent_join_roots.yaml",
+    ))
+    .unwrap()
+}
+
+#[test]
+fn test_join_hints_view_independent_root_measure() {
+    let ctx = independent_roots_ctx();
+    let measure = ctx.create_measure("kpi.yield_pct").unwrap();
+    let hints = collect_join_hints(&measure).unwrap();
+    assert_eq!(hints.len(), 1);
+    // `boards` is a root of the view on its own, so the `locations.boards` path
+    // the same view declares for its other member must not be imposed on it.
+    assert_eq!(hints.items(), &[s("boards")]);
+}
+
+#[test]
+fn test_join_hints_view_independent_root_dimension() {
+    let ctx = independent_roots_ctx();
+    let dim = ctx.create_dimension("kpi.board_id").unwrap();
+    let hints = collect_join_hints(&dim).unwrap();
+    assert_eq!(hints.len(), 1);
+    assert_eq!(hints.items(), &[s("boards")]);
+}
+
+#[test]
+fn test_join_hints_view_dotted_path_dimension() {
+    let ctx = independent_roots_ctx();
+    let dim = ctx.create_dimension("kpi.product").unwrap();
+    let hints = collect_join_hints(&dim).unwrap();
+    assert_eq!(hints.len(), 1);
+    // The member the view declares under `locations.boards` still walks it.
+    assert_eq!(hints.items(), &[v(&["locations", "boards"])]);
+}

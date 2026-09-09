@@ -1,0 +1,71 @@
+# `locations` fans out over `boards` - two location rows per board - so a query
+# rooted at `locations` multiplies the `boards` measures. A view declares
+# `boards` both as a root of its own and as the tail of `locations.boards`, and
+# members of the independent root must not be planned through the longer path.
+cubes:
+  - name: locations
+    sql: "SELECT * FROM locations"
+    joins:
+      - name: boards
+        relationship: many_to_one
+        sql: "{locations}.board_id = {boards.board_id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: pos
+        type: string
+        sql: pos
+    measures:
+      - name: count
+        type: count
+
+  - name: boards
+    sql: "SELECT * FROM boards"
+    dimensions:
+      - name: board_id
+        type: string
+        sql: board_id
+        primary_key: true
+      - name: product
+        type: string
+        sql: product
+    measures:
+      - name: good_count
+        type: sum
+        sql: good
+      - name: total_count
+        type: sum
+        sql: total
+      - name: yield_pct
+        type: number
+        sql: "{good_count} / NULLIF({total_count}, 0) * 100"
+    pre_aggregations:
+      # Carries one dimension more than the query below asks for, which only the
+      # additive matching path allows. A query taken for a multiplied one is
+      # matched on the strict path that wants the dimensions to be equal, and
+      # then this rollup is not usable.
+      - name: boards_rollup
+        type: rollup
+        measures:
+          - good_count
+          - total_count
+        dimensions:
+          - board_id
+          - product
+
+views:
+  - name: kpi
+    cubes:
+      - join_path: locations
+        includes:
+          - count
+          - pos
+      - join_path: locations.boards
+        includes:
+          - product
+      - join_path: boards
+        includes:
+          - yield_pct
+          - board_id
