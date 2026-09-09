@@ -30,10 +30,12 @@ use http_auth_basic::Credentials;
 use log::error;
 use log::info;
 use log::trace;
+use log::Level;
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::error::Error as StdError;
+use std::io;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
@@ -43,6 +45,7 @@ use tokio::io::{AsyncWriteExt, BufReader};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, Mutex};
 use tokio_tungstenite::tungstenite;
+use tokio_tungstenite::tungstenite::error::ProtocolError;
 use tokio_util::sync::CancellationToken;
 use warp::filters::ws::{Message, Ws};
 use warp::http::StatusCode;
@@ -147,6 +150,49 @@ fn message_too_large_reason(
         }
         _ => None,
     }
+}
+
+/// Level at which a websocket transport error is reported, in either
+/// direction. A peer that vanished is not actionable, and a fleet of them going
+/// away at once would otherwise bury the transport failures that are. `warp`
+/// boxes the `tungstenite` error, so it comes back through `source()`; anything
+/// else is not known to be benign and stays at `Error`.
+fn websocket_error_level(e: &warp::Error) -> Level {
+    match e
+        .source()
+        .and_then(|s| s.downcast_ref::<tungstenite::Error>())
+    {
+        Some(e) => tungstenite_error_level(e),
+        None => Level::Error,
+    }
+}
+
+fn tungstenite_error_level(e: &tungstenite::Error) -> Level {
+    match e {
+        // How a client normally goes away: `terminate()`, a killed process, a
+        // closed browser tab. Nothing else about it is ever known.
+        tungstenite::Error::Protocol(ProtocolError::ResetWithoutClosingHandshake) => Level::Debug,
+        // Reading from, or writing to, a peer that has already closed.
+        tungstenite::Error::ConnectionClosed | tungstenite::Error::AlreadyClosed => Level::Debug,
+        tungstenite::Error::Io(io) if is_peer_gone(io.kind()) => Level::Debug,
+        // A frame that raced the peer's own close frame: harmless once, a
+        // client that closes incorrectly if it keeps happening.
+        tungstenite::Error::Protocol(ProtocolError::ReceivedAfterClosing) => Level::Warn,
+        _ => Level::Error,
+    }
+}
+
+/// Whether an IO error means the peer is simply gone, as opposed to the
+/// connection failing while the peer is still there.
+fn is_peer_gone(kind: io::ErrorKind) -> bool {
+    matches!(
+        kind,
+        io::ErrorKind::ConnectionReset
+            | io::ErrorKind::ConnectionAborted
+            | io::ErrorKind::BrokenPipe
+            | io::ErrorKind::NotConnected
+            | io::ErrorKind::UnexpectedEof
+    )
 }
 
 pub struct HttpServer {
@@ -459,7 +505,7 @@ impl HttpServer {
                                 ));
                                 match tokio::time::timeout(EVICTED_CLOSE_TIMEOUT, close).await {
                                     Ok(Ok(())) => {}
-                                    Ok(Err(e)) => error!("Websocket close send error: {:?}", e),
+                                    Ok(Err(e)) => log::log!(websocket_error_level(&e), "Websocket close send error: {:?}", e),
                                     Err(_) => log::warn!(
                                         "Timed out sending the close frame of an evicted websocket connection"
                                     ),
@@ -470,7 +516,7 @@ impl HttpServer {
                                 trace!("Sending web socket response (process_id: {})", process_id);
                                 let send_res = web_socket.send(Message::binary(res.bytes())).await;
                                 if let Err(e) = send_res {
-                                    error!("Websocket message send error: {:?}", e)
+                                    log::log!(websocket_error_level(&e), "Websocket message send error: {:?}", e)
                                 }
                                 if res.should_close_connection() {
                                    log::warn!("Websocket connection closed");
@@ -496,10 +542,13 @@ impl HttpServer {
                                                     Message::close_with(MESSAGE_TOO_BIG_CLOSE_CODE, reason)
                                                 ).await;
                                                 if let Err(e) = send_res {
-                                                    error!("Websocket close send error: {:?}", e)
+                                                    log::log!(websocket_error_level(&e), "Websocket close send error: {:?}", e)
                                                 }
                                             }
-                                            None => error!("Websocket error: {:?}", e),
+                                            None => log::log!(
+                                                websocket_error_level(&e),
+                                                "Websocket error: {:?}", e
+                                            ),
                                         }
                                         break;
                                     }
@@ -531,7 +580,7 @@ impl HttpServer {
                                                     Message::binary(HttpMessage { message_id, connection_id, command: HttpCommand::Error { error } }.bytes())
                                                 ).await;
                                                 if let Err(e) = send_res {
-                                                    error!("Websocket message send error: {:?}", e)
+                                                    log::log!(websocket_error_level(&e), "Websocket message send error: {:?}", e)
                                                 }
                                                 continue;
                                             }
@@ -544,7 +593,7 @@ impl HttpServer {
                                                         Message::binary(HttpMessage { message_id, connection_id, command: HttpCommand::Error { error: e.to_string() } }.bytes())
                                                     ).await;
                                                     if let Err(e) = send_res {
-                                                        error!("Websocket message send error: {:?}", e)
+                                                        log::log!(websocket_error_level(&e), "Websocket message send error: {:?}", e)
                                                     }
                                                     break;
                                                 },
@@ -557,7 +606,7 @@ impl HttpServer {
                                                             Message::binary(HttpMessage { message_id, connection_id, command: HttpCommand::Error { error: e.to_string() } }.bytes())
                                                         ).await;
                                                         if let Err(e) = send_res {
-                                                            error!("Websocket message send error: {:?}", e)
+                                                            log::log!(websocket_error_level(&e), "Websocket message send error: {:?}", e)
                                                         }
                                                         break;
                                                     }
@@ -566,7 +615,7 @@ impl HttpServer {
                                         } else if msg.is_ping() {
                                             let send_res = web_socket.send(Message::pong(Vec::new())).await;
                                             if let Err(e) = send_res {
-                                                error!("Websocket ping send error: {:?}", e)
+                                                log::log!(websocket_error_level(&e), "Websocket ping send error: {:?}", e)
                                             }
                                         } else if msg.is_close() {
                                             break;
