@@ -23,6 +23,8 @@ users. [Pre-aggregations](#pre-aggregations) are designed to provide the
 right balance between time to insight and querying performance.
 
 To reset the **in-memory** cache in development mode, just restart the server.
+Note that [development mode][ref-development-mode] disables authentication
+completely and is meant for local development machines only.
 
 The second level of caching is called **pre-aggregations**, and requires
 explicit configuration to activate.
@@ -186,7 +188,8 @@ cube(`orders`, {
 By default, Cube will check and invalidate the cache in the background when in
 [development mode][ref-development-mode]. In production environments, we
 recommend [running a Refresh Worker as a separate
-instance][ref-production-checklist-refresh].
+instance][ref-production-checklist-refresh] — development mode disables
+authentication completely and must never be used in production.
 
 We recommend enabling background cache invalidation in a separate Cube worker
 for production deployments. Please consult the [Production

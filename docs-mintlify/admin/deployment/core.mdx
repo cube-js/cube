@@ -388,11 +388,31 @@ deployment.
 ### Disable Development Mode
 
 When running Cube in production environments, make sure development mode is
-disabled both on API Instances and Refresh Worker. Running Cube in development
-mode in a production environment can lead to security vulnerabilities. Enabling
-Development Mode in Cube Cloud is not recommended. Development Mode will expose
-your data to the internet. You can read more on the differences between
-[production and development mode here][link-cubejs-dev-vs-prod].
+disabled both on API Instances and Refresh Worker. You can read more on the
+differences between [production and development mode
+here][link-cubejs-dev-vs-prod].
+
+<Warning>
+
+**Development mode disables authentication completely.** While it is enabled, every
+data access endpoint of the Cube instance — the
+[REST (JSON) API](/reference/core-data-apis/rest-api),
+[GraphQL API](/reference/core-data-apis/graphql-api),
+[SQL API](/reference/core-data-apis/sql-api), and
+[Playground](/docs/explore-analyze/playground) — is served without any authentication
+or authorization verification: no JWT is required and
+[member-level access control](/docs/data-modeling/access-control/member-level-security)
+is not enforced. The data model and configuration are also readable and writable
+through those unauthenticated endpoints, so anyone who can reach the instance can
+execute arbitrary SQL against every connected data source.
+
+This is intentional. Development mode is designed to run on a developer's local
+machine for ease of use and debugging. Never run it where anyone else can reach it,
+never expose it to the internet, and never use it in production. Using development
+mode in the Cube cloud platform is highly discouraged — it bypasses the platform's
+security model.
+
+</Warning>
 
 <Info>
 

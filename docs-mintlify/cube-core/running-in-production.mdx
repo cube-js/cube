@@ -10,6 +10,16 @@ Cube Store is enabled by default when running Cube in development mode. In
 production, Cube Store **must** run as a separate process. The easiest way to do
 this is to use the official Docker images for Cube and Cube Store.
 
+<Warning>
+
+Development mode disables authentication completely: data access endpoints are served
+without any authentication or authorization verification, and anyone who can reach the
+instance can execute arbitrary SQL against connected data sources. Use it only on a
+local development machine, never in production. See
+[`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode).
+
+</Warning>
+
 <Info>
 
 Using Windows? We **strongly** recommend using [WSL2 for Windows 10][link-wsl2]

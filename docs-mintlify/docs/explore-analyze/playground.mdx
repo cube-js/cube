@@ -19,6 +19,16 @@ when it's run in the [development mode][ref-dev-mode].
 
 </Info>
 
+<Warning>
+
+Development mode disables authentication completely: data access endpoints are served
+without any authentication or authorization verification, and anyone who can reach the
+instance can execute arbitrary SQL against connected data sources. Use it only on a
+local development machine, never in production. See
+[`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode).
+
+</Warning>
+
 You can [view](#viewing-the-data-model) the data model entities or [search](#searching-the-data-model)
 for them, [compose](#composing-queries) a query from scratch or [paste](#pasting-a-query)
 an exsiting query, view [results](#viewing-results), check a [generated

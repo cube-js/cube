@@ -6,6 +6,20 @@ description: Outlines development mode in Cube Cloud—branch-scoped APIs, save 
 Development mode allows to test and debug the data model in an isolated
 [development environment][ref-environments-dev] before releasing any changes to production.
 
+<Warning>
+
+This page describes development mode in the Cube cloud platform. It is unrelated to
+Cube Core's development mode, which is enabled with
+[`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode) and
+**disables authentication completely**: all data access endpoints are served without
+any authentication or authorization verification, and anyone who can reach the
+instance can execute arbitrary SQL against connected data sources. That is
+intentional — it is designed to run on a developer's local machine for ease of use and
+debugging. Never use it in production, and using it in the Cube cloud platform is
+highly discouraged because it bypasses the platform's security model.
+
+</Warning>
+
 When you enter the development mode, you'll have access to your personal API endpoints
 that will track the branch you're on and will be updated automatically when you make
 changes to the data model.

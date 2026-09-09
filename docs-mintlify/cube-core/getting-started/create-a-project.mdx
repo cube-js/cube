@@ -34,6 +34,28 @@ enable the [Development Mode](/docs/data-modeling/dev-mode). This is
 handy for local development but not suitable for
 [production](/cube-core/running-in-production).
 
+<Warning>
+
+**Development mode disables authentication completely.** While it is enabled, every
+data access endpoint of the Cube instance — the
+[REST (JSON) API](/reference/core-data-apis/rest-api),
+[GraphQL API](/reference/core-data-apis/graphql-api),
+[SQL API](/reference/core-data-apis/sql-api), and
+[Playground](/docs/explore-analyze/playground) — is served without any authentication
+or authorization verification: no JWT is required and
+[member-level access control](/docs/data-modeling/access-control/member-level-security)
+is not enforced. The data model and configuration are also readable and writable
+through those unauthenticated endpoints, so anyone who can reach the instance can
+execute arbitrary SQL against every connected data source.
+
+This is intentional. Development mode is designed to run on a developer's local
+machine for ease of use and debugging. Never run it where anyone else can reach it,
+never expose it to the internet, and never use it in production. Using development
+mode in the Cube cloud platform is highly discouraged — it bypasses the platform's
+security model.
+
+</Warning>
+
 <Info>
 
 If you're using Linux as the Docker host OS, you'll also need to add
