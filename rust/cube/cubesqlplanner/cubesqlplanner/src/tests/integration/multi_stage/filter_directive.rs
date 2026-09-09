@@ -536,3 +536,34 @@ async fn test_rank_with_filter_exclude_ranks_over_whole_universe() {
         insta::assert_snapshot!(result);
     }
 }
+
+// Share-of-partition shape whose denominator partitions by members the query
+// does not group by at all: `group_by` intersects the query grain down to
+// nothing while `filter.exclude` drops the query filter on `status`. The
+// aggregation input widens both ways, so nothing of the query grain survives
+// into the measure side and the reported rows have to come from the keys side.
+// A denominator reported over the widened set surfaces as extra rows carrying
+// a NULL share.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_group_by_outside_query_grain_keeps_query_row_set() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_category_day_share_percent
+          - orders.total_amount
+        dimensions:
+          - orders.status
+        filters:
+          - dimension: orders.status
+            operator: equals
+            values:
+              - completed
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
