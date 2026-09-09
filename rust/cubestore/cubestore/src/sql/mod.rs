@@ -1025,8 +1025,11 @@ impl SqlService for SqlServiceImpl {
                             escape,
                             quote,
                         },
-                        // Parquet ignores delimiter — pass through unchanged
-                        ImportFormat::Parquet => ImportFormat::Parquet,
+                        ImportFormat::Parquet => {
+                            return Err(CubeError::user(
+                                "CSV delimiter options cannot be used with Parquet".to_string(),
+                            ))
+                        }
                     }
                 }
                 let build_range_end = with_options

@@ -8,6 +8,7 @@ import {
   BaseDriver,
   CreateTableIndex,
   DownloadTableCSVData,
+  TableParquetData,
   DownloadTableMemoryData,
   DriverInterface,
   ExternalCreateTableOptions,
@@ -323,12 +324,23 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  private async importParquetFile(tableData: any, table: string, columns: Column[], indexes: any, aggregations: any, queryTracingObj?: any) {
-    const files = Array.isArray(tableData.parquetFile) ? tableData.parquetFile : [tableData.parquetFile];
-    const columnNames = columns.map(c => `${this.quoteIdentifier(c.name)} ${this.fromGenericType(c.type)}`).join(', ');
-    const locationsClause = files.map((f: string) => `'${f}'`).join(', ');
-    const createTableSql = `CREATE TABLE ${table} (${columnNames}) ${indexes} ${aggregations} WITH (input_format = 'parquet') LOCATION ${locationsClause}`;
-    await this.query(createTableSql, [], queryTracingObj);
+  private async importParquetFile(tableData: TableParquetData, table: string, columns: Column[], indexes: string, aggregations: string, queryTracingObj?: any) {
+    if (!columns || columns.length === 0) {
+      throw new Error('Unable to import (as parquet) in Cube Store: empty columns. Most probably, introspection has failed.');
+    }
+    if (!Array.isArray(tableData.parquetFile) || tableData.parquetFile.some(file => typeof file !== 'string' || !file)) {
+      throw new Error('Parquet locations must be an array of non-empty strings');
+    }
+    const options: CreateTableOptions = {
+      buildRangeEnd: queryTracingObj?.buildRangeEnd,
+      indexes,
+      aggregations,
+    };
+    if (tableData.parquetFile.length) {
+      options.inputFormat = 'parquet';
+      options.files = tableData.parquetFile;
+    }
+    return this.createTableWithOptions(table, columns, options, queryTracingObj);
   }
 
   private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: Column[], indexes: any, aggregations: any, queryTracingObj?: any) {
@@ -502,6 +514,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   public capabilities(): ExternalDriverCompatibilities {
     return {
       csvImport: true,
+      parquetImport: true,
       streamImport: true,
     };
   }

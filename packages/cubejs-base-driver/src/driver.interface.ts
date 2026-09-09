@@ -61,13 +61,7 @@ export interface TableCSVData extends DownloadTableBase {
   /**
    * An array of unloaded CSV data temporary URLs.
    */
-  csvFile?: string[];
-
-  /**
-   * An array of unloaded Parquet data GCS URIs (gs://bucket/object).
-   * Used when the driver exports as Parquet instead of CSV.gz.
-   */
-  parquetFile?: string[];
+  csvFile: string[];
 
   /**
    * Unloaded data fields types.
@@ -87,6 +81,12 @@ export interface TableCSVData extends DownloadTableBase {
    * The CSV file escape symbol.
    */
   exportBucketCsvEscapeSymbol?: string;
+}
+
+export interface TableParquetData extends DownloadTableBase {
+  /** Parquet locations supported by the external driver (for example gs://bucket/object). */
+  parquetFile: string[];
+  types?: TableStructure;
 }
 
 export interface StreamTableData extends DownloadTableBase {
@@ -119,13 +119,18 @@ export function isDownloadTableMemoryData(tableData: any): tableData is TableMem
 }
 
 export function isDownloadTableCSVData(tableData: any): tableData is TableCSVData {
-  return Boolean(tableData.csvFile || tableData.parquetFile);
+  return Boolean(tableData.csvFile);
 }
 
-export type DownloadTableData = TableMemoryData | TableCSVData | StreamTableData | StreamingSourceTableData;
+export function isDownloadTableParquetData(tableData: any): tableData is TableParquetData {
+  return Array.isArray(tableData.parquetFile);
+}
+
+export type DownloadTableData = TableMemoryData | TableCSVData | TableParquetData | StreamTableData | StreamingSourceTableData;
 
 export interface ExternalDriverCompatibilities {
   csvImport?: boolean,
+  parquetImport?: boolean,
   streamImport?: boolean,
 }
 
@@ -171,6 +176,7 @@ type UnloadQuery = {
 };
 
 export type UnloadOptions = {
+  parquetImport?: boolean;
   maxFileSize: number,
   query?: UnloadQuery;
   requestId?: string;
@@ -190,6 +196,7 @@ export type ExternalCreateTableOptions = {
 
 export type DownloadTableMemoryData = TableMemoryData & DownloadQueryResultsBase;
 export type DownloadTableCSVData = TableCSVData & DownloadQueryResultsBase;
+export type DownloadTableParquetData = TableParquetData & DownloadQueryResultsBase;
 export type DownloadStreamTableData = StreamTableData & DownloadQueryResultsBase;
 export type DownloadStreamingSourceTableData = StreamingSourceTableData & DownloadQueryResultsBase;
 export type DownloadQueryResultsResult = DownloadTableMemoryData | DownloadTableCSVData | DownloadStreamTableData | DownloadStreamingSourceTableData;
@@ -283,7 +290,7 @@ export interface DriverInterface {
    * Returns to the Cubestore an object with links to unloaded to an
    * export bucket data.
    */
-  unload?: (table: string, options: UnloadOptions) => Promise<TableCSVData>;
+  unload?: (table: string, options: UnloadOptions) => Promise<TableCSVData | TableParquetData>;
   unloadFromQuery?: (sql: string, params: unknown[], options: UnloadOptions) => Promise<DownloadTableCSVData>;
 
   /**

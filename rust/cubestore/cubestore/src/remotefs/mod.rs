@@ -1,5 +1,6 @@
 pub mod cleanup;
 pub mod gcs;
+pub(crate) mod gcs_client;
 pub mod minio;
 pub mod queue;
 pub mod s3;
