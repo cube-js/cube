@@ -125,7 +125,7 @@ export class JoinGraph implements CompilerInterface {
     const joinRequired =
       (v) => `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
 
-    const duplicates = this.duplicateJoinTargets(cube, errorReporter);
+    const duplicates = this.reportDuplicateJoinTargets(cube, errorReporter);
 
     return cube.joins
       .filter(join => {
@@ -168,15 +168,15 @@ export class JoinGraph implements CompilerInterface {
   }
 
   /**
-   * The cubes a cube declares more than one join to. Only one edge per pair of
-   * cubes fits into the graph, so several declarations for the same pair would
-   * leave the join path ambiguous.
+   * Only one edge per pair of cubes fits into the graph, so several declarations
+   * for the same pair would leave the join path ambiguous.
    */
-  protected duplicateJoinTargets(cube: CubeDefinition, errorReporter: ErrorReporter): Set<string> {
+  protected reportDuplicateJoinTargets(cube: CubeDefinition, errorReporter: ErrorReporter): Set<string> {
     const duplicates = new Set<string>();
     // The raw definition, not `cube.joins`: `extends` merges the parent's joins
     // in, and a child redeclaring one of them is a supported override. Duplicates
-    // a parent declares are reported and dropped on the parent itself
+    // a parent declares are reported and dropped on the parent's own edges; a
+    // cube extending it still resolves through one of them
     const ownJoins = this.cubeEvaluator.cubeDefinitions[cube.name]?.joins;
 
     // The map form is keyed by the joined cube name and can not hold duplicates

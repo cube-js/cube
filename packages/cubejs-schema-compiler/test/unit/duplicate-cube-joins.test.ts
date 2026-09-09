@@ -97,6 +97,41 @@ ${managersCube}
     expect(message).toContain('Cube \'orders\' declares 3 joins to \'users\' (joins[0], joins[2], joins[3])');
   });
 
+  it('reports every cube that declares duplicates', async () => {
+    const message = await compileError(`
+cubes:
+  - name: orders
+    sql_table: orders_tbl
+    joins:
+      - name: users
+        sql: "{CUBE}.user_id = {users}.id"
+        relationship: many_to_one
+      - name: users
+        sql: "{CUBE}.manager_id = {users}.id"
+        relationship: many_to_one
+${ordersMembers}
+  - name: tickets
+    sql_table: tickets_tbl
+    joins:
+      - name: managers
+        sql: "{CUBE}.owner_id = {managers}.id"
+        relationship: many_to_one
+      - name: managers
+        sql: "{CUBE}.assignee_id = {managers}.id"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+${usersCube}
+${managersCube}
+`);
+
+    expect(message).toContain('Cube \'orders\' declares 2 joins to \'users\'');
+    expect(message).toContain('Cube \'tickets\' declares 2 joins to \'managers\'');
+  });
+
   it('allows joins to different cubes', async () => {
     const compilers = prepareYamlCompiler(`
 cubes:
