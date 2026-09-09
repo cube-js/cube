@@ -7,7 +7,7 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.js against the platform client CHANGELOG.md. */}
 
-<Update label="2026-09-09" description="v0.7.0" tags={["Added"]}>
+<Update label="2026-09-09" description="v0.7.0" tags={["Added","Changed"]}>
   ### Added
 
   - New public REST API for rendering a published dashboard to PNG or PDF (CUB-4302): `POST /api/v1/deployments/{deploymentId}/dashboard-exports` (`DashboardExportsPublicController.startExport`) submits a render, `GET .../dashboard-exports/{jobId}` (`getExportStatus`) polls its status, and `GET .../dashboard-exports/{jobId}/download` (`downloadExport`) streams the finished file. Asynchronous because a render waits for every widget to finish querying — the job and its file are dropped 5 minutes after submission. By default the render runs under the caller's own security context (requires manage access to the dashboard's workbook); a tenant admin can instead pass `renderAs` to render as another console or embed user, the same subject vocabulary a scheduled notification's recipients use. New schemas: `StartDashboardExportInput`, `DashboardExportJobResponse`, `DashboardExportStatusResponse`, `ExportSubjectInput`.
@@ -15,6 +15,10 @@ rss: true
   - `ConnectReportToWorkbookInput`, `CreateReportInput`, `UpdateReportInput` and `RefreshReportInput` gained `resultChecksum` — a client-computed fingerprint of the cells a write just placed on the sheet, echoed back on `ReportPlacement.resultChecksum` so a client can tell whether a placement has been hand-edited since. New schemas: `ReportPlacementResultChecksumInput` / `ReportPlacementResultChecksum`, `ReportPlacementResultChunkInput` / `ReportPlacementResultChunk`. `ConnectReportToWorkbookInput` also gained `addressOnly`, for an address-only correction (e.g. a renamed sheet tab) that should not erase the stored fingerprint.
   - `PivotItems` / `PivotItemsInput` gained `displayScale` (`"model"` | `"absolute"` | `"thousands"` | `"millions"` | `"billions"`) and `showColumnTotals`.
   - `WorkbookDashboardInput.dashboardDraft` now accepts a widget without an `id` — the server assigns one. New schema `DashboardConfigDraftInput` (with `DashboardWidgetDraftInput`); publishing or creating a dashboard still requires an `id` on every widget via the existing `DashboardConfigInput`.
+
+  ### Changed
+
+  - `CreateReportInput.name` / `.title`, `UpdateReportInput.name` / `.title`, and the `Report.name` response field now enforce `maxLength: 255` (CUB-4440) — matching the column's real storage limit, so a name or title over that limit now returns `400` instead of failing less predictably downstream.
 </Update>
 
 <Update label="2026-09-02" description="v0.6.0" tags={["Added","Changed","Deprecated"]}>
