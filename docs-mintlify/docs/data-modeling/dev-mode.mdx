@@ -9,15 +9,16 @@ Development mode allows to test and debug the data model in an isolated
 <Warning>
 
 This page describes development mode in the Cube cloud platform. It is unrelated to
-Cube Core's development mode — which is on whenever `NODE_ENV` is not `production` or
-[`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode) is
-`true` — and which is an **authentication bypass**: it serves Playground's endpoints with no
-authentication, so anyone who can reach the instance can mint an API token carrying
-any security context (signed with the API secret), read the data model, overwrite it
-and `.env`. With `CUBEJS_DEV_MODE=true` specifically and no
+Cube Core's development mode — which is on when
+[`CUBEJS_DEV_MODE=true`](/reference/configuration/environment-variables#cubejs_dev_mode)
+or whenever `NODE_ENV` is not `production` — and which is an **authentication bypass**.
+Setting the flag also forces `NODE_ENV=development`, switching off JWT verification on
+the data APIs, and Playground's endpoints are served with no authentication at all, so
+anyone who can reach the instance can mint an API token carrying any security context
+(signed with the API secret), read the data model, and overwrite it and `.env`. With
+`CUBEJS_DEV_MODE=true` and no
 [`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password)
-set, the SQL API also accepts any credentials, allowing arbitrary SQL. That is
-intentional — it is designed
+set, the SQL API accepts any credentials as well. That is intentional — it is designed
 to run on a developer's local machine for ease of use and debugging. Never use it in
 production, and using it in the Cube cloud platform is highly discouraged because it
 bypasses the platform's security model.

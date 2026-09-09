@@ -43,18 +43,18 @@ A typical use case would be:
 
 <Warning>
 
-**In development mode, the token is not required for authorization.** Cube is in
-development mode whenever `NODE_ENV` is not `production`, whatever
-[`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode) is
-set to — and in that state this API accepts requests with no token at all.
-`NODE_ENV=production` turns JWT verification on, and — unless `CUBEJS_DEV_MODE=true` —
-also takes the instance out of development mode; a custom
-[`check_auth`](/reference/configuration/config#check_auth) that rejects
-unauthenticated requests enforces it too, whatever `NODE_ENV` is.
+**In development mode, the token is not required for authorization.** JWT
+verification on this API is enabled by `NODE_ENV=production`, so it is off whenever
+`NODE_ENV` is anything else — and setting
+[`CUBEJS_DEV_MODE=true`](/reference/configuration/environment-variables#cubejs_dev_mode)
+forces `NODE_ENV=development`, which switches verification off even where it was
+otherwise on. A custom [`check_auth`](/reference/configuration/config#check_auth) that
+rejects unauthenticated requests enforces it whatever `NODE_ENV` is.
 
-Enabling `CUBEJS_DEV_MODE` bypasses authentication even under
-`NODE_ENV=production`, because Playground's unauthenticated endpoints will mint a
-valid token carrying any security context, signed with your API secret. This is
+`cubejs server` and the official Docker images set `NODE_ENV=production`, so
+verification is on there unless you enable development mode. Development mode also
+exposes Playground's unauthenticated endpoints, which hand out and mint valid tokens
+carrying any security context, signed with your API secret. This is
 intentional — development mode is designed for local development machines only. Never
 use it in production, and using it in the Cube cloud platform is highly discouraged
 because it bypasses the platform's security model.

@@ -1,14 +1,12 @@
 <Warning>
 
-Development mode is an authentication bypass, and Cube is in development mode whenever
-`NODE_ENV` is not `production` or `CUBEJS_DEV_MODE=true`. Playground's endpoints are
-then served with no authentication: anyone who can reach the instance is handed a
-ready-to-use API token, can mint others carrying any security context, can read your
-data model files, and can overwrite your data model and your `.env`. With
-`CUBEJS_DEV_MODE=true` specifically and no
-[`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password)
-set, the SQL API also accepts any credentials, allowing arbitrary SQL against connected
-data sources. Use it only on a local development machine, never in production. See
+Development mode is an authentication bypass. Cube is in development mode when
+`CUBEJS_DEV_MODE=true` — which also forces `NODE_ENV=development` and so switches off
+JWT verification on the REST (JSON) and GraphQL APIs — and whenever `NODE_ENV` is not
+`production`. Playground's endpoints are served with no authentication too: anyone who
+can reach the instance is handed a ready-to-use API token, can mint others carrying any
+security context, can read your data model files, and can overwrite your data model and
+your `.env`. Use it only on a local development machine, never in production. See
 [`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode).
 
 </Warning>

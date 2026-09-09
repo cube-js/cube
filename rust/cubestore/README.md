@@ -73,18 +73,21 @@ Starting with `v0.26.48`, Cube.js ships with Cube Store enabled when `CUBEJS_DEV
 You don't need to set up any `CUBEJS_EXT_DB_*` environment variables or
 `externalDriverFactory` inside your `cube.js` configuration file.
 
-> **Development mode is an authentication bypass.** Cube is in development mode with
-> `CUBEJS_DEV_MODE=true`, and also whenever `NODE_ENV` is not `production` — so
-> `CUBEJS_DEV_MODE=false` alone does not take you out of it. In that state Playground
-> and its supporting endpoints are served with no authentication, so anyone who can
+> **Development mode is an authentication bypass.** `CUBEJS_DEV_MODE=true` also forces
+> `NODE_ENV=development`, which switches off JWT verification on the REST (JSON) and
+> GraphQL APIs, so they accept requests with no token at all. Playground and its
+> supporting endpoints are served with no authentication either, so anyone who can
 > reach the instance is handed a ready-to-use API token (and can mint others carrying
-> any security context, signed with your API secret), read your data model, overwrite
-> it and your `.env`. With `CUBEJS_DEV_MODE=true` specifically and no
-> `CUBEJS_SQL_PASSWORD` set, the SQL API also accepts any credentials, allowing
-> arbitrary SQL against connected data sources. This is intentional — development mode is designed to run on a
-> developer's local machine for ease of use and debugging. Never use it in production, and using it
-> in the Cube cloud platform is highly discouraged, as it bypasses the platform's
-> security model. See
+> any security context, signed with your API secret), can read your data model, and can
+> overwrite it and your `.env`. With no `CUBEJS_SQL_PASSWORD` set, the SQL API accepts
+> any credentials as well, allowing arbitrary SQL against connected data sources.
+>
+> This is intentional — development mode is designed to run on a developer's local
+> machine for ease of use and debugging. Never expose it to the internet or use it in
+> production. Using development mode in the Cube cloud platform is highly discouraged,
+> as it bypasses the platform's security model. Cube is also in development mode
+> whenever `NODE_ENV` is not `production`, but `cubejs server` and the official images
+> already set it to `production`. See
 > [`CUBEJS_DEV_MODE`](https://docs.cube.dev/reference/configuration/environment-variables#cubejs_dev_mode).
 
 For versions prior to `v0.26.48`, you should upgrade your project to the latest
