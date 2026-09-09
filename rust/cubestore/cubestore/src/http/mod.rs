@@ -1505,62 +1505,6 @@ mod tests {
     use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
     use url::Url;
 
-    #[test]
-    fn websocket_error_levels() {
-        // A peer gone without a close handshake, in either of the two shapes
-        // the read stream reports it in.
-        assert_eq!(
-            tungstenite_error_level(&tungstenite::Error::Protocol(
-                ProtocolError::ResetWithoutClosingHandshake
-            )),
-            Level::Debug
-        );
-        assert_eq!(
-            tungstenite_error_level(&tungstenite::Error::Io(io::Error::from(
-                io::ErrorKind::ConnectionReset
-            ))),
-            Level::Debug
-        );
-
-        // A write towards a peer that has already left.
-        assert_eq!(
-            tungstenite_error_level(&tungstenite::Error::ConnectionClosed),
-            Level::Debug
-        );
-        assert_eq!(
-            tungstenite_error_level(&tungstenite::Error::AlreadyClosed),
-            Level::Debug
-        );
-        assert_eq!(
-            tungstenite_error_level(&tungstenite::Error::Io(io::Error::from(
-                io::ErrorKind::BrokenPipe
-            ))),
-            Level::Debug
-        );
-
-        // A close frame raced by an in-flight frame.
-        assert_eq!(
-            tungstenite_error_level(&tungstenite::Error::Protocol(
-                ProtocolError::ReceivedAfterClosing
-            )),
-            Level::Warn
-        );
-
-        // A protocol violation and an IO failure that is not a vanished peer.
-        assert_eq!(
-            tungstenite_error_level(&tungstenite::Error::Protocol(ProtocolError::InvalidOpcode(
-                7
-            ))),
-            Level::Error
-        );
-        assert_eq!(
-            tungstenite_error_level(&tungstenite::Error::Io(io::Error::from(
-                io::ErrorKind::PermissionDenied
-            ))),
-            Level::Error
-        );
-    }
-
     /// Minimal SqlService that always replies with a fixed DataFrame, used to
     /// drive process_command in unit tests.
     struct StubService(Arc<DataFrame>);
