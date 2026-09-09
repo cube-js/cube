@@ -44,10 +44,10 @@ use crate::{
     },
     config::ConfigObj,
     singular_eclass,
-    transport::{DataSource, MetaContext},
+    transport::{DataSource, MetaContext, SqlGenerator},
 };
 use egg::{Subst, Var};
-use std::{fmt::Display, sync::Arc};
+use std::{fmt::Display, ops::ControlFlow, sync::Arc};
 
 pub struct WrapperRules {
     meta_context: Arc<MetaContext>,
@@ -253,17 +253,29 @@ impl WrapperRules {
         }
     }
 
-    fn can_rewrite_template(data_source: &DataSource, meta: &MetaContext, template: &str) -> bool {
-        let sql_generator = match data_source {
+    /// The SQL generator whose templates a wrapper context renders with. `Break` carries the
+    /// verdict of a template check when there is none to consult: an unrestricted context may
+    /// render anything, while nothing renders for a data source `meta` does not know.
+    fn template_sql_generator<'meta>(
+        data_source: &DataSource,
+        meta: &'meta MetaContext,
+    ) -> ControlFlow<bool, &'meta Arc<dyn SqlGenerator + Send + Sync>> {
+        match data_source {
             DataSource::Specific(data_source) => {
-                let Some(sql_generator) = meta.data_source_to_sql_generator.get(*data_source)
-                else {
-                    return false;
-                };
-                sql_generator
+                match meta.data_source_to_sql_generator.get(*data_source) {
+                    Some(sql_generator) => ControlFlow::Continue(sql_generator),
+                    None => ControlFlow::Break(false),
+                }
             }
             // TODO is it correct?
-            DataSource::Unrestricted => return true,
+            DataSource::Unrestricted => ControlFlow::Break(true),
+        }
+    }
+
+    fn can_rewrite_template(data_source: &DataSource, meta: &MetaContext, template: &str) -> bool {
+        let sql_generator = match Self::template_sql_generator(data_source, meta) {
+            ControlFlow::Continue(sql_generator) => sql_generator,
+            ControlFlow::Break(verdict) => return verdict,
         };
 
         sql_generator

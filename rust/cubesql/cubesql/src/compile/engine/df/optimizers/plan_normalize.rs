@@ -36,6 +36,8 @@ use crate::compile::{
 /// - binary operations between a literal string and an expression
 ///   of a different type to a string casted to that type
 /// - binary operations between a timestamp and a date to a timestamp and timestamp operation
+/// - comparisons of a timestamp with `DATE +/- INTERVAL` arithmetic to an explicit
+///   `TIMESTAMP` cast of that arithmetic
 /// - IN list expressions where expression being tested is `TIMESTAMP`
 ///   and values might be `DATE` to values casted to `TIMESTAMP`
 /// - BETWEEN expressions where expression being tested is `TIMESTAMP`
@@ -1342,6 +1344,8 @@ fn grouping_set_normalize(
 /// - binary operations between a literal string and an expression
 ///   of a different type to a string casted to that type
 /// - binary operations between a timestamp and a date to a timestamp and timestamp operation
+/// - comparisons of a timestamp with `DATE +/- INTERVAL` arithmetic to an explicit
+///   `TIMESTAMP` cast of that arithmetic
 #[inline(never)]
 fn binary_expr_normalize(
     optimizer: &PlanNormalize,
@@ -1378,6 +1382,37 @@ fn binary_expr_normalize(
             *left,
         ];
         return Ok(Box::new(Expr::ScalarUDF { fun, args }));
+    }
+
+    // DataFusion types `DATE +/- INTERVAL` as `TIMESTAMP` with no cast node. Strict dialects
+    // (BigQuery) type that arithmetic as `DATETIME` and reject comparing it to a `TIMESTAMP`,
+    // so the implicit cast is made explicit here. Unlike a BETWEEN bound it is not folded:
+    // the arithmetic may hold `now()`-like placeholders that only the rewrite rules resolve.
+    if matches!(
+        op,
+        Operator::Eq
+            | Operator::NotEq
+            | Operator::Lt
+            | Operator::LtEq
+            | Operator::Gt
+            | Operator::GtEq
+            | Operator::IsDistinctFrom
+            | Operator::IsNotDistinctFrom
+    ) {
+        let target_type = match (&left_type, &right_type) {
+            (DataType::Timestamp(_, _), DataType::Timestamp(_, _) | DataType::Date32) => {
+                Some(&left_type)
+            }
+            (DataType::Date32, DataType::Timestamp(_, _)) => Some(&right_type),
+            _ => None,
+        };
+        if let Some(target_type) = target_type {
+            let left =
+                normalize_temporal_operand(optimizer, left, &left_type, target_type, schema)?;
+            let right =
+                normalize_temporal_operand(optimizer, right, &right_type, target_type, schema)?;
+            return Ok(Box::new(Expr::BinaryExpr { left, op, right }));
+        }
     }
 
     // Check if the expression is `TIMESTAMP <op> DATE` or `DATE <op> TIMESTAMP`
@@ -1424,6 +1459,55 @@ fn binary_expr_normalize(
     // The literal can't be casted to the target type; keep the expression as is
     // instead of failing the whole plan normalization.
     Ok(Box::new(Expr::BinaryExpr { left, op, right }))
+}
+
+/// Normalizes one side of a temporal comparison to the `TIMESTAMP` type of the other side:
+/// `DATE +/- INTERVAL` arithmetic gets an explicit cast, a `DATE` side is casted and folded.
+fn normalize_temporal_operand(
+    optimizer: &PlanNormalize,
+    expr: Box<Expr>,
+    expr_type: &DataType,
+    target_type: &DataType,
+    schema: &DFSchema,
+) -> Result<Box<Expr>> {
+    if is_date_interval_arithmetic(&expr, schema)? {
+        return Ok(Box::new(Expr::Cast {
+            expr,
+            data_type: target_type.clone(),
+        }));
+    }
+    if matches!(expr_type, DataType::Date32) {
+        return evaluate_expr(optimizer, expr.cast_to(target_type, schema)?);
+    }
+    Ok(expr)
+}
+
+/// Checks if the expression is `DATE +/- INTERVAL` arithmetic, possibly offset by more
+/// intervals (`CURRENT_DATE - INTERVAL '1 month' + INTERVAL '1 day'`). DataFusion types
+/// such an expression as `TIMESTAMP` without an explicit cast.
+fn is_date_interval_arithmetic(expr: &Expr, schema: &DFSchema) -> Result<bool> {
+    let is_interval = |data_type: &DataType| matches!(data_type, DataType::Interval(_));
+    // Walk down the chain of interval offsets to the expression they apply to.
+    let mut expr = expr;
+    loop {
+        let Expr::BinaryExpr { left, op, right } = expr else {
+            return Ok(false);
+        };
+        if !matches!(op, Operator::Plus | Operator::Minus) {
+            return Ok(false);
+        }
+        let base = if is_interval(&right.get_type(schema)?) {
+            left
+        } else if *op == Operator::Plus && is_interval(&left.get_type(schema)?) {
+            right
+        } else {
+            return Ok(false);
+        };
+        if base.get_type(schema)? == DataType::Date32 {
+            return Ok(true);
+        }
+        expr = base;
+    }
 }
 
 /// Casts a string literal expression to the given type, evaluating it to a constant.
@@ -1776,6 +1860,55 @@ mod tests {
                     Some(expected_nanos),
                     None
                 )))
+            );
+        });
+
+        Ok(())
+    }
+
+    // `DATE - INTERVAL` is typed as TIMESTAMP by DataFusion without a cast; strict dialects
+    // produce a DATETIME there, so the implicit cast is made explicit when compared against
+    // a TIMESTAMP.
+    #[test]
+    fn test_binary_expr_timestamp_computed_date_bound() -> Result<()> {
+        run_async_test(async move {
+            let meta = get_test_tenant_ctx();
+            let cube_ctx = create_test_postgresql_cube_context(meta)
+                .await
+                .expect("Failed to create cube context");
+
+            let schema = Schema::new(vec![Field::new(
+                "ts",
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                true,
+            )]);
+
+            let table_scan = LogicalPlanBuilder::scan_empty(Some("test_table"), &schema, None)
+                .expect("Failed to create table scan")
+                .build()
+                .expect("Failed to build plan");
+
+            // 2026-06-01 minus 28 days
+            let date = Expr::Literal(ScalarValue::Date32(Some(20605)));
+            let interval = Expr::Literal(ScalarValue::IntervalDayTime(Some(28i64 << 32)));
+            let plan = LogicalPlanBuilder::from(table_scan)
+                .filter(col("ts").gt_eq(date.clone() - interval.clone()))
+                .expect("Failed to add filter")
+                .build()
+                .expect("Failed to build plan");
+
+            let optimizer = PlanNormalize::new(&cube_ctx);
+            let optimized = optimizer.optimize(&plan, &OptimizerConfig::new()).unwrap();
+
+            let LogicalPlan::Filter(Filter { predicate, .. }) = &optimized else {
+                panic!("Expected Filter plan, got: {:?}", optimized);
+            };
+            assert_eq!(
+                *predicate,
+                col("test_table.ts").gt_eq(Expr::Cast {
+                    expr: Box::new(date - interval),
+                    data_type: DataType::Timestamp(TimeUnit::Nanosecond, None),
+                })
             );
         });
 
