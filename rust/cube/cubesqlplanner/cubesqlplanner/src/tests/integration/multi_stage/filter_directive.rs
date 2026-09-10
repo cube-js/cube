@@ -537,13 +537,6 @@ async fn test_rank_with_filter_exclude_ranks_over_whole_universe() {
     }
 }
 
-// Share-of-partition shape whose denominator partitions by members the query
-// does not group by at all: `group_by` intersects the query grain down to
-// nothing while `filter.exclude` drops the query filter on `status`. The
-// aggregation input widens both ways, so nothing of the query grain survives
-// into the measure side and the reported rows have to come from the keys side.
-// A denominator reported over the widened set surfaces as extra rows carrying
-// a NULL share.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_group_by_outside_query_grain_keeps_query_row_set() {
     let ctx = create_context();
@@ -568,9 +561,6 @@ async fn test_group_by_outside_query_grain_keeps_query_row_set() {
     }
 }
 
-// Same denominator, this time with a query grain the `group_by` partially
-// keeps: the time dimension survives the intersection while `status` does not,
-// so the widened key grid is non-empty and the share varies per partition.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_group_by_partially_kept_keeps_query_row_set() {
     let ctx = create_context();

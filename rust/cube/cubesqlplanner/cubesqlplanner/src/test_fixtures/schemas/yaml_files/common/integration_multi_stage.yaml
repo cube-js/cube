@@ -856,12 +856,6 @@ cubes:
                       operator: notEquals
                       values: [pending]
 
-          # Denominator whose partition is an intersection with the query
-          # grain, not an addition to it: `group_by` keeps only what the query
-          # already groups by, while `filter.exclude` drops the query filter on
-          # `status`. Naming `created_at` both bare and granularity-suffixed
-          # covers a reference form the intersection has to tolerate — a query
-          # time dimension matches the bare entry at any granularity.
           - name: amount_by_category_day_unfiltered
             type: sum
             sql: "{CUBE.total_amount}"
@@ -871,7 +865,6 @@ cubes:
                 - orders.created_at
                 - orders.created_at.day
             filter:
-                mode: relative
                 exclude:
                     - orders.status
 
