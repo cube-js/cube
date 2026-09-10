@@ -13,6 +13,7 @@ import {
   preAggregationsResultFactory,
   preAggregationPartitionsResultFactory,
   compilerApi,
+  compilerApiWithAccessDenied,
   RefreshSchedulerMock,
   DataSourceStorageMock,
   AdapterApiMock
@@ -49,11 +50,12 @@ const API_SECRET = 'secret';
 async function createApiGateway(
   adapterApi: any = new AdapterApiMock(),
   dataSourceStorage: any = new DataSourceStorageMock(),
-  options: Partial<ApiGatewayOptions> = {}
+  options: Partial<ApiGatewayOptions> = {},
+  compilerApiMock: any = compilerApi
 ) {
   process.env.NODE_ENV = 'production';
 
-  const apiGateway = new ApiGateway(API_SECRET, compilerApi, async () => adapterApi, logger, {
+  const apiGateway = new ApiGateway(API_SECRET, compilerApiMock, async () => adapterApi, logger, {
     standalone: true,
     dataSourceStorage,
     basePath: '/cubejs-api',
@@ -151,6 +153,84 @@ describe('API Gateway', () => {
 
     expect(res.body && res.body.error).toStrictEqual(
       'Query should contain either measures, dimensions or timeDimensions with granularities in order to be valid'
+    );
+  });
+
+  test('access policy denial responds with 403 naming the requested members', async () => {
+    const { app } = await createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {},
+      compilerApiWithAccessDenied(['Foo.bar'])
+    );
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(403);
+
+    expect(res.body && res.body.error).toStrictEqual(
+      'Access to the following members is denied by an access policy: Foo.bar'
+    );
+  });
+
+  test('access policy denial names a member requested through a filter', async () => {
+    const { app } = await createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {},
+      compilerApiWithAccessDenied(['Foo.id'])
+    );
+
+    const res = await request(app)
+      .get(
+        '/cubejs-api/v1/load?query={"measures":["Foo.bar"],"filters":[{"member":"Foo.id","operator":"equals","values":["1"]}]}'
+      )
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(403);
+
+    expect(res.body && res.body.error).toStrictEqual(
+      'Access to the following members is denied by an access policy: Foo.id'
+    );
+  });
+
+  test('access policy denial keeps members the request never asked for out of the response', async () => {
+    const { app } = await createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {},
+      // Denied because SQL generation pulls the primary key in, not because the caller asked for it
+      compilerApiWithAccessDenied(['Foo.id'])
+    );
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(403);
+
+    expect(res.body && res.body.error).toStrictEqual(
+      'Access to some of the requested members is denied by an access policy'
+    );
+    expect(JSON.stringify(res.body)).not.toContain('Foo.id');
+  });
+
+  test('access policy denial responds with 403 on POST /load too', async () => {
+    const { app } = await createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {},
+      compilerApiWithAccessDenied(['Foo.bar'])
+    );
+
+    const res = await request(app)
+      .post('/cubejs-api/v1/load')
+      .set('Content-type', 'application/json')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .send({ query: { measures: ['Foo.bar'] } })
+      .expect(403);
+
+    expect(res.body && res.body.error).toStrictEqual(
+      'Access to the following members is denied by an access policy: Foo.bar'
     );
   });
 

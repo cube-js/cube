@@ -1324,6 +1324,12 @@ class ApiGateway {
   /**
    * Convert incoming query parameter (JSON fetched from the HTTP) to
    * an array of query type and array of normalized queries.
+   *
+   * The last element lists the members an access policy refused member-level
+   * access to (empty when nothing was denied). Denied queries are still
+   * normalized — `applyRowLevelSecurity` neutralizes them with a `1 = 0`
+   * segment — so each API can decide whether that's an empty result (SQL API)
+   * or an error (data APIs, see `load`).
    */
   protected async getNormalizedQueries(
     inputQuery: Record<string, any> | Record<string, any>[],
@@ -1331,7 +1337,7 @@ class ApiGateway {
     persistent = false,
     memberExpressions: boolean = false,
     cacheMode?: CacheMode,
-  ): Promise<[QueryType, NormalizedQuery[], NormalizedQuery[]]> {
+  ): Promise<[QueryType, NormalizedQuery[], NormalizedQuery[], string[]]> {
     let query = this.parseQueryParam(inputQuery);
 
     let queryType: QueryType = QueryTypeEnum.REGULAR_QUERY;
@@ -1380,6 +1386,8 @@ class ApiGateway {
       };
     });
 
+    const deniedMembers = new Set<string>();
+
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queryNormalizationResult.map(
         async ({ normalizedQuery, hasExpressionsInQuery }) => {
@@ -1392,11 +1400,16 @@ class ApiGateway {
           }
 
           // First apply cube/view level security policies
-          const { query: queryWithRlsFilters, denied } = await compilerApi.applyRowLevelSecurity(
+          const {
+            query: queryWithRlsFilters,
+            denied,
+            deniedMembers: queryDeniedMembers,
+          } = await compilerApi.applyRowLevelSecurity(
             normalizedQuery,
             evaluatedQuery,
             context
           );
+          (queryDeniedMembers || []).forEach((member: string) => deniedMembers.add(member));
           // Then apply user-supplied queryRewrite
           let rewrittenQuery = !denied ? await this.queryRewrite(
             queryWithRlsFilters,
@@ -1443,7 +1456,12 @@ class ApiGateway {
       }
     }
 
-    return [queryType, normalizedQueries, queryNormalizationResult.map((it) => remapToQueryAdapterFormat(it.normalizedQuery))];
+    return [
+      queryType,
+      normalizedQueries,
+      queryNormalizationResult.map((it) => remapToQueryAdapterFormat(it.normalizedQuery)),
+      Array.from(deniedMembers),
+    ];
   }
 
   protected async sql4sql({
@@ -2007,6 +2025,97 @@ class ApiGateway {
   }
 
   /**
+   * Collects the member names a request asked for, including the members
+   * referenced by its filters and the dimension behind a `dimension.granularity`
+   * path.
+   */
+  private requestedMemberNames(query: Query | Query[] | undefined): Set<string> {
+    const names = new Set<string>();
+
+    const addName = (member: unknown) => {
+      if (typeof member !== 'string') {
+        return;
+      }
+      names.add(member);
+      // `orders.created_at.month` references the `orders.created_at` dimension
+      const parts = member.split('.');
+      if (parts.length > 2) {
+        names.add(parts.slice(0, 2).join('.'));
+      }
+    };
+
+    const addFilters = (filters: any[] | undefined) => {
+      for (const filter of filters || []) {
+        if (filter?.and || filter?.or) {
+          addFilters(filter.and || filter.or);
+        } else {
+          addName(filter?.member || filter?.dimension);
+        }
+      }
+    };
+
+    const queries = (Array.isArray(query) ? query : [query]).filter(Boolean) as Query[];
+
+    for (const currentQuery of queries) {
+      (currentQuery.measures || []).forEach(addName);
+      (currentQuery.dimensions || []).forEach(addName);
+      (currentQuery.segments || []).forEach(addName);
+      (currentQuery.timeDimensions || []).forEach((td: any) => addName(td?.dimension));
+      addFilters(currentQuery.filters);
+    }
+
+    return names;
+  }
+
+  /**
+   * Fails the request when an access policy denied member-level access to any
+   * of the queried members.
+   *
+   * Such a query is not a server fault and must not be answered with the data
+   * it asks for, so it's reported as `403 Forbidden` rather than surfacing later
+   * as an internal error while the (deliberately empty) result is transformed.
+   *
+   * The message names the denied members the request itself asked for — the
+   * caller supplied those names, and a member that doesn't exist already fails
+   * differently (`400`, "not found for path"), so withholding them would hide
+   * nothing while making a denial hard to act on. Policies are evaluated over
+   * the members the generated SQL touches, though, which pulls in members the
+   * caller never named (a cube's primary key, for one); those are logged only.
+   *
+   * Dev mode is left alone: it doesn't enforce security checks, so a request
+   * without a token — the playground's normal state — carries no security
+   * context, resolves to no groups, and is therefore denied by every policy.
+   * Failing those would break the playground for any model using access
+   * policies, so the denial is only logged there.
+   */
+  protected assertMemberAccess(deniedMembers: string[], query: Query | Query[] | undefined, context: RequestContext) {
+    if (!deniedMembers.length) {
+      return;
+    }
+
+    this.log({
+      type: 'Access Policy Denied',
+      query,
+      deniedMembers,
+    }, context);
+
+    if (getEnv('devMode')) {
+      return;
+    }
+
+    const requested = this.requestedMemberNames(query);
+    const reportableMembers = deniedMembers.filter(member => requested.has(member)).sort();
+
+    throw new CubejsHandlerError(
+      403,
+      'Forbidden',
+      reportableMembers.length
+        ? `Access to the following members is denied by an access policy: ${reportableMembers.join(', ')}`
+        : 'Access to some of the requested members is denied by an access policy'
+    );
+  }
+
+  /**
    * Data queries APIs (`/load`, `/subscribe`) entry point. Used by
    * `CubejsApi#load` and `CubejsApi#subscribe` methods to fetch the
    * data.
@@ -2038,8 +2147,10 @@ class ApiGateway {
         query
       }, context);
 
-      const [queryType, normalizedQueries] =
+      const [queryType, normalizedQueries, , deniedMembers] =
         await this.getNormalizedQueries(query, context, false, false, cacheMode);
+
+      this.assertMemberAccess(deniedMembers, query, context);
 
       if (
         queryType !== QueryTypeEnum.REGULAR_QUERY &&

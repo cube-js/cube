@@ -53,6 +53,20 @@ export interface CompilerApiOptions {
   allowNodeRequire?: boolean;
 }
 
+/**
+ * Outcome of evaluating access policies against a query.
+ *
+ * `denied` means member-level access was refused: at least one queried member
+ * is granted by no applicable policy. `deniedMembers` lists those members so
+ * the denial can be logged server-side — it must not be echoed back to the
+ * caller, who isn't allowed to know the members exist.
+ */
+export interface RowLevelSecurityResult {
+  query: NormalizedQuery;
+  denied: boolean;
+  deniedMembers: string[];
+}
+
 export interface GetSqlOptions {
   includeDebugInfo?: boolean;
   exportAnnotatedSql?: boolean;
@@ -489,12 +503,12 @@ export class CompilerApi {
     query: NormalizedQuery,
     evaluatedQuery: NormalizedQuery,
     context: Context
-  ): Promise<{ query: NormalizedQuery; denied: boolean }> {
+  ): Promise<RowLevelSecurityResult> {
     const compilers = await this.getCompilers({ requestId: context.requestId });
     const { cubeEvaluator } = compilers;
 
     if (!cubeEvaluator.isRbacEnabled()) {
-      return { query, denied: false };
+      return { query, denied: false, deniedMembers: [] };
     }
 
     // Get the SQL to extract member names from the query
@@ -682,17 +696,28 @@ export class CompilerApi {
         // SQL renders CASE WHEN {rowFilter} THEN {value} ELSE {mask} END.
         const memberRowConstraints: any[] = [];
         const seenRowConstraints = new Set<string>();
-        let cubeAccessDenied = false;
+
+        // Members no policy grants at all. Collected up front (rather than
+        // bailing on the first one) so callers can report every denied member
+        // of the cube instead of a single arbitrary one.
+        const deniedMembers = cubeMembersInQuery.filter(
+          (memberName) => !userPolicies.some((policy: any) => policyGrantsMember(policy, memberName))
+        );
+
+        if (deniedMembers.length > 0) {
+          query.segments = query.segments || [];
+          query.segments.push({
+            expression: () => '1 = 0',
+            cubeName: cube.name,
+            name: 'rlsAccessDenied',
+          } as unknown as MemberExpression);
+          return { query, denied: true, deniedMembers };
+        }
 
         for (const memberName of cubeMembersInQuery) {
           const grantingPolicies = userPolicies.filter(
             (policy: any) => policyGrantsMember(policy, memberName)
           );
-
-          if (grantingPolicies.length === 0) {
-            cubeAccessDenied = true;
-            break;
-          }
 
           const hasUnconditionalFullAccess = grantingPolicies.some((policy: any) => {
             const inFullAccess = !policy.memberLevel ||
@@ -746,16 +771,6 @@ export class CompilerApi {
           }
         }
 
-        if (cubeAccessDenied) {
-          query.segments = query.segments || [];
-          query.segments.push({
-            expression: () => '1 = 0',
-            cubeName: cube.name,
-            name: 'rlsAccessDenied',
-          } as unknown as MemberExpression);
-          return { query, denied: true };
-        }
-
         if (memberRowConstraints.length > 0) {
           rlsConstraints.push(
             memberRowConstraints.length === 1
@@ -795,7 +810,7 @@ export class CompilerApi {
         filter: memberMaskFiltersMap[member],
       }));
     }
-    return { query, denied: false };
+    return { query, denied: false, deniedMembers: [] };
   }
 
   protected filterMemberName(filter: any): string | undefined {

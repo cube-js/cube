@@ -10,6 +10,11 @@ import {
   JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
 } from './smoke-tests';
 
+// Member-level denials are refused up front by the API gateway, so the response
+// carries a policy error naming the denied members instead of the
+// post-execution "hidden member" error.
+const ACCESS_DENIED_ERROR = 'denied by an access policy';
+
 describe('GraphQL Schema Caching and RBAC', () => {
   jest.setTimeout(60 * 5 * 1000);
   let birdbox: BirdBox;
@@ -84,7 +89,7 @@ describe('GraphQL Schema Caching and RBAC', () => {
       }
     }`);
     expect(restrictedResult.errors).toBeDefined();
-    expect(restrictedResult.errors[0].message).toContain('You requested hidden member');
+    expect(restrictedResult.errors[0].message).toContain(ACCESS_DENIED_ERROR);
   });
 
   test('tenant-b can query tier but not internalCode', async () => {
@@ -103,7 +108,7 @@ describe('GraphQL Schema Caching and RBAC', () => {
       }
     }`);
     expect(restrictedResult.errors).toBeDefined();
-    expect(restrictedResult.errors[0].message).toContain('You requested hidden member');
+    expect(restrictedResult.errors[0].message).toContain(ACCESS_DENIED_ERROR);
   });
 
   test('default group cannot query any fields - complete denial returns errors', async () => {
@@ -113,7 +118,7 @@ describe('GraphQL Schema Caching and RBAC', () => {
       }
     }`);
     expect(result1.errors).toBeDefined();
-    expect(result1.errors[0].message).toContain('You requested hidden member');
+    expect(result1.errors[0].message).toContain(ACCESS_DENIED_ERROR);
 
     const result2 = await graphqlRequest('default', `{
       cube(where: { orders: {} }) {
@@ -121,7 +126,7 @@ describe('GraphQL Schema Caching and RBAC', () => {
       }
     }`);
     expect(result2.errors).toBeDefined();
-    expect(result2.errors[0].message).toContain('You requested hidden member');
+    expect(result2.errors[0].message).toContain(ACCESS_DENIED_ERROR);
 
     const result3 = await graphqlRequest('default', `{
       cube(where: { orders: {} }) {
@@ -129,6 +134,6 @@ describe('GraphQL Schema Caching and RBAC', () => {
       }
     }`);
     expect(result3.errors).toBeDefined();
-    expect(result3.errors[0].message).toContain('You requested hidden member');
+    expect(result3.errors[0].message).toContain(ACCESS_DENIED_ERROR);
   });
 });
