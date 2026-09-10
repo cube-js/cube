@@ -310,9 +310,7 @@ impl PlanSqlTemplates {
         )
     }
 
-    /// The type a cast has to name to produce a NULL of `sql_type`. Most dialects hold a
-    /// NULL in any type and name nothing; one whose types reject it names the nullable
-    /// form under `types/nullable`.
+    /// The type a cast has to name to produce a NULL of `sql_type`.
     pub fn nullable_type(&self, sql_type: &str) -> Result<String, CubeError> {
         if !self.render.contains_template("types/nullable") {
             return Ok(sql_type.to_string());

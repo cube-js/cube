@@ -187,8 +187,6 @@ export class ClickHouseQuery extends BaseQuery {
   }
 
   public castToString(sql) {
-    // The keys this counts may hold NULLs, and a ClickHouse type takes one only in its
-    // nullable form
     return `CAST(${sql} as Nullable(String))`;
   }
 
