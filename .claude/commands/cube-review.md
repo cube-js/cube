@@ -8,7 +8,10 @@ given in a `PR NUMBER:` line above. Without either, resolve the PR for the
 current branch with `gh pr view`.
 
 If the PR references an issue, read it with `gh issue view` — the reported
-symptom is what the fix has to actually cover. `gh issue list` / `gh search
+symptom is what the fix has to actually cover. Read the changed files
+themselves, not just the diff — a hunk that looks fine in isolation often is
+not. When a finding hinges on runtime behaviour and `docker` / `psql` are
+available, reproduce it instead of guessing. `gh issue list` / `gh search
 issues` are available when the change looks related to other open reports.
 
 Perform a comprehensive code review with the following focus areas:
