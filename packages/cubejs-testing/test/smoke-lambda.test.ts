@@ -11,6 +11,7 @@ import {
   DEFAULT_CONFIG,
   JEST_AFTER_ALL_DEFAULT_TIMEOUT,
   JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
+  stopIfStarted,
 } from './smoke-tests';
 
 const CubeStoreDriver = require('@cubejs-backend/cubestore-driver');
@@ -79,12 +80,12 @@ describe('lambda', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox.stop();
-    await db.stop();
-    await dbKafka.stop();
-    await dbKsql.stop();
-    await network.stop();
-    await cubestore.release();
+    await stopIfStarted('birdbox', birdbox);
+    await stopIfStarted('db', db);
+    await stopIfStarted('dbKafka', dbKafka);
+    await stopIfStarted('dbKsql', dbKsql);
+    await stopIfStarted('network', network);
+    await stopIfStarted('cubestore', cubestore && (() => cubestore.release()));
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('Query lambda with ksql ', async () => {

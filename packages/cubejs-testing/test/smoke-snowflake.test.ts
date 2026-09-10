@@ -7,6 +7,7 @@ import {
   DEFAULT_CONFIG,
   JEST_AFTER_ALL_DEFAULT_TIMEOUT,
   JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
+  stopIfStarted,
 } from './smoke-tests';
 
 const CubeStoreDriver = require('@cubejs-backend/cubestore-driver');
@@ -42,7 +43,7 @@ describe('snowflake', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox.stop();
+    await stopIfStarted('birdbox', birdbox);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('int column data type', async () => {

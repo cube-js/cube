@@ -7,6 +7,7 @@ import WebSocketTransport from '@cubejs-client/ws-transport';
 import { uniq } from 'ramda';
 import { BirdBox, Env, getBirdbox } from '../src';
 import { DriverTest } from './driverTests/driverTest';
+import { stopIfStarted } from './smoke-tests';
 
 type SupportedDriverType =
   'postgres' |
@@ -61,8 +62,8 @@ export function executeTestSuite({ type, tests, config = {} }: TestSuite) {
       });
     });
     afterAll(async () => {
-      await transport.close();
-      await box.stop();
+      await stopIfStarted('transport', transport && (() => transport.close()));
+      await stopIfStarted('birdbox', box);
     });
 
     for (const t of tests) {

@@ -2,21 +2,24 @@ import cubejs, { CubeApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { TrinoDBRunner } from '@cubejs-backend/testing-shared';
+import { StartedTestContainer } from 'testcontainers';
 import { BirdBox, getBirdbox } from '../src';
 import {
   DEFAULT_API_TOKEN,
   DEFAULT_CONFIG,
   JEST_AFTER_ALL_DEFAULT_TIMEOUT,
   JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
+  stopIfStarted,
 } from './smoke-tests';
 
 describe('trino', () => {
   jest.setTimeout(60 * 5 * 1000);
+  let db: StartedTestContainer;
   let birdbox: BirdBox;
   let client: CubeApi;
 
   beforeAll(async () => {
-    const db = await TrinoDBRunner.startContainer({});
+    db = await TrinoDBRunner.startContainer({});
     birdbox = await getBirdbox(
       'trino',
       {
@@ -39,7 +42,8 @@ describe('trino', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox.stop();
+    await stopIfStarted('birdbox', birdbox);
+    await stopIfStarted('db', db);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('query measure grouped by time dimension with timezone', async () => {

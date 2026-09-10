@@ -11,6 +11,7 @@ import {
   DEFAULT_CONFIG,
   JEST_AFTER_ALL_DEFAULT_TIMEOUT,
   JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
+  stopIfStarted,
 } from './smoke-tests';
 
 const PG_PORT = 5656;
@@ -83,8 +84,8 @@ describe('Cube RBAC Engine', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox.stop();
-    await db.stop();
+    await stopIfStarted('birdbox', birdbox);
+    await stopIfStarted('db', db);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   describe('RBAC via SQL API', () => {
@@ -1513,8 +1514,8 @@ describe('Cube RBAC Engine [Tesseract]', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox.stop();
-    await db.stop();
+    await stopIfStarted('birdbox', birdbox);
+    await stopIfStarted('db', db);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   describe('Shorthand and mask tests via SQL API [Tesseract]', () => {
@@ -1756,8 +1757,8 @@ describe('Cube RBAC Engine [dev mode]', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox.stop();
-    await db.stop();
+    await stopIfStarted('birdbox', birdbox);
+    await stopIfStarted('db', db);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('line_items hidden created_at', async () => {
@@ -1812,8 +1813,8 @@ describe('Cube RBAC Engine [Python config]', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox.stop();
-    await db.stop();
+    await stopIfStarted('birdbox', birdbox);
+    await stopIfStarted('db', db);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   describe('RBAC via SQL API [python config]', () => {
@@ -1879,8 +1880,8 @@ describe('Cube RBAC Engine [Python config][dev mode]', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox.stop();
-    await db.stop();
+    await stopIfStarted('birdbox', birdbox);
+    await stopIfStarted('db', db);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('products with no matching policy', async () => {
