@@ -34,6 +34,8 @@ import type {
 } from '@clickhouse/client';
 import { v4 as uuidv4 } from 'uuid';
 
+import { version } from '../package.json';
+
 import { ClickHouseRowStream } from './RowStream';
 import { buildTransformFromMeta, transformRow } from './Transform';
 import { formatError } from './utils';
@@ -268,6 +270,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       request_timeout: this.config.requestTimeout,
       max_open_connections: maxPoolSize,
       http_headers: this.config.headers,
+      application: `CubeDev_Cube/${version}`,
       log: {
         LoggerClass: this.clientLoggerClass(),
         // At WARN the client advises enabling progress headers on every construction,
