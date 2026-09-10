@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://cube.dev?ref=github-readme"><img src="https://raw.githubusercontent.com/cube-js/cube/master/docs/content/cube-core-logo.png" alt="Cube Core — Open-Source Semantic Layer" width="300px"></a>
+  <a href="https://cube.dev?ref=github-readme"><img src="https://raw.githubusercontent.com/cube-js/cube/master/.github/assets/cube-core-logo.png" alt="Cube Core — Open-Source Semantic Layer" width="300px"></a>
 </p>
 <br/>
 
@@ -14,7 +14,7 @@ __Cube Core is the open-source semantic layer.__ Define metrics, dimensions, joi
 Cube Core works with all SQL data sources, including cloud data warehouses like Snowflake, Databricks, and BigQuery; query engines like Presto and Amazon Athena; and application databases like Postgres. It has a built-in relational caching engine to provide sub-second latency and high concurrency for API requests.
 
 <img
-  src="https://raw.githubusercontent.com/cube-js/cube/master/docs/content/cube-core-schema.png"
+  src="https://raw.githubusercontent.com/cube-js/cube/master/.github/assets/cube-core-schema.png"
   alt="Cube Core — semantic layer connecting data sources to embedded analytics, BI tools, and AI agents"
   style="border: none"
   width="100%"

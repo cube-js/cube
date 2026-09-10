@@ -1,6 +1,6 @@
 docs:
 - changed-files:
-  - any-glob-to-any-file: docs/*
+  - any-glob-to-any-file: docs-mintlify/**/*
 
 # Data source drivers
 data source driver:
