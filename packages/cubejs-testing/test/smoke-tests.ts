@@ -34,9 +34,14 @@ interface Stoppable {
 }
 
 export async function stopIfStarted(name: string, resource: Stoppable | undefined) {
-  if (resource) {
-    await resource.stop();
-  } else {
+  if (!resource) {
     console.warn(`[smoke] ${name} was never started, nothing to stop`);
+    return;
+  }
+
+  try {
+    await resource.stop();
+  } catch (e) {
+    console.warn(`[smoke] failed to stop ${name}:`, e);
   }
 }
