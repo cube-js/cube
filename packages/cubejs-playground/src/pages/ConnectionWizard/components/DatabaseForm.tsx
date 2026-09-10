@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 
 import Base64Upload from './Base64Upload';
 
-function DatabaseFormControl({ param }) {
+function databaseFormControl(param) {
   if (!param.title) {
     return (
       <Input.TextArea
@@ -77,7 +77,7 @@ export default function DatabaseForm({
           label={param.title || param.env}
           name={param.env}
         >
-          <DatabaseFormControl param={param} />
+          {databaseFormControl(param)}
         </Form.Item>
       )))}
 
