@@ -574,6 +574,10 @@ export class CubejsServerCore {
     await this.orchestratorStorage.releaseConnections();
 
     this.orchestratorStorage.clear();
+    // A build still in flight would otherwise keep handing its pre-reset api --
+    // built from the pre-reset context and the env this is about to reload -- to
+    // every caller arriving until it settles.
+    this.buildingOrchestratorApis.clear();
     this.compilerCache.clear();
 
     this.reloadEnvVariables();
