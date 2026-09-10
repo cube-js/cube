@@ -22,8 +22,7 @@ const logStage = (stage) => {
 };
 
 const create = async (projectName, options) => {
-  options.template = options.template || 'docker';
-  const createAppOptions = { projectName, dbType: options.dbType, template: options.template };
+  const createAppOptions = { projectName, dbType: options.dbType, template: 'docker' };
 
   event({
     event: 'Create App',
@@ -39,13 +38,7 @@ const create = async (projectName, options) => {
     );
   }
 
-  if (!templates[options.template]) {
-    await displayError(
-      `Unknown template ${chalk.red(options.template)}`,
-      createAppOptions
-    );
-  }
-  const templateConfig = templates[options.template];
+  const templateConfig = templates.docker;
 
   await fs.ensureDir(projectName);
   process.chdir(projectName);
@@ -58,12 +51,12 @@ const create = async (projectName, options) => {
     version: '0.0.1',
     private: true,
     scripts: templateConfig.scripts,
-    template: options.template,
+    template: 'docker',
     templateVersion: cliManifest.version,
   });
 
   logStage('Installing server dependencies');
-  await npmInstall(['@cubejs-backend/server'], options.template === 'docker');
+  await npmInstall(['@cubejs-backend/server'], true);
 
   if (!options.dbType) {
     const Drivers = requireFromPackage<any>('@cubejs-backend/server-core/dist/src/core/DriverDependencies.js');
@@ -85,7 +78,7 @@ const create = async (projectName, options) => {
     await displayError(`Unsupported db type: ${chalk.green(options.dbType)}`, createAppOptions);
   }
 
-  await npmInstall([driverPackageName], options.template === 'docker');
+  await npmInstall([driverPackageName], true);
 
   if (driverPackageName === '@cubejs-backend/jdbc-driver') {
     logStage('Installing JDBC dependencies');
@@ -137,7 +130,6 @@ const create = async (projectName, options) => {
   const env = {
     dbType: options.dbType,
     apiSecret: crypto.randomBytes(64).toString('hex'),
-    projectName,
     dockerVersion: `v${dockerVersion.version}`,
     driverEnvVariables: driverClass.driverEnvVariables && driverClass.driverEnvVariables()
   };
@@ -146,16 +138,6 @@ const create = async (projectName, options) => {
     await fs.ensureDir(path.dirname(fileName));
     await fs.writeFile(fileName, templateConfig.files[fileName](env));
   }));
-
-  if (templateConfig.dependencies) {
-    logStage('Installing template dependencies');
-    await npmInstall(templateConfig.dependencies);
-  }
-
-  if (templateConfig.devDependencies) {
-    logStage('Installing template dev dependencies');
-    await npmInstall(templateConfig.devDependencies);
-  }
 
   await event({
     event: 'Create App Success',
@@ -180,10 +162,6 @@ export function configureCreateCommand(program: CommanderStatic) {
       '-d, --db-type <db-type>',
       'Preconfigure for selected database.\n\t\t\t     ' +
       'Options: postgres, mysql, mongobi, athena, redshift, bigquery, mssql, clickhouse, snowflake, presto, questdb, materialize, firebolt'
-    )
-    .option(
-      '-t, --template <template>',
-      'App template. Options: docker (default), express, serverless, serverless-google.'
     )
     .description('Create new Cube app')
     .action(
