@@ -13,8 +13,8 @@ const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
 
 class DruidFilter extends BaseFilter {
   // Druid's LIKE has no default escape character, so the clause is what makes
-  // the wildcard escaping applied to the value mean anything. Unverified against
-  // a real broker: whether Druid honours ESCAPE on a non-literal pattern.
+  // the wildcard escaping applied to the value mean anything. It honours the
+  // clause on a CONCAT(...) pattern, which druid-driver.test.ts checks by values.
   public likeIgnoreCase(column, not, param, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
