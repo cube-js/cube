@@ -12,7 +12,8 @@ preconfigured alias:
 
 For each thread where ALL of the following hold:
   - `isResolved` is false
-  - the first comment's `author.login` is `claude`
+  - the first comment's `author.login` is yours — `claude` in CI, otherwise
+    the login `gh api user -q .login` returns
   - the concern is no longer applicable in the current diff (file/line gone,
     code rewritten, issue addressed)
 
@@ -21,7 +22,9 @@ resolve it with:
   gh resolve-thread <thread-id>
 
 Do not resolve threads from human reviewers under any circumstance, even if the
-concern looks addressed — leave that decision to the reviewer. Only the two
+concern looks addressed — leave that decision to the reviewer. That includes the
+human whose login you are running under: resolve only threads you recognise as
+output of an earlier review round. Only the two
 aliases above are available; raw `gh api graphql` is not permitted.
 
 **Avoiding duplicate inline comments:**
@@ -32,7 +35,8 @@ deduplicate against your own prior comments. Before calling
 an existing thread already covers it. Skip creating a new inline comment when ALL
 of the following hold for any thread in the list:
   - `isResolved` is false
-  - the first comment's `author.login` is `claude`
+  - the first comment's `author.login` is yours — `claude` in CI, otherwise
+    the login `gh api user -q .login` returns
   - the thread is on the same `path` and `line` as the new issue you would post
   - the existing comment's body raises substantively the same concern (same root
     cause, same fix direction — wording does not need to match)
