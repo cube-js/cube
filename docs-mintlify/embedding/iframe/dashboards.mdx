@@ -103,22 +103,27 @@ format. Reading the parameters works anywhere; it's the writing that is
 published-only. See [Controls → Sharing the current
 selection](/docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection).
 
-## Allow chart export {#allow-csv-export}
+## Allow chart and dashboard export {#allow-csv-export}
 
 By default, embedded dashboards do not expose a download action on individual
-widgets. To let viewers download a chart widget as a **CSV**, **PNG**, or
-**PDF** file, add the `allowExport=true` query parameter to the embed URL:
+widgets or on the dashboard as a whole. To let viewers download a chart widget
+as a **CSV**, **PNG**, or **PDF** file, and download the **whole dashboard** as
+a **PNG** or **PDF**, add the `allowExport=true` query parameter to the embed
+URL:
 
 ```text
 https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&allowExport=true
 ```
 
 When enabled, each chart widget's ⋮ menu shows **Download as CSV**, **Download
-as PNG**, and **Download as PDF** actions. `allowExport` is the single switch
-for all three formats — there is no way to allow one format while blocking
-another. Only the exact literal string `true` opts in: `allowExport=1`,
-`allowExport=TRUE`, a bare `?allowExport`, and omitting the parameter (the
-default) all leave every download action hidden.
+as PNG**, and **Download as PDF** actions, and a dashboard-level ⋮ appears —
+docked in the header in creator mode, floating over the dashboard in the
+published-dashboard embed — with **Download as PNG** and **Download as PDF**
+for the whole dashboard. `allowExport` is the single switch for all of these —
+there is no way to allow one format, or only chart- or dashboard-level export,
+while blocking another. Only the exact literal string `true` opts in:
+`allowExport=1`, `allowExport=TRUE`, a bare `?allowExport`, and omitting the
+parameter (the default) all leave every download action hidden.
 
 The CSV is generated client-side from the data already loaded into the
 widget, so no additional query is issued. Inside an embed, `allowExport` —
