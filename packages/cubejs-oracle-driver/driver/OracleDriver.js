@@ -278,3 +278,4 @@ class OracleDriver extends BaseDriver {
 }
 
 module.exports = OracleDriver;
+module.exports.OracleDriver = OracleDriver;
