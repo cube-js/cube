@@ -3,6 +3,27 @@ import { useEffect } from 'react';
 
 import Base64Upload from './Base64Upload';
 
+function DatabaseFormControl({ param }) {
+  if (!param.title) {
+    return (
+      <Input.TextArea
+        data-testid={param.env}
+        rows={1}
+        style={{
+          overflow: 'hidden',
+          resize: 'none',
+        }}
+      />
+    );
+  }
+
+  if (param.env === 'CUBEJS_DB_PASS') {
+    return <Input.Password data-testid={param.env} />;
+  }
+
+  return <Input data-testid={param.env} />;
+}
+
 export default function DatabaseForm({
   db,
   deployment,
@@ -56,22 +77,7 @@ export default function DatabaseForm({
           label={param.title || param.env}
           name={param.env}
         >
-          {param.title && param.env === 'CUBEJS_DB_PASS' && (
-            <Input.Password data-testid={param.env} />
-          )}
-          {param.title && param.env !== 'CUBEJS_DB_PASS' && (
-            <Input data-testid={param.env} />
-          )}
-          {!param.title && (
-            <Input.TextArea
-              data-testid={param.env}
-              rows={1}
-              style={{
-                overflow: 'hidden',
-                resize: 'none',
-              }}
-            />
-          )}
+          <DatabaseFormControl param={param} />
         </Form.Item>
       )))}
 
