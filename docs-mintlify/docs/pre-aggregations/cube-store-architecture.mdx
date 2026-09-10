@@ -1045,6 +1045,15 @@ Self-hosted deployments can raise the ceiling instead, but
 `CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE` and `CUBESTORE_TRANSPORT_MAX_FRAME_SIZE`
 have to go up together, since a message is sent as a single frame.
 
+### Connection limits
+
+Alongside message size, a node can also cap how many of these WebSocket
+connections one authenticated user holds at once, via
+[`CUBESTORE_MAX_WS_CONNECTIONS_PER_USER`](/reference/configuration/environment-variables#cubestore_max_ws_connections_per_user).
+At the limit, the user's oldest connection is closed to admit the new one; a
+client that still needs it reconnects. The limit is counted per node and
+disabled (`0`) by default.
+
 ### Why it lives in Cube Store
 
 Folding the cache and queue into Cube Store is itself a design decision in
