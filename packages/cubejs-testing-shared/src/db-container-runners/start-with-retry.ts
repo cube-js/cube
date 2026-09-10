@@ -6,10 +6,14 @@ export interface StartContainerRetryOptions {
   delay?: number;
 }
 
-// Subclass instead of a cast to any: an upstream rename of `imageName` fails the build.
-class ImageNameReader extends GenericContainer {
-  public static of(container: GenericContainer): ImageName {
-    return (container as ImageNameReader).imageName;
+// Subclass instead of a cast to any: an upstream rename of these fields fails the build.
+class ContainerInternals extends GenericContainer {
+  public static imageNameOf(container: GenericContainer): ImageName {
+    return (container as ContainerInternals).imageName;
+  }
+
+  public static platformOf(container: GenericContainer): string | undefined {
+    return (container as ContainerInternals).createOpts.platform;
   }
 }
 
@@ -37,7 +41,11 @@ function isPermanent(error: unknown): boolean {
 
 // Pulling here rather than in start() keeps the retry on the pull: a container that
 // fails its wait strategy is a real failure and restarting it only burns the timeout.
-export async function pullImageWithRetry(imageName: ImageName, options: StartContainerRetryOptions = {}) {
+async function pullImageWithRetry(
+  imageName: ImageName,
+  platform: string | undefined,
+  options: StartContainerRetryOptions,
+) {
   const attempts = options.attempts
     ?? parseInt(process.env.TEST_CONTAINER_PULL_ATTEMPTS || '3', 10);
   const delay = options.delay
@@ -47,7 +55,7 @@ export async function pullImageWithRetry(imageName: ImageName, options: StartCon
 
   for (let attempt = 1; ; attempt++) {
     try {
-      await client.image.pull(imageName, { force: false, platform: undefined });
+      await client.image.pull(imageName, { force: false, platform });
       return;
     } catch (error) {
       if (attempt >= attempts || isPermanent(error)) {
@@ -69,7 +77,11 @@ export async function startContainerWithRetry<C extends GenericContainer>(
   container: C,
   options: StartContainerRetryOptions = {},
 ): Promise<Awaited<ReturnType<C['start']>>> {
-  await pullImageWithRetry(ImageNameReader.of(container), options);
+  await pullImageWithRetry(
+    ContainerInternals.imageNameOf(container),
+    ContainerInternals.platformOf(container),
+    options,
+  );
 
   return container.start() as Promise<Awaited<ReturnType<C['start']>>>;
 }
