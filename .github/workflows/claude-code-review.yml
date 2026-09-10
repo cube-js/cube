@@ -40,7 +40,7 @@ jobs:
       # `Read` lets the run read anything on the runner, so gate it on the PR
       # head coming from someone with write access. On `workflow_call` the
       # payload is the caller's issue_comment, whose issue is the PR.
-      READ_TOOL: ${{ contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association || github.event.issue.author_association) && ',Read' || '' }}
+      ADDITIONAL_ALLOWED_TOOLS: ${{ contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association || github.event.issue.author_association) && ',Read' || '' }}
     steps:
       - name: React to trigger comment
         # Quick ACK so the user who typed /bot-review or /bot-deep-review sees
@@ -102,7 +102,7 @@ jobs:
 
           # Tools for comprehensive PR review
           claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,mcp__github__get_issue_comments,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh search issues:*),Bash(gh list-review-threads:*),Bash(gh resolve-thread:*)${{ env.READ_TOOL }}"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,mcp__github__get_issue_comments,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh search issues:*),Bash(gh list-review-threads:*),Bash(gh resolve-thread:*)${{ env.ADDITIONAL_ALLOWED_TOOLS }}"
             --model "claude-opus-5"
             --effort ${{ inputs.effort || 'medium' }}
 
