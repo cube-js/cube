@@ -1,10 +1,10 @@
+// A replaced `OrchestratorStorage` entry is released, and releasing an api closes
+// its Cube Store connection for good -- so building an api twice for one id
+// destroys the connection of whoever holds the api it replaces.
+
 import { CubejsServerCore } from '../../src';
 import { OrchestratorApi } from '../../src/core/OrchestratorApi';
 
-// A replaced `OrchestratorStorage` entry is released, and releasing an api
-// closes its Cube Store connection for good -- so building an api twice for one
-// id is not merely wasteful, it destroys the connection of whoever holds the
-// api it replaces.
 const cores: CubejsServerCore[] = [];
 
 function createServerCore(options: Record<string, unknown> = {}) {
@@ -83,6 +83,19 @@ describe('CubejsServerCore.getOrchestratorApi', () => {
     const [dataQuery, countQuery] = await callConcurrently(createServerCore(), 2);
 
     expect(dataQuery).toBe(countQuery);
+    expect(release).not.toHaveBeenCalled();
+  });
+
+  test('callers of different ids get an api each', async () => {
+    const core = createServerCore({
+      contextToOrchestratorId: (context: any) => context.requestId,
+    });
+
+    const apis = await callConcurrently(core, 3);
+
+    // The other cases all pin one id, so a memo keyed too loosely -- or not
+    // keyed at all -- would satisfy every one of them.
+    expect(new Set(apis).size).toEqual(3);
     expect(release).not.toHaveBeenCalled();
   });
 
