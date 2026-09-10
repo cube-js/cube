@@ -24,8 +24,8 @@ resolve it with:
 Do not resolve threads from human reviewers under any circumstance, even if the
 concern looks addressed — leave that decision to the reviewer. That includes the
 human whose login you are running under: resolve only threads you recognise as
-output of an earlier review round. Only the two
-aliases above are available; raw `gh api graphql` is not permitted.
+output of an earlier review round. Only the two aliases above are available;
+raw `gh api graphql` is not permitted.
 
 **Avoiding duplicate inline comments:**
 
