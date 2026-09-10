@@ -117,13 +117,14 @@ https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?sessi
 
 When enabled, each chart widget's ⋮ menu shows **Download as CSV**, **Download
 as PNG**, and **Download as PDF** actions, and a dashboard-level ⋮ appears —
-docked in the header in [Creator Mode](/embedding/iframe/creator-mode), floating over the dashboard in the
-published-dashboard embed — with **Download as PNG** and **Download as PDF**
-for the whole dashboard. `allowExport` is the single switch for all of these —
-there is no way to allow one format while blocking another, or to allow
-chart-level export without dashboard-level export. Only the exact literal string `true` opts in:
-`allowExport=1`, `allowExport=TRUE`, a bare `?allowExport`, and omitting the
-parameter (the default) all leave every download action hidden.
+docked in the header in [Creator Mode](/embedding/iframe/creator-mode),
+floating over the dashboard in the published-dashboard embed — with **Download
+as PNG** and **Download as PDF** for the whole dashboard. `allowExport` is the
+single switch for all of these — there is no way to allow one format while
+blocking another, or to allow chart-level export without dashboard-level
+export. Only the exact literal string `true` opts in: `allowExport=1`,
+`allowExport=TRUE`, a bare `?allowExport`, and omitting the parameter (the
+default) all leave every download action hidden.
 
 The CSV is generated client-side from the data already loaded into the
 widget, so no additional query is issued. Inside an embed, `allowExport` —
