@@ -37,7 +37,7 @@ const flushReleases = () => new Promise(resolve => { setImmediate(resolve); });
 
 async function waitFor(condition: () => boolean) {
   for (let i = 0; i < 100 && !condition(); i++) {
-    await new Promise(resolve => { setImmediate(resolve); });
+    await flushReleases();
   }
 
   if (!condition()) {
@@ -132,11 +132,10 @@ describe('CubejsServerCore.getOrchestratorApi', () => {
     expect(attempts).toEqual(2);
   });
 
-  // `resetInstanceState()` clears the memo mid-build, so the build it dropped
-  // settles to find the entry owned by a later caller's build. Deleting it there
-  // would send that build's callers back to building an api each. Reachable only
-  // when the dropped build fails: one that succeeds fills the cache on its way
-  // out, and callers read the cache before the memo.
+  // Reachable only when the build dropped by `resetInstanceState()` fails: one
+  // that succeeds fills the cache on its way out, and callers read the cache
+  // before the memo. Deleting the entry it finds would send the replacement
+  // build's callers back to building an api each.
   test('a build that outlives a reset does not drop the build that replaced it', async () => {
     const core = createServerCore();
     const gates: Array<() => void> = [];
