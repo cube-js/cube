@@ -35,6 +35,16 @@ async function callConcurrently(core: CubejsServerCore, times: number) {
 // `disposeAfter` releases asynchronously, so let the microtasks drain first.
 const flushReleases = () => new Promise(resolve => { setImmediate(resolve); });
 
+async function waitFor(condition: () => boolean) {
+  for (let i = 0; i < 100 && !condition(); i++) {
+    await new Promise(resolve => { setImmediate(resolve); });
+  }
+
+  if (!condition()) {
+    throw new Error('Timed out waiting for the build to reach its gate');
+  }
+}
+
 describe('CubejsServerCore.getOrchestratorApi', () => {
   let release: jest.SpyInstance;
 
@@ -107,6 +117,54 @@ describe('CubejsServerCore.getOrchestratorApi', () => {
     expect(attempts).toEqual(1);
     await expect(callConcurrently(core, 1)).resolves.toBeDefined();
     expect(attempts).toEqual(2);
+  });
+
+  // `resetInstanceState()` clears the memo mid-build, so the build it dropped
+  // settles to find the entry owned by a later caller's build. Deleting it there
+  // would send that build's callers back to building an api each. Reachable only
+  // when the dropped build fails: one that succeeds fills the cache on its way
+  // out, and callers read the cache before the memo.
+  test('a build that outlives a reset does not drop the build that replaced it', async () => {
+    const core = createServerCore();
+    const gates: Array<() => void> = [];
+    let builds = 0;
+
+    jest.spyOn(core as any, 'orchestratorOptions').mockImplementation(async () => {
+      const build = builds++;
+
+      // Only the two builds this test orchestrates are held: a third one is the
+      // defect, and letting it run to completion makes the assertions below
+      // report the duplicate rather than time out waiting on it.
+      if (build < 2) {
+        await new Promise<void>(resolve => { gates.push(resolve); });
+      }
+
+      if (build === 0) {
+        throw new Error('the deployment went away mid-build');
+      }
+
+      return {};
+    });
+
+    const acrossReset = callConcurrently(core, 1);
+    await waitFor(() => gates.length === 1);
+
+    await core.resetInstanceState();
+
+    const afterReset = callConcurrently(core, 1);
+    await waitFor(() => gates.length === 2);
+
+    gates[0]();
+    await expect(acrossReset).rejects.toThrow('the deployment went away mid-build');
+
+    // The replacement is still in flight and the cache is still empty, so this
+    // caller can only be answered by the memo entry the failure just ran past.
+    const later = callConcurrently(core, 1);
+    gates[1]();
+
+    expect((await later)[0]).toBe((await afterReset)[0]);
+    expect(builds).toEqual(2);
+    expect(release).not.toHaveBeenCalled();
   });
 
   test('the Cube Store driver of a live caller is not closed under it', async () => {

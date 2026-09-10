@@ -131,17 +131,9 @@ export class CubejsServerCore {
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
 
   /**
-   * Orchestrator apis that are being built right now, by id, so that concurrent
-   * callers of one id end up on a single api instead of one each.
-   *
-   * Building is asynchronous and the cache is only written at the end of it, so
-   * without this every caller of a cold id misses the cache together and caches
-   * an api of its own. Each of those writes replaces the entry, and a replaced
-   * entry is released -- which closes the Cube Store connection of the api the
-   * previous caller is about to run its query on, failing that query with
-   * `Cube Store connection is closed`. Concurrency of two is the everyday case
-   * rather than a rarity: one `/v1/load` with `total: true` fetches the api
-   * once for its data query and once for its count query.
+   * In-flight orchestrator api builds, by id. Concurrent callers of a cold id must
+   * share one build: `OrchestratorStorage` releases a replaced entry, so a second
+   * build closes the Cube Store connection of the api the first caller is using.
    */
   protected readonly buildingOrchestratorApis: Map<string, Promise<OrchestratorApi>> = new Map();
 
@@ -601,14 +593,14 @@ export class CubejsServerCore {
       return building;
     }
 
-    // Registered before the first `await` inside the build, so nothing can run
-    // between the miss above and this line and take the same branch.
+    // Registered before the first `await` in the build, so nothing can interleave
+    // between the miss above and this line.
     const pending = this.buildOrchestratorApi(orchestratorId, context)
       .finally(() => {
-        // A build that failed must not be left behind to fail every later
-        // request for this id, and the one that succeeded is in the cache by
-        // now, so both are dropped here. Guarded because a build started after
-        // this one finished owns the entry.
+        // Dropped once settled: a success is in the cache by now, and a failure must
+        // not become the cached answer for this id. Identity-checked because
+        // `resetInstanceState()` clears the map mid-build, after which the entry
+        // belongs to a later caller's build rather than to this one.
         if (this.buildingOrchestratorApis.get(orchestratorId) === pending) {
           this.buildingOrchestratorApis.delete(orchestratorId);
         }
