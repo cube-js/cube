@@ -156,8 +156,7 @@ describe('MaterializeDriver', () => {
     const data = await driver.query(`SHOW CLUSTER;`, []);
     expect(data).toEqual([
       {
-        'cluster': 'quickstart',
+        cluster: 'quickstart',
       }]);
   });
-
 });

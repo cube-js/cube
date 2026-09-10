@@ -9,9 +9,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit",
-    "unit": "jest dist/test",
-    "lint": "eslint --debug src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "unit": "jest dist/test"
   },
   "files": [
     "README.md",
@@ -49,8 +47,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

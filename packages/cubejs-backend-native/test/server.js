@@ -138,5 +138,6 @@ const meta_fixture = require('./meta');
   });
 
   // block
+  // eslint-disable-next-line no-empty-function
   await new Promise(() => {});
 })();

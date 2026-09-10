@@ -73,9 +73,9 @@ const VARIABLES = {
   'padding-lg': '16px',
 };
 
-Object.keys(colors).forEach(
-  (name) => (VARIABLES[`${name}-color`] = color(name))
-);
+Object.keys(colors).forEach((name) => {
+  VARIABLES[`${name}-color`] = color(name);
+});
 
 const LESS_VARIABLES = {};
 const CSS_PROPERTIES = {};

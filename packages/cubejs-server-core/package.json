@@ -23,8 +23,6 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint src/* test/* --ext .ts,.js",
-    "lint:fix": "eslint --fix src/* test/* --ext .ts,.js",
     "test": "npm run unit",
     "unit": "jest --runInBand --forceExit --coverage dist/test"
   },
@@ -75,8 +73,5 @@
     "jest": "^29",
     "typescript": "~6.0.3"
   },
-  "license": "Apache-2.0",
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
-  }
+  "license": "Apache-2.0"
 }

@@ -17,8 +17,7 @@
     "test": "npm run unit && npm run integration",
     "unit": "jest ./**/*.test.js",
     "integration": "jest ./**/*.integration.js",
-    "integration:mysql-aurora-serverless": "npm run integration",
-    "lint": "eslint driver/*.js test/*.js"
+    "integration:mysql-aurora-serverless": "npm run integration"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.36",
@@ -37,8 +36,5 @@
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

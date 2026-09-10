@@ -5,7 +5,7 @@ on:
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
-      - '.eslintrc.js'
+      - '.oxlintrc.json'
       - '.prettierrc'
       - 'lerna.json'
       - 'package.json'

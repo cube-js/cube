@@ -14,9 +14,7 @@
   "author": "Cube Dev, Inc.",
   "scripts": {
     "test": "npm run unit",
-    "unit": "jest --passWithNoTests",
-    "lint": "eslint src/*.js",
-    "lint:fix": "eslint --fix src/*.js"
+    "unit": "jest --passWithNoTests"
   },
   "files": [
     "src",
@@ -27,14 +25,9 @@
   "license": "MIT",
   "devDependencies": {
     "@babel/core": "^7.24.5",
-    "@babel/eslint-parser": "^7",
     "@babel/preset-env": "^7.24.5",
     "@types/jest": "^29",
     "babel-jest": "^29",
-    "eslint": "^7.21.0",
-    "eslint-config-airbnb-base": "^13.1.0",
-    "eslint-plugin-import": "^2.22.1",
-    "eslint-plugin-node": "^10.0.0",
     "jest": "^29"
   },
   "publishConfig": {

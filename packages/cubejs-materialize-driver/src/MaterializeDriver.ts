@@ -167,7 +167,7 @@ export class MaterializeDriver extends PostgresDriver {
    * @returns {Promise<string>} version
    */
   public async getMaterializeVersion(): Promise<string> {
-    const [{ version }] = await this.query<{version: string}>('SELECT mz_version() as version;', []);
+    const [{ version }] = await this.query<{ version: string }>('SELECT mz_version() as version;', []);
 
     // Materialize returns the version as follows: 'v0.24.3-alpha.5 (65778f520)'
     return version.split(' ')[0];

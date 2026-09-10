@@ -18,9 +18,7 @@
     "test": "yarn integration",
     "unit": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test/unit",
     "integration": "npm run integration:athena",
-    "integration:athena": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "integration:athena": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test"
   },
   "files": [
     "dist/src",
@@ -44,9 +42,6 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   },
   "jest": {
     "testEnvironment": "node"

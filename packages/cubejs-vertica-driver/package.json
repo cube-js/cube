@@ -14,9 +14,7 @@
   "main": "src/VerticaDriver.js",
   "scripts": {
     "integration": "npm run integration:vertica",
-    "integration:vertica": "jest --verbose ./test",
-    "lint": "eslint **/*.js",
-    "lint:fix": "eslint --fix **/*.js"
+    "integration:vertica": "jest --verbose ./test"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.36",
@@ -35,8 +33,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

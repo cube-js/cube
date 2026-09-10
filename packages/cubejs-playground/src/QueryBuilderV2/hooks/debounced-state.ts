@@ -15,7 +15,7 @@ export function useDebouncedState<S>(
   const setValue = useEvent((next: S | ((currentValue: S) => S)) => {
     currentValueRef.current = next instanceof Function ? next(currentValueRef.current) : next;
 
-    void dSetState(currentValueRef.current);
+    dSetState(currentValueRef.current);
   });
 
   return [state, setValue];

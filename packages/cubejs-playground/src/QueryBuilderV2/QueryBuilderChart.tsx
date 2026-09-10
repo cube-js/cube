@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, ReactElement } from 'react';
 import {
   Button,
   Dialog,
@@ -28,9 +28,6 @@ import { AccordionCard } from './components/AccordionCard';
 import { OutdatedLabel } from './components/OutdatedLabel';
 import { QueryBuilderChartResults } from './QueryBuilderChartResults';
 
-const CHART_HEIGHT = 400;
-const MAX_SERIES_LIMIT = 25;
-
 interface QueryBuilderChartProps {
   maxHeight?: number;
   onToggle?: (isExpanded: boolean) => void;
@@ -41,7 +38,7 @@ const ALLOWED_CHART_TYPES = ['table', 'line', 'bar', 'area'];
 export function QueryBuilderChart(props: QueryBuilderChartProps) {
   const [isVizardLoaded, setIsVizardLoaded] = useState(false);
   const [isExpanded, setIsExpanded] = useLocalStorage('QueryBuilder:Chart:expanded', false);
-  const { maxHeight = CHART_HEIGHT, onToggle } = props;
+  const { onToggle } = props;
   let {
     query,
     isLoading,
@@ -101,50 +98,45 @@ export function QueryBuilderChart(props: QueryBuilderChartProps) {
   );
 
   const onMove = useCallback(
-    (arg) => {
-      return updatePivotConfig.moveItem(arg);
-    },
+    (arg) => updatePivotConfig.moveItem(arg),
     [updatePivotConfig]
   );
 
   const onUpdate = useCallback(
-    (arg) => {
-      return updatePivotConfig.update(arg);
-    },
+    (arg) => updatePivotConfig.update(arg),
     [updatePivotConfig]
   );
 
-  const pivotConfigurator = useMemo(() => {
-    return pivotConfig ? (
-      <DialogTrigger type="popover">
-        <Button size="small" rightIcon={<ChevronIcon direction="bottom" />}>
-          Pivot
-        </Button>
-        <Dialog border overflow="hidden" width="40x max-content 80x">
-          <PivotAxes pivotConfig={pivotConfig} onMove={onMove} />
-          <Divider />
-          <div style={{ padding: '8px' }}>
-            <PivotOptions pivotConfig={pivotConfig} onUpdate={onUpdate} />
-          </div>
-        </Dialog>
-      </DialogTrigger>
-    ) : undefined;
-  }, [pivotConfig, onMove, onUpdate]);
+  const pivotConfigurator = useMemo(() => (pivotConfig ? (
+    <DialogTrigger type="popover">
+      <Button size="small" rightIcon={<ChevronIcon direction="bottom" />}>
+        Pivot
+      </Button>
+      <Dialog border overflow="hidden" width="40x max-content 80x">
+        <PivotAxes pivotConfig={pivotConfig} onMove={onMove} />
+        <Divider />
+        <div style={{ padding: '8px' }}>
+          <PivotOptions pivotConfig={pivotConfig} onUpdate={onUpdate} />
+        </div>
+      </Dialog>
+    </DialogTrigger>
+  ) : undefined),
+  [pivotConfig, onMove, onUpdate]);
+
+  let subtitle: ReactElement | undefined;
+
+  if (isLoading && isExpanded) {
+    subtitle = <LoadingOutlined />;
+  } else if (!isLoading && isResultOutdated) {
+    subtitle = <OutdatedLabel />;
+  }
 
   return (
     <AccordionCard
       qa="QueryBuilderChart"
       isExpanded={isExpanded}
       title="Chart"
-      subtitle={
-        isLoading ? (
-          isExpanded ? (
-            <LoadingOutlined />
-          ) : undefined
-        ) : isResultOutdated ? (
-          <OutdatedLabel />
-        ) : undefined
-      }
+      subtitle={subtitle}
       extra={
         isExpanded ? (
           <Space>
@@ -193,8 +185,8 @@ export function QueryBuilderChart(props: QueryBuilderChartProps) {
                 >
                   Code
                 </Button>
-                {/*<TooltipProvider title="Get a code example that visualize your data using a charting library of your choice.">*/}
-                {/*</TooltipProvider>*/}
+                {/* <TooltipProvider title="Get a code example that visualize your data using a charting library of your choice."> */}
+                {/* </TooltipProvider> */}
                 <Dialog isDismissable>
                   <Header>
                     <Title>Chart Prototyping</Title>

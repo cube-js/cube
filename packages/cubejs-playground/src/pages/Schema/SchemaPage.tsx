@@ -17,19 +17,18 @@ const { TreeNode } = Tree;
 const { TabPane } = Tabs;
 
 const schemasMap = {};
-const schemaToTreeData = (schemas) =>
-  Object.keys(schemas).map((schemaName) => ({
-    title: schemaName,
-    key: schemaName,
-    treeData: Object.keys(schemas[schemaName]).map((tableName) => {
-      const key = `${schemaName}.${tableName}`;
-      schemasMap[key] = [schemaName, tableName];
-      return {
-        title: tableName,
-        key,
-      };
-    }),
-  }));
+const schemaToTreeData = (schemas) => Object.keys(schemas).map((schemaName) => ({
+  title: schemaName,
+  key: schemaName,
+  treeData: Object.keys(schemas[schemaName]).map((tableName) => {
+    const key = `${schemaName}.${tableName}`;
+    schemasMap[key] = [schemaName, tableName];
+    return {
+      title: tableName,
+      key,
+    };
+  }),
+}));
 
 type SchemaPageProps = RouterProps;
 
@@ -192,52 +191,49 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
       : [];
     const isYamlFormatSupported: boolean = (Number(major) > 0) || (!minor || Number(minor) >= 31);
 
-    const renderTreeNodes = (data) =>
-      data.map((item) => {
-        if (item.treeData) {
-          return (
-            // @ts-ignore
-            <TreeNode title={item.title} key={item.key} dataRef={item}>
-              {renderTreeNodes(item.treeData)}
-            </TreeNode>
-          );
-        }
-        return <TreeNode {...item} />;
-      });
+    const renderTreeNodes = (data) => data.map((item) => {
+      if (item.treeData) {
+        return (
+        // @ts-ignore
+          <TreeNode title={item.title} key={item.key} dataRef={item}>
+            {renderTreeNodes(item.treeData)}
+          </TreeNode>
+        );
+      }
+      return <TreeNode {...item} />;
+    });
 
-    const renderTree = () =>
-      Object.keys(tablesSchema || {}).length > 0 ? (
-        <Tree
-          checkable
-          onExpand={this.onExpand.bind(this)}
-          expandedKeys={expandedKeys}
-          autoExpandParent={autoExpandParent}
-          onCheck={this.onCheck.bind(this)}
-          checkedKeys={checkedKeys}
-          onSelect={this.onSelect.bind(this)}
-          selectedKeys={selectedKeys}
-        >
-          {renderTreeNodes(schemaToTreeData(tablesSchema || {}))}
-        </Tree>
-      ) : (
-        <Alert
-          message="Empty DB Schema"
-          description="Please check connection settings"
-          type="warning"
-        />
-      );
+    const renderTree = () => (Object.keys(tablesSchema || {}).length > 0 ? (
+      <Tree
+        checkable
+        onExpand={this.onExpand.bind(this)}
+        expandedKeys={expandedKeys}
+        autoExpandParent={autoExpandParent}
+        onCheck={this.onCheck.bind(this)}
+        checkedKeys={checkedKeys}
+        onSelect={this.onSelect.bind(this)}
+        selectedKeys={selectedKeys}
+      >
+        {renderTreeNodes(schemaToTreeData(tablesSchema || {}))}
+      </Tree>
+    ) : (
+      <Alert
+        message="Empty DB Schema"
+        description="Please check connection settings"
+        type="warning"
+      />
+    ));
 
-    const renderTreeOrError = () =>
-      schemaLoadingError ? (
-        <Alert
-          data-testid="schema-error"
-          message="Error while loading DB schema"
-          description={schemaLoadingError.toString()}
-          type="error"
-        />
-      ) : (
-        renderTree()
-      );
+    const renderTreeOrError = () => (schemaLoadingError ? (
+      <Alert
+        data-testid="schema-error"
+        message="Error while loading DB schema"
+        description={schemaLoadingError.toString()}
+        type="error"
+      />
+    ) : (
+      renderTree()
+    ));
 
     return (
       <Layout style={{ height: '100%' }}>
@@ -245,13 +241,13 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
           <Tabs
             activeKey={activeTab}
             onChange={(tab) => this.setState({ activeTab: tab })}
-            tabBarExtraContent={
+            tabBarExtraContent={(
               <ButtonDropdown
                 show={this.state.shown}
                 disabled={!checkedKeys.length}
                 type="primary"
                 data-testid="chart-type-btn"
-                overlay={
+                overlay={(
                   <Menu data-testid="generate-schema">
                     <Menu.Item
                       title={
@@ -268,7 +264,7 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
                       JavaScript
                     </Menu.Item>
                   </Menu>
-                }
+                )}
                 style={{ border: 0 }}
                 onOverlayOpen={() => this.setState({ shown: true })}
                 onOverlayClose={() => this.setState({ shown: false })}
@@ -276,7 +272,7 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
               >
                 Generate Data Model
               </ButtonDropdown>
-            }
+            )}
           >
             <TabPane tab="Tables" key="schema">
               {schemaLoading ? <CubeLoader /> : renderTreeOrError()}
@@ -335,9 +331,7 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
           )}
 
           <AppContextConsumer
-            onReady={({ playgroundContext }) =>
-              this.setState({ isDocker: playgroundContext?.isDocker })
-            }
+            onReady={({ playgroundContext: readyContext }) => this.setState({ isDocker: readyContext?.isDocker })}
           />
         </Content>
       </Layout>

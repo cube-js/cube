@@ -18,9 +18,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
-    "unit": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand --coverage --verbose test/unit",
-    "lint": "eslint src/* test/* --ext .ts,.js",
-    "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
+    "unit": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand --coverage --verbose test/unit"
   },
   "files": [
     "README.md",
@@ -45,9 +43,6 @@
     "typescript": "~6.0.3"
   },
   "license": "Apache-2.0",
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
-  },
   "publishConfig": {
     "access": "public"
   }

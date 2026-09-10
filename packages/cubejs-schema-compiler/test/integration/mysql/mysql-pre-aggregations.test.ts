@@ -216,7 +216,7 @@ describe('MySqlPreAggregations', () => {
 
     const preAggregations = cubeEvaluator.scheduledPreAggregations();
     const partitionedPreAgg =
-        preAggregations.find(p => p.preAggregationName === 'partitioned' && p.cube === 'visitors');
+      preAggregations.find(p => p.preAggregationName === 'partitioned' && p.cube === 'visitors');
 
     const minMaxQueries = query.preAggregationStartEndQueries('visitors', partitionedPreAgg?.preAggregation);
 

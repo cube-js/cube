@@ -66,6 +66,7 @@ export default function ConnectionTest({
               <a
                 href="https://cube.dev/cube-core/getting-started/create-a-project"
                 target="_blank"
+                rel="noreferrer"
               >
                 https://cube.dev/cube-core/getting-started/create-a-project
               </a>

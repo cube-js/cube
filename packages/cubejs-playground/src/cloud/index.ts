@@ -1,1 +1,1 @@
-export * from './CloudProvider'
+export * from './CloudProvider';

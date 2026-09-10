@@ -11,7 +11,7 @@ on:
       - 'rust/cubestore/**'
       - 'rust/cubesql/**'
       - 'rust/cube/**'
-      - '.eslintrc.js'
+      - '.oxlintrc.json'
       - '.prettierrc'
       - 'package.json'
       - 'lerna.json'
@@ -30,7 +30,7 @@ on:
       - 'rust/cubestore/**'
       - 'rust/cubesql/**'
       - 'rust/cube/**'
-      - '.eslintrc.js'
+      - '.oxlintrc.json'
       - '.prettierrc'
       - 'package.json'
       - 'lerna.json'
@@ -198,8 +198,15 @@ jobs:
         run: if [ "$(git status | grep nothing)x" = "x" ]; then echo "Non empty changeset after lerna bootstrap"; git status; exit 1; else echo "Nothing to commit. Proceeding"; fi;
       - name: NPM lint
         run: yarn lint:npm
-      - name: Lerna lint
-        run: yarn lerna run --concurrency 1 lint
+      - name: Oxlint
+        run: yarn lint:js
+      # cubejs-client-ngx has no tests and is not in the root tsconfig references, so
+      # oxlint is otherwise the only thing that ever looks at it. ng build needs
+      # @cubejs-client/core's declarations, hence the build:client-core first.
+      - name: Build client-ngx
+        run: |
+          yarn lerna run build:client-core
+          yarn workspace @cubejs-client/ngx build
       - name: Cargo fmt cube workspace
         run: |
           cargo fmt --manifest-path rust/cube/Cargo.toml --all -- --check

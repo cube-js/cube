@@ -114,15 +114,15 @@ export type JoinDefinition = {
 
 export type Filter =
   | {
-      member: string;
-      memberReference?: string;
-      [key: string]: any;
-    }
+    member: string;
+    memberReference?: string;
+    [key: string]: any;
+  }
   | {
-      and?: Filter[];
-      or?: Filter[];
-      [key: string]: any;
-    };
+    and?: Filter[];
+    or?: Filter[];
+    [key: string]: any;
+  };
 
 export type AccessPolicyDefinition = {
   group?: string;
@@ -734,10 +734,10 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     const body = `
       var base = \`\${(${baseSql.toString()})(${baseSqlArgs.join(', ')})}\`;
       ${resolvedParams.map((p, idx) => {
-    const sep = idx === 0 ? '?' : '&';
-    const paramArgs = paramArgSets[idx].join(', ');
-    return `base += " || '${sep}${p.encodedKey}=' || " + SQL_UTILS.urlEncode((${p.valueFn.toString()})(${paramArgs}));`;
-  }).join('\n      ')}
+        const sep = idx === 0 ? '?' : '&';
+        const paramArgs = paramArgSets[idx].join(', ');
+        return `base += " || '${sep}${p.encodedKey}=' || " + SQL_UTILS.urlEncode((${p.valueFn.toString()})(${paramArgs}));`;
+      }).join('\n      ')}
       return base;
     `;
 

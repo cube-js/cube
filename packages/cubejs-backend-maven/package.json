@@ -21,9 +21,7 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "unit:disabled-for-ci": "jest dist/test/*.js",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "unit:disabled-for-ci": "jest dist/test/*.js"
   },
   "files": [
     "README.md",
@@ -44,8 +42,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

@@ -361,7 +361,7 @@ export class QueryOrchestrator {
   }
 
   public async getPreAggregationVersionEntries(
-    preAggregations: { preAggregation: any, partitions: any[]}[],
+    preAggregations: { preAggregation: any, partitions: any[] }[],
     preAggregationsSchema: string,
     requestId: string,
   ) {

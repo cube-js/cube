@@ -22,9 +22,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "integration": "npm run integration:mysql",
-    "integration:mysql": "jest --verbose dist/test",
-    "lint": "eslint src/* test/* --ext .ts,.js",
-    "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
+    "integration:mysql": "jest --verbose dist/test"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.36",
@@ -40,9 +38,6 @@
     "stream-to-array": "^2.3.0",
     "testcontainers": "^10.28.0",
     "typescript": "~6.0.3"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   },
   "license": "Apache-2.0",
   "publishConfig": {

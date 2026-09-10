@@ -23,9 +23,7 @@
     "watch": "tsc -w",
     "unit": "jest --verbose dist/test/unit",
     "integration": "npm run integration:pinot",
-    "integration:pinot": "jest --verbose dist/test",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "integration:pinot": "jest --verbose dist/test"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.36",
@@ -46,8 +44,5 @@
     "should": "^13.2.3",
     "testcontainers": "^10.28.0",
     "typescript": "~6.0.3"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

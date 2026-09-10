@@ -47,15 +47,15 @@ export interface CompilerInterface {
 }
 
 export type Compiler = {
-    compiler: DataSchemaCompiler;
-    metaTransformer: CubeToMetaTransformer;
-    cubeEvaluator: CubeEvaluator;
-    contextEvaluator: ContextEvaluator;
-    viewGroupEvaluator: ViewGroupEvaluator;
-    joinGraph: JoinGraph;
-    compilerCache: CompilerCache;
-    headCommitId?: string;
-    compilerId: string;
+  compiler: DataSchemaCompiler;
+  metaTransformer: CubeToMetaTransformer;
+  cubeEvaluator: CubeEvaluator;
+  contextEvaluator: ContextEvaluator;
+  viewGroupEvaluator: ViewGroupEvaluator;
+  joinGraph: JoinGraph;
+  compilerCache: CompilerCache;
+  headCommitId?: string;
+  compilerId: string;
 };
 
 export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}): Compiler => {

@@ -23,9 +23,7 @@
     "watch": "tsc -w",
     "unit": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/unit",
     "integration": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/integration",
-    "integration:presto": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/integration",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "integration:presto": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/integration"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.36",
@@ -45,8 +43,5 @@
     "should": "^13.2.3",
     "testcontainers": "^10.28.0",
     "typescript": "~6.0.3"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

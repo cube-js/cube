@@ -23,9 +23,7 @@
     "watch": "tsc -w",
     "unit": "vitest run test/unit",
     "integration": "npm run integration:snowflake",
-    "integration:snowflake": "vitest run test/SnowflakeDriver.test.ts",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "integration:snowflake": "vitest run test/SnowflakeDriver.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.726.0",
@@ -36,9 +34,6 @@
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "1.7.36",

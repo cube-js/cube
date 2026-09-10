@@ -2422,7 +2422,7 @@ describe('PreAggregations', () => {
 
     const preAggregations = cubeEvaluator.scheduledPreAggregations();
     const partitionedPreAgg =
-        preAggregations.find(p => p.preAggregationName === 'partitioned' && p.cube === 'visitor_checkins');
+      preAggregations.find(p => p.preAggregationName === 'partitioned' && p.cube === 'visitor_checkins');
 
     const minMaxQueries = query.preAggregationStartEndQueries('visitor_checkins', partitionedPreAgg?.preAggregation);
 
@@ -2458,7 +2458,7 @@ describe('PreAggregations', () => {
 
     const preAggregations = cubeEvaluator.scheduledPreAggregations();
     const partitionedPreAgg =
-        preAggregations.find(p => p.preAggregationName === 'emptyPartitioned' && p.cube === 'visitor_checkins');
+      preAggregations.find(p => p.preAggregationName === 'emptyPartitioned' && p.cube === 'visitor_checkins');
 
     const minMaxQueries = query.preAggregationStartEndQueries('visitor_checkins', partitionedPreAgg?.preAggregation);
 

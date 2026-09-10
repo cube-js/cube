@@ -19,8 +19,6 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint src/* test/ test/bin --ext .ts",
-    "lint:fix": "eslint --fix src/* test/ test/bin --ext .ts",
     "dataset:minimal": "node dist/test/bin/download-dataset.js",
     "birdbox": "jest --runInBand --verbose dist/test",
     "birdbox:snapshot": "jest --runInBand --updateSnapshot --verbose dist/test",
@@ -123,7 +121,6 @@
     "cypress-localstorage-commands": "^1.4.5",
     "cypress-plugin-snapshots": "^1.4.4",
     "cypress-wait-until": "^1.7.2",
-    "eslint-plugin-cypress": "^2.12.1",
     "globby": "^11.0.4",
     "jest": "^29",
     "jsonwebtoken": "^9.0.2",
@@ -134,8 +131,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

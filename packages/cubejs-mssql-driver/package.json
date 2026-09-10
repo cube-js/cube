@@ -20,9 +20,7 @@
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
-    "watch": "tsc -w",
-    "lint": "eslint src/* --ext .ts,.js",
-    "lint:fix": "eslint --fix src/* --ext .ts,.js"
+    "watch": "tsc -w"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.36",
@@ -35,9 +33,6 @@
   },
   "jest": {
     "testEnvironment": "node"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   },
   "license": "Apache-2.0",
   "publishConfig": {

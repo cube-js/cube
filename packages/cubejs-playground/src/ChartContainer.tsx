@@ -73,9 +73,7 @@ const UnsupportedFrameworkPlaceholder: UnsupportedPlaceholder = ({
       href="https://cube.dev/reference/javascript-sdk/reference/cubejs-client-core"
       target="_blank"
       rel="noopener noreferrer"
-      onClick={() =>
-        playgroundAction('Unsupported Framework Docs', { framework })
-      }
+      onClick={() => playgroundAction('Unsupported Framework Docs', { framework })}
     >
       Vanilla JavaScript &nbsp;docs
     </a>
@@ -160,12 +158,11 @@ class ChartContainer extends Component<
 
   static getDerivedStateFromProps(props, state) {
     if (
-      props.isChartRendererReady &&
-      props.iframeRef.current != null &&
-      props.chartingLibrary
+      props.isChartRendererReady
+      && props.iframeRef.current != null
+      && props.chartingLibrary
     ) {
-      const { __cubejsPlayground } =
-        props.iframeRef.current.contentWindow || {};
+      const { __cubejsPlayground } = props.iframeRef.current.contentWindow || {};
 
       if (!__cubejsPlayground) {
         return {
@@ -189,10 +186,9 @@ class ChartContainer extends Component<
       if (props.framework === 'react') {
         codeExample = codesandboxFiles['index.js'];
       } else if (props.framework === 'angular') {
-        codeExample =
-          codesandboxFiles[
-            'src/app/query-renderer/query-renderer.component.ts'
-          ];
+        codeExample = codesandboxFiles[
+          'src/app/query-renderer/query-renderer.component.ts'
+        ];
       } else if (props.framework === 'vue') {
         codeExample = codesandboxFiles['src/components/ChartRenderer.vue'];
       }
@@ -226,7 +222,6 @@ class ChartContainer extends Component<
       dependencies,
       redirectToDashboard,
       activeTab,
-      addingToDashboard,
       chartRendererError,
       sql,
     } = this.state;
@@ -257,28 +252,27 @@ class ChartContainer extends Component<
 
     const parameters = isChartRendererReady
       ? getParameters(
-          codeSandboxDefinition(
-            frameworkToTemplate[framework],
-            codesandboxFiles,
-            dependencies
-          )
+        codeSandboxDefinition(
+          frameworkToTemplate[framework],
+          codesandboxFiles,
+          dependencies
         )
+      )
       : null;
 
-    const chartLibrariesMenu =
-      (chartLibraries[framework] || []).length > 0 ? (
-        <Menu
-          data-testid="charting-library-dropdown"
-          onClick={(e) => {
-            playgroundAction('Set Chart Library', { chartingLibrary: e.key });
-            setChartLibrary(e.key);
-          }}
-        >
-          {(chartLibraries[framework] || []).map((library) => (
-            <Menu.Item key={library.value}>{library.title}</Menu.Item>
-          ))}
-        </Menu>
-      ) : null;
+    const chartLibrariesMenu = (chartLibraries[framework] || []).length > 0 ? (
+      <Menu
+        data-testid="charting-library-dropdown"
+        onClick={(e) => {
+          playgroundAction('Set Chart Library', { chartingLibrary: e.key });
+          setChartLibrary(e.key);
+        }}
+      >
+        {(chartLibraries[framework] || []).map((library) => (
+          <Menu.Item key={library.value}>{library.title}</Menu.Item>
+        ))}
+      </Menu>
+    ) : null;
 
     const frameworkMenu = (
       <Menu
@@ -455,16 +449,16 @@ class ChartContainer extends Component<
       } else if (activeTab === 'generated-sql') {
         return (
           <Suspense
-            fallback={
+            fallback={(
               <div style={{ height: 363 }}>
                 <CubeLoader />
               </div>
-            }
+            )}
           >
             <SqlQueryTab
               query={query}
-              onChange={(sql) => {
-                this.setState({ sql });
+              onChange={(nextSql) => {
+                this.setState({ sql: nextSql });
               }}
             />
           </Suspense>
@@ -472,11 +466,11 @@ class ChartContainer extends Component<
       } else if (activeTab === 'cache') {
         return (
           <Suspense
-            fallback={
+            fallback={(
               <div style={{ height: 363 }}>
                 <CubeLoader />
               </div>
-            }
+            )}
           >
             <CachePane query={query} />
           </Suspense>
@@ -488,11 +482,11 @@ class ChartContainer extends Component<
 
         return (
           <Suspense
-            fallback={
+            fallback={(
               <div style={{ height: 363 }}>
                 <CubeLoader />
               </div>
-            }
+            )}
           >
             <GraphiQLSandbox
               apiUrl={this.props.apiUrl}

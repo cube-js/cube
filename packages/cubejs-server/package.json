@@ -33,8 +33,6 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit",
-    "lint": "eslint src/* test/ --ext .ts,.js",
-    "lint:fix": "eslint --fix src/* test/ --ext .ts,js",
     "unit": "jest",
     "unit:debug": "jest --runInBand",
     "jest:shapshot": "jest --updateSnapshot test"
@@ -76,9 +74,6 @@
     "typescript": "~6.0.3"
   },
   "license": "Apache-2.0",
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
-  },
   "oclif": {
     "commands": "./dist/src/command",
     "bin": "cubejs-server",

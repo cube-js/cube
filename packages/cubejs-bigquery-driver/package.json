@@ -17,9 +17,7 @@
     "watch": "tsc -w",
     "test": "yarn integration",
     "integration": "npm run integration:bigquery",
-    "integration:bigquery": "jest --verbose dist/test",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "integration:bigquery": "jest --verbose dist/test"
   },
   "files": [
     "dist/src",
@@ -49,8 +47,5 @@
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

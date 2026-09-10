@@ -87,12 +87,12 @@ export function getStructureVersion(preAggregation) {
 }
 
 export type VersionEntry = {
-  'table_name': string,
-  'content_version': string,
-  'structure_version': string,
-  'last_updated_at': number,
-  'build_range_end'?: string,
-  'naming_version'?: number
+  table_name: string,
+  content_version: string,
+  structure_version: string,
+  last_updated_at: number,
+  build_range_end?: string,
+  naming_version?: number
 };
 
 export type VersionEntriesObj = {
@@ -765,7 +765,7 @@ export class PreAggregations {
   /**
    * Returns registered queries queues hash table.
    */
-  public getQueues(): {[dataSource: string]: QueryQueue} {
+  public getQueues(): { [dataSource: string]: QueryQueue } {
     return this.queue;
   }
 

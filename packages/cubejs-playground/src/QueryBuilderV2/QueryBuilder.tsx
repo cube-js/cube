@@ -36,13 +36,12 @@ export function QueryBuilder(
     disableSidebarResizing,
   } = props;
 
-  const cubeApi = useMemo(() => {
-    return apiUrl && apiToken && apiToken !== 'undefined'
-      ? cube(apiToken, {
-          apiUrl,
-        })
-      : undefined;
-  }, [apiUrl, apiToken]);
+  const cubeApi = useMemo(() => (apiUrl && apiToken && apiToken !== 'undefined'
+    ? cube(apiToken, {
+      apiUrl,
+    })
+    : undefined),
+  [apiUrl, apiToken]);
 
   const [storedTimezones] = useLocalStorage<string[]>('QueryBuilder:timezones', []);
 
@@ -50,8 +49,10 @@ export function QueryBuilder(
     const queryCopy = JSON.parse(JSON.stringify(query));
 
     // add the last stored timezone if the query is empty
-    if (JSON.stringify(queryCopy) === '{}' && storedTimezones[0]) {
-      queryCopy.timezone = storedTimezones[0];
+    const [lastStoredTimezone] = storedTimezones;
+
+    if (JSON.stringify(queryCopy) === '{}' && lastStoredTimezone) {
+      queryCopy.timezone = lastStoredTimezone;
     }
 
     return queryCopy;
@@ -85,13 +86,12 @@ export function QueryBuilder(
 
   useEffect(() => {
     if (defaultQuery && shouldRunDefaultQuery && meta) {
-      void runQuery();
+      runQuery();
     }
   }, [shouldRunDefaultQuery, meta]);
 
-  useCommitPress(() => {
-    return runQuery();
-  }, true);
+  useCommitPress(() => runQuery(),
+    true);
 
   if (!apiToken || !cubeApi || !apiUrl) {
     return null;
@@ -123,7 +123,7 @@ export function QueryBuilder(
         ...otherProps,
       }}
     >
-      {!meta ? (
+      {!meta && (
         <Block flexGrow={1} padding="2x">
           {!metaError ? (
             <Card>Loading meta information...</Card>
@@ -134,11 +134,8 @@ export function QueryBuilder(
             </Alert>
           )}
         </Block>
-      ) : props.children ? (
-        props.children
-      ) : (
-        <QueryBuilderInternals />
       )}
+      {!!meta && (props.children || <QueryBuilderInternals />)}
     </QueryBuilderContext.Provider>
   );
 }

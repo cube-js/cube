@@ -1,31 +1,24 @@
 {
   "name": "@cubejs-backend/linter",
-  "description": "Cube.js ESLint (virtual package) for linting code",
+  "description": "Cube.js shared oxlint configuration (virtual package) for linting code",
   "author": "Cube Dev, Inc.",
   "version": "1.7.36",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
-    "directory": "packages/cubejs-mssql-driver"
+    "directory": "packages/cubejs-linter"
   },
   "engines": {
     "node": ">=20.0.0"
   },
-  "main": "index.js",
-  "peerDependencies": {
-    "eslint": ">=8.57"
-  },
   "dependencies": {
-    "@stylistic/eslint-plugin-ts": "^3.1.0",
-    "@typescript-eslint/eslint-plugin": "^8.46.0",
-    "@typescript-eslint/parser": "^8.46.0",
-    "eslint": "^8.57.1",
-    "eslint-config-airbnb-base": "^14.2.1",
-    "eslint-plugin-import": "^2.22.1",
-    "eslint-plugin-node": "^10.0.0"
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "oxlint": "^1.82.0"
   },
   "files": [
-    "index.js"
+    ".oxlintrc.json",
+    "airbnb-base.json",
+    "airbnb-react.json"
   ],
   "license": "Apache-2.0",
   "publishConfig": {
