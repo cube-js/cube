@@ -10,7 +10,7 @@ import {
   displayError,
   executeCommand, findMaxVersion,
   loadCliManifest,
-  npmInstall,
+  npmInstallDev,
   writePackageJson,
   event,
 } from '../utils';
@@ -55,8 +55,10 @@ const create = async (projectName, options) => {
     templateVersion: cliManifest.version,
   });
 
+  // The official Docker image bundles the Cube packages and docker-compose masks
+  // node_modules/@cubejs-backend/, so these are only installed for local tooling.
   logStage('Installing server dependencies');
-  await npmInstall(['@cubejs-backend/server'], true);
+  await npmInstallDev(['@cubejs-backend/server']);
 
   if (!options.dbType) {
     const Drivers = requireFromPackage<any>('@cubejs-backend/server-core/dist/src/core/DriverDependencies.js');
@@ -78,7 +80,7 @@ const create = async (projectName, options) => {
     await displayError(`Unsupported db type: ${chalk.green(options.dbType)}`, createAppOptions);
   }
 
-  await npmInstall([driverPackageName], true);
+  await npmInstallDev([driverPackageName]);
 
   if (driverPackageName === '@cubejs-backend/jdbc-driver') {
     logStage('Installing JDBC dependencies');
