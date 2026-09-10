@@ -4,6 +4,7 @@ import { jest, expect, beforeAll, afterAll } from '@jest/globals';
 import cubejs, { Query, CubeApi } from '@cubejs-client/core';
 import WebSocketTransport from '@cubejs-client/ws-transport';
 import { BirdBox } from '../src';
+import { stopIfStarted } from './smoke-tests';
 
 type QueryTestOptions = {
   name: string;
@@ -138,7 +139,7 @@ export function createBirdBoxTestCase(
     // eslint-disable-next-line consistent-return
     afterAll(async () => {
       await wsTransport.close();
-      await birdbox.stop();
+      await stopIfStarted('birdbox', birdbox);
     });
 
     it('Failing query rewrite', async () => {

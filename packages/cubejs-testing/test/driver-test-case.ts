@@ -3,6 +3,7 @@ import { jest, expect, beforeAll, afterAll } from '@jest/globals';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import cubejs, { Query, CubeApi } from '@cubejs-client/core';
 import { BirdBox } from '../src';
+import { stopIfStarted } from './smoke-tests';
 
 // eslint-disable-next-line import/prefer-default-export
 export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<BirdBox>) {
@@ -30,7 +31,7 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
 
     // eslint-disable-next-line consistent-return
     afterAll(async () => {
-      await birdbox.stop();
+      await stopIfStarted('birdbox', birdbox);
     });
 
     it('Orders.totalAmount', async () => {

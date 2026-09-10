@@ -10,6 +10,7 @@ import {
   DEFAULT_CONFIG,
   JEST_AFTER_ALL_DEFAULT_TIMEOUT,
   JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
+  stopIfStarted,
 } from './smoke-tests';
 
 // TODO: Random port?
@@ -88,8 +89,8 @@ describe('multidb', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox.stop();
-    await db.stop();
+    await stopIfStarted('birdbox', birdbox);
+    await stopIfStarted('db', db);
     await db2.stop();
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 

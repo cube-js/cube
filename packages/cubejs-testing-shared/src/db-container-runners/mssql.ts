@@ -1,6 +1,7 @@
 import { GenericContainer, Wait } from 'testcontainers';
 
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
+import { startContainerWithRetry } from './start-with-retry';
 
 export class MssqlDbRunner extends DbRunnerAbstract {
   public static startContainer(options: DBRunnerContainerOptions) {
@@ -22,6 +23,6 @@ export class MssqlDbRunner extends DbRunnerAbstract {
       container.withBindMounts(binds);
     }
 
-    return container.start();
+    return startContainerWithRetry(container);
   }
 }

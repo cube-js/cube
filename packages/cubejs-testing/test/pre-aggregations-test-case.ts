@@ -4,6 +4,7 @@ import fetch from 'node-fetch';
 import WebSocketTransport from '@cubejs-client/ws-transport';
 
 import { BirdBox } from '../src';
+import { stopIfStarted } from './smoke-tests';
 
 type QueryTestOptions = {
   name: string;
@@ -216,7 +217,7 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
     afterAll(async () => {
       await wsTransport.close();
 
-      await birdbox.stop();
+      await stopIfStarted('birdbox', birdbox);
     });
 
     it('Pre-aggregations API', async () => {
