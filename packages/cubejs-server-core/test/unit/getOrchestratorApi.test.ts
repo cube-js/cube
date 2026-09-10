@@ -11,8 +11,8 @@ function createServerCore(options: Record<string, unknown> = {}) {
   const core = new CubejsServerCore(<any>{
     apiSecret: 'secret',
     driverFactory: () => <any>({ type: 'postgres' }),
-    // One id for every caller: a burst of requests carrying the same security
-    // context, which is what the deployment that reported this was serving.
+    // One shared id for all callers: a burst of requests carrying the same
+    // security context, which is what the deployment that reported this served.
     contextToOrchestratorId: () => 'ORCHESTRATOR_ID',
     ...options,
   });
