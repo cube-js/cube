@@ -1,9 +1,9 @@
 ---
-title: Spacer, Divider & Stack
-description: Non-data layout elements — a spacer for whitespace, a divider line, and stack containers that group widgets — to help you structure a dashboard.
+title: Spacer, Divider, Stack & Grid
+description: Non-data layout elements — a spacer for whitespace, a divider line, and stack and grid containers that group widgets — to help you structure a dashboard.
 ---
 
-Spacers, dividers, and stacks are non-data **layout** widgets. They carry no data of their own; you place them on the canvas alongside charts, text, and controls to add whitespace, visual structure, and grouping to a dashboard.
+Spacers, dividers, stacks, and grids are non-data **layout** widgets. They carry no data of their own; you place them on the canvas alongside charts, text, and controls to add whitespace, visual structure, and grouping to a dashboard.
 
 ## Spacer
 
@@ -28,9 +28,17 @@ Add a widget to a stack by dragging it in — from the canvas, the **Add Widgets
 
 Because a stack owns its children's layout, you work with the **container as a unit**: select, move, resize, or delete the stack itself and it carries its children with it. Individual widgets inside a stack are not separately selectable on the board — a marquee drawn over a stack selects the container, not its children. To rearrange children, drag one to a new position **within** the stack; to take one out, drag it onto the canvas or into another container.
 
+## Grid
+
+A **grid** is a container whose children each hold a fixed cell position and size, unlike a stack's evenly shared space. A grid is a window into the same uniform cell grid as the board that holds it, so a child keeps the exact footprint you give it — nothing is auto-compacted, swapped, resized, or moved to make room. Dragging, resizing, or dropping a widget onto a cell that's already occupied is rejected and the widget stays where it was.
+
+Click the grid's header to select it and drag its resize grip to change its size; resizing only crops or restores empty rows and columns (a grid can't shrink below 2×2 or cut into an occupied cell). Give the grid a title by clicking into the header once it's selected.
+
+A grid can be nested inside the root board or inside another grid, but not inside a stack.
+
 ## Adding a layout widget
 
-In the [dashboard builder][ref-workbooks], open the **Add Widgets** menu in the toolbar and choose **Spacer**, **Divider**, **Horizontal Stack**, or **Vertical Stack**. The widget is added to the canvas, where you can drag it into place and resize it (a divider resizes horizontally only).
+In the [dashboard builder][ref-workbooks], open the **Add Widgets** menu in the toolbar and choose **Spacer**, **Divider**, **Horizontal Stack**, **Vertical Stack**, or **Grid**. The widget is added to the canvas, where you can drag it into place and resize it (a divider resizes horizontally only).
 
 ## Styling
 
@@ -39,6 +47,6 @@ The **spacer** and **divider** follow the dashboard's [widget styling settings](
 - The **divider** draws its line using the widget **border** width, style, and color.
 - A **spacer** picks up the same border and background settings while you are editing, so its bounds are easy to see.
 
-A **stack** draws no card of its own — it only groups and sizes its children, each of which keeps its own styling.
+A **stack** draws no card of its own — it only groups and sizes its children, each of which keeps its own styling. A **grid** draws a header band with its title, visible to viewers on the published dashboard too.
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
