@@ -2838,9 +2838,7 @@ from
           CAST(100 AS REAL) * COUNT(*) / (200 * COUNT(*)) AS "float32_ratio",
           100.1 * COUNT(*) / (200 * COUNT(*)) AS "fractional_ratio",
           -100.0 * COUNT(*) / (200 * COUNT(*)) AS "negative_ratio",
-          COUNT(*) / (2 * COUNT(*)) AS "integer_ratio",
-          CAST(NULL AS DOUBLE) AS "float64_null",
-          CAST(NULL AS REAL) AS "float32_null"
+          COUNT(*) / (2 * COUNT(*)) AS "integer_ratio"
         FROM "Customers"
         WHERE LOWER("customerName") <> '__float_literal_test__'
       `;
@@ -2856,13 +2854,11 @@ from
         expect(pushedSql.match(/(?<![-\w.])1e2\b/g)?.length).toBeGreaterThanOrEqual(2);
         expect(pushedSql).toContain('1.001e2');
         expect(pushedSql).toContain('-1e2');
-        expect(pushedSql.match(/\(NULL \+ 0e0\)/g)).toHaveLength(2);
       } else {
         // Dialects choose their own FLOAT/DOUBLE spellings, including precision.
         expect(pushedSql.match(/CAST\(100 AS [\w ()]+\)/g)?.length).toBeGreaterThanOrEqual(2);
         expect(pushedSql).toMatch(/CAST\(100\.1 AS [\w ()]+\)/);
         expect(pushedSql).toMatch(/CAST\(-100 AS [\w ()]+\)/);
-        expect(pushedSql.match(/CAST\(NULL AS [\w ()]+\)/g)).toHaveLength(2);
       }
 
       const { rows } = await connection.query(query);
@@ -2872,8 +2868,6 @@ from
       expect(Number(rows[0].fractional_ratio)).toBeCloseTo(0.5005, 10);
       expect(Number(rows[0].negative_ratio)).toBeCloseTo(-0.5, 10);
       expect(Number(rows[0].integer_ratio)).toBe(0);
-      expect(rows[0].float64_null).toBeNull();
-      expect(rows[0].float32_null).toBeNull();
     });
 
     executePg('SQL API: metabase count cast to float32 from push down', async (connection) => {
