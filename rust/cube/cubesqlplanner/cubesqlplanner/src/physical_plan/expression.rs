@@ -66,7 +66,10 @@ impl Expr {
         context: Rc<VisitorContext>,
     ) -> Result<String, CubeError> {
         match self {
-            Self::Null => Ok(format!("CAST(NULL as integer)")),
+            Self::Null => Ok(format!(
+                "CAST(NULL as {})",
+                templates.nullable_type("integer")?
+            )),
             Self::Member(member) => {
                 let context = if let Some(self_context) = &member.context {
                     self_context.clone()
