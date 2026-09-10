@@ -15576,12 +15576,27 @@ ORDER BY "source"."str0" ASC
                 .find_cube_scan_wrapped_sql()
                 .wrapped_sql
                 .sql;
-            assert!(sql.contains(rendered), "{constant}, mysql={mysql}: {sql}");
+            assert!(
+                sql.contains(rendered),
+                "{}, mysql={}: {}",
+                constant,
+                mysql,
+                sql
+            );
             assert!(
                 !sql.contains("UNEXPECTED_INT_DIVISION"),
-                "{constant}, mysql={mysql}: {sql}"
+                "{}, mysql={}: {}",
+                constant,
+                mysql,
+                sql
             );
-            assert!(sql.contains("NULLIF("), "{constant}, mysql={mysql}: {sql}");
+            assert!(
+                sql.contains("NULLIF("),
+                "{}, mysql={}: {}",
+                constant,
+                mysql,
+                sql
+            );
         }
     }
 

@@ -935,6 +935,8 @@ impl SqlTemplates {
         // Keep the existing readable Display formatting on the cast path. Format Float32
         // at its original precision; the dialect's cast supplies the target SQL type.
         // Unlike the override above, this intentionally retains positional notation.
+        // This also retains the source's decimal-literal range limits: a cast cannot
+        // recover a value that overflows or underflows while parsing its operand.
         let expr = value.map_or_else(
             || "NULL".to_string(),
             |value| match data_type {

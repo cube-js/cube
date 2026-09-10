@@ -4840,7 +4840,7 @@ mod tests {
             )
             .unwrap();
             if let Some(expected) = expected {
-                assert!(sql.contains('e'), "{literal:?}: {sql}");
+                assert!(sql.contains('e'), "{:?}: {}", literal, sql);
                 assert_eq!(
                     sql.parse::<f64>().unwrap().to_bits(),
                     expected.to_bits(),

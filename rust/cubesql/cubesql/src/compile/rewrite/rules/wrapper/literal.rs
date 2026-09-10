@@ -101,11 +101,11 @@ impl WrapperRules {
                     // NaN and infinity need dialect-specific syntax; neither a bare
                     // identifier in a cast nor an exponent literal can represent them.
                     ScalarValue::Float32(value) => {
-                        return value.map_or(true, |value| value.is_finite())
+                        return value.is_none_or(|value| value.is_finite())
                             && supports_float_literal("types/float");
                     }
                     ScalarValue::Float64(value) => {
-                        return value.map_or(true, |value| value.is_finite())
+                        return value.is_none_or(|value| value.is_finite())
                             && supports_float_literal("types/double");
                     }
                     ScalarValue::TimestampNanosecond(_, _)
@@ -194,6 +194,111 @@ impl WrapperRules {
                 }
             }
             false
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::compile::{
+        rewrite::{analysis::LogicalPlanAnalysis, WrapperReplacerContextInputDataSource},
+        test::{get_test_session, get_test_tenant_ctx_customized},
+        CubeContext, DatabaseProtocol,
+    };
+    use crate::config::ConfigObjImpl;
+    use datafusion::{
+        execution::context::SessionContext, physical_plan::planner::DefaultPhysicalPlanner,
+    };
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn test_float_literal_gate() {
+        for missing in [
+            None,
+            Some("types/float"),
+            Some("types/double"),
+            Some("expressions/cast"),
+        ] {
+            for has_override in [false, true] {
+                let mut templates = missing
+                    .into_iter()
+                    .map(|name| (name.to_string(), String::new()))
+                    .collect::<Vec<_>>();
+                if has_override {
+                    templates.push((
+                        "expressions/float_literal".to_string(),
+                        "{{ value }}".to_string(),
+                    ));
+                }
+                let meta = get_test_tenant_ctx_customized(templates);
+                let session = get_test_session(DatabaseProtocol::PostgreSQL, meta.clone()).await;
+                let context = Arc::new(CubeContext::new(
+                    Arc::new(SessionContext::new().state.read().clone()),
+                    meta.clone(),
+                    session.session_manager.clone(),
+                    session.state.clone(),
+                ));
+                let mut graph = CubeEGraph::new(LogicalPlanAnalysis::new(
+                    context,
+                    Arc::new(DefaultPhysicalPlanner::default()),
+                ));
+                let mut subst = Subst::default();
+                subst.insert(
+                    var!("?source"),
+                    graph.add(LogicalPlanLanguage::WrapperReplacerContextInputDataSource(
+                        WrapperReplacerContextInputDataSource(Some("default".to_string())),
+                    )),
+                );
+                let rules = WrapperRules::new(meta, Arc::new(ConfigObjImpl::default()));
+                for (literal, type_template, finite) in [
+                    (ScalarValue::Float32(Some(100.0)), "types/float", true),
+                    (ScalarValue::Float64(Some(100.0)), "types/double", true),
+                    (ScalarValue::Float32(None), "types/float", true),
+                    (ScalarValue::Float64(None), "types/double", true),
+                    (ScalarValue::Float32(Some(f32::NAN)), "types/float", false),
+                    (ScalarValue::Float64(Some(f64::NAN)), "types/double", false),
+                    (
+                        ScalarValue::Float32(Some(f32::INFINITY)),
+                        "types/float",
+                        false,
+                    ),
+                    (
+                        ScalarValue::Float64(Some(f64::INFINITY)),
+                        "types/double",
+                        false,
+                    ),
+                    (
+                        ScalarValue::Float32(Some(f32::NEG_INFINITY)),
+                        "types/float",
+                        false,
+                    ),
+                    (
+                        ScalarValue::Float64(Some(f64::NEG_INFINITY)),
+                        "types/double",
+                        false,
+                    ),
+                ] {
+                    subst.insert(
+                        var!("?value"),
+                        graph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                            literal.clone(),
+                        ))),
+                    );
+                    let expected = finite
+                        && (has_override
+                            || (missing != Some(type_template)
+                                && missing != Some("expressions/cast")));
+                    assert_eq!(
+                        rules.transform_literal("?source", "?value")(&mut graph, &mut subst),
+                        expected,
+                        "{:?}, missing {:?}, override={}",
+                        literal,
+                        missing,
+                        has_override
+                    );
+                }
+            }
         }
     }
 }
