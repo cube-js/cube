@@ -37,6 +37,10 @@ jobs:
       # Same coalesce as the concurrency group above (which can't read `env`,
       # so the expression appears twice).
       PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
+      # `Read` lets the run read anything on the runner, so gate it on the PR
+      # head coming from someone with write access. On `workflow_call` the
+      # payload is the caller's issue_comment, whose issue is the PR.
+      READ_TOOL: ${{ contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association || github.event.issue.author_association) && ',Read' || '' }}
     steps:
       - name: React to trigger comment
         # Quick ACK so the user who typed /bot-review or /bot-deep-review sees
@@ -82,23 +86,6 @@ jobs:
             strip_frontmatter .claude/docs/review-threads.md
             echo 'CUBE_REVIEW_EOF'
           } >> "$GITHUB_ENV"
-
-      # `Read` turns "can post a comment" into "can read anything on the runner
-      # and post it", so only grant it when the PR head we checked out comes
-      # from someone with write access. Fails closed.
-      - name: Gate the Read tool on a trusted PR author
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-        run: |
-          assoc=$(gh api "repos/$REPO/pulls/$PR_NUMBER" \
-            --jq .author_association) || assoc=NONE
-          case "$assoc" in
-            OWNER | MEMBER | COLLABORATOR) read_tool=",Read" ;;
-            *) read_tool="" ;;
-          esac
-          echo "Author association: $assoc -> Read allowed: ${read_tool:-no}"
-          echo "READ_TOOL=$read_tool" >> "$GITHUB_ENV"
 
       - name: Review
         id: review
