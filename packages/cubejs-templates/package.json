@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/templates",
-  "version": "1.7.36",
+  "version": "1.7.37",
   "description": "Cube.js Templates helpers",
   "author": "Cube Dev, Inc.",
   "repository": {
@@ -26,7 +26,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@cubejs-backend/shared": "1.7.36",
+    "@cubejs-backend/shared": "1.7.37",
     "cross-spawn": "^7.0.3",
     "fs-extra": "^11.1.1",
     "node-fetch": "^2.7.0",
@@ -35,7 +35,7 @@
     "tar": "^7.5.22"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.36",
+    "@cubejs-backend/linter": "1.7.37",
     "@types/node": "^22",
     "typescript": "~6.0.3"
   }
