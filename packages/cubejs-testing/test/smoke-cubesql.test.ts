@@ -80,7 +80,7 @@ describe('SQL API', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await connection.end();
+    await stopIfStarted('connection', connection && (() => connection.end()));
     await stopIfStarted('birdbox', birdbox);
     await stopIfStarted('db', db);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);

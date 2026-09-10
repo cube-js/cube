@@ -138,7 +138,7 @@ export function createBirdBoxTestCase(
 
     // eslint-disable-next-line consistent-return
     afterAll(async () => {
-      await wsTransport.close();
+      await stopIfStarted('wsTransport', wsTransport && (() => wsTransport.close()));
       await stopIfStarted('birdbox', birdbox);
     });
 

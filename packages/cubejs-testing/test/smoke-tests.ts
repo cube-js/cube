@@ -33,14 +33,16 @@ interface Stoppable {
   stop(): Promise<unknown>;
 }
 
-export async function stopIfStarted(name: string, resource: Stoppable | undefined) {
+type Teardown = Stoppable | (() => Promise<unknown>);
+
+export async function stopIfStarted(name: string, resource: Teardown | undefined) {
   if (!resource) {
     console.warn(`[smoke] ${name} was never started, nothing to stop`);
     return;
   }
 
   try {
-    await resource.stop();
+    await (typeof resource === 'function' ? resource() : resource.stop());
   } catch (e) {
     console.warn(`[smoke] failed to stop ${name}:`, e);
   }

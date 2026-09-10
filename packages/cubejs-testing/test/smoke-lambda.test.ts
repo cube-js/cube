@@ -82,10 +82,10 @@ describe('lambda', () => {
   afterAll(async () => {
     await stopIfStarted('birdbox', birdbox);
     await stopIfStarted('db', db);
-    await dbKafka.stop();
-    await dbKsql.stop();
-    await network.stop();
-    await cubestore.release();
+    await stopIfStarted('dbKafka', dbKafka);
+    await stopIfStarted('dbKsql', dbKsql);
+    await stopIfStarted('network', network);
+    await stopIfStarted('cubestore', cubestore && (() => cubestore.release()));
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('Query lambda with ksql ', async () => {
