@@ -698,6 +698,18 @@ impl SqlTemplates {
         )
     }
 
+    /// Arity-specific templates let older dialects support only space trimming.
+    pub fn scalar_function_template_name(&self, function: &str, arity: usize) -> String {
+        let function = function.to_uppercase();
+        if matches!(function.as_str(), "TRIM" | "BTRIM" | "LTRIM" | "RTRIM") {
+            let template = format!("functions/{}_{}", function, arity);
+            if self.contains_template(&template) {
+                return template;
+            }
+        }
+        format!("functions/{}", function)
+    }
+
     pub fn scalar_function(
         &self,
         scalar_function: String,
@@ -705,10 +717,10 @@ impl SqlTemplates {
         date_part: Option<String>,
         interval: Option<String>,
     ) -> Result<String, CubeError> {
-        let function = scalar_function.to_string().to_uppercase();
+        let template = self.scalar_function_template_name(&scalar_function, args.len());
         let args_concat = args.join(", ");
         self.render_template(
-            &format!("functions/{}", function),
+            &template,
             context! {
                 args_concat => args_concat,
                 args => args,

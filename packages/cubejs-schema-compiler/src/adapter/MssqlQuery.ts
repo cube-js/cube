@@ -293,6 +293,15 @@ export class MssqlQuery extends BaseQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    // SQL Server 2014 supports space trimming through one-argument LTRIM/RTRIM.
+    // Explicit character sets require newer versions and must not be pushed down.
+    delete templates.functions.BTRIM;
+    delete templates.functions.LTRIM;
+    delete templates.functions.RTRIM;
+    templates.functions.BTRIM_1 = 'LTRIM(RTRIM({{ args[0] }}))';
+    templates.functions.TRIM_1 = templates.functions.BTRIM_1;
+    templates.functions.LTRIM_1 = 'LTRIM({{ args[0] }})';
+    templates.functions.RTRIM_1 = 'RTRIM({{ args[0] }})';
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.functions.UTCTIMESTAMP = 'GETUTCDATE()';
