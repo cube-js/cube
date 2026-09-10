@@ -206,6 +206,31 @@ that is outside the allow-list — or that you don't have permission to see — 
 with a **403 Forbidden** (`Deployment <id> is not available via MCP for this account`), so
 neither `listDeployments` nor the `chat` selection can reach an excluded deployment.
 
+## Target a dev-mode branch
+
+By default, an MCP session reads and queries the deployed data model. To exercise a
+[development mode][ref-dev-mode] branch — a data-model change plus its agent
+configuration (skills, rules, spaces) — before it's committed, connect with the dev
+`branchName` returned by `startDataModelEdit`:
+
+```text
+https://cubecloud.dev/mcp?branchName=dev-<user>-<hash>
+```
+
+A client that can't set a query parameter on the endpoint can send the same value as an
+`x-mcp-branch-name` header instead (checked first; `mcp-branch-name` is a second, lower-priority
+alias). Only an active dev branch is accepted — `main`, the deploy branch, or a branch
+with no dev worker running is rejected at connect time with a `400` error, never a silent
+fallback to the deployed model.
+
+Once connected this way, every branch-aware tool below defaults to that branch instead of
+the deployed model — you don't need to keep passing `branchName` on each call. Any tool
+can still override it per call: pass a different `branchName` to target another branch for
+just that one request, or pass `null` to force the deployed model for one call on an
+otherwise branch-scoped session. Every response echoes back the branch it actually ran on
+as `branchName` (`null` means the deployed model), so a client can always confirm what it
+queried.
+
 ## Available actions
 
 The MCP server exposes 23 tools, grouped below.
@@ -228,27 +253,36 @@ happens without an explicit approval.
 | Tool | Description |
 | --- | --- |
 | `listDeployments` | Lists the deployments and agents you can reach over MCP. |
-| `chat` | Asks a question of a Cube agent, optionally targeting a specific deployment and agent. |
+| `chat` | Asks a question of a Cube agent, optionally targeting a specific deployment and agent. Pass `branchName` to have the agent answer from a dev branch's model instead of the deployed one. |
 | `loadQueryResults` | Paginates through the results of a previous query. |
 
 See [Select a deployment and agent](#select-a-deployment-and-agent) for how these three
 work together.
 
+A chat conversation is pinned to whichever branch answered its first message — later
+messages in the same conversation stay on that branch, and `loadQueryResults` pages using
+it. Passing a different `branchName` while resuming an existing `chatId` fails rather than
+silently switching branches mid-conversation: omit `branchName` to keep talking on the
+conversation's branch, or omit `chatId` to start a new conversation on the one you want.
+
 ### Query and discovery
 
 | Tool | Description | Access |
 | --- | --- | --- |
-| `searchDataModel` | Searches the semantic model by similarity — views and their measures and dimensions — to discover what is queryable. Returns compact records (name, title, description, type) to reference in `runQuery`. | Read-only |
+| `searchDataModel` | Searches the semantic model by similarity — views and their measures and dimensions — to discover what is queryable. Returns compact records (name, title, description, type) to reference in `runQuery`. Pass the dev `branchName` from `startDataModelEdit` to search that branch's model, including members that don't exist in production yet. | Read-only |
 | `runQuery` | Runs a Cube SQL query (PostgreSQL dialect) against the [SQL API][ref-sql-api]. Returns a schema, a page of rows, and `hasMore` / `totalRows` for pagination via `offset`. Pass the dev `branchName` from `startDataModelEdit` to query that branch instead of the deployed model. | Read-only |
 
 Call `searchDataModel` before `runQuery` to find exact view and member names rather than
-guessing them.
+guessing them — pass the same `branchName` to both so the members you find are the ones the
+query will see.
 
-Omitting `branchName` queries the deployed model, exactly as before this parameter existed.
-Passing a `branchName` that isn't an active dev branch — for example the deploy branch's own
-name, or a feature branch with no dev worker running — fails with an error rather than
-silently answering from the deployed model, so a query aimed at the wrong branch never
-looks like a query that just returned no rows.
+Omitting `branchName` on a call uses the session's branch if you [connected with
+one](#target-a-dev-mode-branch), or the deployed model otherwise; passing `null` forces the
+deployed model for that one call regardless of the session. Passing a `branchName` that
+isn't an active dev branch — for example the deploy branch's own name, or a feature branch
+with no dev worker running — fails with an error rather than silently answering from the
+deployed model, so a query aimed at the wrong branch never looks like a query that just
+returned no rows.
 
 ### Dashboard authoring
 
@@ -285,8 +319,8 @@ default. Users without it never see them.
 
 | Tool | Description | Access |
 | --- | --- | --- |
-| `listDataModelFiles` | Lists the semantic model source files (raw YAML, JavaScript, or Python). | Read-only |
-| `readDataModelFile` | Reads one file's raw source. | Read-only |
+| `listDataModelFiles` | Lists the semantic model source files (raw YAML, JavaScript, or Python). Pass `branchName` to list a dev branch's files instead of the deploy branch's. | Read-only |
+| `readDataModelFile` | Reads one file's raw source. Pass `branchName` to read it from a dev branch instead of the deploy branch. | Read-only |
 | `startDataModelEdit` | Enters [development mode][ref-dev-mode], starts a dev worker, and returns the dev `branchName` that every write tool requires. | Write |
 | `writeDataModelFile` | Creates or overwrites a model source file on the dev branch (whole-file replacement). Recompiles the model and reports `valid` plus any `validationError`. | Destructive — prompts |
 | `deleteDataModelFile` | Deletes a model source file on the dev branch. | Destructive — prompts |
@@ -339,8 +373,8 @@ registered under the same semantic-model permission as the data model tools abov
 
 | Tool | Description | Access |
 | --- | --- | --- |
-| `getPreAggregationStatus` | Lists the data model's pre-aggregations with their definitions and, for each, how many partitions exist, how many were built, when the newest build landed, and the exact error if a build failed. | Read-only |
-| `buildPreAggregation` | Queues an on-demand build of one pre-aggregation and returns once it is accepted. The build runs asynchronously. | Write |
+| `getPreAggregationStatus` | Lists the data model's pre-aggregations with their definitions and, for each, how many partitions exist, how many were built, when the newest build landed, and the exact error if a build failed. Pass `branchName` to check a dev branch's pre-aggregations instead of the deployed model's. | Read-only |
+| `buildPreAggregation` | Queues an on-demand build of one pre-aggregation and returns once it is accepted. The build runs asynchronously. Pass `branchName` to build against a dev branch's definition. | Write |
 
 Together these close the loop on pre-aggregation work: a query alone cannot prove a rollup
 was used, and external pre-aggregations fail in configuration-specific ways — a missing

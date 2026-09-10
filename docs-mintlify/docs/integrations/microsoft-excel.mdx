@@ -142,6 +142,32 @@ To change the order measures appear in within their group, drag them within
 the **Measures** pane on the **Pivot** tab. Position and order are saved with
 the exploration and survive **Refresh**.
 
+### Column totals
+
+The **Column totals** switch, below **Measure position** on the **Display** tab,
+appends a bold **Total** row at the bottom of the written range, with one value per
+measure column. It's disabled, with a tooltip explaining why, until the query has at
+least one measure.
+
+Each total is computed by a separate query rather than summed from the cells on the
+sheet, so it's correct for non-additive measures — an average totals to the average
+over the whole column, not an average of the visible rows, and the same for a
+count-distinct. With a dimension pivoted onto columns, each pivot column gets its own
+total the same way. [Calculations][ref-calculated-fields] based on window functions,
+such as running totals, are excluded — the same exclusion as Cube's own [row, column,
+and pivot totals](/docs/explore-analyze/workbooks/querying-data#totals).
+
+Totals are computed over the query's full result, not just the rows visible on the
+sheet, so a row-limited query still totals the whole result. Measure filters are
+dropped from the totals query; dimension filters are kept. With measures on **Rows**
+and no row dimension, no totals row is written, since each "total" would just restate
+its own data row.
+
+Column totals are saved with the exploration and survive **Refresh**; with auto-run
+off, toggling the switch waits for **Run** like any other display change.
+
+{/* TODO: screenshot — a pivoted exploration with the Total row on the sheet */}
+
 When your exploration is ready, click **Save** to add it to your workspace. You
 can then [work with the exploration](#work-with-explorations) from the add-in.
 To discard an unsaved exploration instead, choose **Delete exploration** from
@@ -218,3 +244,4 @@ Saved explorations also appear in the Cube workspace. See
 [link-excel-addins]: https://support.microsoft.com/en-us/office/add-or-remove-add-ins-in-excel-0af570c4-5cf3-4fa9-9b88-403625a0b460
 [link-ms-appsource]: https://appsource.microsoft.com/en-us/product/office/WA200008486
 [ref-explorations]: /docs/explore-analyze/explore#saving-explorations
+[ref-calculated-fields]: /docs/explore-analyze/workbooks/calculated-fields
