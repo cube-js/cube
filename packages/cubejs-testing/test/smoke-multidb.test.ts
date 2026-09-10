@@ -91,7 +91,7 @@ describe('multidb', () => {
   afterAll(async () => {
     await stopIfStarted('birdbox', birdbox);
     await stopIfStarted('db', db);
-    await db2.stop();
+    await stopIfStarted('db2', db2);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('query', async () => {
