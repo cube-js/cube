@@ -34,18 +34,25 @@ priority first:
    message sent from the host page (see [At runtime](#at-runtime)).
 2. **URL parameter** — the `?timezone=` query parameter on the embed URL (see
    [Per embed via URL](#per-embed-via-url)).
-3. **Dashboard's own zone** — a dashboard pinned to a named zone, or set to resolve per
+3. **Session setting** — `settings.timezone` on the [Generate Session
+   API](/reference/embed-apis/generate-session#session-settings), for a zone that belongs
+   to the viewer rather than to one placement. Set it once when you mint the session and
+   every iframe that session opens buckets time in it.
+4. **Dashboard's own zone** — a dashboard pinned to a named zone, or set to resolve per
    viewer (see [dashboard time zone](/admin/time-zones#dashboard-time-zone)). In
    [signed embedding](/embedding/iframe/auth/signed) the viewer has no Cube account and
    therefore no personal zone, so a viewer-resolved dashboard falls through to the next
-   step — supply `?timezone=` if you want each end user's own zone.
-4. **Account default** — the zone configured in **Embed → Settings** (see
+   step — supply `settings.timezone` or `?timezone=` if you want each end user's own zone.
+5. **Account default** — the zone configured in **Embed → Settings** (see
    [Account-wide default](#account-wide-default)).
-5. **Account-wide zone**, then the deployment's default time zone.
+6. **Account-wide zone**, then the deployment's default time zone.
 
-A host override outranks a dashboard's pinned zone by design: the integrator is speaking
-for the whole frame, and you know your user's zone better than the dashboard's author
-does.
+A bare UTC offset (`+05:00`) or an unknown zone name falls through to the next source
+rather than failing: Cube would compute in UTC and report nothing for it.
+
+Everything the integrator supplies — the runtime message, the URL parameter, the session
+setting — outranks a dashboard's pinned zone by design: you are speaking for the whole
+frame, and you know your user's zone better than the dashboard's author does.
 
 <Note>
   If the account policy is disabled, none of this applies — Cube sends no zone and the

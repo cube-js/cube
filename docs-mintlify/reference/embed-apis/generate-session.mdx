@@ -63,11 +63,14 @@ Accounts are limited to 10,000 external users. To increase this limit, please co
 ## Session settings
 
 `settings` is an object of per-session overrides for embed behavior, applied to
-every embed opened with this session. Each key is **tri-state**: omit it to
-inherit what the layer below says — the account-wide setting under **Embed →
-Settings** for the AI keys, the built-in default for the rest — or set
-`true`/`false` to pin the behavior for this session, taking precedence over the
-account-wide setting.
+every embed opened with this session. Omit a key to inherit what the layer below
+says — the account-wide setting under **Embed → Settings** for the AI keys and
+for `locale`/`timezone`, the built-in default for the rest.
+
+The switches are **tri-state**: `true`/`false` pins the behavior for this session,
+taking precedence over the account-wide setting. `locale` and `timezone` carry a
+value rather than a switch, and sit one step below the matching iframe URL
+parameter; a value Cube cannot use falls through instead of failing the session.
 
 Because these values are signed into the session token, a viewer cannot change
 them; use them for anything that differs per customer. See [Show and hide
@@ -93,6 +96,8 @@ account-wide settings and the iframe URL parameters.
 | `showWorkbookShare` | boolean | No | Sharing in the [Creator Mode][ref-creator-mode] workspace: the workbook header's **Share** button and the **Share** action on a workbook, dashboard, exploration, or folder row. Set `false` for a deployment where each embed user should only ever see their own content. Shown by default. Hides the entry points only — it does not revoke access already granted, and never widens what the session may do. |
 | `showDashboardSettings` | boolean | No | The dashboard editor's settings panel — the gear button and the sidebar behind it. That panel is the only place an embed user reaches the dashboard slug, the per-dashboard time zone, the per-dashboard agent, the grid behavior switches, and the dashboard theme, so `false` withdraws all of them together. Shown by default. |
 | `showMemberNames` | boolean | No | The **Show Member Names** item in the workbook data pane's more-actions menu. Member names are the data model's own identifiers, so this is schema protection in the same family as **Show Generated SQL**. `false` hides the item **and** pins the pane to titles, returning a user who had already switched to names. Shown by default. |
+| `locale` | string | No | UI language for every embed opened with this session, as a BCP-47 code — a full code (`es-ES`), a short code (`es`), or a regional variant all resolve to a shipped language. Sits between the per-iframe `?locale=` parameter, which still wins, and the account-wide default under **Embed → Settings**. A language Cube does not ship falls through to that default rather than failing the session. See [Localization](/embedding/iframe/localization). |
+| `timezone` | string | No | IANA time zone the agent runs its queries in for every embed opened with this session (e.g. `America/New_York`). Sits between the per-iframe `?timezone=` parameter and the account-wide default, and stays subject to the account's user-time-zone policy — it is not a way around it. A bare UTC offset or an unknown name falls through rather than failing the session. See [Time zones](/embedding/iframe/time-zones). |
 | `showGroupByCube` | boolean | No | The **Group by Cube** / **Group by Folder** item in the data pane's more-actions menu. `false` hides the item **and** pins the pane to the grouping it would have defaulted to — by folder when the view defines folders, by cube otherwise. No content is withdrawn either way. Shown by default. |
 
 <Note>

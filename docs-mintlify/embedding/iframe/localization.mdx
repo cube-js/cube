@@ -38,9 +38,9 @@ host page.
 English (`en-US`) is the default and the fallback when no language is configured.
 
 A locale value can be a full code (`es-ES`), a short language code (`es`), or a regional
-variant that isn't shipped (`es-AR`). Short codes and unsupported regional variants
-resolve to the first supported locale for that language — for example, both `es` and
-`es-AR` resolve to `es-ES`. A value that doesn't match any supported language is ignored.
+variant that isn't shipped (`es-AR`). An exact match wins; otherwise the language's own
+default is used — `es` and `es-AR` both resolve to `es-MX`, and `pt`/`pt-AO` to `pt-PT`.
+A value that doesn't match any supported language is ignored.
 
 ## How the language is resolved
 
@@ -51,9 +51,15 @@ priority first:
    message sent from the host page (see [At runtime](#at-runtime)).
 2. **URL parameter** — the `?locale=` query parameter on the embed URL (see
    [Per embed via URL](#per-embed-via-url)).
-3. **Account default** — the language configured in **Embed → Settings** (see
+3. **Session setting** — `settings.locale` on the [Generate Session
+   API](/reference/embed-apis/generate-session#session-settings), for a language that
+   belongs to the viewer rather than to one placement. Set it once when you mint the
+   session and every iframe that session opens renders in it.
+4. **Account default** — the language configured in **Embed → Settings** (see
    [Account-wide default](#account-wide-default)).
-4. **Fallback** — `en-US`.
+5. **Fallback** — `en-US`.
+
+A language Cube doesn't ship falls through to the next source rather than failing.
 
 ## Account-wide default
 
