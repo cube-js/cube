@@ -40,3 +40,47 @@ async fn test_sub_query_dim_in_join_condition() {
         insta::assert_snapshot!(result);
     }
 }
+
+// A multiplied measure reads its rows from the source cube joined beside the
+// keys subquery, and a sub-query dimension the join condition names is joined
+// there too. That dimension's join matches on the primary key, so the key has
+// to resolve against the cube joined for the measure — resolving it anywhere
+// that is not in scope at that point makes the whole select unrunnable.
+//
+// `B.sum_foo_id` multiplies over the one-to-many join to C, and the B → C
+// condition names the sub_query dim `B.foo_id`, which is what puts the
+// dimension sub-query into that same join.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_sub_query_dim_join_key_for_multiplied_measure() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - B.sum_foo_id
+        dimensions:
+          - B.id
+          - C.bar_id
+        order:
+          - id: B.id
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+
+    let subquery_join = sql
+        .split("AS \"B_foo_id_subquery\" ON")
+        .nth(2)
+        .unwrap_or_default()
+        .split('\n')
+        .next()
+        .unwrap_or_default()
+        .to_string();
+    assert!(
+        subquery_join.contains("\"b_key_b\".id"),
+        "Expected the sub-query join to match on the key of the cube joined for the measure:\n{}",
+        sql
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
