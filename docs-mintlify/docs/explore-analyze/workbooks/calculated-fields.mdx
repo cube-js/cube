@@ -152,6 +152,15 @@ menu—either in the sidebar or on its column header in the results. Only fields
 this panel generated offer the action; a `CASE` expression written by hand does
 not.
 
+A bucketed field can also be **filtered**, the same way as a native dimension —
+choose **Filter** from its menu. The value picker offers only the bucket's own
+labels (e.g. `Picked` and `Other`), since a bucket can't return a value it
+wasn't built to produce, and `is null` / `is not null` are offered only when
+the bucket can actually return `NULL`. Editing the bucket afterward keeps the
+filter's selection where possible — renaming a label moves the selection with
+it — but changing the number of buckets drops a selection that no longer
+matches, since the underlying structure changed.
+
 ### Editing a calculated field
 
 Select a calculated field in the sidebar to open the editor. You can change its

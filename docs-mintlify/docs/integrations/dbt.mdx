@@ -418,6 +418,32 @@ reviewed rather than the one saved on the integration. See [dbt sync as a CI tes
 gate](/reference/cli#dbt-sync-as-a-ci-test-gate) for the full pipeline, including
 the compile and query steps.
 
+### Sync from an uploaded manifest
+
+By default, a sync clones your dbt repository and runs `dbt parse` to produce a
+`manifest.json` before converting it. If your CI pipeline already produces one —
+via `dbt parse`, `dbt compile`, or `dbt build` — you can upload it directly and
+skip the repository clone entirely:
+
+```bash
+jq -n --arg source manifest --slurpfile manifest target/manifest.json \
+  '{source: $source, manifest: $manifest[0]}' | \
+  curl -X POST "https://your-tenant.cubecloud.dev/api/v1/deployments/DEPLOYMENT_ID/dbt-sync" \
+    -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" \
+    --data-binary @-
+```
+
+Build the body with `jq` (or an equivalent JSON tool) rather than interpolating the
+file into a shell string — a real `manifest.json` is routinely tens of megabytes,
+past what a shell accepts as a single argument, and `--data-binary @-` streams it
+to `curl` instead of holding it in argv. The request body is capped at 50 MB.
+
+This is useful when your platform policy won't issue Cube a repository credential
+(a PAT, deploy key, or GitHub App install), or simply to skip the clone, dependency
+install, and `dbt parse` steps for a faster per-merge CI gate — Cube converts the
+manifest you already validated, with no re-parse of a branch tip that may have
+moved on. `source` defaults to `git`, so calls that omit it are unaffected.
+
 ### Trigger on every push
 
 Register a webhook on your dbt repository so Cube syncs automatically whenever the
