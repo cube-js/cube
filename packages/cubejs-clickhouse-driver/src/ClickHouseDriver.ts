@@ -69,7 +69,8 @@ const ClickhouseTypeToGeneric: Record<string, string> = {
   ipv6: 'text',
   nothing: 'text',
   bfloat16: 'float',
-  // 128 and 256 bit integers arrive as strings; bigint would truncate them.
+  // 128 and 256 bit integers do not fit a bigint. They currently lose digits in JSON.parse when
+  // the server does not quote them (default off since 25.x) — see the format work tracked separately.
   int128: 'decimal',
   int256: 'decimal',
   uint128: 'decimal',
