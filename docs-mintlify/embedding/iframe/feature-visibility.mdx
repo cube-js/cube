@@ -164,7 +164,8 @@ what the parameter does:
   the control visible.
 - **A parameter that selects a value** (`locale`, `timezone`) falls through to
   the next source in the ladder when the value is one Cube cannot use — the
-  session setting first, then the account default.
+  session setting first, then (for `timezone`) a zone the dashboard's author
+  pinned, then the account default.
 
 Note that the two boolean conventions are inverses of each other: `allowExport`
 must be turned *on*, `show…` must be turned *off*.

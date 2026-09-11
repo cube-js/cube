@@ -64,8 +64,9 @@ Accounts are limited to 10,000 external users. To increase this limit, please co
 
 `settings` is an object of per-session overrides for embed behavior, applied to
 every embed opened with this session. Omit a key to inherit what the layer below
-says — the account-wide setting under **Embed → Settings** for the AI keys and
-for `locale`/`timezone`, the built-in default for the rest.
+says — the account-wide setting under **Embed → Settings** for the AI keys (except
+`allowChatWorkspaceAuthoring`, which has none) and for `locale`/`timezone`, the
+built-in default for the rest.
 
 The switches are **tri-state**: `true`/`false` pins the behavior for this session,
 taking precedence over the account-wide setting. `locale` and `timezone` carry a
