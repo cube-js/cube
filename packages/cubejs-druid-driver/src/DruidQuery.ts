@@ -65,10 +65,10 @@ export class DruidQuery extends BaseQuery {
     // timestamp format. The base template renders the value bare, which is invalid
     // syntax
     templates.expressions.timestamp_literal = 'TIME_PARSE(\'{{ value }}\')';
-    delete templates.expressions.like_escape;
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
     // Same escape clause as DruidFilter.likeIgnoreCase; it cannot go inside
-    // `like_pattern`, whose pattern is wrapped in CONCAT(...).
+    // `like_pattern`, whose pattern is wrapped in CONCAT(...). Druid accepts the
+    // clause, so `expressions.like_escape` stays for the SQL API to push down.
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }} ESCAPE \'\\\'';
     // Druid evaluates CURRENT_TIMESTAMP in the sqlTimeZone query context, which
     // defaults to UTC — assumes the connection does not override sqlTimeZone

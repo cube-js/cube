@@ -13,14 +13,17 @@ import { DruidQuery } from '../src/DruidQuery';
 // interprets it. Druid accepts a non-literal pattern and honours ESCAPE on it
 // only over a real datasource, so this needs one rather than an inline SELECT.
 const LIKE_DATASOURCE = 'like_escape_filters';
-const LIKE_ROWS = ['50%Yoff', '50%_off', '50Xyoff', 'off', 'plain'];
+const LIKE_ROWS = ['50%Yoff', '50%_off', '50Xyoff', 'off', 'plain', 'a\\b', 'aXb'];
 
 const LIKE_CASES: [string, string, string[]][] = [
   ['contains', '%', ['50%Yoff', '50%_off']],
   ['contains', '_', ['50%_off']],
-  ['notContains', '%', ['50Xyoff', 'off', 'plain']],
+  ['notContains', '%', ['50Xyoff', 'off', 'plain', 'a\\b', 'aXb']],
   ['startsWith', '50%', ['50%Yoff', '50%_off']],
   ['endsWith', '_off', ['50%_off']],
+  // The escape character is the third thing escaped in a value, and getting it
+  // wrong costs a row rather than adding one - so `aXb` stands by as the decoy.
+  ['contains', 'a\\b', ['a\\b']],
   // An ordinary value has to keep working: escaping must not break plain search.
   ['contains', 'off', ['50%Yoff', '50%_off', '50Xyoff', 'off']],
 ];
@@ -145,7 +148,7 @@ describe('DruidDriver', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Basic ${Buffer.from('admin:password1').toString('base64')}`,
+        Authorization: `Basic ${Buffer.from(`${config.user}:${config.password}`).toString('base64')}`,
       },
       body: JSON.stringify(payload),
     });
