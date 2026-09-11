@@ -15,9 +15,10 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc --build",
-    "test": "yarn test:types && jest --runInBand",
+    "test": "yarn unit",
     "test:types": "tsc --project tsconfig.test.json",
     "tsc": "tsc --build",
+    "unit": "yarn test:types && jest --runInBand",
     "watch": "tsc --build --watch"
   },
   "files": [

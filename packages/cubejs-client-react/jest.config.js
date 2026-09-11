@@ -12,6 +12,5 @@ module.exports = {
   moduleNameMapper: {
     ...base.moduleNameMapper,
     '^@cubejs-client/core$': '<rootDir>/../cubejs-client-core/src/index.ts',
-    '^(\\.{1,2}/.*)\\.js$': '$1',
   },
 };
