@@ -759,7 +759,7 @@ describe('index.test', () => {
     }
   );
 
-  // Cube can override env
+  // cube.js config can override env
   testRefreshWorkerAndRollupModes(
     {
       testName: 'Override scheduledRefreshTimer (false) & rollupOnlyMode from cube.js',
