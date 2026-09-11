@@ -265,13 +265,13 @@ asyncModule(async () => {
 
 ```javascript
 // cube.js
-const MySQLDriver = require("@cubejs-backend/mysql-driver");
-const PostgresDriver = require("@cubejs-backend/postgres-driver");
+const { MySqlDriver } = require("@cubejs-backend/mysql-driver");
+const { PostgresDriver } = require("@cubejs-backend/postgres-driver");
 
 module.exports = {
   driverFactory: ({ dataSource }) => {
     if (dataSource === "mysql") {
-      return new MySQLDriver({ database: dataSource });
+      return new MySqlDriver({ database: dataSource });
     }
 
     return new PostgresDriver({ database: dataSource });
