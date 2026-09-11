@@ -119,7 +119,6 @@
     "@types/node": "^22",
     "cypress": "15.21.1",
     "cypress-localstorage-commands": "^1.4.5",
-    "cypress-plugin-snapshots": "^1.4.4",
     "cypress-wait-until": "^1.7.2",
     "globby": "^11.0.4",
     "jest": "^29",
