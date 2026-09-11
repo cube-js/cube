@@ -2,6 +2,7 @@
 import { DockerComposeEnvironment, StartedDockerComposeEnvironment, Wait } from 'testcontainers';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import path from 'path';
+import fs from 'fs';
 
 import { prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
 
@@ -61,10 +62,22 @@ describe('DruidDriver', () => {
       return;
     }
 
-    const dc = new DockerComposeEnvironment(
-      path.resolve(path.dirname(__filename), '../../'),
-      'docker-compose.yml'
-    );
+    const composePath = path.resolve(path.dirname(__filename), '../../');
+
+    // The compose file bind-mounts ./storage as /opt/data - Druid's local deep
+    // storage and its indexing-log directory. Docker creates a missing
+    // bind-mount source owned by root while the image runs as `druid`, so an
+    // indexing task cannot publish a segment unless the directory already
+    // exists and is writable. Docker Desktop makes bind mounts writable
+    // whatever the container user, which hides this everywhere but Linux.
+    for (const dir of ['', 'segments', 'indexing-logs']) {
+      const created = path.join(composePath, 'storage', dir);
+
+      fs.mkdirSync(created, { recursive: true });
+      fs.chmodSync(created, 0o777);
+    }
+
+    const dc = new DockerComposeEnvironment(composePath, 'docker-compose.yml');
 
     env = await dc
       .withWaitStrategy('zookeeper', Wait.forLogMessage('binding to port /0.0.0.0:2181'))
@@ -143,14 +156,14 @@ describe('DruidDriver', () => {
     });
   });
 
-  const druidPost = async (endpoint: string, payload: unknown) => {
+  const druidRequest = async (endpoint: string, payload?: unknown) => {
     const response = await fetch(`${config.url}${endpoint}`, {
-      method: 'POST',
+      method: payload === undefined ? 'GET' : 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Basic ${Buffer.from(`${config.user}:${config.password}`).toString('base64')}`,
       },
-      body: JSON.stringify(payload),
+      body: payload === undefined ? undefined : JSON.stringify(payload),
     });
 
     if (!response.ok) {
@@ -160,8 +173,18 @@ describe('DruidDriver', () => {
     return response.json();
   };
 
+  // What Druid itself says about the task, so a failure to ingest reads as the
+  // reason rather than as a timeout.
+  const taskStatus = async (task: string) => {
+    const { status } = await druidRequest(`/druid/indexer/v1/task/${task}/status`) as {
+      status: { status: string, errorMsg?: string },
+    };
+
+    return status;
+  };
+
   const ingestLikeRows = async () => {
-    const { task } = await druidPost('/druid/indexer/v1/task', {
+    const { task } = await druidRequest('/druid/indexer/v1/task', {
       type: 'index_parallel',
       spec: {
         ioConfig: {
@@ -183,8 +206,10 @@ describe('DruidDriver', () => {
     }) as { task: string };
 
     // Ingestion finishing and the segment becoming queryable are separate
-    // events, so wait for the rows themselves rather than for the task.
+    // events, so wait for the rows themselves - but watch the task too, or a
+    // task that died reads as nothing more than a timeout.
     const deadline = Date.now() + 4 * 60 * 1000;
+    let last = 'unknown';
 
     while (Date.now() < deadline) {
       const driver = new DruidDriver(config);
@@ -201,10 +226,20 @@ describe('DruidDriver', () => {
         await driver.release();
       }
 
+      const { status, errorMsg } = await taskStatus(task);
+
+      last = status;
+
+      if (status !== 'RUNNING' && status !== 'PENDING' && status !== 'WAITING' && status !== 'SUCCESS') {
+        throw new Error(`Ingestion task ${task} ended ${status}: ${errorMsg ?? 'no error message'}`);
+      }
+
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
 
-    throw new Error(`Ingestion task ${task} did not make ${LIKE_DATASOURCE} queryable in time`);
+    throw new Error(
+      `Ingestion task ${task} is ${last} and ${LIKE_DATASOURCE} did not become queryable in time`
+    );
   };
 
   const filteredNames = async (operator: string, value: string, useNativeSqlPlanner: boolean) => {
