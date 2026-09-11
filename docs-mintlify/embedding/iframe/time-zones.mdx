@@ -67,8 +67,10 @@ Set a default time zone for all embedded surfaces:
 1. Go to **Embed → Settings**.
 2. In the **Time Zone** card, pick a zone from the dropdown.
 
-The selected zone applies to every embedded surface across the account, unless a specific
-embed overrides it. Re-selecting the account-wide zone clears the embed-specific value, so
+The selected zone applies to every embedded surface across the account, unless something
+higher in the ladder above overrides it: a session's own `settings.timezone`, a
+`?timezone=` URL parameter, a runtime `cube:action:set-timezone` message, or a zone the
+dashboard's author pinned. Re-selecting the account-wide zone clears the embed-specific value, so
 embeds follow the account-wide zone again.
 
 The picker is inert while user time zones are off for the account — a zone stored there
@@ -96,8 +98,9 @@ number.
 
 Switch the zone after the embed has loaded by sending a
 [`cube:action:set-timezone`](/embedding/iframe/events#cube-action-set-timezone) message
-from the host page. This takes precedence over both the URL parameter and the account
-default — use it when your own user changes their zone:
+from the host page. This takes precedence over every other source — the URL parameter, a
+session's `settings.timezone`, a dashboard's own pinned zone, and the account default —
+use it when your own user changes their zone:
 
 ```js
 sendAction("cube:action:set-timezone", { timezone: "Asia/Tokyo" });
