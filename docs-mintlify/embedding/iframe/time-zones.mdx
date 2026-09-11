@@ -48,7 +48,8 @@ priority first:
 6. **Account-wide zone**, then the deployment's default time zone.
 
 A bare UTC offset (`+05:00`) or an unknown zone name falls through to the next source
-rather than failing: Cube would compute in UTC and report nothing for it.
+rather than failing. Cube cannot compute in such a zone — it would fall back to UTC and
+report nothing about it — so ignoring the value is safer than forwarding it.
 
 Everything the integrator supplies — the runtime message, the URL parameter, the session
 setting — outranks a dashboard's pinned zone by design: you are speaking for the whole
@@ -87,7 +88,9 @@ navigation won't drop it.
 
 Values must be [IANA time zone names](/admin/time-zones#valid-time-zone-values). An
 unusable value — including a bare UTC offset like `+05:30` — is ignored, and the embed
-falls back to the account default rather than quietly shifting every number.
+falls through to the next source in the ladder above (`settings.timezone`, then the
+dashboard's own zone, then the account default) rather than quietly shifting every
+number.
 
 ## At runtime
 

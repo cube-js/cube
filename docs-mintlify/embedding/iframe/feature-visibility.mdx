@@ -152,9 +152,9 @@ the bar for you.
 
 ### How values are parsed {#parsing}
 
-Every parameter falls back to what your account would have done anyway, so a typo
-never buys something you did not ask for. Which direction that is depends on what
-the parameter does:
+Every parameter falls back to whatever the embed would have done without it, so a
+typo never buys something you did not ask for. Which direction that is depends on
+what the parameter does:
 
 - **A parameter that grants** (`allowExport`) requires the exact literal string
   `true`. `allowExport=1`, `allowExport=TRUE`, and a bare `?allowExport` all
@@ -182,8 +182,8 @@ and the AI ones are what a session's own AI keys override.
 | **Show AI chat in the embedded workspace** | `showWorkbookChat`. | On |
 | **Allow AI summary widgets in embeds** | `showAiWidgets`. | On |
 | **Allow comments on embedded dashboards** | Commenting on embedded published dashboards. Separate from commenting in the Cube app, which has its own setting. | Off |
-| **Language** | Default UI language for embedded surfaces, overridden per embed by `?locale=`. | English |
-| **Time Zone** | Time zone agent queries run in, overridden per embed by `?timezone=` or a host message. | Tenant default |
+| **Language** | Default UI language for embedded surfaces, below `settings.locale` and `?locale=`. | English |
+| **Time Zone** | Time zone agent queries run in, below `settings.timezone`, `?timezone=`, and a host message. | Account-wide zone |
 
 The same page carries the account-wide [Creator
 Mode](/embedding/iframe/creator-mode) settings: the workspace header title (with
