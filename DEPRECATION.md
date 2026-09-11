@@ -464,4 +464,4 @@ The Hive / SparkSQL driver (`@cubejs-backend/hive-driver`) is deprecated and wil
 removed in a future release. It is community-supported and is not maintained by Cube or
 the database vendor. There is no drop-in replacement; `@cubejs-backend/jdbc-driver`
 ships Hive/SparkSQL connection settings that can be used through a custom
-[`driverFactory`](https://docs.cube.dev/reference/configuration/configuration-options#driverfactory).
+[`driverFactory`](https://docs.cube.dev/reference/configuration/config#driver_factory).

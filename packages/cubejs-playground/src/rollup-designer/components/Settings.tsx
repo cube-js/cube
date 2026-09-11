@@ -261,7 +261,7 @@ export function Settings({
                         <Typography.Paragraph>
                           <Typography.Link
                             target="_blank"
-                            href="https://cube.dev/reference/data-modeling/pre-aggregations#refresh_key"
+                            href="https://docs.cube.dev/reference/data-modeling/pre-aggregations#refresh_key"
                           >
                             See how to format your cron expression
                           </Typography.Link>

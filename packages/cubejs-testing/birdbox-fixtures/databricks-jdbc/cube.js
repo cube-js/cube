@@ -1,4 +1,4 @@
-// Cube.js configuration options: https://cube.dev/docs/config
+// Cube.js configuration options: https://docs.cube.dev/reference/configuration/config
 module.exports = {
   queryRewrite: (query) => {
     if (query.measures) {

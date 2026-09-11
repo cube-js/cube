@@ -70,7 +70,7 @@ const UnsupportedFrameworkPlaceholder: UnsupportedPlaceholder = ({
     <br />
     Please refer to&nbsp;
     <a
-      href="https://cube.dev/reference/javascript-sdk/reference/cubejs-client-core"
+      href="https://docs.cube.dev/reference/javascript-sdk/reference/cubejs-client-core"
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => playgroundAction('Unsupported Framework Docs', { framework })}
@@ -88,7 +88,7 @@ const BIPlaceholder: UnsupportedPlaceholder = () => (
     <br />
     Please refer to&nbsp;
     <a
-      href="https://cube.dev/reference/core-data-apis/sql-api"
+      href="https://docs.cube.dev/reference/core-data-apis/sql-api"
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => playgroundAction('BI Docs')}

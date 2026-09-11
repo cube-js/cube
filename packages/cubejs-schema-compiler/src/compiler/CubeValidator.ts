@@ -106,7 +106,7 @@ const everyCronTimeZone = Joi.string().custom((value, helper) => {
     cronParser.parseExpression('0 * * * *', { currentDate: '2020-01-01 00:00:01', tz: value });
     return value;
   } catch (e) {
-    return helper.message({ custom: `(${formatStatePath(helper.state)} = ${value}) unknown timezone. Take a look here https://cube.dev/docs/schema/reference/cube#supported-timezones to get available time zones` });
+    return helper.message({ custom: `(${formatStatePath(helper.state)} = ${value}) unknown timezone. Take a look here https://docs.cube.dev/admin/time-zones#valid-time-zone-values to get available time zones` });
   }
 });
 

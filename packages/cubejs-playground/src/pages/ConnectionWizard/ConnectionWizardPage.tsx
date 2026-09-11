@@ -258,7 +258,7 @@ export function ConnectionWizardPage({ history }) {
                     Docker.
                     <br />
                     <Typography.Link
-                      href="https://cube.dev/cube-core/getting-started/create-a-project"
+                      href="https://docs.cube.dev/cube-core/getting-started/create-a-project"
                       target="_blank"
                     >
                       Learn more about connecting to databases in the
