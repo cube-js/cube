@@ -22,6 +22,17 @@ same as in a standalone dashboard embed. To hide any of its controls (title,
 back button, Edit, Duplicate) for your embed, see
 [Show or hide header controls](/embedding/iframe/dashboards#show-or-hide-header-controls).
 
+## AI
+
+Creator Mode workbooks show the same AI entry points as the full Cube app — the chat side panel, the launchpad's "Ask Cube Agent" button, "Fix in chat" on a failed report, and AI summary widgets — unless you turn them off.
+
+Two account-wide switches under **Embed → Settings** control this, each overridable per session via [Generate Session][ref-generate-session]:
+
+- **AI** (`allowAi`) is the master switch. Turning it off is enforced server-side — a denied session can't obtain AI credentials at all, so it can't spend AI tokens, and it overrides the toggles below.
+- **Workbook chat** (`showWorkbookChat`) and **AI widgets** (`showAiWidgets`) hide those specific entry points without disabling AI as a whole. While the master switch is off, these are disabled rather than cleared, so turning AI back on restores their configured state.
+
+See [Session settings][ref-session-settings] for the full list of AI-related keys, including `allowChatWorkspaceAuthoring` for headless chat integrations that shouldn't let the agent create or modify workbooks, explorations, or dashboards.
+
 ## Embed tenant scoping
 
 In Creator Mode, content (workbooks, dashboards) and the groups/user attributes referenced by the session are scoped to an **embed tenant**. Pass `embedTenantName` to isolate content per customer; omit it to use the current tenant.
@@ -108,3 +119,4 @@ For a complete working example, see the [cube-embedding-demo](https://github.com
 
 [ref-generate-session]: /reference/embed-apis/generate-session
 [ref-bootstrap]: /reference/embed-apis/generate-session#creator-mode-bootstrapping-groups-and-user-attributes
+[ref-session-settings]: /reference/embed-apis/generate-session#session-settings

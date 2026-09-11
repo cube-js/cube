@@ -131,6 +131,17 @@ widget, so no additional query is issued. Inside an embed, `allowExport` —
 not the viewer's own Cube role — is the authority on whether the download
 actions appear.
 
+To turn on per-widget downloads without the whole-dashboard ⋮ menu — for a
+host that surfaces its own dashboard-level export, for example — add
+`showDashboardExportMenu=false`:
+
+```text
+https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&allowExport=true&showDashboardExportMenu=false
+```
+
+Like the header controls below, only the exact literal string `false` hides
+the menu; it has no effect unless `allowExport=true` is also set.
+
 ## Show or hide the AI chat
 
 Embedded dashboards show an AI chat (the agent panel and its launcher bubble) by
@@ -191,8 +202,21 @@ object, unlike `showDashboardChat`, and they have no account-wide default
 under **Embed → Settings**.
 </Note>
 
-These parameters apply to the dashboard header only — the workbook header
-(which carries Publish and Share) is unaffected.
+These parameters apply to the dashboard header only. The [Creator
+Mode](/embedding/iframe/creator-mode) workbook header — which carries the
+workbook name, tabs, Publish changes, and Share — has its own, separate
+back-button switch:
+
+| Parameter | Hides |
+| --- | --- |
+| `showWorkbookBackButton=false` | The back button in the Creator Mode workbook header |
+
+`showWorkbookBackButton` is independent of `showDashboardBackButton` — the two
+headers are separate surfaces, so a host that wants neither back button sets
+both. The rest of the workbook header (name, tabs, Publish changes, Share) has
+no equivalent switch, since those actions are part of the authoring flow. The
+workbook actions menu still offers **View all**, so hiding the back button
+never removes a way back to the workspace.
 
 Setting `showDashboardHeader=false` overrides the other four: the whole bar
 disappears regardless of their values. `showDashboardEditButton` can only

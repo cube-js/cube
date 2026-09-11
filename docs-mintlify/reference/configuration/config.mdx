@@ -513,6 +513,12 @@ module.exports = {
 }
 ```
 
+Cube's own drivers can also be loaded with a named ESM import instead of `require`:
+
+```javascript
+import { PostgresDriver } from '@cubejs-backend/postgres-driver'
+```
+
 ### `orchestrator_options`
 
 <Warning>
