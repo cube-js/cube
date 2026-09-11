@@ -1078,6 +1078,16 @@
                 ]
               },
               {
+                "group": "Databricks Metric View Publication",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /api/v1/deployments/{deploymentId}/databricks-metric-view-previews",
+                  "GET /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}",
+                  "DELETE /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}",
+                  "GET /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}/result"
+                ]
+              },
+              {
                 "group": "Users (SCIM)",
                 "openapi": "/api-reference/scim.yaml",
                 "pages": [

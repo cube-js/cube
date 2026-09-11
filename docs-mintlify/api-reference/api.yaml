@@ -48,6 +48,7 @@ tags:
   - name: Usage Analytics
   - name: OpenAPI Spec
   - name: Dashboard Exports
+  - name: Databricks Metric View Publication
 paths:
   /api/v1/app-config:
     get:
@@ -419,6 +420,115 @@ paths:
           Returns `409` while the job is still rendering — poll `GET /dashboard-exports/{jobId}`
           first — `422` if the render failed (terminal: submit a new export rather than retrying
           this one), and `404` once the job has expired or if it belongs to a different user.
+  /api/v1/deployments/{deploymentId}/databricks-metric-view-previews:
+    post:
+      operationId: startPreview
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewInput'
+        description: DatabricksMetricViewPublicationPreviewInput
+        required: true
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewStartResponse'
+          description: ''
+      summary: Start a Databricks Metric View publication preview
+      tags:
+        - Databricks Metric View Publication
+      x-mint:
+        content: >-
+          Queues an offline conversion of static YAML from the deployment's latest successful build
+          and returns polling URLs immediately. Exact retries while the same content-addressed
+          preview is running reuse that work; a later submission starts a fresh execution. Preview
+          payloads and results are retained for at most seven days. The conversion supports scalar
+          dimensions, common and calculated measures, and acyclic many-to-one equi-joins from one
+          Databricks datasource. Access policies, templating, extends, unsafe fanout, unsupported
+          expressions, multiple datasources, and converter loss are blocked per view. Two-part
+          schema.table sources are qualified with CUBEJS_DB_DATABRICKS_CATALOG for the selected
+          datasource; without that setting they fail closed with an actionable issue. Requires
+          SchemaRead or SchemaUpdate access and useDatabricksMetricViewsPush.
+  /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}:
+    delete:
+      operationId: cancelPreview
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: previewId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Cancel a Databricks Metric View preview
+      tags:
+        - Databricks Metric View Publication
+    get:
+      operationId: previewStatus
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: previewId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewStatusResponse'
+          description: ''
+      summary: Get Databricks Metric View preview status
+      tags:
+        - Databricks Metric View Publication
+  /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}/result:
+    get:
+      operationId: previewResult
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: previewId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewResultResponse'
+          description: ''
+      summary: Get a completed Databricks Metric View preview result
+      tags:
+        - Databricks Metric View Publication
+      x-mint:
+        content: Returns 409 while the preview is still running or if it ended without a conversion result.
   /api/v1/deployments/{deploymentId}/dbt-sync:
     get:
       operationId: listDbtSyncs
@@ -7113,6 +7223,351 @@ components:
       required:
         - success
       type: object
+    DatabricksMetricViewPublicationCounts:
+      properties:
+        dimensions:
+          type: integer
+        errors:
+          type: integer
+        joins:
+          type: integer
+        measures:
+          type: integer
+        warnings:
+          type: integer
+      required:
+        - dimensions
+        - measures
+        - joins
+        - warnings
+        - errors
+      type: object
+    DatabricksMetricViewPublicationDatasetSource:
+      properties:
+        dataSource:
+          type: string
+        dataset:
+          type: string
+        originalSource:
+          type: string
+        resolvedSource:
+          type: string
+      required:
+        - dataset
+        - dataSource
+        - originalSource
+        - resolvedSource
+      type: object
+    DatabricksMetricViewPublicationIssue:
+      properties:
+        code:
+          type: string
+        element:
+          oneOf:
+            - type: string
+            - type: 'null'
+        message:
+          type: string
+        severity:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationIssueSeverity'
+        stage:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationIssueStage'
+      required:
+        - code
+        - severity
+        - stage
+        - message
+      type: object
+    DatabricksMetricViewPublicationIssueSeverity:
+      enum:
+        - ERROR
+        - WARNING
+      type: string
+    DatabricksMetricViewPublicationIssueStage:
+      enum:
+        - INPUT
+        - VIEW_PROJECTION
+        - OSSIE_VALIDATION
+        - OSSIE_TO_DATABRICKS
+        - OUTPUT_VALIDATION
+        - EXECUTION
+      type: string
+    DatabricksMetricViewPublicationPreviewInput:
+      properties:
+        dataSourceName:
+          type: string
+        selectionMode:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewInputSelectionMode'
+        sourceOverrides:
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
+          description: >-
+            Optional Cube view name to root Ossie dataset overrides for otherwise ambiguous view
+            projections.
+        targetNames:
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
+          description: Optional Cube view name to Databricks Metric View name overrides.
+        viewNameRegex:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            A safe, bounded regex subset for view names. Supports literals, ^, $, dot, and one .*
+            wildcard; grouping, alternation, lookaround, and backreferences are rejected.
+        viewNames:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+          description: Required only when selectionMode is 'selected'.
+      required:
+        - dataSourceName
+        - selectionMode
+      type: object
+    DatabricksMetricViewPublicationPreviewInputSelectionMode:
+      enum:
+        - all
+        - selected
+        - pattern
+      type: string
+    DatabricksMetricViewPublicationPreviewResultResponse:
+      properties:
+        buildJobId:
+          type: integer
+        commit:
+          oneOf:
+            - type: string
+            - type: 'null'
+        completedAt:
+          pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+          type: string
+        dataSourceName:
+          type: string
+        deploymentId:
+          type: integer
+        durationMs:
+          type: integer
+        outcome:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewResultResponseOutcome'
+        previewId:
+          type: string
+        runtime:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationRuntime'
+        sourceSha256:
+          type: string
+        version:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewResultResponseVersion'
+        views:
+          items:
+            $ref: '#/components/schemas/DatabricksMetricViewPublicationViewResult'
+          type: array
+      required:
+        - previewId
+        - deploymentId
+        - dataSourceName
+        - buildJobId
+        - completedAt
+        - durationMs
+        - version
+        - outcome
+        - sourceSha256
+        - views
+        - runtime
+      type: object
+    DatabricksMetricViewPublicationPreviewResultResponseOutcome:
+      enum:
+        - success
+        - partial
+        - failed
+      type: string
+    DatabricksMetricViewPublicationPreviewResultResponseVersion:
+      enum:
+        - 2
+      type: integer
+    DatabricksMetricViewPublicationPreviewStartResponse:
+      properties:
+        buildJobId:
+          type: integer
+        commit:
+          oneOf:
+            - type: string
+            - type: 'null'
+        dataSourceName:
+          type: string
+        deploymentId:
+          type: integer
+        previewId:
+          type: string
+        resultUrl:
+          type: string
+        reused:
+          type: boolean
+        status:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewStartResponseStatus'
+        statusUrl:
+          type: string
+      required:
+        - previewId
+        - deploymentId
+        - dataSourceName
+        - buildJobId
+        - reused
+        - status
+        - statusUrl
+        - resultUrl
+      type: object
+    DatabricksMetricViewPublicationPreviewStartResponseStatus:
+      enum:
+        - QUEUED
+      type: string
+    DatabricksMetricViewPublicationPreviewStatusResponse:
+      properties:
+        dataSourceName:
+          type: string
+        deploymentId:
+          type: integer
+        error:
+          oneOf:
+            - type: string
+            - type: 'null'
+        previewId:
+          type: string
+        progress:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationProgress'
+        resultAvailable:
+          type: boolean
+        startedAt:
+          pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+          type: string
+        status:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewStatusResponseStatus'
+        updatedAt:
+          pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+          type: string
+      required:
+        - previewId
+        - deploymentId
+        - dataSourceName
+        - status
+        - progress
+        - resultAvailable
+        - startedAt
+        - updatedAt
+      type: object
+    DatabricksMetricViewPublicationPreviewStatusResponseStatus:
+      enum:
+        - QUEUED
+        - RUNNING
+        - COMPLETED
+        - FAILED
+        - CANCELLED
+      type: string
+    DatabricksMetricViewPublicationProgress:
+      properties:
+        message:
+          type: string
+        percentComplete:
+          type: integer
+        stage:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationProgressStage'
+      required:
+        - stage
+        - percentComplete
+        - message
+      type: object
+    DatabricksMetricViewPublicationProgressStage:
+      enum:
+        - QUEUED
+        - RUNNING
+        - COMPLETED
+        - FAILED
+        - CANCELLED
+      type: string
+    DatabricksMetricViewPublicationRuntime:
+      properties:
+        bridgeCommit:
+          type: string
+        bridgeVersion:
+          type: string
+        cubeConverterVersion:
+          type: string
+        databricksConverterVersion:
+          type: string
+        ossieCommit:
+          type: string
+        ossieCoreVersion:
+          type: string
+        policyVersion:
+          type: integer
+        runnerVersion:
+          type: string
+        templateName:
+          type: string
+      required:
+        - bridgeCommit
+        - bridgeVersion
+        - ossieCommit
+        - ossieCoreVersion
+        - databricksConverterVersion
+        - cubeConverterVersion
+        - templateName
+        - runnerVersion
+        - policyVersion
+      type: object
+    DatabricksMetricViewPublicationViewResult:
+      properties:
+        counts:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationCounts'
+        cubeViewName:
+          type: string
+        datasetSources:
+          items:
+            $ref: '#/components/schemas/DatabricksMetricViewPublicationDatasetSource'
+          type: array
+        eligibleForPublication:
+          type: boolean
+        issues:
+          items:
+            $ref: '#/components/schemas/DatabricksMetricViewPublicationIssue'
+          type: array
+        metricViewName:
+          type: string
+        metricViewSha256:
+          oneOf:
+            - type: string
+            - type: 'null'
+        metricViewYaml:
+          oneOf:
+            - type: string
+            - type: 'null'
+        outcome:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationViewResultOutcome'
+        source:
+          oneOf:
+            - type: string
+            - type: 'null'
+      required:
+        - cubeViewName
+        - metricViewName
+        - outcome
+        - eligibleForPublication
+        - issues
+        - datasetSources
+        - counts
+      type: object
+    DatabricksMetricViewPublicationViewResultOutcome:
+      enum:
+        - success
+        - failed
+      type: string
     DbtSyncCancelResponse:
       properties:
         message:
@@ -7296,6 +7751,12 @@ components:
               type: array
             - type: 'null'
           description: Per-phase timings, in the order they ran. Absent while the sync is running.
+        source:
+          description: >-
+            Where this sync got its dbt metadata: `git` (Cube cloned the dbt repository and ran dbt)
+            or `manifest` (the caller uploaded a `manifest.json` and no repository was accessed).
+            Runs predating the manifest source report `git`.
+          type: string
         startedAt:
           description: >-
             When the sync started, as an ISO 8601 timestamp. See completedAt before comparing the
@@ -7333,6 +7794,7 @@ components:
         - deploymentId
         - status
         - trigger
+        - source
         - branchName
         - startedAt
       type: object
@@ -7375,6 +7837,13 @@ components:
             - type: integer
             - type: 'null'
           description: How many cubes the sync generated.
+        dbtVersion:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            The dbt version that produced the converted manifest, from its `metadata` block.
+            Advisory — absent when the producer omitted it.
         generatedFileCount:
           oneOf:
             - type: integer
@@ -7385,6 +7854,14 @@ components:
             - type: integer
             - type: 'null'
           description: dbt macros found in the manifest.
+        manifestGeneratedAt:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            When dbt generated the converted manifest, as an ISO 8601 timestamp. For an uploaded
+            manifest this is how you tell a stale upload from a fresh one; it is NOT when the sync
+            ran.
         models:
           oneOf:
             - type: integer
@@ -8104,6 +8581,20 @@ components:
       type: object
     EmbedSessionSettings:
       properties:
+        allowAi:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether this session may use AI at all. This is the master switch over every AI surface
+            in the embed: the dashboard agent, the workbook chat, the AI summary widgets and the
+            standalone embedded chat. Omit to inherit the account-wide embed setting (allowed by
+            default); `false` disables AI even if it is enabled account-wide. Unlike the `show*`
+            keys below it is enforced server-side — the session cannot obtain AI Chat credentials at
+            all, so no request made with it can consume AI tokens — and it outranks them: a `false`
+            here disables a surface whose own `show*` key is `true`. It does not change user roles
+            or permissions for non-AI API calls. `null` is accepted and means the same as omitting
+            it.
         allowChatWorkspaceAuthoring:
           oneOf:
             - type: boolean
@@ -8117,6 +8608,18 @@ components:
             `true` to preserve the session user's role-derived authoring capabilities; `true` never
             grants access the user does not already have. This setting changes only AI Chat tools
             and instructions. It does not change user roles or permissions for direct API calls.
+        showAiWidgets:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether AI summary widgets are authorable and refreshable with this session: the "AI
+            widget" entry in the dashboard editor's Add widgets menu, and the prompt input plus
+            Generate/Regenerate controls on an existing widget. An already-generated summary still
+            renders, so a published dashboard keeps its content — it simply cannot be regenerated.
+            Omit to inherit the account-wide embed setting (enabled by default); `false` disables
+            them even if they are enabled account-wide, `true` enables them even if they are
+            disabled account-wide.
         showDashboardChat:
           oneOf:
             - type: boolean
@@ -8125,10 +8628,26 @@ components:
             Whether embedded published dashboards viewed with this session show the AI chat (agent
             panel and launcher bubble). Omit to inherit the account-wide embed setting (shown by
             default); `false` hides the chat even if it is enabled account-wide, `true` shows it
-            even if it is disabled account-wide. Only affects the dashboard surface.
+            even if it is disabled account-wide. Only affects the dashboard surface, and only hides
+            the entry point — use `allowAi` to withhold AI from the session.
+        showWorkbookChat:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether the Creator Mode workbook viewed with this session shows its AI entry points:
+            the chat side panel and its toggle, the launchpad's "Ask Cube Agent" button and the "Fix
+            in chat" action on a failed report. Omit to inherit the account-wide embed setting
+            (shown by default); `false` hides them even if they are enabled account-wide, `true`
+            shows them even if they are disabled account-wide. Hides entry points only — use
+            `allowAi` to withhold AI from the session.
       type: object
     EmbedSettings:
       properties:
+        allowAi:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         enableDashboardComments:
           oneOf:
             - type: boolean
@@ -8137,7 +8656,15 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        showAiWidgets:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         showDashboardChat:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        showWorkbookChat:
           oneOf:
             - type: boolean
             - type: 'null'
@@ -10435,6 +10962,16 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        manifest:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+          description: >-
+            The contents of your dbt `target/manifest.json`, as JSON. Required when `source` is
+            `manifest` and ignored otherwise. Produced by `dbt parse`, `dbt compile` or `dbt build`,
+            so a CI job can POST the manifest it just validated and be sure Cube converts exactly
+            that — no re-parse of a branch tip that may already have moved.
         ref:
           oneOf:
             - type: string
@@ -10444,7 +10981,16 @@ components:
             Overrides the branch saved on the deployment’s dbt git integration for this sync only,
             so CI can sync the ref under review (e.g. a pull request’s head branch) instead of the
             tracked branch. The generated Cube branch is named after it.
+        source:
+          oneOf:
+            - $ref: '#/components/schemas/StartDbtSyncInputSource'
+            - type: 'null'
       type: object
+    StartDbtSyncInputSource:
+      enum:
+        - git
+        - manifest
+      type: string
     StartDevModeRequest:
       properties:
         branchName:

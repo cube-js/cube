@@ -7,6 +7,14 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-09-11" description="v0.8.0" tags={["Added"]}>
+  ### Added
+
+  - New public REST API for previewing a Databricks Metric View publication (CUB-4442): `POST /api/v1/deployments/{deploymentId}/databricks-metric-view-previews` (`DatabricksMetricViewPublicationPublicController.startPreview`) queues an offline conversion of the deployment's latest successful build and returns `202` with polling URLs; `GET .../databricks-metric-view-previews/{previewId}` (`previewStatus`) polls progress; `GET .../databricks-metric-view-previews/{previewId}/result` (`previewResult`) returns the completed result (`409` while still running or if it ended without one); `DELETE .../databricks-metric-view-previews/{previewId}` (`cancelPreview`) requests cancellation. Requires `SchemaRead` or `SchemaUpdate` access and the `useDatabricksMetricViewsPush` flag; preview payloads and results are retained for at most seven days. New schemas: `DatabricksMetricViewPublicationPreviewInput`, `DatabricksMetricViewPublicationPreviewStartResponse`, `DatabricksMetricViewPublicationPreviewStatusResponse`, `DatabricksMetricViewPublicationPreviewResultResponse`, `DatabricksMetricViewPublicationViewResult`, `DatabricksMetricViewPublicationIssue`, `DatabricksMetricViewPublicationCounts`, `DatabricksMetricViewPublicationDatasetSource`, `DatabricksMetricViewPublicationRuntime`, `DatabricksMetricViewPublicationProgress`.
+  - `StartDbtSyncInput` gained `source` (`"git"` | `"manifest"`) and `manifest` — pass an uploaded `manifest.json` directly instead of having Cube clone the dbt repository and run dbt itself (CUB-4492). The corresponding `DbtSyncRun` response gained `source` (which pull path a run used), and `DbtSyncRunStats` gained `dbtVersion` and `manifestGeneratedAt`, populated for manifest-sourced runs.
+  - `EmbedSessionSettings` / `EmbedSettings` gained `allowAi`, `showAiWidgets`, and `showWorkbookChat` (CUB-2615) — per-session AI opt-outs for embeds. `allowAi` disables every AI surface, including the standalone embed chat, and is enforced server-side so a client holding the token can't work around it; the `show*` keys (alongside the existing `showDashboardChat`) only hide specific entry points — the dashboard agent, workspace chat, and AI-summary widget generation, respectively.
+</Update>
+
 <Update label="2026-09-09" description="v0.7.0" tags={["Added","Changed"]}>
   ### Added
 
