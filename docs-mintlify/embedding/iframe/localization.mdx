@@ -68,12 +68,12 @@ Set a default language for all embedded surfaces from the Cube interface:
 1. Go to **Embed → Settings**.
 2. In the **Language** card, pick a language from the dropdown.
 
-The selected language applies to every embedded surface across the account, unless a
-specific embed overrides it with a `?locale=` URL parameter or a runtime
-`cube:action:set-locale` message.
+The selected language applies to every embedded surface across the account, unless
+something higher in the ladder above overrides it: a session's own `settings.locale`, a
+`?locale=` URL parameter, or a runtime `cube:action:set-locale` message.
 
-Clearing the setting removes the stored default, and embeds fall back to `en-US` (or to
-whatever a per-embed override specifies).
+Clearing the setting removes the stored default, and embeds fall back to `en-US` — unless
+a session or a per-embed override names a language.
 
 ## Per embed via URL
 
@@ -91,7 +91,8 @@ navigation won't drop it.
 
 Switch the language after the embed has loaded by sending a
 [`cube:action:set-locale`](/embedding/iframe/events#cube-action-set-locale) message from
-the host page. This takes precedence over both the URL parameter and the account default:
+the host page. This takes precedence over every other source — the URL parameter, the
+session setting, and the account default:
 
 ```js
 sendAction("cube:action:set-locale", { locale: "es" });
