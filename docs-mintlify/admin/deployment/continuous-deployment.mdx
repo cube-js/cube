@@ -47,6 +47,24 @@ git remote add cubecloud <YOUR-CUBE-CLOUD-GIT-URL>
 git push cubecloud master
 ```
 
+<Tip>
+
+**Should I push to the Cube Cloud Git remote or connect my provider directly?**
+
+If your data model already lives in a hosted Git provider (GitHub, GitLab, or
+Bitbucket), **connect that repository directly** — see [Deploy with
+GitHub](#deploy-with-github) below, or [import via SSH][ref-import-ssh] for
+GitLab and Bitbucket. You then push only to your own repository and Cube Cloud
+stays in sync automatically through a webhook, with no need to also push to the
+`cubecloud` remote.
+
+Push to the Cube Cloud Git remote (`git push cubecloud …`) only when you are
+**not** connecting an external provider — for example, when Cube Cloud is the
+only place your data model is versioned. Pushing to both your own provider and
+the `cubecloud` remote is redundant and risks the two copies diverging.
+
+</Tip>
+
 ## Deploy with GitHub
 
 You can connect a GitHub repository to your deployment by clicking the
@@ -61,6 +79,55 @@ session prior to connecting to your GitHub account from Cube.
 
 </Warning>
 
+### GitHub App permissions
+
+Connecting a GitHub repository installs the **Cube Cloud GitHub App**. Install
+it on the **organization** that owns the repository (not just your personal
+account), and grant it access either to the specific repositories you want to
+connect or to all repositories in the organization. The app requests permission
+to:
+
+- **Read repository contents** — to clone your data model and pick up new
+  commits.
+- **Administer repositories** — to create a repository on your behalf when you
+  choose *Create new repository* (see below).
+- **Manage webhooks** — to receive push, pull-request, and branch-delete events
+  that keep staging environments and production in sync.
+- **Read metadata** — the baseline access GitHub requires for any app.
+
+<Note>
+
+If your organization restricts third-party application access, an **organization
+owner must approve the Cube Cloud GitHub App installation**. Install and approve
+the app *before* connecting or creating a repository — otherwise the repository
+list will be empty, or the connection will fail with a permissions error.
+
+</Note>
+
+### Creating a new repository
+
+From the **Connect to GitHub** dialog you can either connect an existing
+repository or choose **Create new repository** to have Cube Cloud create one for
+you.
+
+<Warning>
+
+When Cube Cloud creates a repository in a **GitHub organization**, it is created
+through the GitHub App installation. Depending on your organization's settings,
+the person who initiated the creation is **not** automatically added as a
+collaborator, and the new repository may not appear under your personal
+repositories — look for it under the organization's repositories and add the
+required collaborators or teams in GitHub afterwards.
+
+A newly created repository also starts **empty**. Before a deployment can use a
+project path inside it, the repository must contain a Cube project — that is, a
+`model/` folder (the legacy `schema/` folder is also accepted). Connecting to an
+empty repository, or to a path that has no `model/` folder, fails with a **"data
+model not found"** error. Push an initial data model — or generate one from the
+Cube Cloud UI — before pointing a deployment at it.
+
+</Warning>
+
 What happens after connecting depends on the deploy mode:
 
 - In **Deploy with Git** mode, Cube Cloud will automatically deploy from the
@@ -69,6 +136,35 @@ What happens after connecting depends on the deploy mode:
 - In **Deploy with CLI** mode, only non-production branches are auto-synced
   into their staging environments. See [Connecting GitHub on a CLI
   deployment](#connecting-github-on-a-cli-deployment) for details.
+
+## Keeping your repository in sync
+
+Once a repository is connected, Cube Cloud is notified of new commits through a
+webhook — it does **not** poll your provider on a timer. In steady state a push
+to a connected branch is picked up within seconds, and the Cube Cloud UI
+reflects build and sync status within about ten seconds. A short (~30 second)
+per-branch cooldown between webhook events means rapid consecutive pushes to the
+same branch may be briefly coalesced.
+
+The **first connection** behaves differently. When you first connect a
+repository, Cube Cloud performs a one-time full clone of it, registers the
+webhook, and — for a newly provisioned or previously suspended deployment —
+starts the staging, [development mode][ref-dev-mode], and IDE instances from a
+cold state. Because of this, the first time a branch or commit appears in a
+[staging environment][ref-environments-staging], development mode, the IDE, or
+**Cubes & Views** in Explore can take noticeably longer (and longer still for
+large repositories). This is a one-time warm-up: after the initial clone
+completes and the instances are running, later pushes sync within seconds.
+
+<Note>
+
+A branch appears in the branch switcher only after Cube Cloud has fetched it,
+which happens when it is pushed *after* the webhook is active — a branch that
+existed before you connected the repository shows up once the first sync
+completes. Staging environments also suspend after 10 minutes of inactivity and
+take a moment to resume on the next request.
+
+</Note>
 
 ## Deploy with CLI
 
@@ -148,3 +244,4 @@ automatically, switch the deployment to [Deploy with Git](#deploy-with-git).
 [ref-environments-dev]: /admin/deployment/environments#development-environments
 [ref-environments-prod]: /admin/deployment/environments#production-environment
 [ref-environments-staging]: /admin/deployment/environments#staging-environments
+[ref-import-ssh]: /docs/getting-started/migrate-from-core/import-git-repository-via-ssh
