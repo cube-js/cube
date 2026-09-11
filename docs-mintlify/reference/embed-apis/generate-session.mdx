@@ -69,7 +69,7 @@ says — the account-wide setting under **Embed → Settings** for the AI keys (
 built-in default for the rest.
 
 The switches are **tri-state**: `true`/`false` pins the behavior for this session,
-taking precedence over the account-wide setting. `locale` and `timezone` carry a
+taking precedence over whatever the layer below would have said. `locale` and `timezone` carry a
 value rather than a switch, and sit one step below the matching iframe URL
 parameter; a value Cube cannot use falls through instead of failing the session.
 
