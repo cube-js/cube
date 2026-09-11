@@ -49,7 +49,7 @@ export function Vizard() {
     params = JSON.parse(
       atob(decodeURIComponent(location.hash.slice(1)))
     ) as VizardProps;
-  } catch (e) {
+  } catch {
     throw new Error('Invalid params');
   }
 
