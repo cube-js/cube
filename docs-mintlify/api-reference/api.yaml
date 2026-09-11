@@ -10435,17 +10435,6 @@ components:
           oneOf:
             - type: string
             - type: 'null'
-        manifest:
-          oneOf:
-            - type: object
-              additionalProperties: true
-              description: >-
-                The contents of your dbt `target/manifest.json`, as JSON. Required
-                when `source` is `manifest` and ignored otherwise. Produced by
-                `dbt parse`, `dbt compile` or `dbt build`, so a CI job can POST the
-                manifest it just validated and be sure Cube converts exactly that —
-                no re-parse of a branch tip that may already have moved.
-            - type: 'null'
         ref:
           oneOf:
             - type: string
@@ -10455,16 +10444,7 @@ components:
             Overrides the branch saved on the deployment’s dbt git integration for this sync only,
             so CI can sync the ref under review (e.g. a pull request’s head branch) instead of the
             tracked branch. The generated Cube branch is named after it.
-        source:
-          oneOf:
-            - $ref: '#/components/schemas/StartDbtSyncInputSource'
-            - type: 'null'
       type: object
-    StartDbtSyncInputSource:
-      enum:
-        - git
-        - manifest
-      type: string
     StartDevModeRequest:
       properties:
         branchName:

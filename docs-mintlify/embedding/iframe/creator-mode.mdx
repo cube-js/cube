@@ -26,7 +26,7 @@ back button, Edit, Duplicate) for your embed, see
 
 Creator Mode workbooks show the same AI entry points as the full Cube app — the chat side panel, the launchpad's "Ask Cube Agent" button, "Fix in chat" on a failed report, and AI summary widgets — unless you turn them off.
 
-Two account-wide switches under **Embed → Settings** control this, each overridable per session via [Generate Session][ref-generate-session]:
+Three account-wide switches under **Embed → Settings** control this, each overridable per session via [Generate Session][ref-generate-session]:
 
 - **AI** (`allowAi`) is the master switch. Turning it off is enforced server-side — a denied session can't obtain AI credentials at all, so it can't spend AI tokens, and it overrides the toggles below.
 - **Workbook chat** (`showWorkbookChat`) and **AI widgets** (`showAiWidgets`) hide those specific entry points without disabling AI as a whole. While the master switch is off, these are disabled rather than cleared, so turning AI back on restores their configured state.
