@@ -75,15 +75,26 @@ export function useCubeQuery(
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const context = useContext(CubeContext);
+  const requestIdRef = useRef(0);
 
   let subscribeRequest: UnsubscribeObj | null = null;
 
-  // `progressResponse` is not part of the public `ProgressResult` API
-  const progressCallback: ProgressCallback = (progressResult) => setProgress(
-    (progressResult as unknown as ProgressResultWithResponse).progressResponse
-  );
+  function isCurrentRequest(requestId: number) {
+    return requestId === requestIdRef.current;
+  }
 
-  async function fetch() {
+  function createProgressCallback(requestId: number): ProgressCallback {
+    return (progressResult) => {
+      if (isCurrentRequest(requestId)) {
+        // `progressResponse` is not part of the public `ProgressResult` API
+        setProgress(
+          (progressResult as unknown as ProgressResultWithResponse).progressResponse
+        );
+      }
+    };
+  }
+
+  async function fetchQuery(requestId: number) {
     const { resetResultSetOnChange } = options;
     const cubeApi = options.cubeApi || context?.cubeApi;
 
@@ -102,20 +113,32 @@ export function useCubeQuery(
       const response = await cubeApi.load(query, {
         mutexObj: mutexRef.current,
         mutexKey: 'query',
-        progressCallback,
+        progressCallback: createProgressCallback(requestId),
         castNumerics: Boolean(typeof options.castNumerics === 'boolean' ? options.castNumerics : context?.options?.castNumerics),
         ...(options.cache ? { cache: options.cache } : {}),
       });
 
-      setResultSet(response);
-      setProgress(null);
+      if (isCurrentRequest(requestId)) {
+        setResultSet(response);
+        setProgress(null);
+      }
     } catch (loadError) {
-      setError(loadError as Error);
-      setResultSet(null);
-      setProgress(null);
+      if (isCurrentRequest(requestId)) {
+        setError(loadError as Error);
+        setResultSet(null);
+        setProgress(null);
+      }
     }
 
-    setLoading(false);
+    if (isCurrentRequest(requestId)) {
+      setLoading(false);
+    }
+  }
+
+  async function fetch() {
+    const requestId = ++requestIdRef.current;
+
+    await fetchQuery(requestId);
   }
 
   useEffect(() => {
@@ -129,6 +152,8 @@ export function useCubeQuery(
 
     async function loadQuery() {
       if (!skip && isQueryPresent(query)) {
+        const requestId = ++requestIdRef.current;
+
         // `areQueriesEqual` is declared for a single query, and reads no more
         // than `order` off one when given an array of queries
         const previousQuery = currentQuery as DeeplyReadonly<Query> | null;
@@ -155,27 +180,31 @@ export function useCubeQuery(
               {
                 mutexObj: mutexRef.current,
                 mutexKey: 'query',
-                progressCallback,
+                progressCallback: createProgressCallback(requestId),
                 ...(options.cache ? { cache: options.cache } : {}),
               },
               (e, result) => {
-                if (e) {
-                  setError(e);
-                } else {
-                  setResultSet(result);
+                if (isCurrentRequest(requestId)) {
+                  if (e) {
+                    setError(e);
+                  } else {
+                    setResultSet(result);
+                  }
+                  setLoading(false);
+                  setProgress(null);
                 }
-                setLoading(false);
-                setProgress(null);
               }
             );
           } else {
-            await fetch();
+            await fetchQuery(requestId);
           }
         } catch (e) {
-          setError(e as Error);
-          setResultSet(null);
-          setLoading(false);
-          setProgress(null);
+          if (isCurrentRequest(requestId)) {
+            setError(e as Error);
+            setResultSet(null);
+            setLoading(false);
+            setProgress(null);
+          }
         }
       }
     }
@@ -183,6 +212,8 @@ export function useCubeQuery(
     loadQuery();
 
     return () => {
+      requestIdRef.current += 1;
+
       if (subscribeRequest) {
         subscribeRequest.unsubscribe();
         subscribeRequest = null;
