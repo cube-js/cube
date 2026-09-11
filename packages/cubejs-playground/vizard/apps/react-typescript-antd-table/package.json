@@ -1,5 +1,5 @@
 {
-  "name": "vizard-react-typescript-chartjs",
+  "name": "vizard-react-typescript-antd-table",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -14,9 +14,7 @@
     "@cubejs-client/react": "^1.7.37",
     "@cubejs-client/ws-transport": "^1.7.37",
     "antd": "^5.14.2",
-    "chart.js": "^4.4.2",
     "react": "^18.2.0",
-    "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
