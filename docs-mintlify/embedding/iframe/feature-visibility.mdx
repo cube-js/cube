@@ -13,7 +13,7 @@ belongs to is not arbitrary — it follows from **what the switch answers**:
 | Layer | Set where | Applies to | Can the viewer change it? |
 | --- | --- | --- | --- |
 | [Account settings](#account-settings) | **Embed → Settings** in the Cube console | Every embed in the account | No |
-| [Session settings](#session-settings) | The `settings` object of the [Generate Session API][ref-generate-session] | Every embed opened with that session — i.e. one viewer | No — they are signed into the session token |
+| [Session settings](#session-settings) | The `settings` object of the [Generate Session API][ref-generate-session] | Every embed opened with that session — i.e. one viewer | No for the switches — they are signed into the session token. `locale` / `timezone` yield to a URL parameter |
 | [URL parameters](#url-parameters) | The query string of the iframe `src` | That one iframe | Yes — it is a URL in their browser |
 
 A fourth channel, [host messages](/embedding/iframe/events), changes a few of
@@ -31,9 +31,11 @@ account setting is the default behind both.
 That is why the layers are not interchangeable, and why a given switch usually
 exists in exactly one of them:
 
-- **Session settings are per-viewer and tamper-proof.** Your backend decides
-  them when it mints the session, and they are signed into the session token, so
-  a viewer cannot grant themselves something you withheld. Everything that
+- **Session settings are per-viewer, and the switches are tamper-proof.** Your
+  backend decides them when it mints the session, and they are signed into the
+  session token, so a viewer cannot switch on something you withheld. (The two
+  value settings, `locale` and `timezone`, are deliberately softer: a URL
+  parameter overrides them, because neither grants anything.) Everything that
   differs *per customer* — whether sharing exists, whether the AI agent may
   write to the workspace, whether raw member names may be revealed — is a
   session setting. Some of them are enforced on the server, not merely hidden in
@@ -86,6 +88,7 @@ session value is an override of what the account already says.
 | `showDashboardChat` | The AI chat on embedded published dashboards — agent panel and launcher bubble. | Account setting, then shown |
 | `showWorkbookChat` | The [Creator Mode](/embedding/iframe/creator-mode) workbook's AI entry points: the chat side panel and its toggle, the launchpad's **Ask Cube Agent** button, and **Fix in chat** on a failed report. | Account setting, then shown |
 | `showAiWidgets` | Authoring and refreshing AI summary widgets: the **AI widget** entry in the dashboard editor's Add widgets menu, and a widget's prompt input plus Generate/Regenerate. An already-generated summary keeps rendering, so switching this off never blanks a published dashboard — it only stops it being regenerated. | Account setting, then enabled |
+| `allowChatWorkspaceAuthoring` | Whether AI Chat authenticated with this session may create or modify persistent workspace content. `false` keeps ad-hoc analysis and inline tables/charts, but the agent cannot save or update explorations and reports, create or modify workbooks, create or publish dashboards, or point users at those surfaces — for headless chat integrations that render answers in their own UI. `true` never grants authoring the user's role does not already allow. This one has **no account-wide setting**: it defaults to allowed. | Allowed |
 
 ### Language and time zone
 
@@ -93,12 +96,13 @@ These two carry a value rather than a switch, and they are the answer for a
 viewer rather than for a placement: set them once when you mint the session and
 every iframe that session opens uses them. The per-iframe `?locale=` /
 `?timezone=` parameters still win where a host sets one, and the account-wide
-default applies where neither does.
+default applies where neither does. Neither grants anything, which is why a
+viewer-editable URL parameter is allowed to override them.
 
 | Setting | Governs |
 | --- | --- |
 | `locale` | The embed's UI language, as a BCP-47 code. A full code (`es-ES`), a short code (`es`), and an unshipped regional variant all resolve to a shipped language; one Cube does not ship falls through to the account default rather than failing the session. See [Localization](/embedding/iframe/localization). |
-| `timezone` | The IANA zone the agent runs its queries in (`America/New_York`). Still subject to the account's user-time-zone policy — a session setting is not a way around it — and a bare UTC offset or unknown name falls through. See [Time zones](/embedding/iframe/time-zones). |
+| `timezone` | The IANA zone the agent runs its queries in (`America/New_York`). It outranks a zone the dashboard's author pinned, so every dashboard this session opens is bucketed in it — set it when the viewer's zone should win, not to nudge a default. Still subject to the account's user-time-zone policy, and a bare UTC offset or unknown name falls through. See [Time zones](/embedding/iframe/time-zones). |
 
 ### Creator Mode controls
 
@@ -111,7 +115,6 @@ question, so the session is the only place to answer it. All default to shown.
 | `showDashboardSettings` | The dashboard editor's settings panel — the gear button and the sidebar behind it. That panel is the only place an embed user can reach the dashboard slug, the per-dashboard time zone, the per-dashboard agent, the grid behavior switches, and the dashboard theme, so `false` withdraws all of them together. |
 | `showMemberNames` | The **Show Member Names** item in the data pane's more-actions menu. Member names are your data model's own identifiers, so this belongs to the same schema-protection family as **Show Generated SQL**. `false` hides the item **and** pins the pane to titles, so a user who had already switched to names is returned to them. |
 | `showGroupByCube` | The **Group by Cube** / **Group by Folder** item in the data pane's more-actions menu. `false` hides the item **and** pins the pane to the grouping it would have defaulted to — by folder when the view defines folders, by cube otherwise. No content is withdrawn either way. |
-| `allowChatWorkspaceAuthoring` | Whether AI Chat authenticated with this session may create or modify persistent workspace content. `false` keeps ad-hoc analysis and inline tables/charts, but the agent cannot save or update explorations and reports, create or modify workbooks, create or publish dashboards, or point users at those surfaces. Intended for headless chat integrations that render answers in their own UI. `true` never grants authoring the user's role does not already allow. |
 
 <Note>
 The [Chat API](/reference/embed-apis/chat-api)'s own session exchange accepts
@@ -136,9 +139,6 @@ they are ignored outside `/embed/*`.
 | `showDashboardEditButton=false` | Hides the **Edit** action. Can only hide it — it never shows one to a viewer without edit permission. | Dashboards |
 | `showDashboardDuplicateButton=false` | Hides the **Duplicate** action. | Dashboards |
 | `showWorkbookBackButton=false` | Hides the back button in the Creator Mode **workbook** header. The rest of that header is the authoring flow (name, tabs, Publish, Share), so there is no master switch for it. The workbook actions menu keeps its **View all** item, which reaches the same place. | Creator Mode |
-| `showNewChat=false` | Hides the **New chat** button in the standalone chat embed. | Analytics Chat |
-| `showChatInput=false` | Hides the chat's message input, for a read-only transcript. | Analytics Chat |
-| `showChatHistory=false` | Hides the **Chat History** button. | Analytics Chat |
 | `locale=es-MX` | Sets the embed's UI language, overriding `settings.locale`. See [Localization](/embedding/iframe/localization). | All |
 | `timezone=America/New_York` | Sets the time zone agent queries run in, overriding `settings.timezone`. See [Time zones](/embedding/iframe/time-zones). | All |
 
@@ -201,9 +201,8 @@ URL parameters of its own.
 | `showChatHistory=false` | Hides the **Chat History** button. |
 
 They follow the same rule as every other `show…` parameter: only the literal
-`false` hides. Their original spellings — `hideNewChat=1`, `hideChatInput=1`,
-`hideHistory=1`, each accepting `1` or `true` — still work so that existing embed
-URLs keep working, and the `show…` form wins when both are present.
+`false` hides. Each also has an older `hide…` spelling that still works — see
+[Analytics Chat → Customize the chat](/embedding/iframe/analytics-chat#customize-the-chat).
 
 Whether the chat surface is available at all is a session question, not a URL
 one: `settings.allowAi: false` withholds it.
@@ -217,18 +216,24 @@ shape the product your users see; they are not a replacement for permissions.
   session may do. `showDashboardEditButton` cannot give edit rights;
   `showWorkbookShare: true` cannot share content the user may not share;
   `allowChatWorkspaceAuthoring: true` grants nothing the user's role withholds.
-- **Three of them are enforced, not merely hidden.** `allowAi: false` stops the
-  session obtaining AI credentials at all. `allowChatWorkspaceAuthoring: false`
-  changes the tools and instructions the agent is given, on the server.
-  `showMemberNames: false` and `showGroupByCube: false` additionally pin the data
-  pane's state, so a user who had already switched cannot stay switched.
+- **Two of them are enforced on the server, not merely hidden.** `allowAi: false`
+  stops the session obtaining AI credentials at all. `allowChatWorkspaceAuthoring:
+  false` changes the tools and instructions the agent is given.
+- **Two more reset state as well as hiding a control**, in the browser rather
+  than on the server: `showMemberNames: false` and `showGroupByCube: false` pin
+  the data pane so a user who had already switched cannot stay switched. That
+  keeps the pane consistent for every viewer of the session; it is not a
+  server-side guarantee about what the data model reveals.
 - **URL parameters are visible to the viewer.** They are chrome and layout
   decisions, made per placement. Anything a viewer must not be able to turn back
   on belongs in the session settings.
 - **Export is client-side.** A widget's CSV is serialized in the browser from
   data the widget has already loaded, so `allowExport` decides whether the action
-  is offered, not whether the viewer's browser holds the rows. The tenant-wide
-  **restrict data downloads** governance lock outranks it.
+  is offered, not whether the viewer's browser holds the rows. The account-wide
+  **Allow data downloads** switch outranks it — see [Restricting data
+  downloads](/admin/users-and-permissions/roles-and-permissions#restricting-data-downloads),
+  which also notes that the per-user **Download data** role action is bypassed by
+  anonymous embed viewers.
 
 ## Recipes
 

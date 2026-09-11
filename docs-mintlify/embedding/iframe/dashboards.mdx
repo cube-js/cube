@@ -126,17 +126,12 @@ export. Only the exact literal string `true` opts in: `allowExport=1`,
 `allowExport=TRUE`, a bare `?allowExport`, and omitting the parameter (the
 default) all leave every download action hidden.
 
-The whole dashboard can also be downloaded as a single PNG or PDF, from a
-download menu in the dashboard header (Creator Mode) or floating over the
-dashboard (published-dashboard embeds). `allowExport=true` grants that menu too —
-it is the same opt-in, not a second one. To keep the per-widget downloads but
-drop the dashboard-level menu (for example when your own chrome already offers
-it), add `showDashboardExportMenu=false`.
-
 The CSV is generated client-side from the data already loaded into the
 widget, so no additional query is issued. Inside an embed, `allowExport` —
 not the viewer's own Cube role — is the authority on whether the download
-actions appear. The tenant-wide **restrict data downloads** setting outranks it.
+actions appear. The account-wide **Allow data downloads** switch outranks it —
+see [Restricting data
+downloads](/admin/users-and-permissions/roles-and-permissions#restricting-data-downloads).
 
 To turn on per-widget downloads without the whole-dashboard ⋮ menu — for a
 host that surfaces its own dashboard-level export, for example — add
@@ -154,8 +149,8 @@ the menu; it has no effect unless `allowExport=true` is also set.
 Embedded dashboards show an AI chat (the agent panel and its launcher bubble) by
 default. You can control it in two ways:
 
-- **Globally, in the UI.** Toggle **Show dashboard chat** under
-  **Embed → Settings** in the Cube Cloud console. This switch is
+- **Globally, in the UI.** Toggle **Show AI chat on embedded dashboards** under
+  **Embed → Settings** in the Cube console. This switch is
   account-wide — it turns the AI chat on or off for the entire embedded surface,
   i.e. every embedded dashboard.
 - **Per session, via the API.** Pass `settings.showDashboardChat` when you
@@ -194,7 +189,6 @@ of them individually with URL parameters on the embed iframe `src`:
 | `showDashboardTitle=false` | The dashboard title |
 | `showDashboardEditButton=false` | The Edit action |
 | `showDashboardDuplicateButton=false` | The Duplicate action |
-| `showDashboardExportMenu=false` | The whole-dashboard download menu (see [Allow chart export](#allow-csv-export)) |
 
 ```text
 https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&showDashboardBackButton=false&showDashboardTitle=false
