@@ -22,6 +22,7 @@ import {
   track,
   FileRepository,
   SchemaFileRepository,
+  withLogRedaction,
 } from '@cubejs-backend/shared';
 
 import type { Application as ExpressApplication } from 'express';
@@ -343,6 +344,13 @@ export class CubejsServerCore {
       }
 
       this.event('Server Start');
+    }
+
+    // Installed last, as the outermost wrapper: the telemetry and agent
+    // wrappers above forward the params they receive, so they have to receive
+    // the redacted copy.
+    if (getEnv('logRedaction')) {
+      this.logger = withLogRedaction(this.logger);
     }
   }
 

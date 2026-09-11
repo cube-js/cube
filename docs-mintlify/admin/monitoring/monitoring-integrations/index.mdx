@@ -143,6 +143,20 @@ specified, only `error` and `info` logs will be exported.
 If you'd like to adjust severity levels of logs from API instances and the
 refresh scheduler, use the [`CUBEJS_LOG_LEVEL`](/reference/configuration/environment-variables#cubejs_log_level) environment variable.
 
+Filter values, SQL parameters, and string literals in SQL API statements are replaced
+with `redacted` before an event is logged. Member names, numeric literals, date ranges,
+and the query shape are kept, as is the security context. Error messages from a data
+source are logged as returned; a SQL API error that quotes the statement has it redacted.
+
+A redacted SQL API statement is re-printed from its parse tree, so comments and the
+original spacing are not kept. Every string argument is redacted, a granularity such as
+`'month'` or an `INTERVAL '1 day'` included. A statement that cannot be parsed is logged
+as it was received.
+
+This is controlled by
+[`CUBEJS_LOG_REDACTION`](/reference/configuration/environment-variables#cubejs_log_redaction),
+which is on by default outside development mode.
+
 </Info>
 
 ### Fields in exported logs

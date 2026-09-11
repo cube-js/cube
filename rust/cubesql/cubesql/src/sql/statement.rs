@@ -5,13 +5,16 @@ use pg_srv::{
     BindValue, PgType, PgTypeId,
 };
 use sqlparser::ast::{
-    self, Expr, Function, FunctionArg, FunctionArgExpr, FunctionArgumentList, FunctionArguments,
-    Ident, ObjectName, ObjectNamePart, Value,
+    self, visit_expressions_mut, Expr, Function, FunctionArg, FunctionArgExpr,
+    FunctionArgumentList, FunctionArguments, Ident, ObjectName, ObjectNamePart, Value, VisitMut,
 };
-use std::{collections::HashMap, error::Error};
+use std::{collections::HashMap, error::Error, ops::ControlFlow};
 
 use super::types::ColumnType;
-use crate::sql::postgres::ConnectionError;
+use crate::{
+    compile::{parser::parse_sql_to_statements, DatabaseProtocol},
+    sql::postgres::ConnectionError,
+};
 
 #[derive(Debug)]
 enum PlaceholderType {
@@ -830,6 +833,95 @@ impl<'ast> Visitor<'ast, ConnectionError> for StatementPlaceholderReplacer {
 
         Ok(())
     }
+}
+
+/// Replaces a string-bearing value with `'redacted'` and says whether it did.
+/// Numbers, booleans, NULL and placeholders carry limits, ordinals and parameter
+/// positions rather than values and stay. Exhaustive on purpose: a variant added
+/// to sqlparser has to be classified here.
+fn redact_value(value: &mut ast::Value) -> bool {
+    match value {
+        ast::Value::SingleQuotedString(_)
+        | ast::Value::DollarQuotedString(_)
+        | ast::Value::TripleSingleQuotedString(_)
+        | ast::Value::TripleDoubleQuotedString(_)
+        | ast::Value::EscapedStringLiteral(_)
+        | ast::Value::UnicodeStringLiteral(_)
+        | ast::Value::SingleQuotedByteStringLiteral(_)
+        | ast::Value::DoubleQuotedByteStringLiteral(_)
+        | ast::Value::TripleSingleQuotedByteStringLiteral(_)
+        | ast::Value::TripleDoubleQuotedByteStringLiteral(_)
+        | ast::Value::SingleQuotedRawStringLiteral(_)
+        | ast::Value::DoubleQuotedRawStringLiteral(_)
+        | ast::Value::TripleSingleQuotedRawStringLiteral(_)
+        | ast::Value::TripleDoubleQuotedRawStringLiteral(_)
+        | ast::Value::NationalStringLiteral(_)
+        | ast::Value::QuoteDelimitedStringLiteral(_)
+        | ast::Value::NationalQuoteDelimitedStringLiteral(_)
+        | ast::Value::HexStringLiteral(_)
+        | ast::Value::DoubleQuotedString(_) => {
+            *value = ast::Value::SingleQuotedString("redacted".to_string());
+            true
+        }
+        ast::Value::Number(..)
+        | ast::Value::Boolean(_)
+        | ast::Value::Null
+        | ast::Value::Placeholder(_) => false,
+    }
+}
+
+/// Replaces every string literal an expression carries, in any statement kind,
+/// with `'redacted'`; says whether anything was replaced. Strings the AST keeps
+/// outside expressions (a `SHOW ... LIKE` pattern, a `COMMENT ON` text) are not
+/// reached.
+pub fn redact_literals<V: VisitMut>(node: &mut V) -> bool {
+    let mut redacted = false;
+    let _ = visit_expressions_mut(node, |expr| {
+        let value = match expr {
+            Expr::Value(value) => Some(&mut value.value),
+            Expr::TypedString(typed) => Some(&mut typed.value.value),
+            _ => None,
+        };
+        if let Some(value) = value {
+            redacted |= redact_value(value);
+        }
+        ControlFlow::<()>::Continue(())
+    });
+    redacted
+}
+
+/// The statement as it may be logged: string literals replaced per
+/// `redact_literals`, several statements joined with `; `. The text is
+/// re-printed from the parse tree, so comments are dropped and spacing
+/// normalised. A statement with no string literal is returned as received, and
+/// so is one that does not parse, the way Cube Cloud's Query History export
+/// treats it.
+pub fn redact_sql_literals(sql: &str) -> String {
+    let mut statements = match parse_sql_to_statements(sql, DatabaseProtocol::PostgreSQL, &mut None)
+    {
+        Ok(statements) => statements,
+        Err(_) => return sql.to_string(),
+    };
+
+    if !redact_literals(&mut statements) {
+        return sql.to_string();
+    }
+
+    statements
+        .iter()
+        .map(|statement| statement.to_string())
+        .join("; ")
+}
+
+/// The `{ "sql": ... }` query key a SQL API load event carries, redacted when the
+/// configuration asks for it.
+pub fn sql_query_key(sql: &str, redact: bool) -> serde_json::Value {
+    let sql = if redact {
+        redact_sql_literals(sql)
+    } else {
+        sql.to_string()
+    };
+    serde_json::json!({ "sql": sql })
 }
 
 #[derive(Debug)]
@@ -1701,43 +1793,57 @@ impl<'a> Visitor<'a, ConnectionError> for ApproximateCountDistinctVisitor {
     }
 }
 
-#[derive(Debug)]
-pub struct SensitiveDataSanitizer {}
-
-impl SensitiveDataSanitizer {
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
-        let mut result = stmt;
-
-        self.visit_statement(&mut result).unwrap();
-
-        result
-    }
+/// A copy of the statement with its string literals replaced, for the
+/// `sanitizedQuery` of error telemetry.
+pub fn redacted_statement(stmt: &ast::Statement) -> ast::Statement {
+    let mut redacted = stmt.clone();
+    redact_literals(&mut redacted);
+    redacted
 }
 
-impl<'ast> Visitor<'ast, ConnectionError> for SensitiveDataSanitizer {
-    fn visit_value(
-        &mut self,
-        val: &mut ast::Value,
-        _pt: PlaceholderType,
-    ) -> Result<(), ConnectionError> {
-        match val {
-            ast::Value::SingleQuotedString(str)
-            | ast::Value::DoubleQuotedString(str)
-            | ast::Value::NationalStringLiteral(str) => {
-                if ["false", "true"].contains(&str.as_str()) || str.len() < 4 {
-                    return Ok(());
-                }
-                *str = "[REPLACED]".to_string();
-            }
-            _ => (),
-        };
-
-        Ok(())
+/// An error message with the statement it quotes whole redacted, whether it
+/// quotes the text as the client sent it (`Multiple statements was specified in
+/// one query: ...`) or as sqlparser re-prints it (`Unsupported query type:
+/// {stmt}`, upper-cased keywords, normalised spacing, comments dropped). An
+/// error quoting only a fragment of the statement is left as is.
+pub fn redact_error_message(message: &str, query: &str) -> String {
+    if message.contains(query) {
+        return message.replace(query, &redact_sql_literals(query));
     }
+
+    let Ok(statements) = parse_sql_to_statements(query, DatabaseProtocol::PostgreSQL, &mut None)
+    else {
+        return message.to_string();
+    };
+
+    let mut message = message.to_string();
+    for statement in statements {
+        let printed = statement.to_string();
+        if message.contains(&printed) {
+            message = message.replace(&printed, &redacted_statement(&statement).to_string());
+        }
+    }
+    message
+}
+
+/// The message and props of a failed statement as they may be logged: the
+/// `query` prop redacted, and the statement redacted inside the message per
+/// `redact_error_message`. The client keeps receiving the originals.
+pub fn redact_error_log(
+    message: &str,
+    props: Option<HashMap<String, String>>,
+) -> (String, Option<HashMap<String, String>>) {
+    let Some(mut props) = props else {
+        return (message.to_string(), None);
+    };
+    let Some(query) = props.get("query").cloned() else {
+        return (message.to_string(), Some(props));
+    };
+
+    let message = redact_error_message(message, &query);
+    props.insert("query".to_string(), redact_sql_literals(&query));
+
+    (message, Some(props))
 }
 
 #[cfg(test)]
@@ -1746,6 +1852,78 @@ mod tests {
     use crate::CubeError;
     use pg_srv::{DateValue, TimestampValue};
     use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
+
+    #[test]
+    fn test_redact_sql_literals() {
+        // The statement Cube Cloud's Query History export tests redact
+        let redacted = redact_sql_literals(
+            "SELECT developer_engagement.developer_name, developer_engagement.developer_business_email \
+             FROM developer_engagement \
+             WHERE developer_engagement.developer_business_email = 'secret@example.com' \
+             AND developer_engagement.developer_name = $$John Secret$$ \
+             GROUP BY 1, 2 ORDER BY 1 DESC LIMIT 500",
+        );
+        assert!(!redacted.contains("secret@example.com"));
+        assert!(!redacted.contains("John Secret"));
+        assert!(redacted.contains("developer_engagement.developer_business_email = 'redacted'"));
+        assert!(redacted.contains("developer_engagement.developer_name = 'redacted'"));
+        assert!(redacted.contains("LIMIT 500"));
+
+        // Numbers, booleans, NULL, placeholders and identifiers stay; every string kind goes,
+        // typed strings included
+        assert_eq!(
+            redact_sql_literals(
+                "SELECT MEASURE(\"Orders\".\"count\") FROM \"Orders\" \
+                 WHERE \"Orders\".\"email\" = $1 AND \"Orders\".\"status\" IN ('a', E'b\\'c', N'd') \
+                 AND \"Orders\".\"amount\" > 10.5 AND \"Orders\".\"paid\" = true AND \"Orders\".\"note\" IS NULL \
+                 AND \"Orders\".\"day\" = DATE '2024-01-01' \
+                 LIMIT 10"
+            ),
+            "SELECT MEASURE(\"Orders\".\"count\") FROM \"Orders\" \
+             WHERE \"Orders\".\"email\" = $1 AND \"Orders\".\"status\" IN ('redacted', 'redacted', 'redacted') \
+             AND \"Orders\".\"amount\" > 10.5 AND \"Orders\".\"paid\" = true AND \"Orders\".\"note\" IS NULL \
+             AND \"Orders\".\"day\" = DATE 'redacted' \
+             LIMIT 10"
+        );
+
+        // Statement kinds Cube does not plan are redacted too: they are logged before rejection
+        for sql in [
+            "SET application_name = 'secret@example.com'",
+            "INSERT INTO t VALUES ('secret@example.com')",
+            "PREPARE p AS SELECT 1 WHERE a = 'secret@example.com'",
+            "EXECUTE p('secret@example.com')",
+            "SELECT * FROM t WHERE a = 'x'; SELECT 'secret@example.com'",
+        ] {
+            let redacted = redact_sql_literals(sql);
+            assert!(!redacted.contains("secret@example.com"), "{}", redacted);
+            assert!(redacted.contains("'redacted'"), "{}", redacted);
+        }
+
+        // Several statements
+        assert_eq!(
+            redact_sql_literals("SELECT 'a'; SELECT 'b'"),
+            "SELECT 'redacted'; SELECT 'redacted'"
+        );
+
+        // A statement with no string literal is logged as received, comments and spacing included
+        let untouched = "SELECT   1 /* Tableau */ FROM t -- trace\nWHERE a = $1 AND b = 2";
+        assert_eq!(redact_sql_literals(untouched), untouched);
+
+        // A statement that does not parse is logged as received
+        assert_eq!(
+            redact_sql_literals("SELEC 'oops' FROM"),
+            "SELEC 'oops' FROM"
+        );
+
+        assert_eq!(
+            sql_query_key("SELECT 'a'", true),
+            serde_json::json!({ "sql": "SELECT 'redacted'" })
+        );
+        assert_eq!(
+            sql_query_key("SELECT 'a'", false),
+            serde_json::json!({ "sql": "SELECT 'a'" })
+        );
+    }
 
     fn run_cast_replacer(input: &str, output: &str) -> Result<(), CubeError> {
         let stmt = Parser::parse_sql(&PostgreSqlDialect {}, &input)
@@ -2175,25 +2353,86 @@ mod tests {
         Ok(())
     }
 
-    fn assert_sensitive_data_sanitizer(input: &str, output: &str) -> Result<(), CubeError> {
+    fn assert_redacted_statement(input: &str, output: &str) -> Result<(), CubeError> {
         let stmt = Parser::parse_sql(&PostgreSqlDialect {}, &input)
             .unwrap()
             .pop()
             .expect("must contain at least one statement");
 
-        let binder = SensitiveDataSanitizer::new();
-        let result = binder.replace(stmt);
-
-        assert_eq!(result.to_string(), output);
+        assert_eq!(redacted_statement(&stmt).to_string(), output);
 
         Ok(())
     }
 
     #[test]
-    fn test_sensitive_data_sanitizer() -> Result<(), CubeError> {
-        assert_sensitive_data_sanitizer(
-            "SELECT * FROM testdata WHERE email = 'to@replace.com'",
-            "SELECT * FROM testdata WHERE email = '[REPLACED]'",
+    fn test_redact_error_log() {
+        let statement = "INSERT INTO t VALUES ('secret@example.com')";
+        let message = format!("Unsupported query type: {}", statement);
+        let props = HashMap::from([
+            ("query".to_string(), statement.to_string()),
+            ("planningId".to_string(), "p1".to_string()),
+        ]);
+
+        let (log_message, log_props) = redact_error_log(&message, Some(props));
+        let log_props = log_props.unwrap();
+        assert_eq!(
+            log_message,
+            "Unsupported query type: INSERT INTO t VALUES ('redacted')"
+        );
+        assert_eq!(
+            log_props.get("query").unwrap(),
+            "INSERT INTO t VALUES ('redacted')"
+        );
+        assert_eq!(log_props.get("planningId").unwrap(), "p1");
+
+        // The message quotes the statement as sqlparser re-prints it, the props hold the
+        // text as the client sent it (the native bridge)
+        assert_eq!(
+            redact_error_message(
+                "Unsupported query type: INSERT INTO t VALUES ('secret@example.com')",
+                "insert  into t\nvalues ('secret@example.com') -- note",
+            ),
+            "Unsupported query type: INSERT INTO t VALUES ('redacted')"
+        );
+        // The message quotes the text as the client sent it (a parser error)
+        assert_eq!(
+            redact_error_message(
+                "Multiple statements was specified in one query: select 'a@b.c'; select 'c@d.e'",
+                "select 'a@b.c'; select 'c@d.e'",
+            ),
+            "Multiple statements was specified in one query: SELECT 'redacted'; SELECT 'redacted'"
+        );
+        // A fragment, or a statement that does not parse, is left alone
+        assert_eq!(
+            redact_error_message("Cannot cast 'x'", "SELECT 'x'::int"),
+            "Cannot cast 'x'"
+        );
+        assert_eq!(
+            redact_error_message("Unsupported query type: SELEC 'x'", "SELEC 'x' FROM"),
+            "Unsupported query type: SELEC 'x'"
+        );
+
+        // No statement to redact: nothing changes
+        assert_eq!(
+            redact_error_log("Internal Error", None),
+            ("Internal Error".to_string(), None)
+        );
+        let (log_message, log_props) = redact_error_log(
+            "boom",
+            Some(HashMap::from([(
+                "planningId".to_string(),
+                "p1".to_string(),
+            )])),
+        );
+        assert_eq!(log_message, "boom");
+        assert_eq!(log_props.unwrap().get("planningId").unwrap(), "p1");
+    }
+
+    #[test]
+    fn test_redacted_statement() -> Result<(), CubeError> {
+        assert_redacted_statement(
+            "SELECT * FROM testdata WHERE email = 'to@replace.com' AND flag = 'on' LIMIT 5",
+            "SELECT * FROM testdata WHERE email = 'redacted' AND flag = 'redacted' LIMIT 5",
         )?;
 
         Ok(())

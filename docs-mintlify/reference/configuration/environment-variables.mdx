@@ -1375,6 +1375,28 @@ emitted as human-readable text.
 See also `CUBESTORE_LOG_LEVEL`.
 See also the [`logger` configuration option](/reference/configuration/config#logger).
 
+## `CUBEJS_LOG_REDACTION`
+
+If `true`, filter values, SQL parameters, and string literals in [SQL API][ref-sql-api]
+statements are replaced with `redacted` before a log event reaches the logger, so
+personal data passed in queries does not end up in log storage. Member names, numeric
+literals, date ranges, and the query shape are kept, as is the security context. Error
+messages from a data source are logged as returned; a SQL API error that quotes the
+statement has it redacted.
+
+A redacted SQL API statement is re-printed from its parse tree, so comments and the
+original spacing are not kept. Every string argument is redacted, a granularity such as
+`'month'` or an `INTERVAL '1 day'` included. A statement that cannot be parsed is logged
+as it was received.
+
+It is off by default in development mode, that is when `NODE_ENV` is not `production` or
+[`CUBEJS_DEV_MODE`](#cubejs_dev_mode) is `true`, so runnable SQL statements can be read
+from the console.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `true`                |
+
 ## `CUBEJS_MAX_PARTITIONS_PER_CUBE`
 
 The maximum number of partitions each pre-aggregation in a cube can use.

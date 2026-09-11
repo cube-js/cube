@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 
-import { SchemaFileRepository, withTimeout } from '@cubejs-backend/shared';
+import { SchemaFileRepository, queryKeyMd5, withTimeout } from '@cubejs-backend/shared';
 
 import {
   CreateOptions,
@@ -96,6 +96,7 @@ describe('index.test', () => {
     delete process.env.CUBEJS_ROLLUP_ONLY;
     delete process.env.CUBEJS_SCHEDULED_REFRESH;
     delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMER;
+    delete process.env.CUBEJS_LOG_REDACTION;
 
     process.env.NODE_ENV = 'development';
     process.env.CUBEJS_API_SECRET = 'api-secret';
@@ -530,6 +531,55 @@ describe('index.test', () => {
           warning: `You are using MockOS platform with ${process.arch} architecture, which is not supported by Cube Store.`
         }
       ]
+    ]);
+  });
+
+  test('Should log query values as they are in development mode by default', async () => {
+    const logger = jest.fn(() => {
+      //
+    });
+    const params = { query: { filters: [{ member: 'Orders.email', operator: 'equals', values: ['john@example.com'] }] } };
+
+    process.env.CUBEJS_DB_TYPE = 'mysql';
+    process.env.CUBEJS_DEV_MODE = 'true';
+
+    const cubejsServerCore = new CubejsServerCoreOpen({ logger });
+    cubejsServerCore.logger('Load Request', params);
+    await cubejsServerCore.beforeShutdown();
+    await cubejsServerCore.shutdown();
+
+    expect(logger.mock.calls).toEqual([['Load Request', params]]);
+  });
+
+  test('Should redact query values in every log event in production by default', async () => {
+    const logger = jest.fn(() => {
+      //
+    });
+    const queryKey = ['SELECT * FROM orders WHERE email = ?', ['john@example.com'], []];
+
+    process.env.NODE_ENV = 'production';
+    process.env.CUBEJS_DB_TYPE = 'mysql';
+
+    const cubejsServerCore = new CubejsServerCoreOpen({ logger });
+    // What the gateway and the query orchestrator hand to the core logger
+    cubejsServerCore.logger('Load Request', {
+      query: { filters: [{ member: 'Orders.email', operator: 'equals', values: ['john@example.com'] }] },
+      apiType: 'rest',
+    });
+    cubejsServerCore.logger('Performing query', {
+      queryKey,
+      requestId: 'r1',
+    });
+    await cubejsServerCore.beforeShutdown();
+    await cubejsServerCore.shutdown();
+
+    expect(logger.mock.calls).toEqual([
+      ['Load Request', { query: { filters: [{ member: 'Orders.email', operator: 'equals', values: ['redacted'] }] }, apiType: 'rest' }],
+      ['Performing query', {
+        queryKey: ['SELECT * FROM orders WHERE email = ?', ['redacted'], []],
+        queryKeyMd5: queryKeyMd5(queryKey),
+        requestId: 'r1',
+      }],
     ]);
   });
 

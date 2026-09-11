@@ -2,9 +2,10 @@ use cubesql::compile::engine::df::scan::parse_used_pre_aggregations;
 use cubesql::compile::parser::parse_sql_to_statement;
 use cubesql::compile::{convert_statement_to_cube_query, get_df_batches};
 use cubesql::config::processing_loop::ShutdownMode;
+use cubesql::config::ConfigObj;
 use cubesql::sql::dataframe::arrow_to_column_type;
 use cubesql::sql::ColumnType;
-use cubesql::sql::Session;
+use cubesql::sql::{redact_error_message, sql_query_key, Session};
 use cubesql::transport::{SpanId, TransportService};
 use futures::StreamExt;
 
@@ -276,11 +277,7 @@ enum SqlQueryOutcome {
 /// request - a polling client opens further attempts under the same request id,
 /// and CUB-4099 has one that ran 44 minutes over six of them - but it does give
 /// this attempt an end.
-async fn log_continue_wait(
-    session: &Arc<Session>,
-    span_id: &Option<Arc<SpanId>>,
-    sql_query: &str,
-) -> Result<(), CubeError> {
+async fn log_continue_wait(session: &Arc<Session>, span_id: &Arc<SpanId>) -> Result<(), CubeError> {
     let Some(auth_context) = session.state.auth_context() else {
         return Ok(());
     };
@@ -290,16 +287,14 @@ async fn log_continue_wait(
         .server
         .transport
         .log_load_state(
-            span_id.clone(),
+            Some(span_id.clone()),
             auth_context,
             session.state.get_load_request_meta("sql"),
             "Continue wait".to_string(),
             serde_json::json!({
-                "query": {
-                    "sql": sql_query,
-                },
+                "query": span_id.query_key.clone(),
                 "apiType": "sql",
-                "duration": span_id.as_ref().map(|span_id| span_id.duration()),
+                "duration": span_id.duration(),
             }),
         )
         .await
@@ -316,10 +311,14 @@ async fn handle_sql_query(
     throw_continue_wait: bool,
     request_id: Option<String>,
 ) -> Result<SqlQueryOutcome, CubeError> {
-    let span_id = Some(Arc::new(SpanId::new(
+    let config = services
+        .injector()
+        .get_service_typed::<dyn ConfigObj>()
+        .await;
+    let span_id = Arc::new(SpanId::new(
         request_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
-        serde_json::json!({ "sql": sql_query }),
-    )));
+        sql_query_key(sql_query, config.log_redaction()),
+    ));
 
     let transport_service = services
         .injector()
@@ -333,12 +332,12 @@ async fn handle_sql_query(
                 .server
                 .transport
                 .log_load_state(
-                    span_id.clone(),
+                    Some(span_id.clone()),
                     auth_context,
                     session.state.get_load_request_meta("sql"),
                     "Load Request".to_string(),
                     serde_json::json!({
-                        "query": span_id.as_ref().unwrap().query_key,
+                        "query": span_id.query_key,
                     }),
                 )
                 .await?;
@@ -393,7 +392,7 @@ async fn handle_sql_query(
                 meta_context.clone(),
                 session,
                 &mut None,
-                span_id_clone,
+                Some(span_id_clone),
             )
             .await?;
 
@@ -469,15 +468,11 @@ async fn handle_sql_query(
             // folded to `false` because only some of its loads were external
             // would then be overridden back to `true`, undoing the conservative
             // fold in `SpanId::set_external`.
-            let (span_last_refresh_time, span_external, span_used_pre_aggregations) =
-                match span_id_for_schema.as_ref() {
-                    Some(span_id) => (
-                        span_id.last_refresh_time().await,
-                        span_id.external().await,
-                        span_id.used_pre_aggregations().await,
-                    ),
-                    None => (None, None, None),
-                };
+            let (span_last_refresh_time, span_external, span_used_pre_aggregations) = (
+                span_id_for_schema.last_refresh_time().await,
+                span_id_for_schema.external().await,
+                span_id_for_schema.used_pre_aggregations().await,
+            );
 
             let last_refresh_time = span_last_refresh_time.or_else(|| {
                 stream
@@ -582,7 +577,7 @@ async fn handle_sql_query(
             Ok(SqlQueryOutcome::ClientDisconnected) => {
                 log::debug!(
                     "Client disconnected before the result was fully written, span id: {}",
-                    span_id.as_ref().map(|s| s.span_id.as_str()).unwrap_or("-")
+                    span_id.span_id
                 );
 
                 // Usually nothing else reports this outcome, so without this
@@ -593,7 +588,7 @@ async fn handle_sql_query(
                 // `SqlQueryOutcome::ClientDisconnected` for why it is not gated
                 // on `throw_continue_wait`, and the `Err` arm below for why a
                 // real continue wait deliberately does not log here.
-                log_continue_wait(&session_clone, &span_id, sql_query).await?;
+                log_continue_wait(&session_clone, &span_id).await?;
             }
             Ok(SqlQueryOutcome::Completed) => {
                 session_clone
@@ -601,18 +596,16 @@ async fn handle_sql_query(
                     .server
                     .transport
                     .log_load_state(
-                        span_id.clone(),
+                        Some(span_id.clone()),
                         session_clone.state.auth_context().unwrap(),
                         session_clone.state.get_load_request_meta("sql"),
                         "Load Request Success".to_string(),
                         serde_json::json!({
-                            "query": {
-                                "sql": sql_query,
-                            },
+                            "query": span_id.query_key.clone(),
                             "apiType": "sql",
-                            "duration": span_id.as_ref().unwrap().duration(),
-                            "isDataQuery": span_id.as_ref().unwrap().is_data_query().await,
-                            "lastRefreshTime": span_id.as_ref().unwrap().last_refresh_time().await,
+                            "duration": span_id.duration(),
+                            "isDataQuery": span_id.is_data_query().await,
+                            "lastRefreshTime": span_id.last_refresh_time().await,
                         }),
                     )
                     .await?;
@@ -635,22 +628,27 @@ async fn handle_sql_query(
                 // equality check this replaces let it through and reported the
                 // queue signal as a failed request in query history.
                 if !err.is_continue_wait() {
+                    // A compilation error can quote the statement whole; the log
+                    // gets it redacted like `query`, the same way the shim does
+                    let error = if config.log_redaction() {
+                        redact_error_message(&err.message, sql_query)
+                    } else {
+                        err.message.clone()
+                    };
                     session_clone
                         .session_manager
                         .server
                         .transport
                         .log_load_state(
-                            span_id.clone(),
+                            Some(span_id.clone()),
                             session_clone.state.auth_context().unwrap(),
                             session_clone.state.get_load_request_meta("sql"),
                             "Cube SQL Error".to_string(),
                             serde_json::json!({
-                                "query": {
-                                    "sql": sql_query
-                                },
+                                "query": span_id.query_key.clone(),
                                 "apiType": "sql",
-                                "duration": span_id.as_ref().unwrap().duration(),
-                                "error": err.message,
+                                "duration": span_id.duration(),
+                                "error": error,
                             }),
                         )
                         .await?;

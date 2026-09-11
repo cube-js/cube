@@ -1,6 +1,5 @@
 import R from 'ramda';
-import crypto from 'crypto';
-import { getEnv, MaybeCancelablePromise, LoggerFn } from '@cubejs-backend/shared';
+import { getEnv, MaybeCancelablePromise, LoggerFn, queryKeyMd5 } from '@cubejs-backend/shared';
 import {
   cancelCombinator,
   DownloadQueryResultsResult,
@@ -46,29 +45,6 @@ type QueryOptions = {
 // Extra defence for drivers that don't expose now() yet.
 function nowTimestamp(client: DriverInterface) {
   return client.nowTimestamp?.() ?? new Date().getTime();
-}
-
-/**
- * Computes MD5 hash of the query key.
- * Special handling for FETCH_TABLES_FOR queries - returns the original string instead of hash.
- */
-function queryKeyMd5(queryKey: QueryKey): string {
-  const jsonStr = JSON.stringify(queryKey);
-
-  // Special case: if query contains FETCH_TABLES_FOR, return the string representation
-  if (jsonStr.includes('FETCH_TABLES_FOR')) {
-    // Extract the SQL string from the query key if it's a string
-    if (Array.isArray(queryKey) && queryKey.length > 0) {
-      const firstElement = queryKey[0];
-      if (Array.isArray(firstElement) && typeof firstElement[0] === 'string') {
-        return firstElement[0];
-      }
-    }
-    return jsonStr;
-  }
-
-  // Otherwise, return MD5 hash
-  return crypto.createHash('md5').update(jsonStr).digest('hex');
 }
 
 export class PreAggregationLoader {

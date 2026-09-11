@@ -2993,6 +2993,17 @@ source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=33cf41ae4ddd0c409f
 dependencies = [
  "log",
  "recursive",
+ "sqlparser_derive",
+]
+
+[[package]]
+name = "sqlparser_derive"
+version = "0.5.0"
+source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=33cf41ae4ddd0c409f52fd72fb5101ae000aad53#33cf41ae4ddd0c409f52fd72fb5101ae000aad53"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
 ]
 
 [[package]]

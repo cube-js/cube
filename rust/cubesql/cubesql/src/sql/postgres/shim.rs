@@ -7,6 +7,7 @@ use super::{
     ast_helpers::parse_fetch_limit, error::ConnectionError, extended::PreparedStatement,
     pg_auth_service::AuthenticationStatus,
 };
+use crate::sql::statement::{redact_error_log, sql_query_key};
 use crate::{
     compile::{
         convert_statement_to_cube_query,
@@ -257,7 +258,7 @@ impl AsyncPostgresShim {
 
             let result = match message {
                 protocol::FrontendMessage::Query(body) => {
-                    let span_id = Self::new_span_id(body.query.clone());
+                    let span_id = self.new_span_id(body.query.clone());
                     let mut qtrace = Qtrace::new(&body.query);
                     if let Some(qtrace) = &qtrace {
                         debug!("Assigned query UUID: {}", qtrace.uuid())
@@ -265,7 +266,7 @@ impl AsyncPostgresShim {
                     let result = self
                         .process_query(body.query, &mut qtrace, span_id.clone())
                         .await
-                        .map_err(|e| e.with_span_id(span_id));
+                        .map_err(|e| e.with_span_id(Some(span_id)));
                     if let Some(qtrace) = &qtrace {
                         qtrace.save_json()
                     }
@@ -280,7 +281,7 @@ impl AsyncPostgresShim {
                     }
                     doing_extended_query_message = true;
                     let mut qtrace = Qtrace::new(&body.query);
-                    let span_id = Self::new_span_id(body.query.clone());
+                    let span_id = self.new_span_id(body.query.clone());
                     if let Some(qtrace) = &qtrace {
                         debug!("Assigned query UUID: {}", qtrace.uuid())
                     }
@@ -290,12 +291,12 @@ impl AsyncPostgresShim {
                             .server
                             .transport
                             .log_load_state(
-                                span_id.clone(),
+                                Some(span_id.clone()),
                                 auth_context,
                                 self.session.state.get_load_request_meta("sql"),
                                 "Load Request".to_string(),
                                 serde_json::json!({
-                                    "query": span_id.as_ref().unwrap().query_key.clone(),
+                                    "query": span_id.query_key.clone(),
                                     // Hide query by default until Execute
                                     "isDataQuery": false,
                                 }),
@@ -303,9 +304,9 @@ impl AsyncPostgresShim {
                             .await?;
                     }
                     let result = self
-                        .parse(body, &mut qtrace, span_id.clone())
+                        .parse(body, &mut qtrace, Some(span_id.clone()))
                         .await
-                        .map_err(|e| e.with_span_id(span_id));
+                        .map_err(|e| e.with_span_id(Some(span_id)));
                     if let Err(err) = &result {
                         if let Some(qtrace) = &mut qtrace {
                             qtrace.set_query_error_message(&err.to_string())
@@ -455,11 +456,23 @@ impl AsyncPostgresShim {
         }
     }
 
-    fn new_span_id(sql: String) -> Option<Arc<SpanId>> {
-        Some(Arc::new(SpanId::new(
+    fn new_span_id(&self, sql: String) -> Arc<SpanId> {
+        Arc::new(SpanId::new(
             Uuid::new_v4().to_string(),
-            serde_json::json!({ "sql": sql }),
-        )))
+            self.sql_query_key(&sql),
+        ))
+    }
+
+    /// The `{ "sql": ... }` a load event carries for a statement, redacted per configuration.
+    fn sql_query_key(&self, sql: &str) -> serde_json::Value {
+        sql_query_key(
+            sql,
+            self.session
+                .session_manager
+                .server
+                .config_obj
+                .log_redaction(),
+        )
     }
 
     pub async fn handle_connection_error(
@@ -507,6 +520,19 @@ impl AsyncPostgresShim {
             trace!("Backtrace: not found");
         }
 
+        // The client gets its statement and message back as sent; the log does not
+        let (log_message, log_props) = if self
+            .session
+            .session_manager
+            .server
+            .config_obj
+            .log_redaction()
+        {
+            redact_error_log(&message, props.clone())
+        } else {
+            (message.clone(), props.clone())
+        };
+
         if let Some(auth_context) = self.session.state.auth_context() {
             if let Some(span_id) = err.span_id() {
                 self.session
@@ -520,7 +546,7 @@ impl AsyncPostgresShim {
                         "SQL API Error".to_string(),
                         serde_json::json!({
                             "query": span_id.query_key.clone(),
-                            "error": message.clone(),
+                            "error": log_message.clone(),
                             "duration": span_id.duration(),
                         }),
                     )
@@ -541,7 +567,7 @@ impl AsyncPostgresShim {
             None => err.to_error_response(),
         };
 
-        self.logger.error(message.as_str(), props);
+        self.logger.error(log_message.as_str(), log_props);
 
         self.write(err_response).await?;
 
@@ -1977,7 +2003,7 @@ impl AsyncPostgresShim {
         &mut self,
         query: String,
         qtrace: &mut Option<Qtrace>,
-        span_id: Option<Arc<SpanId>>,
+        span_id: Arc<SpanId>,
     ) -> Result<(), ConnectionError> {
         let start_time = SystemTime::now();
         if let Some(auth_context) = self.session.state.auth_context() {
@@ -1986,52 +2012,47 @@ impl AsyncPostgresShim {
                 .server
                 .transport
                 .log_load_state(
-                    span_id.clone(),
+                    Some(span_id.clone()),
                     auth_context,
                     self.session.state.get_load_request_meta("sql"),
                     "Load Request".to_string(),
                     serde_json::json!({
-                        "query": {
-                            "sql": query.clone(),
-                        }
+                        "query": span_id.query_key.clone(),
                     }),
                 )
                 .await?;
         }
         debug!("Query: {}", query);
 
-        if let Err(err) = self.execute_query(&query, qtrace, span_id.clone()).await {
+        if let Err(err) = self
+            .execute_query(&query, qtrace, Some(span_id.clone()))
+            .await
+        {
             if let Some(qtrace) = qtrace {
                 qtrace.set_query_error_message(&err.to_string())
             }
-            let err = err.with_span_id(span_id.clone());
+            let err = err.with_span_id(Some(span_id.clone()));
             self.handle_connection_error(err).await?;
-        } else {
-            if let Some(auth_context) = self.session.state.auth_context() {
-                if let Some(span_id) = span_id {
-                    self.session
-                        .session_manager
-                        .server
-                        .transport
-                        .log_load_state(
-                            Some(span_id.clone()),
-                            auth_context,
-                            self.session.state.get_load_request_meta("sql"),
-                            "Load Request Success".to_string(),
-                            serde_json::json!({
-                                "query": {
-                                    "sql": query,
-                                },
-                                "apiType": "sql",
-                                "duration": start_time.elapsed().unwrap().as_millis() as u64,
-                                "isDataQuery": span_id.is_data_query().await,
-                                "lastRefreshTime": span_id.last_refresh_time().await,
-                            }),
-                        )
-                        .await?;
-                }
-            }
-        };
+        } else if let Some(auth_context) = self.session.state.auth_context() {
+            self.session
+                .session_manager
+                .server
+                .transport
+                .log_load_state(
+                    Some(span_id.clone()),
+                    auth_context,
+                    self.session.state.get_load_request_meta("sql"),
+                    "Load Request Success".to_string(),
+                    serde_json::json!({
+                        "query": span_id.query_key.clone(),
+                        "apiType": "sql",
+                        "duration": start_time.elapsed().unwrap().as_millis() as u64,
+                        "isDataQuery": span_id.is_data_query().await,
+                        "lastRefreshTime": span_id.last_refresh_time().await,
+                    }),
+                )
+                .await?;
+        }
 
         self.write_ready().await
     }
