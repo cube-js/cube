@@ -17,7 +17,6 @@
     "coverage/",
     "gen/",
     "**/*.d.ts",
-    "docs/",
     "docs-mintlify/",
     "examples/",
     "rust/cubesql/",
