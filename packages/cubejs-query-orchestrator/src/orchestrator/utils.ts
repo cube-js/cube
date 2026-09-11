@@ -53,20 +53,25 @@ export function evaluateLocalRefreshKey(
 }
 
 /**
- * `refreshKeyRenewalThreshold` caches the refresh key query result, and that cache is also what
- * bounds how often the key can advance: a value re-read once a day advances once a day, whatever
- * `every` says. Sampling the clock at the same granularity reproduces that bound without a query,
- * and reproduces it identically on every instance, where the SQL path's phase depended on when
- * each cache entry happened to be written.
+ * The threshold bounds how often a key may advance, so the clock is floored to it. `phaseSeed`
+ * shifts each key's window so they do not all flip at the same instant.
  */
-export function snapToRenewalThreshold(nowMs: number, thresholdSeconds?: number): number {
+export function snapToRenewalThreshold(nowMs: number, thresholdSeconds?: number, phaseSeed = 0): number {
   if (!Number.isFinite(thresholdSeconds) || <number>thresholdSeconds <= 0) {
     return nowMs;
   }
 
   const thresholdMs = <number>thresholdSeconds * 1000;
+  const offset = Number.isFinite(phaseSeed) ? phaseSeed % thresholdMs : 0;
 
-  return Math.floor(nowMs / thresholdMs) * thresholdMs;
+  return Math.floor((nowMs - offset) / thresholdMs) * thresholdMs + offset;
+}
+
+/**
+ * md5 of the refresh key identity, so every instance derives the same phase for the same key.
+ */
+export function refreshKeyPhaseSeed(cacheKey: CacheKey): number {
+  return parseInt(getCacheHash(cacheKey).slice(0, 8), 16);
 }
 
 export function isValidLocalRefreshKey(descriptor?: LocalRefreshKeyDescriptor): boolean {

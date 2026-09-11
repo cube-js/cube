@@ -30,6 +30,7 @@ import {
   getCacheHash,
   evaluateLocalRefreshKey,
   isValidLocalRefreshKey,
+  refreshKeyPhaseSeed,
   snapToRenewalThreshold,
 } from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
@@ -242,7 +243,15 @@ export class QueryCache {
     return this.localRefreshKeyEnabled;
   }
 
-  public localRefreshKeyResult(queryOptions?: QueryOptions): [{ refresh_key: string }] | null {
+  /**
+   * `bound` is the cache entry the SQL path would have written for this key. Its TTL caps the
+   * snap window (the entry was re-read once it expired, whatever the threshold said) and its
+   * identity phases the window so keys do not all advance together.
+   */
+  public localRefreshKeyResult(
+    queryOptions?: QueryOptions,
+    bound?: { expiration: number; cacheKey: CacheKey },
+  ): [{ refresh_key: string }] | null {
     if (!this.isLocalRefreshKeyActive() || !isValidLocalRefreshKey(queryOptions?.localRefreshKey)) {
       return null;
     }
@@ -250,9 +259,12 @@ export class QueryCache {
     // The per-key `queryOptions.renewalThreshold` is deliberately not snapped to: it is a fraction
     // of the interval (`BaseQuery.refreshKeyRenewalThresholdForInterval`), so the SQL path re-reads
     // faster than the key can move and snapping would only delay the boundary.
+    const threshold = this.options.refreshKeyRenewalThreshold;
+    const window = threshold ? Math.min(threshold, bound?.expiration ?? threshold) : undefined;
+
     return evaluateLocalRefreshKey(
       <LocalRefreshKeyDescriptor>queryOptions?.localRefreshKey,
-      snapToRenewalThreshold(Date.now(), this.options.refreshKeyRenewalThreshold),
+      snapToRenewalThreshold(Date.now(), window, bound ? refreshKeyPhaseSeed(bound.cacheKey) : 0),
     );
   }
 
@@ -513,13 +525,12 @@ export class QueryCache {
     options: RefreshKeyCacheOptions,
   ) {
     const [query, values, queryOptions] = sqlQuery;
+    const cacheKey = QueryCache.refreshKeyIdentity(sqlQuery, options.dataSource);
 
-    const local = this.localRefreshKeyResult(queryOptions);
+    const local = this.localRefreshKeyResult(queryOptions, { expiration, cacheKey });
     if (local) {
       return local;
     }
-
-    const cacheKey = QueryCache.refreshKeyIdentity(sqlQuery, options.dataSource);
 
     return this.cacheQueryResult(query, values, cacheKey, expiration, {
       ...options,

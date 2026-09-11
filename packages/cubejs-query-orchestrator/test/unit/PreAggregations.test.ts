@@ -8,6 +8,7 @@ import {
 import crypto from 'crypto';
 
 import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, QueryCacheOptions, LocalCacheDriver, version } from '../../src';
+import { evaluateLocalRefreshKey, refreshKeyPhaseSeed, snapToRenewalThreshold } from '../../src/orchestrator/utils';
 
 class MockDriver {
   public tables: string[] = [];
@@ -517,11 +518,15 @@ describe('PreAggregations', () => {
       expect(mockDriver!.executedQueries).toEqual([]);
     });
 
+    // `keyQueryResult` caches refresh keys for an hour, so that is the window a daily threshold
+    // is capped to, phased by the key identity.
     test('keyQueryResult evaluates locally under a refreshKeyRenewalThreshold', async () => {
       const day = 24 * 60 * 60;
       const loadCache = newLoadCache({ localRefreshKey: true, refreshKeyRenewalThreshold: day });
+      const now = 86_400_000 + 600_000;
+      const phase = refreshKeyPhaseSeed([REFRESH_KEY_SQL, [], true, 'default']);
 
-      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(86_400_000 + 600_000);
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
       try {
         const result = await loadCache.keyQueryResult(
           [REFRESH_KEY_SQL, [], { external: true, renewalThreshold: 60, localRefreshKey: descriptor }],
@@ -529,7 +534,7 @@ describe('PreAggregations', () => {
           10,
         );
 
-        expect(result).toEqual([{ refresh_key: '144' }]);
+        expect(result).toEqual(evaluateLocalRefreshKey(descriptor, snapToRenewalThreshold(now, 60 * 60, phase)));
         expect(mockDriver!.executedQueries).toEqual([]);
       } finally {
         nowSpy.mockRestore();

@@ -1468,7 +1468,8 @@ database, since their values depend on your data and not just on the time.
 
 [`queryCacheOptions.refreshKeyRenewalThreshold`][ref-config-query-cache-options] is still
 honoured: an `every`-based key computed locally advances at most once per threshold window,
-the same bound that caching the query result used to provide.
+and no less often than the cached query result used to be re-read. Each key's window is offset
+by the key's own identity, so pre-aggregation rebuilds do not all land at the same instant.
 
 <Warning>
 
