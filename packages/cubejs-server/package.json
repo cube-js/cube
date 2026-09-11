@@ -52,7 +52,7 @@
     "body-parser": "^1.19.0",
     "codesandbox-import-utils": "^2.1.12",
     "cors": "^2.8.4",
-    "express": "^4.21.1",
+    "express": "^4.22.2",
     "jsonwebtoken": "^9.0.2",
     "semver": "^7.6.3",
     "source-map-support": "^0.5.19",
