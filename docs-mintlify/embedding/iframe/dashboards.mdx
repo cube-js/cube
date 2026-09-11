@@ -126,10 +126,17 @@ export. Only the exact literal string `true` opts in: `allowExport=1`,
 `allowExport=TRUE`, a bare `?allowExport`, and omitting the parameter (the
 default) all leave every download action hidden.
 
+The whole dashboard can also be downloaded as a single PNG or PDF, from a
+download menu in the dashboard header (Creator Mode) or floating over the
+dashboard (published-dashboard embeds). `allowExport=true` grants that menu too —
+it is the same opt-in, not a second one. To keep the per-widget downloads but
+drop the dashboard-level menu (for example when your own chrome already offers
+it), add `showDashboardExportMenu=false`.
+
 The CSV is generated client-side from the data already loaded into the
 widget, so no additional query is issued. Inside an embed, `allowExport` —
 not the viewer's own Cube role — is the authority on whether the download
-actions appear.
+actions appear. The tenant-wide **restrict data downloads** setting outranks it.
 
 To turn on per-widget downloads without the whole-dashboard ⋮ menu — for a
 host that surfaces its own dashboard-level export, for example — add
@@ -170,7 +177,9 @@ body: JSON.stringify({
 
 This applies to embedded published dashboards; it does not affect the standalone
 [Analytics Chat](/embedding/iframe/analytics-chat) surface, where embedding the
-chat is itself the opt-in.
+chat is itself the opt-in. To withhold AI from a session entirely — every surface,
+enforced on the server — use `settings.allowAi` instead. See [Show and hide
+features](/embedding/iframe/feature-visibility).
 
 ## Show or hide header controls
 
@@ -185,6 +194,7 @@ of them individually with URL parameters on the embed iframe `src`:
 | `showDashboardTitle=false` | The dashboard title |
 | `showDashboardEditButton=false` | The Edit action |
 | `showDashboardDuplicateButton=false` | The Duplicate action |
+| `showDashboardExportMenu=false` | The whole-dashboard download menu (see [Allow chart export](#allow-csv-export)) |
 
 ```text
 https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&showDashboardBackButton=false&showDashboardTitle=false

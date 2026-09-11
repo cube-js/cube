@@ -15,12 +15,25 @@ To enable it, pass `creatorMode: true` to the [Generate Session API][ref-generat
   Creator Mode requires [Signed embedding](/embedding/iframe/auth/signed). Private embedding is not supported.
 </Note>
 
-## Dashboard header controls
+## Hiding features
 
-When a user opens a dashboard inside Creator Mode, its header renders the
-same as in a standalone dashboard embed. To hide any of its controls (title,
-back button, Edit, Duplicate) for your embed, see
-[Show or hide header controls](/embedding/iframe/dashboards#show-or-hide-header-controls).
+Creator Mode ships the full authoring experience, and most of it can be taken
+back out for a given customer or a given placement:
+
+- **Per session**, via `settings` on the [Generate Session API][ref-generate-session]:
+  `showWorkbookShare` (the Share button and row actions), `showDashboardSettings`
+  (the dashboard gear and its sidebar), `showMemberNames` and `showGroupByCube`
+  (the data pane's more-actions items), `showWorkbookChat` and `showAiWidgets`
+  (AI entry points), and `allowAi` (AI entirely).
+- **Per iframe**, via URL parameters: `showWorkbookBackButton=false` on the
+  workbook header, and the dashboard header controls — which render the same in
+  Creator Mode as in a standalone dashboard embed.
+- **Account-wide**, under **Embed → Settings**: the workspace header title and
+  whether it shows at all, and whether embed users may see Semantic SQL and
+  Generated SQL.
+
+[Show and hide features](/embedding/iframe/feature-visibility) documents all of
+them, and the rule for which layer to use.
 
 ## AI
 

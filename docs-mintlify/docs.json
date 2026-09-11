@@ -441,6 +441,7 @@
               "embedding/iframe/dashboards",
               "embedding/iframe/analytics-chat",
               "embedding/iframe/creator-mode",
+              "embedding/iframe/feature-visibility",
               "embedding/iframe/customization",
               "embedding/iframe/localization",
               "embedding/iframe/time-zones",

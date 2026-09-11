@@ -58,6 +58,10 @@ Add these query parameters to the embed URL to hide parts of the chat UI:
 | `hideChatInput=1` | Hides the message input, for a read-only transcript. |
 | `hideHistory=1`   | Hides the **Chat History** button.                 |
 
+These parameters accept either `1` or `true`, and hide chrome only. Whether the
+session may use AI at all is decided when you generate it (`settings.allowAi`) —
+see [Show and hide features](/embedding/iframe/feature-visibility).
+
 By default, the chat header shows a **Chat History** button that lists the
 user's past conversations (matched by `externalId` under signed embedding) so
 they can resume one instead of always starting fresh.
