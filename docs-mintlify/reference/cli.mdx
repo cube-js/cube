@@ -354,7 +354,11 @@ credential, provisioning a sandbox, or running dbt. This makes the sync faster a
 also works when the deployment has no dbt Git integration. Any dbt command that
 parses the project can produce `target/manifest.json`, including `dbt parse`, `dbt
 compile`, `dbt run`, and `dbt build`. Use `--manifest -` to read it from standard
-input.
+input. The complete serialized request must be no larger than 50 MiB; the CLI checks
+this before uploading and directs larger projects to the Git-based sync path.
+After starting the sync, the CLI reads its history row to confirm the tenant honored
+the `manifest` source instead of silently falling back to Git, so `--manifest` requires
+both `SchemaUpdate` and `SchemaRead` access.
 
 The server validates that the upload is a supported dbt manifest, rather than another
 dbt artifact such as `catalog.json` or `run_results.json`. Saved conversion settings

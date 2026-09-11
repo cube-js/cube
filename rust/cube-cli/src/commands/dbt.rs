@@ -31,7 +31,12 @@ enum Cmd {
         r#ref: Option<String>,
         /// Read and upload a dbt manifest from this path (`-` for stdin), instead
         /// of cloning the dbt repository and running dbt
-        #[arg(long, value_name = "PATH", conflicts_with = "ref")]
+        #[arg(
+            long,
+            value_name = "PATH",
+            value_parser = util::nonempty_path,
+            conflicts_with = "ref"
+        )]
         manifest: Option<String>,
         /// Name for the Cube branch the generated cubes land on (defaults to a
         /// generated `dbt-sync/…` name)
@@ -113,10 +118,8 @@ fn base(deployment: i64) -> String {
     format!("/api/v1/deployments/{deployment}/dbt-sync")
 }
 
-/// Read the manifest locally so the API receives the JSON object it declares, rather
-/// than a string containing JSON. Only the shape required by the wire contract is
-/// checked here; the server owns dbt artifact and schema-version validation, keeping
-/// one acceptance rule for every caller.
+/// Read locally so the API receives a JSON object rather than a string containing JSON.
+/// The server owns dbt artifact and schema-version validation.
 fn read_manifest(path: &str) -> Result<Value> {
     let (raw, source) = if path == "-" {
         let mut raw = String::new();
@@ -158,6 +161,73 @@ fn start_body(branch: &Option<String>, r#ref: &Option<String>, manifest: Option<
     }
 
     util::body(body)
+}
+
+/// Cube's public edge and console server both accept JSON request bodies up to 50 MiB.
+/// Measure the complete serialized request, not the source file: parsing removes dbt's
+/// formatting, while the source and optional branch fields add their own bytes.
+const MANIFEST_UPLOAD_LIMIT_BYTES: usize = 50 * 1024 * 1024;
+
+fn ensure_manifest_upload_fits(body: &Value) -> Result<()> {
+    let bytes = serde_json::to_vec(body)?.len();
+    ensure_manifest_upload_size(bytes)
+}
+
+fn ensure_manifest_upload_size(bytes: usize) -> Result<()> {
+    if bytes > MANIFEST_UPLOAD_LIMIT_BYTES {
+        bail!(
+            "dbt manifest upload is {:.1} MiB after JSON serialization, exceeding Cube's \
+             50 MiB request limit; omit `--manifest` and use a Git-based dbt sync instead",
+            bytes as f64 / (1024.0 * 1024.0)
+        );
+    }
+
+    Ok(())
+}
+
+/// A pre-manifest server accepts the unknown fields, then silently starts a Git sync.
+/// Start/status do not carry a source; history is recorded before start returns, so its
+/// discriminator is the confirmation required before reporting success.
+fn ensure_manifest_source(history: &Value, sync_job_id: &str) -> Result<()> {
+    let runs = output::items(history);
+    let Some(run) = runs
+        .iter()
+        .find(|run| output::field(run, "syncJobId") == sync_job_id)
+    else {
+        bail!(
+            "dbt sync {sync_job_id} started, but its manifest source could not be verified \
+             because the run is absent from sync history; the CLI will not treat it as a \
+             manifest sync"
+        );
+    };
+
+    let source = output::field(run, "source");
+    if source == "manifest" {
+        return Ok(());
+    }
+
+    let report = if util::is_blank(&source) {
+        "did not report a source".to_string()
+    } else {
+        format!("reported source `{source}`")
+    };
+    bail!(
+        "this Cube tenant did not confirm dbt manifest upload support: dbt sync \
+         {sync_job_id} {report} \
+         instead of `manifest`; update the tenant before retrying with `--manifest`"
+    )
+}
+
+async fn verify_manifest_source(api: &Client, deployment: i64, sync_job_id: &str) -> Result<()> {
+    let query = vec![("first".to_string(), "100".to_string())];
+    let history = api.get(&base(deployment), &query).await.with_context(|| {
+        format!(
+            "dbt sync {sync_job_id} started, but its manifest source could not be \
+                 verified from sync history"
+        )
+    })?;
+
+    ensure_manifest_source(&history, sync_job_id)
 }
 
 /// The status values that end a sync. Everything else — including a value this
@@ -602,9 +672,17 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             timeout,
             poll,
         } => {
+            let manifest_requested = manifest.is_some();
             let manifest = manifest.as_deref().map(read_manifest).transpose()?;
             let body = start_body(&branch, &r#ref, manifest);
+            if manifest_requested {
+                ensure_manifest_upload_fits(&body)?;
+            }
             let started = api.post(&base(deployment), Some(&body)).await?;
+            if manifest_requested {
+                let sync_job_id = output::field(&started, "syncJobId");
+                verify_manifest_source(&api, deployment, &sync_job_id).await?;
+            }
 
             let sync_job_id = output::field(&started, "syncJobId");
             let branch_name = output::field(&started, "branchName");
@@ -961,6 +1039,82 @@ mod tests {
             start_body(&None, &Some("main".to_string()), None),
             json!({ "ref": "main" })
         );
+    }
+
+    #[test]
+    fn a_manifest_start_must_be_confirmed_by_the_server() {
+        assert!(ensure_manifest_source(
+            &json!({ "items": [{
+                "syncJobId": "sync-1",
+                "source": "manifest"
+            }]}),
+            "sync-1"
+        )
+        .is_ok());
+
+        let git = ensure_manifest_source(
+            &json!({ "items": [{
+                "syncJobId": "sync-2",
+                "source": "git"
+            }]}),
+            "sync-2",
+        )
+        .unwrap_err();
+        assert_eq!(
+            git.to_string(),
+            "this Cube tenant did not confirm dbt manifest upload support: dbt sync sync-2 \
+             reported source `git` instead of `manifest`; update the tenant before retrying \
+             with `--manifest`"
+        );
+
+        let missing =
+            ensure_manifest_source(&json!({ "items": [{ "syncJobId": "sync-3" }] }), "sync-3")
+                .unwrap_err();
+        assert!(missing.to_string().contains("did not report a source"));
+
+        let absent = ensure_manifest_source(
+            &json!({ "items": [{ "syncJobId": "another-sync", "source": "manifest" }] }),
+            "sync-4",
+        )
+        .unwrap_err();
+        assert!(absent.to_string().contains("absent from sync history"));
+    }
+
+    #[test]
+    fn a_manifest_upload_stays_inside_the_request_limit() {
+        assert!(ensure_manifest_upload_fits(&json!({
+            "source": "manifest",
+            "manifest": { "nodes": {} }
+        }))
+        .is_ok());
+        assert!(ensure_manifest_upload_size(MANIFEST_UPLOAD_LIMIT_BYTES).is_ok());
+
+        let too_large = ensure_manifest_upload_size(MANIFEST_UPLOAD_LIMIT_BYTES + 1).unwrap_err();
+        assert!(too_large.to_string().contains("50 MiB request limit"));
+    }
+
+    #[test]
+    fn manifest_input_rejects_empty_paths_and_ref_combinations() {
+        use clap::Parser as _;
+
+        let empty = crate::Cli::try_parse_from(["cube", "dbt", "sync", "1", "--manifest", ""])
+            .err()
+            .expect("an empty manifest path should be rejected");
+        assert!(empty.to_string().contains("an empty value"));
+
+        let conflict = crate::Cli::try_parse_from([
+            "cube",
+            "dbt",
+            "sync",
+            "1",
+            "--manifest",
+            "-",
+            "--ref",
+            "main",
+        ])
+        .err()
+        .expect("manifest and ref should conflict");
+        assert!(conflict.to_string().contains("cannot be used with"));
     }
 
     #[test]
