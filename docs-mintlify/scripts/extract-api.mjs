@@ -208,7 +208,8 @@ const TAG_MAP = {
 const TAG_ORDER = [
   'Deployments', 'Deployment Creation', 'Environments', 'Env Variables', 'Regions',
   'Data Model', 'Data Model Uploads', 'GitHub', 'GitHub Connection', 'dbt Sync',
-  'Folders', 'Reports', 'Workbooks', 'Notifications', 'Workspace', 'Agents', 'Metadata',
+  'Databricks Metric View Publication',
+  'Folders', 'Reports', 'Workbooks', 'Dashboard Exports', 'Notifications', 'Workspace', 'Agents', 'Metadata',
   'Users', 'Users Admin', 'Groups', 'User Groups',
   'User Attributes', 'User Attribute Values', 'Resource Policies', 'Tenant Settings',
   'OAuth Integrations', 'User OAuth Tokens', 'OIDC Token Configs',

@@ -28,9 +28,11 @@ tags:
   - name: GitHub
   - name: GitHub Connection
   - name: dbt Sync
+  - name: Databricks Metric View Publication
   - name: Folders
   - name: Reports
   - name: Workbooks
+  - name: Dashboard Exports
   - name: Notifications
   - name: Workspace
   - name: Users
@@ -47,8 +49,6 @@ tags:
   - name: Dashboard Embed Access
   - name: Usage Analytics
   - name: OpenAPI Spec
-  - name: Dashboard Exports
-  - name: Databricks Metric View Publication
 paths:
   /api/v1/app-config:
     get:

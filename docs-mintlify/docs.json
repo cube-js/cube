@@ -869,6 +869,16 @@
                 ]
               },
               {
+                "group": "Databricks Metric View Publication",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /api/v1/deployments/{deploymentId}/databricks-metric-view-previews",
+                  "GET /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}",
+                  "DELETE /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}",
+                  "GET /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}/result"
+                ]
+              },
+              {
                 "group": "Folders",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
@@ -908,6 +918,15 @@
                   "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread",
                   "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate",
                   "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/publish"
+                ]
+              },
+              {
+                "group": "Dashboard Exports",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /api/v1/deployments/{deploymentId}/dashboard-exports",
+                  "GET /api/v1/deployments/{deploymentId}/dashboard-exports/{jobId}",
+                  "GET /api/v1/deployments/{deploymentId}/dashboard-exports/{jobId}/download"
                 ]
               },
               {
@@ -1066,25 +1085,6 @@
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
                   "GET /api/v1/spec"
-                ]
-              },
-              {
-                "group": "Dashboard Exports",
-                "openapi": "/api-reference/api.yaml",
-                "pages": [
-                  "POST /api/v1/deployments/{deploymentId}/dashboard-exports",
-                  "GET /api/v1/deployments/{deploymentId}/dashboard-exports/{jobId}",
-                  "GET /api/v1/deployments/{deploymentId}/dashboard-exports/{jobId}/download"
-                ]
-              },
-              {
-                "group": "Databricks Metric View Publication",
-                "openapi": "/api-reference/api.yaml",
-                "pages": [
-                  "POST /api/v1/deployments/{deploymentId}/databricks-metric-view-previews",
-                  "GET /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}",
-                  "DELETE /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}",
-                  "GET /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}/result"
                 ]
               },
               {
