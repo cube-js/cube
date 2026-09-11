@@ -20,11 +20,11 @@
     "integration:mysql-aurora-serverless": "npm run integration"
   },
   "dependencies": {
+    "@aws-sdk/client-rds-data": "^3.1048.0",
     "@cubejs-backend/base-driver": "1.7.37",
     "@cubejs-backend/shared": "1.7.37",
     "@types/mysql": "^2.15.19",
-    "aws-sdk": "^2.787.0",
-    "data-api-client": "^1.1.0"
+    "data-api-client": "^2.4.1"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "1.7.37",
