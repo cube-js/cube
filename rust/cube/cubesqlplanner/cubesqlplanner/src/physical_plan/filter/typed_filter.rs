@@ -3,14 +3,22 @@ use super::ToSql;
 use crate::cube_bridge::member_sql::FilterParamsColumn;
 use crate::physical_plan::sql_nodes::SqlNode;
 use crate::physical_plan::SqlEvaluatorVisitor;
+use crate::planner::filter::operators::rolling_window::{
+    RegularRollingWindowOp, RollingWindowOffsetOp,
+};
+use crate::planner::filter::operators::to_date_rolling_window::ToDateRollingWindowOp;
 use crate::planner::filter::typed_filter::{resolve_base_symbol, FilterOp, TypedFilter};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_call::SqlCallFilterParamsItem;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::FiltersContext;
+use crate::planner::QueryDateTime;
+use crate::planner::QueryDateTimeHelper;
 use crate::planner::SqlInterval;
+use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
+use std::str::FromStr;
 
 impl ToSql for TypedFilter {
     fn to_sql(
@@ -109,15 +117,19 @@ impl TypedFilter {
                         item.filter_symbol_name
                     )));
                 }
-                let values =
-                    self.filter_param_values(query_tools, plan_templates, use_db_time_zone)?;
                 // A column applies what its filter supplies, and nothing when the
                 // filter cannot supply what the column takes — a `set` or `notSet`
-                // operator carries no values at all, and a one-sided date operator
-                // carries one where the column takes both bounds. The filter still
-                // reaches the query on its own; only its restatement inside this
-                // SQL is dropped, which is narrower than binding a bound the
-                // filter never gave.
+                // operator carries no values at all, a one-sided date operator
+                // carries one where the column takes both bounds, and a rolling
+                // window whose band is not derivable can state no band at all. The
+                // filter still reaches the query on its own; only its restatement
+                // inside this SQL is dropped, which is narrower than binding a
+                // bound the filter never gave.
+                let Some(values) =
+                    self.filter_param_values(query_tools, plan_templates, use_db_time_zone)?
+                else {
+                    return plan_templates.always_true();
+                };
                 if values.len() < compiled.value_params_count {
                     return plan_templates.always_true();
                 }
@@ -138,32 +150,35 @@ impl TypedFilter {
             FilterParamsColumn::Callback(callback) => {
                 // A callback column is opaque SQL produced by user code, so a
                 // time shift can't be wrapped around it; it is rendered as-is.
-                let args =
-                    self.filter_param_values(query_tools, plan_templates, use_db_time_zone)?;
+                let Some(args) =
+                    self.filter_param_values(query_tools, plan_templates, use_db_time_zone)?
+                else {
+                    return plan_templates.always_true();
+                };
                 callback.call(&args)
             }
         }
     }
 
     // The filter's values, formatted the way a `FILTER_PARAMS` column expects to
-    // receive them.
+    // receive them. `None` where the filter states a band the column cannot be
+    // given, which leaves the binding to widen rather than restate the band
+    // narrower than it is.
     fn filter_param_values(
         &self,
         query_tools: &Rc<QueryTools>,
         plan_templates: &PlanSqlTemplates,
         use_db_time_zone: bool,
-    ) -> Result<Vec<String>, CubeError> {
+    ) -> Result<Option<Vec<String>>, CubeError> {
+        let ctx = FilterSqlContext::new(
+            "",
+            query_tools,
+            plan_templates,
+            use_db_time_zone,
+            self.use_raw_values(),
+        );
         let args = match self.operation() {
-            // RollingWindowOffset carries [from, to, trailing, leading, offset];
-            // only the from/to dates are filter-param args for the callback.
-            FilterOp::DateRange(_) | FilterOp::DateSingle(_) | FilterOp::RollingWindowOffset(_) => {
-                let ctx = FilterSqlContext::new(
-                    "",
-                    query_tools,
-                    plan_templates,
-                    use_db_time_zone,
-                    self.use_raw_values(),
-                );
+            FilterOp::DateRange(_) | FilterOp::DateSingle(_) => {
                 let from = self
                     .values()
                     .first()
@@ -178,6 +193,22 @@ impl TypedFilter {
                     .transpose()?;
                 [from, to].into_iter().flatten().collect()
             }
+            // A rolling window reads a band wider than the period reported: its
+            // own frame, and for a to_date window the period it counts from. A
+            // column restating the reported period instead would cut the scan
+            // to less than the window sums, and every window would undercount
+            // its tail. The band's own bounds are what the column gets.
+            FilterOp::RegularRollingWindow(_)
+            | FilterOp::RollingWindowOffset(_)
+            | FilterOp::ToDateRollingWindow(_) => {
+                let Some((from, to)) = self.rolling_window_band(query_tools.timezone())? else {
+                    return Ok(None);
+                };
+                vec![
+                    ctx.format_and_allocate_from_date_no_cast(&from)?,
+                    ctx.format_and_allocate_to_date_no_cast(&to)?,
+                ]
+            }
             _ => self
                 .values()
                 .iter()
@@ -185,8 +216,80 @@ impl TypedFilter {
                 .map(|v| query_tools.allocate_param(&v))
                 .collect::<Vec<_>>(),
         };
-        Ok(args)
+        Ok(Some(args))
     }
+
+    /// The band a rolling window's base scan reads, as `[from, to]` dates.
+    /// `None` where either end is not derivable here — an unbounded side has no
+    /// bound to state, and a window whose series is only known at run time
+    /// carries no dates to shift.
+    fn rolling_window_band(&self, tz: Tz) -> Result<Option<(String, String)>, CubeError> {
+        match self.operation() {
+            FilterOp::ToDateRollingWindow(ToDateRollingWindowOp { window_range, .. }) => {
+                Ok(window_range.clone())
+            }
+            FilterOp::RegularRollingWindow(RegularRollingWindowOp {
+                trailing,
+                leading,
+                series_range,
+            }) => {
+                let Some((series_from, series_to)) = series_range else {
+                    return Ok(None);
+                };
+                let from = shift_bound(tz, series_from, trailing, true)?;
+                let to = shift_bound(tz, series_to, leading, false)?;
+                Ok(from.zip(to))
+            }
+            // Without a granularity the window is anchored by one end of the
+            // date range rather than by a series, and both its bounds are that
+            // anchor shifted by the frame.
+            FilterOp::RollingWindowOffset(RollingWindowOffsetOp {
+                from,
+                to,
+                trailing,
+                leading,
+                offset,
+            }) => {
+                let precision = 3;
+                let anchor = if offset == "start" {
+                    from.as_deref()
+                        .map(|v| QueryDateTimeHelper::format_from_date(v, precision))
+                } else {
+                    to.as_deref()
+                        .map(|v| QueryDateTimeHelper::format_to_date(v, precision))
+                };
+                let Some(anchor) = anchor.transpose()? else {
+                    return Ok(None);
+                };
+                let lower = shift_bound(tz, &anchor, trailing, true)?;
+                let upper = shift_bound(tz, &anchor, leading, false)?;
+                Ok(lower.zip(upper))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+/// `date` moved by `interval`, or `None` for an `unbounded` side — which has no
+/// bound to state. A side with no interval keeps the date as it is.
+fn shift_bound(
+    tz: Tz,
+    date: &str,
+    interval: &Option<String>,
+    subtract: bool,
+) -> Result<Option<String>, CubeError> {
+    let interval = match interval.as_deref() {
+        Some("unbounded") => return Ok(None),
+        Some(interval) => SqlInterval::from_str(interval)?,
+        None => return Ok(Some(date.to_string())),
+    };
+    let anchor = QueryDateTime::from_date_str(tz, date)?;
+    let shifted = if subtract {
+        anchor.sub_interval(&interval)?
+    } else {
+        anchor.add_interval(&interval)?
+    };
+    Ok(Some(shifted.format("%Y-%m-%dT%H:%M:%S%.3f")))
 }
 
 fn dispatch_to_sql(op: &FilterOp, ctx: &FilterSqlContext) -> Result<String, CubeError> {
