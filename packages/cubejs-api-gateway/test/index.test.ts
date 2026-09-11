@@ -20,6 +20,16 @@ import {
 import { ApiScopesTuple } from '../src/types/auth';
 import { PreAggJob } from '../src/types/request';
 
+// The redaction pass lives in the native module; only its plumbing is under test here.
+// A Proxy rather than a spread: the module's exports are non-enumerable getters.
+jest.mock('@cubejs-backend/native', () => {
+  const actual = jest.requireActual('@cubejs-backend/native');
+  const redactSqlLiterals = (sql: string) => sql.replace(/'[^']*'/g, "'redacted'");
+  return new Proxy(actual, {
+    get: (target, prop) => (prop === 'redactSqlLiterals' ? redactSqlLiterals : target[prop]),
+  });
+});
+
 const logger = (type, message) => console.log({ type, ...message });
 
 async function requestBothGetAndPost(app, { url, query, body }, assert) {
@@ -1421,6 +1431,56 @@ describe('API Gateway', () => {
   });
 
   describe('/v1/cubesql', () => {
+    describe('with log redaction on', () => {
+      beforeEach(() => {
+        process.env.CUBEJS_LOG_REDACTION = 'true';
+      });
+
+      afterEach(() => {
+        delete process.env.CUBEJS_LOG_REDACTION;
+      });
+
+      test('a malformed body is still a 400 and its User Error is still logged', async () => {
+        const { app, apiGateway } = await createApiGateway();
+        const logSpy = jest.spyOn(apiGateway, 'log');
+
+        const res = await request(app)
+          .post('/cubejs-api/v1/cubesql')
+          .set('Content-type', 'application/json')
+          .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+          .send({ query: 42 })
+          .expect(400);
+
+        expect(res.body.error).toMatch(/Invalid query format/);
+        const userError = logSpy.mock.calls.find(([event]) => event.type === 'User Error');
+        expect(userError).toBeDefined();
+        expect(userError![0]).toMatchObject({ query: { sql: 42 } });
+        expect(userError![0]).not.toHaveProperty('redactedQuery');
+      });
+
+      test('a failing statement is logged with its redacted twin', async () => {
+        const { app, apiGateway } = await createApiGateway();
+        const logSpy = jest.spyOn(apiGateway, 'log');
+        apiGateway.getSQLServer().execSql = jest.fn(async () => {
+          throw new Error('boom');
+        });
+
+        await request(app)
+          .post('/cubejs-api/v1/cubesql')
+          .set('Content-type', 'application/json')
+          .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+          .send({ query: "SELECT id FROM test WHERE email = 'john@example.com'" })
+          .expect(500);
+
+        const event = logSpy.mock.calls.find(([e]) => e.type === 'Internal Server Error');
+        expect(event).toBeDefined();
+        expect(event![0]).toMatchObject({
+          query: { sql: "SELECT id FROM test WHERE email = 'john@example.com'" },
+          redactedQuery: { sql: "SELECT id FROM test WHERE email = 'redacted'" },
+        });
+      });
+    });
+
     test('simple query works', async () => {
       const { app, apiGateway } = await createApiGateway();
 

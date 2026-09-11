@@ -83,6 +83,10 @@ pub struct SqlResponse {
 pub struct SpanId {
     pub span_id: String,
     pub query_key: serde_json::Value,
+    /// The query key with its string literals redacted, when log redaction is on.
+    /// Logged beside `query_key` as `redactedQuery`: the log sink swaps it in, APM
+    /// events keep the statement as sent.
+    pub redacted_query_key: Option<serde_json::Value>,
     span_start: SystemTime,
     is_data_query: RWLockAsync<bool>,
     last_refresh_time: RWLockAsync<Option<DateTime<Utc>>>,
@@ -95,12 +99,21 @@ impl SpanId {
         Self {
             span_id,
             query_key,
+            redacted_query_key: None,
             span_start: SystemTime::now(),
             is_data_query: tokio::sync::RwLock::new(false),
             last_refresh_time: tokio::sync::RwLock::new(None),
             external: tokio::sync::RwLock::new(None),
             used_pre_aggregations: tokio::sync::RwLock::new(serde_json::Map::new()),
         }
+    }
+
+    pub fn with_redacted_query_key(
+        mut self,
+        redacted_query_key: Option<serde_json::Value>,
+    ) -> Self {
+        self.redacted_query_key = redacted_query_key;
+        self
     }
 
     pub async fn set_is_data_query(&self, is_data_query: bool) {
