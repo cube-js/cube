@@ -346,7 +346,14 @@ impl TypedFilterBuilder {
                         ))
                     })?;
 
-                    FilterOp::ToDateRollingWindow(ToDateRollingWindowOp::new(granularity_obj))
+                    let window_range = values
+                        .get(3)
+                        .and_then(|v| v.to_param_string())
+                        .zip(values.get(4).and_then(|v| v.to_param_string()));
+                    FilterOp::ToDateRollingWindow(ToDateRollingWindowOp::new(
+                        granularity_obj,
+                        window_range,
+                    ))
                 }
                 FilterOperator::Contains
                 | FilterOperator::NotContains

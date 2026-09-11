@@ -1293,6 +1293,53 @@ impl MultiStageQueryPlanner {
         ))
     }
 
+    /// Span the base scan of a `to_date` window over `time_dimension` reads:
+    /// from the start of the period the series opens in, to the series' own
+    /// end. Both follow from the time dimension's granularity and date range
+    /// plus the window's own period, so both are known here and the filter
+    /// renders them as literals instead of reading them back off the series.
+    ///
+    /// `None` wherever the series itself is not derivable
+    /// ([`Self::rolling_series_bounds`]), and for a period whose boundaries are
+    /// rows of a calendar cube — no interval math reproduces those, so the
+    /// lower bound has to stay a sub-select over the series that read them.
+    fn to_date_window_bounds(
+        &self,
+        time_dimension: &Rc<TimeDimensionSymbol>,
+        granularity: &str,
+    ) -> Result<Option<(String, String)>, CubeError> {
+        let Some((series_from, series_to)) = self.rolling_series_bounds(time_dimension)? else {
+            return Ok(None);
+        };
+        let compiler_cell = self.query_tools.compiler().clone();
+        let mut compiler = compiler_cell.borrow_mut();
+        let Some(period) = GranularityHelper::make_granularity_obj(
+            self.query_tools.cube_evaluator().clone(),
+            &mut compiler,
+            &time_dimension.cube_name(),
+            &time_dimension.name(),
+            Some(granularity.to_string()),
+        )?
+        else {
+            return Ok(None);
+        };
+        if period.calendar_sql().is_some() {
+            return Ok(None);
+        }
+        // Millisecond bounds; the filter pads them to the dialect's precision
+        // when it renders them.
+        let precision = 3;
+        let period_start = if period.is_predefined_granularity() {
+            QueryTimeSeries::period_start_predefined(period.granularity(), &series_from, precision)?
+        } else {
+            let tz = self.query_tools.query_tools().timezone();
+            let start =
+                period.align_date_to_origin(QueryDateTime::from_date_str(tz, &series_from)?)?;
+            format!("{}.000", start.format("%Y-%m-%dT%H:%M:%S"))
+        };
+        Ok(Some((period_start, series_to)))
+    }
+
     /// The granularity of a `to_date` rolling window whose period boundary is
     /// defined by a calendar column. `None` for a boundary that interval math
     /// can compute on its own.
@@ -1430,7 +1477,12 @@ impl MultiStageQueryPlanner {
         new_state.set_dimensions(dimensions);
 
         if let Some(granularity) = self.get_to_date_rolling_granularity(rolling_window)? {
-            new_state.replace_to_date_date_range_filter(&time_dimension_base_name, &granularity)?;
+            let window_bounds = self.to_date_window_bounds(&time_dimension_symbol, &granularity)?;
+            new_state.replace_to_date_date_range_filter(
+                &time_dimension_base_name,
+                &granularity,
+                window_bounds,
+            )?;
         } else {
             new_state.replace_regular_date_range_filter(
                 &time_dimension_base_name,

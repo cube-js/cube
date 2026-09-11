@@ -1059,13 +1059,21 @@ impl QueryProperties {
         Ok(())
     }
 
+    /// Rewrite the `InDateRange` filter on `member_name` into a `to_date`
+    /// rolling-window filter. The filter carries `[from, to, granularity]`,
+    /// followed by the span the window reads when that is known at plan time.
     pub fn replace_to_date_date_range_filter(
         &mut self,
         member_name: &str,
         granularity: &String,
+        window_range: Option<(String, String)>,
     ) -> Result<(), CubeError> {
         let operator = FilterOperator::ToDateRollingWindowDateRange;
-        let values = vec![FilterValue::Str(granularity.clone())];
+        let mut values = vec![FilterValue::Str(granularity.clone())];
+        if let Some((window_from, window_to)) = window_range {
+            values.push(FilterValue::Str(window_from));
+            values.push(FilterValue::Str(window_to));
+        }
         self.time_dimensions_filters = self.change_date_range_filter_impl(
             member_name,
             &self.time_dimensions_filters,

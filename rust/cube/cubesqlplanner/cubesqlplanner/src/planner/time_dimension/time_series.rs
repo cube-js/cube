@@ -98,6 +98,23 @@ impl QueryTimeSeries {
         Ok((first.start_str, format_with_padding(past_end, &nines)))
     }
 
+    /// Start of the `granularity` period `date` falls in — the lower bound a
+    /// "since the start of <granularity>" window reaches back to.
+    pub fn period_start_predefined(
+        granularity: &str,
+        date: &str,
+        timestamp_precision: u32,
+    ) -> Result<String, CubeError> {
+        check_precision(timestamp_precision)?;
+        if !is_predefined_granularity(granularity) {
+            return Err(CubeError::user(format!(
+                "Unsupported time granularity: {granularity}"
+            )));
+        }
+        let pos = QueryDateTimeHelper::parse_native_date_time(date)?;
+        Ok(predefined_bucket(granularity, pos, timestamp_precision)?.start_str)
+    }
+
     /// Walks buckets by repeatedly adding the parsed interval starting from the
     /// position aligned to `origin`. Each bucket's end is `next_start - 1s`,
     /// formatted with the sub-second `'9'` padding.
