@@ -1,4 +1,4 @@
-use std::io::{Read, Write};
+use std::io::Read;
 use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context as _, Result};
@@ -163,62 +163,21 @@ fn start_body(branch: &Option<String>, r#ref: &Option<String>, manifest: Option<
     util::body(body)
 }
 
-/// Kept in step with the `50mb` JSON parsers in cubejs-enterprise's console-server
-/// `app.ts` and cloud-router `jsonBodyParsers.ts`. Measure the serialized request,
-/// because parsing removes dbt's formatting while the other request fields add bytes.
-const MANIFEST_UPLOAD_LIMIT_BYTES: usize = 50 * 1024 * 1024;
-const MANIFEST_SOURCE_TIMEOUT: Duration = Duration::from_secs(30);
-const MANIFEST_SOURCE_POLL: Duration = Duration::from_secs(1);
-
-#[derive(Default)]
-struct ByteCounter(usize);
-
-impl Write for ByteCounter {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0 += buf.len();
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-fn ensure_manifest_upload_fits(body: &Value) -> Result<()> {
-    let mut counter = ByteCounter::default();
-    serde_json::to_writer(&mut counter, body)?;
-    ensure_manifest_upload_size(counter.0)
-}
-
-fn ensure_manifest_upload_size(bytes: usize) -> Result<()> {
-    if bytes > MANIFEST_UPLOAD_LIMIT_BYTES {
-        bail!(
-            "dbt manifest upload is {:.1} MiB after JSON serialization, exceeding Cube's \
-             50 MiB request limit; omit `--manifest` and use a Git-based dbt sync instead",
-            bytes as f64 / (1024.0 * 1024.0)
-        );
-    }
-
-    Ok(())
-}
-
 /// A pre-manifest server accepts the unknown fields, then silently starts a Git sync.
-/// Start/status do not carry a source, so require the history row's discriminator before
-/// reporting success; a briefly absent row remains a wait state rather than a verdict.
-fn manifest_source_progress(history: &Value, sync_job_id: &str) -> Result<Progress<()>> {
+/// Start/status do not carry a source, so require the synchronously recorded history
+/// row's discriminator before reporting success.
+fn ensure_manifest_source(history: &Value, sync_job_id: &str) -> Result<()> {
     let runs = output::items(history);
     let Some(run) = runs
         .iter()
         .find(|run| output::field(run, "syncJobId") == sync_job_id)
     else {
-        return Ok(Progress::Waiting(
-            "sync history not available yet".to_string(),
-        ));
+        bail!("dbt sync {sync_job_id} is absent from sync history");
     };
 
     let source = output::field(run, "source");
     if source == "manifest" {
-        return Ok(Progress::Done(()));
+        return Ok(());
     }
 
     let report = if util::is_blank(&source) {
@@ -234,27 +193,17 @@ fn manifest_source_progress(history: &Value, sync_job_id: &str) -> Result<Progre
 
 async fn verify_manifest_source(api: &Client, deployment: i64, sync_job_id: &str) -> Result<()> {
     let query = vec![("first".to_string(), "100".to_string())];
-    wait::poll(
-        Wait::new(
-            "dbt manifest source",
-            MANIFEST_SOURCE_TIMEOUT,
-            MANIFEST_SOURCE_POLL,
-        )
-        .advising_nothing(),
-        || async {
-            let history = api.get(&base(deployment), &query).await?;
-            manifest_source_progress(&history, sync_job_id)
-        },
-    )
-    .await
-    .with_context(|| {
-        format!(
-            "dbt sync {sync_job_id} was started, but the CLI could not confirm it used the \
-             uploaded manifest. Cancel the in-flight sync with `cube dbt cancel \
-             {deployment} {}`. Source verification requires `SchemaRead` access",
-            util::shell_quote(sync_job_id)
-        )
-    })
+    api.get(&base(deployment), &query)
+        .await
+        .and_then(|history| ensure_manifest_source(&history, sync_job_id))
+        .with_context(|| {
+            format!(
+                "dbt sync {sync_job_id} was started, but the CLI could not confirm it used the \
+                 uploaded manifest. Cancel the in-flight sync with `cube dbt cancel \
+                 {deployment} {}`. Source verification requires `SchemaRead` access",
+                util::shell_quote(sync_job_id)
+            )
+        })
 }
 
 /// The status values that end a sync. Everything else — including a value this
@@ -702,9 +651,6 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let manifest_requested = manifest.is_some();
             let manifest = manifest.as_deref().map(read_manifest).transpose()?;
             let body = start_body(&branch, &r#ref, manifest);
-            if manifest_requested {
-                ensure_manifest_upload_fits(&body)?;
-            }
             let started = api.post(&base(deployment), Some(&body)).await?;
             let sync_job_id = output::field(&started, "syncJobId");
             if manifest_requested {
@@ -1069,27 +1015,23 @@ mod tests {
 
     #[test]
     fn a_manifest_start_must_be_confirmed_by_the_server() {
-        assert!(matches!(
-            manifest_source_progress(
-                &json!({ "items": [{
-                    "syncJobId": "sync-1",
-                    "source": "manifest"
-                }]}),
-                "sync-1"
-            )
-            .unwrap(),
-            Progress::Done(())
-        ));
+        assert!(ensure_manifest_source(
+            &json!({ "items": [{
+                "syncJobId": "sync-1",
+                "source": "manifest"
+            }]}),
+            "sync-1"
+        )
+        .is_ok());
 
-        let git = manifest_source_progress(
+        let git = ensure_manifest_source(
             &json!({ "items": [{
                 "syncJobId": "sync-2",
                 "source": "git"
             }]}),
             "sync-2",
         )
-        .err()
-        .expect("a Git fallback must fail immediately");
+        .expect_err("a Git fallback must fail immediately");
         assert_eq!(
             git.to_string(),
             "this Cube tenant did not confirm dbt manifest upload support: dbt sync sync-2 \
@@ -1098,9 +1040,8 @@ mod tests {
         );
 
         let missing =
-            manifest_source_progress(&json!({ "items": [{ "syncJobId": "sync-3" }] }), "sync-3")
-                .err()
-                .expect("a row without a source must fail immediately");
+            ensure_manifest_source(&json!({ "items": [{ "syncJobId": "sync-3" }] }), "sync-3")
+                .expect_err("a row without a source must fail immediately");
         assert_eq!(
             missing.to_string(),
             "this Cube tenant did not confirm dbt manifest upload support: dbt sync sync-3 \
@@ -1108,25 +1049,15 @@ mod tests {
              `--manifest`"
         );
 
-        let absent = manifest_source_progress(
+        let absent = ensure_manifest_source(
             &json!({ "items": [{ "syncJobId": "another-sync", "source": "manifest" }] }),
             "sync-4",
         )
-        .expect("an absent row is not a settled failure");
-        assert!(matches!(absent, Progress::Waiting(_)));
-    }
-
-    #[test]
-    fn a_manifest_upload_stays_inside_the_request_limit() {
-        assert!(ensure_manifest_upload_fits(&json!({
-            "source": "manifest",
-            "manifest": { "nodes": {} }
-        }))
-        .is_ok());
-        assert!(ensure_manifest_upload_size(MANIFEST_UPLOAD_LIMIT_BYTES).is_ok());
-
-        let too_large = ensure_manifest_upload_size(MANIFEST_UPLOAD_LIMIT_BYTES + 1).unwrap_err();
-        assert!(too_large.to_string().contains("50 MiB request limit"));
+        .expect_err("an absent row must fail safely");
+        assert_eq!(
+            absent.to_string(),
+            "dbt sync sync-4 is absent from sync history"
+        );
     }
 
     #[test]
