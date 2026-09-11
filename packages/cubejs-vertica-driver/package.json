@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/vertica-driver",
-  "description": "Cube.js Vertica database driver",
+  "description": "Cube Vertica database driver",
   "author": "Eduard Karacharov, Tim Brown, Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {

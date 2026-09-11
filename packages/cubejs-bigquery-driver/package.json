@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/bigquery-driver",
-  "description": "Cube.js BigQuery database driver",
+  "description": "Cube BigQuery database driver",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {

@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-backend/docker",
   "version": "0.31.20",
-  "description": "Cube.js In Docker (virtual package)",
+  "description": "Cube In Docker (virtual package)",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
   "private": true,

@@ -1,4 +1,4 @@
-<p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
+<p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube" width="300px"></a></p>
 
 [Website](https://cube.dev) • [Docs](https://docs.cube.dev) •
 [Examples](#examples) • [Blog](https://cube.dev/blog) •

@@ -7,7 +7,7 @@
     "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-client-ws-transport"
   },
-  "description": "Cube.js WebSocket transport",
+  "description": "Cube WebSocket transport",
   "main": "dist/cubejs-client-ws-transport.cjs.js",
   "typings": "dist/index.d.ts",
   "author": "Cube Dev, Inc.",

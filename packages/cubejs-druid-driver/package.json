@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/druid-driver",
-  "description": "Cube.js Druid database driver",
+  "description": "Cube Druid database driver",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "license": "Apache-2.0",

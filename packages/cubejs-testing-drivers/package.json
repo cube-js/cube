@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-backend/testing-drivers",
   "version": "1.7.37",
-  "description": "Cube.js drivers test suite",
+  "description": "Cube drivers test suite",
   "author": "Cube Dev, Inc.",
   "repository": {
     "type": "git",

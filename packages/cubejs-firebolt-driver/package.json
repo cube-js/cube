@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/firebolt-driver",
-  "description": "Cube.js Firebolt database driver",
+  "description": "Cube Firebolt database driver",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {

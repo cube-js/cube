@@ -2393,7 +2393,7 @@ async fn select_agg_where_false() {
 
     let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
-    // Final query uses grouped query to Cube.js with WHERE FALSE, but without LIMIT 0
+    // Final query uses grouped query to Cube with WHERE FALSE, but without LIMIT 0
     assert!(!sql.contains("\"ungrouped\":"));
     assert!(sql.contains(r#"\"sql\":\"FALSE\""#));
     assert!(sql.contains(r#""limit": 50000"#));
@@ -2444,7 +2444,7 @@ async fn wrapper_dimension_agg_where_false() {
 
     let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
-    // Final query uses grouped query to Cube.js with WHERE FALSE, but without LIMIT 0
+    // Final query uses grouped query to Cube with WHERE FALSE, but without LIMIT 0
     assert!(!sql.contains("\"ungrouped\":"));
     assert!(sql.contains(r#"\"sql\":\"FALSE\""#));
     assert!(!sql.contains(r#""limit""#));

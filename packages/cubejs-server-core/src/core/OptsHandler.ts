@@ -436,7 +436,7 @@ export class OptsHandler {
         warning: (
           'You are using multitenancy without configuring scheduledRefreshContexts, ' +
           'which can lead to issues where the security context will be undefined ' +
-          'while Cube.js will do background refreshing: ' +
+          'while Cube will do background refreshing: ' +
           'https://cube.dev/docs/config#options-reference-scheduled-refresh-contexts'
         ),
       });

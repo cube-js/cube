@@ -2,7 +2,7 @@
  * @license Apache-2.0
  * @copyright Cube Dev, Inc.
  * @fileoverview
- * Cube.js auth related data types definition.
+ * Cube auth related data types definition.
  */
 
 import { ApiScopes } from './strings';

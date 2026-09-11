@@ -446,7 +446,7 @@ export class CubejsServerCore {
     } else {
       app.get('/', (req, res) => {
         res.status(200)
-          .send('<html><body>Cube.js server is running in production mode. <a href="https://cube.dev/docs/deployment/production-checklist">Learn more about production mode</a>.</body></html>');
+          .send('<html><body>Cube server is running in production mode. <a href="https://cube.dev/docs/deployment/production-checklist">Learn more about production mode</a>.</body></html>');
       });
     }
   }
@@ -930,7 +930,7 @@ export class CubejsServerCore {
     console.error(e.stack || e);
 
     if (e.message && e.message.indexOf('Redis connection to') !== -1) {
-      console.log('🛑 Cube.js Server requires locally running Redis instance to connect to');
+      console.log('🛑 Cube Server requires locally running Redis instance to connect to');
       if (process.platform.indexOf('win') === 0) {
         console.log('💾 To install Redis on Windows please use https://github.com/MicrosoftArchive/redis/releases');
       } else if (process.platform.indexOf('darwin') === 0) {

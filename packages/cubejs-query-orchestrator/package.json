@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/query-orchestrator",
-  "description": "Cube.js Query Orchestrator and Cache",
+  "description": "Cube Query Orchestrator and Cache",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {

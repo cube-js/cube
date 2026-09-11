@@ -1,8 +1,8 @@
 openapi: "3.0.0"
 info:
-  description: "Cube.js Swagger Schema"
+  description: "Cube Swagger Schema"
   version: "1.0.0"
-  title: "Cube.js"
+  title: "Cube"
 paths:
   "/v1/meta":
     get:

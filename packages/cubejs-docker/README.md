@@ -1,4 +1,4 @@
-<p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
+<p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube" width="300px"></a></p>
 
 [Website](https://cube.dev) • [Docs](https://docs.cube.dev) •
 [Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/the_cube_dev)
@@ -21,30 +21,30 @@ Found an issue? File it on our GitHub Issues page.
 
 Supported architectures: `amd64`
 
-Need the documentation? Check out the [Cube.js documentation
+Need the documentation? Check out the [Cube documentation
 website][link-cubejs-docs].
 
 [link-cubejs-docs]: https://docs.cube.dev
 
-# What is Cube.js?
+# What is Cube?
 
-Cube.js is an open-source analytical API platform. It is primarily used to build
+Cube is an open-source analytical API platform. It is primarily used to build
 internal business intelligence tools or add customer-facing analytics to
 existing applications.
 
-Cube.js was designed to work with Serverless Query Engines like AWS Athena and
+Cube was designed to work with Serverless Query Engines like AWS Athena and
 Google BigQuery. Multi-stage querying approach makes it suitable for handling
-trillions of data points. Most modern RDBMS work with Cube.js as well and can be
+trillions of data points. Most modern RDBMS work with Cube as well and can be
 tuned for adequate performance.
 
 Unlike others, it is not a monolith application, but a set of modules, which
-does one thing well. Cube.js provides modules to run transformations and
+does one thing well. Cube provides modules to run transformations and
 modeling in data warehouse, querying and caching, managing API gateway and
 building UI on top of that.
 
 # How to use this image
 
-## Start a Cube.js instance
+## Start a Cube instance
 
 ```bash
 docker pull cubejs/cube:latest
@@ -59,7 +59,7 @@ docker run -d -p 3000:3000 -p 4000:4000 \
   cubejs/cube:latest
 ```
 
-The Cube.js Developer Playground will be available at `http://localhost:4000`.
+The Cube Developer Playground will be available at `http://localhost:4000`.
 For more information about supported environment variables, please consult the
 documentation for [Environment Variables][link-cubejs-env-vars].
 
@@ -80,7 +80,7 @@ services:
     ports:
       # It's better to use random port binding for 4000/3000 ports
       # without it you will not able to start multiple projects inside docker
-      - 4000:4000  # Cube.js API and Developer Playground
+      - 4000:4000  # Cube API and Developer Playground
       - 3000:3000  # Dashboard app, if created
     env_file: .env
     volumes:
@@ -94,4 +94,4 @@ services:
 
 ### License
 
-Cube.js Docker is [Apache 2.0 licensed](./LICENSE).
+Cube Docker is [Apache 2.0 licensed](./LICENSE).
