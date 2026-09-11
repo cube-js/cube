@@ -12,7 +12,7 @@ belongs to is not arbitrary — it follows from **what the switch answers**:
 
 | Layer | Set where | Applies to | Can the viewer change it? |
 | --- | --- | --- | --- |
-| [Account settings](#account-settings) | **Embed → Settings** in the Cube console | Every embed in the account | No |
+| [Account settings](#account-settings) | **Embed → Settings** in the Cube console | Every embed in the account | No for the switches. **Language** / **Time Zone** yield to a URL parameter |
 | [Session settings](#session-settings) | The `settings` object of the [Generate Session API][ref-generate-session] | Every embed opened with that session — i.e. one viewer | No for the switches — they are signed into the session token. `locale` / `timezone` yield to a URL parameter |
 | [URL parameters](#url-parameters) | The query string of the iframe `src` | That one iframe | Yes — it is a URL in their browser |
 
