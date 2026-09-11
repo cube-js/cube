@@ -178,6 +178,18 @@ pub fn nonempty_ref(s: &str) -> Result<String, String> {
     Ok(s.to_string())
 }
 
+/// Reject a supplied-but-empty file path while preserving meaningful whitespace in
+/// names that really contain it. `-` remains valid for commands that use it as stdin.
+pub fn nonempty_path(s: &str) -> Result<String, String> {
+    if s.trim().is_empty() {
+        return Err(format!(
+            "{EMPTY_VALUE_REFUSED} names no file to read — pass a path or `-` for stdin"
+        ));
+    }
+
+    Ok(s.to_string())
+}
+
 /// `nonempty` with a message specific to a LIST FILTER — `dbt history --status`, and
 /// anything that follows it — where an empty value is neither a filter nor nothing at
 /// all: `push` sends `status=`, and every runs / no runs / a complaint are three answers
@@ -554,6 +566,10 @@ mod tests {
         assert!(nonempty_ref("main").is_ok());
         assert!(nonempty_ref("").is_err());
         assert!(nonempty_ref("\t").is_err());
+        assert_eq!(nonempty_path("manifest.json").unwrap(), "manifest.json");
+        assert_eq!(nonempty_path("-").unwrap(), "-");
+        assert!(nonempty_path("").is_err());
+        assert!(nonempty_path("  ").is_err());
         assert_eq!(nonempty_filter("FAILED").unwrap(), "FAILED");
         assert!(nonempty_filter("").is_err());
         assert!(nonempty_filter("  ").is_err());

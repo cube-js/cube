@@ -1,6 +1,7 @@
+use std::io::Read;
 use std::time::{Duration, Instant};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context as _, Result};
 use clap::Subcommand;
 use owo_colors::OwoColorize;
 use serde_json::Value;
@@ -9,7 +10,7 @@ use crate::client::{Client, Query};
 use crate::wait::{self, Progress, Wait};
 use crate::{output, util, Ctx};
 
-/// Run a deployment's dbt sync: pull the dbt project, convert its models into
+/// Run a deployment's dbt sync: convert a dbt project or uploaded manifest into
 /// cubes, and commit them to a fresh branch.
 #[derive(clap::Args)]
 pub struct Args {
@@ -28,6 +29,15 @@ enum Cmd {
         /// only, so CI can test the ref under review.
         #[arg(long, value_parser = util::nonempty_ref)]
         r#ref: Option<String>,
+        /// Read and upload a dbt manifest from this path (`-` for stdin), instead
+        /// of cloning the dbt repository and running dbt
+        #[arg(
+            long,
+            value_name = "PATH",
+            value_parser = util::nonempty_path,
+            conflicts_with = "ref"
+        )]
+        manifest: Option<String>,
         /// Name for the Cube branch the generated cubes land on (defaults to a
         /// generated `dbt-sync/…` name)
         #[arg(long, value_parser = util::nonempty)]
@@ -106,6 +116,94 @@ enum Cmd {
 
 fn base(deployment: i64) -> String {
     format!("/api/v1/deployments/{deployment}/dbt-sync")
+}
+
+/// Read locally so the API receives a JSON object rather than a string containing JSON.
+/// The server owns dbt artifact and schema-version validation.
+fn read_manifest(path: &str) -> Result<Value> {
+    let (raw, source) = if path == "-" {
+        let mut raw = String::new();
+        std::io::stdin()
+            .read_to_string(&mut raw)
+            .context("failed to read dbt manifest from stdin")?;
+        (raw, "stdin".to_string())
+    } else {
+        (
+            std::fs::read_to_string(path)
+                .with_context(|| format!("failed to read dbt manifest from {path}"))?,
+            path.to_string(),
+        )
+    };
+
+    parse_manifest(&raw, &source)
+}
+
+fn parse_manifest(raw: &str, source: &str) -> Result<Value> {
+    let manifest: Value = serde_json::from_str(raw)
+        .with_context(|| format!("dbt manifest from {source} is not valid JSON"))?;
+    if !manifest.is_object() {
+        bail!("dbt manifest from {source} must be a JSON object");
+    }
+
+    Ok(manifest)
+}
+
+/// Build the start payload in one place so the source discriminator can never be sent
+/// without the manifest it describes (or vice versa). Omitting a manifest deliberately
+/// omits `source` too, preserving the server's backwards-compatible git default.
+fn start_body(branch: &Option<String>, r#ref: &Option<String>, manifest: Option<Value>) -> Value {
+    let mut body = serde_json::Map::new();
+    util::set(&mut body, "branchName", branch);
+    util::set(&mut body, "ref", r#ref);
+    if let Some(manifest) = manifest {
+        body.insert("source".to_string(), Value::String("manifest".to_string()));
+        body.insert("manifest".to_string(), manifest);
+    }
+
+    util::body(body)
+}
+
+/// A pre-manifest server accepts the unknown fields, then silently starts a Git sync.
+/// Start/status do not carry a source, so require the synchronously recorded history
+/// row's discriminator before reporting success. History is ordered newest-first.
+fn ensure_manifest_source(history: &Value, sync_job_id: &str) -> Result<()> {
+    let runs = output::items(history);
+    let Some(run) = runs
+        .iter()
+        .find(|run| output::field(run, "syncJobId") == sync_job_id)
+    else {
+        bail!("dbt sync {sync_job_id} was not found among the 100 most recent syncs");
+    };
+
+    let source = output::field(run, "source");
+    if source == "manifest" {
+        return Ok(());
+    }
+
+    let report = if util::is_blank(&source) {
+        "did not report a source at all".to_string()
+    } else {
+        format!("reported source `{source}` instead of `manifest`")
+    };
+    bail!(
+        "this Cube tenant did not confirm dbt manifest upload support: dbt sync \
+         {sync_job_id} {report}; update the tenant before retrying with `--manifest`"
+    )
+}
+
+async fn verify_manifest_source(api: &Client, deployment: i64, sync_job_id: &str) -> Result<()> {
+    let query = vec![("first".to_string(), "100".to_string())];
+    api.get(&base(deployment), &query)
+        .await
+        .and_then(|history| ensure_manifest_source(&history, sync_job_id))
+        .with_context(|| {
+            format!(
+                "dbt sync {sync_job_id} was started, but the CLI could not confirm it used the \
+                 uploaded manifest. Cancel the in-flight sync with `cube dbt cancel \
+                 {deployment} {}`. Source verification requires `SchemaRead` access",
+                util::shell_quote(sync_job_id)
+            )
+        })
 }
 
 /// The status values that end a sync. Everything else — including a value this
@@ -324,10 +422,11 @@ fn human_duration_ms(raw: &str) -> String {
 /// The columns of `history`, paired with the row `history_row` builds — the two are
 /// positional, so they are declared next to each other and a test holds them the same
 /// width.
-const HISTORY_COLUMNS: [&str; 6] = [
+const HISTORY_COLUMNS: [&str; 7] = [
     "SYNC JOB ID",
     "STATUS",
     "TRIGGER",
+    "SOURCE",
     "STARTED",
     "DURATION",
     "BRANCH",
@@ -339,7 +438,7 @@ const ID_COLUMN: usize = 0;
 
 /// One run as a table row, under the names the list endpoint publishes.
 ///
-/// The columns are the six a run is identified and judged by; the rest of the record —
+/// The columns are the seven a run is identified and judged by; the rest of the record —
 /// `gitRef`, `failedPhase`, `lastStage`, per-phase timings, manifest counts — is in
 /// `--json`, which is where a table would stop being one.
 fn history_row(run: &Value) -> Vec<String> {
@@ -356,6 +455,7 @@ fn history_row(run: &Value) -> Vec<String> {
         // it shows what the row says.
         cell("status"),
         cell("trigger"),
+        cell("source"),
         cell("startedAt"),
         // `durationMs` ONLY — never `completedAt` minus `startedAt`. Those two stamps
         // are written by different processes, so their difference can disagree with the
@@ -542,17 +642,27 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         Cmd::Sync {
             deployment,
             r#ref,
+            manifest,
             branch,
             wait,
             timeout,
             poll,
         } => {
-            let mut body = serde_json::Map::new();
-            util::set(&mut body, "branchName", &branch);
-            util::set(&mut body, "ref", &r#ref);
-            let started = api.post(&base(deployment), Some(&util::body(body))).await?;
-
+            let manifest_requested = manifest.is_some();
+            let manifest = manifest.as_deref().map(read_manifest).transpose()?;
+            let body = start_body(&branch, &r#ref, manifest);
+            let started = api.post(&base(deployment), Some(&body)).await?;
             let sync_job_id = output::field(&started, "syncJobId");
+            if manifest_requested {
+                if util::is_blank(&sync_job_id) {
+                    bail!(
+                        "Cube started the dbt manifest sync but did not return a sync job id, \
+                         so its source could not be verified"
+                    );
+                }
+                verify_manifest_source(&api, deployment, &sync_job_id).await?;
+            }
+
             let branch_name = output::field(&started, "branchName");
             // Every message below says which branch, and a payload that named none would
             // otherwise leave a hole mid-sentence. The raw value stays for the two things
@@ -848,6 +958,7 @@ mod tests {
     fn a_run_renders_the_record_the_list_endpoint_publishes() {
         let run = json!({
             "syncJobId": "abc", "deploymentId": 42, "status": "COMPLETED", "trigger": "api",
+            "source": "manifest",
             "branchName": "dbt-sync/main-1", "gitRef": "feature/orders",
             "startedAt": "2026-08-24T10:00:00Z", "completedAt": "2026-08-24T10:15:12Z",
             "durationMs": 912_345, "stats": { "cubeCount": 12 }
@@ -858,6 +969,7 @@ mod tests {
                 "abc",
                 "COMPLETED",
                 "api",
+                "manifest",
                 "2026-08-24T10:00:00Z",
                 "15m 12s",
                 "dbt-sync/main-1"
@@ -881,6 +993,121 @@ mod tests {
         assert_eq!(
             cell(&history_row(&json!({"status": " FAILED\n"})), "STATUS"),
             "FAILED"
+        );
+    }
+
+    #[test]
+    fn a_manifest_start_payload_selects_the_manifest_source() {
+        let manifest = json!({
+            "metadata": { "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json" },
+            "nodes": {}
+        });
+        assert_eq!(
+            start_body(&Some("review".to_string()), &None, Some(manifest.clone())),
+            json!({
+                "branchName": "review",
+                "source": "manifest",
+                "manifest": manifest
+            })
+        );
+
+        // The existing call remains byte-for-byte the old shape. The server defaults an
+        // omitted source to git, which keeps this CLI compatible with older tenants.
+        assert_eq!(
+            start_body(&None, &Some("main".to_string()), None),
+            json!({ "ref": "main" })
+        );
+    }
+
+    #[test]
+    fn a_manifest_start_must_be_confirmed_by_the_server() {
+        assert!(ensure_manifest_source(
+            &json!({ "items": [{
+                "syncJobId": "sync-1",
+                "source": "manifest"
+            }]}),
+            "sync-1"
+        )
+        .is_ok());
+
+        let git = ensure_manifest_source(
+            &json!({ "items": [{
+                "syncJobId": "sync-2",
+                "source": "git"
+            }]}),
+            "sync-2",
+        )
+        .expect_err("a Git fallback must fail immediately");
+        assert_eq!(
+            git.to_string(),
+            "this Cube tenant did not confirm dbt manifest upload support: dbt sync sync-2 \
+             reported source `git` instead of `manifest`; update the tenant before retrying \
+             with `--manifest`"
+        );
+
+        let missing =
+            ensure_manifest_source(&json!({ "items": [{ "syncJobId": "sync-3" }] }), "sync-3")
+                .expect_err("a row without a source must fail immediately");
+        assert_eq!(
+            missing.to_string(),
+            "this Cube tenant did not confirm dbt manifest upload support: dbt sync sync-3 \
+             did not report a source at all; update the tenant before retrying with \
+             `--manifest`"
+        );
+
+        let absent = ensure_manifest_source(
+            &json!({ "items": [{ "syncJobId": "another-sync", "source": "manifest" }] }),
+            "sync-4",
+        )
+        .expect_err("an absent row must fail safely");
+        assert_eq!(
+            absent.to_string(),
+            "dbt sync sync-4 was not found among the 100 most recent syncs"
+        );
+    }
+
+    #[test]
+    fn manifest_input_rejects_empty_paths_and_ref_combinations() {
+        use clap::Parser as _;
+
+        let empty = crate::Cli::try_parse_from(["cube", "dbt", "sync", "1", "--manifest", ""])
+            .err()
+            .expect("an empty manifest path should be rejected");
+        assert!(empty.to_string().contains("an empty value"));
+
+        let conflict = crate::Cli::try_parse_from([
+            "cube",
+            "dbt",
+            "sync",
+            "1",
+            "--manifest",
+            "-",
+            "--ref",
+            "main",
+        ])
+        .err()
+        .expect("manifest and ref should conflict");
+        assert!(conflict.to_string().contains("cannot be used with"));
+    }
+
+    #[test]
+    fn a_manifest_must_be_a_json_object() {
+        let manifest = parse_manifest(r#"{"metadata":{},"nodes":{}}"#, "manifest.json")
+            .expect("an object is a valid request value");
+        assert!(manifest.is_object());
+
+        let array = parse_manifest("[]", "manifest.json").unwrap_err();
+        assert_eq!(
+            array.to_string(),
+            "dbt manifest from manifest.json must be a JSON object"
+        );
+
+        let malformed = parse_manifest("{", "manifest.json").unwrap_err();
+        assert!(
+            malformed
+                .to_string()
+                .starts_with("dbt manifest from manifest.json is not valid JSON"),
+            "{malformed:#}"
         );
     }
 

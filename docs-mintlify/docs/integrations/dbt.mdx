@@ -12,10 +12,14 @@ Available on [Premium and above plans](https://cube.dev/pricing).
 
 If your team already models data in [dbt](https://www.getdbt.com/), you can import
 those models into Cube as cubes instead of redefining them by hand. **dbt pull**
-connects to your dbt project's Git repository, parses the project, converts each dbt
-model into a cube — including dimensions, measures, descriptions, and joins — and
-commits the generated files to a branch where you review them before they reach
-production.
+converts each dbt model into a cube — including dimensions, measures, descriptions,
+and joins — and commits the generated files to a branch where you review them before
+they reach production.
+
+Cube can either clone and parse your dbt project's Git repository, or accept the
+`target/manifest.json` your own CI job produced. Uploading the manifest converts the
+exact artifact your pipeline validated and doesn't require Cube to have a credential
+for the dbt repository.
 
 Pulls can run manually, from your CI/CD pipeline, automatically on every push to your
 dbt repository, or from [Analytics Chat](#trigger-from-analytics-chat) — so your
@@ -32,23 +36,24 @@ available via [dbt push](#push-cubes-to-dbt), currently in preview.
 
 ## How it works
 
-When a pull runs — whether triggered manually, from CI, or by a repository push —
-Cube spins up a short-lived, isolated sandbox and:
+Every pull converts a dbt manifest into cube definitions and commits the generated
+files to a review branch. How the manifest reaches Cube depends on the source:
 
-1. **Clones your dbt repository** (a shallow clone of the branch you selected).
-2. **Installs your project's dependencies** (`dbt deps`).
-3. **Parses the project** (`dbt parse`) to produce dbt's `manifest.json` — the
-   structured description of every model, column, test, and constraint.
-4. **Converts each dbt model into a cube definition** (one `.yml` file per model).
-5. **Commits the generated files** to a branch for review, then tears the sandbox
-   down.
+- **Git (default):** Cube creates a short-lived, isolated sandbox, clones the selected
+  branch, installs dependencies with `dbt deps`, and runs `dbt parse`. It converts the
+  resulting `target/manifest.json`, commits the cubes, and tears the sandbox down.
+- **Uploaded manifest:** Your pipeline runs `dbt parse`, `dbt compile`, `dbt run`, or
+  `dbt build`, then uploads the resulting `target/manifest.json` with the Cube CLI.
+  Cube validates and converts that artifact directly. It doesn't create a sandbox,
+  clone a repository, or run dbt, so this path usually takes seconds rather than
+  minutes.
 
-**By default, no connection to your data warehouse is made during a pull.** Cube uses
-`dbt parse`, not `dbt run` or `dbt compile`, so it reads your project's structure
-without ever querying your warehouse. dbt pull generates cube definitions; it assumes
-the underlying tables were already built by your own production `dbt run`. The one
-exception is [Infer column types from dbt catalog](#infer-column-types-from-dbt-catalog),
-an opt-in option that reads real column types from your warehouse.
+**Cube doesn't build your dbt models during either kind of pull.** A Git-based pull
+uses `dbt parse`, which doesn't query the warehouse. A manifest pull doesn't run dbt
+at all, although the pipeline command that produced the manifest might. The generated
+cubes assume the underlying tables were already built by your production dbt job. The
+one Cube-side exception is [Infer column types from dbt catalog](#infer-column-types-from-dbt-catalog),
+an opt-in option for Git-based pulls that reads real column types from the warehouse.
 
 ## Prerequisites
 
@@ -56,11 +61,10 @@ an opt-in option that reads real column types from your warehouse.
   **Amazon Redshift**, **PostgreSQL**, **Google BigQuery**, **Databricks**,
   **Amazon Athena**, and **ClickHouse**. If your deployment uses any other database
   type, the pull dialog will tell you it's unsupported.
-- **A Git repository** containing your dbt project, reachable over **HTTPS** or
-  **SSH**. GitHub, GitLab, Bitbucket, Azure DevOps, and self-hosted Git servers all
-  work.
-- **Read access to that repository** — either a personal access token (PAT) for
-  HTTPS, or the ability to register a read-only deploy key for SSH.
+- **A source for dbt metadata:** either a Git repository Cube can reach over HTTPS or
+  SSH, with a PAT or read-only deploy key; or a CI job that can produce and upload
+  `target/manifest.json` with the [Cube CLI](/reference/cli#dbt-sync). GitHub, GitLab,
+  Bitbucket, Azure DevOps, and self-hosted Git servers all work for the Git source.
 - For the generated cubes to return data, the dbt models must already be **built into
   your warehouse** by your normal production `dbt run`. dbt pull generates cube
   definitions that point at each model's relation; it does not create the underlying
@@ -71,6 +75,14 @@ an opt-in option that reads real column types from your warehouse.
 ## Connect your dbt repository
 
 The dbt connection is configured on your deployment's **default data source**.
+
+<Info>
+
+Skip this section if your CI pipeline uploads `manifest.json`. A manifest pull doesn't
+need a dbt Git integration or repository credential. When an integration is configured,
+its conversion settings still shape the generated cubes.
+
+</Info>
 
 <Steps>
 
@@ -157,10 +169,12 @@ the second is the common override
 
 <Warning>
 If your project overrides `generate_schema_name` and keys it on the environment —
-the widespread `{% if target.name == 'prod' %}` pattern — you **must** set **dbt
-target** to that production target name. Otherwise the macro takes its fallback
-branch and every model collapses onto the **dbt target schema** value, so every
-generated cube points at one schema.
+the widespread `{% if target.name == 'prod' %}` pattern — a Git-based pull **must**
+set **dbt target** to that production target name. Otherwise the macro takes its
+fallback branch and every model collapses onto the **dbt target schema** value, so
+every generated cube points at one schema. For a manifest upload, the target and
+resolved schemas are already baked into the artifact by your pipeline; Cube doesn't
+re-resolve them.
 </Warning>
 
 To see what a pull actually resolved, open any generated `.yml` and read its
@@ -171,15 +185,16 @@ declared-vs-resolved breakdown in the sync logs for a given pull.)
 
 ## Configure pull settings
 
-Pull options are saved on the integration itself, so every pull — manual or
-automated — uses the same configuration:
+Pull options are saved on the integration itself. Options that shape conversion apply
+to Git and uploaded-manifest pulls. A manifest pull without an integration uses the
+defaults below. Options that require Cube to run dbt apply only to the Git source.
 
 | Option | Default | Description |
 | --- | --- | --- |
 | **Output path** | `/model/cubes/dbt` | Directory in the repository where the generated cube files are written. This folder is replaced on each pull. |
 | **Name prefix** | `dbt_` | Prefix added to each generated cube's name. |
 | **Title prefix** | `(dbt) ` | Prefix added to each generated cube's display title. |
-| **Model selector** | _(empty)_ | Optional dbt selector using `dbt ls --select` syntax to limit which models are pulled, e.g. `tag:cube` or `marts.*`. Leave empty to pull all models. |
+| **Model selector** | _(empty)_ | **Git source only.** Optional dbt selector using `dbt ls --select` syntax to limit which models are pulled, e.g. `tag:cube` or `marts.*`. Leave empty to pull all models. |
 | **Only pull marts** | Off | When enabled, only pulls models whose path starts with the **Marts folder** value (e.g. `marts`). |
 | **Auto-detect primary keys from column names** | On | Falls back to a column-name guess when dbt declares no key. See [Primary key detection](#primary-key-detection). |
 | **Primary key column suffixes** | `_id` | Comma-separated suffixes treated as key columns, e.g. `_sk, _key`. The default `_id` also matches a column named `id`. Only shown when **Auto-detect primary keys from column names** is on. |
@@ -188,7 +203,7 @@ automated — uses the same configuration:
 | **Include descriptions** | On | Carries dbt model and column descriptions into cubes and dimensions. |
 | **Generate joins** | On | Infers joins between cubes from dbt `relationships` tests and foreign-key constraints. |
 | **Also generate reverse joins** | Off | Adds a `one_to_many` join back to the referencing cube, so a query can start from either side. Only shown when **Generate joins** is on. |
-| **Infer column types from dbt catalog** | Off | Reads real warehouse column types from dbt's `catalog.json` instead of guessing from column names. See [below](#infer-column-types-from-dbt-catalog). |
+| **Infer column types from dbt catalog** | Off | **Git source only.** Reads real warehouse column types from dbt's `catalog.json` instead of guessing from column names. See [below](#infer-column-types-from-dbt-catalog). |
 
 ### Primary key detection
 
@@ -240,8 +255,9 @@ models:
       # …every other column of the model needs a data_type too
 ```
 
-Your warehouse doesn't have to enforce primary keys for this to work — most don't. The
-pull only runs `dbt parse`, and reads the declaration out of `manifest.json`.
+Your warehouse doesn't have to enforce primary keys for this to work — most don't. A
+Git-based pull reads the declaration from the manifest produced by `dbt parse`; a
+manifest pull reads it from the artifact you upload.
 
 If your project doesn't use contracts, tier 2 is the way to declare a single-column key:
 add `unique` and `not_null` tests to it.
@@ -274,6 +290,10 @@ when none is declared — from a column-name heuristic (`*_id` → `number`, `cr
 `time`, …). Enable this option and the pull additionally runs `dbt docs generate` to
 produce dbt's `catalog.json`, which carries the **actual warehouse column types**.
 
+This option is only available for the Git source. An uploaded-manifest pull never runs
+dbt and accepts only `manifest.json`, so it uses declared data types from that artifact
+and the column-name fallback.
+
 Type precedence becomes: **declared `data_type` → catalog type → column-name heuristic**.
 An explicit `data_type` in your dbt YAML still wins; the catalog only fills the gaps.
 
@@ -287,6 +307,9 @@ An explicit `data_type` in your dbt YAML still wins; the catalog only fills the 
   declared and name-based types exactly as it would with the option off.
 
 ## Pass environment variables to dbt
+
+This section applies only to Git-based pulls. A manifest pull runs no dbt process in
+Cube; provide any variables to the pipeline command that creates the manifest.
 
 Some dbt projects read environment variables while the sandbox runs — most
 commonly a token used to install a **private dbt package**. For example, a
@@ -346,6 +369,9 @@ and the settings card flags it.
 
 ## Run a pull manually
 
+Manual pulls from the Cube UI use the Git source. To upload a manifest, use the
+[Cube CLI](#trigger-from-your-cicd-pipeline).
+
 <Steps>
 
 <Step title="Enter development mode">
@@ -387,16 +413,20 @@ through your normal workflow.
 
 ## Keep Cube in sync automatically
 
-Automated syncs run the same pipeline as a manual pull, but instead of committing to
-your working branch they **create a fresh review branch** — so a person can approve
-the update before it reaches the live data model.
+Automated syncs **create a fresh review branch** instead of committing to your working
+branch, so a person can approve the update before it reaches the live data model. CI
+can upload a manifest or ask Cube to clone a Git ref; repository webhooks use the Git
+source.
 
 ### Trigger from your CI/CD pipeline
 
 Cube exposes a REST endpoint you can call at the end of your dbt deployment pipeline,
-right after `dbt run`. As soon as your warehouse tables are rebuilt, your pipeline
-tells Cube to regenerate the matching cubes. The exact endpoint URL for your
-deployment is shown in the dbt settings card, ready to drop into a CI step.
+right after `dbt run` or `dbt build`. As soon as your warehouse tables are rebuilt,
+your pipeline can upload the `target/manifest.json` that command produced and tell Cube
+to regenerate the matching cubes.
+
+The dbt settings card shows the exact REST endpoint for your deployment if your
+pipeline calls the API directly.
 
 <Frame>
   <img
@@ -405,18 +435,30 @@ deployment is shown in the dbt settings card, ready to drop into a CI step.
   />
 </Frame>
 
-The [Cube CLI](/reference/cli#dbt-sync) wraps the same endpoint and can **wait** for
-the sync to finish, which is what turns it into a test gate: sync the ref under
-review, compile it, and fail the job before anything reaches production.
+The [Cube CLI](/reference/cli#dbt-sync) parses and uploads the manifest, then can
+**wait** for the sync to finish:
+
+```bash
+cube dbt sync DEPLOYMENT_ID --manifest target/manifest.json --wait
+```
+
+This is the preferred CI path: Cube converts the exact manifest the job validated,
+even if the remote branch moves before the sync starts. Cube needs no access to the
+dbt repository, and skips sandbox creation, cloning, dependency installation, and
+`dbt parse`. Use `--manifest -` to read the JSON from standard input. `--wait` exits
+non-zero if the sync fails.
+
+If Cube already has repository access and your job doesn't have a manifest, run a
+Git-based sync instead:
 
 ```bash
 cube dbt sync DEPLOYMENT_ID --ref "$GITHUB_HEAD_REF" --wait
 ```
 
-`--wait` exits non-zero if the sync fails, and `--ref` syncs the branch being
-reviewed rather than the one saved on the integration. See [dbt sync as a CI test
-gate](/reference/cli#dbt-sync-as-a-ci-test-gate) for the full pipeline, including
-the compile and query steps.
+`--ref` syncs the branch being reviewed rather than the one saved on the integration.
+It can't be combined with `--manifest`. See [dbt sync as a CI test
+gate](/reference/cli#dbt-sync-as-a-ci-test-gate) for a complete manifest-based pipeline,
+including the compile and query steps.
 
 ### Sync from an uploaded manifest
 
@@ -708,8 +750,9 @@ Each push creates exactly two new files:
   [primary keys](#primary-key-detection) and joins.
 - **Pull is one-directional** — dbt pull never writes back to your dbt repository.
   Promoting cubes into dbt is the [dbt push](#push-cubes-to-dbt) direction (in preview).
-- **No warehouse connection** — a pull doesn't trigger a `dbt run`; it assumes your
-  tables are already built. The only exception is the opt-in
+- **No model build** — a pull doesn't trigger a `dbt run`; it assumes your tables are
+  already built. An uploaded-manifest pull never connects to the warehouse. The only
+  Cube-side warehouse connection is the Git source's opt-in
   [Infer column types from dbt catalog](#infer-column-types-from-dbt-catalog) option
   (in preview), which runs `dbt docs generate` on Snowflake, Amazon Redshift,
   PostgreSQL, and ClickHouse.
