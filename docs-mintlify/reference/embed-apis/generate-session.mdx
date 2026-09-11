@@ -62,29 +62,59 @@ Accounts are limited to 10,000 external users. To increase this limit, please co
 
 ## Session settings
 
-`settings` is an object of per-session overrides for embed behavior. Each key is
-**tri-state**: omit it to inherit the account-wide setting, or set `true`/`false`
-to force the behavior for every embed viewed with this session, taking precedence
-over the account-wide setting.
+`settings` is an object of per-session overrides for embed behavior, applied to
+every embed opened with this session. Omit a key to inherit what the layer below
+says — the account-wide setting under **Embed → Settings** for the AI keys (except
+`allowChatWorkspaceAuthoring`, which has none) and for `locale`/`timezone`, the
+built-in default for the rest.
+
+The switches are **tri-state**: `true`/`false` pins the behavior for this session,
+taking precedence over whatever the layer below would have said. `locale` and
+`timezone` carry a value rather than a switch, and sit one step below the
+matching iframe URL parameter; a value Cube cannot use falls through instead of
+failing the session.
+
+The switches are signed into the session token, so a viewer cannot turn one back
+on; use them for anything that differs per customer. (`locale` and `timezone`
+grant nothing, and a URL parameter deliberately overrides them.) See [Show and hide
+features](/embedding/iframe/feature-visibility) for how they relate to the
+account-wide settings and the iframe URL parameters.
 
 ```json
 {
   "settings": {
-    "showDashboardChat": false
+    "allowAi": false,
+    "showWorkbookShare": false
   }
 }
 ```
 
 | Property | Type | Required | Notes |
 |----------|------|----------|-------|
-| `allowAi` | boolean | No | Master switch over every AI surface in the embed: the dashboard agent, the workbook chat, the AI summary widgets, and the standalone [embedded chat][ref-analytics-chat]. Omit to inherit the account-wide **Embed → Settings** default (allowed by default); `false` disables AI even if it's enabled account-wide. Unlike the other keys on this table, `allowAi` is enforced server-side — a session with `allowAi: false` cannot obtain AI credentials at all, so it can't spend AI tokens — and it outranks the `show*` keys below, which only hide UI entry points. |
-| `showDashboardChat` | boolean | No | Show or hide the AI chat (agent panel and launcher bubble) on embedded dashboards for this session. Omit to inherit the account-wide **Show dashboard chat** toggle (**Embed → Settings**; shown by default); `false` hides it even if enabled account-wide, `true` shows it even if disabled. Affects embedded **published dashboards** only — not the standalone [embedded chat][ref-analytics-chat] surface. See [Hiding the AI chat][ref-signed-embedding]. |
-| `showWorkbookChat` | boolean | No | Show or hide AI entry points in a [Creator Mode][ref-creator-mode] workbook for this session: the chat side panel and its toggle, the launchpad's "Ask Cube Agent" button, and "Fix in chat" on a failed report. Omit to inherit the account-wide **Embed → Settings** default (shown by default). Hides entry points only — use `allowAi` to withhold AI from the session entirely. |
-| `showAiWidgets` | boolean | No | Show or hide AI summary widget authoring for this session: the "AI widget" entry in the dashboard editor's Add widgets menu, and the Generate/Regenerate controls on an existing widget. Omit to inherit the account-wide **Embed → Settings** default (enabled by default). An already-generated summary keeps rendering either way — this only stops it being re-spent. |
-| `allowChatWorkspaceAuthoring` | boolean | No | Restricts this session's AI chat from creating or modifying persistent Cube Workspace content. Set to `false` for headless chat integrations that render answers in their own UI: ad-hoc analysis and inline tables/charts remain available, but the agent can't save or update explorations/reports, or create or publish workbooks and dashboards. Omit or `true` preserves the session user's role-derived authoring capabilities; it never grants access the user doesn't already have. |
+| `allowAi` | boolean | No | **Master switch** over every AI surface in the embed: the dashboard agent, the workbook chat, the AI summary widgets, and the standalone [embedded chat][ref-analytics-chat]. Omit to inherit the account-wide setting (allowed by default). Unlike the `show*` keys it is enforced server-side — a session with `false` cannot obtain AI Chat credentials at all, so no request made with it can consume AI tokens — and it outranks them: `false` here disables a surface whose own `show*` key is `true`. It does not change roles or permissions for non-AI API calls. |
+| `showDashboardChat` | boolean | No | The AI chat (agent panel and launcher bubble) on embedded **published dashboards**. Omit to inherit the account-wide **Show AI chat on embedded dashboards** toggle (**Embed → Settings**; shown by default). Does not affect the standalone [embedded chat][ref-analytics-chat] surface. |
+| `showWorkbookChat` | boolean | No | The [Creator Mode][ref-creator-mode] workbook's AI entry points: the chat side panel and its toggle, the launchpad's **Ask Cube Agent** button, and **Fix in chat** on a failed report. Omit to inherit the account-wide toggle (shown by default). |
+| `showAiWidgets` | boolean | No | Authoring and refreshing AI summary widgets: the **AI widget** entry in the dashboard editor's Add widgets menu, and a widget's prompt input plus Generate/Regenerate controls. An already-generated summary still renders, so a published dashboard keeps its content — it simply cannot be regenerated. Omit to inherit the account-wide toggle (enabled by default). |
+| `allowChatWorkspaceAuthoring` | boolean | No | Whether AI Chat authenticated with this session may create or modify persistent workspace content. `false` keeps ad-hoc analysis and inline tables/charts, but the agent cannot save or update standalone explorations and reports, create or modify workbooks, create or publish dashboards, or direct users to those surfaces — intended for headless chat integrations that render answers in their own UI. Omit or `true` preserves the user's role-derived capabilities and never grants more. Changes AI Chat tools and instructions only. |
+| `showWorkbookShare` | boolean | No | Sharing in the [Creator Mode][ref-creator-mode] workspace: the workbook header's **Share** button and the **Share** action on a workbook, dashboard, exploration, or folder row. Set `false` for a deployment where each embed user should only ever see their own content. Shown by default. Hides the entry points only — it does not revoke access already granted, and never widens what the session may do. |
+| `showDashboardSettings` | boolean | No | The dashboard editor's settings panel — the gear button and the sidebar behind it. That panel is the only place an embed user reaches the dashboard slug, the per-dashboard time zone, the per-dashboard agent, the grid behavior switches, and the dashboard theme, so `false` withdraws all of them together. Shown by default. |
+| `showMemberNames` | boolean | No | The **Show Member Names** item in the workbook data pane's more-actions menu. Member names are the data model's own identifiers, so this is schema protection in the same family as **Show Generated SQL**. `false` hides the item **and** pins the pane to titles, returning a user who had already switched to names. Shown by default. |
+| `showGroupByCube` | boolean | No | The **Group by Cube** / **Group by Folder** item in the data pane's more-actions menu. `false` hides the item **and** pins the pane to the grouping it would have defaulted to — by folder when the view defines folders, by cube otherwise. No content is withdrawn either way. Shown by default. |
+| `locale` | string | No | UI language for every embed opened with this session, as a BCP-47 code — a full code (`es-ES`), a short code (`es`), or a regional variant all resolve to a shipped language. Sits below a runtime [`cube:action:set-locale`](/embedding/iframe/events#cube-action-set-locale) message and the per-iframe `?locale=` parameter, both of which still win, and above the account-wide default under **Embed → Settings**. A language Cube does not ship falls through to that default rather than failing the session. See [Localization](/embedding/iframe/localization). |
+| `timezone` | string | No | IANA time zone the agent runs its queries in for every embed opened with this session (e.g. `America/New_York`). Below a runtime [`cube:action:set-timezone`](/embedding/iframe/events#cube-action-set-timezone) message and the per-iframe `?timezone=` parameter, and above the account-wide default — and above a zone a dashboard's author pinned, so every dashboard this session opens is bucketed in it. Stays subject to the account's user-time-zone policy; a bare UTC offset or an unknown name falls through rather than failing the session. See [Time zones](/embedding/iframe/time-zones). |
 
 <Note>
-The dashboard header's title, back button, Edit, and Duplicate controls are hidden with URL parameters on the embed iframe instead — they aren't part of this `settings` object. See [Show or hide header controls](/embedding/iframe/dashboards#show-or-hide-header-controls).
+Chrome that belongs to a **placement** rather than to a viewer — the dashboard
+header and its controls, the workbook back button, chart export — is set with URL
+parameters on the iframe `src` instead, and is not accepted in this `settings`
+object. [Show and hide features](/embedding/iframe/feature-visibility) covers
+both layers together and the rule for choosing between them.
+</Note>
+
+<Note>
+The [Chat API](/reference/embed-apis/chat-api) session exchange accepts
+`allowChatWorkspaceAuthoring` as a **top-level** field of its request body rather
+than inside a `settings` object. It means the same thing.
 </Note>
 
 ## User profile
