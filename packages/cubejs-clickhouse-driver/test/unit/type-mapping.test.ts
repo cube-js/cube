@@ -120,8 +120,8 @@ const TYPES: Array<[type: string, converter: string, generic: string]> = [
   ['', 'none', ''],
 ];
 
-// An AggregateFunction state is refused as a column type, and no converter sees through it either:
-// the state bytes are not a value of the argument type.
+// The state bytes are not a value of the argument type, so nothing can be derived from it: no
+// generic type, and no converter either.
 const AGGREGATE_TYPES: Array<[type: string, converter: string]> = [
   ['AggregateFunction(sum, Int64)', 'none'],
   ['AggregateFunction(quantiles(0.5, 0.9), UInt64)', 'none'],

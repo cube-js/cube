@@ -49,17 +49,14 @@ const ClickhouseTypeToGeneric: Record<string, string> = {
   datetime: 'timestamp',
   datetime64: 'timestamp',
   date: 'date',
-  // integers
   int8: 'int',
   int16: 'int',
   int32: 'int',
   int64: 'bigint',
-  // unsigned int
   uint8: 'int',
   uint16: 'int',
   uint32: 'int',
   uint64: 'bigint',
-  // floats
   float32: 'float',
   float64: 'double',
   // We don't support enums
@@ -595,9 +592,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       return 'text';
     }
 
-    // An unmapped name is passed on with its arguments and original casing: the base driver returns
-    // it unchanged and the Cube Store CREATE TABLE then fails, naming the type ClickHouse reported.
-    // That is deliberate — guessing `text` for something numeric would corrupt the column quietly.
+    // An unmapped name is handed on as ClickHouse spelled it, so the Cube Store CREATE TABLE fails
+    // naming that type. Deliberate: guessing `text` for something numeric would corrupt it quietly.
     return super.toGenericType(columnType.trim(), precision, scale);
   }
 

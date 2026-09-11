@@ -101,7 +101,7 @@ describe('ClickHouseDriver', () => {
               map_str_date32 Map(String, Date32),
               simple_agg_int64 SimpleAggregateFunction(sum, Int64),
               simple_agg_datetime64 SimpleAggregateFunction(max, DateTime64(3)),
-              simple_agg_map SimpleAggregateFunction(anyLast, Map(String, Int64))
+              simple_agg_map SimpleAggregateFunction(anyLast, Map(String, Int32))
             ) ENGINE Log
         `
       );
@@ -502,9 +502,10 @@ describe('ClickHouseDriver', () => {
             simple_agg_int64: '5',
             simple_agg_datetime64: '2020-01-02T00:00:00.123',
             // A container behind SimpleAggregateFunction used to be stringified into
-            // "[object Object]" by the substring based converter lookup. Int64 inside the map is
-            // quoted by ClickHouse itself, output_format_json_quote_64bit_integers is on by default.
-            simple_agg_map: '{"a":"1"}',
+            // "[object Object]" by the substring based converter lookup. Int32 rather than Int64,
+            // because whether ClickHouse quotes a 64 bit integer is a server default that changed
+            // in 25.x, and this assertion is about the driver.
+            simple_agg_map: '{"a":1}',
           },
         ]);
       } finally {

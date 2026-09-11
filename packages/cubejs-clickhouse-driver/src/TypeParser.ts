@@ -1,6 +1,4 @@
 /**
- * Every raw ClickHouse type string in the driver is read through here.
- *
  * TODO: replace with ClickHouse's own `@clickhouse/datatype-parser` once this package is ESM. The
  * parser is ESM only, so reaching it from CommonJS needs `await import()`, which turns every parse
  * site async.
