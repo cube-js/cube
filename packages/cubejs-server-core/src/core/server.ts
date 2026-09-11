@@ -446,7 +446,7 @@ export class CubejsServerCore {
     } else {
       app.get('/', (req, res) => {
         res.status(200)
-          .send('<html><body>Cube.js server is running in production mode. <a href="https://cube.dev/docs/deployment/production-checklist">Learn more about production mode</a>.</body></html>');
+          .send('<html><body>Cube.js server is running in production mode. <a href="https://docs.cube.dev/cube-core/deployment#production-checklist">Learn more about production mode</a>.</body></html>');
       });
     }
   }

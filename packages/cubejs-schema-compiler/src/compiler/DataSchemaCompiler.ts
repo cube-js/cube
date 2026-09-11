@@ -974,7 +974,7 @@ export class DataSchemaCompiler {
   private standaloneCompileContextProxy() {
     return new Proxy({}, {
       get: () => {
-        throw new UserError('COMPILE_CONTEXT can\'t be used unless contextToAppId is defined. Please see https://cube.dev/docs/config#options-reference-context-to-app-id.');
+        throw new UserError('COMPILE_CONTEXT can\'t be used unless contextToAppId is defined. Please see https://docs.cube.dev/reference/configuration/config#context_to_app_id.');
       }
     });
   }

@@ -218,7 +218,7 @@ export abstract class BaseSchemaFormatter {
         null,
         [
           'Pre-aggregation definitions go here.',
-          'Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started',
+          'Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations',
         ]
       ),
     };

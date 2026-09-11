@@ -4009,7 +4009,7 @@ paths:
           The token is scoped to your account: it carries the same server-resolved security context
           as the embedded Usage Analytics page, so queries only ever see your own data. Send it as
           `Authorization: Bearer <token>` on requests to the returned `apiUrl` (the deployment's
-          [Cube REST API](https://cube.dev/docs/product/apis-integrations/rest-api)).
+          [Cube REST API](/reference/core-data-apis/rest-api)).
 
 
           Tokens expire after 1 hour (see `expiresAt`). Issue a fresh one per session or scheduled

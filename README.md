@@ -21,7 +21,7 @@ Cube Core works with all SQL data sources, including cloud data warehouses like 
 />
 
 <p align="center">
-  <i>Learn more about connecting Cube to <a href="https://docs.cube.dev/cube-core/getting-started/create-a-project?ref=github-readme" target="_blank">data sources</a> and <a href="https://docs.cube.dev/docs/integrations?ref=github-readme" target="_blank">analytics & visualization tools</a>.</i>
+  <i>Learn more about connecting Cube to <a href="https://docs.cube.dev/cube-core/getting-started/create-a-project?ref=github-readme" target="_blank">data sources</a> and <a href="https://docs.cube.dev/admin/connect-to-data/visualization-tools?ref=github-readme" target="_blank">analytics & visualization tools</a>.</i>
 </p>
 
 ## Why Cube Core?

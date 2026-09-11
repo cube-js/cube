@@ -23,7 +23,7 @@ By contributing to Cube Dev, Inc., You accept and agree to the terms and conditi
 ## Step-by-step guide to contributing
 
 1. Find [issues](https://github.com/cube-js/cube/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) where we need help. Search for issues with either [`good first issue`](https://github.com/cube-js/cube/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22good+first+issue%22+) and/or [`help wanted`](https://github.com/cube-js/cube/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22help+wanted%22) labels.
-2. Follow the directions in the [Getting Started guide](https://docs.cube.dev/docs/getting-started) to get Cube up and running (incl. the [Developer Playground](https://docs.cube.dev/docs/explore-analyze/playground)). 
+2. Follow the directions in the [Getting Started guide](https://docs.cube.dev/cube-core/getting-started) to get Cube up and running (incl. the [Developer Playground](https://docs.cube.dev/docs/explore-analyze/playground)). 
 3. Clone the [Cube repo](https://github.com/cube-js/cube).
 4. Submit your Pull Request. 
 5. Testing: Please include test(s) for your code contribution. Depending on a change it can be tested by unit, integration or E2E test. See some of the test examples for [drivers](https://github.com/cube-js/cube/pull/1333/commits/56dadccd62ac4eaceafe650d2853406f5d3d9d43) and [backend](https://github.com/cube-js/cube/tree/master/packages/cubejs-backend-shared/test). There're separate packages for [E2E testing](https://github.com/cube-js/cube/tree/master/packages/cubejs-testing/) and [E2E driver testing](https://github.com/cube-js/cube/tree/master/packages/cubejs-testing-drivers/). **Tests are required for most of the contributions.**

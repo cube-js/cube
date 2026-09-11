@@ -18,11 +18,11 @@ CUBEJS_EXTERNAL_DEFAULT=true
 CUBEJS_SCHEDULED_REFRESH_DEFAULT=true
 CUBEJS_SCHEMA_PATH=model`;
 
-const defaultDotEnvVars = env => `# Cube environment variables: https://cube.dev/docs/reference/environment-variables
+const defaultDotEnvVars = env => `# Cube environment variables: https://docs.cube.dev/reference/configuration/environment-variables
 ${sharedDotEnvVars(env)}
 CUBEJS_WEB_SOCKETS=true`;
 
-const athenaDotEnvVars = env => `# Cube environment variables: https://cube.dev/docs/reference/environment-variables
+const athenaDotEnvVars = env => `# Cube environment variables: https://docs.cube.dev/reference/configuration/environment-variables
 CUBEJS_AWS_KEY=<YOUR ATHENA AWS KEY HERE>
 CUBEJS_AWS_SECRET=<YOUR ATHENA SECRET KEY HERE>
 CUBEJS_AWS_REGION=<AWS REGION STRING, e.g. us-east-1>
@@ -71,7 +71,7 @@ const ordersYml = `cubes:
       SELECT 5 AS id, 600 AS amount, 'shipped' status
 
     # Pre-aggregation definitions go here.
-    # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    # Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
     # pre_aggregations:
 
     measures:
@@ -91,7 +91,7 @@ const ordersYml = `cubes:
 const exampleViewYml = `# In Cube, views are used to expose slices of your data graph and act as data marts.
 # You can control which measures and dimensions are exposed to BIs or data apps,
 # as well as the direction of joins between the exposed cubes.
-# You can learn more about views in documentation here - https://cube.dev/docs/schema/reference/view
+# You can learn more about views in documentation here - https://docs.cube.dev/reference/data-modeling/view
 
 # The following example shows a view defined on top of orders and customers cubes.
 # Both orders and customers cubes are exposed using the "includes" parameter to
@@ -118,7 +118,7 @@ const exampleViewYml = `# In Cube, views are used to expose slices of your data 
 #           - city
 `;
 
-const cubeJs = `// Cube configuration options: https://cube.dev/docs/config
+const cubeJs = `// Cube configuration options: https://docs.cube.dev/reference/configuration/config
 /** @type{ import('@cubejs-backend/server-core').CreateOptions } */
 module.exports = {
 };
