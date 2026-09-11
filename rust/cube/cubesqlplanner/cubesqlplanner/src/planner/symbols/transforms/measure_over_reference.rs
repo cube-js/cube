@@ -2,20 +2,12 @@ use super::super::{MeasureSymbol, MemberSymbol};
 use crate::planner::SqlCall;
 use std::rc::Rc;
 
-/// Returns a copy of the measure that aggregates `reference` instead of
-/// the value it declares — the form a measure takes in a select that
-/// reads its row-level input from a source below.
+/// Returns a copy of the measure that aggregates `reference` instead of the
+/// value it declares.
 ///
-/// The measure keeps everything that describes how the aggregated
-/// result is emitted: its aggregation, its mask, the `order_by` a rank
-/// window uses, its multi-stage and rolling context, and any render
-/// modifier stamped on it.
-///
-/// It keeps nothing that describes how the input is computed: the
-/// `case` body and the measure-level filters produced the rows that the
-/// source below already aggregated, and re-applying them here would
-/// both double the condition and read members this select has no access
-/// to.
+/// The `case` body and the measure filters are dropped: they shaped the rows
+/// the source below already aggregated, so re-applying them here would double
+/// the condition and read members this select cannot reach.
 pub fn measure_over_reference(
     measure: &MeasureSymbol,
     reference: Rc<MemberSymbol>,

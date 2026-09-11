@@ -133,7 +133,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
 
         let mut schema = logical_plan.schema().clone();
         let references_builder = ReferencesBuilder::new(from.clone());
-        let mut substitutions = calc_group_literals.clone();
+        let mut substitutions = calc_group_literals;
 
         match logical_plan.source() {
             QuerySource::LogicalJoin(join) => {
@@ -202,39 +202,37 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             );
         }
 
-        for dimension in schema.all_dimensions() {
-            self.builder.collect_query_dimension_substitution(
-                dimension,
-                &references_builder,
-                &from,
-                &mut substitutions,
-            )?;
-        }
-
         let measures_for_query = self.builder.measures_for_query(&schema.measures, &context);
-        for (measure, exists) in measures_for_query.iter() {
-            if *exists {
-                references_builder.collect_substitutions_for_member(
-                    measure.clone(),
-                    &None,
+        let over_full_aggregated_source = self.is_over_full_aggregated_source(logical_plan);
+
+        // A select over a pre-aggregation reads its members from the rollup
+        // columns, which the pre-aggregation node already resolved, so nothing
+        // is collected for it: the values pinned by the query, already in
+        // `substitutions`, are all it substitutes.
+        if !is_pre_aggregation {
+            for dimension in schema.all_dimensions() {
+                self.builder.collect_query_dimension_substitution(
+                    dimension,
+                    &references_builder,
+                    &from,
                     &mut substitutions,
                 )?;
             }
-        }
 
-        let over_full_aggregated_source = self.is_over_full_aggregated_source(logical_plan);
-        if over_full_aggregated_source {
-            references_builder.collect_substitutions_for_filter(&having, &mut substitutions)?;
-        }
+            for (measure, exists) in measures_for_query.iter() {
+                if *exists {
+                    references_builder.collect_substitutions_for_member(
+                        measure.clone(),
+                        &None,
+                        &mut substitutions,
+                    )?;
+                }
+            }
 
-        // A select over a pre-aggregation reads its members from the rollup
-        // columns, which the pre-aggregation node already resolved; only the
-        // values pinned by the query are substituted here.
-        let substitutions = if is_pre_aggregation {
-            calc_group_literals
-        } else {
-            substitutions
-        };
+            if over_full_aggregated_source {
+                references_builder.collect_substitutions_for_filter(&having, &mut substitutions)?;
+            }
+        }
 
         let schema = logical_transforms::substitute_symbols_in_schema(&schema, &substitutions)?;
         let filter = logical_transforms::substitute_symbols_in_filter(filter, &substitutions)?;
