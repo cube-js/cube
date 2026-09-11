@@ -165,14 +165,14 @@ fn start_body(branch: &Option<String>, r#ref: &Option<String>, manifest: Option<
 
 /// A pre-manifest server accepts the unknown fields, then silently starts a Git sync.
 /// Start/status do not carry a source, so require the synchronously recorded history
-/// row's discriminator before reporting success.
+/// row's discriminator before reporting success. History is ordered newest-first.
 fn ensure_manifest_source(history: &Value, sync_job_id: &str) -> Result<()> {
     let runs = output::items(history);
     let Some(run) = runs
         .iter()
         .find(|run| output::field(run, "syncJobId") == sync_job_id)
     else {
-        bail!("dbt sync {sync_job_id} is absent from sync history");
+        bail!("dbt sync {sync_job_id} was not found among the 100 most recent syncs");
     };
 
     let source = output::field(run, "source");
@@ -1062,7 +1062,7 @@ mod tests {
         .expect_err("an absent row must fail safely");
         assert_eq!(
             absent.to_string(),
-            "dbt sync sync-4 is absent from sync history"
+            "dbt sync sync-4 was not found among the 100 most recent syncs"
         );
     }
 
