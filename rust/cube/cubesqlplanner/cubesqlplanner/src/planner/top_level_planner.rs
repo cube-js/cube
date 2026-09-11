@@ -94,6 +94,7 @@ impl TopLevelPlanner {
         let result = if !self.request.is_pre_aggregation_query() {
             let mut pre_aggregation_optimizer = PreAggregationOptimizer::new(
                 self.query_tools.clone(),
+                self.request.query_join_hints().clone(),
                 self.cubestore_support_multistage,
             );
             let disable_external_pre_aggregations =

@@ -50,6 +50,10 @@ enum RowGrain {
 
 pub struct PreAggregationOptimizer {
     query_tools: Rc<State>,
+    // The join hints the query was planned with. A query whose members alone don't
+    // determine a join root resolves only with these, so the query-side hint sets
+    // rebuilt here have to start from them.
+    query_join_hints: Rc<JoinHints>,
     allow_multi_stage: bool,
     usages: Vec<PreAggregationUsage>,
     usage_counter: usize,
@@ -59,9 +63,14 @@ pub struct PreAggregationOptimizer {
 }
 
 impl PreAggregationOptimizer {
-    pub fn new(query_tools: Rc<State>, allow_multi_stage: bool) -> Self {
+    pub fn new(
+        query_tools: Rc<State>,
+        query_join_hints: Rc<JoinHints>,
+        allow_multi_stage: bool,
+    ) -> Self {
         Self {
             query_tools,
+            query_join_hints,
             allow_multi_stage,
             usages: Vec::new(),
             usage_counter: 0,
@@ -701,7 +710,7 @@ impl PreAggregationOptimizer {
                 let query_has_multiplied = if has_filters {
                     MultiFactJoinGroups::try_new(
                         self.query_tools.clone(),
-                        MeasuresJoinHints::builder(&JoinHints::new())
+                        MeasuresJoinHints::builder(&self.query_join_hints)
                             .add_dimensions(&schema.dimensions)
                             .add_dimensions(&schema.time_dimensions)
                             .add_filters(&filters.dimensions_filters)
@@ -850,7 +859,7 @@ impl PreAggregationOptimizer {
         schema: &Rc<LogicalSchema>,
         measures: &[Rc<MemberSymbol>],
     ) -> Result<MultiFactJoinGroups, CubeError> {
-        let hints = MeasuresJoinHints::builder(&JoinHints::new())
+        let hints = MeasuresJoinHints::builder(&self.query_join_hints)
             .add_dimensions(&schema.dimensions)
             .add_dimensions(&schema.time_dimensions)
             .build(measures)?;
