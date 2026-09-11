@@ -85,10 +85,6 @@ export default class QueryRenderer extends React.Component<QueryRendererProps, Q
   // TypeScript field declarations into `everything-else`, which the configured
   // order puts after `lifecycle`. Runtime is unaffected: field initializers run
   // right after `super()`, so the constructor's assignments still win.
-  //
-  // `this.context` is not re-declared: React types it as `any`, and a field
-  // declaration would be emitted at runtime and shadow the context React
-  // assigns.
   private mutexObj: MutexObj;
 
   cubeApi(): CubeApi {
