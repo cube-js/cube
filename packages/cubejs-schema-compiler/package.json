@@ -79,7 +79,7 @@
     "pg-promise": "^11.5.5",
     "source-map-support": "^0.5.19",
     "sqlstring": "^2.3.3",
-    "testcontainers": "^10.28.0",
+    "testcontainers": "^12.1.0",
     "typescript": "~6.0.3"
   },
   "license": "Apache-2.0"

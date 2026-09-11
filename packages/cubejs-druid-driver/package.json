@@ -36,7 +36,7 @@
     "@types/jest": "^29",
     "@types/node": "^22",
     "jest": "^29",
-    "testcontainers": "^10.28.0",
+    "testcontainers": "^12.1.0",
     "typescript": "~6.0.3"
   },
   "publishConfig": {

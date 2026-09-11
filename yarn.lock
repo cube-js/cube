@@ -3232,11 +3232,6 @@
   dependencies:
     eslint-visitor-keys "^3.4.3"
 
-"@fastify/busboy@^2.0.0":
-  version "2.1.1"
-  resolved "https://registry.yarnpkg.com/@fastify/busboy/-/busboy-2.1.1.tgz#b9da6a878a371829a0502c9b6c1c143ef6663f4d"
-  integrity sha512-vBZP4NlzfOlerQTnba4aqZoMhE/a9HY7HRqoOPaETQcSQuWEIyZMHGfVu6w9wGtGK5fED5qRs2DteVCjOH60sA==
-
 "@formatjs/ecma402-abstract@1.18.2":
   version "1.18.2"
   resolved "https://registry.yarnpkg.com/@formatjs/ecma402-abstract/-/ecma402-abstract-1.18.2.tgz#bf103712a406874eb1e387858d5be2371ab3aa14"
@@ -4360,6 +4355,13 @@
   version "1.5.0"
   resolved "https://registry.yarnpkg.com/@jsonjoy.com/util/-/util-1.5.0.tgz#6008e35b9d9d8ee27bc4bfaa70c8cbf33a537b4c"
   integrity sha512-ojoNsrIuPI9g6o8UxhraZQSyF2ByJanAY4cTFbc8Mf2AXEF4aQRGY1dJxyJpuyav8r9FGflEt/Ff3u5Nt6YMPA==
+
+"@kwsites/file-exists@^1.1.1":
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/@kwsites/file-exists/-/file-exists-1.1.1.tgz#ad1efcac13e1987d8dbaf235ef3be5b0d96faa99"
+  integrity sha512-m9/5YGR18lIwxSFDwfE3oA7bWuq9kdau6ugN4H2rJeyhFQZcG9AgSHkQtSD15a8WvTgfz9aikZMrKPHvbpqFiw==
+  dependencies:
+    debug "^4.1.1"
 
 "@leichtgewicht/ip-codec@^2.0.1":
   version "2.0.4"
@@ -7769,12 +7771,13 @@
   resolved "https://registry.yarnpkg.com/@tediousjs/connection-string/-/connection-string-0.5.0.tgz#9b3d858c040aac6bdf5584bf45370cef5b6522b4"
   integrity sha512-7qSgZbincDDDFyRweCIEvZULFAw5iz/DeunhvuxpL31nfntX3P4Yd4HkHBRg9H8CdqY1e5WFN1PZIz/REL9MVQ==
 
-"@testcontainers/kafka@~10.28.0":
-  version "10.28.0"
-  resolved "https://registry.yarnpkg.com/@testcontainers/kafka/-/kafka-10.28.0.tgz#eb658c06d8f72ce3ed54587b0acf29d27e06d2d1"
-  integrity sha512-4FxjliTmDf+1UpXxDi2qUQsxXRiMMqBq9sSiazguft7sPvHpZ5Snh/OdW+rBBJ2f8+xF0474LS+57vF+q5M6uw==
+"@testcontainers/kafka@~12.1.0":
+  version "12.1.0"
+  resolved "https://registry.yarnpkg.com/@testcontainers/kafka/-/kafka-12.1.0.tgz#58b4af92e8176eb1237dd60cbdb1a896ba73831f"
+  integrity sha512-hllpKME5id18IIhwvzibVp+CG7eEvrrzlTZ0HHai5HzXpZe1/fqHWN40GZAWssuowpmVgBDbIwcwhuDdmWFr8A==
   dependencies:
-    testcontainers "^10.28.0"
+    compare-versions "^6.1.1"
+    testcontainers "^12.1.0"
 
 "@tootallnate/once@1":
   version "1.1.2"
@@ -8035,10 +8038,10 @@
     "@types/node" "*"
     "@types/ssh2" "*"
 
-"@types/dockerode@^3.3.35":
-  version "3.3.42"
-  resolved "https://registry.yarnpkg.com/@types/dockerode/-/dockerode-3.3.42.tgz#7f7da393724cf0b3a09764e982139f778a37ba2b"
-  integrity sha512-U1jqHMShibMEWHdxYhj3rCMNCiLx5f35i4e3CEUuW+JSSszc/tVqc6WCAPdhwBymG5R/vgbcceagK0St7Cq6Eg==
+"@types/dockerode@^4.0.1":
+  version "4.0.1"
+  resolved "https://registry.yarnpkg.com/@types/dockerode/-/dockerode-4.0.1.tgz#26a44995a86322b4489090efd97890a5585a63a5"
+  integrity sha512-cmUpB+dPN955PxBEuXE3f6lKO1hHiIGYJA46IVF3BJpNsZGvtBDcRnlrHYHtOH/B6vtDOyl2kZ2ShAu3mgc27Q==
   dependencies:
     "@types/docker-modem" "*"
     "@types/node" "*"
@@ -10813,6 +10816,11 @@ commondir@^1.0.1:
   resolved "https://registry.yarnpkg.com/commondir/-/commondir-1.0.1.tgz#ddd800da0c66127393cca5950ea968a3aaf1253b"
   integrity sha1-3dgA2gxmEnOTzKWVDqloo6rxJTs=
 
+compare-versions@^6.1.1:
+  version "6.1.1"
+  resolved "https://registry.yarnpkg.com/compare-versions/-/compare-versions-6.1.1.tgz#7af3cc1099ba37d244b3145a9af5201b629148a9"
+  integrity sha512-4hm4VPpIecmlg59CHXnRDnqGplJFrbLG4aFEl5vl6cK1u76ws3LLvX7ikFnTDl5vo39sjWD6AaDPYodJp/NNHg==
+
 component-bind@1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/component-bind/-/component-bind-1.0.0.tgz#00c608ab7dcd93897c0009651b1d3a8e1e73bbd1"
@@ -11532,7 +11540,7 @@ debug@2.6.9, debug@^2.2.0:
   dependencies:
     ms "2.0.0"
 
-debug@4, debug@4.4.3, debug@^4.1.0, debug@^4.1.1, debug@^4.3.1, debug@^4.3.2, debug@^4.3.3, debug@^4.3.4, debug@^4.3.5, debug@^4.3.6, debug@^4.4.1, debug@^4.4.3:
+debug@4, debug@4.4.3, debug@^4.1.0, debug@^4.1.1, debug@^4.3.1, debug@^4.3.2, debug@^4.3.3, debug@^4.3.4, debug@^4.3.6, debug@^4.4.1, debug@^4.4.3:
   version "4.4.3"
   resolved "https://registry.yarnpkg.com/debug/-/debug-4.4.3.tgz#c6ae432d9bd9662582fce08709b038c58e9e3d6a"
   integrity sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==
@@ -11783,35 +11791,34 @@ dns-packet@^5.2.2:
   dependencies:
     "@leichtgewicht/ip-codec" "^2.0.1"
 
-docker-compose@^0.24.8:
-  version "0.24.8"
-  resolved "https://registry.yarnpkg.com/docker-compose/-/docker-compose-0.24.8.tgz#6c125e6b9e04cf68ced47e2596ef2bb93ee9694e"
-  integrity sha512-plizRs/Vf15H+GCVxq2EUvyPK7ei9b/cVesHvjnX4xaXjM9spHe2Ytq0BitndFgvTJ3E3NljPNUEl7BAN43iZw==
+docker-compose@^1.4.2:
+  version "1.4.2"
+  resolved "https://registry.yarnpkg.com/docker-compose/-/docker-compose-1.4.2.tgz#a389b9ab754c722bccf97fba6206859098edf835"
+  integrity sha512-rPHigTKGaEHpkUmfd69QgaOp+Os5vGJwG/Ry8lcr8W/382AmI+z/D7qoa9BybKIkqNppaIbs8RYeHSevdQjWww==
   dependencies:
     yaml "^2.2.2"
 
-docker-modem@^5.0.6:
-  version "5.0.6"
-  resolved "https://registry.yarnpkg.com/docker-modem/-/docker-modem-5.0.6.tgz#cbe9d86a1fe66d7a072ac7fb99a9fc390a3e8b9a"
-  integrity sha512-ens7BiayssQz/uAxGzH8zGXCtiV24rRWXdjNha5V4zSOcxmAZsfGVm/PPFbwQdqEkDnhG+SyR9E3zSHUbOKXBQ==
+docker-modem@^5.0.7:
+  version "5.0.7"
+  resolved "https://registry.yarnpkg.com/docker-modem/-/docker-modem-5.0.7.tgz#57f3f0e2c7a893e66a0d4a626f9cbc933d77157b"
+  integrity sha512-XJgGhoR/CLpqshm4d3L7rzH6t8NgDFUIIpztYlLHIApeJjMZKYJMz2zxPsYxnejq5h3ELYSw/RBsi3t5h7gNTA==
   dependencies:
     debug "^4.1.1"
     readable-stream "^3.5.0"
     split-ca "^1.0.1"
     ssh2 "^1.15.0"
 
-dockerode@^4.0.5:
-  version "4.0.7"
-  resolved "https://registry.yarnpkg.com/dockerode/-/dockerode-4.0.7.tgz#8c68a80f4e057723a07a1e886416248945056621"
-  integrity sha512-R+rgrSRTRdU5mH14PZTCPZtW/zw3HDWNTS/1ZAQpL/5Upe/ye5K9WQkIysu4wBoiMwKynsz0a8qWuGsHgEvSAA==
+dockerode@^5.0.1:
+  version "5.0.1"
+  resolved "https://registry.yarnpkg.com/dockerode/-/dockerode-5.0.1.tgz#c389c0e32e825a818a3964f8c9b26f60aa306be1"
+  integrity sha512-avsq/xk4YPIrn0CgleX5bjT9Y8IT1p9PxrNQ++RBQ2WEyFfHCTDsT9kmyxz+H/axnjAwg8wJWEIuPGOUuNupiA==
   dependencies:
     "@balena/dockerignore" "^1.0.2"
     "@grpc/grpc-js" "^1.11.1"
     "@grpc/proto-loader" "^0.7.13"
-    docker-modem "^5.0.6"
+    docker-modem "^5.0.7"
     protobufjs "^7.3.2"
-    tar-fs "~2.1.2"
-    uuid "^10.0.0"
+    tar-fs "^2.1.4"
 
 dom-align@^1.7.0:
   version "1.12.2"
@@ -13221,10 +13228,10 @@ get-package-type@^0.1.0:
   resolved "https://registry.yarnpkg.com/get-package-type/-/get-package-type-0.1.0.tgz#8de2d803cff44df3bc6c456e6668b36c3926e11a"
   integrity sha512-pjzuKtY64GYfWizNAJ0fr9VqttZkNiK2iS430LtIHzjBEr6bX8Am2zm4sW4Ro5wjWW5cAlRL1qAMTcXbjNAO2Q==
 
-get-port@^7.1.0:
-  version "7.1.0"
-  resolved "https://registry.yarnpkg.com/get-port/-/get-port-7.1.0.tgz#d5a500ebfc7aa705294ec2b83cc38c5d0e364fec"
-  integrity sha512-QB9NKEeDg3xxVwCCwJQ9+xycaz6pBB6iQ76wiWMl1927n0Kir6alPiP+yuiICLLU4jpMe08dXfpebuQppFA2zw==
+get-port@^5.1.1:
+  version "5.1.1"
+  resolved "https://registry.yarnpkg.com/get-port/-/get-port-5.1.1.tgz#0469ed07563479de6efb986baf053dcd7d4e3193"
+  integrity sha512-g/Q1aTSDOxFpchXC4i8ZWvxA1lnPqx/JHqcpIw0/LX9T8x/GBbi6YnlN5nhaKIFkT8oFsscUKgDJYxfwfS6QsQ==
 
 get-proto@1.0.1, get-proto@^1.0.0, get-proto@^1.0.1:
   version "1.0.1"
@@ -18468,12 +18475,13 @@ proper-lockfile@^4.1.2:
     retry "^0.12.0"
     signal-exit "^3.0.2"
 
-properties-reader@^2.3.0:
-  version "2.3.0"
-  resolved "https://registry.yarnpkg.com/properties-reader/-/properties-reader-2.3.0.tgz#f3ab84224c9535a7a36e011ae489a79a13b472b2"
-  integrity sha512-z597WicA7nDZxK12kZqHr2TcvwNU1GCfA5UwfDY/HDp3hXPoPlb5rlEx9bwGTiJnc0OqbBTkU975jDToth8Gxw==
+properties-reader@^3.0.1:
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/properties-reader/-/properties-reader-3.0.1.tgz#576af69708759bb75672bfc162b80cc8a3d1bdb2"
+  integrity sha512-WPn+h9RGEExOKdu4bsF4HksG/uzd3cFq3MFtq8PsFeExPse5Ha/VOjQNyHhjboBFwGXGev6muJYTSPAOkROq2g==
   dependencies:
-    mkdirp "^1.0.4"
+    "@kwsites/file-exists" "^1.1.1"
+    mkdirp "^3.0.1"
 
 proto-list@~1.2.1:
   version "1.2.4"
@@ -21084,7 +21092,7 @@ tapable@^2.1.1, tapable@^2.2.0, tapable@^2.2.1:
   resolved "https://registry.yarnpkg.com/tapable/-/tapable-2.2.1.tgz#1967a73ef4060a82f12ab96af86d52fdb76eeca0"
   integrity sha512-GNzQvQTOIP6RyTfE2Qxb8ZVlNmw0n88vp1szwWRimP02mnTsx3Wtn5qRdqY9w2XduFNUgvOwhNnQsjwCp+kqaQ==
 
-tar-fs@^2.0.0, tar-fs@~2.1.2:
+tar-fs@^2.0.0:
   version "2.1.4"
   resolved "https://registry.yarnpkg.com/tar-fs/-/tar-fs-2.1.4.tgz#800824dbf4ef06ded9afea4acafe71c67c76b930"
   integrity sha512-mDAjwmZdh7LTT6pNleZ05Yt65HC3E+NiQzl672vQG38jIrehtJk/J3mNwIg+vShQPcLF/LV7CMnDW6vjj6sfYQ==
@@ -21094,10 +21102,20 @@ tar-fs@^2.0.0, tar-fs@~2.1.2:
     pump "^3.0.0"
     tar-stream "^2.1.4"
 
-tar-fs@^3.0.7:
-  version "3.1.1"
-  resolved "https://registry.yarnpkg.com/tar-fs/-/tar-fs-3.1.1.tgz#4f164e59fb60f103d472360731e8c6bb4a7fe9ef"
-  integrity sha512-LZA0oaPOc2fVo82Txf3gw+AkEd38szODlptMYejQUhndHMLQ9M059uXR+AfS7DNo0NpINvSqDsvyaCrBVkptWg==
+tar-fs@^2.1.4:
+  version "2.1.5"
+  resolved "https://registry.yarnpkg.com/tar-fs/-/tar-fs-2.1.5.tgz#33e9c29413dce0c58ada7ff77db4e5a30afffe70"
+  integrity sha512-OboTd8mmMhZDNPV+UjQcK9yKAatXu2aJ+r1w4im1Otd4M4fl2hwvdoXUxIYHFTHWK/3y3FarBP70v3vwmGlOxw==
+  dependencies:
+    chownr "^1.1.1"
+    mkdirp-classic "^0.5.2"
+    pump "^3.0.0"
+    tar-stream "^2.1.4"
+
+tar-fs@^3.1.3:
+  version "3.1.3"
+  resolved "https://registry.yarnpkg.com/tar-fs/-/tar-fs-3.1.3.tgz#05668cc68a30741c3813f9c16593b8dec7dcbcd1"
+  integrity sha512-/hU4AXnIdZu+Gvl1pk0oI5f5HxWsCJRtY2aFaJdk9VvyL48DWU6iU5WAIPG+wIi1YvWA6eTJvIviP/tMAZZNwQ==
   dependencies:
     pump "^3.0.0"
     tar-stream "^3.1.5"
@@ -21236,26 +21254,26 @@ test-exclude@^6.0.0:
     glob "^7.1.4"
     minimatch "^3.0.4"
 
-testcontainers@^10.28.0:
-  version "10.28.0"
-  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-10.28.0.tgz#73d3757fcd60405c20dd55599ca89e44cadc8ccf"
-  integrity sha512-1fKrRRCsgAQNkarjHCMKzBKXSJFmzNTiTbhb5E/j5hflRXChEtHvkefjaHlgkNUjfw92/Dq8LTgwQn6RDBFbMg==
+testcontainers@^12.1.0:
+  version "12.1.0"
+  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-12.1.0.tgz#e33a18c89187da5bd1560eba2359e18f8cba07b2"
+  integrity sha512-YjDLqIITuhGLMnM10yhg3oV6lIG5IMpz1R1DPBZoOOks83q7i7IVpeSWRTiyl7roozjiyLmwIoLK/KY8OnZmIA==
   dependencies:
     "@balena/dockerignore" "^1.0.2"
-    "@types/dockerode" "^3.3.35"
+    "@types/dockerode" "^4.0.1"
     archiver "^7.0.1"
     async-lock "^1.4.1"
     byline "^5.0.0"
-    debug "^4.3.5"
-    docker-compose "^0.24.8"
-    dockerode "^4.0.5"
-    get-port "^7.1.0"
+    debug "^4.4.3"
+    docker-compose "^1.4.2"
+    dockerode "^5.0.1"
+    get-port "^5.1.1"
     proper-lockfile "^4.1.2"
-    properties-reader "^2.3.0"
+    properties-reader "^3.0.1"
     ssh-remote-port-forward "^1.0.4"
-    tar-fs "^3.0.7"
-    tmp "^0.2.3"
-    undici "^5.29.0"
+    tar-fs "^3.1.3"
+    tmp "^0.2.7"
+    undici "^8.9.0"
 
 text-decoder@^1.1.0:
   version "1.1.1"
@@ -21396,7 +21414,7 @@ tldts@^6.1.32:
   dependencies:
     tldts-core "^6.1.74"
 
-tmp@0.2.7, tmp@^0.2.3, tmp@~0.2.4:
+tmp@0.2.7, tmp@^0.2.7, tmp@~0.2.4:
   version "0.2.7"
   resolved "https://registry.yarnpkg.com/tmp/-/tmp-0.2.7.tgz#26f4db11d1601ce8012dcb8a798ece1c06a99059"
   integrity sha512-e0votIpp4Uo2AJYSzVHV6xCcawuiez3DzqDAbrTc3YxBkplN6e+dM13ZeIcZnDg/QpSuU2zfZ3rzwY8ukEnaXw==
@@ -21706,12 +21724,10 @@ undici-types@~6.21.0:
   resolved "https://registry.yarnpkg.com/undici-types/-/undici-types-6.21.0.tgz#691d00af3909be93a7faa13be61b3a5b50ef12cb"
   integrity sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==
 
-undici@^5.29.0:
-  version "5.29.0"
-  resolved "https://registry.yarnpkg.com/undici/-/undici-5.29.0.tgz#419595449ae3f2cdcba3580a2e8903399bd1f5a3"
-  integrity sha512-raqeBD6NQK4SkWhQzeYKd1KmIG6dllBOTt55Rmkt4HtI9mwdWtJljnrXjAFUBLTSN67HWrOIZ3EPF4kjUw80Bg==
-  dependencies:
-    "@fastify/busboy" "^2.0.0"
+undici@^8.9.0:
+  version "8.10.2"
+  resolved "https://registry.yarnpkg.com/undici/-/undici-8.10.2.tgz#960bcb0b43c267f86910ea7ca408ada843a44bc7"
+  integrity sha512-/y4/bH9YNU5hi9NIrpOuvGXFcxrj3CMrV+/AYpowAYTpHn8gX/XPFjNy766FPoYY0miQhdW977JFWKGNhBdwyQ==
 
 unicode-canonical-property-names-ecmascript@^2.0.0:
   version "2.0.0"
@@ -21955,11 +21971,6 @@ uuid@8.0.0:
   version "8.0.0"
   resolved "https://registry.yarnpkg.com/uuid/-/uuid-8.0.0.tgz#bc6ccf91b5ff0ac07bbcdbf1c7c4e150db4dbb6c"
   integrity sha512-jOXGuXZAWdsTH7eZLtyXMqUb9EcWMGZNbL9YcGBJl4MH4nrxHmZJhEHvyLFrkxo+28uLb/NYRcStH48fnD0Vzw==
-
-uuid@^10.0.0:
-  version "10.0.0"
-  resolved "https://registry.yarnpkg.com/uuid/-/uuid-10.0.0.tgz#5a95aa454e6e002725c79055fd42aaba30ca6294"
-  integrity sha512-8XkAphELsDnEGrDxUOHB3RGvXz6TeuYSGEZBOjtTtPm2lwhGBjLgOzLHB63IUWfBpNucQjND6d3AOudO+H3RWQ==
 
 uuid@^11.1.0, uuid@^11.1.1:
   version "11.1.1"

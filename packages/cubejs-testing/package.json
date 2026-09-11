@@ -104,7 +104,7 @@
     "http-proxy": "^1.18.1",
     "node-fetch": "^2.7.0",
     "ramda": "^0.27.2",
-    "testcontainers": "^10.28.0",
+    "testcontainers": "^12.1.0",
     "yargs": "^17.7.1"
   },
   "devDependencies": {
