@@ -95,9 +95,10 @@ session value there is an override of what the account already says;
 
 These two carry a value rather than a switch, and they are the answer for a
 viewer rather than for a placement: set them once when you mint the session and
-every iframe that session opens uses them. The per-iframe `?locale=` /
-`?timezone=` parameters still win where a host sets one, and the account-wide
-default applies where neither does. Neither grants anything, which is why a
+every iframe that session opens uses them. A runtime [host
+message](/embedding/iframe/events) and the per-iframe `?locale=` / `?timezone=`
+parameters both still win where a host sends one, and the account-wide default
+applies where none does. Neither setting grants anything, which is why a
 viewer-editable URL parameter is allowed to override them.
 
 | Setting | Governs |
