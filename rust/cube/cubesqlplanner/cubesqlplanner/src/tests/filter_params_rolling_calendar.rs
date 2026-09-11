@@ -127,3 +127,82 @@ async fn a_column_binding_leaves_the_window_whole() {
     assert_eq!(pushed_down, full_scan);
     insta::assert_snapshot!(pushed_down);
 }
+
+// --- a rolling window over a shifted calendar dimension ---
+
+/// The fixture with a measure that is both: a `to_date` window over the
+/// calendar, read a fiscal year earlier.
+fn shifted_schema(binding: Option<&str>) -> MockSchema {
+    const PLAIN: &str = "sql: \"SELECT * FROM cal_orders\"";
+    const ANCHOR: &str = "      - name: count_week_to_date";
+    let yaml = std::fs::read_to_string(format!(
+        "{}/src/test_fixtures/schemas/yaml_files/common/integration_calendar.yaml",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .expect("the calendar fixture is readable");
+    assert!(yaml.contains(ANCHOR), "the fixture's measures moved");
+    let added = "      - name: count_month_to_date_prev_year\n\
+                 \x20       type: number\n\
+                 \x20       multi_stage: true\n\
+                 \x20       sql: \"{count_month_to_date}\"\n\
+                 \x20       time_shift:\n\
+                 \x20         - name: one_year\n\n";
+    let yaml = yaml.replace(ANCHOR, &format!("{added}{ANCHOR}"));
+    let yaml = match binding {
+        Some(binding) => yaml.replace(
+            PLAIN,
+            &format!("sql: \"SELECT * FROM cal_orders WHERE {{{}}}\"", binding),
+        ),
+        None => yaml,
+    };
+    MockSchema::from_yaml(&yaml).unwrap()
+}
+
+const SHIFTED_QUERY: &str = indoc! {r#"
+    measures:
+      - calendar_orders.count_month_to_date_prev_year
+    time_dimensions:
+      - dimension: custom_calendar.date_val
+        granularity: day
+        dateRange:
+          - "2024-02-29"
+          - "2024-03-09"
+    order:
+      - id: custom_calendar.date_val
+"#};
+
+// Nothing addresses the shift, so nothing states the band the stage reads and
+// the scan stays open — the shift contract, unchanged by the window on top.
+#[test]
+fn a_shifted_window_without_a_binding_for_its_shift_leaves_the_scan_open() {
+    let ctx = TestContext::new(shifted_schema(Some(COLUMN))).unwrap();
+    let sql = ctx.build_sql(SHIFTED_QUERY).unwrap();
+
+    assert_eq!(
+        fact_scan_predicate(&sql).as_deref(),
+        Some("(1 = 1)"),
+        "{sql}"
+    );
+}
+
+// Addressing the shift is what the model is told to do, and a stage that is
+// also a rolling window's base scan must not refuse it: its filter is the
+// window's own, and carries the same two bounds a date range does.
+#[test]
+fn a_shifted_window_accepts_a_binding_addressing_its_shift() {
+    const CALLBACK: &str =
+        "FILTER_PARAMS:custom_calendar.date_val@one_year:created_at >= (%0)::timestamptz \
+         AND created_at <= (%1)::timestamptz";
+    let ctx = TestContext::new(shifted_schema(Some(CALLBACK))).unwrap();
+    let sql = ctx.build_sql(SHIFTED_QUERY).unwrap();
+
+    // The band itself is still not derivable — a calendar's period start is a
+    // row, and the shift moves it further — so the binding states nothing and
+    // the scan stays open. It is accepted rather than refused, which is what
+    // leaves the model somewhere to stand.
+    assert_eq!(
+        fact_scan_predicate(&sql).as_deref(),
+        Some("(1 = 1)"),
+        "{sql}"
+    );
+}
