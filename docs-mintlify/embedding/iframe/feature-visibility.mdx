@@ -79,12 +79,13 @@ body: JSON.stringify({
 
 ### AI
 
-These four inherit an account-wide default from **Embed → Settings**, so a
-session value is an override of what the account already says.
+All but the last inherit an account-wide default from **Embed → Settings**, so a
+session value there is an override of what the account already says;
+`allowChatWorkspaceAuthoring` has no account-wide counterpart.
 
 | Setting | Governs | Default |
 | --- | --- | --- |
-| `allowAi` | **Master switch** over every AI surface in the embed. Enforced on the server: a session with `allowAi: false` cannot obtain AI Chat credentials at all, so it cannot spend AI tokens. Outranks the three keys below — `false` here disables a surface whose own key is `true`. | Account setting, then allowed |
+| `allowAi` | **Master switch** over every AI surface in the embed. Enforced on the server: a session with `allowAi: false` cannot obtain AI Chat credentials at all, so it cannot spend AI tokens. Outranks every key below — `false` here disables a surface whose own key is `true`. | Account setting, then allowed |
 | `showDashboardChat` | The AI chat on embedded published dashboards — agent panel and launcher bubble. | Account setting, then shown |
 | `showWorkbookChat` | The [Creator Mode](/embedding/iframe/creator-mode) workbook's AI entry points: the chat side panel and its toggle, the launchpad's **Ask Cube Agent** button, and **Fix in chat** on a failed report. | Account setting, then shown |
 | `showAiWidgets` | Authoring and refreshing AI summary widgets: the **AI widget** entry in the dashboard editor's Add widgets menu, and a widget's prompt input plus Generate/Regenerate. An already-generated summary keeps rendering, so switching this off never blanks a published dashboard — it only stops it being regenerated. | Account setting, then enabled |
@@ -161,8 +162,9 @@ the parameter does:
 - **A parameter that hides** (every `show…`) requires the exact literal string
   `false`. `=0`, `=False`, `=FALSE`, and a bare `?showDashboardTitle` all leave
   the control visible.
-- **A parameter that selects a value** (`locale`, `timezone`) drops to the
-  account default when the value is one Cube cannot use.
+- **A parameter that selects a value** (`locale`, `timezone`) falls through to
+  the next source in the ladder when the value is one Cube cannot use — the
+  session setting first, then the account default.
 
 Note that the two boolean conventions are inverses of each other: `allowExport`
 must be turned *on*, `show…` must be turned *off*.
