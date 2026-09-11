@@ -76,11 +76,18 @@ export function useCubeQuery(
   const [error, setError] = useState<Error | null>(null);
   const context = useContext(CubeContext);
   const requestIdRef = useRef(0);
+  const hasStartedRequestRef = useRef(false);
 
   let subscribeRequest: UnsubscribeObj | null = null;
 
   function isCurrentRequest(requestId: number) {
     return requestId === requestIdRef.current;
+  }
+
+  function startRequest() {
+    hasStartedRequestRef.current = true;
+
+    return ++requestIdRef.current;
   }
 
   function createProgressCallback(requestId: number): ProgressCallback {
@@ -108,6 +115,7 @@ export function useCubeQuery(
 
     setError(null);
     setLoading(true);
+    setProgress(null);
 
     try {
       const response = await cubeApi.load(query, {
@@ -136,7 +144,7 @@ export function useCubeQuery(
   }
 
   async function fetch() {
-    const requestId = ++requestIdRef.current;
+    const requestId = startRequest();
 
     await fetchQuery(requestId);
   }
@@ -152,7 +160,7 @@ export function useCubeQuery(
 
     async function loadQuery() {
       if (!skip && isQueryPresent(query)) {
-        const requestId = ++requestIdRef.current;
+        const requestId = startRequest();
 
         // `areQueriesEqual` is declared for a single query, and reads no more
         // than `order` off one when given an array of queries
@@ -167,6 +175,7 @@ export function useCubeQuery(
 
         setError(null);
         setLoading(true);
+        setProgress(null);
 
         try {
           if (subscribeRequest) {
@@ -206,6 +215,9 @@ export function useCubeQuery(
             setProgress(null);
           }
         }
+      } else if (hasStartedRequestRef.current) {
+        setLoading(false);
+        setProgress(null);
       }
     }
 

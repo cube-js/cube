@@ -144,6 +144,8 @@ const granularities: GranularityOption[] = [
 export default class QueryBuilder extends React.Component<QueryBuilderProps, QueryBuilderInternalState> {
   static contextType = CubeContext;
 
+  declare context: React.ContextType<typeof CubeContext>;
+
   static defaultProps = {
     cubeApi: null,
     stateChangeHeuristics: null,

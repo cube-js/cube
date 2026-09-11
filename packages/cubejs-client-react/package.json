@@ -15,8 +15,9 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc --build",
+    "test": "yarn test:types && jest --runInBand",
+    "test:types": "tsc --project tsconfig.test.json",
     "tsc": "tsc --build",
-    "test": "jest --runInBand",
     "watch": "tsc --build --watch"
   },
   "files": [
@@ -36,7 +37,7 @@
     "@babel/preset-typescript": "^7.13.0",
     "@types/jest": "^29",
     "@types/ramda": "^0.27.40",
-    "@types/react": "^16.9.41",
+    "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "babel-jest": "^29",
     "jest": "^29",

@@ -20,6 +20,8 @@ import type {
 export default class QueryRenderer extends React.Component<QueryRendererProps, QueryRendererState> {
   static contextType = CubeContext;
 
+  declare context: React.ContextType<typeof CubeContext>;
+
   static defaultProps = {
     cubeApi: null,
     query: null,

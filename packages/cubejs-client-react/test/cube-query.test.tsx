@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 
@@ -8,10 +8,6 @@ import type {
   UseCubeQueryInternalResult,
   UseCubeQueryOptions,
 } from '../src/types';
-
-const { act } = React as typeof React & {
-  act: typeof import('react-dom/test-utils').act;
-};
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -106,7 +102,17 @@ describe('useCubeQuery', () => {
     };
 
     render({ measures: ['Orders.count'] }, { cubeApi: cubeApi as never });
+    act(() => {
+      cubeApi.load.mock.calls[0][1].progressCallback({
+        progressResponse: staleProgress,
+      });
+    });
+
+    expect(hookResult.progress).toBe(staleProgress);
+
     render({ measures: ['Users.count'] }, { cubeApi: cubeApi as never });
+
+    expect(hookResult.progress).toBeNull();
 
     act(() => {
       cubeApi.load.mock.calls[1][1].progressCallback({
@@ -132,6 +138,47 @@ describe('useCubeQuery', () => {
       secondRequest.resolve({ request: 'latest' });
       await secondRequest.promise;
     });
+  });
+
+  it('settles loading when an in-flight request is invalidated without a replacement', async () => {
+    const request = deferred<object>();
+    const cubeApi = { load: jest.fn().mockReturnValue(request.promise) };
+
+    render({ measures: ['Orders.count'] }, { cubeApi: cubeApi as never });
+
+    act(() => {
+      cubeApi.load.mock.calls[0][1].progressCallback({
+        progressResponse: { stage: 'Executing query' },
+      });
+    });
+
+    expect(hookResult.isLoading).toBe(true);
+    expect(hookResult.progress).not.toBeNull();
+
+    render(
+      { measures: ['Orders.count'] },
+      { cubeApi: cubeApi as never, skip: true }
+    );
+
+    expect(hookResult.isLoading).toBe(false);
+    expect(hookResult.progress).toBeNull();
+
+    await act(async () => {
+      request.resolve({ request: 'stale' });
+      await request.promise;
+    });
+
+    expect(hookResult.resultSet).toBeNull();
+    expect(hookResult.isLoading).toBe(false);
+  });
+
+  it('preserves the initial loading state for an empty query', () => {
+    const cubeApi = { load: jest.fn() };
+
+    render({}, { cubeApi: cubeApi as never });
+
+    expect(cubeApi.load).not.toHaveBeenCalled();
+    expect(hookResult.isLoading).toBe(true);
   });
 
   it('ignores callbacks from a superseded subscription', () => {
