@@ -292,26 +292,30 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         } else {
             logical_plan.modifers().order_by.clone()
         };
-        // Items present in the schema are sorted by their stamped and
-        // substituted schema symbol; only a measure absent from the projection
-        // carries its own symbol into the ORDER BY and needs both here.
-        let order_by = order_by
-            .iter()
-            .map(|o| -> Result<_, CubeError> {
-                if !schema.find_member_positions(&o.name()).is_empty() {
-                    return Ok(o.clone());
-                }
-                let symbol = match &measure_modifier {
-                    Some(modifier) => {
-                        transforms::measures_render_modifier(&o.member_symbol(), modifier)?
+        // Items present in the schema are sorted by their stamped schema
+        // symbol; only a measure absent from the projection carries its own
+        // symbol into the ORDER BY and needs the form stamped here.
+        let order_by = if let Some(modifier) = &measure_modifier {
+            order_by
+                .iter()
+                .map(|o| -> Result<_, CubeError> {
+                    if !schema.find_member_positions(&o.name()).is_empty() {
+                        return Ok(o.clone());
                     }
-                    None => o.member_symbol(),
-                };
-                let symbol = transforms::substitute_by_name(&symbol, &substitutions)?;
-                Ok(OrderByItem::new(symbol, o.desc()))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        select_builder.set_order_by(self.builder.make_order_by(&schema, &order_by)?);
+                    Ok(OrderByItem::new(
+                        transforms::measures_render_modifier(&o.member_symbol(), modifier)?,
+                        o.desc(),
+                    ))
+                })
+                .collect::<Result<Vec<_>, _>>()?
+        } else {
+            order_by
+        };
+        select_builder.set_order_by(self.builder.make_order_by(
+            &schema,
+            &order_by,
+            &substitutions,
+        )?);
 
         let res = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(res)

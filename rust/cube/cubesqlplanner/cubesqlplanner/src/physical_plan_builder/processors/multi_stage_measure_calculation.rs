@@ -108,10 +108,11 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             select_builder.set_group_by(group_by);
-            select_builder.set_order_by(
-                self.builder
-                    .make_order_by(&schema, measure_calculation.order_by())?,
-            );
+            select_builder.set_order_by(self.builder.make_order_by(
+                &schema,
+                measure_calculation.order_by(),
+                &substitutions,
+            )?);
         }
 
         let select = Rc::new(select_builder.build(query_tools.clone(), context_factory));

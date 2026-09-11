@@ -12,9 +12,10 @@ use std::rc::Rc;
 ///
 /// A `ColumnRef` is the exception: it renders itself and nothing may
 /// wrap it, so it goes straight to the bare evaluate node rather than
-/// through any configured chain. This is the outermost dispatch of the
-/// chain, so that rule holds for every position a reference can appear
-/// in, including the dependencies of another member's SQL.
+/// through any configured chain. Every dispatch above this one passes a
+/// reference straight through, so the rule holds for every position a
+/// reference can appear in, including the dependencies of another
+/// member's SQL.
 pub struct RootSqlNode {
     dimension_processor: Rc<dyn SqlNode>,
     time_dimesions_processor: Rc<dyn SqlNode>,

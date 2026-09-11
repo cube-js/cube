@@ -244,10 +244,15 @@ impl PhysicalPlanBuilder {
         Ok(())
     }
 
+    /// Builds the ORDER BY of a select. An item present in the schema is
+    /// sorted by the schema's own symbol, which the select already
+    /// substituted; an item absent from it carries its own symbol and so
+    /// needs the same substitution applied here.
     pub(crate) fn make_order_by(
         &self,
         logical_schema: &LogicalSchema,
         order_by: &Vec<OrderByItem>,
+        substitutions: &ReferenceSubstitutions,
     ) -> Result<Vec<OrderBy>, CubeError> {
         let mut result = Vec::new();
         for o in order_by.iter() {
@@ -257,8 +262,10 @@ impl PhysicalPlanBuilder {
             // correct processing of order by dimension that is not included in the
             // selection list will be implemented
             if positions.is_empty() && o.member_symbol().is_measure() {
+                let symbol =
+                    symbol_transforms::substitute_by_name(&o.member_symbol(), substitutions)?;
                 result.push(OrderBy::new(
-                    Expr::Member(MemberExpression::new(o.member_symbol())),
+                    Expr::Member(MemberExpression::new(symbol)),
                     0,
                     o.desc(),
                 ));

@@ -139,12 +139,16 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
         // rolling source produced for it, so it reads its input from that
         // source instead of computing it.
         for measure in schema.measures.iter() {
+            // Only a measure reads its input through an aggregation; anything
+            // else in this list renders its own SQL, as it did before.
+            let Ok(measure_symbol) = measure.as_measure() else {
+                continue;
+            };
             let name_in_base_query = measure_input_schema.resolve_member_alias(measure);
             let input = column_reference(
                 measure,
                 QualifiedColumnName::new(Some(measure_input_alias.clone()), name_in_base_query),
             );
-            let measure_symbol = measure.as_measure()?;
             let over_input = transforms::measure_over_reference(&measure_symbol, input);
             substitutions.insert(measure.full_name(), MemberSymbol::new_measure(over_input));
         }
@@ -177,10 +181,11 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             select_builder.set_group_by(group_by);
-            select_builder.set_order_by(
-                self.builder
-                    .make_order_by(&schema, &rolling_window.order_by)?,
-            );
+            select_builder.set_order_by(self.builder.make_order_by(
+                &schema,
+                &rolling_window.order_by,
+                &substitutions,
+            )?);
         }
 
         let select = Rc::new(select_builder.build(query_tools.clone(), context_factory));

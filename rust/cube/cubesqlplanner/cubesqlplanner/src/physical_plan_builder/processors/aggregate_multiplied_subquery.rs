@@ -216,6 +216,12 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                 continue;
             }
             if let Some(subquery) = &measure_source {
+                // Only a measure reads its input through an aggregation. A
+                // member expression the SQL API built reaches this list too and
+                // renders its own SQL, as it did before.
+                let Ok(measure_symbol) = measure.as_measure() else {
+                    continue;
+                };
                 // The joined subquery aggregated the deduplicated rows, so the
                 // measure re-aggregates its column instead of its own value.
                 let input = column_reference(
@@ -225,7 +231,6 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                         subquery.schema().resolve_member_alias(measure),
                     ),
                 );
-                let measure_symbol = measure.as_measure()?;
                 let over_input = transforms::measure_over_reference(&measure_symbol, input);
                 substitutions.insert(measure.full_name(), MemberSymbol::new_measure(over_input));
             } else {

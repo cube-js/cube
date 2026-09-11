@@ -81,6 +81,18 @@ impl SqlNode for RenderReferencesSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
+        // A reference already names what it reads, and it carries the name of
+        // the member it stands for — looking that name up here would render it
+        // from this map instead of from itself.
+        if matches!(node.as_ref(), MemberSymbol::ColumnRef(_)) {
+            return self.input.to_sql(
+                visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+                templates,
+            );
+        }
         let full_name = node.full_name();
         if let Some(reference) = self.references.get(&full_name) {
             match reference {
