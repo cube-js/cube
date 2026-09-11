@@ -654,6 +654,12 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let started = api.post(&base(deployment), Some(&body)).await?;
             let sync_job_id = output::field(&started, "syncJobId");
             if manifest_requested {
+                if util::is_blank(&sync_job_id) {
+                    bail!(
+                        "Cube started the dbt manifest sync but did not return a sync job id, \
+                         so its source could not be verified"
+                    );
+                }
                 verify_manifest_source(&api, deployment, &sync_job_id).await?;
             }
 
