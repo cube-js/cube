@@ -1,4 +1,4 @@
-<p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
+<p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube" width="300px"></a></p>
 
 [Website](https://cube.dev) • [Docs](https://docs.cube.dev) •
 [Examples](#examples) • [Blog](https://cube.dev/blog) •
@@ -10,7 +10,7 @@
 
 # Cube Store
 
-Cube.js pre-aggregation storage layer.
+Cube pre-aggregation storage layer.
 
 ## Motivation
 
@@ -45,8 +45,8 @@ Cube Store is fully open-sourced and released under the Apache 2.0 license.
 
 ## Plans
 
-We intend to start distributing Cube Store with Cube.js, and eventually make
-Cube Store the default pre-aggregation storage layer for Cube.js. Support for
+We intend to start distributing Cube Store with Cube, and eventually make
+Cube Store the default pre-aggregation storage layer for Cube. Support for
 MySQL and Postgres as external databases will continue, but at a lower priority.
 
 We'll also update all documentation regarding pre-aggregations and include usage
@@ -67,9 +67,9 @@ and deployment instructions for Cube Store.
 
 ## Usage
 
-### With Cube.js
+### With Cube
 
-Starting with `v0.26.48`, Cube.js ships with Cube Store enabled when `CUBEJS_DEV_MODE=true`.
+Starting with `v0.26.48`, Cube ships with Cube Store enabled when `CUBEJS_DEV_MODE=true`.
 You don't need to set up any `CUBEJS_EXT_DB_*` environment variables or
 `externalDriverFactory` inside your `cube.js` configuration file.
 
@@ -80,7 +80,7 @@ version and install the Cube Store driver:
 yarn add @cubejs-backend/cubestore-driver
 ```
 
-After starting up, Cube.js will print a message:
+After starting up, Cube will print a message:
 
 `🔥 Cube Store (0.26.64) is assigned to 3030 port.`
 
@@ -92,7 +92,7 @@ Start Cube Store in a Docker container and bind port `3030` to `127.0.0.1`:
 docker run -d -p 3030:3030 cubejs/cubestore:edge
 ```
 
-Configure Cube.js to use the above connection for an external database via the
+Configure Cube to use the above connection for an external database via the
 `.env` file:
 
 ```dotenv
@@ -113,7 +113,7 @@ services:
   cube:
     image: cubejs/cube:latest
     ports:
-      - 4000:4000  # Cube.js API and Developer Playground
+      - 4000:4000  # Cube API and Developer Playground
       - 3000:3000  # Dashboard app, if created
     env_file: .env
     depends_on:
@@ -124,7 +124,7 @@ services:
       - ./schema:/cube/conf/schema
 ```
 
-Configure Cube.js to use the above connection for an external database via the
+Configure Cube to use the above connection for an external database via the
 `.env` file:
 
 ```dotenv

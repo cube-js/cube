@@ -4,7 +4,7 @@ import CubeContext from './CubeContext';
 import type { CubeContextProps, CubeProviderProps } from './types';
 
 /**
- * Cube.js context provider
+ * Cube context provider
  * ```js
  * import React from 'react';
  * import cube from '@cubejs-client/core';

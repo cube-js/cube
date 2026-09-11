@@ -7,6 +7,6 @@ import { resolveJDBCDriver } from './helpers';
   try {
     await resolveJDBCDriver();
   } catch (e: any) {
-    await displayCLIError(e, 'Cube.js Databricks JDBC Installer');
+    await displayCLIError(e, 'Cube Databricks JDBC Installer');
   }
 })();

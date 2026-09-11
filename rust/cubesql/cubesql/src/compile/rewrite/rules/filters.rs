@@ -3610,7 +3610,7 @@ impl FilterRules {
                 }
                 if has_dimensions && has_measures {
                     // This filter references both measure and dimension in a single OR
-                    // It is not supported by Cube.js
+                    // It is not supported by Cube
                     return false;
                 }
             }

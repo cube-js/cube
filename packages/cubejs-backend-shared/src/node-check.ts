@@ -10,7 +10,7 @@ if (major < leastSupportedVersion) {
   console.error(
     color.red(
       `You are running Node.js ${currentNodeVersion}.\n` +
-      `Cube.js CLI requires Node.js ${leastSupportedVersion} or higher.\n` +
+      `Cube CLI requires Node.js ${leastSupportedVersion} or higher.\n` +
       'Please update your Node.js version.'
     )
   );

@@ -1,16 +1,16 @@
 # Deprecation
 
-This page provides an overview of features that are deprecated in Cube.js.
+This page provides an overview of features that are deprecated in Cube.
 Changes in packaging, and supported (Linux) distributions are not included. To
 learn about end of support for Linux distributions, refer to the
 [changelog](CHANGELOG.md).
 
 ## Feature Deprecation Policy
 
-As changes are made to Cube.js, there may be times when existing features need
+As changes are made to Cube, there may be times when existing features need
 to be removed or replaced with newer features. Before an existing feature is
 removed it is marked as "deprecated" within the documentation and remains in
-Cube.js for at least one stable release unless specified explicitly otherwise.
+Cube for at least one stable release unless specified explicitly otherwise.
 After that time it may be removed.
 
 Users are expected to take note of the list of deprecated features each release
@@ -38,7 +38,7 @@ features:
 | Removed    | [Node.js 8](#nodejs-8)                                                                                                            | v0.22.4    | v0.26.0   |
 | Removed    | [`hearBeatInterval`](#hearbeatinterval)                                                                                           | v0.23.8    | June 2021 |
 | Removed    | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                                                                                         | v0.23.11   | v0.26.0   |
-| Removed    | [Embedding Cube.js within Express](#embedding-cubejs-within-express)                                                              | v0.24.0    | June 2021 |
+| Removed    | [Embedding Cube within Express](#embedding-cube-within-express)                                                                   | v0.24.0    | June 2021 |
 | Removed    | [Absolute import for `@cubejs-backend/query-orchestrator`](#absolute-import-for-@cubejs-backendquery-orchestrator)                | v0.24.2    | v0.32.0   |
 | Removed    | [`contextToDataSourceId`](#contexttodatasourceid)                                                                                 | v0.25.0    | v0.25.0   |
 | Removed    | [Absolute import for `@cubejs-backend/server-core`](#absolute-import-for-@cubejs-backendserver-core)                              | v0.25.4    | v0.32.0   |
@@ -93,23 +93,23 @@ replaced by `heartBeatInterval`.
 
 **Removed in Release: v0.26.0**
 
-We no longer recommend setting TLS options via Cube.js. Developers should set up
+We no longer recommend setting TLS options via Cube. Developers should set up
 TLS on a load balancer or reverse proxy instead. [Read more
 here][link-enable-https].
 
 [link-enable-https]:
   https://docs.cube.dev/admin/deployment/core#set-up-reverse-proxy
 
-### Embedding Cube.js within Express
+### Embedding Cube within Express
 
 **Deprecated in Release: v0.24.0**
 
-Embedding Cube.js into Express applications is deprecated due to performance and
+Embedding Cube into Express applications is deprecated due to performance and
 reliability considerations. [Read more about this change
 here][link-cube-docker].
 
 Developers are encouraged to [migrate to the new `cube.js` configuration
-file][link-migration] and deploy Cube.js as a microservice (or multiple
+file][link-migration] and deploy Cube as a microservice (or multiple
 microservices, if necessary).
 
 [link-cube-docker]: https://cube.dev/blog/cubejs-loves-docker
@@ -142,7 +142,7 @@ const { BaseDriver } = require("@cubejs-backend/query-orchestrator");
 The `contextToDataSourceId` option in the `cube.js` configuration file has been
 replaced by [`contextToOrchestratorId`][link-contexttoorchestratorid]. Prior to
 this change, multi-tenant setups were forced to share a Query Orchestrator
-instance. Now orchestrator instances can be shared by Cube.js instances and
+instance. Now orchestrator instances can be shared by Cube instances and
 across different tenants, if need be. Single-tenant setups should consider
 removing the `contextToDataSourceId` property completely.
 
@@ -192,7 +192,7 @@ const { BaseQuery } = require("@cubejs-backend/schema-compiler");
 **Removed in Release: v0.36.0**
 
 The `checkAuthMiddleware` option was tightly bound to Express,
-[which has been deprecated](#embedding-cubejs-within-express). Since Cube.js
+[which has been deprecated](#embedding-cube-within-express). Since Cube
 supports HTTP **and** WebSockets as transports, we want our authentication API
 to not rely on transport-specific details. We now recommend using
 [`checkAuth`][ref-checkauth] as a transport-agnostic method of authentication.

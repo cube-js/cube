@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/trino-driver",
-  "description": "Cube.js Trino database driver",
+  "description": "Cube Trino database driver",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {

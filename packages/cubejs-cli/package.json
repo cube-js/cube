@@ -1,6 +1,6 @@
 {
   "name": "cubejs-cli",
-  "description": "Cube.js Command Line Interface",
+  "description": "Cube Command Line Interface",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {

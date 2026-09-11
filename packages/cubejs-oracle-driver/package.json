@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/oracle-driver",
-  "description": "Cube.js oracle database driver",
+  "description": "Cube oracle database driver",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {

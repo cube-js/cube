@@ -4,7 +4,7 @@
  * @menuCategory Reference
  * @subcategory Frontend
  * @menuOrder 3
- * @description `@cubejs-client/react` provides React Components for easy Cube.js integration in a React app.
+ * @description `@cubejs-client/react` provides React Components for easy Cube integration in a React app.
  */
 import QueryRenderer from './QueryRenderer';
 import QueryRendererWithTotals from './QueryRendererWithTotals';

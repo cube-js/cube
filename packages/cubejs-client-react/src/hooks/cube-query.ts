@@ -22,7 +22,7 @@ import type {
 } from '../types';
 
 /**
- * A React hook for executing Cube.js queries
+ * A React hook for executing Cube queries
  * ```js
  * import React from 'react';
  * import { Table } from 'antd';
