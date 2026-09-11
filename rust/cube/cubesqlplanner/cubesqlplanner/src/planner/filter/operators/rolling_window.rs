@@ -1,15 +1,30 @@
 /// `RegularRollingWindow` filter operation: trailing and leading
 /// interval bounds of a rolling window relative to each time-series
 /// point.
+///
+/// `series_range` holds the outer bounds of the series the window walks, when
+/// they are known at plan time. The filter restricts the base scan to the span
+/// the widest window can reach, and a literal span is one an engine can
+/// eliminate partitions by; without it the bounds are read back off the series
+/// with a scalar sub-select, which is opaque to pruning.
 #[derive(Clone, Debug)]
 pub struct RegularRollingWindowOp {
     pub(crate) trailing: Option<String>,
     pub(crate) leading: Option<String>,
+    pub(crate) series_range: Option<(String, String)>,
 }
 
 impl RegularRollingWindowOp {
-    pub fn new(trailing: Option<String>, leading: Option<String>) -> Self {
-        Self { trailing, leading }
+    pub fn new(
+        trailing: Option<String>,
+        leading: Option<String>,
+        series_range: Option<(String, String)>,
+    ) -> Self {
+        Self {
+            trailing,
+            leading,
+            series_range,
+        }
     }
 }
 

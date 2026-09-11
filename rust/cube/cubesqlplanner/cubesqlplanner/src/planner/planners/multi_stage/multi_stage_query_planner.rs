@@ -20,13 +20,19 @@ use crate::planner::symbols::AggregationType;
 use crate::planner::Case;
 use crate::planner::CaseSwitchDefinition;
 use crate::planner::CaseSwitchItem;
+use crate::planner::Granularity;
 use crate::planner::GranularityHelper;
 use crate::planner::MeasureKind;
 use crate::planner::MemberSymbol;
 use crate::planner::MultiStageFilter;
 use crate::planner::MultiStageFilterMode;
 use crate::planner::MultiStageGrain;
+use crate::planner::QueryDateTime;
+use crate::planner::QueryDateTimeHelper;
 use crate::planner::QueryProperties;
+use crate::planner::QueryTimeSeries;
+use crate::planner::TimeDimensionSymbol;
+use chrono::Duration;
 use cubenativeutils::CubeError;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -1213,6 +1219,80 @@ impl MultiStageQueryPlanner {
         Ok(description)
     }
 
+    /// Outer bounds of the series a rolling window over `time_dimension` walks.
+    /// The series is derived from the dimension's granularity and date range,
+    /// so both bounds are known here; the base-scan filter renders them as
+    /// literals instead of reading them back off the series.
+    ///
+    /// `None` where the series is not derivable at plan time: without a date
+    /// range the range itself is a query, a granularity whose periods come off
+    /// a calendar cube has boundaries no interval math reproduces, and a range
+    /// standing for a pre-aggregation's partition holds placeholders rather
+    /// than dates.
+    fn rolling_series_bounds(
+        &self,
+        time_dimension: &Rc<TimeDimensionSymbol>,
+    ) -> Result<Option<(String, String)>, CubeError> {
+        let Some(granularity) = time_dimension.granularity_obj() else {
+            return Ok(None);
+        };
+        if granularity.calendar_sql().is_some() {
+            return Ok(None);
+        }
+        let Some(date_range) = time_dimension.date_range_vec() else {
+            return Ok(None);
+        };
+        if date_range
+            .iter()
+            .any(|bound| QueryDateTimeHelper::parse_native_date_time(bound).is_err())
+        {
+            return Ok(None);
+        }
+        // Millisecond bounds; the filter pads them to the dialect's precision
+        // when it renders them.
+        let precision = 3;
+        let bounds = if granularity.is_predefined_granularity() {
+            QueryTimeSeries::covering_bounds_predefined(
+                granularity.granularity(),
+                granularity.granularity_interval(),
+                &[date_range[0].clone(), date_range[1].clone()],
+                precision,
+            )?
+        } else {
+            self.custom_series_bounds(&granularity, &date_range)?
+        };
+        Ok(Some(bounds))
+    }
+
+    /// [`Self::rolling_series_bounds`] for a custom granularity, whose buckets
+    /// are placed by stepping its interval from its origin. The lower bound
+    /// aligns to that origin the way the series itself is placed; the upper one
+    /// reaches an interval past the range end, which covers the last bucket of
+    /// either series shape.
+    fn custom_series_bounds(
+        &self,
+        granularity: &Granularity,
+        date_range: &[String],
+    ) -> Result<(String, String), CubeError> {
+        let interval = granularity.granularity_interval();
+        if interval.is_zero() {
+            return Err(CubeError::user(format!(
+                "Granularity interval can't be zero: {}",
+                granularity.granularity()
+            )));
+        }
+        let tz = self.query_tools.query_tools().timezone();
+        let first =
+            granularity.align_date_to_origin(QueryDateTime::from_date_str(tz, &date_range[0])?)?;
+        let past_end = QueryDateTime::from_date_str(tz, &date_range[1])?
+            .add_interval(interval)?
+            .add_duration(Duration::seconds(-1))?;
+        Ok((
+            format!("{}.000", first.format("%Y-%m-%dT%H:%M:%S")),
+            format!("{}.999", past_end.format("%Y-%m-%dT%H:%M:%S")),
+        ))
+    }
+
     /// The granularity of a `to_date` rolling window whose period boundary is
     /// defined by a calendar column. `None` for a boundary that interval math
     /// can compute on its own.
@@ -1356,6 +1436,7 @@ impl MultiStageQueryPlanner {
                 &time_dimension_base_name,
                 rolling_window.trailing.clone(),
                 rolling_window.leading.clone(),
+                self.rolling_series_bounds(&time_dimension_symbol)?,
             )?;
         }
 
