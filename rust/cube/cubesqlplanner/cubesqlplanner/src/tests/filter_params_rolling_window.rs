@@ -1,3 +1,4 @@
+use crate::cube_bridge::base_query_options::FilterValue;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
@@ -37,6 +38,13 @@ cubes:
             rolling_window:
                 trailing: 30 day
                 offset: end
+
+          - name: amount_month_to_date
+            type: sum
+            sql: amount
+            rolling_window:
+                type: to_date
+                granularity: month
 "#,
         fact_sql
     ))
@@ -69,6 +77,26 @@ fn fact_scan_predicate(sql: &str) -> String {
     after[..end].trim().to_string()
 }
 
+/// The values the placeholders of `predicate` stand for, in the order they
+/// appear. A parameter the predicate does not name says nothing about what the
+/// scan reads.
+fn predicate_values(predicate: &str, params: &[FilterValue]) -> Vec<String> {
+    predicate
+        .split('$')
+        .skip(1)
+        .filter_map(|tail| {
+            tail.chars()
+                .take_while(char::is_ascii_digit)
+                .collect::<String>()
+                .parse::<usize>()
+                .ok()
+        })
+        // Placeholders are 1-based in the rendered SQL.
+        .filter_map(|position| params.get(position.checked_sub(1)?))
+        .filter_map(|value| value.to_param_string())
+        .collect()
+}
+
 const QUERY: &str = indoc! {r#"
     measures:
       - fprw_sales.amount
@@ -99,22 +127,20 @@ fn a_column_binding_widens_with_the_window() {
     );
 }
 
-// Characterisation, not a statement of intent: a callback binding is handed
-// the filter's own values, and a rolling filter's values are the reported
-// bounds followed by the window's own parts. What the callback receives is
-// therefore the reported period, so a model narrowing its scan through a
-// callback loses the tail of every window. Recorded here so the disagreement
-// is visible; the fix is not settled by this test.
+// A callback binding is handed the band the stage reads rather than the period
+// reported, so the scan it writes reaches as far back as the window sums. The
+// band arrives as dates, already shifted, since a callback's SQL is opaque and
+// nothing can wrap an interval around it.
 #[test]
-fn a_callback_binding_is_handed_the_reported_period_only() {
+fn a_callback_binding_reaches_back_as_far_as_the_window() {
     let ctx = TestContext::new(schema(Some(CALLBACK))).unwrap();
-    let sql = ctx.build_sql(QUERY).unwrap();
+    let (sql, params) = ctx.build_sql_and_params(QUERY).unwrap();
     let predicate = fact_scan_predicate(&sql);
+    let bounds = predicate_values(&predicate, &params);
 
     assert!(
-        !predicate.contains("interval '30 day'"),
-        "the callback is handed nothing of the window\npredicate: {}",
-        predicate
+        bounds.iter().any(|bound| bound.starts_with("2024-01-31")),
+        "the scan stops short of the 30 days the window sums: {bounds:?}\npredicate: {predicate}"
     );
 }
 
@@ -138,10 +164,10 @@ async fn a_column_binding_leaves_the_window_whole() {
     insta::assert_snapshot!(pushed_down);
 }
 
-// Characterisation: the callback form answers less than the same model without
-// the binding, which is the disagreement above in numbers.
+// The same in numbers for the callback form: a 30-day trailing window over one
+// row per day answers 30 for every day of the reporting period, binding or not.
 #[tokio::test(flavor = "multi_thread")]
-async fn a_callback_binding_answers_less_than_a_full_scan() {
+async fn a_callback_binding_leaves_the_window_whole() {
     let with_pushdown = TestContext::new(schema(Some(CALLBACK))).unwrap();
     let without = TestContext::new(schema(None)).unwrap();
 
@@ -153,6 +179,75 @@ async fn a_callback_binding_answers_less_than_a_full_scan() {
         .await
         .expect("the plain model runs wherever the pushdown one does");
 
-    assert_ne!(pushed_down, full_scan);
+    assert_eq!(pushed_down, full_scan);
+    insta::assert_snapshot!(pushed_down);
+}
+
+// A `to_date` window reads from the start of its period, which for a range
+// opening mid-month is well before the reported period. Both stages -- the
+// cube's own scan and the window's -- have to reach that far.
+const TO_DATE_QUERY: &str = indoc! {r#"
+    measures:
+      - fprw_sales.amount_month_to_date
+    time_dimensions:
+      - dimension: fprw_sales.day_d
+        granularity: day
+        dateRange:
+          - "2024-03-15"
+          - "2024-03-21"
+    order:
+      - id: fprw_sales.day_d
+"#};
+
+// A bound an engine can evaluate before reading the table is what eliminates
+// partitions; one read back off the series with a scalar sub-select is opaque
+// to that, and a table declared with a mandatory partition filter rejects the
+// query outright.
+#[test]
+fn a_column_binding_under_a_to_date_window_pushes_literal_bounds() {
+    let ctx = TestContext::new(schema(Some(COLUMN))).unwrap();
+    let sql = ctx.build_sql(TO_DATE_QUERY).unwrap();
+    let predicate = fact_scan_predicate(&sql);
+
+    assert!(
+        !predicate.contains("time_series"),
+        "the scan is bounded by a sub-select over the series\npredicate: {}",
+        predicate
+    );
+}
+
+// The callback is handed the bounds of the reported period, and a to_date
+// window reads from the start of its own period instead -- so the scan stops
+// short of what the window sums.
+#[test]
+fn a_callback_binding_under_a_to_date_window_reaches_the_period_start() {
+    let ctx = TestContext::new(schema(Some(CALLBACK))).unwrap();
+    let (sql, params) = ctx.build_sql_and_params(TO_DATE_QUERY).unwrap();
+    let predicate = fact_scan_predicate(&sql);
+    let bounds = predicate_values(&predicate, &params);
+
+    assert!(
+        bounds.iter().any(|bound| bound.starts_with("2024-03-01")),
+        "the scan stops short of the period the window sums: {bounds:?}\npredicate: {predicate}"
+    );
+}
+
+// The same in numbers: month-to-date over one row per day answers the day of
+// the month. A binding cutting the scan to the reported period answers the day
+// of that period instead.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_callback_binding_leaves_a_to_date_window_whole() {
+    let with_pushdown = TestContext::new(schema(Some(CALLBACK))).unwrap();
+    let without = TestContext::new(schema(None)).unwrap();
+
+    let Some(pushed_down) = with_pushdown.try_execute_pg(TO_DATE_QUERY, SEED).await else {
+        return;
+    };
+    let full_scan = without
+        .try_execute_pg(TO_DATE_QUERY, SEED)
+        .await
+        .expect("the plain model runs wherever the pushdown one does");
+
+    assert_eq!(pushed_down, full_scan);
     insta::assert_snapshot!(pushed_down);
 }
