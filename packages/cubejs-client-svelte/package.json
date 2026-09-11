@@ -1,0 +1,64 @@
+{
+  "name": "@cubejs-client/svelte",
+  "version": "1.7.19",
+  "description": "Svelte bindings for Cube",
+  "author": "Cube Dev, Inc.",
+  "license": "MIT",
+  "engines": {},
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.git",
+    "directory": "packages/cubejs-client-svelte"
+  },
+  "svelte": "./dist/index.js",
+  "module": "./dist/index.js",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "svelte": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "svelte-package",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "lint": "eslint src/lib tests --ext .ts",
+    "test": "npm run unit",
+    "unit": "vitest run --coverage",
+    "watch": "svelte-package --watch"
+  },
+  "dependencies": {
+    "@cubejs-client/core": "1.7.19"
+  },
+  "devDependencies": {
+    "@sveltejs/package": "^2.5.8",
+    "@sveltejs/vite-plugin-svelte": "^7.2.0",
+    "@testing-library/svelte": "^5.4.2",
+    "@typescript-eslint/eslint-plugin": "^6.12.0",
+    "@typescript-eslint/parser": "^6.12.0",
+    "@vitest/coverage-v8": "^4.0.0",
+    "eslint": "^8.57.1",
+    "jsdom": "^29.1.1",
+    "svelte": "^5.56.7",
+    "svelte-check": "^4.7.3",
+    "typescript": "~5.2.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.0.0"
+  },
+  "peerDependencies": {
+    "svelte": "^5.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
