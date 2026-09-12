@@ -7,7 +7,8 @@ import {
 } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 
-import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, LocalCacheDriver, version } from '../../src';
+import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, QueryCacheOptions, LocalCacheDriver, version } from '../../src';
+import { evaluateLocalRefreshKey, refreshKeyPhaseSeed, snapToRenewalThreshold } from '../../src/orchestrator/utils';
 
 class MockDriver {
   public tables: string[] = [];
@@ -471,20 +472,20 @@ describe('PreAggregations', () => {
     const REFRESH_KEY_SQL = 'SELECT FLOOR((UNIX_TIMESTAMP()) / 600) as refresh_key';
     const descriptor = { interval: 600, utcOffset: 0, dayOffset: 0, cron: false };
 
-    const newQueryCache = (localRefreshKey?: boolean) => new QueryCache(
+    const newQueryCache = (additional: Partial<QueryCacheOptions> = {}) => new QueryCache(
       'TEST',
       mockDriverFactory as any,
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       () => {},
       {
         cacheAndQueueDriver: 'memory',
-        localRefreshKey,
         queueOptions: async () => ({ executionTimeout: 1, concurrency: 2 }),
+        ...additional,
       },
     );
 
-    const newLoadCache = (localRefreshKey?: boolean) => {
-      const cache = newQueryCache(localRefreshKey);
+    const newLoadCache = (additional: Partial<QueryCacheOptions> = {}) => {
+      const cache = newQueryCache(additional);
       (cache.getCacheDriver() as LocalCacheDriver).reset();
 
       const preAggregations = new PreAggregations(
@@ -505,7 +506,7 @@ describe('PreAggregations', () => {
     };
 
     test('keyQueryResult evaluates locally without querying the datasource', async () => {
-      const loadCache = newLoadCache(true);
+      const loadCache = newLoadCache({ localRefreshKey: true });
 
       const result = await loadCache.keyQueryResult(
         [REFRESH_KEY_SQL, [], { external: true, renewalThreshold: 60, localRefreshKey: descriptor }],
@@ -517,8 +518,31 @@ describe('PreAggregations', () => {
       expect(mockDriver!.executedQueries).toEqual([]);
     });
 
+    // `keyQueryResult` caches refresh keys for an hour, so that is the window a daily threshold
+    // is capped to, phased by the key identity.
+    test('keyQueryResult evaluates locally under a refreshKeyRenewalThreshold', async () => {
+      const day = 24 * 60 * 60;
+      const loadCache = newLoadCache({ localRefreshKey: true, refreshKeyRenewalThreshold: day });
+      const now = 86_400_000 + 600_000;
+      const phase = refreshKeyPhaseSeed([REFRESH_KEY_SQL, [], true, 'default']);
+
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
+      try {
+        const result = await loadCache.keyQueryResult(
+          [REFRESH_KEY_SQL, [], { external: true, renewalThreshold: 60, localRefreshKey: descriptor }],
+          false,
+          10,
+        );
+
+        expect(result).toEqual(evaluateLocalRefreshKey(descriptor, snapToRenewalThreshold(now, 60 * 60, phase)));
+        expect(mockDriver!.executedQueries).toEqual([]);
+      } finally {
+        nowSpy.mockRestore();
+      }
+    });
+
     test('keyQueryResult still queries when the flag is off', async () => {
-      const loadCache = newLoadCache(false);
+      const loadCache = newLoadCache({ localRefreshKey: false });
 
       await loadCache.keyQueryResult(
         [REFRESH_KEY_SQL, [], { external: false, renewalThreshold: 60, localRefreshKey: descriptor }],
@@ -530,7 +554,7 @@ describe('PreAggregations', () => {
     });
 
     test('keyQueryResult still queries an incremental key that carries no descriptor', async () => {
-      const loadCache = newLoadCache(true);
+      const loadCache = newLoadCache({ localRefreshKey: true });
       const incrementalSql = 'SELECT CASE WHEN NOW() < $1 THEN FLOOR((UNIX_TIMESTAMP()) / 3600) END as refresh_key';
 
       await loadCache.keyQueryResult(
@@ -552,7 +576,7 @@ describe('PreAggregations', () => {
     // interval boundary would look a table up under one content version and enqueue it under
     // another.
     test('keyQueryResult is stable across an interval boundary within one load cache', async () => {
-      const loadCache = newLoadCache(true);
+      const loadCache = newLoadCache({ localRefreshKey: true });
       const key: [string, any[], Record<string, any>] =
         [REFRESH_KEY_SQL, [], { external: true, renewalThreshold: 60, localRefreshKey: descriptor }];
 

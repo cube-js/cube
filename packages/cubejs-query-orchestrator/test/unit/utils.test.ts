@@ -1,4 +1,4 @@
-import { evaluateLocalRefreshKey, isValidLocalRefreshKey } from '../../src/orchestrator/utils';
+import { evaluateLocalRefreshKey, isValidLocalRefreshKey, refreshKeyPhaseSeed, snapToRenewalThreshold } from '../../src/orchestrator/utils';
 
 describe('evaluateLocalRefreshKey', () => {
   const tenMinutes = { interval: 600, utcOffset: 0, dayOffset: 0 };
@@ -64,5 +64,106 @@ describe('isValidLocalRefreshKey', () => {
     expect(isValidLocalRefreshKey({ interval: Infinity, utcOffset: 0, dayOffset: 0 })).toBe(false);
     expect(isValidLocalRefreshKey({ interval: 600, utcOffset: NaN, dayOffset: 0 })).toBe(false);
     expect(isValidLocalRefreshKey({ interval: 600, utcOffset: 0, dayOffset: NaN })).toBe(false);
+  });
+});
+
+describe('snapToRenewalThreshold', () => {
+  const day = 24 * 60 * 60;
+
+  test('leaves the clock alone when no threshold is configured', () => {
+    for (const threshold of [undefined, 0, -60, NaN, Infinity]) {
+      expect(snapToRenewalThreshold(1_234_567, threshold)).toBe(1_234_567);
+    }
+  });
+
+  test('floors to the threshold boundary', () => {
+    expect(snapToRenewalThreshold(0, 120)).toBe(0);
+    expect(snapToRenewalThreshold(119_999, 120)).toBe(0);
+    expect(snapToRenewalThreshold(120_000, 120)).toBe(120_000);
+    expect(snapToRenewalThreshold(239_999, 120)).toBe(120_000);
+  });
+
+  test.each([0, 45_000, 119_999])('never goes backwards with phase %i', (phase) => {
+    let previous = -Infinity;
+
+    for (let ms = 0; ms < 600_000; ms += 17_000) {
+      const snapped = snapToRenewalThreshold(ms, 120, phase);
+
+      expect(snapped).toBeGreaterThanOrEqual(previous);
+      expect(snapped).toBeLessThanOrEqual(ms);
+      previous = snapped;
+    }
+  });
+
+  test('offsets the boundary by the phase', () => {
+    expect(snapToRenewalThreshold(44_999, 120, 45_000)).toBe(45_000 - 120_000);
+    expect(snapToRenewalThreshold(45_000, 120, 45_000)).toBe(45_000);
+    expect(snapToRenewalThreshold(164_999, 120, 45_000)).toBe(45_000);
+    expect(snapToRenewalThreshold(165_000, 120, 45_000)).toBe(165_000);
+  });
+
+  test('wraps a phase seed larger than the window and ignores a non-finite one', () => {
+    expect(snapToRenewalThreshold(165_000, 120, 45_000 + 7 * 120_000)).toBe(165_000);
+    expect(snapToRenewalThreshold(165_000, 120, NaN)).toBe(120_000);
+  });
+
+  test('a phased 10 minute key is constant inside its window and stays in its own series', () => {
+    const tenMinutes = { interval: 600, utcOffset: 0, dayOffset: 0 };
+    const phase = 5 * 3_600_000;
+    const at = (ms: number) => evaluateLocalRefreshKey(tenMinutes, snapToRenewalThreshold(ms, day, phase))[0].refresh_key;
+
+    // The window opens at 05:00 on day one, where a 10 minute key really is 144 + 30
+    expect(at(86_400_000 + phase)).toBe('174');
+    expect(at(2 * 86_400_000 + phase - 1)).toBe('174');
+    expect(at(2 * 86_400_000 + phase)).toBe('318');
+    expect(at(86_400_000 + phase)).toBe(evaluateLocalRefreshKey(tenMinutes, 86_400_000 + phase)[0].refresh_key);
+  });
+
+  test('advances a 10 minute key once per daily threshold, staying in its own series', () => {
+    const tenMinutes = { interval: 600, utcOffset: 0, dayOffset: 0 };
+    const at = (ms: number) => evaluateLocalRefreshKey(tenMinutes, snapToRenewalThreshold(ms, day))[0].refresh_key;
+
+    expect(at(0)).toBe('0');
+    expect(at(600_000)).toBe('0');
+    expect(at(86_399_000)).toBe('0');
+    expect(at(86_400_000)).toBe('144');
+    expect(at(86_400_000 + 600_000)).toBe('144');
+    expect(at(2 * 86_400_000)).toBe('288');
+
+    for (const ms of [0, 86_400_000, 2 * 86_400_000]) {
+      expect(at(ms)).toBe(evaluateLocalRefreshKey(tenMinutes, ms)[0].refresh_key);
+    }
+  });
+
+  test('keeps the numbering of a cron key', () => {
+    // every '0 10 * * *' => interval 1 day, dayOffset 10 hours
+    const daily = { interval: day, utcOffset: 0, dayOffset: 36_000 };
+    const threshold = 4 * 60 * 60;
+    const at = (ms: number) => evaluateLocalRefreshKey(daily, snapToRenewalThreshold(ms, threshold))[0].refresh_key;
+
+    expect(at(36_000_000 - 1)).toBe('-1');
+    // The fire at 10:00 is observed at the 12:00 sample, exactly as a 4 hour cache would have
+    expect(at(36_000_000)).toBe('-1');
+    expect(at(43_200_000)).toBe('0');
+    expect(at(36_000_000 + 86_400_000)).toBe('0');
+    expect(at(43_200_000 + 86_400_000)).toBe('1');
+  });
+});
+
+describe('refreshKeyPhaseSeed', () => {
+  const identity = (sql: string): [string, string[], boolean, string] => [sql, [], true, 'default'];
+
+  test('is the same for the same identity and below 2^32', () => {
+    const seed = refreshKeyPhaseSeed(identity('SELECT FLOOR((UNIX_TIMESTAMP()) / 600) as refresh_key'));
+
+    expect(seed).toBe(refreshKeyPhaseSeed(identity('SELECT FLOOR((UNIX_TIMESTAMP()) / 600) as refresh_key')));
+    expect(Number.isInteger(seed)).toBe(true);
+    expect(seed).toBeGreaterThanOrEqual(0);
+    expect(seed).toBeLessThan(2 ** 32);
+  });
+
+  test('differs between refresh keys', () => {
+    expect(refreshKeyPhaseSeed(identity('SELECT FLOOR((UNIX_TIMESTAMP()) / 600) as refresh_key')))
+      .not.toBe(refreshKeyPhaseSeed(identity('SELECT FLOOR((UNIX_TIMESTAMP()) / 3600) as refresh_key')));
   });
 });

@@ -52,6 +52,28 @@ export function evaluateLocalRefreshKey(
   return [{ refresh_key: String(Math.floor((utcOffset + nowMs / 1000 - dayOffset) / interval)) }];
 }
 
+/**
+ * The threshold bounds how often a key may advance, so the clock is floored to it. `phaseSeed`
+ * shifts each key's window so they do not all flip at the same instant.
+ */
+export function snapToRenewalThreshold(nowMs: number, thresholdSeconds?: number, phaseSeed = 0): number {
+  if (!Number.isFinite(thresholdSeconds) || <number>thresholdSeconds <= 0) {
+    return nowMs;
+  }
+
+  const thresholdMs = <number>thresholdSeconds * 1000;
+  const offset = Number.isFinite(phaseSeed) ? phaseSeed % thresholdMs : 0;
+
+  return Math.floor((nowMs - offset) / thresholdMs) * thresholdMs + offset;
+}
+
+/**
+ * md5 of the refresh key identity, so every instance derives the same phase for the same key.
+ */
+export function refreshKeyPhaseSeed(cacheKey: CacheKey): number {
+  return parseInt(getCacheHash(cacheKey).slice(0, 8), 16);
+}
+
 export function isValidLocalRefreshKey(descriptor?: LocalRefreshKeyDescriptor): boolean {
   return !!descriptor &&
     Number.isFinite(descriptor.interval) && descriptor.interval > 0 &&
