@@ -77,6 +77,55 @@ describe('ClickHouseDriver', () => {
       await driver.insert('test.types_test', [
         ['2020-01-03', '2020-01-03 00:00:00', '2020-01-03 00:00:00.234', '2020-01-03 00:00:00.234567', '2020-01-03 00:00:00.234567890', 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3.03, 3.03, 3.03, 'hello', 'world', 'Date', [1, 2], ['2020-01-01 00:00:00'], { a: 1 }, [1, 'a'], 'x']
       ]);
+
+      // The types that used to reach Cube Store as their raw ClickHouse name. Held to what the
+      // default 23.11 image supports, so no Variant/Dynamic/JSON/Time/BFloat16 here.
+      await driver.command(
+        `
+            CREATE TABLE test.wide_types_test (
+              date32 Date32,
+              bool Bool,
+              uuid UUID,
+              fixed_string FixedString(4),
+              ipv4 IPv4,
+              ipv6 IPv6,
+              int128 Int128,
+              int256 Int256,
+              uint128 UInt128,
+              uint256 UInt256,
+              decimal256 Decimal256(2),
+              lc_fixed_string LowCardinality(FixedString(4)),
+              nullable_uuid Nullable(UUID),
+              array_date32 Array(Date32),
+              array_uuid Array(UUID),
+              map_str_date32 Map(String, Date32),
+              simple_agg_int64 SimpleAggregateFunction(sum, Int64),
+              simple_agg_datetime64 SimpleAggregateFunction(max, DateTime64(3)),
+              simple_agg_map SimpleAggregateFunction(anyLast, Map(String, Int32))
+            ) ENGINE Log
+        `
+      );
+
+      await driver.insert('test.wide_types_test', [
+        [
+          '2020-01-01', true, '00000000-0000-0000-0000-000000000001', 'abcd', '1.2.3.4', '::1',
+          '1', '2', '3', '4', '1.01', 'abcd', null,
+          ['2020-01-01'], ['00000000-0000-0000-0000-000000000001'], { a: '2020-01-01' },
+          5, '2020-01-02 00:00:00.123', { a: 1 },
+        ]
+      ]);
+
+      // An AggregateFunction state has no generic type, so it lives apart from the columns the
+      // stream test reads.
+      await driver.command(
+        `
+            CREATE TABLE test.agg_types_test (
+              agg_uniq AggregateFunction(uniq, String)
+            ) ENGINE AggregatingMergeTree ORDER BY tuple()
+        `
+      );
+
+      await driver.command('INSERT INTO test.agg_types_test SELECT uniqState(\'x\')');
     });
   }, 30 * 1000);
 
@@ -189,8 +238,8 @@ describe('ClickHouseDriver', () => {
         enum_type_named: 'Date',
         array_int32: [1, 2],
         array_datetime: ['2020-01-01 00:00:00'],
-        map_str_int32: { a: 1 },
-        tuple_int32_str: [1, 'a'],
+        map_str_int32: '{"a":1}',
+        tuple_int32_str: '[1,"a"]',
         lc_nullable: 'x',
       }]);
     });
@@ -293,7 +342,7 @@ describe('ClickHouseDriver', () => {
     });
   });
 
-  it('leaves container types untouched', async () => {
+  it('leaves the contents of an array untouched', async () => {
     await doWithDriver(async (driver) => {
       const rows = await driver.query(
         `SELECT
@@ -314,7 +363,8 @@ describe('ClickHouseDriver', () => {
   });
 
   // Pre-aggregation content versions hash JSON.stringify output, so this pins ordering and value
-  // representation to the previous JSON format.
+  // representation to the previous JSON format. Containers are the one departure: they are reported
+  // as text, so they are rendered as text rather than left as the object ClickHouse parsed to.
   it('pins the serialisation of a row', async () => {
     await doWithDriver(async (driver) => {
       const rows = await driver.query('SELECT * FROM test.types_test ORDER BY int8 LIMIT 1', []);
@@ -325,7 +375,7 @@ describe('ClickHouseDriver', () => {
         '"uint8":"1","uint16":"1","uint32":"1","uint64":"1","float32":"1","float64":"1",' +
         '"decimal32":"1.01","decimal64":"1.01","decimal128":"1.01","enum8":"hello","enum16":"world",' +
         '"enum_type_named":"Date","array_int32":[1,2],"array_datetime":["2020-01-01 00:00:00"],' +
-        '"map_str_int32":{"a":1},"tuple_int32_str":[1,"a"],"lc_nullable":"x"}]'
+        '"map_str_int32":"{\\"a\\":1}","tuple_int32_str":"[1,\\"a\\"]","lc_nullable":"x"}]'
       );
     });
   });
@@ -392,14 +442,83 @@ describe('ClickHouseDriver', () => {
           { name: 'lc_nullable', type: 'text' },
         ]);
         expect(await streamToArray(tableData.rowStream as any)).toEqual([
-          { date: '2020-01-01T00:00:00.000', datetime: '2020-01-01T00:00:00.000', datetime64_millis: '2020-01-01T00:00:00.000', datetime64_micros: '2020-01-01T00:00:00.000', datetime64_nanos: '2020-01-01T00:00:00.000', int8: '1', int16: '1', int32: '1', int64: '1', uint8: '1', uint16: '1', uint32: '1', uint64: '1', float32: '1', float64: '1', decimal32: '1.01', decimal64: '1.01', decimal128: '1.01', enum8: 'hello', enum16: 'world', enum_type_named: 'Date', array_int32: [1, 2], array_datetime: ['2020-01-01 00:00:00'], map_str_int32: { a: 1 }, tuple_int32_str: [1, 'a'], lc_nullable: 'x' },
-          { date: '2020-01-02T00:00:00.000', datetime: '2020-01-02T00:00:00.000', datetime64_millis: '2020-01-02T00:00:00.123', datetime64_micros: '2020-01-02T00:00:00.123', datetime64_nanos: '2020-01-02T00:00:00.123', int8: '2', int16: '2', int32: '2', int64: '2', uint8: '2', uint16: '2', uint32: '2', uint64: '2', float32: '2', float64: '2', decimal32: '2.02', decimal64: '2.02', decimal128: '2.02', enum8: 'hello', enum16: 'world', enum_type_named: 'Date', array_int32: [1, 2], array_datetime: ['2020-01-01 00:00:00'], map_str_int32: { a: 1 }, tuple_int32_str: [1, 'a'], lc_nullable: 'x' },
-          { date: '2020-01-03T00:00:00.000', datetime: '2020-01-03T00:00:00.000', datetime64_millis: '2020-01-03T00:00:00.234', datetime64_micros: '2020-01-03T00:00:00.234', datetime64_nanos: '2020-01-03T00:00:00.234', int8: '3', int16: '3', int32: '3', int64: '3', uint8: '3', uint16: '3', uint32: '3', uint64: '3', float32: '3', float64: '3', decimal32: '3.03', decimal64: '3.03', decimal128: '3.03', enum8: 'hello', enum16: 'world', enum_type_named: 'Date', array_int32: [1, 2], array_datetime: ['2020-01-01 00:00:00'], map_str_int32: { a: 1 }, tuple_int32_str: [1, 'a'], lc_nullable: 'x' },
+          { date: '2020-01-01T00:00:00.000', datetime: '2020-01-01T00:00:00.000', datetime64_millis: '2020-01-01T00:00:00.000', datetime64_micros: '2020-01-01T00:00:00.000', datetime64_nanos: '2020-01-01T00:00:00.000', int8: '1', int16: '1', int32: '1', int64: '1', uint8: '1', uint16: '1', uint32: '1', uint64: '1', float32: '1', float64: '1', decimal32: '1.01', decimal64: '1.01', decimal128: '1.01', enum8: 'hello', enum16: 'world', enum_type_named: 'Date', array_int32: [1, 2], array_datetime: ['2020-01-01 00:00:00'], map_str_int32: '{"a":1}', tuple_int32_str: '[1,"a"]', lc_nullable: 'x' },
+          { date: '2020-01-02T00:00:00.000', datetime: '2020-01-02T00:00:00.000', datetime64_millis: '2020-01-02T00:00:00.123', datetime64_micros: '2020-01-02T00:00:00.123', datetime64_nanos: '2020-01-02T00:00:00.123', int8: '2', int16: '2', int32: '2', int64: '2', uint8: '2', uint16: '2', uint32: '2', uint64: '2', float32: '2', float64: '2', decimal32: '2.02', decimal64: '2.02', decimal128: '2.02', enum8: 'hello', enum16: 'world', enum_type_named: 'Date', array_int32: [1, 2], array_datetime: ['2020-01-01 00:00:00'], map_str_int32: '{"a":1}', tuple_int32_str: '[1,"a"]', lc_nullable: 'x' },
+          { date: '2020-01-03T00:00:00.000', datetime: '2020-01-03T00:00:00.000', datetime64_millis: '2020-01-03T00:00:00.234', datetime64_micros: '2020-01-03T00:00:00.234', datetime64_nanos: '2020-01-03T00:00:00.234', int8: '3', int16: '3', int32: '3', int64: '3', uint8: '3', uint16: '3', uint32: '3', uint64: '3', float32: '3', float64: '3', decimal32: '3.03', decimal64: '3.03', decimal128: '3.03', enum8: 'hello', enum16: 'world', enum_type_named: 'Date', array_int32: [1, 2], array_datetime: ['2020-01-01 00:00:00'], map_str_int32: '{"a":1}', tuple_int32_str: '[1,"a"]', lc_nullable: 'x' },
         ]);
       } finally {
         // @ts-ignore
         await tableData.release();
       }
+    });
+  });
+
+  it('stream wide types', async () => {
+    await doWithDriver(async (driver) => {
+      const tableData = await driver.stream('SELECT * FROM test.wide_types_test', [], {
+        highWaterMark: 100,
+      });
+
+      try {
+        expect(tableData.types).toEqual([
+          { name: 'date32', type: 'date' },
+          { name: 'bool', type: 'boolean' },
+          { name: 'uuid', type: 'uuid' },
+          { name: 'fixed_string', type: 'text' },
+          { name: 'ipv4', type: 'text' },
+          { name: 'ipv6', type: 'text' },
+          { name: 'int128', type: 'decimal' },
+          { name: 'int256', type: 'decimal' },
+          { name: 'uint128', type: 'decimal' },
+          { name: 'uint256', type: 'decimal' },
+          { name: 'decimal256', type: 'decimal' },
+          { name: 'lc_fixed_string', type: 'text' },
+          { name: 'nullable_uuid', type: 'uuid' },
+          { name: 'array_date32', type: 'date[]' },
+          { name: 'array_uuid', type: 'uuid[]' },
+          { name: 'map_str_date32', type: 'text' },
+          { name: 'simple_agg_int64', type: 'bigint' },
+          { name: 'simple_agg_datetime64', type: 'timestamp' },
+          { name: 'simple_agg_map', type: 'text' },
+        ]);
+        expect(await streamToArray(tableData.rowStream as any)).toEqual([
+          {
+            date32: '2020-01-01T00:00:00.000',
+            bool: true,
+            uuid: '00000000-0000-0000-0000-000000000001',
+            fixed_string: 'abcd',
+            ipv4: '1.2.3.4',
+            ipv6: '::1',
+            int128: '1',
+            int256: '2',
+            uint128: '3',
+            uint256: '4',
+            decimal256: '1.01',
+            lc_fixed_string: 'abcd',
+            nullable_uuid: null,
+            array_date32: ['2020-01-01'],
+            array_uuid: ['00000000-0000-0000-0000-000000000001'],
+            map_str_date32: '{"a":"2020-01-01"}',
+            simple_agg_int64: '5',
+            simple_agg_datetime64: '2020-01-02T00:00:00.123',
+            // A container behind SimpleAggregateFunction used to be stringified into
+            // "[object Object]" by the substring based converter lookup. Int32 rather than Int64,
+            // because whether ClickHouse quotes a 64 bit integer is a server default that changed
+            // in 25.x, and this assertion is about the driver.
+            simple_agg_map: '{"a":1}',
+          },
+        ]);
+      } finally {
+        // @ts-ignore
+        await tableData.release();
+      }
+    });
+  });
+
+  it('refuses an AggregateFunction state as a column type', async () => {
+    await doWithDriver(async (driver) => {
+      await expect(driver.queryColumnTypes('test.agg_types_test', []))
+        .rejects.toThrow('ClickHouse type AggregateFunction(uniq, String) is not supported');
     });
   });
 });

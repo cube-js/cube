@@ -38,6 +38,7 @@ import { version } from '../package.json';
 
 import { ClickHouseRowStream } from './RowStream';
 import { buildTransformFromMeta, transformRow } from './Transform';
+import { isOpaqueTypeName, parseType } from './TypeParser';
 import { formatError } from './utils';
 
 const SUPPORTED_BUCKET_TYPES = ['s3'];
@@ -48,24 +49,48 @@ const ClickhouseTypeToGeneric: Record<string, string> = {
   datetime: 'timestamp',
   datetime64: 'timestamp',
   date: 'date',
-  decimal: 'decimal',
-  // integers
   int8: 'int',
   int16: 'int',
   int32: 'int',
   int64: 'bigint',
-  // unsigned int
   uint8: 'int',
   uint16: 'int',
   uint32: 'int',
   uint64: 'bigint',
-  // floats
   float32: 'float',
   float64: 'double',
   // We don't support enums
   enum8: 'text',
   enum16: 'text',
+  date32: 'date',
+  uuid: 'uuid',
+  fixedstring: 'text',
+  ipv4: 'text',
+  ipv6: 'text',
+  nothing: 'text',
+  bfloat16: 'float',
+  // 128 and 256 bit integers do not fit a bigint. They currently lose digits in JSON.parse when
+  // the server does not quote them (default off since 25.x) — see the format work tracked separately.
+  int128: 'decimal',
+  int256: 'decimal',
+  uint128: 'decimal',
+  uint256: 'decimal',
+  // A duration, not a point in time.
+  time: 'string',
+  time64: 'string',
 };
+
+// Decimal32/64/128/256 take only a scale argument; the width fixes the precision.
+const DECIMAL_WIDTH_PRECISION: Record<string, number> = {
+  decimal32: 9,
+  decimal64: 18,
+  decimal128: 38,
+  decimal256: 76,
+};
+
+// Cube Store keeps a decimal in a Decimal128, and Arrow allows it no more than 38 digits, so a
+// wider ClickHouse precision is clamped rather than passed on to fail the CREATE TABLE.
+const MAX_DECIMAL_PRECISION = 38;
 
 export interface ClickHouseDriverOptions {
   host?: string,
@@ -517,52 +542,60 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   /**
-   * Example of types:
-   *
-   * Int64
-   * Nullable(Int64) / Nullable(String)
-   * Nullable(DateTime('UTC'))
-   * LowCardinality(Nullable(String))
-   * Array(DateTime) -> timestamp[]
-   * Map(String, Int32) / Tuple(Int32, String)
+   * `Decimal(76, 10)` and `Decimal256(10)` are the same ClickHouse column, so both spellings clamp
+   * here. Cube Store widens a precision back up to the scale, so the scale is clamped along with
+   * it. A NaN or zero part falls through to a bare `decimal`, the same as an argument-less Decimal.
    */
+  private toGenericDecimal(precision: number, scale: number): GenericDataBaseType {
+    const clamped = Math.min(precision, MAX_DECIMAL_PRECISION);
+
+    return super.toGenericType('decimal', clamped, Math.min(scale, clamped));
+  }
+
   protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): GenericDataBaseType {
-    const type = columnType.trim();
-    const lowerType = type.toLowerCase();
-
-    if (lowerType in ClickhouseTypeToGeneric) {
-      return ClickhouseTypeToGeneric[lowerType];
-    }
-
-    const argsStart = type.indexOf('(');
-    if (argsStart === -1) {
-      return super.toGenericType(type, precision, scale);
-    }
-
-    const name = lowerType.slice(0, argsStart).trim();
-    const args = type.slice(argsStart + 1, type.lastIndexOf(')'));
+    const { name, args } = parseType(columnType);
 
     switch (name) {
       case 'nullable':
       case 'lowcardinality':
-        return this.toGenericType(args, precision, scale);
+        return args.length > 0 ? this.toGenericType(args[0], precision, scale) : 'text';
+      // An AggregateFunction column holds a binary intermediate state rather than a value, so
+      // mapping it to its argument type would hand Cube Store the state bytes.
+      case 'aggregatefunction':
+        throw new Error(
+          `ClickHouse type ${columnType.trim()} is not supported. Finalize the column in the ` +
+          'query instead, e.g. `uniqMerge(col)`.'
+        );
+      // SimpleAggregateFunction stores and reads back a plain value of its argument type
+      case 'simpleaggregatefunction':
+        return args.length > 1 ? this.toGenericType(args[1]) : 'text';
       case 'array':
-        return `${this.toGenericType(args)}[]`;
-      case 'map':
-      case 'tuple':
-      case 'nested':
-        return 'text';
-      case 'decimal': {
-        const [argPrecision, argScale] = args.split(',');
-        return super.toGenericType(name, Number(argPrecision), Number(argScale));
-      }
+        return args.length > 0 ? `${this.toGenericType(args[0])}[]` : 'text';
+      case 'decimal':
+        return this.toGenericDecimal(Number(args[0]), Number(args[1]));
       default:
-        // Parameterized scalars: DateTime('UTC'), DateTime64(3, 'UTC'), Enum8('Date' = 1),
-        // FixedString(16). Their arguments never carry a type, so only the name is mapped.
-        return name in ClickhouseTypeToGeneric
-          ? ClickhouseTypeToGeneric[name]
-          : super.toGenericType(name, precision, scale);
+        break;
     }
+
+    if (isOpaqueTypeName(name)) {
+      return 'text';
+    }
+
+    if (Object.hasOwn(DECIMAL_WIDTH_PRECISION, name)) {
+      return this.toGenericDecimal(DECIMAL_WIDTH_PRECISION[name], Number(args[0]));
+    }
+
+    if (Object.hasOwn(ClickhouseTypeToGeneric, name)) {
+      return ClickhouseTypeToGeneric[name];
+    }
+
+    if (name.startsWith('interval')) {
+      return 'text';
+    }
+
+    // An unmapped name is handed on as ClickHouse spelled it, so the Cube Store CREATE TABLE fails
+    // naming that type. Deliberate: guessing `text` for something numeric would corrupt it quietly.
+    return super.toGenericType(columnType.trim(), precision, scale);
   }
 
   public async createSchemaIfNotExists(schemaName: string): Promise<void> {
