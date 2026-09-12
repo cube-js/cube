@@ -216,9 +216,9 @@ fn a_column_binding_under_a_to_date_window_pushes_literal_bounds() {
     );
 }
 
-// The callback is handed the bounds of the reported period, and a to_date
-// window reads from the start of its own period instead -- so the scan stops
-// short of what the window sums.
+// A to_date window reads from the start of its own period rather than from the
+// start of the range reported, and the callback is handed that start — so the
+// scan it writes covers what the window sums.
 #[test]
 fn a_callback_binding_under_a_to_date_window_reaches_the_period_start() {
     let ctx = TestContext::new(schema(Some(CALLBACK))).unwrap();

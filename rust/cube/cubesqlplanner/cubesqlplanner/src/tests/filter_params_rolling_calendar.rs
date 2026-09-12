@@ -206,3 +206,79 @@ fn a_shifted_window_accepts_a_binding_addressing_its_shift() {
         "{sql}"
     );
 }
+
+/// The fixture with a plain trailing window alongside the calendar ones.
+fn mixed_schema() -> MockSchema {
+    const ANCHOR: &str = "      - name: count_week_to_date";
+    let yaml = std::fs::read_to_string(format!(
+        "{}/src/test_fixtures/schemas/yaml_files/common/integration_calendar.yaml",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .expect("the calendar fixture is readable");
+    assert!(yaml.contains(ANCHOR), "the fixture's measures moved");
+    let added = "      - name: count_trailing_7d\n\
+                 \x20       type: count\n\
+                 \x20       rolling_window:\n\
+                 \x20         trailing: 7 day\n\n";
+    MockSchema::from_yaml(&yaml.replace(ANCHOR, &format!("{added}{ANCHOR}"))).unwrap()
+}
+
+// A query mixing a plain trailing window with a `to_date` one counting off the
+// calendar shares one series between them, and the calendar's periods travel
+// on it. The plain window's scan is bounded by literals derived from interval
+// math, so those bounds have to still cover the series the calendar drives —
+// otherwise the window silently loses the rows past them.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_window_sharing_a_calendar_series_keeps_its_rows() {
+    let ctx = TestContext::new(mixed_schema()).unwrap();
+
+    let alone = indoc! {r#"
+        measures:
+          - calendar_orders.count_trailing_7d
+        time_dimensions:
+          - dimension: custom_calendar.date_val
+            granularity: day
+            dateRange:
+              - "2024-02-29"
+              - "2024-03-09"
+        order:
+          - id: custom_calendar.date_val
+    "#};
+    let mixed = indoc! {r#"
+        measures:
+          - calendar_orders.count_trailing_7d
+          - calendar_orders.count_month_to_date
+        time_dimensions:
+          - dimension: custom_calendar.date_val
+            granularity: day
+            dateRange:
+              - "2024-02-29"
+              - "2024-03-09"
+        order:
+          - id: custom_calendar.date_val
+    "#};
+
+    let Some(alone) = ctx.try_execute_pg(alone, SEED).await else {
+        return;
+    };
+    let mixed = ctx
+        .try_execute_pg(mixed, SEED)
+        .await
+        .expect("the mixed query runs wherever the plain one does");
+
+    // The trailing counts are the same column in both, so every row of the
+    // plain answer must appear in the mixed one.
+    for line in alone.lines().skip(2) {
+        let (day, count) = line.split_once('|').expect("a data row");
+        let day = day.trim();
+        let count = count.trim();
+        let mixed_row = mixed
+            .lines()
+            .find(|l| l.trim_start().starts_with(day))
+            .unwrap_or_else(|| panic!("{day} missing from the mixed answer:\n{mixed}"));
+        assert!(
+            mixed_row.contains(count),
+            "{day}: trailing count {count} changed when the calendar window joined:\n{mixed_row}"
+        );
+    }
+}
