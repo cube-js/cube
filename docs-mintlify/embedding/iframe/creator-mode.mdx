@@ -52,7 +52,7 @@ See [Session settings][ref-session-settings] for the full list of AI-related key
 Four account-wide switches under **Embed → Settings**, in the **Creator Mode** section, control the embedded workspace's chrome and how much of the underlying query embed users can see. Each auto-saves.
 
 - **Show workspace title** (`showWorkspaceTitle`, boolean, default `true`) — whether the header row at the embedded workspace root renders at all.
-- **Workspace title** (`workspaceTitle`, string, default `Workspace`) — the header's text; breadcrumbs reuse it as the root label. **Edit titles** opens per-language overrides (`localizedTitles`, up to 50 entries — each a full locale code like `es-ES`, not a short code like `es`).
+- **Workspace title** (`workspaceTitle`, string, default `Workspace`) — the header's text; breadcrumbs reuse it as the root label. **Edit titles** opens per-language overrides (`localizedTitles`, up to 50 entries), picked from Cube's list of supported languages — the same list used to set the [account-wide UI language][ref-localization-account-default].
 - **Show Semantic SQL** (`showSemanticSql`, boolean, default `true`) — lets embed users view the semantic (Cube) query behind reports and chat results.
 - **Show Generated SQL** (`showGeneratedSql`, boolean, default `false`) — lets embed users view the generated SQL, the physical data-source query. It defaults to hidden, the opposite polarity of the switch above, because generated SQL reveals table and schema names from your data source.
 
@@ -148,3 +148,4 @@ For a complete working example, see the [cube-embedding-demo](https://github.com
 [ref-bootstrap]: /reference/embed-apis/generate-session#creator-mode-bootstrapping-groups-and-user-attributes
 [ref-session-settings]: /reference/embed-apis/generate-session#session-settings
 [ref-localization]: /embedding/iframe/localization
+[ref-localization-account-default]: /embedding/iframe/localization#account-wide-default
