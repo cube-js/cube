@@ -648,6 +648,20 @@ export class QueryCache {
     }
   }
 
+  /**
+   * A queue payload as it may be logged: an inline table's rows are data source
+   * content and have no place in a log line, so only its name and columns stay.
+   */
+  private static payloadForLog(req: { inlineTables?: InlineTables, [key: string]: any }): Record<string, any> {
+    if (!req.inlineTables) {
+      return { ...req };
+    }
+    return {
+      ...req,
+      inlineTables: req.inlineTables.map(({ name, columns }) => ({ name, columns })),
+    };
+  }
+
   public async getQueue(dataSource = 'default') {
     if (!this.queue[dataSource]) {
       const queueOptions = await this.options.queueOptions(dataSource);
@@ -656,7 +670,7 @@ export class QueryCache {
           `SQL_QUERY_${this.cachePrefix}_${dataSource}`,
           () => this.driverFactory(dataSource),
           (client, req) => {
-            this.logger('Executing SQL', { ...req });
+            this.logger('Executing SQL', QueryCache.payloadForLog(req));
             if (req.useCsvQuery) {
               return this.csvQuery(client, req);
             } else {
@@ -724,9 +738,7 @@ export class QueryCache {
         `SQL_QUERY_EXT_${this.cachePrefix}`,
         this.options.externalDriverFactory,
         (client, q) => {
-          this.logger('Executing SQL', {
-            ...q
-          });
+          this.logger('Executing SQL', QueryCache.payloadForLog(q));
           return client.query(q.query, q.values, q);
         },
         {
@@ -797,7 +809,7 @@ export class QueryCache {
         },
       },
       streamHandler: async (req, target) => {
-        queue.logger('Streaming SQL', { ...req });
+        queue.logger('Streaming SQL', QueryCache.payloadForLog(req));
         await (new Promise((resolve, reject) => {
           let logged = false;
           Promise

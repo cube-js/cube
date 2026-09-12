@@ -20,4 +20,5 @@ pub use postgres::*;
 pub use server_manager::ServerManager;
 pub use session::{Session, SessionProperties, SessionState};
 pub use session_manager::SessionManager;
+pub use statement::{redact_error_message, redact_sql_literals, sql_query_key};
 pub use types::{ColumnFlags, ColumnType};
