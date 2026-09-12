@@ -47,6 +47,17 @@ Three account-wide switches under **Embed → Settings** control this, each over
 
 See [Session settings][ref-session-settings] for the full list of AI-related keys, including `allowChatWorkspaceAuthoring` for headless chat integrations that shouldn't let the agent create or modify workbooks, explorations, or dashboards.
 
+## Workspace appearance and SQL visibility
+
+Four account-wide switches under **Embed → Settings**, in the **Creator Mode** section, control the embedded workspace's chrome and how much of the underlying query embed users can see. Each auto-saves.
+
+- **Show workspace title** (`showWorkspaceTitle`, boolean, default `true`) — whether the header row at the embedded workspace root renders at all.
+- **Workspace title** (`workspaceTitle`, string, default `Workspace`) — the header's text; breadcrumbs reuse it as the root label. **Edit titles** opens per-language overrides (`localizedTitles`, up to 50 full BCP-47 locale codes). An embed resolves the title by the visitor's language: an exact locale override, then any stored same-language variant, then this default. A blank or all-whitespace title falls back to `Workspace` rather than rendering an empty header — use **Show workspace title** to hide the header instead.
+- **Show Semantic SQL** (`showSemanticSql`, boolean, default `true`) — lets embed users view the semantic (Cube) query behind reports and chat results.
+- **Show Generated SQL** (`showGeneratedSql`, boolean, default `false`) — lets embed users view the generated SQL, the physical data-source query. It defaults to hidden, the opposite polarity of the switch above, because generated SQL reveals table and schema names from your data source.
+
+These are account-wide only — there's no per-session `settings` key or URL parameter for any of them. Turning on **Show Generated SQL** doesn't expose source tables: the workbook launchpad's Source tables tab and the data pane's source-schema explorer stay hidden in every embed regardless of this switch, since an embed's deployment token carries no `sql-runner` scope.
+
 ## Embed tenant scoping
 
 In Creator Mode, content (workbooks, dashboards) and the groups/user attributes referenced by the session are scoped to an **embed tenant**. Pass `embedTenantName` to isolate content per customer; omit it to use the current tenant.

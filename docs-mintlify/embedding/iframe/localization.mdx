@@ -75,6 +75,13 @@ something higher in the ladder above overrides it: a session's own `settings.loc
 Clearing the setting removes the stored default, and embeds fall back to `en-US` — unless
 a session or a per-embed override names a language.
 
+<Note>
+  The Creator Mode workspace title has its own, separate per-language overrides — set
+  under **Embed → Settings**, in the same **Creator Mode** section — resolved by the
+  visitor's language independently of the UI language above. See [Workspace appearance
+  and SQL visibility](/embedding/iframe/creator-mode#workspace-appearance-and-sql-visibility).
+</Note>
+
 ## Per embed via URL
 
 Override the account default for an individual embed by adding the `?locale=` query
