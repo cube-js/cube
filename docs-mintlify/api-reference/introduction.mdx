@@ -80,9 +80,12 @@ Resources by entity:
 | [GitHub](/api-reference/github/list-repositories-accessible-to-a-github-app-installation) | `/api/v1/github` | v1 |
 | [GitHub Connection](/api-reference/github-connection/connect-a-deployment-to-a-github-repository-and-trigger-a-build) | `/build/api/v1/deployments/{deploymentId}/github/connect` | v1 |
 | [dbt Sync](/api-reference/dbt-sync/list-dbt-syncs-for-a-deployment) | `/api/v1/deployments/{deploymentId}/dbt-sync` | v1 |
+| [Databricks Metric View Publication](/api-reference/databricks-metric-view-publication/start-a-databricks-metric-view-publication-preview) | `/api/v1/deployments/{deploymentId}/databricks-metric-view-previews` | v1 |
+| [Databricks Metric View Integration](/api-reference/databricks-metric-view-integration/get-databricks-metric-view-publication-settings) | `/api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}` | v1 |
 | [Folders](/api-reference/folders/list-folders) | `/api/v1/deployments/{deploymentId}/folders` | v1 |
 | [Reports](/api-reference/reports/list-reports) | `/api/v1/deployments/{deploymentId}/reports` | v1 |
 | [Workbooks](/api-reference/workbooks/get-workbooks) | `/api/v1/deployments/{deploymentId}/workbooks` | v1 |
+| [Dashboard Exports](/api-reference/dashboard-exports/export-a-dashboard-as-png-or-pdf) | `/api/v1/deployments/{deploymentId}/dashboard-exports` | v1 |
 | [Notifications](/api-reference/notifications/list-scheduled-notifications) | `/api/v1/deployments/{deploymentId}/notifications` | v1 |
 | [Workspace](/api-reference/workspace/list-shared-workspace-items) | `/api/v1/deployments/{deploymentId}` | v1 |
 | [Users](/api-reference/users/update-my-settings) | `/api/v1/users/me/settings` | v1 |
@@ -96,10 +99,9 @@ Resources by entity:
 | [App Theme](/api-reference/app-theme/get-app-config) | `/api/v1/app-config` | v1 |
 | [Embed](/api-reference/embed/get-an-embeddable-dashboard) | `/api/v1/embed` | v1 |
 | [Embed Tenants](/api-reference/embed-tenants/list-embed-tenants) | `/api/v1/embed-tenants` | v1 |
-| [Dashboard Embed Access](/api-reference/dashboard-embed-access/list-a-dashboards-embed-access) | `/api/v1/deployments/{deploymentId}/workbooks/{workbookId}/embed-access` | v1 |
+| [Dashboard Embed Access](/api-reference/dashboard-embed-access/list-workbooks-accessible-to-an-embed-tenant) | `/api/v1/deployments/{deploymentId}` | v1 |
 | [Usage Analytics](/api-reference/usage-analytics/issue-a-cube-api-token-for-usage-analytics) | `/api/v1/usage-analytics/token` | v1 |
 | [OpenAPI Spec](/api-reference/openapi-spec/get-the-openapi-specification) | `/api/v1/spec` | v1 |
-| [Dashboard Exports](/api-reference/dashboard-exports/export-a-dashboard-as-png-or-pdf) | `/api/v1/deployments/{deploymentId}/dashboard-exports` | v1 |
 | [Users (SCIM)](/api-reference/scim-users/list-users) | `/api/scim/v2/Users` | SCIM 2.0 |
 | [Groups (SCIM)](/api-reference/scim-groups/list-groups) | `/api/scim/v2/Groups` | SCIM 2.0 |
 

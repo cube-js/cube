@@ -208,7 +208,8 @@ const TAG_MAP = {
 const TAG_ORDER = [
   'Deployments', 'Deployment Creation', 'Environments', 'Env Variables', 'Regions',
   'Data Model', 'Data Model Uploads', 'GitHub', 'GitHub Connection', 'dbt Sync',
-  'Folders', 'Reports', 'Workbooks', 'Notifications', 'Workspace', 'Agents', 'Metadata',
+  'Databricks Metric View Publication', 'Databricks Metric View Integration',
+  'Folders', 'Reports', 'Workbooks', 'Dashboard Exports', 'Notifications', 'Workspace', 'Agents', 'Metadata',
   'Users', 'Users Admin', 'Groups', 'User Groups',
   'User Attributes', 'User Attribute Values', 'Resource Policies', 'Tenant Settings',
   'OAuth Integrations', 'User OAuth Tokens', 'OIDC Token Configs',
@@ -506,6 +507,45 @@ const out = {
     schemas: sortedSchemas,
   },
 };
+
+// Prose throughout `out` is authored in cubejs-enterprise, whose contributors can't see
+// this site's routes, so a hyperlink to the pre-#11851 `cube.dev/docs/<path>` scheme can
+// resurface anywhere in the document on any regeneration; scanning must happen here,
+// pre-serialization, since a `yaml.dump` line-wrap can split a markdown link across lines.
+const LEGACY_LINK_REWRITES = [
+  ['https://cube.dev/docs/product/apis-integrations/rest-api', '/reference/core-data-apis/rest-api'],
+];
+const leakedLegacyLinks = [];
+function rewriteString(s, loc) {
+  let out = s;
+  for (const [from, to] of LEGACY_LINK_REWRITES) out = out.split(from).join(to);
+  if (/https?:\/\/cube\.dev\/docs\//.test(out)) leakedLegacyLinks.push(loc);
+  return out;
+}
+function rewriteLegacyLinks(node, loc) {
+  if (Array.isArray(node)) {
+    node.forEach((n, i) => {
+      const at = `${loc}[${i}]`;
+      if (typeof n === 'string') node[i] = rewriteString(n, at);
+      else rewriteLegacyLinks(n, at);
+    });
+    return;
+  }
+  if (!node || typeof node !== 'object') return;
+  for (const [k, v] of Object.entries(node)) {
+    const at = `${loc}.${k}`;
+    if (typeof v === 'string') node[k] = rewriteString(v, at);
+    else rewriteLegacyLinks(v, at);
+  }
+}
+rewriteLegacyLinks(out, 'out');
+if (leakedLegacyLinks.length) {
+  console.error(
+    'Aborting: legacy cube.dev/docs/ hyperlink(s) survived rewriting — add a LEGACY_LINK_REWRITES entry:\n  ' +
+      leakedLegacyLinks.join('\n  ')
+  );
+  process.exit(1);
+}
 
 writeOrCheck(OUT, yaml.dump(out, { lineWidth: 100, noRefs: true }));
 console.log('paths:', Object.keys(paths).length, '| schemas:', Object.keys(schemas).length, '| tags:', orderedTags.length);
