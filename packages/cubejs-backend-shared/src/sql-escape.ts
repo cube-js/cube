@@ -134,10 +134,8 @@ class SqlEscaper {
 
   /**
    * Substitutes positional placeholders in `sql` with escaped `values`:
-   *   - `?`  is replaced by an escaped value ({@link escapeValue})
-   *   - `??` is replaced by an escaped identifier ({@link escapeIdentifier})
-   * Longer runs of `?` are left untouched. This mirrors `sqlstring.format`'s
-   * placeholder semantics so it can be a drop-in replacement in drivers.
+   * - `?`  is replaced by an escaped value ({@link escapeValue})
+   * - `??` is replaced by an escaped identifier ({@link escapeIdentifier})
    */
   public format(sql: string, values?: unknown): string {
     if (values === null || values === undefined) {
@@ -145,22 +143,28 @@ class SqlEscaper {
     }
 
     const valueList = Array.isArray(values) ? values : [values];
-    if (valueList.length === 0) {
-      return sql;
-    }
 
     const placeholders = /\?+/g;
+
     let result = '';
     let chunkIndex = 0;
     let valuesIndex = 0;
-    let match: RegExpExecArray | null = placeholders.exec(sql);
+    let placeholderCount = 0;
 
-    while (valuesIndex < valueList.length && match !== null) {
-      const len = match[0].length;
+    let match: RegExpExecArray | null;
+
+    // eslint-disable-next-line no-cond-assign
+    while ((match = placeholders.exec(sql)) !== null) {
       // `?` -> value, `??` -> identifier. Longer runs (`???`+) are not placeholders
       // we understand, so we leave them verbatim and consume no value.
-      if (len <= 2) {
-        const rendered = len === 2
+      if (match[0].length > 2) {
+        continue;
+      }
+
+      placeholderCount += 1;
+
+      if (valuesIndex < valueList.length) {
+        const rendered = match[0].length === 2
           ? this.escapeIdentifier(String(valueList[valuesIndex]))
           : this.escapeValue(valueList[valuesIndex]);
 
@@ -168,13 +172,24 @@ class SqlEscaper {
         chunkIndex = placeholders.lastIndex;
         valuesIndex += 1;
       }
-      match = placeholders.exec(sql);
+    }
+
+    if (placeholderCount !== valueList.length) {
+      throw SqlEscaper.parameterCountMismatch(placeholderCount, valueList.length);
     }
 
     if (chunkIndex === 0) {
       return sql;
     }
+
     return chunkIndex < sql.length ? result + sql.slice(chunkIndex) : result;
+  }
+
+  protected static parameterCountMismatch(placeholderCount: number, valueCount: number): Error {
+    return new Error(
+      `SQL parameter count mismatch: ${placeholderCount} placeholder(s) but ${valueCount} value(s) supplied. ` +
+      'A literal \'?\' in SQL must be escaped or bound as a parameter.'
+    );
   }
 }
 
