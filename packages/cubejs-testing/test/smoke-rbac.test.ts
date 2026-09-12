@@ -52,6 +52,11 @@ async function createPostgresClient(user: string, password: string) {
   return conn;
 }
 
+// Member-level denials are refused up front by the API gateway (HTTP 403), so the
+// response carries a policy error naming the denied members instead of the
+// post-execution "hidden member" error.
+const ACCESS_DENIED_ERROR = 'denied by an access policy';
+
 describe('Cube RBAC Engine', () => {
   jest.setTimeout(60 * 5 * 1000);
   let db: StartedTestContainer;
@@ -1423,12 +1428,18 @@ describe('Cube RBAC Engine', () => {
         },
       };
       let error = '';
+      let status: number | undefined;
       try {
         await client.load(query, {});
       } catch (e: any) {
         error = e.toString();
+        status = e.status;
       }
-      expect(error).toContain('You requested hidden member');
+      // A policy denial is an authorization failure, not a server fault
+      expect(status).toBe(403);
+      expect(error).toContain(ACCESS_DENIED_ERROR);
+      // The denied member the caller asked for is named, so the denial is actionable
+      expect(error).toContain('line_items.price_dim');
 
       query = {
         measures: ['line_items_view_no_policy.count'],
@@ -1444,14 +1455,18 @@ describe('Cube RBAC Engine', () => {
 
     test('orders_view and cube with default policy', async () => {
       let error = '';
+      let status: number | undefined;
       try {
         await defaultClient.load({
           measures: ['orders.count'],
         });
       } catch (e: any) {
         error = e.toString();
+        status = e.status;
       }
-      expect(error).toContain('You requested hidden member');
+      expect(status).toBe(403);
+      expect(error).toContain(ACCESS_DENIED_ERROR);
+      expect(error).toContain('orders.count');
 
       error = '';
       try {
@@ -1465,7 +1480,7 @@ describe('Cube RBAC Engine', () => {
       } catch (e: any) {
         error = e.toString();
       }
-      expect(error).toContain('You requested hidden member');
+      expect(error).toContain(ACCESS_DENIED_ERROR);
 
       const result = await defaultClient.load({
         measures: ['orders_open.count'],

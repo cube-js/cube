@@ -268,6 +268,20 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
   },
 }));
 
+/**
+ * Compiler API whose access policies deny member-level access to `deniedMembers`,
+ * mirroring what `CompilerApi.applyRowLevelSecurity` returns for an RBAC denial:
+ * the query is neutralized with a `1 = 0` segment and the denied members are
+ * reported back to the gateway.
+ */
+export const compilerApiWithAccessDenied = (deniedMembers: string[]) => jest.fn().mockImplementation(async () => ({
+  ...(await compilerApi()),
+
+  async applyRowLevelSecurity(query: any) {
+    return { query, denied: true, deniedMembers };
+  },
+}));
+
 export class RefreshSchedulerMock {
   public async preAggregationPartitions() {
     return preAggregationPartitionsResultFactory();
