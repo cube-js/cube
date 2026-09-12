@@ -29,6 +29,7 @@ tags:
   - name: GitHub Connection
   - name: dbt Sync
   - name: Databricks Metric View Publication
+  - name: Databricks Metric View Integration
   - name: Folders
   - name: Reports
   - name: Workbooks
@@ -420,6 +421,69 @@ paths:
           Returns `409` while the job is still rendering — poll `GET /dashboard-exports/{jobId}`
           first — `422` if the render failed (terminal: submit a new export rather than retrying
           this one), and `404` once the job has expired or if it belongs to a different user.
+  /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}:
+    get:
+      operationId: getIntegration
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: dataSourceName
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewIntegrationResponse'
+          description: ''
+      summary: Get Databricks Metric View publication settings
+      tags:
+        - Databricks Metric View Integration
+      x-mint:
+        content: >-
+          Requires a Databricks datasource. This is currently in preview — reach out to the Cube
+          support team to activate it for your account.
+    put:
+      operationId: saveIntegration
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: dataSourceName
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveDatabricksMetricViewIntegrationInput'
+        description: SaveDatabricksMetricViewIntegrationInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewIntegrationResponse'
+          description: ''
+      summary: Create or update Databricks Metric View publication settings
+      tags:
+        - Databricks Metric View Integration
+      x-mint:
+        content: >-
+          Uses optimistic configuration versioning. Pass `expectedConfigurationVersion` 0 to create.
+          Requires a Databricks datasource. This is currently in preview — reach out to the Cube
+          support team to activate it for your account.
   /api/v1/deployments/{deploymentId}/databricks-metric-view-previews:
     post:
       operationId: startPreview
@@ -455,9 +519,10 @@ paths:
           dimensions, common and calculated measures, and acyclic many-to-one equi-joins from one
           Databricks datasource. Access policies, templating, extends, unsafe fanout, unsupported
           expressions, multiple datasources, and converter loss are blocked per view. Two-part
-          schema.table sources are qualified with CUBEJS_DB_DATABRICKS_CATALOG for the selected
+          schema.table sources are qualified with `CUBEJS_DB_DATABRICKS_CATALOG` for the selected
           datasource; without that setting they fail closed with an actionable issue. Requires
-          SchemaRead or SchemaUpdate access and useDatabricksMetricViewsPush.
+          `SchemaRead` or `SchemaUpdate` access. This is currently in preview — reach out to the
+          Cube support team to activate it for your account.
   /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}:
     delete:
       operationId: cancelPreview
@@ -689,6 +754,74 @@ paths:
       summary: Get the result of a completed dbt sync
       tags:
         - dbt Sync
+  /api/v1/deployments/{deploymentId}/embed-tenants/{embedTenantName}/workbooks:
+    get:
+      operationId: listEmbedTenantWorkbooks
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: accessSource
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/EmbedTenantWorkbooksListQueryAccessSource'
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedTenantWorkbooksListResponse'
+          description: ''
+      summary: List workbooks accessible to an embed tenant
+      tags:
+        - Dashboard Embed Access
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Return every workbook the named embed tenant can access in this deployment. Effective
+          access includes workbooks shared directly with the tenant, workbooks shared with all embed
+          users, and workbooks inherited from shared folders. Supports `first`/`after` cursor
+          pagination.
+
+
+          Filter workbooks by how access is granted:
+
+
+          - `tenant`: the workbook itself is explicitly shared with the named embed tenant. Excludes
+          workbooks available only through the all-embed-users group or a shared folder.
+
+          - `allEmbedUsers`: the workbook itself is explicitly shared with the built-in
+          all-embed-users group, making it available to every embed tenant. Excludes tenant-specific
+          direct shares and folder-inherited access.
+
+          - `folder`: access is inherited because the workbook is inside a shared folder or any of
+          its descendant folders. The folder may be shared specifically with the named tenant or
+          with all embed users.
+
+
+          Omit this parameter to return the union of all three access sources. A workbook can match
+          more than one source.
   /api/v1/deployments/{deploymentId}/env-vars:
     get:
       operationId: getEnvVariables
@@ -3570,6 +3703,256 @@ paths:
 
           Note that the flag alone does not make a dashboard embeddable — it must also be published
           and shared with the embed tenant. Returns `404` if the dashboard does not exist.
+  /api/v1/embed/dashboard/{publicId}/comments:
+    get:
+      operationId: listDashboardComments
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: includeResolved
+          schema:
+            oneOf:
+              - type: boolean
+              - type: 'null'
+        - in: query
+          name: resolvedOnly
+          schema:
+            oneOf:
+              - type: boolean
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedDashboardCommentThreadsListResponse'
+          description: ''
+      summary: List comment threads on an embeddable dashboard
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Returns one page of comment threads — each a root comment plus its replies, oldest first —
+          for the dashboard identified by its `publicId`, scoped to the caller's embed tenant.
+
+
+          Threads are ordered newest-first by when they started, so a thread holds its place while
+          it is being replied to. Open threads are returned by default; pass `includeResolved` to
+          widen the page to resolved ones too, or `resolvedOnly` to replace the set with just those.
+
+
+          A comment whose author deleted it is returned with an empty `body` and `removedAt` set, so
+          a thread keeps its shape and the surviving replies stay readable.
+
+
+          Requires a signed embed session scoped to an embed tenant. Every comment endpoint does: a
+          conversation lives inside one embed tenant's partition, so a credential that names no
+          tenant — an API key, a console session — has no conversation to be served and receives
+          `403`.
+    post:
+      operationId: createDashboardComment
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEmbedDashboardCommentBody'
+        description: CreateEmbedDashboardCommentBody
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedDashboardCommentDto'
+          description: ''
+      summary: Post a comment on an embeddable dashboard
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Starts a thread, or replies to one when `parentId` names a thread root.
+
+
+          The comment is attributed to the calling embed user — the author is taken from the signed
+          session, never from the request body. Nesting is one level deep: replying to a reply
+          returns `400`, and `404` covers a `parentId` that names a comment on another dashboard, a
+          deleted thread, or nothing at all.
+  /api/v1/embed/dashboard/{publicId}/comments/mentionable-users:
+    get:
+      operationId: listMentionableEmbedUsers
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: search
+          schema:
+            oneOf:
+              - maxLength: 255
+                type: string
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedMentionableUsersListResponse'
+          description: ''
+      summary: List embed users mentionable in a dashboard comment
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Returns one page of the caller's fellow embed users, for a mention autocomplete, ordered
+          by username.
+
+
+          Scoped to the caller's own embed tenant and to embed users only — console users of the
+          host tenant are never returned. Pass `search` to filter by username or email. `email` may
+          be `null`: `username` is the only identity field an embed user is guaranteed to have.
+  /api/v1/embed/dashboard/{publicId}/comments/{commentId}:
+    delete:
+      operationId: removeDashboardComment
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: commentId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Delete a comment on an embeddable dashboard
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Soft-deletes a comment. Author only.
+
+
+          Deleting a thread root takes its replies with it, so a deleted thread leaves nothing
+          behind. Deleting a reply re-derives its thread's last-activity marker, so the thread does
+          not keep its position on the strength of a message that is gone.
+    patch:
+      operationId: updateDashboardComment
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: commentId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEmbedDashboardCommentBody'
+        description: UpdateEmbedDashboardCommentBody
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedDashboardCommentDto'
+          description: ''
+      summary: Edit a comment on an embeddable dashboard
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Replaces a comment's body and stamps `editedAt`.
+
+
+          Author only: another embed user's comment returns `403`, and a comment that is not on this
+          dashboard returns `404` rather than revealing that it exists elsewhere.
+  /api/v1/embed/dashboard/{publicId}/comments/{commentId}/resolve:
+    post:
+      operationId: setDashboardCommentResolved
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: commentId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetEmbedDashboardCommentResolvedBody'
+        description: SetEmbedDashboardCommentResolvedBody
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedDashboardCommentThreadDto'
+          description: ''
+      summary: Resolve or re-open a comment thread
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Marks a thread resolved, or re-opens it. Author only — the embed user who started the
+          thread.
+
+
+          The console surface is wider: there, a workbook editor may also resolve someone else's
+          thread. That branch has no analogue here, because an embed viewer holds no workbook rights
+          at all, so authorship is the whole rule.
+
+
+          Threads only — a reply has no resolve state of its own, and one carrying it would put two
+          answers on the same thread, so `400` is returned for a reply's id. A thread whose root was
+          deleted while replies survive is still resolvable, or it would sit in the unresolved list
+          forever.
   /api/v1/embed/dashboard/{publicId}/python-run:
     post:
       operationId: postDashboardPythonRun
@@ -4119,7 +4502,7 @@ paths:
           The token is scoped to your account: it carries the same server-resolved security context
           as the embedded Usage Analytics page, so queries only ever see your own data. Send it as
           `Authorization: Bearer <token>` on requests to the returned `apiUrl` (the deployment's
-          [Cube REST API](/reference/core-data-apis/rest-api)).
+          [Cube REST API](https://cube.dev/docs/product/apis-integrations/rest-api)).
 
 
           Tokens expire after 1 hour (see `expiresAt`). Issue a fresh one per session or scheduled
@@ -5192,6 +5575,8 @@ components:
           oneOf:
             - $ref: '#/components/schemas/EmbedSettings'
             - type: 'null'
+        sheetsAgentChatEnabled:
+          type: boolean
         sheetsUi:
           oneOf:
             - $ref: '#/components/schemas/SheetsUiSettings'
@@ -5202,6 +5587,7 @@ components:
             - type: 'null'
       required:
         - applyThemeGlobally
+        - sheetsAgentChatEnabled
       type: object
     AppTheme:
       properties:
@@ -5819,6 +6205,19 @@ components:
             Token lifetime in seconds, between 60 and 86400. Omit to keep the historical default of
             24 hours (86400). Callers that hold the token outside a browser session — scripts, BI
             tools, scheduled jobs — should request a short lifetime and re-issue tokens instead.
+      type: object
+    CreateEmbedDashboardCommentBody:
+      properties:
+        body:
+          maxLength: 10000
+          minLength: 1
+          type: string
+        parentId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - body
       type: object
     CreateEmbedGroupInput:
       properties:
@@ -7223,6 +7622,106 @@ components:
       required:
         - success
       type: object
+    DatabricksMetricViewIntegrationConfigurationResponse:
+      properties:
+        deletionPolicy:
+          $ref: '#/components/schemas/DatabricksMetricViewIntegrationConfigurationResponseDeletionPolicy'
+        enabled:
+          type: boolean
+        selectionMode:
+          $ref: '#/components/schemas/DatabricksMetricViewIntegrationConfigurationResponseSelectionMode'
+        sourceOverrides:
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
+        targetCatalog:
+          type: string
+        targetNamePrefix:
+          oneOf:
+            - type: string
+            - type: 'null'
+        targetNames:
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
+        targetSchema:
+          type: string
+        version:
+          $ref: '#/components/schemas/DatabricksMetricViewIntegrationConfigurationResponseVersion'
+        viewNameRegex:
+          oneOf:
+            - type: string
+            - type: 'null'
+        viewNames:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+      required:
+        - version
+        - enabled
+        - targetCatalog
+        - targetSchema
+        - selectionMode
+        - deletionPolicy
+      type: object
+    DatabricksMetricViewIntegrationConfigurationResponseDeletionPolicy:
+      enum:
+        - retain
+        - delete-managed
+      type: string
+    DatabricksMetricViewIntegrationConfigurationResponseSelectionMode:
+      enum:
+        - all
+        - selected
+        - pattern
+      type: string
+    DatabricksMetricViewIntegrationConfigurationResponseVersion:
+      enum:
+        - 1
+      type: number
+    DatabricksMetricViewIntegrationResponse:
+      properties:
+        accessTest:
+          oneOf:
+            - type: object
+            - type: 'null'
+        configuration:
+          $ref: '#/components/schemas/DatabricksMetricViewIntegrationConfigurationResponse'
+        configurationVersion:
+          type: integer
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        dataSourceName:
+          type: string
+        deploymentId:
+          type: integer
+        publicId:
+          type: string
+        updatedAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+      required:
+        - publicId
+        - deploymentId
+        - dataSourceName
+        - configurationVersion
+        - configuration
+        - createdAt
+        - updatedAt
+      type: object
     DatabricksMetricViewPublicationCounts:
       properties:
         dimensions:
@@ -7305,8 +7804,8 @@ components:
                 type: string
             - type: 'null'
           description: >-
-            Optional Cube view name to root Ossie dataset overrides for otherwise ambiguous view
-            projections.
+            Optional map of Cube view name to the root source dataset the view projects from, for
+            view projections where that root would otherwise be ambiguous.
         targetNames:
           oneOf:
             - type: object
@@ -8523,6 +9022,85 @@ components:
         - read
         - none
       type: string
+    EmbedDashboardCommentDto:
+      properties:
+        body:
+          type: string
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        dashboardId:
+          type: string
+        editedAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        id:
+          type: integer
+        isOwn:
+          type: boolean
+        removedAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        userId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - id
+        - dashboardId
+        - body
+        - createdAt
+        - isOwn
+      type: object
+    EmbedDashboardCommentThreadDto:
+      properties:
+        replies:
+          items:
+            $ref: '#/components/schemas/EmbedDashboardCommentDto'
+          type: array
+        resolvedAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        resolvedBy:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        root:
+          $ref: '#/components/schemas/EmbedDashboardCommentDto'
+      required:
+        - root
+        - replies
+      type: object
+    EmbedDashboardCommentThreadsListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/EmbedDashboardCommentThreadDto'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
     EmbedGroupMemberInput:
       properties:
         embedUserId:
@@ -8566,6 +9144,36 @@ components:
         - addedMembers
         - unchangedMembers
       type: object
+    EmbedMentionableUserDto:
+      properties:
+        email:
+          oneOf:
+            - type: string
+            - type: 'null'
+        firstName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: integer
+        username:
+          type: string
+      required:
+        - id
+        - username
+      type: object
+    EmbedMentionableUsersListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/EmbedMentionableUserDto'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
     EmbedPythonFilteredRunInput:
       properties:
         reportId:
@@ -8608,6 +9216,16 @@ components:
             `true` to preserve the session user's role-derived authoring capabilities; `true` never
             grants access the user does not already have. This setting changes only AI Chat tools
             and instructions. It does not change user roles or permissions for direct API calls.
+        locale:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            UI language for every embed viewed with this session, as a BCP-47 code — a full code
+            (`es-ES`), a short code (`es`) or a regional variant all resolve to a shipped locale.
+            Sits between the per-iframe `?locale=` parameter, which still wins because it is the
+            more specific answer, and the account-wide default under Embed → Settings. A language
+            Cube does not ship falls through to that default rather than failing the session.
         showAiWidgets:
           oneOf:
             - type: boolean
@@ -8630,6 +9248,40 @@ components:
             default); `false` hides the chat even if it is enabled account-wide, `true` shows it
             even if it is disabled account-wide. Only affects the dashboard surface, and only hides
             the entry point — use `allowAi` to withhold AI from the session.
+        showDashboardSettings:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether the dashboard editor viewed with this session offers its settings panel — the
+            gear button and the sidebar behind it. That panel is the ONLY place an embed user can
+            reach the dashboard slug, the per-dashboard time zone, the per-dashboard agent, the grid
+            behaviour switches and the dashboard theme, so `false` withdraws all of them together.
+            Omit or set to `true` to keep the panel (the default).
+        showGroupByCube:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether the workbook data pane viewed with this session offers the "Group by Cube" /
+            "Group by Folder" item in its more-actions menu. `false` hides the item AND pins the
+            pane to the grouping it would have defaulted to — by folder when the view defines
+            folders, by cube otherwise. The choice is remembered per browser, so pinning is what
+            makes the pane look the same for every user of the session rather than freezing whatever
+            each of them last picked. No content is withdrawn either way. Omit or set to `true` to
+            leave the choice with the user (the default).
+        showMemberNames:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether the workbook data pane viewed with this session may display raw member NAMES
+            instead of their titles (the "Show Member Names" item in the pane's more-actions menu).
+            Member names are the data model's own identifiers, so this is a schema-protection
+            setting in the same family as the account-wide Show Generated SQL switch. `false` hides
+            the menu item AND pins the pane to titles, so a user who already switched to names is
+            returned to titles — hiding the control alone would leave them stuck on names with no
+            way back. Omit or set to `true` to leave the choice with the user (the default).
         showWorkbookChat:
           oneOf:
             - type: boolean
@@ -8641,6 +9293,27 @@ components:
             (shown by default); `false` hides them even if they are enabled account-wide, `true`
             shows them even if they are disabled account-wide. Hides entry points only — use
             `allowAi` to withhold AI from the session.
+        showWorkbookShare:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether the Creator Mode workspace viewed with this session offers sharing: the workbook
+            header's Share button and the Share action on a workbook, dashboard, exploration or
+            folder row in the workspace list. Set to `false` for a deployment where each embed user
+            should only ever see their own content. Omit or set to `true` to keep sharing available
+            (the default). Hides the entry points only — it does not revoke access already granted,
+            and it never widens what the session's own permissions allow.
+        timezone:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            IANA time zone the agent runs its queries in for every embed viewed with this session
+            (e.g. `America/New_York`). Sits between the per-iframe `?timezone=` parameter and the
+            account-wide default, and remains subject to the tenant time-zone policy — it is not a
+            way around it. A bare UTC offset or an unknown name falls through to the account default
+            rather than failing the session, because Cube would compute in UTC and report nothing.
       type: object
     EmbedSettings:
       properties:
@@ -8704,6 +9377,24 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+      type: object
+    EmbedTenantWorkbooksListQueryAccessSource:
+      enum:
+        - tenant
+        - allEmbedUsers
+        - folder
+      type: string
+    EmbedTenantWorkbooksListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Workbook'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
       type: object
     EmbedTenantsPublicResponse:
       properties:
@@ -10818,6 +11509,61 @@ components:
         - name
         - actions
       type: object
+    SaveDatabricksMetricViewIntegrationInput:
+      properties:
+        deletionPolicy:
+          $ref: '#/components/schemas/SaveDatabricksMetricViewIntegrationInputDeletionPolicy'
+        enabled:
+          type: boolean
+        expectedConfigurationVersion:
+          description: Use 0 to create; otherwise pass the configurationVersion returned by GET.
+          minimum: 0
+          type: integer
+        selectionMode:
+          $ref: '#/components/schemas/SaveDatabricksMetricViewIntegrationInputSelectionMode'
+        sourceOverrides:
+          additionalProperties:
+            type: string
+          type: object
+        targetCatalog:
+          maxLength: 255
+          type: string
+        targetNamePrefix:
+          maxLength: 255
+          type: string
+        targetNames:
+          additionalProperties:
+            type: string
+          type: object
+        targetSchema:
+          maxLength: 255
+          type: string
+        viewNameRegex:
+          maxLength: 128
+          type: string
+        viewNames:
+          items:
+            type: string
+          maxItems: 128
+          type: array
+      required:
+        - expectedConfigurationVersion
+        - enabled
+        - targetCatalog
+        - targetSchema
+        - selectionMode
+      type: object
+    SaveDatabricksMetricViewIntegrationInputDeletionPolicy:
+      enum:
+        - retain
+        - delete-managed
+      type: string
+    SaveDatabricksMetricViewIntegrationInputSelectionMode:
+      enum:
+        - all
+        - selected
+        - pattern
+      type: string
     SetBranchStagingEnvironmentRequest:
       properties:
         branchId:
@@ -10839,6 +11585,13 @@ components:
           $ref: '#/components/schemas/BranchResponse'
       required:
         - data
+      type: object
+    SetEmbedDashboardCommentResolvedBody:
+      properties:
+        resolved:
+          type: boolean
+      required:
+        - resolved
       type: object
     SetEnvVariablesInput:
       properties:
@@ -11262,6 +12015,15 @@ components:
         - read
         - none
       type: string
+    UpdateEmbedDashboardCommentBody:
+      properties:
+        body:
+          maxLength: 10000
+          minLength: 1
+          type: string
+      required:
+        - body
+      type: object
     UpdateEmbedGroupInput:
       properties:
         description:

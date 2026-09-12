@@ -879,6 +879,14 @@
                 ]
               },
               {
+                "group": "Databricks Metric View Integration",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}",
+                  "PUT /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}"
+                ]
+              },
+              {
                 "group": "Folders",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
@@ -1041,6 +1049,12 @@
                 "pages": [
                   "GET /api/v1/embed/dashboard/{publicId}",
                   "PATCH /api/v1/embed/dashboard/{publicId}",
+                  "GET /api/v1/embed/dashboard/{publicId}/comments",
+                  "POST /api/v1/embed/dashboard/{publicId}/comments",
+                  "GET /api/v1/embed/dashboard/{publicId}/comments/mentionable-users",
+                  "PATCH /api/v1/embed/dashboard/{publicId}/comments/{commentId}",
+                  "DELETE /api/v1/embed/dashboard/{publicId}/comments/{commentId}",
+                  "POST /api/v1/embed/dashboard/{publicId}/comments/{commentId}/resolve",
                   "POST /api/v1/embed/dashboard/{publicId}/python-run",
                   "POST /api/v1/embed/generate-session",
                   "POST /api/v1/embed/session/token"
@@ -1069,6 +1083,7 @@
                 "group": "Dashboard Embed Access",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
+                  "GET /api/v1/deployments/{deploymentId}/embed-tenants/{embedTenantName}/workbooks",
                   "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/embed-access",
                   "PUT /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/embed-access"
                 ]
