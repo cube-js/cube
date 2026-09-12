@@ -508,31 +508,34 @@ const out = {
   },
 };
 
-// Prose throughout `out` — operation descriptions, schema/property descriptions,
-// parameter descriptions, tag descriptions — is authored in cubejs-enterprise, whose
-// contributors can't see this site's routes, so a hyperlink to the pre-#11851
-// `cube.dev/docs/<path>` scheme (root-relativized everywhere else in this repo) can
-// resurface anywhere in the document on any regeneration — as it did in `x-mint.content`
-// the first time this ran after #11851 landed on master. Walk every string in the final
-// document (pre-serialization, so a `yaml.dump` line-wrap can't hide a link inside
-// `](…)`), rewrite known offenders, and fail closed on anything left over rather than
-// silently re-publishing a dead link.
+// Prose throughout `out` is authored in cubejs-enterprise, whose contributors can't see
+// this site's routes, so a hyperlink to the pre-#11851 `cube.dev/docs/<path>` scheme can
+// resurface anywhere in the document on any regeneration; scanning must happen here,
+// pre-serialization, since a `yaml.dump` line-wrap can split a markdown link across lines.
 const LEGACY_LINK_REWRITES = [
   ['https://cube.dev/docs/product/apis-integrations/rest-api', '/reference/core-data-apis/rest-api'],
 ];
 const leakedLegacyLinks = [];
-function rewriteLegacyLinks(node, path) {
-  if (Array.isArray(node)) { node.forEach((n, i) => rewriteLegacyLinks(n, `${path}[${i}]`)); return; }
+function rewriteString(s, loc) {
+  let out = s;
+  for (const [from, to] of LEGACY_LINK_REWRITES) out = out.split(from).join(to);
+  if (/https?:\/\/cube\.dev\/docs\//.test(out)) leakedLegacyLinks.push(loc);
+  return out;
+}
+function rewriteLegacyLinks(node, loc) {
+  if (Array.isArray(node)) {
+    node.forEach((n, i) => {
+      const at = `${loc}[${i}]`;
+      if (typeof n === 'string') node[i] = rewriteString(n, at);
+      else rewriteLegacyLinks(n, at);
+    });
+    return;
+  }
   if (!node || typeof node !== 'object') return;
   for (const [k, v] of Object.entries(node)) {
-    if (typeof v === 'string') {
-      let rewritten = v;
-      for (const [from, to] of LEGACY_LINK_REWRITES) rewritten = rewritten.split(from).join(to);
-      node[k] = rewritten;
-      if (/https?:\/\/cube\.dev\/docs\//.test(rewritten)) leakedLegacyLinks.push(`${path}.${k}`);
-    } else {
-      rewriteLegacyLinks(v, `${path}.${k}`);
-    }
+    const at = `${loc}.${k}`;
+    if (typeof v === 'string') node[k] = rewriteString(v, at);
+    else rewriteLegacyLinks(v, at);
   }
 }
 rewriteLegacyLinks(out, 'out');
