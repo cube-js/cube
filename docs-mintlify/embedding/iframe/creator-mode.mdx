@@ -58,7 +58,7 @@ Four account-wide switches under **Embed → Settings**, in the **Creator Mode**
 
 The workspace title resolves against the same UI language the embed has already resolved (see [Localization][ref-localization]): an exact locale override, then a same-language override, then this default. A blank or all-whitespace title falls back to `Workspace` rather than rendering an empty header — use **Show workspace title** to hide the header instead.
 
-These are account-wide only — there's no per-session `settings` key or URL parameter for any of them. Turning on **Show Generated SQL** doesn't expose source tables: the workbook launchpad's Source tables tab and the data pane's source-schema explorer stay hidden in every embed regardless of this switch, since an embed's deployment token carries no `sql-runner` scope.
+These are account-wide only — there's no per-session `settings` key or URL parameter for any of them. Turning on **Show Generated SQL** doesn't expose source tables: the workbook launchpad's Source tables tab and the data pane's source-schema explorer stay hidden in every embed regardless of this switch.
 
 ## Embed tenant scoping
 
