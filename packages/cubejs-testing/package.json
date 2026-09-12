@@ -104,7 +104,7 @@
     "http-proxy": "^1.18.1",
     "node-fetch": "^2.7.0",
     "ramda": "^0.27.2",
-    "testcontainers": "^10.28.0",
+    "testcontainers": "^12.1.0",
     "yargs": "^17.7.1"
   },
   "devDependencies": {
@@ -119,7 +119,6 @@
     "@types/node": "^22",
     "cypress": "15.21.1",
     "cypress-localstorage-commands": "^1.4.5",
-    "cypress-plugin-snapshots": "^1.4.4",
     "cypress-wait-until": "^1.7.2",
     "globby": "^11.0.4",
     "jest": "^29",

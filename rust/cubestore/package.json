@@ -42,7 +42,7 @@
   },
   "dependencies": {
     "@cubejs-backend/shared": "1.7.37",
-    "@octokit/core": "^3.2.5",
+    "@octokit/core": "^5.2.2",
     "source-map-support": "^0.5.19"
   },
   "jest": {

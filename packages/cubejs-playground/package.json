@@ -46,7 +46,7 @@
     "graphql-ws": "^5.7.0",
     "history": "^4.9.0",
     "html-entities": "^2.3.3",
-    "js-cookie": "^2.2.1",
+    "js-cookie": "^3.0.7",
     "js-object-pretty-print": "^0.3.0",
     "js-yaml": "^4.1.0",
     "jwt-decode": "^3.1.2",
@@ -65,7 +65,6 @@
     "uuid": "^11.1.1"
   },
   "devDependencies": {
-    "@ant-design/compatible": "^1.0.1",
     "@ant-design/icons": "^5.3.5",
     "@cube-dev/ui-kit": "0.52.3",
     "@cubejs-client/core": "1.7.37",

@@ -19,7 +19,7 @@
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.37",
     "@cubejs-backend/shared": "1.7.37",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^6.0.1"
   },
   "license": "Apache-2.0",
   "devDependencies": {
