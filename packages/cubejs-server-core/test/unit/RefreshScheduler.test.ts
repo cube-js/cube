@@ -232,6 +232,53 @@ cube('Bar', {
   ]),
 };
 
+// Build range that moves with time, e.g. `buildRangeStart: { sql: 'SELECT NOW() - INTERVAL 3 YEAR' }`.
+// See https://github.com/cube-js/cube/issues/11860
+const repositoryWithMovingBuildRange: SchemaFileRepository = {
+  localPath: () => __dirname,
+  dataSchemaFiles: () => Promise.resolve([
+    {
+      fileName: 'main.js', content: `
+cube('Moving', {
+  sql: 'select * from moving',
+
+  measures: {
+    count: {
+      type: 'count'
+    }
+  },
+
+  dimensions: {
+    time: {
+      sql: 'timestamp',
+      type: 'time'
+    }
+  },
+
+  preAggregations: {
+    byDay: {
+      type: 'rollup',
+      measureReferences: [count],
+      timeDimensionReference: time,
+      granularity: 'day',
+      partitionGranularity: 'day',
+      refreshKey: {
+        every: '1 second'
+      },
+      buildRangeStart: {
+        sql: 'SELECT moving_build_range_start'
+      },
+      buildRangeEnd: {
+        sql: 'SELECT moving_build_range_end'
+      }
+    }
+  }
+});
+`,
+    },
+  ]),
+};
+
 const repositoryWithRefreshKeys: SchemaFileRepository = {
   localPath: () => __dirname,
   dataSchemaFiles: () => Promise.resolve([
@@ -291,6 +338,8 @@ class MockDriver extends BaseDriver {
 
   public queryAttempts: number = 0;
 
+  public movingBuildRangeShift: number = 0;
+
   public constructor() {
     super();
   }
@@ -330,6 +379,16 @@ class MockDriver extends BaseDriver {
 
     if (query.match(/max\(.*timestamp.*bar/)) {
       promise = promise.then(() => [{ max: '2020-12-31T01:00:00.000' }]);
+    }
+
+    // A build range that moves on every execution, as `SELECT NOW() - INTERVAL 3 YEAR` does
+    if (query.match(/moving_build_range_start/)) {
+      const start = new Date(Date.UTC(2020, 11, 1) + this.movingBuildRangeShift++ * 1000);
+      promise = promise.then(() => [{ start: start.toJSON().substring(0, 23) }]);
+    }
+
+    if (query.match(/moving_build_range_end/)) {
+      promise = promise.then(() => [{ end: '2020-12-05T00:00:00.000' }]);
     }
 
     if (this.tablesReady.find(t => query.indexOf(t) !== -1)) {
@@ -387,11 +446,12 @@ class MockDriver extends BaseDriver {
 
 let testCounter = 1;
 
-const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertSecurityContext, refreshKeyRenewalThreshold }: {
+const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertSecurityContext, refreshKeyRenewalThreshold, sqlCache }: {
   repository: SchemaFileRepository,
   useOriginalSqlPreAggregations?: boolean,
   skipAssertSecurityContext?: true,
-  refreshKeyRenewalThreshold?: number
+  refreshKeyRenewalThreshold?: number,
+  sqlCache?: boolean
 }) => {
   const mockDriver = new MockDriver();
   const externalDriver = new MockDriver();
@@ -447,6 +507,7 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertS
       compileContext: {
         useOriginalSqlPreAggregations,
       },
+      sqlCache,
       logger: (msg, params) => {
         console.log(msg, params);
       },
@@ -1327,5 +1388,55 @@ describe('Refresh Scheduler', () => {
       expect(intervalKeyQueries.length).toBeGreaterThan(0);
       expect(sqlKeyQueries.length).toBeGreaterThan(0);
     });
+  });
+
+  // Reproduction for https://github.com/cube-js/cube/issues/11860
+  //
+  // Expanding partitions goes through `compilerCacheFn(requestId, baseQuery, ['expandPartitions'])`,
+  // and `baseQuery` is the same on every run for a given pre-aggregation and timezone.
+  // `partitionPreAggregations()` then caches the whole list of partition descriptions under
+  // `['partitions', JSON.stringify(buildRange)]`. With a build range that moves with time every
+  // refresh-key renewal yields a new key, and nothing ever releases the previous lists: the
+  // schema-compiler `QueryCache` behind `compilerCacheFn` is a plain nested object with no size
+  // limit and no eviction, and its `CompilerCache` LRU entry never expires because the scheduler
+  // reads it on every run.
+  test('Expanded partitions do not accumulate when the build range moves', async () => {
+    process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
+
+    const { refreshScheduler, compilerApi, mockDriver } = setupScheduler({
+      repository: repositoryWithMovingBuildRange,
+      skipAssertSecurityContext: true,
+      refreshKeyRenewalThreshold: 1,
+      sqlCache: true,
+    });
+
+    const renewals = 5;
+
+    for (let renewal = 0; renewal < renewals; renewal++) {
+      await refreshScheduler.preAggregationPartitions(
+        { authInfo: {}, securityContext: {}, requestId: `moving-build-range-${renewal}` },
+        {
+          timezones: ['UTC'],
+          preAggregations: [{ id: 'Moving.byDay' }],
+        } as any,
+      );
+      // Let the build range query renew so that the next run observes a new range
+      await pausePromise(1500);
+    }
+
+    const compilers: any = await compilerApi.getCompilers();
+    let cachedPartitionLists = 0;
+    for (const [, queryCache] of compilers.compilerCache.queryCache.entries()) {
+      const partitions = queryCache.storage?.expandPartitions?.partitions;
+      if (partitions) {
+        cachedPartitionLists += Object.keys(partitions).length;
+      }
+    }
+
+    // Sanity check: the build range really did move across runs
+    expect(mockDriver.movingBuildRangeShift).toBeGreaterThan(1);
+    // One list per pre-aggregation and timezone is expected, not one per renewal
+    expect(cachedPartitionLists).toBeLessThanOrEqual(1);
   });
 });
