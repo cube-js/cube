@@ -22,6 +22,11 @@ Prefer to manage dashboards from source control? You can also apply dashboards,
 workbooks, and reports to a deployment through the REST API and keep their
 definitions in Git — see [Dashboards as code](/docs/explore-analyze/dashboards/dashboards-as-code).
 
+A published dashboard's header shows a version chip (e.g. `v4`). Click it to
+see who published that version, when, and a summary of what changed since the
+previous published version — widgets added, updated, or removed, and whether
+the layout was rearranged.
+
 ## Data freshness
 
 Each widget shows a [freshness](/docs/explore-analyze/workbooks/querying-data#result-freshness-and-provenance) leaf indicating how recently its data was refreshed. The dashboard's own leaf reflects its least-recently-refreshed widget, so you can see at a glance whether everything on the dashboard is up to date.
@@ -65,6 +70,18 @@ slug. (If you later clear or change a slug that links still reference, the
 options sidebar warns you to update those links.)
 
 </Note>
+
+## Comments
+
+Open a published dashboard and click **Comment** to start a discussion where
+it matters. Reply to a comment (one level deep) or react to it with an
+emoji instead of replying. Mark a thread **Resolved** to close the
+discussion — a resolved thread keeps its comments and reactions visible but
+takes no further replies or reactions until it's reopened.
+
+An admin must turn on comments for your account before this appears; it's a
+separate setting from [comments on embedded
+dashboards](/embedding/iframe/feature-visibility#account-settings).
 
 ## Download as PNG, PDF, or CSV {#download-as-png-or-pdf}
 

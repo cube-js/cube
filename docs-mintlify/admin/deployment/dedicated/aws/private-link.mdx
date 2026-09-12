@@ -92,6 +92,9 @@ information with the Cube team:
   "clickhouse-dev")
 - **Ports**: a list of ports that will be accessed through this connection
 - **DNS Name(s)**: see [DNS and TLS](#dns-and-tls) below
+- **Endpoint Service Region** (only if different from your Cube Region): if
+  your Endpoint Service is published in an AWS region other than the one
+  hosting your Dedicated Infrastructure, share that region too
 - **Cube Region:** PrivateLink requires Cube to be hosted on
   [Dedicated Infrastructure][cube-region]. Specify which Cube Region should
   host your Dedicated Infrastructure.
@@ -112,6 +115,13 @@ TLS:
   Cube team will share back an internal endpoint hostname (e.g. an
   AWS-assigned interface-endpoint DNS name) that you can configure as the
   upstream when you wire the connection into Cube.
+
+## Multiple subdomains in one DNS zone
+
+If several endpoints should resolve inside the same private hosted zone,
+list each additional subdomain along with the DNS name you share. The Cube
+team creates a matching record for each one, plus an optional wildcard
+fallback record for any subdomain you didn't list explicitly.
 
 ## Accepting the connection
 

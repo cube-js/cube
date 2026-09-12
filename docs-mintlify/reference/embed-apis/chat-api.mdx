@@ -222,6 +222,7 @@ When Cube token authentication is used:
 | `sessionSettings.userAttributes` | array | No | Array of `{name, value}` pairs for row-level security. Not allowed with `internalId`. |
 | `sessionSettings.groups` | string[] | No | Array of group names the user belongs to. Not allowed with `internalId`. |
 | `sessionSettings.securityContext` | object | No | Custom security context object passed to Cube queries. Not allowed with `internalId`. |
+| `sessionSettings.timezone` | string | No | IANA time zone the agent runs its queries in for this turn (e.g. `America/New_York`), so relative filters and time buckets land on the viewer's day. Also accepted nested as `sessionSettings.settings.timezone`, the shape the [Generate Session API](/reference/embed-apis/generate-session#session-settings) uses — the flat field wins if both are sent. Falls back to the deployment's default time zone if omitted. |
 | `activeBranchName` | string | No | Name of a development branch to use for the chat session. When provided, queries run against the specified branch instead of the main branch. |
 | `isDefaultBranch` | boolean | No | Whether the specified `activeBranchName` is the default branch. Defaults to `true` when `activeBranchName` is not set, and `false` when it is. Set to `true` if passing the main/production branch name. |
 
@@ -304,6 +305,7 @@ in **Admin → Agents**, or — for the deployment's Auto agent — from
   - **`userAttributes`** (array): Array of `{name, value}` pairs for row-level security. Not allowed with `internalId`.
   - **`groups`** (string[]): Array of group names for user. Not allowed with `internalId`.
   - **`securityContext`** (object): Custom security context object passed to Cube queries. Not allowed with `internalId`.
+  - **`timezone`** (string): IANA time zone the agent runs its queries in for this turn. Also accepted nested as `sessionSettings.settings.timezone`, for parity with the Generate Session API's `settings` object — the flat field wins if both are sent.
 - **`activeBranchName`** (string): Name of a development branch to use for the chat session. When provided, queries run against the specified branch instead of the main branch.
 - **`isDefaultBranch`** (boolean): Whether the specified `activeBranchName` is the default branch. Defaults to `true` when `activeBranchName` is not set, and `false` when it is. Set to `true` if passing the main/production branch name.
 
