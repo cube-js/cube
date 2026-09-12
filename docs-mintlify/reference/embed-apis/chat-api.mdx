@@ -222,7 +222,7 @@ When Cube token authentication is used:
 | `sessionSettings.userAttributes` | array | No | Array of `{name, value}` pairs for row-level security. Not allowed with `internalId`. |
 | `sessionSettings.groups` | string[] | No | Array of group names the user belongs to. Not allowed with `internalId`. |
 | `sessionSettings.securityContext` | object | No | Custom security context object passed to Cube queries. Not allowed with `internalId`. |
-| `sessionSettings.timezone` | string | No | IANA time zone the agent runs *this chat turn's* queries in (e.g. `America/New_York`). Also accepted, at lower priority, nested as `sessionSettings.settings.timezone` — see [Request Body](#stream-chat-state-request-body) below. Falls back to [`CUBEJS_DEFAULT_TIMEZONE`](/reference/configuration/environment-variables#cubejs_default_timezone) if neither is set or valid. |
+| `sessionSettings.timezone` | string | No | IANA time zone the agent runs *this chat turn's* queries in (e.g. `America/New_York`). Also accepted, at lower priority, nested as `sessionSettings.settings.timezone` — see [Request Body](#request-body) below. Falls back to [`CUBEJS_DEFAULT_TIMEZONE`](/reference/configuration/environment-variables#cubejs_default_timezone) if neither is set or valid. |
 | `activeBranchName` | string | No | Name of a development branch to use for the chat session. When provided, queries run against the specified branch instead of the main branch. |
 | `isDefaultBranch` | boolean | No | Whether the specified `activeBranchName` is the default branch. Defaults to `true` when `activeBranchName` is not set, and `false` when it is. Set to `true` if passing the main/production branch name. |
 
@@ -291,7 +291,7 @@ in **Admin → Agents**, or — for the deployment's Auto agent — from
 - **`agentId`** (string, required for the agent form): The AI agent identifier (e.g., "1"). You can find it in **Admin → Agents → Click on Agent row in the table**.
 - **`deploymentId`** (string, required for the deployment form): The deployment identifier (e.g., "9"). It is in the deployment URL, e.g. https://acme.cubecloud.dev/d/9. Resolves to the deployment's Auto agent.
 
-### Request Body {#stream-chat-state-request-body}
+### Request Body {#request-body}
 
 - **`input`** (string): User message or query to send to the AI agent, e.g. "What is our revenue last month?". If omitted, returns current state of thread with provided `chatId`.
 - **`chatId`** (string): Chat thread ID. If omitted, a new thread is created automatically. If provided, it should match the previously returned `chatId` from a message with id `__cutoff__`.
@@ -977,7 +977,7 @@ Supports the same authentication methods as the Chat API: an
 [Cube token](#cube-token-authentication). As with `stream-chat-state`, the
 `/deployments/{deploymentId}/…` form accepts only a Cube token.
 
-### Request Body
+### Request Body {#abort-request-body}
 
 - **`chatId`** (string, required): The chat thread ID to abort. This must match
   the `chatId` of an active or recently completed chat session.
