@@ -389,37 +389,6 @@ if (leakedStaffOnly.length) {
   process.exit(1);
 }
 
-// Operation descriptions are authored in cubejs-enterprise, whose contributors can't
-// see this site's routes, so a hyperlink to the pre-#11851 `cube.dev/docs/<path>`
-// scheme (root-relativized everywhere else in this repo) can resurface on any
-// regeneration — as it did the first time this ran after #11851 landed on master.
-// Rewrite known offenders, then fail closed on anything left over rather than
-// silently re-publishing a dead link.
-const LEGACY_LINK_REWRITES = [
-  ['https://cube.dev/docs/product/apis-integrations/rest-api', '/reference/core-data-apis/rest-api'],
-];
-const leakedLegacyLinks = [];
-for (const [p, ops] of Object.entries(paths)) {
-  for (const m of METHODS) {
-    const op = ops[m];
-    if (!op) continue;
-    const holder = op['x-mint'] ?? op;
-    const key = op['x-mint'] ? 'content' : 'description';
-    if (typeof holder[key] !== 'string') continue;
-    for (const [from, to] of LEGACY_LINK_REWRITES) {
-      holder[key] = holder[key].split(from).join(to);
-    }
-    if (/https?:\/\/cube\.dev\/docs\//.test(holder[key])) leakedLegacyLinks.push(`${m.toUpperCase()} ${p}`);
-  }
-}
-if (leakedLegacyLinks.length) {
-  console.error(
-    'Aborting: legacy cube.dev/docs/ hyperlink(s) survived rewriting — add a LEGACY_LINK_REWRITES entry:\n  ' +
-      leakedLegacyLinks.join('\n  ')
-  );
-  process.exit(1);
-}
-
 // 2. Transitive $ref schema closure.
 function collectRefs(node, acc) {
   if (Array.isArray(node)) { node.forEach((n) => collectRefs(n, acc)); return; }
@@ -538,6 +507,42 @@ const out = {
     schemas: sortedSchemas,
   },
 };
+
+// Prose throughout `out` — operation descriptions, schema/property descriptions,
+// parameter descriptions, tag descriptions — is authored in cubejs-enterprise, whose
+// contributors can't see this site's routes, so a hyperlink to the pre-#11851
+// `cube.dev/docs/<path>` scheme (root-relativized everywhere else in this repo) can
+// resurface anywhere in the document on any regeneration — as it did in `x-mint.content`
+// the first time this ran after #11851 landed on master. Walk every string in the final
+// document (pre-serialization, so a `yaml.dump` line-wrap can't hide a link inside
+// `](…)`), rewrite known offenders, and fail closed on anything left over rather than
+// silently re-publishing a dead link.
+const LEGACY_LINK_REWRITES = [
+  ['https://cube.dev/docs/product/apis-integrations/rest-api', '/reference/core-data-apis/rest-api'],
+];
+const leakedLegacyLinks = [];
+function rewriteLegacyLinks(node, path) {
+  if (Array.isArray(node)) { node.forEach((n, i) => rewriteLegacyLinks(n, `${path}[${i}]`)); return; }
+  if (!node || typeof node !== 'object') return;
+  for (const [k, v] of Object.entries(node)) {
+    if (typeof v === 'string') {
+      let rewritten = v;
+      for (const [from, to] of LEGACY_LINK_REWRITES) rewritten = rewritten.split(from).join(to);
+      node[k] = rewritten;
+      if (/https?:\/\/cube\.dev\/docs\//.test(rewritten)) leakedLegacyLinks.push(`${path}.${k}`);
+    } else {
+      rewriteLegacyLinks(v, `${path}.${k}`);
+    }
+  }
+}
+rewriteLegacyLinks(out, 'out');
+if (leakedLegacyLinks.length) {
+  console.error(
+    'Aborting: legacy cube.dev/docs/ hyperlink(s) survived rewriting — add a LEGACY_LINK_REWRITES entry:\n  ' +
+      leakedLegacyLinks.join('\n  ')
+  );
+  process.exit(1);
+}
 
 writeOrCheck(OUT, yaml.dump(out, { lineWidth: 100, noRefs: true }));
 console.log('paths:', Object.keys(paths).length, '| schemas:', Object.keys(schemas).length, '| tags:', orderedTags.length);
