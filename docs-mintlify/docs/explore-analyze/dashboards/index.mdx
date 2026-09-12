@@ -22,11 +22,6 @@ Prefer to manage dashboards from source control? You can also apply dashboards,
 workbooks, and reports to a deployment through the REST API and keep their
 definitions in Git — see [Dashboards as code](/docs/explore-analyze/dashboards/dashboards-as-code).
 
-A published dashboard's header shows a version chip (e.g. `v4`). Click it to
-see who published that version, when, and a summary of what changed since the
-previous published version — widgets added, updated, or removed, and whether
-the layout was rearranged.
-
 ## Data freshness
 
 Each widget shows a [freshness](/docs/explore-analyze/workbooks/querying-data#result-freshness-and-provenance) leaf indicating how recently its data was refreshed. The dashboard's own leaf reflects its least-recently-refreshed widget, so you can see at a glance whether everything on the dashboard is up to date.
@@ -84,6 +79,13 @@ An admin must turn on the **Allow comments on dashboards** switch on the
 from [comments on embedded
 dashboards](/embedding/iframe/feature-visibility#account-settings), which
 has its own switch and isn't affected by this one.
+
+## Version history
+
+A published dashboard's header shows a version chip (e.g. `v4`). Click it to
+see who published that version, when, and a summary of what changed since the
+previous published version — widgets added, updated, or removed, and whether
+the layout was rearranged.
 
 ## Download as PNG, PDF, or CSV {#download-as-png-or-pdf}
 

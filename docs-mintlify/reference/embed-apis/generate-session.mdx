@@ -115,6 +115,12 @@ both layers together and the rule for choosing between them.
 The [Chat API](/reference/embed-apis/chat-api) session exchange accepts
 `allowChatWorkspaceAuthoring` as a **top-level** field of its request body rather
 than inside a `settings` object. It means the same thing.
+
+It also accepts a `timezone`, both as its own `sessionSettings.timezone` field
+and nested as `sessionSettings.settings.timezone` matching this object's shape.
+That value only sets the zone the agent runs *that chat turn's* queries in — it
+is resolved independently of, and does not affect, the `timezone` documented
+above, which governs iframe rendering.
 </Note>
 
 ## User profile
