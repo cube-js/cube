@@ -96,6 +96,23 @@ describe('MssqlQuery', () => {
 
   const joinedSchemaCompilers = prepareJsCompiler(createJoinedCubesSchema());
 
+  it('renders SQL API pushdown joins after FROM and before WHERE', async () => {
+    await compiler.compile();
+
+    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['visitors.count'],
+    });
+
+    // The SQL API supplies already-rendered joins to statements.select.
+    // Omitting this loop leaves projected columns referring to absent aliases.
+    const { select } = query.sqlTemplates().statements;
+    const joins = '{% for join in joins %}\n{{ join }}{% endfor %}';
+    expect(select).toContain(joins);
+    expect(select.indexOf(joins)).toBeGreaterThan(select.indexOf('FROM {{ from_prepared }}'));
+    expect(select.indexOf(joins)).toBeGreaterThan(select.indexOf(') AS {{ from_alias }}'));
+    expect(select.indexOf(joins)).toBeLessThan(select.indexOf('{% if filter %}'));
+  });
+
   it('should group by the created_at field on the calculated granularity for unbounded trailing windows',
     () => compiler.compile().then(() => {
       const query = new MssqlQuery(
