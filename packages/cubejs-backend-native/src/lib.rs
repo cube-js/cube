@@ -20,6 +20,7 @@ pub mod orchestrator;
 pub mod python;
 pub mod rest4sql;
 pub mod sql4sql;
+pub mod sql_filters;
 pub mod stream;
 pub mod template;
 pub mod transport;
