@@ -883,7 +883,17 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         K: Hash,
     {
         let row = self.get_row_by_index_opt(row_key, secondary_index, false)?;
-        row.ok_or(CubeError::internal(format!(
+        if let Some(row) = row {
+            return Ok(row);
+        }
+        // Unique index: index entry missing but row might still exist.
+        // Rebuild the index so the next lookup succeeds, mirroring the
+        // existing repair pattern in get_row_by_index_opt.
+        if RocksSecondaryIndex::is_unique(secondary_index) {
+            let index = self.get_index_by_id(BaseRocksSecondaryIndex::get_id(secondary_index));
+            self.rebuild_index(&index)?;
+        }
+        Err(CubeError::internal(format!(
             "One value expected in {:?} for {:?} but nothing found",
             self, row_key
         )))
