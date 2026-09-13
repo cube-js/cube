@@ -230,6 +230,12 @@ export interface CubeDefinition {
   isSplitView?: boolean;
   includedMembers?: ViewIncludedMember[];
   joinMap?: string[][];
+  /**
+   * Cubes the view includes at the root of its join tree, i.e. declared with a
+   * single-segment `join_path`. Such a cube is reachable on its own, no matter
+   * what other join paths of the view walk through it.
+   */
+  rootCubes?: string[];
   fileName?: string;
 }
 
@@ -806,6 +812,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     const types = ['hierarchies', 'dimensions', 'measures', 'segments'];
 
     const joinMap: string[][] = [];
+    const rootCubes: string[] = [];
 
     const viewAllMembers: ViewResolvedMember[] = [];
 
@@ -822,6 +829,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         // No need to keep a simple direct cube joins in join map
         if (split.length > 1) {
           joinMap.push(split);
+        } else {
+          rootCubes.push(cubeRef);
         }
 
         if (it.includes === '*') {
@@ -901,6 +910,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     }
 
     cube.joinMap = joinMap;
+    cube.rootCubes = rootCubes;
 
     [...memberSets.allMembers].filter(it => !memberSets.resolvedMembers.has(it)).forEach(it => {
       errorReporter.error(`Member '${it}' is included in '${cube.name}' but not defined in any cube`);

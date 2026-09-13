@@ -13,7 +13,7 @@ pub mod transforms;
 
 pub use common::*;
 pub use cube_symbol::{
-    CubeNameSymbol, CubeNameSymbolFactory, CubeTableSymbol, CubeTableSymbolFactory,
+    CubeNameSymbol, CubeNameSymbolFactory, CubeTableSymbol, CubeTableSymbolFactory, ViewJoinMap,
 };
 pub use dimension_kinds::DimensionKind;
 pub use dimension_symbol::*;

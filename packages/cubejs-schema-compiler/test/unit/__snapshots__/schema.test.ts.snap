@@ -1894,6 +1894,9 @@ Object {
   "preAggregations": Object {},
   "rawCubes": [Function],
   "rawFolders": [Function],
+  "rootCubes": Array [
+    "orders",
+  ],
   "segments": Object {},
 }
 `;

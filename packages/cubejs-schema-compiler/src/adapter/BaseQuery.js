@@ -516,8 +516,11 @@ export class BaseQuery {
   }
 
   /**
+   * How the views the query's members belong to reach the cubes they include:
+   * the join paths they declare, and the cubes they include at the root of
+   * their join tree, per view.
    * @private
-   * @return { Record<string, string[][]>}
+   * @return { Record<string, { paths: string[][], rootCubes: Set<string> }>}
    */
   queryJoinMap() {
     const queryMembers = this.allMembersConcat(false);
@@ -526,7 +529,10 @@ export class BaseQuery {
     for (const member of queryMembers) {
       const memberCube = member.cube?.();
       if (memberCube?.isView && !joinMaps[memberCube.name] && memberCube.joinMap) {
-        joinMaps[memberCube.name] = memberCube.joinMap;
+        joinMaps[memberCube.name] = {
+          paths: memberCube.joinMap,
+          rootCubes: new Set(memberCube.rootCubes ?? []),
+        };
       }
     }
 
@@ -564,23 +570,30 @@ export class BaseQuery {
   /**
    * @private
    * @param { (string|string[])[] } hints
-   * @param { Record<string, string[][]>} joinMap
+   * @param { Record<string, { paths: string[][], rootCubes: Set<string> }>} joinMap
    * @return {(string|string[])[]}
    */
   enrichHintsWithJoinMap(hints, joinMap) {
-    // Potentially, if joins between views would take place, we need to distinguish
-    // join maps on per view basis.
-    const allPaths = Object.values(joinMap).flat();
+    const views = Object.values(joinMap);
 
     return hints.map(hint => {
       if (Array.isArray(hint)) {
         return hint;
       }
 
-      for (const path of allPaths) {
-        const hintIndex = path.indexOf(hint);
-        if (hintIndex !== -1) {
-          return path.slice(0, hintIndex + 1);
+      for (const { paths, rootCubes } of views) {
+        for (const path of paths) {
+          const hintIndex = path.indexOf(hint);
+          if (hintIndex !== -1) {
+            // A cube this view also includes at the root of its join tree is
+            // reachable on its own, so a bare hint into it must not be moved
+            // onto a longer path - that path serves the members included
+            // under it.
+            if (hintIndex > 0 && rootCubes.has(hint)) {
+              return hint;
+            }
+            return path.slice(0, hintIndex + 1);
+          }
         }
       }
 

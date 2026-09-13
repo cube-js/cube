@@ -264,3 +264,74 @@ async fn test_view_raw_and_granular_time_dimension_converted_once_each() {
         insta::assert_snapshot!(result);
     }
 }
+
+/// A view that declares a cube both as a root of its own and as the tail of a
+/// longer join path. A query over the members of the independent root alone
+/// must stay on that root: the longer path serves the members declared under
+/// it, and walking it here would fan the measures out over `locations` and put
+/// pre-aggregation matching on the strict, multiplied path.
+fn independent_roots_context() -> TestContext {
+    let schema = MockSchema::from_yaml_file("common/view_independent_join_roots.yaml");
+    TestContext::new(schema).unwrap()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_independent_root_query_does_not_walk_the_dotted_path() {
+    let ctx = independent_roots_context();
+
+    let query = indoc! {"
+        measures:
+          - kpi.yield_pct
+        dimensions:
+          - kpi.board_id
+        order:
+          - id: kpi.board_id
+    "};
+
+    let (sql, pre_aggregations) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+
+    assert!(
+        !sql.contains("locations"),
+        "the query touches no member of locations, got: {sql}"
+    );
+    assert_eq!(
+        pre_aggregations.len(),
+        1,
+        "the rollup on boards covers the query, got: {sql}"
+    );
+    assert_eq!(pre_aggregations[0].name(), "boards_rollup");
+}
+
+/// The other side of the same rule. `scrap_pct` is declared under
+/// `locations.boards`, and its components resolve to bare `boards` hints -
+/// exactly the hints the rule above leaves alone. They must not pull the
+/// measure off the path it is declared on: it still fans out over `locations`,
+/// which is what forces the deduplicating keys subquery.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_dotted_path_query_still_walks_it() {
+    let ctx = independent_roots_context();
+
+    let query = indoc! {"
+        measures:
+          - kpi.scrap_pct
+        dimensions:
+          - kpi.board_id
+        order:
+          - id: kpi.board_id
+    "};
+
+    let (sql, pre_aggregations) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+
+    assert!(
+        sql.contains("locations"),
+        "the measure is declared under locations.boards, got: {sql}"
+    );
+    assert!(
+        sql.contains(r#" AS "keys""#),
+        "the fan-out has to be deduplicated, got: {sql}"
+    );
+    assert!(
+        pre_aggregations.is_empty(),
+        "a multiplied query does not match the rollup on boards, got: {sql}"
+    );
+}
