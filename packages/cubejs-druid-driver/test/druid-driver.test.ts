@@ -2,8 +2,40 @@
 import { DockerComposeEnvironment, StartedDockerComposeEnvironment, Wait } from 'testcontainers';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import path from 'path';
+import fs from 'fs';
+
+import { prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
 
 import { DruidDriver, DruidDriverConfiguration } from '../src/DruidDriver';
+import { DruidQuery } from '../src/DruidQuery';
+
+// A LIKE filter has to match the user's value literally, and that only works if
+// the escaping applied to the value reaches Druid with the clause that
+// interprets it. Druid accepts a non-literal pattern and honours ESCAPE on it
+// only over a real datasource, so this needs one rather than an inline SELECT.
+const LIKE_DATASOURCE = 'like_escape_filters';
+const LIKE_ROWS = ['50%Yoff', '50%_off', '50Xyoff', 'off', 'plain', 'a\\b', 'aXb'];
+
+const LIKE_CASES: [string, string, string[]][] = [
+  ['contains', '%', ['50%Yoff', '50%_off']],
+  ['contains', '_', ['50%_off']],
+  ['notContains', '%', ['50Xyoff', 'off', 'plain', 'a\\b', 'aXb']],
+  ['startsWith', '50%', ['50%Yoff', '50%_off']],
+  ['endsWith', '_off', ['50%_off']],
+  // The escape character is the third thing escaped in a value, and getting it
+  // wrong costs a row rather than adding one - so `aXb` stands by as the decoy.
+  ['contains', 'a\\b', ['a\\b']],
+  // An ordinary value has to keep working: escaping must not break plain search.
+  ['contains', 'off', ['50%Yoff', '50%_off', '50Xyoff', 'off']],
+];
+
+const LIKE_MODEL = `
+  cube('names', {
+    sql: \`SELECT * FROM ${LIKE_DATASOURCE}\`,
+    measures: { count: { type: 'count' } },
+    dimensions: { name: { sql: 'name', type: 'string' } },
+  });
+`;
 
 describe('DruidDriver', () => {
   let env: StartedDockerComposeEnvironment | null = null;
@@ -30,10 +62,22 @@ describe('DruidDriver', () => {
       return;
     }
 
-    const dc = new DockerComposeEnvironment(
-      path.resolve(path.dirname(__filename), '../../'),
-      'docker-compose.yml'
-    );
+    const composePath = path.resolve(path.dirname(__filename), '../../');
+
+    // The compose file bind-mounts ./storage as /opt/data - Druid's local deep
+    // storage and its indexing-log directory. Docker creates a missing
+    // bind-mount source owned by root while the image runs as `druid`, so an
+    // indexing task cannot publish a segment unless the directory already
+    // exists and is writable. Docker Desktop makes bind mounts writable
+    // whatever the container user, which hides this everywhere but Linux.
+    for (const dir of ['', 'segments', 'indexing-logs']) {
+      const created = path.join(composePath, 'storage', dir);
+
+      fs.mkdirSync(created, { recursive: true });
+      fs.chmodSync(created, 0o777);
+    }
+
+    const dc = new DockerComposeEnvironment(composePath, 'docker-compose.yml');
 
     env = await dc
       .withWaitStrategy('zookeeper', Wait.forLogMessage('binding to port /0.0.0.0:2181'))
@@ -110,5 +154,131 @@ describe('DruidDriver', () => {
         ]
       });
     });
+  });
+
+  const druidRequest = async (endpoint: string, payload?: unknown) => {
+    const response = await fetch(`${config.url}${endpoint}`, {
+      method: payload === undefined ? 'GET' : 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Basic ${Buffer.from(`${config.user}:${config.password}`).toString('base64')}`,
+      },
+      body: payload === undefined ? undefined : JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`${endpoint} responded ${response.status}: ${await response.text()}`);
+    }
+
+    return response.json();
+  };
+
+  // What Druid itself says about the task, so a failure to ingest reads as the
+  // reason rather than as a timeout.
+  const taskStatus = async (task: string) => {
+    const { status } = await druidRequest(`/druid/indexer/v1/task/${task}/status`) as {
+      status: { status: string, errorMsg?: string },
+    };
+
+    return status;
+  };
+
+  const ingestLikeRows = async () => {
+    const { task } = await druidRequest('/druid/indexer/v1/task', {
+      type: 'index_parallel',
+      spec: {
+        ioConfig: {
+          type: 'index_parallel',
+          inputSource: {
+            type: 'inline',
+            data: LIKE_ROWS.map(name => JSON.stringify({ ts: '2020-01-01T00:00:00Z', name })).join('\n'),
+          },
+          inputFormat: { type: 'json' },
+        },
+        dataSchema: {
+          dataSource: LIKE_DATASOURCE,
+          timestampSpec: { column: 'ts', format: 'iso' },
+          dimensionsSpec: { dimensions: ['name'] },
+          granularitySpec: { queryGranularity: 'none', rollup: false, segmentGranularity: 'day' },
+        },
+        tuningConfig: { type: 'index_parallel' },
+      },
+    }) as { task: string };
+
+    // Ingestion finishing and the segment becoming queryable are separate
+    // events, so wait for the rows themselves - but watch the task too, or a
+    // task that died reads as nothing more than a timeout.
+    const deadline = Date.now() + 4 * 60 * 1000;
+    let last = 'unknown';
+
+    while (Date.now() < deadline) {
+      const driver = new DruidDriver(config);
+
+      try {
+        const rows = await driver.query<Record<string, unknown>>(`SELECT COUNT(*) AS c FROM ${LIKE_DATASOURCE}`, []);
+
+        if (Number(Object.values(rows[0])[0]) === LIKE_ROWS.length) {
+          return;
+        }
+      } catch {
+        // the datasource is not there yet
+      } finally {
+        await driver.release();
+      }
+
+      const { status, errorMsg } = await taskStatus(task);
+
+      last = status;
+
+      if (status !== 'RUNNING' && status !== 'PENDING' && status !== 'WAITING' && status !== 'SUCCESS') {
+        throw new Error(`Ingestion task ${task} ended ${status}: ${errorMsg ?? 'no error message'}`);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+
+    throw new Error(
+      `Ingestion task ${task} is ${last} and ${LIKE_DATASOURCE} did not become queryable in time`
+    );
+  };
+
+  const filteredNames = async (operator: string, value: string, useNativeSqlPlanner: boolean) => {
+    const { compiler, joinGraph, cubeEvaluator } = originalPrepareCompiler({
+      localPath: () => __dirname,
+      dataSchemaFiles: () => Promise.resolve([{ fileName: 'main.js', content: LIKE_MODEL }]),
+    }, { adapter: 'druid' });
+
+    await compiler.compile();
+
+    const query = new DruidQuery({ joinGraph, cubeEvaluator, compiler }, {
+      dimensions: ['names.name'],
+      filters: [{ member: 'names.name', operator, values: [value] }],
+      useNativeSqlPlanner,
+    });
+
+    const [sql, params] = query.buildSqlAndParams();
+    const driver = new DruidDriver(config);
+
+    try {
+      const rows = await driver.query<Record<string, unknown>>(sql, params);
+
+      return rows.map(row => Object.values(row)[0]).sort();
+    } finally {
+      await driver.release();
+    }
+  };
+
+  describe('LIKE filters match the value literally', () => {
+    beforeAll(async () => {
+      await ingestLikeRows();
+    }, 5 * 60 * 1000);
+
+    it.each(LIKE_CASES)('%s %p on the legacy planner', async (operator, value, expected) => {
+      expect(await filteredNames(operator, value, false)).toEqual([...expected].sort());
+    }, 60 * 1000);
+
+    it.each(LIKE_CASES)('%s %p on the tesseract planner', async (operator, value, expected) => {
+      expect(await filteredNames(operator, value, true)).toEqual([...expected].sort());
+    }, 60 * 1000);
   });
 });

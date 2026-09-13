@@ -13,10 +13,13 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class DremioFilter extends BaseFilter {
+  // Dremio's `ILIKE(expr, pattern)` is a function and takes no escape argument,
+  // so case folding goes on LOWER(...) and matching on LIKE, which takes one.
+  // Dremio has no default escape character, so the clause is not optional.
   likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
-    return ` ILIKE (${column}${not ? ' NOT' : ''}, CONCAT('${p}', ${this.allocateParam(param)}, '${s}'))`;
+    return `LOWER(${column})${not ? ' NOT' : ''} LIKE LOWER(CONCAT('${p}', ${this.allocateParam(param)}, '${s}')) ESCAPE '\\'`;
   }
 
   castParameter() {
@@ -167,6 +170,9 @@ class DremioQuery extends BaseQuery {
     templates.expressions.interval_single_date_part = 'CAST({{ num }} as INTERVAL {{ date_part }})';
     templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     delete templates.expressions.ilike;
+    // Dremio's ILIKE is a function (see DremioFilter.likeIgnoreCase), not an
+    // infix operator, and takes no escape argument - so match with LOWER + LIKE.
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }}) ESCAPE \'\\\'';
     delete templates.functions.WIDTH_BUCKET;
     templates.quotes.identifiers = '"';
     return templates;
