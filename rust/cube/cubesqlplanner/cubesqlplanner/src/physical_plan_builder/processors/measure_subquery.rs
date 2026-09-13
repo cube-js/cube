@@ -48,6 +48,13 @@ impl<'a> LogicalNodeProcessor<'a, MeasureSubquery> for MeasureSubqueryProcessor<
             select_builder.add_projection_member(&meas, None);
         }
 
+        // The enclosing keys subquery already restricts the rows, so this
+        // select carries no WHERE of its own - but its source cubes must still
+        // see the query's filters, or a `FILTER_PARAMS` binding in a cube's
+        // `sql` falls back to always-true and the join is built against the
+        // whole unfiltered fact table.
+        select_builder.set_filter_params_filters(measure_subquery.filter.all_filters());
+
         let select = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(select)
     }

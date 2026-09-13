@@ -187,6 +187,17 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         let from = From::new_from_join(join_builder.build());
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut select_builder = SelectBuilder::new(from.clone());
+        // The keys side already restricts the rows, so this select needs no
+        // WHERE of its own. Its sources still have to see the query's filters:
+        // a `FILTER_PARAMS` binding in the fact cube's `sql` would otherwise
+        // fall back to always-true and the join would be built against the
+        // whole unfiltered fact table.
+        select_builder.set_filter_params_filters(
+            aggregate_multiplied_subquery
+                .keys_subquery
+                .filter()
+                .all_filters(),
+        );
         let mut group_by = Vec::new();
 
         self.builder.resolve_subquery_dimensions_references(
