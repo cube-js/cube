@@ -28,7 +28,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: 1.90.0
           # override: true # this is by default on
@@ -143,7 +143,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: 1.90.0
           # override: true # this is by default on
@@ -255,7 +255,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: 1.90.0
           # override: true # this is by default on
@@ -338,7 +338,7 @@ jobs:
         run: rustup set auto-self-update disable
         shell: bash
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: 1.90.0
           # override: true # this is by default on
