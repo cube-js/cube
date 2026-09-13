@@ -210,6 +210,15 @@ cubes:
             sql: customer_id
             rolling_window:
                 trailing: 7 day
+          # The same rolling window read a month earlier — its base scan reads
+          # the shifted period, which is not the period the unshifted one reads.
+          - name: rolling_sum_trailing_7d_prior
+            type: number
+            multi_stage: true
+            sql: "{rolling_sum_trailing_7d}"
+            time_shift:
+                - interval: 1 month
+                  type: prior
           # Cat 5 — different windows for multi-rolling tests
           - name: rolling_sum_14d
             type: sum

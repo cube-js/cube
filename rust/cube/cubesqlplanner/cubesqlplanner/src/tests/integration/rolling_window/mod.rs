@@ -1,4 +1,5 @@
 mod aggregation_types;
+mod base_scan_merge;
 mod basic_types;
 mod calculated_measures;
 mod custom_granularities;
