@@ -13,6 +13,7 @@
   },
   "main": "src/VerticaDriver.js",
   "scripts": {
+    "unit": "jest --verbose ./test/unit",
     "integration": "npm run integration:vertica",
     "integration:vertica": "jest --verbose ./test"
   },

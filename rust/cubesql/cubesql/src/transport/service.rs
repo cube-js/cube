@@ -916,6 +916,37 @@ impl SqlTemplates {
         )
     }
 
+    pub fn float_literal_expr(
+        &self,
+        value: Option<f64>,
+        data_type: DataType,
+    ) -> Result<String, CubeError> {
+        if self.contains_template("expressions/float_literal") {
+            // Scientific notation preserves floating-point semantics on MySQL versions
+            // that cannot CAST to FLOAT/DOUBLE. Keep the caller's widened Float32 value:
+            // MySQL evaluates exponent literals as doubles, so formatting 0.1f32 as 1e-1
+            // would lose its exact widened value, 1.0000000149011612e-1.
+            return self.render_template(
+                "expressions/float_literal",
+                context! { value => value.map(|value| format!("{value:e}")) },
+            );
+        }
+
+        // Keep the existing readable Display formatting on the cast path. Format Float32
+        // at its original precision; the dialect's cast supplies the target SQL type.
+        // Unlike the override above, this intentionally retains positional notation.
+        // This also retains the source's decimal-literal range limits: a cast cannot
+        // recover a value that overflows or underflows while parsing its operand.
+        let expr = value.map_or_else(
+            || "NULL".to_string(),
+            |value| match data_type {
+                DataType::Float32 => (value as f32).to_string(),
+                _ => value.to_string(),
+            },
+        );
+        self.cast_expr(expr, self.sql_type(data_type)?)
+    }
+
     pub fn in_list_expr(
         &self,
         expr: String,
@@ -1177,6 +1208,26 @@ mod tests {
             templates.nullable_type("String".to_string()).unwrap(),
             "Nullable(String)"
         );
+    }
+
+    #[test]
+    fn float_literal_override_does_not_require_cast_templates() {
+        let templates = sql_templates_with(vec![(
+            "expressions/float_literal",
+            "{% if value is none %}(NULL + 0e0){% else %}{{ value }}{% endif %}",
+        )]);
+        for data_type in [DataType::Float32, DataType::Float64] {
+            assert_eq!(
+                templates
+                    .float_literal_expr(Some(100.0), data_type.clone())
+                    .unwrap(),
+                "1e2"
+            );
+            assert_eq!(
+                templates.float_literal_expr(None, data_type).unwrap(),
+                "(NULL + 0e0)"
+            );
+        }
     }
 
     #[tokio::test]

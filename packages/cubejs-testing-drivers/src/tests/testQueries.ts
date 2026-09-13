@@ -2829,6 +2829,47 @@ from
       expect(res.rows).toMatchSnapshot();
     });
 
+    executePg('SQL API: floating-point literals preserve arithmetic in pushdown', async (connection) => {
+      // Depend on source rows so constant folding cannot evaluate the divisions locally.
+      // The expression filter also prevents using the Customers count pre-aggregation.
+      const query = `
+        SELECT
+          100.0 * COUNT(*) / (200 * COUNT(*)) AS "float64_ratio",
+          CAST(100 AS REAL) * COUNT(*) / (200 * COUNT(*)) AS "float32_ratio",
+          100.1 * COUNT(*) / (200 * COUNT(*)) AS "fractional_ratio",
+          -100.0 * COUNT(*) / (200 * COUNT(*)) AS "negative_ratio",
+          COUNT(*) / (2 * COUNT(*)) AS "integer_ratio"
+        FROM "Customers"
+        WHERE LOWER("customerName") <> '__float_literal_test__'
+      `;
+      const explained = await connection.query(`EXPLAIN ${query}`);
+      const plan = explained.rows.map(row => Object.values(row).join('\n')).join('\n');
+      expect(plan).toContain('CubeScanWrappedSql');
+      expect(plan).not.toMatch(/Projection:[^\n]*[*/]/);
+
+      // Inspect the source SQL, not local projections that could supply the constants.
+      const pushedSql = plan.match(/CubeScanExecutionPlan, SQL:\s*([\s\S]*)/)?.[1] ?? '';
+      expect(pushedSql).not.toBe('');
+      if (type === 'mysql') {
+        expect(pushedSql.match(/(?<![-\w.])1e2\b/g)?.length).toBeGreaterThanOrEqual(2);
+        expect(pushedSql).toContain('1.001e2');
+        expect(pushedSql).toContain('-1e2');
+      } else {
+        // Dialects choose their own FLOAT/DOUBLE spellings, including precision.
+        expect(pushedSql.match(/CAST\(100 AS [\w ()]+\)/g)?.length).toBeGreaterThanOrEqual(2);
+        expect(pushedSql).toMatch(/CAST\(100\.1 AS [\w ()]+\)/);
+        expect(pushedSql).toMatch(/CAST\(-100 AS [\w ()]+\)/);
+      }
+
+      const { rows } = await connection.query(query);
+      expect(rows).toHaveLength(1);
+      expect(Number(rows[0].float64_ratio)).toBeCloseTo(0.5, 10);
+      expect(Number(rows[0].float32_ratio)).toBeCloseTo(0.5, 6);
+      expect(Number(rows[0].fractional_ratio)).toBeCloseTo(0.5005, 10);
+      expect(Number(rows[0].negative_ratio)).toBeCloseTo(-0.5, 10);
+      expect(Number(rows[0].integer_ratio)).toBe(0);
+    });
+
     executePg('SQL API: metabase count cast to float32 from push down', async (connection) => {
       const res = await connection.query(`
         select cast(count(*) as float) as "a0" from "Customers"
