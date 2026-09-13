@@ -1,0 +1,145 @@
+---
+title: Fields
+description: Build a chart from the query's measures and dimensions — marks, axis sides, break-downs, small multiples, and tooltips.
+---
+
+The **Fields** tab of the chart configuration panel builds the chart out of your query's columns. On a
+bar, line, area, or scatter chart it reads top to bottom in the order you build: one section per
+measure, then the shared dimension, then **Small multiples**, then **Tooltips**.
+
+{/* TODO screenshot: Fields tab open on a bar chart showing the Measure section, Dimension, Small multiples and Tooltips rows (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Measure sections
+
+Each measure drawn on the chart gets its own section. A single measure's section is titled
+**Measure**; from two on they are numbered **Measure 1**, **Measure 2**, and so on, and each row
+gains a grip you can drag to reorder the measures. List order decides drawing order, so the first
+measure is drawn first.
+
+The row holds three controls plus the axis-side toggle:
+
+| Control | What it sets |
+|---|---|
+| **Mark** | How this measure is drawn: **Bar**, **Line**, **Area**, or **Scatter** |
+| Measure select | Which of the query's measures this section draws |
+| **Axis side** | Which axis the measure is scaled against — appears once there are two measures |
+
+Use the section's **Measure actions** menu (⋮) to **Add a measure**, or to **Remove measure** once
+there are two. There is no limit on the number of measures.
+
+### Axis sides
+
+With two or more measures, each one is assigned to **Left axis** or **Right axis** — **Bottom axis**
+and **Top axis** when the bars are horizontal. Any number of measures can sit on one side. Measures
+sharing a side share its scale, and the axis title lists them in list order.
+
+A side is drawn only while a measure uses it, so putting every measure on the right gives you a right
+axis and no left one. This is how you combine measures whose units or magnitudes differ — order count
+as bars on the left, revenue per order as a line on the right.
+
+Bar measures on one side are drawn side by side inside each category band, in list order. Lines and
+points are drawn over them against the same scale.
+
+{/* TODO screenshot: two measure sections, one on each axis side, the second with its mark set to Line (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Break down by
+
+Each measure has its own **Break down by** row: pick a dimension to split that measure into one
+series per dimension value. Measures are broken down independently, and two measures can be broken
+down by different dimensions.
+
+Next to the dimension slot, the placement control decides how the resulting series sit relative to
+each other. It is disabled until a dimension is picked, and its options depend on the mark:
+
+| Mark | Placements |
+|---|---|
+| Bar | **Stacked**: the values stack inside each bar · **Side by side**: one bar per value · **Stacked to 100%**: each bar stretched to the full height |
+| Area | **Stacked**: the areas stack on each other · **Overlaid**: the areas share the baseline · **Stacked to 100%**: the areas fill the full height |
+| Line, Scatter | None — the series are always drawn over one another |
+
+Side by side is unavailable when two bar measures already share the axis, since each measure already
+occupies its own bar in the band.
+
+A break-down decides what a color stands for, so it also decides how the measure is colored — see
+[color scales](/docs/explore-analyze/charts/configuration/color-and-stacking#color-scales).
+
+## Dimension
+
+The **Dimension** section holds the shared category or time axis — the one every measure is drawn
+against.
+
+Its header carries the **Chart orientation** switch: **Vertical bars, the dimension on the X axis**
+or **Horizontal bars, the dimension on the Y axis**. Rotating the chart rotates every measure,
+including lines and areas, and the panel keeps its shape. Horizontal bars suit long category labels
+and long category lists.
+
+The switch is offered on every cartesian chart except scatter, and is disabled with a reason while
+the chart is incomplete — *Add a measure to rotate the bars* or *Add a dimension to rotate the bars*.
+
+A **Sort** row appears where sorting applies, on an ordinal dimension with no time granularity.
+
+The scale type is derived rather than asked for: a time dimension is temporal on a line, area, or
+scatter chart and ordinal on a bar chart; any other dimension is ordinal.
+
+## Small multiples
+
+**Small multiples** splits the chart into a grid of panels, one per value of a dimension — see
+[small multiples](/docs/explore-analyze/charts/configuration/small-multiples) for the grid, scale,
+and sorting options. The control appears once per chart, and is disabled with a reason while two
+axis sides are in use.
+
+## Tooltips
+
+The **Tooltips** row summarizes what is shown on hover — *All fields*, *N fields*, or *None*. Open it
+to check or uncheck the query's columns, dimensions first. Unchecking all turns tooltips off.
+
+The setting applies to the whole chart, not to one measure. See
+[tooltips](/docs/explore-analyze/charts/configuration/tooltips) for hover behavior.
+
+## Scatter charts
+
+A scatter chart plots measures against each other, so it takes a different set of slots:
+**X-Axis** and **Y-Axis** (both measures), **Series** to color the points by a dimension, and
+**Size** to scale each point's radius by a measure. There is no orientation switch and no break-down
+row.
+
+A **Scatter** mark and the scatter chart type are separate things. Any measure can take the scatter
+mark to draw its values as points against the shared dimension, alongside a bar or a line. The scatter
+*chart type* is the one that replaces the measure sections with the slots above.
+
+## The chart type follows the fields
+
+The chart type shown on the chart-type button is derived from what you build rather than set
+separately:
+
+| Chart type | What produces it |
+|---|---|
+| **Bar** | Bar marks, no break-down |
+| **Stacked Bar** | Bar marks broken down and stacked |
+| **Grouped Bar** | Bar marks broken down side by side |
+| **Stacked Bar %** | Bar marks broken down and stacked to 100% |
+| **Line**, **Area**, **Scatter** | Every measure drawn with that mark |
+| **Composite** | Measures drawn with different marks |
+
+Picking a tile in the chart-type picker is an edit, not a reset: it sets every measure's mark, and a
+bar tile also sets the first measure's placement. Break-downs, axis sides, tooltips, and small
+multiples survive. **Scatter** is the exception — it rebuilds the chart around its own slots.
+**Composite** has no tile of its own; it appears once your measures' marks differ.
+
+## When a measure can't be summed
+
+Cube folds the result rows down to what the chart draws. Which operation it folds with comes from the
+measure's own aggregation type in the data model, so a count or a sum is summed, and a min or a max
+folds with its own operation.
+
+Some measures cannot be folded correctly at all — an average, a ratio, a distinct count, a running
+total, or a custom expression. When the query groups by a dimension the chart does not draw, or the
+time granularity is coarser than the query's, such a measure would produce a wrong number. Rather
+than draw it, Cube refuses the chart with a notice naming what to fix:
+
+> **Completed percentage can't be summed across Status.** Remove Status from the query, or add it to
+> the chart.
+
+Either fix works: drop the dimension from the query, or bring it onto the chart — as the
+**Dimension**, or in **Break down by** — so nothing has to be folded. Measures that fold safely are
+unaffected, and when nothing needs folding every measure is drawn.
