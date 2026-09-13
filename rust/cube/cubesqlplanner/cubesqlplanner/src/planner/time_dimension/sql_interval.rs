@@ -16,6 +16,19 @@ pub struct SqlInterval {
 }
 
 impl SqlInterval {
+    /// An interval that advances nothing. A bucket walk over one never
+    /// terminates, and an alignment to one never converges.
+    pub fn is_zero(&self) -> bool {
+        self.year == 0
+            && self.quarter == 0
+            && self.month == 0
+            && self.week == 0
+            && self.day == 0
+            && self.hour == 0
+            && self.minute == 0
+            && self.second == 0
+    }
+
     pub fn new(
         year: i32,
         quarter: i32,

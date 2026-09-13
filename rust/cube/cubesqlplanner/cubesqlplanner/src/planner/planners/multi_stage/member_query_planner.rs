@@ -516,6 +516,18 @@ impl MultiStageMemberQueryPlanner {
             self.description.member_node().clone()
         };
         let member_node = &member_node;
+        let co_measures = self
+            .description
+            .co_measures()
+            .into_iter()
+            .map(|measure| {
+                if leaf_as_state {
+                    transforms::measures_as_state(&measure)
+                } else {
+                    Ok(measure)
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         let mut dimensions = self.description.state().dimensions().clone();
         let mut time_dimensions = self.description.state().time_dimensions().clone();
         let mut measures = vec![];
@@ -541,6 +553,7 @@ impl MultiStageMemberQueryPlanner {
                 _ => {}
             }
         }
+        measures.extend(co_measures.iter().cloned());
 
         let mut measures_filters = self.description.state().measures_filters().clone();
         if leaf_as_state {
@@ -582,7 +595,9 @@ impl MultiStageMemberQueryPlanner {
             query_planner.plan(scope)
         })?;
         let leaf_measure_plan = MultiStageLeafMeasure {
-            measures: vec![member_node.clone()],
+            measures: std::iter::once(member_node.clone())
+                .chain(co_measures)
+                .collect_vec(),
             query,
             evaluation_context,
         };
@@ -630,12 +645,13 @@ impl MultiStageMemberQueryPlanner {
             .input()
             .iter()
             .map(|d| {
+                let measures = d.measures();
                 let schema = LogicalSchema::default()
                     .set_time_dimensions(d.state().time_dimensions().clone())
                     .set_dimensions(d.state().dimensions().clone())
-                    .set_measures(vec![d.member_node().clone()])
+                    .set_measures(measures.clone())
                     .into_rc();
-                (d.alias().clone(), vec![d.member_node().clone()], schema)
+                (d.alias().clone(), measures, schema)
             })
             .unique_by(|(a, _, _)| a.clone())
             .collect_vec()

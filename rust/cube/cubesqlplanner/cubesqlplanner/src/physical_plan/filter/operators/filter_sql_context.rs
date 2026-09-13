@@ -181,6 +181,27 @@ impl<'a> FilterSqlContext<'a> {
         self.plan_templates.convert_tz(field.to_string())
     }
 
+    /// The rolling window's series bounds as literal parameters, or `None`
+    /// when they can only be read back off the series itself.
+    ///
+    /// Raw values are spliced into pre-aggregation SQL verbatim rather than
+    /// allocated as parameters, which a bound cannot be rendered as.
+    pub fn date_range_literals(
+        &self,
+        range: &Option<(String, String)>,
+    ) -> Result<Option<(String, String)>, CubeError> {
+        let Some((from, to)) = range else {
+            return Ok(None);
+        };
+        if self.use_raw_values {
+            return Ok(None);
+        }
+        Ok(Some((
+            self.format_and_allocate_from_date(from)?,
+            self.format_and_allocate_to_date(to)?,
+        )))
+    }
+
     pub fn date_range_from_time_series(&self) -> Result<(String, String), CubeError> {
         Ok((
             self.time_series_bound("min", "date_from")?,
