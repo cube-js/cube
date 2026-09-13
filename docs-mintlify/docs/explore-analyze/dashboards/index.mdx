@@ -26,6 +26,8 @@ definitions in Git — see [Dashboards as code](/docs/explore-analyze/dashboards
 
 Each widget shows a [freshness](/docs/explore-analyze/workbooks/querying-data#result-freshness-and-provenance) leaf indicating how recently its data was refreshed. The dashboard's own leaf reflects its least-recently-refreshed widget, so you can see at a glance whether everything on the dashboard is up to date.
 
+Use a chart's **Refresh** action, or **Refresh all charts** for the whole dashboard, to force new data. If a chart is served from a [pre-aggregation](/docs/pre-aggregations) that needs to rebuild first, Cube tracks the rebuild and reports what actually happened once it can confirm it, rather than declaring success while the rebuild is still running: **Refreshed successfully** once the new data has landed, **Refresh requested** when Cube can't yet confirm whether a rebuild finished, or **Still rebuilding pre-aggregations** if it's taking longer than a few minutes. Refreshing several charts at once shows a single combined notification for the whole batch.
+
 ## Linking between dashboards
 
 Dashboards can link to one another. When a table widget shows a dimension that
