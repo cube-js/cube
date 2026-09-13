@@ -1155,6 +1155,120 @@ describe('pre-aggregations', () => {
       expect(query.buildSqlAndParams()[0]).toMatch(/orders/);
     });
   });
+  // A cross-cube rollup makes matching re-derive the query's join groups. The query
+  // carries its own joinHints because `users` and `line_items` have no join between
+  // them — only `base_orders` joins both — so dropping those hints turns a fully
+  // specified query into "Can't find join path to join 'users', 'line_items'".
+  describe('a rollup that cannot serve the query does not change how it is planned', () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+cubes:
+  - name: base_orders
+    sql: SELECT * FROM orders
+    joins:
+      - name: line_items
+        sql: "{CUBE.id} = {line_items.order_id}"
+        relationship: one_to_many
+      - name: users
+        sql: "{CUBE.user_id} = {users.id}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: user_id
+        sql: user_id
+        type: number
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: orders_and_line_items_of_users
+        measures:
+          - count
+          - base_orders.line_items.count
+          - base_orders.line_items.sum_price
+        dimensions:
+          - base_orders.users.gender
+          - base_orders.users.state
+
+  - name: line_items
+    sql: SELECT * FROM line_items
+    joins:
+      - name: products
+        sql: "{CUBE.product_id} = {products.id}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: order_id
+        sql: order_id
+        type: number
+      - name: product_id
+        sql: product_id
+        type: number
+    measures:
+      - name: count
+        type: count
+      - name: sum_price
+        sql: price
+        type: sum
+
+  - name: users
+    sql: SELECT * FROM users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: gender
+        sql: gender
+        type: string
+      - name: state
+        sql: state
+        type: string
+
+  - name: products
+    sql: SELECT * FROM products
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: name
+        sql: name
+        type: string
+`);
+
+    beforeAll(async () => {
+      await compiler.compile();
+    });
+
+    describe.each([
+      ['legacy planner', false],
+      ['native planner', true],
+    ])('%s', (_name, useNativeSqlPlanner) => {
+      it('plans a multi-cube query along its own join hints', async () => {
+        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+          measures: ['base_orders.count', 'line_items.count'],
+          dimensions: ['users.state'],
+          joinHints: [
+            ['base_orders', 'users'],
+            ['base_orders', 'line_items'],
+          ],
+          timezone: 'UTC',
+          preAggregationsSchema: '',
+          useNativeSqlPlanner,
+        });
+
+        expect(() => query.buildSqlAndParams()).not.toThrow();
+        expect(query.buildSqlAndParams()[0]).toMatch(/line_items/);
+      });
+    });
+  });
+
   // A rollupJoin resolves hop by hop, and each hop needs a leg rollup carrying that hop's key
   // on each side. That is a requirement on every leg rollup, not a limit on how many cubes the
   // chain spans — an interior rollup needs the upstream hop's key too, which no query selects.

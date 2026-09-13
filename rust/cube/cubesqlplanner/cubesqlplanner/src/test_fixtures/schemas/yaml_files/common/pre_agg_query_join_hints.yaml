@@ -1,0 +1,105 @@
+# base_orders is the only cube that joins both line_items and users; line_items
+# joins products only and users joins nothing, so a query touching base_orders
+# and line_items cannot derive a join root from its members alone and the SQL API
+# sends explicit query-level joinHints instead.
+cubes:
+  - name: base_orders
+    sql: "SELECT * FROM base_orders"
+    joins:
+      - name: line_items
+        relationship: one_to_many
+        sql: "{CUBE.id} = {line_items.order_id}"
+      - name: users
+        relationship: many_to_one
+        sql: "{CUBE.user_id} = {users.id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: user_id
+        type: number
+        sql: user_id
+      - name: status
+        type: string
+        sql: status
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: orders_and_line_items_of_users
+        type: rollup
+        measures:
+          - count
+          - base_orders.line_items.count
+          - base_orders.line_items.sum_price
+        dimensions:
+          - base_orders.users.gender
+          - base_orders.users.state
+
+  - name: line_items
+    sql: "SELECT * FROM line_items"
+    joins:
+      - name: products
+        relationship: many_to_one
+        sql: "{CUBE.product_id} = {products.id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: order_id
+        type: number
+        sql: order_id
+      - name: product_id
+        type: number
+        sql: product_id
+    measures:
+      - name: count
+        type: count
+      - name: sum_price
+        type: sum
+        sql: price
+
+  - name: users
+    sql: "SELECT * FROM users"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: gender
+        type: string
+        sql: gender
+      - name: state
+        type: string
+        sql: state
+
+  - name: products
+    sql: "SELECT * FROM products"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: name
+        type: string
+        sql: name
+
+views:
+  - name: orders_view
+    cubes:
+      - join_path: base_orders
+        includes:
+          - count
+          - status
+      - join_path: base_orders.line_items
+        prefix: true
+        includes:
+          - count
+          - sum_price
+      - join_path: base_orders.users
+        prefix: true
+        includes:
+          - gender
+          - state
