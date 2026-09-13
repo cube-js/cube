@@ -537,6 +537,14 @@ export interface PyConfiguration {
   scheduledRefreshContexts?: (ctx: unknown) => Promise<string[]>
   scheduledRefreshTimeZones?: (ctx: unknown) => Promise<string[]>
   contextToGroups?: (ctx: unknown) => Promise<string[]>
+  /**
+   * LLM Gateway hook; Core ignores it. Resolves to a list of chunks, or to
+   * `{ next }` for a stream — where `next()` resolves to `undefined`, NOT
+   * `null`, at the end: the bridge converts a Python `None` to `undefined`, so
+   * `if (chunk === null) break` never terminates. Python values with no bridge
+   * representation (a model object, an async generator) throw instead.
+   */
+  chatCompletion?: (request: unknown) => Promise<unknown>
 }
 
 function simplifyExpressRequest(req: ExpressRequest) {
