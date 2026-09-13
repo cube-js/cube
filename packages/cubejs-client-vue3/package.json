@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/vue3",
-  "version": "1.7.34",
+  "version": "1.7.37",
   "engines": {},
   "repository": {
     "type": "git",
@@ -14,7 +14,6 @@
     "Cube Dev, Inc."
   ],
   "scripts": {
-    "lint": "eslint src tests",
     "test": "jest",
     "unit": "npm run test:unit",
     "test:unit": "jest",
@@ -27,37 +26,20 @@
     "src"
   ],
   "dependencies": {
-    "@cubejs-client/core": "1.7.34",
-    "ramda": "^0.27.0"
+    "@cubejs-client/core": "1.7.37",
+    "ramda": "^0.27.2"
   },
   "devDependencies": {
-    "@babel/core": "^7",
-    "@babel/preset-env": "^7",
+    "@babel/core": "^7.24.5",
+    "@babel/preset-env": "^7.24.5",
     "@vue/test-utils": "^2.4",
     "babel-jest": "^29",
-    "eslint": "^7.21.0",
     "jest": "^29",
     "jest-environment-jsdom": "^29",
     "vue": "^3.0"
   },
   "peerDependencies": {
     "vue": "^3.0.0"
-  },
-  "eslintConfig": {
-    "root": true,
-    "env": {
-      "es2021": true,
-      "node": true,
-      "jest": true
-    },
-    "extends": [
-      "eslint:recommended"
-    ],
-    "rules": {},
-    "parserOptions": {
-      "ecmaVersion": 2021,
-      "sourceType": "module"
-    }
   },
   "browserslist": [
     "> 1%",

@@ -15,12 +15,50 @@ To enable it, pass `creatorMode: true` to the [Generate Session API][ref-generat
   Creator Mode requires [Signed embedding](/embedding/iframe/auth/signed). Private embedding is not supported.
 </Note>
 
-## Dashboard header controls
+## Hiding features
 
-When a user opens a dashboard inside Creator Mode, its header renders the
-same as in a standalone dashboard embed. To hide any of its controls (title,
-back button, Edit, Duplicate) for your embed, see
-[Show or hide header controls](/embedding/iframe/dashboards#show-or-hide-header-controls).
+Creator Mode ships the full authoring experience, and most of it can be taken
+back out for a given customer or a given placement:
+
+- **Per session**, via `settings` on the [Generate Session API][ref-generate-session]:
+  `showWorkbookShare` (the Share button and row actions), `showDashboardSettings`
+  (the dashboard gear and its sidebar), `showMemberNames` and `showGroupByCube`
+  (the data pane's more-actions items), `showWorkbookChat` and `showAiWidgets`
+  (AI entry points), `allowChatWorkspaceAuthoring` (whether the agent may author
+  workbooks, explorations, and dashboards at all), and `allowAi` (AI entirely).
+- **Per iframe**, via URL parameters: `showWorkbookBackButton=false` on the
+  workbook header, and the dashboard header controls — which render the same in
+  Creator Mode as in a standalone dashboard embed.
+- **Account-wide**, under **Embed → Settings**: the workspace header title and
+  whether it shows at all, and whether embed users may see Semantic SQL and
+  Generated SQL.
+
+[Show and hide features](/embedding/iframe/feature-visibility) documents all of
+them, and the rule for which layer to use.
+
+## AI
+
+Creator Mode workbooks show the same AI entry points as the full Cube app — the chat side panel, the launchpad's "Ask Cube Agent" button, "Fix in chat" on a failed report, and AI summary widgets — unless you turn them off.
+
+Three account-wide switches under **Embed → Settings** control this, each overridable per session via [Generate Session][ref-generate-session]:
+
+- **AI** (`allowAi`) is the master switch. Turning it off is enforced server-side — a denied session can't obtain AI credentials at all, so it can't spend AI tokens, and it overrides the toggles below.
+- **Workbook chat** (`showWorkbookChat`) and **AI widgets** (`showAiWidgets`) hide those specific entry points without disabling AI as a whole. While the master switch is off, these are disabled rather than cleared, so turning AI back on restores their configured state.
+
+See [Session settings][ref-session-settings] for the full list of AI-related keys, including `allowChatWorkspaceAuthoring` for headless chat integrations that shouldn't let the agent create or modify workbooks, explorations, or dashboards.
+
+## Workspace appearance and SQL visibility
+
+Four account-wide switches under **Embed → Settings**, in the **Creator Mode** section, control the embedded workspace's chrome and how much of the underlying query embed users can see. Each auto-saves.
+
+- **Show workspace title** (`showWorkspaceTitle`, boolean, default `true`) — whether the header row at the embedded workspace root renders at all.
+- **Workspace title** (`workspaceTitle`, string, default `Workspace`) — the header's text; breadcrumbs reuse it as the root label. **Edit titles** opens per-language overrides (`localizedTitles`, up to 50 entries), picked from [Cube's list of supported languages][ref-localization-supported-languages] — the same list the account-wide UI language is set from.
+- **Show Semantic SQL** (`showSemanticSql`, boolean, default `true`) — lets embed users view the semantic (Cube) query behind reports and chat results.
+- **Show Generated SQL** (`showGeneratedSql`, boolean, default `false`) — lets embed users view the generated SQL, the physical data-source query. It defaults to hidden, the opposite polarity of the switch above, because generated SQL reveals table and schema names from your data source.
+
+The workspace title resolves against the same UI language the embed has already resolved (see [Localization][ref-localization]): an exact locale override, then a same-language override, then this default. A blank or all-whitespace title falls back to `Workspace` rather than rendering an empty header — use **Show workspace title** to hide the header instead.
+
+These are account-wide only — there's no per-session `settings` key or URL parameter for any of them. Turning on **Show Generated SQL** doesn't expose source tables: the workbook launchpad's Source tables tab and the data pane's source-schema explorer stay hidden in every embed regardless of this switch.
 
 ## Embed tenant scoping
 
@@ -108,3 +146,6 @@ For a complete working example, see the [cube-embedding-demo](https://github.com
 
 [ref-generate-session]: /reference/embed-apis/generate-session
 [ref-bootstrap]: /reference/embed-apis/generate-session#creator-mode-bootstrapping-groups-and-user-attributes
+[ref-session-settings]: /reference/embed-apis/generate-session#session-settings
+[ref-localization]: /embedding/iframe/localization
+[ref-localization-supported-languages]: /embedding/iframe/localization#supported-languages

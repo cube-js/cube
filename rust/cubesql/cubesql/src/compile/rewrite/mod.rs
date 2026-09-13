@@ -491,6 +491,8 @@ crate::plan_to_language! {
             // Data source restriction for SQL generation imposed by `input` of LP node being rewritten
             // Will be provided from top, when wrapping new LP node, and for initial CubeScan wrap
             // `None` means it is not restricted yet, any data source could work here
+            // A scan over a view spanning data sources gets one context per data source it
+            // reaches, and only members of that data source are pushed into each of them
             input_data_source: Option<String>,
         },
         WrapperPushdownReplacer {
@@ -827,6 +829,27 @@ where
     .unwrap()
 }
 
+/// [`transforming_rewrite`] whose transform yields any number of substitutions, each applied
+/// as its own instance of the applier pattern and unioned with the matched class. For a
+/// match that has several valid outcomes at once, like a scan over a view spanning data
+/// sources that gets one wrapper context per data source.
+pub fn transforming_rewrite_multi<T>(
+    name: &str,
+    searcher: String,
+    applier: String,
+    transform_fn: T,
+) -> CubeRewrite
+where
+    T: Fn(&mut CubeEGraph, &Subst) -> Vec<Subst> + Sync + Send + 'static,
+{
+    Rewrite::new(
+        name.to_string(),
+        searcher.parse::<Pattern<LogicalPlanLanguage>>().unwrap(),
+        MultiTransformingPattern::new(applier.as_str(), transform_fn),
+    )
+    .unwrap()
+}
+
 pub fn transforming_rewrite_with_root<T>(
     name: &str,
     searcher: String,
@@ -894,6 +917,10 @@ where
     .unwrap()
 }
 
+/// Every combination of one match per element of a list. `substs` holds the matches of
+/// every element back to back, `prevs` links each match to a match of the previous element
+/// that agrees with it on the top level variables, and `start` marks the last element's range,
+/// so walking `prevs` from there spells out a combination.
 struct ListMatches {
     len: usize,
     substs: Vec<Subst>,
@@ -918,6 +945,14 @@ impl ListMatches {
             f(&substs);
         }
     }
+}
+
+/// Every match of every element of a list, kept apart per element rather than combined,
+/// for an applier that builds each element from all of its matches at once: the
+/// combinations are not needed there, and their count is the product of the alternatives.
+/// One group per assignment of the top level variables, an element's matches at its index.
+struct ListElemMatches {
+    groups: Vec<Vec<Vec<Subst>>>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -981,6 +1016,9 @@ struct ListNodeSearcher {
     /// union, and folding a `Distinct` into a single-query one would drop the deduplication
     /// with no operator to render it on.
     min_elements: usize,
+    /// Report the matches of every element as [`ListElemMatches`] instead of combining them
+    /// into [`ListMatches`]. Only for an applier that consumes them per element.
+    per_elem: bool,
 }
 
 impl ListNodeSearcher {
@@ -992,7 +1030,13 @@ impl ListNodeSearcher {
             elem_pattern: elem_pattern.parse().unwrap(),
             top_level_elem_vars: vec![],
             min_elements: 1,
+            per_elem: false,
         }
+    }
+
+    fn with_per_elem_matches(mut self) -> Self {
+        self.per_elem = true;
+        self
     }
 
     fn with_min_elements(mut self, min_elements: usize) -> Self {
@@ -1080,6 +1124,11 @@ impl ListNodeSearcher {
                 continue;
             }
 
+            if self.per_elem {
+                self.search_elem_matches(egraph, limit, list_children, list_subst, output);
+                continue;
+            }
+
             let mut list_matches = ListMatches {
                 len: list_children.len(),
                 substs: vec![],
@@ -1125,6 +1174,57 @@ impl ListNodeSearcher {
                 subst.data = Some(Arc::new(list_matches));
                 output.push(subst);
             }
+        }
+    }
+
+    /// Collect the matches of every element into [`ListElemMatches`]: grouped by the values
+    /// of the top level variables, so a group holds only matches that agree on them, and
+    /// dropped when any element has no match in it. `limit` caps the matches of every
+    /// element and ends its search there; the combining path caps only its first element.
+    fn search_elem_matches(
+        &self,
+        egraph: &CubeEGraph,
+        limit: usize,
+        list_children: &[Id],
+        list_subst: &Subst,
+        output: &mut Vec<Subst>,
+    ) {
+        let mut groups: Vec<(Vec<Option<Id>>, Vec<Vec<Subst>>)> = vec![];
+        for (index, &list_child) in list_children.iter().enumerate() {
+            let mut kept = 0;
+            self.elem_pattern
+                .search_eclass_with_fn(egraph, list_child, |subst| {
+                    if kept >= limit {
+                        return Err(());
+                    }
+                    kept += 1;
+                    let key = self
+                        .top_level_elem_vars
+                        .iter()
+                        .map(|&v| subst.get(v).copied())
+                        .collect::<Vec<_>>();
+                    let group = match groups.iter_mut().find(|(k, _)| *k == key) {
+                        Some((_, group)) => group,
+                        None => {
+                            groups.push((key, vec![vec![]; list_children.len()]));
+                            &mut groups.last_mut().unwrap().1
+                        }
+                    };
+                    group[index].push(subst.clone());
+                    Ok(())
+                })
+                .unwrap_or_default();
+        }
+
+        let groups = groups
+            .into_iter()
+            .map(|(_, group)| group)
+            .filter(|group| group.iter().all(|substs| !substs.is_empty()))
+            .collect::<Vec<_>>();
+        if !groups.is_empty() {
+            let mut subst = list_subst.clone();
+            subst.data = Some(Arc::new(ListElemMatches { groups }));
+            output.push(subst);
         }
     }
 }
@@ -1249,12 +1349,23 @@ struct ListNodeApplier {
     /// searcher binds every variable the applier uses, so a typo anywhere else in the
     /// applier still fails when the rule is built rather than when it first matches.
     transform_vars: Vec<Var>,
+    /// Build every list element from the class all of the element's matches resolve to,
+    /// instead of building one list per combination of matches. The searcher has to report
+    /// [`ListElemMatches`] for this. Every list gets one node per group of matches, so the
+    /// elements' alternatives never multiply the nodes of the list or of anything built on
+    /// top of it.
+    per_elem: bool,
 }
 
 impl ListNodeApplier {
     fn with_transform(mut self, transform: ListNodeTransform, transform_vars: &[&str]) -> Self {
         self.transform = Some(transform);
         self.transform_vars = transform_vars.iter().map(|v| v.parse().unwrap()).collect();
+        self
+    }
+
+    fn with_per_elem_matches(mut self) -> Self {
+        self.per_elem = true;
         self
     }
 }
@@ -1283,6 +1394,7 @@ impl ListNodeApplier {
         Self {
             transform: None,
             transform_vars: vec![],
+            per_elem: false,
             list_pattern: list_pattern.parse().unwrap(),
             lists: lists
                 .into_iter()
@@ -1309,6 +1421,14 @@ impl Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeApplier {
             .data
             .as_ref()
             .expect("no data, did you use ListNodeSearcher?");
+
+        if self.per_elem {
+            let elem_matches = data
+                .downcast_ref::<ListElemMatches>()
+                .expect("wrong data type, did you use ListNodeSearcher::with_per_elem_matches?");
+            return self.apply_per_elem(egraph, eclass, subst, elem_matches);
+        }
+
         let list_matches = data.downcast_ref::<ListMatches>().expect("wrong data type");
 
         let mut subst = subst.clone();
@@ -1351,6 +1471,71 @@ impl Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeApplier {
         }
         vars.retain(|v| !self.transform_vars.contains(v)); // and these by the transform
         vars
+    }
+}
+
+impl ListNodeApplier {
+    /// Instantiate every list once per group. An element's node is instantiated from each of
+    /// its matches and all of them have to resolve to one class, which is what the list
+    /// holds: that is the case with the searcher's own element pattern, where every match
+    /// maps back to the class the element was matched in, and anything else would put
+    /// unrelated plans into one class, so it is asserted. The transform and the list pattern
+    /// see the top level variables and the element variables of the first match of the
+    /// first element, so they must not depend on which alternative of an element that is.
+    fn apply_per_elem(
+        &self,
+        egraph: &mut CubeEGraph,
+        mut eclass: Id,
+        subst: &Subst,
+        elem_matches: &ListElemMatches,
+    ) -> Vec<Id> {
+        let mut result_ids = vec![];
+        for group in &elem_matches.groups {
+            let mut subst = subst.clone();
+            for list in &self.lists {
+                let new_list = group
+                    .iter()
+                    .map(|elem_substs| {
+                        let instantiate = |egraph: &mut CubeEGraph, elem_subst: &Subst| {
+                            let mut subst = subst.clone();
+                            subst.extend(elem_subst.iter());
+                            egraph.add_instantiation(&list.elem_pattern, &subst)
+                        };
+                        let elem = instantiate(egraph, &elem_substs[0]);
+                        let elem = egraph.find(elem);
+                        // The other alternatives are instantiated only to be checked, so
+                        // only where the check runs
+                        if cfg!(debug_assertions) {
+                            for elem_subst in &elem_substs[1..] {
+                                let id = instantiate(egraph, elem_subst);
+                                assert_eq!(
+                                    egraph.find(id),
+                                    elem,
+                                    "the applier's element pattern must be the searcher's, \
+                                     so every alternative resolves to the element's class"
+                                );
+                            }
+                        }
+                        elem
+                    })
+                    .collect();
+
+                subst.insert(list.new_list_var, egraph.add(list.make_node(new_list)));
+            }
+            subst.extend(group[0][0].iter());
+            if let Some(transform) = &self.transform {
+                if !transform(egraph, &mut subst) {
+                    continue;
+                }
+            }
+            let new_id = egraph.add_instantiation(&self.list_pattern, &subst);
+            if egraph.union(eclass, new_id) {
+                result_ids.push(new_id);
+                eclass = new_id;
+            }
+        }
+
+        result_ids
     }
 }
 
@@ -2534,6 +2719,48 @@ where
     }
 }
 
+pub struct MultiTransformingPattern<T>
+where
+    T: Fn(&mut CubeEGraph, &Subst) -> Vec<Subst>,
+{
+    pattern: Pattern<LogicalPlanLanguage>,
+    substitutions: T,
+}
+
+impl<T> MultiTransformingPattern<T>
+where
+    T: Fn(&mut CubeEGraph, &Subst) -> Vec<Subst>,
+{
+    pub fn new(pattern: &str, substitutions: T) -> Self {
+        Self {
+            pattern: pattern.parse().unwrap(),
+            substitutions,
+        }
+    }
+}
+
+impl<T> Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for MultiTransformingPattern<T>
+where
+    T: Fn(&mut CubeEGraph, &Subst) -> Vec<Subst>,
+{
+    fn apply_one(
+        &self,
+        egraph: &mut CubeEGraph,
+        eclass: Id,
+        subst: &Subst,
+        searcher_ast: Option<&PatternAst<LogicalPlanLanguage>>,
+        rule_name: Symbol,
+    ) -> Vec<Id> {
+        (self.substitutions)(egraph, subst)
+            .iter()
+            .flat_map(|subst| {
+                self.pattern
+                    .apply_one(egraph, eclass, subst, searcher_ast, rule_name)
+            })
+            .collect()
+    }
+}
+
 /// `list_rewrite_with_lists_and_vars` with a transform. The transform runs once the
 /// substitution carries the list's own variables — including the `top_level_elem_vars`
 /// every element agreed on — so it can build what a pattern cannot: a cleared replacer
@@ -2562,6 +2789,41 @@ where
     .with_min_elements(min_elements);
     let applier = ListNodeApplier::from_lists(applier_pattern, lists)
         .with_transform(Box::new(transform_fn), transform_vars);
+    Rewrite::new(name.to_string(), searcher, applier).unwrap()
+}
+
+/// `transforming_list_rewrite_with_lists_and_vars` for a list whose elements have many
+/// alternatives each: rather than one list per combination of alternatives, their product,
+/// every list element is built from all of the element's alternatives at once, so the list,
+/// and everything the rewrite builds on it, is a single node no matter how many forms each
+/// element takes. See [`ListNodeApplier::apply_per_elem`] for what the element pattern of
+/// an applier list may be.
+pub fn transforming_list_rewrite_per_elem_with_lists_and_vars<T>(
+    name: &str,
+    list_type: ListType,
+    searcher: ListPattern,
+    applier_pattern: &str,
+    lists: impl IntoIterator<Item = ListApplierListPattern>,
+    top_level_elem_vars: &[&str],
+    min_elements: usize,
+    transform_vars: &[&str],
+    transform_fn: T,
+) -> CubeRewrite
+where
+    T: Fn(&mut CubeEGraph, &mut Subst) -> bool + Sync + Send + 'static,
+{
+    let searcher = ListNodeSearcher::new(
+        list_type,
+        &searcher.list_var,
+        &searcher.pattern,
+        &searcher.elem,
+    )
+    .with_top_level_elem_vars(top_level_elem_vars)
+    .with_min_elements(min_elements)
+    .with_per_elem_matches();
+    let applier = ListNodeApplier::from_lists(applier_pattern, lists)
+        .with_transform(Box::new(transform_fn), transform_vars)
+        .with_per_elem_matches();
     Rewrite::new(name.to_string(), searcher, applier).unwrap()
 }
 

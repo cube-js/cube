@@ -836,7 +836,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       },
       (stmt, rows) => {
         const hydrationMap = this.generateHydrationMap(stmt.getColumns() ?? []);
-        const types: {name: string, type: string}[] =
+        const types: { name: string, type: string }[] =
           this.getTypes(stmt);
         if (rows?.length && Object.keys(hydrationMap).length) {
           for (const row of rows) {
@@ -878,7 +878,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     const abort = stmtPromise.cancel;
 
     const promise = <CancelablePromise<StreamTableDataWithTypes>>stmtPromise.then((stmt) => {
-      const types: {name: string, type: string}[] =
+      const types: { name: string, type: string }[] =
         this.getTypes(stmt);
       const hydrationMap = this.generateHydrationMap(stmt.getColumns() ?? []);
 

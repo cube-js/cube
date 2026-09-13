@@ -20,7 +20,7 @@ type CubeError = Error & {
   response?: {
     stack: string;
   }
-}
+};
 
 type FatalErrorProps = {
   error: CubeError | string;
@@ -30,11 +30,10 @@ type FatalErrorProps = {
 export function FatalError({ error, stack }: FatalErrorProps) {
   const [visible, setVisible] = useState(false);
 
-  const ansiHtmlError = useMemo(() => {
-    return generateAnsiHTML(error.toString()).replace(/(Error:\s)/g, '');
-  }, [error])
+  const ansiHtmlError = useMemo(() => generateAnsiHTML(error.toString()).replace(/(Error:\s)/g, ''),
+    [error]);
 
-  const errorStack = stack || (typeof error !== 'string' ? error.response?.stack  : null);
+  const errorStack = stack || (typeof error !== 'string' ? error.response?.stack : null);
 
   return (
     <Space direction="vertical">
@@ -56,7 +55,7 @@ export function FatalError({ error, stack }: FatalErrorProps) {
 
       <Alert
         type="error"
-        message={
+        message={(
           <Space direction="vertical">
             <Code
               dangerouslySetInnerHTML={{
@@ -76,7 +75,7 @@ export function FatalError({ error, stack }: FatalErrorProps) {
               </>
             ) : null}
           </Space>
-        }
+        )}
       />
     </Space>
   );

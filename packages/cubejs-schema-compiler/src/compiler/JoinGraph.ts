@@ -63,11 +63,11 @@ export class JoinGraph implements CompilerInterface {
 
   public compile(cubes: unknown, errorReporter: ErrorReporter): void {
     this.edges = R.compose<
-        Array<CubeDefinition>,
-        Array<CubeDefinition>,
-        Array<[string, JoinEdge][]>,
-        Array<[string, JoinEdge]>,
-        Record<string, JoinEdge>
+      Array<CubeDefinition>,
+      Array<CubeDefinition>,
+      Array<[string, JoinEdge][]>,
+      Array<[string, JoinEdge]>,
+      Record<string, JoinEdge>
     >(
       R.fromPairs,
       R.unnest,
@@ -78,11 +78,11 @@ export class JoinGraph implements CompilerInterface {
     // This requires @types/ramda@0.29 or newer
     // @ts-ignore
     this.nodes = R.compose<
-        Record<string, JoinEdge>,
-        Array<[string, JoinEdge]>,
-        Array<JoinEdge>,
-        Record<string, Array<JoinEdge> | undefined>,
-        Record<string, Record<string, 1>>
+      Record<string, JoinEdge>,
+      Array<[string, JoinEdge]>,
+      Array<JoinEdge>,
+      Record<string, Array<JoinEdge> | undefined>,
+      Record<string, Record<string, 1>>
     >(
       // This requires @types/ramda@0.29 or newer
       // @ts-ignore
@@ -177,10 +177,10 @@ export class JoinGraph implements CompilerInterface {
     const key = JSON.stringify(cubesToJoin);
     if (!this.builtJoins[key]) {
       const join = R.pipe<
-          JoinHints,
-          Array<JoinTree | null>,
-          Array<JoinTree>,
-          Array<JoinTree>
+        JoinHints,
+        Array<JoinTree | null>,
+        Array<JoinTree>,
+        Array<JoinTree>
       >(
         R.map(
           (cube: JoinHint): JoinTree | null => this.buildJoinTreeForRoot(cube, R.without([cube], cubesToJoin))

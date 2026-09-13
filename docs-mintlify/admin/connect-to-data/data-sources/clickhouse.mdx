@@ -198,6 +198,9 @@ module.exports = {
 
 ## Query attribution
 
+Cube identifies itself to ClickHouse as the client `application` (e.g. `CubeDev_Cube/1.7.37`),
+visible alongside your other connections in ClickHouse's session and connection monitoring.
+
 Cube sets the ClickHouse [`query_id`](https://clickhouse.com/docs/operations/system-tables/query_log)
 of every statement it runs to `<cube-query-id>-<uuid>`, where `<cube-query-id>` is the
 identifier shown for the query in Query History and `<uuid>` is generated per statement, so

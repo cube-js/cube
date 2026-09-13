@@ -23,9 +23,9 @@ type PlaygroundWrapperProps = {
   children: ReactNode;
   identifier?: string;
   playgroundContext?: Partial<PlaygroundContext>;
-} & Pick<SecurityContextProps, 'token' | 'onTokenPayloadChange'> &
-  Pick<SecurityContextProviderProps, 'tokenUpdater'> &
-  Pick<AppContextProps, 'apiUrl'>;
+} & Pick<SecurityContextProps, 'token' | 'onTokenPayloadChange'>
+  & Pick<SecurityContextProviderProps, 'tokenUpdater'>
+  & Pick<AppContextProps, 'apiUrl'>;
 
 export function PlaygroundWrapper({
   token,

@@ -6,6 +6,26 @@ description: Outlines development mode in Cube Cloud—branch-scoped APIs, save 
 Development mode allows to test and debug the data model in an isolated
 [development environment][ref-environments-dev] before releasing any changes to production.
 
+<Warning>
+
+This page describes development mode in the Cube cloud platform. It is unrelated to
+Cube Core's development mode — which is on when
+[`CUBEJS_DEV_MODE=true`](/reference/configuration/environment-variables#cubejs_dev_mode)
+or whenever `NODE_ENV` is not `production` — and which is an **authentication bypass**.
+Under the `cubejs` CLI and the official Docker images, setting the flag also forces
+`NODE_ENV=development`, switching off JWT verification on the data APIs. Playground's
+endpoints are served with no authentication at all, so
+anyone who can reach the instance can mint an API token carrying any security context
+(signed with the API secret), read the data model, and overwrite it and `.env`. With
+`CUBEJS_DEV_MODE=true` and no
+[`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password)
+set, the SQL API accepts any credentials as well. That is intentional — it is designed
+to run on a developer's local machine for ease of use and debugging. Never use it in
+production, and using it in the Cube cloud platform is highly discouraged because it
+bypasses the platform's security model.
+
+</Warning>
+
 When you enter the development mode, you'll have access to your personal API endpoints
 that will track the branch you're on and will be updated automatically when you make
 changes to the data model.

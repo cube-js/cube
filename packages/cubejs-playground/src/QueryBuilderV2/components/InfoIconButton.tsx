@@ -28,11 +28,11 @@ export function InfoIconButton(props: InfoTooltipButtonProps) {
 
   return (
     <TooltipProvider
-      title={
+      title={(
         <>
           {tooltip} {DEFAULT_TOOLTIP_SUFFIX !== tooltipSuffix || rest.to ? tooltipSuffix : ''}
         </>
-      }
+      )}
       width="initial max-content 40x"
     >
       <TooltipButton {...rest}>

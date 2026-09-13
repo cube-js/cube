@@ -3,6 +3,8 @@ title: Environment variables
 description: "To see a complete list of environment variables for a specific data source, please check the relevant page on Connecting to Data Sources."
 ---
 
+import DevModeWarning from '/snippets/dev-mode-warning.mdx';
+
 <Info>
 
 To see a complete list of environment variables for a specific data source,
@@ -21,6 +23,33 @@ The secret key used to sign and verify JWTs. Generated on project scaffold with
 
 See also the [`check_auth` configuration
 option](/reference/configuration/config#check_auth).
+
+## `CUBEJS_API_SECRETS`
+
+A comma-separated list of secret keys accepted when verifying JWTs. Use it to
+rotate [`CUBEJS_API_SECRET`](#cubejs_api_secret) without a window in which valid
+tokens are rejected: list the outgoing and incoming secrets together until every
+client has re-signed, then drop the outgoing one.
+
+| Possible Values                   | Default in Development | Default in Production |
+| --------------------------------- | ---------------------- | --------------------- |
+| A comma-separated list of strings | N/A                    | N/A                   |
+
+```dotenv
+CUBEJS_API_SECRETS=outgoing-secret,incoming-secret
+```
+
+A token is accepted if any secret in the list verifies its signature. Whitespace
+around entries is trimmed, empty entries are dropped, and duplicates are removed.
+
+When set to a non-empty value, this variable takes precedence over
+`CUBEJS_API_SECRET` and only the listed secrets are accepted. Set it to an empty
+value to fall back to `CUBEJS_API_SECRET`.
+
+This variable affects verification only; tokens are still signed with whichever
+single secret the issuer holds. It has no effect when
+[`CUBEJS_JWK_URL`](#cubejs_jwk_url) is set, because signing keys are then
+resolved from the JWKS endpoint by key ID.
 
 ## `CUBEJS_APP`
 
@@ -1196,6 +1225,8 @@ If `true`, enables [development mode](/docs/data-modeling/dev-mode).
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                 | `false`               |
 
+<DevModeWarning />
+
 ## `CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH`
 
 If `true`, it enables dropping pre-aggregations that Refresh Worker doesn't
@@ -2321,6 +2352,20 @@ If `true`, enables debug logging.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |
 
+## `NODE_EXTRA_CA_CERTS`
+
+A path to a PEM file with CA certificates that Node.js should trust in
+addition to its built-in bundle — additive, it doesn't replace the public CA
+bundle. Read once at process start, so the deployment must restart after this
+is set for it to take effect. Used by [Semantic Layer Sync][ref-sls] when the
+BI tool is served with a certificate from a private or internal CA — the
+sync's outbound requests run in Node.js, so `CURL_CA_BUNDLE` and
+`REQUESTS_CA_BUNDLE` have no effect on it.
+
+| Possible Values   | Default in Development | Default in Production |
+| ----------------- | ---------------------- | --------------------- |
+| A valid file path | N/A                    | N/A                   |
+
 ## `PORT`
 
 The port for a Cube deployment to listen to API connections on.
@@ -2400,3 +2445,4 @@ The port for a Cube deployment to listen to API connections on.
 [ref-time-zone]: /reference/core-data-apis/queries#time-zone
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
 [nodejs-docs-tls-options]: https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
+[ref-sls]: /docs/integrations/semantic-layer-sync

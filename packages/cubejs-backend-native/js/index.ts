@@ -151,7 +151,7 @@ export type DBResponsePrimitive =
 // TODO type this better, to make it proper disjoint union
 export type Sql4SqlOk = {
   sql: string,
-    values: Array<string | null>,
+  values: Array<string | null>,
 };
 export type Sql4SqlError = { error: string };
 export type Sql4SqlCommon = {
@@ -466,7 +466,7 @@ export const buildSqlAndParams = (cubeEvaluator: any): any[] => {
 
 export type ResultRow = Record<string, string>;
 
-export const parseCubestoreResultMessage = async (message: ArrayBuffer): Promise<ResultWrapper> => {
+export const parseCubestoreResultMessage = async (message: Buffer): Promise<ResultWrapper> => {
   const native = loadNative();
 
   const msg = await native.parseCubestoreResultMessage(message) as NativeQueryResultRef;
@@ -530,7 +530,7 @@ export const transpileYaml = async (transpileRequests: TransformConfig[]): Promi
 export interface PyConfiguration {
   repositoryFactory?: (ctx: unknown) => Promise<unknown>,
   logger?: (msg: string, params: Record<string, any>) => void,
-  checkAuth?: (req: unknown, authorization: string) => Promise<{ 'security_context'?: unknown }>
+  checkAuth?: (req: unknown, authorization: string) => Promise<{ security_context?: unknown }>
   extendContext?: (req: unknown) => Promise<unknown>
   queryRewrite?: (query: unknown, ctx: unknown) => Promise<unknown>
   contextToApiScopes?: () => Promise<string[]>

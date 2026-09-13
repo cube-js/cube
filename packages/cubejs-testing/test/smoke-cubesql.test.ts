@@ -11,6 +11,7 @@ import {
   DEFAULT_CONFIG,
   JEST_AFTER_ALL_DEFAULT_TIMEOUT,
   JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
+  stopIfStarted,
 } from './smoke-tests';
 
 describe('SQL API', () => {
@@ -79,9 +80,9 @@ describe('SQL API', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await connection.end();
-    await birdbox.stop();
-    await db.stop();
+    await stopIfStarted('connection', connection && (() => connection.end()));
+    await stopIfStarted('birdbox', birdbox);
+    await stopIfStarted('db', db);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   describe('Cube SQL over HTTP', () => {
@@ -658,7 +659,7 @@ describe('SQL API', () => {
 
     test('select dimension agg where false', async () => {
       const query =
-          'SELECT MAX("createdAt") AS "max" FROM "BigOrders" WHERE 1 = 0';
+        'SELECT MAX("createdAt") AS "max" FROM "BigOrders" WHERE 1 = 0';
       const res = await connection.query(query);
       expect(res.rows).toEqual([{ max: null }]);
     });

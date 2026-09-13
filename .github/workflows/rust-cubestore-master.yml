@@ -26,7 +26,7 @@ jobs:
       RUST: ${{ matrix.rust }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Maximize build space
         uses: ./.github/actions/maximize-build-space
       - name: Install Rust
@@ -81,10 +81,10 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Repo metadata
         id: repo
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const repo = await github.rest.repos.get(context.repo)
@@ -126,14 +126,14 @@ jobs:
             echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           } >> "$GITHUB_OUTPUT"
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./rust
           file: ./rust/cubestore/Dockerfile
@@ -153,7 +153,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
       - name: Update repo description
-        uses: peter-evans/dockerhub-description@v2
+        uses: peter-evans/dockerhub-description@v5
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -194,7 +194,7 @@ jobs:
             compress: false
       fail-fast: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Disable rustup update (issue workaround for Windows)
         run: rustup set auto-self-update disable
         if: contains(runner.os, 'windows')
@@ -213,22 +213,24 @@ jobs:
         if: ${{ startsWith(matrix.os, 'windows') }}
         run: choco install -y --force llvm --version 22.1.0
       - name: Set Env Variables for Windows
-        uses: allenevans/set-env@v4.0.0
         if: ${{ startsWith(matrix.os, 'windows') }}
-        with:
-          OPENSSL_DIR: 'C:/vcpkg/packages/openssl_x64-windows'
-          # This paths are required to work with static linking
-          OPENSSL_LIB_DIR: 'C:/vcpkg/packages/openssl_x64-windows/lib'
-          OPENSSL_INCLUDE_DIR: 'C:/vcpkg/packages/openssl_x64-windows/include'
-          LIBCLANG_PATH: 'C:\Program Files\LLVM\bin'
+        shell: bash
+        run: |
+          {
+            echo "OPENSSL_DIR=C:/vcpkg/packages/openssl_x64-windows"
+            # This paths are required to work with static linking
+            echo "OPENSSL_LIB_DIR=C:/vcpkg/packages/openssl_x64-windows/lib"
+            echo "OPENSSL_INCLUDE_DIR=C:/vcpkg/packages/openssl_x64-windows/include"
+            printf '%s\n' 'LIBCLANG_PATH=C:\Program Files\LLVM\bin'
+          } >> "$GITHUB_ENV"
       - name: Build with Cargo
         run: |
           cd rust/cubestore && cargo build --release --target=${{ matrix.target }} -p cubestore
       - name: Compress binaries
-        uses: svenstaro/upx-action@v2
+        uses: svenstaro/upx-action@v3
         if: ${{ matrix.compress }}
         with:
-          file: rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
+          files: rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
           args: --lzma
           strip: ${{ matrix.strip }}
       - name: Create folder for archive
@@ -243,7 +245,7 @@ jobs:
           mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
           tar -cvzf cubestored-${{ matrix.target }}.tar.gz ./*
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           path: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
           name: cubestored-${{ matrix.target }}.tar.gz
@@ -264,13 +266,13 @@ jobs:
           # Please use minimal possible version of ubuntu, because it produces constraint on glibc
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            image: cubejs/rust-cross:x86_64-unknown-linux-gnu-31072025
+            image: cubejs/rust-cross:x86_64-unknown-linux-gnu-08092026
             executable_name: cubestored
             strip: true
             compress: false
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-musl
-            image: cubejs/rust-cross:x86_64-unknown-linux-musl-31072025
+            image: cubejs/rust-cross:x86_64-unknown-linux-musl-08092026
             executable_name: cubestored
             strip: true
             # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890
@@ -287,7 +289,7 @@ jobs:
     container:
       image: ${{ matrix.image }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Setup Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -303,12 +305,19 @@ jobs:
           key: target-${{ matrix.target }}
       - name: Build with Cargo
         run: |
+          # jemalloc bakes the page size in at build time. This runner has 4 KiB
+          # pages, but arm64 hosts can use up to 64 KiB (Raspberry Pi, Ubuntu
+          # arm64-largemem, Asahi), so build for the largest one there.
+          # TODO: drop once we are on jemalloc 5.3.1+, where this is the default.
+          case "${{ matrix.target }}" in
+            aarch64-*) export JEMALLOC_SYS_WITH_LG_PAGE=16 ;;
+          esac
           cd rust/cubestore && cargo build --release --target=${{ matrix.target }} -p cubestore
       - name: Compress binaries
-        uses: svenstaro/upx-action@v2
+        uses: svenstaro/upx-action@v3
         if: ${{ matrix.compress }}
         with:
-          file: rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
+          files: rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
           args: --lzma
           strip: ${{ matrix.strip }}
       - name: Create folder for archive
@@ -320,7 +329,7 @@ jobs:
           mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
           tar -cvzf cubestored-${{ matrix.target }}.tar.gz ./*
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           path: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
           name: cubestored-${{ matrix.target }}.tar.gz

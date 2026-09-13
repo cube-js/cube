@@ -157,14 +157,12 @@ export function updateQuery(
         },
       ];
     }
+  } else if (updatedQuery[memberType]?.includes(key)) {
+    updatedQuery[memberType] = updatedQuery[memberType]!.filter(
+      (k) => key !== k
+    );
   } else {
-    if (updatedQuery[memberType]?.includes(key)) {
-      updatedQuery[memberType] = updatedQuery[memberType]!.filter(
-        (k) => key !== k
-      );
-    } else {
-      updatedQuery[memberType] = [...(updatedQuery[memberType] || []), key];
-    }
+    updatedQuery[memberType] = [...(updatedQuery[memberType] || []), key];
   }
 
   return updatedQuery;
@@ -172,8 +170,8 @@ export function updateQuery(
 
 function isBuffer(obj) {
   return (
-    typeof obj?.constructor?.isBuffer === 'function' &&
-    obj.constructor.isBuffer(obj)
+    typeof obj?.constructor?.isBuffer === 'function'
+    && obj.constructor.isBuffer(obj)
   );
 }
 
@@ -195,7 +193,7 @@ export function flatten(target: Object, opts: FlattenOptions = {}) {
   const output = {};
 
   function step(object, prev = null, keyDepth = 1) {
-    Object.keys(object).forEach(function (key) {
+    Object.keys(object).forEach((key) => {
       const value = object[key];
       const isArray = opts.safe && Array.isArray(value);
       const type = Object.prototype.toString.call(value);
@@ -207,11 +205,11 @@ export function flatten(target: Object, opts: FlattenOptions = {}) {
         : transformKey(key);
 
       if (
-        !isArray &&
-        !isbuffer &&
-        isobject &&
-        Object.keys(value).length &&
-        (!opts.maxDepth || keyDepth < maxDepth)
+        !isArray
+        && !isbuffer
+        && isobject
+        && Object.keys(value).length
+        && (!opts.maxDepth || keyDepth < maxDepth)
       ) {
         return step(value, newKey, keyDepth + 1);
       }
@@ -232,8 +230,8 @@ export function buildSettings(
 
   if (values['refreshKey.checked.every']) {
     if (
-      values['refreshKey.isCron'] &&
-      (values['refreshKey.cron'] || values['refreshKey.timeZone'])
+      values['refreshKey.isCron']
+      && (values['refreshKey.cron'] || values['refreshKey.timeZone'])
     ) {
       nextSettings.refreshKey = {};
 

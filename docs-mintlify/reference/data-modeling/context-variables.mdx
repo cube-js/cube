@@ -392,6 +392,73 @@ binding always renders as `1 = 1`.
 
 </Info>
 
+### Example with a time shift
+
+A measure with a [`time_shift`][ref-ref-time-shift] over a
+[calendar cube][ref-calendar-cubes] reads a different period than the one the
+query reports: which rows those are is held in the calendar's own table, and no
+expression over the source column reproduces it. A binding that restated the
+reported period there would narrow the scan past the rows that period needs, so
+it does not render — the shift has to be addressed explicitly:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: sales
+    sql: |
+      SELECT *
+      FROM sales
+      WHERE {FILTER_GROUP(
+        FILTER_PARAMS.fiscal_calendar.report_date.filter('day_date'),
+        FILTER_PARAMS.fiscal_calendar.report_date.time_shifts.prev_fiscal_year.filter(
+          lambda x, y: f"day_date >= {x}::date - 364 AND day_date <= {y}::date - 364"
+        )
+      )}
+```
+
+```javascript title="JavaScript"
+cube(`sales`, {
+  sql: `
+    SELECT *
+    FROM sales
+    WHERE ${FILTER_GROUP(
+      FILTER_PARAMS.fiscal_calendar.report_date.filter(`day_date`),
+      FILTER_PARAMS.fiscal_calendar.report_date.time_shifts.prev_fiscal_year.filter(
+        (from, to) => `day_date >= ${from}::date - 364 AND day_date <= ${to}::date - 364`
+      )
+    )}
+  `
+})
+```
+
+</CodeGroup>
+
+Each binding renders in one place only: the plain one where no calendar shift
+is applied, and `time_shifts.prev_fiscal_year` where that shift is. Where the
+model declares no binding for the shift a query applies, nothing is pushed down
+and the cube's `sql` scans unrestricted — correct, but without the narrowing.
+
+The name is the one the calendar cube gives the shift in its dimension's
+`time_shift`, and it is reached whether the measure asks for that shift by name
+or by the interval the calendar declares it with. The bounds passed to the
+callback are the reported ones, unshifted: the model states which rows its own
+table holds for that period. A `time_shifts` binding therefore takes a function
+of both bounds — a string column cannot express a mapping, and a query filtering
+the member with anything but a date range is an error.
+
+An interval shift on a dimension that is not part of a calendar cube needs none
+of this: the plain binding renders there, with the interval applied to the
+column.
+
+<Info>
+
+Addressing a time shift is only supported by the default SQL planner. With
+[`CUBEJS_TESSERACT_SQL_PLANNER`][ref-env-tesseract] set to `false`, such a
+binding always renders as `1 = 1`.
+
+</Info>
+
 ## `FILTER_GROUP`
 
 If you use `FILTER_PARAMS` in your query more than once, you must wrap them
@@ -880,3 +947,5 @@ cube(`orders`, {
 [ref-links]: /reference/data-modeling/dimensions#links
 [ref-ref-segments]: /reference/data-modeling/segments
 [ref-env-tesseract]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
+[ref-ref-time-shift]: /reference/data-modeling/measures#time_shift
+[ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes

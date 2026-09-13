@@ -213,7 +213,7 @@ variable for this; set `queryTag` from a custom [`driverFactory`][ref-driver-fac
 instead of returning a plain options object:
 
 ```javascript
-const SnowflakeDriver = require('@cubejs-backend/snowflake-driver');
+const { SnowflakeDriver } = require('@cubejs-backend/snowflake-driver');
 
 module.exports = {
   driverFactory: () =>

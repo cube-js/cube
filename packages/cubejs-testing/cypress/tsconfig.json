@@ -1,14 +1,17 @@
 {
-  "extends": "../tsconfig.json",
+  "extends": "../../../tsconfig.base.json",
   "include": [
-    "src",
-    "test"
+    "support",
+    "queries.ts",
+    "global.d.ts"
   ],
   "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["dom", "dom.iterable", "es2023"],
     "types": ["cypress", "@4tw/cypress-drag-drop"],
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": ".",
     "sourceMap": false
   }
 }

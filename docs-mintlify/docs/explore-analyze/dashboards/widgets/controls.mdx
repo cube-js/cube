@@ -129,7 +129,7 @@ A value that isn't one of the switcher's [allowed granularities](#allowed-granul
 The attribute is resolved for the viewer, not baked into the dashboard. Editing the attribute's value changes what that viewer opens on the next time the dashboard loads; it never rewrites the published dashboard, so the default granularity you set in the builder stays intact for everyone else.
 </Note>
 
-Viewers can still switch granularities unless the control's [visibility](#visibility) is set to **Disabled**, and their own pick outranks the attribute for the rest of the session. A granularity passed [in the URL](#sharing-the-current-selection) outranks both, so deep links continue to work. If a [parent control](#parent) drives this switcher and the option the viewer is on maps a granularity to it, that mapping decides the granularity — a mapping the author made for that arrangement is more specific than a per-viewer starting point. An option that [leaves the switcher empty](#children) has no opinion, so the attribute still seeds it; one set to **Reset to default** sends the switcher to the [default granularity](#default-granularity) saved on it rather than re-resolving the attribute, and leaves the switcher untouched when no default granularity was saved.
+Viewers can still switch granularities unless the control's [visibility](#visibility) is set to **Disabled**, and their own pick outranks the attribute for the rest of the session. A granularity passed [in the URL](#sharing-the-current-selection) outranks both, so deep links continue to work. If a [parent control](#parent) drives this switcher and the option the viewer is on maps a granularity to it, that mapping decides the granularity — a mapping the author made for that arrangement is more specific than a per-viewer starting point. An option that [leaves the switcher empty](#children) has no opinion, so the attribute still seeds it; one set to **Reset to default** returns the switcher to the granularity it opens on *for that viewer* — the attribute granularity when one resolves, otherwise the saved [default granularity](#default-granularity) — and leaves it untouched when neither resolves.
 
 ## Field switcher
 
@@ -173,7 +173,7 @@ Like [filters](#user-attribute-default), [time granularity switchers](#time-gran
 
 This is how one dashboard opens on the breakdown each audience cares about — a **Breakdown** switcher opening on `region` for one team and `channel` for another, from a single published dashboard.
 
-The attribute seeds the *selection*, exactly as the [default option](#field-switcher-default-option) does, and loses to a pick the viewer has already made. A member passed [in the URL](#sharing-the-current-selection) outranks both, so deep links keep working. If a [parent control](#parent) drives this switcher and the option the viewer is on maps a member to it, that mapping decides the member; an option that [leaves the switcher empty](#children) has no opinion, so the attribute still seeds it, and one set to **Reset to default** sends the switcher to its [default option](#field-switcher-default-option) rather than re-resolving the attribute. A value that isn't among the **Alternatives** is ignored rather than forced: the attribute is set per user and the options are set per dashboard, so the two can drift apart without anyone editing either, and the safe reading of an unusable value is "no opinion" — the control falls back to the default option.
+The attribute seeds the *selection*, exactly as the [default option](#field-switcher-default-option) does, and loses to a pick the viewer has already made. A member passed [in the URL](#sharing-the-current-selection) outranks both, so deep links keep working. If a [parent control](#parent) drives this switcher and the option the viewer is on maps a member to it, that mapping decides the member; an option that [leaves the switcher empty](#children) has no opinion, so the attribute still seeds it, and one set to **Reset to default** returns the switcher to the member it opens on *for that viewer* — the attribute member when the switcher still offers it, otherwise its [default option](#field-switcher-default-option). A value that isn't among the **Alternatives** is ignored rather than forced: the attribute is set per user and the options are set per dashboard, so the two can drift apart without anyone editing either, and the safe reading of an unusable value is "no opinion" — the control falls back to the default option.
 
 ### What the swap preserves
 
@@ -218,7 +218,7 @@ Repeat for each control you want the parent to drive. Every option/child pair ca
 | State | What happens when the viewer picks that option |
 |---|---|
 | **A value** | The child is set to that value. |
-| **Reset to default** | The child is put back to its own default. For a filter that means no filtering on that dimension; for a time granularity switcher, its [default granularity](#default-granularity); for a field switcher, its [default option](#field-switcher-default-option). Turn on the row's **Reset to default** switch. |
+| **Reset to default** | The child is put back to the value it opens on *for that viewer*. When the child takes its default from a **User attribute default** — a [filter](#user-attribute-default)'s, a [time granularity switcher](#time-granularity-user-attribute-default)'s, or a [field switcher](#field-switcher-user-attribute-default)'s — that's the attribute value; otherwise it's the child's own static default: no filtering on that dimension for a filter, its [default granularity](#default-granularity) for a time granularity switcher, its [default option](#field-switcher-default-option) for a field switcher. Turn on the row's **Reset to default** switch. |
 | **Left empty** | The child is left alone — it keeps whatever value the viewer already had. Use this deliberately when an option shouldn't have an opinion about a particular child. |
 
 While the parent's settings are open, the children it drives are highlighted on the canvas, so you can see the scope of the mapping at a glance.
@@ -368,9 +368,10 @@ Each control's picker offers only the members it can actually be resolved agains
 | [Field switcher](#field-switcher) set to **Dimension** | Dimensions. |
 | [Field switcher](#field-switcher) set to **Measure** | Measures, since the control replaces a measure. |
 
-Filter and time granularity mappings are also configurable by AI agents when they build or edit a dashboard, so an agent can wire those controls across charts that use different semantic views without you needing to revisit each chart manually. Field switchers are outside what agents author, so their mappings are yours to set.
+For filter, time granularity, and field switcher controls — the three that map onto a member — the [Workbook Agent][ref-workbook-agent] can set the same per-chart overrides you would from **Controls mapping**: exclude a chart from a filter, or remap any of the three onto a different member for one chart. That lets it wire these controls across charts on different semantic views without you revisiting each chart manually.
 
 [ref-embed-url-filters]: /embedding/iframe/dashboards#pre-set-dashboard-filters-via-url
+[ref-workbook-agent]: /docs/explore-analyze/workbooks/workbook-agent
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-charts]: /docs/explore-analyze/dashboards/widgets/charts

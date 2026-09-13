@@ -1,6 +1,6 @@
 use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryTimeDimension};
 use datafusion::{
-    logical_plan::{JoinType, LogicalPlan, PlanVisitor},
+    logical_plan::{plan::Extension, JoinType, LogicalPlan, PlanVisitor},
     physical_plan::displayable,
     scalar::ScalarValue,
 };
@@ -11,14 +11,16 @@ use std::sync::Arc;
 
 use crate::{
     compile::{
-        engine::df::scan::MemberField,
+        engine::df::scan::{CubeScanNode, MemberField},
         rewrite::rewriter::Rewriter,
         test::{
             convert_select_to_query_plan, convert_select_to_query_plan_customized,
             convert_select_to_query_plan_with_config, convert_sql_to_cube_query, get_test_session,
             get_test_session_with_config, get_test_tenant_ctx,
-            get_test_tenant_ctx_with_cube_data_sources, init_testing_logger, member_expression_sql,
-            LogicalPlanTestUtils, TestContext,
+            get_test_tenant_ctx_with_cube_data_sources,
+            get_test_tenant_ctx_with_multi_data_source_view,
+            get_test_tenant_ctx_with_multi_data_source_view_and_templates, init_testing_logger,
+            member_expression_sql, LogicalPlanTestUtils, TestContext,
         },
         DatabaseProtocol,
     },
@@ -1087,6 +1089,51 @@ async fn test_case_wrapper_escaping() {
         .sql
         // Expect 6 backslashes as output is JSON and it's escaped one more time
         .contains("\\\\\\\\\\\\`"));
+}
+
+/// A NULL is pushed down as a cast that gives it a type. Where the dialect's types hold no
+/// NULL of their own, that cast has to name the nullable form instead, or the data source
+/// rejects the query it is handed.
+#[tokio::test]
+async fn wrapper_typed_null_casts_to_the_nullable_type_of_the_dialect() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan_customized(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            dim_str0,
+            AVG(avgPrice),
+            CASE
+                WHEN SUM((NULLIF(0.0, 0.0))) IS NOT NULL THEN SUM((NULLIF(0.0, 0.0)))
+                ELSE 0
+                END
+        FROM MultiTypeCube
+        GROUP BY 1
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        vec![(
+            "types/nullable".to_string(),
+            "Nullable({{ data_type }})".to_string(),
+        )],
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+
+    assert!(
+        sql.contains("SUM(CAST(NULL AS Nullable(DOUBLE)))"),
+        "the NULL names the nullable form of its type: {}",
+        sql
+    );
 }
 
 #[tokio::test]
@@ -4201,4 +4248,425 @@ async fn test_wrapper_multi_arg_aggregate_function_without_template() {
         "unexpected error: {}",
         error
     );
+}
+
+/// A pivot with subtotals on both axes: a four-way union of
+/// aggregations, one per grouping set, each filtered before and after aggregating and
+/// projected with literals, under a grouping, sort and limit that read the union. Every
+/// query has several pushed down forms, and a union that spelled out every combination of
+/// them would blow past the node limit of the rewrite before rules on top of the union even
+/// start multiplying it.
+#[tokio::test]
+async fn test_wrapper_union_of_many_form_queries_stays_within_node_limit() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query = |gender: bool, note: bool| {
+        let group_by = match (gender, note) {
+            (true, true) => "GROUP BY 1, 2",
+            (true, false) | (false, true) => "GROUP BY 1",
+            (false, false) => "",
+        };
+        format!(
+            "SELECT {gender_expr} AS market, {note_expr} AS note, \
+             {gender_total} AS is_market_total, {note_total} AS is_note_total, s AS total \
+             FROM (\
+               SELECT {gender_col}{note_col}SUM(sumPrice) AS s FROM KibanaSampleDataEcommerce \
+               WHERE order_date >= '2024-01-01' {group_by}\
+             ) q WHERE s IS NOT NULL",
+            gender_expr = if gender {
+                "customer_gender"
+            } else {
+                "CAST(NULL AS TEXT)"
+            },
+            note_expr = if note { "notes" } else { "CAST(NULL AS TEXT)" },
+            gender_total = if gender { "FALSE" } else { "TRUE" },
+            note_total = if note { "FALSE" } else { "TRUE" },
+            gender_col = if gender { "customer_gender, " } else { "" },
+            note_col = if note { "notes, " } else { "" },
+        )
+    };
+    let sql = format!(
+        "SELECT note, is_note_total FROM ({} UNION ALL {} UNION ALL {} UNION ALL {}) core \
+         GROUP BY 1, 2 ORDER BY 2, 1 LIMIT 102",
+        query(true, true),
+        query(true, false),
+        query(false, true),
+        query(false, false),
+    );
+
+    let sql = convert_select_to_query_plan(sql, DatabaseProtocol::PostgreSQL)
+        .await
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+
+    assert_eq!(
+        sql.matches("UNION ALL").count(),
+        3,
+        "all four queries are pushed down in one union: {}",
+        sql
+    );
+    // Each query keeps its own grouping: the subtotal queries stand in a NULL for the
+    // column they roll up, two for each column and none twice over
+    assert_eq!(
+        sql.matches("CAST(NULL AS STRING) \"market\"").count(),
+        2,
+        "two queries roll up the market: {}",
+        sql
+    );
+    assert_eq!(
+        sql.matches("CAST(NULL AS STRING) \"note\"").count(),
+        2,
+        "two queries roll up the note: {}",
+        sql
+    );
+    // Each query keeps both of its filters: the one before aggregating and the one after
+    assert_eq!(
+        sql.matches("afterOrOnDate").count(),
+        4,
+        "every query filters by date before aggregating: {}",
+        sql
+    );
+    assert_eq!(
+        sql.matches("\"operator\": \"set\"").count(),
+        4,
+        "every query drops empty totals after aggregating: {}",
+        sql
+    );
+    assert!(
+        sql.contains("GROUP BY 1, 2") && sql.contains("LIMIT 102"),
+        "the grouping and limit above the union are pushed down with it: {}",
+        sql
+    );
+}
+
+/// A view can include cubes from different data sources. Until a rewrite narrows a scan over
+/// it to the members a query references, the scan names every member of the view and their
+/// data sources conflict. That used to deny SQL pushdown to every query over such a view,
+/// even one that reads a single data source. A filtered measure, the shape a DAX `CALCULATE`
+/// with a column filter produces, has no plan without pushdown, so it has to keep it.
+#[tokio::test]
+async fn test_wrapper_filtered_measure_over_multi_data_source_view() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_multi_data_source_view();
+    let query_plan = convert_sql_to_cube_query(
+        &"SELECT SUM(CASE WHEN customer_gender = 'female' THEN sumPrice END) AS filtered \
+          FROM MultiSourceView"
+            .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await
+    .expect("a query over one data source of the view should compile");
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    let measures = request
+        .measures
+        .expect("the filtered measure is pushed to Cube");
+    assert_eq!(measures.len(), 1, "unexpected measures: {:?}", measures);
+    let measure: serde_json::Value = serde_json::from_str(&measures[0]).unwrap();
+    assert_eq!(measure["expr"]["type"], "PatchMeasure", "{}", measures[0]);
+    assert_eq!(
+        measure["expr"]["sourceMeasure"], "MultiSourceView.sumPrice",
+        "{}",
+        measures[0]
+    );
+    assert_eq!(
+        measure["expr"]["addFilters"].as_array().map(Vec::len),
+        Some(1),
+        "{}",
+        measures[0]
+    );
+}
+
+/// The view's data sources are visited in a stable order, and every other test here reads the
+/// first one. A query over the second one alone pins that it gets its own context too, and
+/// that the filtered measure resolves to its own member.
+#[tokio::test]
+async fn test_wrapper_filtered_measure_over_multi_data_source_view_second_source() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_multi_data_source_view();
+    let query_plan = convert_sql_to_cube_query(
+        &"SELECT COUNT(DISTINCT CASE WHEN content = 'error' THEN agentCount END) AS filtered \
+          FROM MultiSourceView"
+            .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await
+    .expect("a query over the view's second data source should compile");
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    let measures = request
+        .measures
+        .expect("the filtered measure is pushed to Cube");
+    assert_eq!(measures.len(), 1, "unexpected measures: {:?}", measures);
+    let measure: serde_json::Value = serde_json::from_str(&measures[0]).unwrap();
+    assert_eq!(measure["expr"]["type"], "PatchMeasure", "{}", measures[0]);
+    assert_eq!(
+        measure["expr"]["sourceMeasure"], "MultiSourceView.agentCount",
+        "{}",
+        measures[0]
+    );
+    assert_eq!(
+        measure["expr"]["addFilters"].as_array().map(Vec::len),
+        Some(1),
+        "{}",
+        measures[0]
+    );
+}
+
+/// The same view read across both of its data sources has no single data source to run on.
+/// Each data source has its own wrapper context and only takes members of its own, so no
+/// pushed down form of the query completes, and it is refused like any other query without
+/// a plan.
+#[tokio::test]
+async fn test_wrapper_multi_data_source_view_across_data_sources_fails() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_multi_data_source_view();
+    let error = convert_sql_to_cube_query(
+        &"SELECT SUM(CASE WHEN content = 'error' THEN sumPrice END) AS filtered \
+          FROM MultiSourceView"
+            .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await
+    .expect_err("a query across two data sources should not compile");
+
+    assert!(
+        error.to_string().contains("Can't detect Cube query"),
+        "unexpected error: {}",
+        error
+    );
+}
+
+/// Plain members over a view spanning data sources need no pushdown, and keep going to Cube
+/// as a regular scan.
+#[tokio::test]
+async fn test_wrapper_multi_data_source_view_plain_query_not_wrapped() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_multi_data_source_view();
+    let logical_plan = convert_sql_to_cube_query(
+        &"SELECT customer_gender, SUM(sumPrice) AS total FROM MultiSourceView GROUP BY 1"
+            .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await
+    .expect("a plain query over the view should compile")
+    .as_logical_plan();
+
+    let root_is_plain_scan = match &logical_plan {
+        LogicalPlan::Extension(Extension { node }) => {
+            node.as_any().downcast_ref::<CubeScanNode>().is_some()
+        }
+        _ => false,
+    };
+    assert!(
+        root_is_plain_scan,
+        "plain members should not need SQL pushdown: {:?}",
+        logical_plan
+    );
+}
+
+/// A wrapper context over a view spanning data sources is bound to the data source of the
+/// members the query references, and a template it cannot render keeps the expression in
+/// post processing. A window function is a shape the cost model always prefers to push down.
+#[tokio::test]
+async fn test_wrapper_multi_data_source_view_missing_template_stays_post_processed() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let no_window_function = vec![("expressions/window_function".to_string(), "".to_string())];
+    let meta = get_test_tenant_ctx_with_multi_data_source_view_and_templates(vec![
+        ("default", no_window_function.clone()),
+        ("other", no_window_function),
+    ]);
+    let logical_plan = convert_sql_to_cube_query(
+        &"SELECT g, ROW_NUMBER() OVER (ORDER BY g) AS rn \
+          FROM (SELECT customer_gender AS g, SUM(sumPrice) AS s FROM MultiSourceView GROUP BY 1) q"
+            .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await
+    .expect("a window function without a template should compile through post processing")
+    .as_logical_plan();
+
+    assert!(
+        matches!(logical_plan, LogicalPlan::Projection(_)),
+        "the window function is left to post processing: {:?}",
+        logical_plan
+    );
+}
+
+/// The wrapper context of a query over a view spanning data sources is bound to the data
+/// source of the members it references, so a template check is exact: the window function
+/// here lands on `default`, which can render it, and only `other` cannot.
+#[tokio::test]
+async fn test_wrapper_multi_data_source_view_template_missing_in_other_source_pushes_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_multi_data_source_view_and_templates(vec![(
+        "other",
+        vec![("expressions/window_function".to_string(), "".to_string())],
+    )]);
+    let logical_plan = convert_sql_to_cube_query(
+        &"SELECT f, ROW_NUMBER() OVER (ORDER BY f) AS rn \
+          FROM (SELECT SUM(CASE WHEN customer_gender = 'female' THEN sumPrice END) AS f \
+                FROM MultiSourceView) q"
+            .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await
+    .expect("a window function over a filtered measure should compile")
+    .as_logical_plan();
+
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("OVER"),
+        "the window function is pushed down to the data source that renders it: {}",
+        sql
+    );
+}
+
+/// Queries over a view spanning data sources are each bound to the data source of the members
+/// they reference. Two of them on the same data source push down as one set operation.
+#[tokio::test]
+async fn test_wrapper_union_over_multi_data_source_view_same_source_pushed_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_multi_data_source_view();
+    let logical_plan = convert_sql_to_cube_query(
+        &"SELECT SUM(CASE WHEN customer_gender = 'female' THEN sumPrice END) AS f \
+          FROM MultiSourceView \
+          UNION ALL \
+          SELECT SUM(CASE WHEN customer_gender = 'male' THEN sumPrice END) AS f \
+          FROM MultiSourceView"
+            .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await
+    .expect("a union over the view should compile")
+    .as_logical_plan();
+
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("UNION ALL"),
+        "the union is pushed down: {}",
+        sql
+    );
+}
+
+/// Two queries over the same view bound to different data sources cannot be rendered by one
+/// of them, so the union stays in post processing.
+#[tokio::test]
+async fn test_wrapper_union_over_multi_data_source_view_across_sources_not_pushed_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_multi_data_source_view();
+    let logical_plan = convert_sql_to_cube_query(
+        &"SELECT SUM(CASE WHEN customer_gender = 'female' THEN sumPrice END) AS f \
+          FROM MultiSourceView \
+          UNION ALL \
+          SELECT COUNT(DISTINCT CASE WHEN content = 'error' THEN agentCount END) AS f \
+          FROM MultiSourceView"
+            .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await
+    .expect("a union across the view's data sources should compile")
+    .as_logical_plan();
+
+    assert!(
+        matches!(logical_plan, LogicalPlan::Union(_)),
+        "the union is left to post processing: {:?}",
+        logical_plan
+    );
+    assert_eq!(
+        logical_plan.find_cube_scans().len(),
+        2,
+        "every query keeps its own scan: {:?}",
+        logical_plan
+    );
+}
+
+/// A query grouping members from both data sources of the view has no pushed down form, but
+/// Cube can still serve it as a plain scan (a rollup join pre-aggregation, for one). Shapes
+/// the cost model likes to push down, a window function or a limit with an ordering
+/// expression, must keep that plain scan under post processing rather than pick a pushed
+/// down form that SQL generation cannot render.
+#[tokio::test]
+async fn test_wrapper_multi_data_source_view_cross_source_query_stays_plain() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for sql in [
+        "SELECT g, c, ROW_NUMBER() OVER (ORDER BY g) AS rn \
+         FROM (SELECT customer_gender AS g, content AS c, SUM(sumPrice) AS s \
+               FROM MultiSourceView GROUP BY 1, 2) q",
+        "SELECT customer_gender, content, SUM(sumPrice) AS s FROM MultiSourceView \
+         GROUP BY 1, 2 ORDER BY LOWER(content) LIMIT 5",
+    ] {
+        let meta = get_test_tenant_ctx_with_multi_data_source_view();
+        let logical_plan = convert_sql_to_cube_query(
+            &sql.to_string(),
+            meta.clone(),
+            get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+        )
+        .await
+        .expect("a query across the view's data sources should compile as a plain scan")
+        .as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+        assert_eq!(
+            cube_scan.request.dimensions.as_deref().map(<[String]>::len),
+            Some(2),
+            "both dimensions go to Cube in one plain scan: {:?}",
+            logical_plan
+        );
+    }
 }

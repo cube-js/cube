@@ -49,17 +49,17 @@ export default function DraggableItem({
             <Radio.Button value="none">NONE</Radio.Button>
           </Radio.Group>
 
-          {/*<Button*/}
-          {/*  type={order !== 'none' ? 'primary' : null}*/}
-          {/*  size="small"*/}
-          {/*  style={{*/}
-          {/*    minWidth: 70,*/}
-          {/*    marginLeft: 8,*/}
-          {/*  }}*/}
-          {/*  onClick={() => onOrderChange(id, getNextOrder())}*/}
-          {/*>*/}
-          {/*  {order.toUpperCase()}*/}
-          {/*</Button>*/}
+          {/* <Button */}
+          {/*  type={order !== 'none' ? 'primary' : null} */}
+          {/*  size="small" */}
+          {/*  style={{ */}
+          {/*    minWidth: 70, */}
+          {/*    marginLeft: 8, */}
+          {/*  }} */}
+          {/*  onClick={() => onOrderChange(id, getNextOrder())} */}
+          {/* > */}
+          {/*  {order.toUpperCase()} */}
+          {/* </Button> */}
         </div>
       )}
     </Draggable>

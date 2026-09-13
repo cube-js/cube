@@ -635,7 +635,7 @@ export abstract class BaseDriver implements DriverInterface {
     return Date.now();
   }
 
-  public wrapQueryWithLimit(query: { query: string, limit: number}) {
+  public wrapQueryWithLimit(query: { query: string, limit: number }) {
     query.query = `SELECT * FROM (${query.query}) AS t LIMIT ${query.limit}`;
   }
 
@@ -686,7 +686,7 @@ export abstract class BaseDriver implements DriverInterface {
     prefix: string
   ): Promise<string[]> {
     // Lazy loading, because it's using azure SDK, which is quite heavy.
-    return (await import('./storage-fs/aws.fs')).extractUnloadedFilesFromS3(clientOptions, bucketName, prefix);
+    return (await import('./storage-fs/aws.fs.js')).extractUnloadedFilesFromS3(clientOptions, bucketName, prefix);
   }
 
   /**
@@ -698,7 +698,7 @@ export abstract class BaseDriver implements DriverInterface {
     tableName: string
   ): Promise<string[]> {
     // Lazy loading, because it's using azure SDK, which is quite heavy.
-    return (await import('./storage-fs/gcs.fs')).extractFilesFromGCS(gcsConfig, bucketName, tableName);
+    return (await import('./storage-fs/gcs.fs.js')).extractFilesFromGCS(gcsConfig, bucketName, tableName);
   }
 
   protected async extractFilesFromAzure(
@@ -707,6 +707,6 @@ export abstract class BaseDriver implements DriverInterface {
     tableName: string
   ): Promise<string[]> {
     // Lazy loading, because it's using azure SDK, which is quite (extremely) heavy.
-    return (await import('./storage-fs/azure.fs')).extractFilesFromAzure(azureConfig, bucketName, tableName);
+    return (await import('./storage-fs/azure.fs.js')).extractFilesFromAzure(azureConfig, bucketName, tableName);
   }
 }

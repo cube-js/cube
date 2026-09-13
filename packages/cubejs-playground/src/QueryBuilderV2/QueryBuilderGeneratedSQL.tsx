@@ -16,8 +16,7 @@ const EditSQLQueryButton = tasty(Button, {
 });
 
 export function QueryBuilderGeneratedSQL() {
-  let { query, queryHash, cubeApi, isQueryEmpty, verificationError, openSqlRunner } =
-    useQueryBuilderContext();
+  const { query, queryHash, cubeApi, isQueryEmpty, verificationError, openSqlRunner } = useQueryBuilderContext();
 
   return useDeepMemo(() => {
     if (!isQueryEmpty) {
@@ -44,12 +43,12 @@ export function QueryBuilderGeneratedSQL() {
             }
 
             // in the case of a compareDateRange query the SQL will be the same
-            const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
-            const value = query && sqlFormatter.format(query.sql());
+            const [firstSqlQuery] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
+            const value = firstSqlQuery && sqlFormatter.format(firstSqlQuery.sql());
 
             return (
               <TabPaneWithToolbar
-                actions={
+                actions={(
                   <>
                     <CopyButton type="secondary" value={value}>
                       Copy
@@ -58,7 +57,7 @@ export function QueryBuilderGeneratedSQL() {
                       <EditSQLQueryButton onPress={() => openSqlRunner?.(value)} />
                     ) : undefined}
                   </>
-                }
+                )}
               >
                 <ScrollableCodeContainer value={value} />
               </TabPaneWithToolbar>

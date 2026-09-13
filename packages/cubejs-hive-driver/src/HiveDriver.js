@@ -222,3 +222,4 @@ class HiveDriver extends BaseDriver {
 }
 
 module.exports = HiveDriver;
+module.exports.HiveDriver = HiveDriver;

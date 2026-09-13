@@ -49,18 +49,6 @@ function metaToTypes(meta: Meta) {
   return types;
 }
 
-export function convertJsonQueryToGraphQL({ meta, query }: { meta?: Meta | null; query: Query }) {
-  const types = meta ? metaToTypes(meta) : null;
-
-  if (!types) {
-    return '';
-  }
-
-  const converter = new CubeGraphQLConverter(query, types);
-
-  return converter.convert();
-}
-
 const singleValueOperators = ['gt', 'gte', 'lt', 'lte'];
 
 const OPERATORS_MAP = {
@@ -68,6 +56,16 @@ const OPERATORS_MAP = {
   notEquals: 'notIn',
   notSet: 'set',
 } as const;
+
+function graphQLOperator(filter: { operator: string; values?: string[] }) {
+  if (filter.operator === 'equals' && (filter.values || []).length <= 1) {
+    return 'equals';
+  }
+
+  return filter.operator in OPERATORS_MAP
+    ? OPERATORS_MAP[filter.operator as keyof typeof OPERATORS_MAP]
+    : filter.operator;
+}
 
 enum FilterKind {
   AND = 'AND',
@@ -151,10 +149,10 @@ export class CubeGraphQLConverter {
     | t.ObjectFieldNode
     | t.ObjectFieldNode[]
     | {
-        kind: 'ObjectField';
-        name: { kind: 'Name'; value: string };
-        value: { kind: 'ObjectValue'; fields: t.ObjectFieldNode[] };
-      }
+      kind: 'ObjectField';
+      name: { kind: 'Name'; value: string };
+      value: { kind: 'ObjectValue'; fields: t.ObjectFieldNode[] };
+    }
   )[] {
     const plainFilters = Object.values(
       filter.reduce((memo: any, f: any) => {
@@ -330,23 +328,18 @@ export class CubeGraphQLConverter {
             f.values === undefined && !['set', 'notSet'].includes(f.operator)
               ? []
               : [
-                  {
-                    kind: t.Kind.OBJECT_FIELD,
-                    name: {
-                      kind: t.Kind.NAME,
-                      // A single value maps to "equals"
-                      // Whereas multiple values for "equals" operator maps to "in"
-                      // value: operatorsMap[f.operator] || f.operator,
-                      value:
-                        f.operator === 'equals' && (f.values || []).length <= 1
-                          ? 'equals'
-                          : f.operator in OPERATORS_MAP
-                            ? OPERATORS_MAP[f.operator as keyof typeof OPERATORS_MAP]
-                            : f.operator,
-                    },
-                    value: value(f),
+                {
+                  kind: t.Kind.OBJECT_FIELD,
+                  name: {
+                    kind: t.Kind.NAME,
+                    // A single value maps to "equals"
+                    // Whereas multiple values for "equals" operator maps to "in"
+                    // value: operatorsMap[f.operator] || f.operator,
+                    value: graphQLOperator(f),
                   },
-                ],
+                  value: value(f),
+                },
+              ],
         },
       } as t.ObjectFieldNode;
     });
@@ -561,8 +554,8 @@ export class CubeGraphQLConverter {
           name: field,
           ...(gqlGranularity
             ? {
-                granularities: [...(currentField?.granularities || []), gqlGranularity],
-              }
+              granularities: [...(currentField?.granularities || []), gqlGranularity],
+            }
             : null),
         });
       });
@@ -623,4 +616,16 @@ export class CubeGraphQLConverter {
       });
     }
   }
+}
+
+export function convertJsonQueryToGraphQL({ meta, query }: { meta?: Meta | null; query: Query }) {
+  const types = meta ? metaToTypes(meta) : null;
+
+  if (!types) {
+    return '';
+  }
+
+  const converter = new CubeGraphQLConverter(query, types);
+
+  return converter.convert();
 }

@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/ksql-driver",
   "description": "Cube.js ksql database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.7.34",
+  "version": "1.7.37",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -16,19 +16,26 @@
     "index.js"
   ],
   "main": "index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js",
+      "require": "./index.js"
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
   "typings": "dist/src/index.d.ts",
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "unit": "jest --verbose dist/test/unit",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "unit": "jest --verbose dist/test/unit"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.7.34",
-    "@cubejs-backend/schema-compiler": "1.7.34",
-    "@cubejs-backend/shared": "1.7.34",
+    "@cubejs-backend/base-driver": "1.7.37",
+    "@cubejs-backend/schema-compiler": "1.7.37",
+    "@cubejs-backend/shared": "1.7.37",
     "async-mutex": "0.3.2",
     "axios": "^1.8.3",
     "kafkajs": "^2.2.3"
@@ -37,11 +44,10 @@
   "publishConfig": {
     "access": "public"
   },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
-  },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.34",
-    "typescript": "~5.2.2"
+    "@cubejs-backend/linter": "1.7.37",
+    "@types/jest": "^29",
+    "@types/node": "^22",
+    "typescript": "~6.0.3"
   }
 }

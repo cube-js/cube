@@ -11,7 +11,7 @@ export function contains(
   substring = substring.normalize('NFC');
 
   let scan = 0;
-  let sliceLength = substring.length;
+  const sliceLength = substring.length;
 
   for (; scan + sliceLength <= string.length; scan++) {
     const sliced = string.slice(scan, scan + sliceLength);

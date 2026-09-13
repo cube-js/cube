@@ -70,7 +70,7 @@ export function loadable(
   if (timeout) {
     setTimeout(() => {
       if (!Component.loaded) {
-        void Component.load();
+        Component.load();
       }
     }, timeout);
   }

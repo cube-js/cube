@@ -1502,4 +1502,32 @@ mod tests {
             _ => panic!("Expected PreAggregationSource::Join"),
         }
     }
+
+    #[test]
+    fn test_compile_rollup_join_cube_reached_only_by_time_dimension() {
+        let schema = MockSchema::from_yaml_file("common/rollup_join_time_dimension_hints.yaml");
+        let test_context = TestContext::new(schema).unwrap();
+        let query_tools = test_context.query_tools().clone();
+
+        let cube_names = vec!["boards".to_string(), "locations".to_string()];
+        let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
+
+        let pre_agg_name = PreAggregationFullName::new("boards".to_string(), "joined".to_string());
+        let compiled = compiler.compile_pre_aggregation(&pre_agg_name).unwrap();
+
+        let single_name = |source: &PreAggregationSource| match source {
+            PreAggregationSource::Single(table) => table.name.clone(),
+            _ => panic!("Expected Single source"),
+        };
+
+        match compiled.source.as_ref() {
+            PreAggregationSource::Join(join) => {
+                assert_eq!(join.items.len(), 1);
+                assert_eq!(single_name(&join.items[0].from), "locations_rollup");
+                assert_eq!(single_name(&join.items[0].to), "boards_rollup");
+                assert_eq!(single_name(&join.root), "locations_rollup");
+            }
+            _ => panic!("Expected PreAggregationSource::Join"),
+        }
+    }
 }

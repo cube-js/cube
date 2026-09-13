@@ -187,7 +187,7 @@ export class ClickHouseQuery extends BaseQuery {
   }
 
   public castToString(sql) {
-    return `CAST(${sql} as String)`;
+    return `CAST(${sql} as Nullable(String))`;
   }
 
   public seriesSql(timeDimension: BaseTimeDimension) {
@@ -286,6 +286,11 @@ export class ClickHouseQuery extends BaseQuery {
     delete templates.expressions.like_escape;
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
+    // ClickHouse spells its string type `String`, and case-sensitively so
+    templates.types.string = 'String';
+    // A ClickHouse type holds no NULL of its own, so a cast that has to produce one
+    // names the nullable form of the type instead
+    templates.types.nullable = 'Nullable({{ data_type }})';
     templates.types.boolean = 'BOOL';
     templates.types.timestamp = 'DATETIME';
     delete templates.types.time;

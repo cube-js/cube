@@ -306,7 +306,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
   /* eslint-disable camelcase */
   public async getTablesQuery(): Promise<
     { table_name?: string; TABLE_NAME?: string }[]
-    > {
+  > {
     const data = await this.query<{ table_name: string }>('SHOW TABLES', []);
     return data.map(({ table_name }) => ({ table_name }));
   }

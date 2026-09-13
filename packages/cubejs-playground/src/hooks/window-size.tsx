@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 
-type WindowSize = { 
-  width?: number; 
-  height?: number 
-}
+type WindowSize = {
+  width?: number;
+  height?: number
+};
 
 export function useWindowSize() {
   // Initialize state with undefined width/height so server and client renders match

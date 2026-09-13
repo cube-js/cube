@@ -197,3 +197,4 @@ class AuroraServerlessMySqlDriver extends BaseDriver {
 }
 
 module.exports = AuroraServerlessMySqlDriver;
+module.exports.AuroraServerlessMySqlDriver = AuroraServerlessMySqlDriver;

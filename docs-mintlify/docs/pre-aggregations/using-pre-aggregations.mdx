@@ -1031,6 +1031,95 @@ With all of the above set up, making a query such as the following will now use
 }
 ```
 
+### Indexing the joined rollup for partition pruning
+
+A `rollup_join` can only be planned if each side of the join can be scanned in
+join-key order — either from the rollup's default index, where dimensions come
+first, or from an explicit index whose leading columns cover the join key, like
+`user_index` above. However, an index that *starts* with the join key gives you
+no partition pruning: Cube Store partitions are ranged by index order, so a
+filter only prunes partitions when it constrains the index's leading column. A
+filter on the second column of an index prunes nothing unless a partition
+happens to cover a single value of the first column.
+
+**When queries filter the joined rollup by a highly selective, single-value
+dimension, define an index that puts that dimension before the join key.**
+Suppose `users` has such a dimension, `alt_key`, and queries commonly filter on
+it. Add it to `users_rollup` and index it ahead of the join key:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: users
+    # ...
+
+    pre_aggregations:
+      - name: users_rollup
+        dimensions:
+          - CUBE.id
+          - CUBE.name
+          - CUBE.alt_key
+
+        indexes:
+          - name: alt_key_index
+            columns:
+              - CUBE.alt_key
+              - CUBE.id
+```
+
+```javascript title="JavaScript"
+cube(`users`, {
+  // ...
+
+  pre_aggregations: {
+    users_rollup: {
+      dimensions: [CUBE.id, CUBE.name, CUBE.alt_key],
+
+      indexes: {
+        alt_key_index: {
+          columns: [CUBE.alt_key, CUBE.id]
+        }
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+Cube Store will pick `alt_key_index` for the joined side of such a query — the
+join key is still covered by the index's leading columns, it just doesn't come
+first — and prune every partition whose range excludes the filtered value.
+
+This pays off twice over, because the joined rollup's partitions are never split
+up: only the left-most rollup is divided into batches, and every batch carries
+all partitions of the joined one. Those partitions also consume the per-batch
+join budget that bounds how large the right side of a rollup join can be, so
+pruning them can be what keeps a query planning at all.
+
+A few things to keep in mind:
+
+- Only single-value (equality) filters let the filtered dimension sit ahead of
+  the join key. A range filter, including a time dimension filter, won't make
+  such an index eligible for the join — though a range filter on an index's
+  leading column does prune partitions normally.
+- The join key must still be part of the index's leading columns, together with
+  the filtered dimension. Listing the filtered dimension alone, without the join
+  key, makes the index unusable for the join.
+- Queries that hit the rollup join without the equality filter are planned on a
+  join-key-leading scan instead, so keep one available — the default index
+  serves that as long as the join key is the rollup's first dimension.
+- The other side of the join — typically the large rollup carrying the time
+  dimension — still needs to be scanned in join-key order, and its time
+  dimension filter will not prune partitions there.
+- Each extra index adds build time and storage, so add one when the filter is
+  both common and selective.
+
+As always,
+[use `EXPLAIN` and `EXPLAIN ANALYZE`][ref-cubestore-sql-commands] to confirm
+which index was picked and how many partitions were scanned.
+
 ## Pre-Aggregation build strategies
 
 <Info>
@@ -1180,7 +1269,7 @@ or a decimal type, depending on the nature of your data.
 [ref-schema-ref-preaggs-refresh-key-every]: /reference/data-modeling/pre-aggregations#every
 [ref-schema-ref-preaggs-refresh-key-sql]: /reference/data-modeling/pre-aggregations#sql
 [ref-deploy-refresh-wrkr]: /cube-core/architecture#refresh-worker
-[ref-prod-list-refresh]: /cube-core/running-in-production#set-up-refresh-worker
+[ref-prod-list-refresh]: /cube-core/deployment#set-up-refresh-worker
 [ref-original-sql]: /reference/data-modeling/pre-aggregations#original_sql
 [self-batching]: #batching
 [self-export-bucket]: #export-bucket

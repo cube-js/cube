@@ -49,11 +49,12 @@ export function PreAggregationStatus({
           </Badge>
         )}
 
-        {isAggregated ? (
+        {isAggregated && (
           <Typography.Text>
             Query was accelerated with pre-aggregation
           </Typography.Text>
-        ) : isVersionGte ? (
+        )}
+        {!isAggregated && isVersionGte && (
           <Button
             data-testid="not-pre-agg-query-btn"
             type="link"
@@ -61,7 +62,7 @@ export function PreAggregationStatus({
           >
             Query was not accelerated with pre-aggregation {'->'}
           </Button>
-        ) : null}
+        )}
 
         {isAggregated && external && extDbType !== 'cubestore' ? (
           <Alert
@@ -72,13 +73,13 @@ export function PreAggregationStatus({
 
         {isAggregated && !external && preAggregationType !== 'originalSql' ? (
           <Alert
-            message={
+            message={(
               <>
                 For optimized performance, consider using <b>external</b>{' '}
                 {preAggregationType} pre-aggregation, rather than the source
                 database (internal)
               </>
-            }
+            )}
             type="warning"
           />
         ) : null}

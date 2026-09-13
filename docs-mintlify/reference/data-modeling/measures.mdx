@@ -463,6 +463,13 @@ for the series of time windows.
 With Tesseract, the [next-generation data modeling engine][link-tesseract],
 rolling window calculations don't require the date range for the time dimension. In versions before v1.7.0, Tesseract was not enabled by default.
 
+Omitting the date range requires the data source to generate the time series in
+SQL. It is supported for Amazon Athena, Databricks, Google BigQuery, Microsoft SQL
+Server, Postgres, Presto, Snowflake, and Trino, as well as for MySQL with the
+`CUBEJS_DB_MYSQL_USE_GENERATED_TIME_SERIES` environment variable set. With other
+data sources, and with [custom granularities][ref-custom-granularities] on Google
+BigQuery, Microsoft SQL Server, and Snowflake, the date range is still required.
+
 </Warning>
 
 #### `offset`
@@ -1504,6 +1511,7 @@ cube(`orders`, {
 [ref-nested-aggregate]: /docs/data-modeling/measures#nested-aggregates
 [ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
 [ref-switch-dimensions]: /reference/data-modeling/dimensions#type
+[ref-custom-granularities]: /reference/data-modeling/dimensions#granularities
 [ref-filters-query]: /reference/core-data-apis/rest-api/query-format#filters-format
 [ref-data-masking]: /docs/data-modeling/data-access-policies#data-masking
 [link-d3-format]: https://d3js.org/d3-format

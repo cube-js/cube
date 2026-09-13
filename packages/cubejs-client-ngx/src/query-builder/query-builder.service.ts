@@ -26,23 +26,32 @@ export type TQueryBuilderState = {
 @Injectable()
 export class QueryBuilderService {
   private _cube: CubeClient;
+
   private _meta: Meta;
+
   private _query: Query;
+
   private _disableHeuristics: boolean = false;
+
   private _resolveQuery: (query: Query) => void;
+
   private _resolveBuilderMeta: (query: BuilderMeta) => void;
+
   private _heuristicChange$ = new Subject<any>();
 
-  readonly builderMeta = new Promise<BuilderMeta>(
-    (resolve) => (this._resolveBuilderMeta = resolve)
-  );
-  readonly query = new Promise<Query>(
-    (resolve) => (this._resolveQuery = resolve)
-  );
-  readonly state = new BehaviorSubject<TQueryBuilderState>({});
+  public readonly builderMeta = new Promise<BuilderMeta>((resolve) => {
+    this._resolveBuilderMeta = resolve;
+  });
 
-  pivotConfig: PivotConfig;
-  chartType: ChartType;
+  public readonly query = new Promise<Query>((resolve) => {
+    this._resolveQuery = resolve;
+  });
+
+  public readonly state = new BehaviorSubject<TQueryBuilderState>({});
+
+  public pivotConfig: PivotConfig;
+
+  public chartType: ChartType;
 
   private async init() {
     this.pivotConfig = new PivotConfig(null);
@@ -64,24 +73,22 @@ export class QueryBuilderService {
     if (!this._disableHeuristics) {
       this._heuristicChange$
         .pipe(
-          switchMap((data) => {
-            return combineLatest([
-              this._cube.dryRun(data.query).pipe(catchError((error) => {
-                console.error(error);
-                return of(null);
-              })),
-              of(data.shouldApplyHeuristicOrder),
-            ]);
-          })
+          switchMap((data) => combineLatest([
+            this._cube.dryRun(data.query).pipe(catchError((error) => {
+              console.error(error);
+              return of(null);
+            })),
+            of(data.shouldApplyHeuristicOrder),
+          ]))
         )
         .subscribe(
           ([dryRunResponse, shouldApplyHeuristicOrder]) => {
             if (!dryRunResponse) {
               return;
             }
-            
+
             const { pivotQuery, queryOrder } = dryRunResponse;
-            
+
             this.pivotConfig.set(
               ResultSet.getNormalizedPivotConfig(
                 pivotQuery,
@@ -126,7 +133,7 @@ export class QueryBuilderService {
     return query;
   }
 
-  setCubeClient(cubeClient: CubeClient) {
+  public setCubeClient(cubeClient: CubeClient) {
     this._cube = cubeClient;
     this.init();
   }
@@ -134,11 +141,9 @@ export class QueryBuilderService {
   private subscribe() {
     Object.getOwnPropertyNames(this).forEach((key) => {
       if (this[key] instanceof StateSubject) {
-        this[key].subject.subscribe((value) =>
-          this.setPartialState({
-            [key]: value,
-          })
-        );
+        this[key].subject.subscribe((value) => this.setPartialState({
+          [key]: value,
+        }));
       }
     });
     this.query.then((query) => {
@@ -150,7 +155,7 @@ export class QueryBuilderService {
     });
   }
 
-  async deserialize(state) {
+  public async deserialize(state) {
     if (state.query) {
       (await this.query).setQuery(state.query);
     }
@@ -164,18 +169,18 @@ export class QueryBuilderService {
     this.subscribe();
   }
 
-  setPartialState(partialState) {
+  public setPartialState(partialState) {
     this.state.next({
       ...this.state.getValue(),
       ...partialState,
     });
   }
 
-  disableHeuristics() {
-    this._disableHeuristics = false;
+  public disableHeuristics() {
+    this._disableHeuristics = true;
   }
 
-  enableHeuristics() {
-    this._disableHeuristics = true;
+  public enableHeuristics() {
+    this._disableHeuristics = false;
   }
 }

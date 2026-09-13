@@ -57,7 +57,7 @@ type JobedPreAggregation = {
   tableName: string,
   targetTableName: string,
   // eslint-disable-next-line camelcase
-  refreshKeyValues: {refresh_key: string}[][],
+  refreshKeyValues: { refresh_key: string }[][],
   queryKey: any[],
   lastUpdatedAt: string,
   type: string,

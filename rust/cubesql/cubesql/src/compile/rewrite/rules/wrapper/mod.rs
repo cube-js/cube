@@ -211,6 +211,48 @@ impl WrapperRules {
         })
     }
 
+    /// The data source a wrapper context is bound to, `None` when unrestricted. Borrowed from
+    /// `meta` rather than the e-graph, so a transform can hold it while resolving members,
+    /// which borrows the e-graph mutably. `Err` when the context cannot be read, or names a
+    /// data source `meta` does not know.
+    fn context_data_source<'meta>(
+        egraph: &CubeEGraph,
+        subst: &mut Subst,
+        input_data_source_var: Var,
+        meta: &'meta MetaContext,
+    ) -> Result<Option<&'meta str>, ()> {
+        let data_source =
+            Self::get_data_source(egraph, subst, input_data_source_var).map_err(|_| ())?;
+        let Some(data_source) = data_source.specific() else {
+            return Ok(None);
+        };
+        meta.data_source_to_sql_generator
+            .get_key_value(data_source)
+            .map(|(data_source, _)| Some(data_source.as_str()))
+            .ok_or(())
+    }
+
+    /// Whether `member` may be pushed into a wrapper context bound to `data_source`, as read
+    /// with [`Self::context_data_source`] (`None` is unrestricted). A scan over a view spanning
+    /// data sources gets one context per data source it reaches, so a pushed down select is
+    /// complete only when every member it references shares one, and that is the data source
+    /// SQL generation resolves to. A member reaching no data source of its own, like a
+    /// synthetic field, fits any.
+    fn member_fits_data_source(
+        data_source: Option<&str>,
+        meta: &MetaContext,
+        member: &str,
+    ) -> bool {
+        let Some(data_source) = data_source else {
+            return true;
+        };
+        match meta.data_source_for_member_name(member) {
+            Ok(DataSource::Unrestricted) => true,
+            Ok(DataSource::Specific(member_data_source)) => member_data_source == data_source,
+            Err(_) => false,
+        }
+    }
+
     fn can_rewrite_template(data_source: &DataSource, meta: &MetaContext, template: &str) -> bool {
         let sql_generator = match data_source {
             DataSource::Specific(data_source) => {

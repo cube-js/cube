@@ -34,8 +34,8 @@ export function IndexPage() {
       if (context.shouldStartConnectionWizardFlow) {
         push('/connection');
       } else if (
-        !files.length ||
-        (files.length === 1 && files[0].fileName === 'Orders.js')
+        !files.length
+        || (files.length === 1 && files[0].fileName === 'Orders.js')
       ) {
         push('/schema');
       } else {

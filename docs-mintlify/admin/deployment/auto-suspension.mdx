@@ -117,6 +117,11 @@ the Deployments page, this reads stored data and resumes nothing.
 To resume a suspended deployment, send a query to Cube using the API or by
 navigating to the deployment in Cube Cloud.
 
+Users who can resume the deployment are also notified in their notification
+inbox when it suspends, with a link straight to it. This excludes anyone
+already working on the deployment in dev mode, since their own branch stays
+unaffected by suspension.
+
 <Warning>
 
 Currently, Cube Cloud's auto-suspension feature cannot guarantee a 100% resume

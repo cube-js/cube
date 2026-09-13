@@ -22,7 +22,7 @@ export class CubeClient {
 
   private cubeApi: CubeApi;
 
-  constructor(@Inject('config') private config: any | Observable<any>) {
+  public constructor(@Inject('config') private config: any | Observable<any>) {
     if (this.config instanceof Observable) {
       this.config.subscribe(() => {
         this.ready$.next(true);
@@ -56,7 +56,7 @@ export class CubeClient {
     query: Query | Query[],
     options?: LoadMethodOptions
   ): Observable<ResultSet<any>> {
-    return from(<Promise<ResultSet<any>>>this.apiInstance().load(query, options));
+    return from(this.apiInstance().load(query, options) as Promise<ResultSet<any>>);
   }
 
   public sql(
@@ -78,18 +78,15 @@ export class CubeClient {
   }
 
   public watch(query, params = {}): Observable<ResultSet<any>> {
-    return new Observable((observer) =>
-      query.subscribe({
-        next: async (query) => {
-          try {
-            const resultSet = await this.apiInstance().load(query, params);
-            observer.next(resultSet);
-          } catch(err) {
-            observer.error(err);
-          }
-
-        },
-      })
-    );
+    return new Observable((observer) => query.subscribe({
+      next: async (currentQuery) => {
+        try {
+          const resultSet = await this.apiInstance().load(currentQuery, params);
+          observer.next(resultSet);
+        } catch (err) {
+          observer.error(err);
+        }
+      },
+    }));
   }
 }

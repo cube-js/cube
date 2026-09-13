@@ -333,7 +333,7 @@ export class OptsHandler {
       displayCLIWarning(
         'Cube Store is not found. Please follow this documentation ' +
         'to configure Cube Store ' +
-        'https://cube.dev/docs/caching/running-in-production'
+        'https://docs.cube.dev/cube-core/running-in-production'
       );
     }
 
@@ -341,7 +341,7 @@ export class OptsHandler {
       displayCLIWarning(
         `Using ${externalDbType} as an external database is deprecated. ` +
         'Please use Cube Store instead: ' +
-        'https://cube.dev/docs/caching/running-in-production'
+        'https://docs.cube.dev/cube-core/running-in-production'
       );
     }
 
@@ -437,7 +437,7 @@ export class OptsHandler {
           'You are using multitenancy without configuring scheduledRefreshContexts, ' +
           'which can lead to issues where the security context will be undefined ' +
           'while Cube.js will do background refreshing: ' +
-          'https://cube.dev/docs/config#options-reference-scheduled-refresh-contexts'
+          'https://docs.cube.dev/reference/configuration/config#scheduled_refresh_contexts'
         ),
       });
     }

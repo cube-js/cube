@@ -11,7 +11,7 @@ on:
       - 'rust/cubestore/**'
       - 'rust/cubesql/**'
       - 'rust/cube/**'
-      - '.eslintrc.js'
+      - '.oxlintrc.json'
       - '.prettierrc'
       - 'package.json'
       - 'lerna.json'
@@ -30,7 +30,7 @@ on:
       - 'rust/cubestore/**'
       - 'rust/cubesql/**'
       - 'rust/cube/**'
-      - '.eslintrc.js'
+      - '.oxlintrc.json'
       - '.prettierrc'
       - 'package.json'
       - 'lerna.json'
@@ -48,7 +48,7 @@ jobs:
     outputs:
       sha: ${{ steps.get-tag.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - id: git-log
@@ -89,21 +89,21 @@ jobs:
         env:
           OUT: ${{ needs['latest-tag-sha'].outputs.sha }}
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # pulls all commits (needed for codecov)
           fetch-depth: 2
       - name: Download backend-native artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: "native-linux-x64-glibc-${{ matrix.python-version }}.node"
           path: ./packages/cubejs-backend-native/
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
       - name: Get yarn cache directory path
@@ -111,7 +111,7 @@ jobs:
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Restore yarn cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
@@ -120,7 +120,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.22
       - name: Yarn install
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -146,7 +146,7 @@ jobs:
           find ./packages -type f -name lcov.fixed.info -exec cat {} + >> ./combined-unit.lcov || true
       - name: Upload coverage artifact
         if: (matrix.node-version == '24.x')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-unit
           path: ./combined-unit.lcov
@@ -159,7 +159,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -168,7 +168,7 @@ jobs:
           rustflags: ""
           components: rustfmt
       - name: Install Node.js 24.x
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.x
       - name: Get yarn cache directory path
@@ -176,7 +176,7 @@ jobs:
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Restore yarn cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
@@ -185,7 +185,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.22
       - name: Yarn install
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -198,8 +198,15 @@ jobs:
         run: if [ "$(git status | grep nothing)x" = "x" ]; then echo "Non empty changeset after lerna bootstrap"; git status; exit 1; else echo "Nothing to commit. Proceeding"; fi;
       - name: NPM lint
         run: yarn lint:npm
-      - name: Lerna lint
-        run: yarn lerna run --concurrency 1 lint
+      - name: Oxlint
+        run: yarn lint:js
+      # cubejs-client-ngx has no tests and is not in the root tsconfig references, so
+      # oxlint is otherwise the only thing that ever looks at it. ng build needs
+      # @cubejs-client/core's declarations, hence the build:client-core first.
+      - name: Build client-ngx
+        run: |
+          yarn lerna run build:client-core
+          yarn workspace @cubejs-client/ngx build
       - name: Cargo fmt cube workspace
         run: |
           cargo fmt --manifest-path rust/cube/Cargo.toml --all -- --check
@@ -215,7 +222,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -224,7 +231,7 @@ jobs:
       # cubesqlplanner pre-aggregation tests run against this binary; the
       # resolver picks up target/release first (see cubestore_service.rs).
       - name: Download cubestored artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: ./rust/cubestore/target/release/
           name: cubestored-x86_64-unknown-linux-gnu-release
@@ -239,10 +246,10 @@ jobs:
     timeout-minutes: 60
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     container:
-      image: cubejs/rust-cross:x86_64-unknown-linux-gnu-31072025
+      image: cubejs/rust-cross:x86_64-unknown-linux-gnu-08092026
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -261,7 +268,7 @@ jobs:
           cd rust/cubestore
           cargo build --release -j 4 -p cubestore
       - name: 'Upload cubestored-x86_64-unknown-linux-gnu-release artifact'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cubestored-x86_64-unknown-linux-gnu-release
           path: ./rust/cubestore/target/release/cubestored
@@ -278,10 +285,10 @@ jobs:
         python-version: [ 3.13 ]
       fail-fast: false
     container:
-      image: cubejs/rust-cross:x86_64-unknown-linux-gnu-31072025-python-${{ matrix.python-version }}
+      image: cubejs/rust-cross:x86_64-unknown-linux-gnu-08092026-python-${{ matrix.python-version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -297,7 +304,7 @@ jobs:
           key: native-${{ runner.OS }}-x86_64-unknown-linux-gnu
           shared-key: native-${{ runner.OS }}-x86_64-unknown-linux-gnu
       - name: Install Node.js 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
       - name: Install Yarn
@@ -314,7 +321,7 @@ jobs:
         working-directory: ./packages/cubejs-backend-native
         run: yarn run native:build-release-python
       - name: Store build artifact for dev image
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: "native-linux-x64-glibc-${{ env.PYTHON_VERSION_CURRENT }}.node"
           path: ./packages/cubejs-backend-native/index.node
@@ -333,15 +340,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Maximize build space
         uses: ./.github/actions/maximize-build-space
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION_CURRENT }}
       - name: Get yarn cache directory path
@@ -349,7 +356,7 @@ jobs:
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Restore yarn cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
@@ -358,7 +365,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.22
       - name: Yarn install
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -370,12 +377,12 @@ jobs:
       - name: Lerna tsc
         run: yarn tsc
       - name: Download backend-native artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: "native-linux-x64-glibc-${{ env.PYTHON_VERSION_CURRENT }}.node"
           path: ./packages/cubejs-backend-native/
       - name: Download cubestored artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: ./rust/cubestore/target/release/
           name: cubestored-x86_64-unknown-linux-gnu-release
@@ -440,9 +447,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Download backend-native artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: "native-linux-x64-glibc-${{ env.PYTHON_VERSION_CURRENT }}.node"
           path: ./packages/cubejs-backend-native/
@@ -454,11 +461,11 @@ jobs:
           rustflags: ""
           components: rustfmt
       - name: Install Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION_CURRENT }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
@@ -466,7 +473,7 @@ jobs:
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Restore yarn cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
@@ -475,7 +482,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.22
       - name: Yarn install
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -489,7 +496,7 @@ jobs:
       - name: Lerna tsc
         run: yarn tsc
       - name: Run Integration tests for ${{ matrix.db }} matrix
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         with:
           max_attempts: 3
           retry_on: error
@@ -535,7 +542,7 @@ jobs:
           find ./packages -type f -name lcov.fixed.info -exec cat {} + >> ./combined-integration-${{ matrix.db }}-${{ matrix.use_tesseract_sql_planner }}.lcov || true
       - name: Upload coverage artifact
         if: (matrix.node-version == '24.x')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-integration-${{ matrix.db }}-${{ matrix.use_tesseract_sql_planner }}
           path: ./combined-integration-${{ matrix.db }}-${{ matrix.use_tesseract_sql_planner }}.lcov
@@ -555,20 +562,20 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Maximize build space
         uses: ./.github/actions/maximize-build-space
       - name: Download backend-native artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: "native-linux-x64-glibc-${{ matrix.python-version }}.node"
           path: ./packages/cubejs-backend-native/
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
       - name: Get yarn cache directory path
@@ -576,7 +583,7 @@ jobs:
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Restore yarn cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
@@ -585,7 +592,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.22
       - name: Yarn install
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -601,7 +608,7 @@ jobs:
       - name: Lerna tsc
         run: yarn tsc
       - name: Download cubestored-x86_64-unknown-linux-gnu-release artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: rust/cubestore/downloaded/latest/bin/
           name: cubestored-x86_64-unknown-linux-gnu-release
@@ -623,7 +630,7 @@ jobs:
       tag: ${{ steps.get-tag.outputs.tag }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - id: get-tag
         run: echo "tag=$(git tag --contains "$GITHUB_SHA")" >> "$GITHUB_OUTPUT"
         env:
@@ -653,16 +660,16 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Maximize build space
         uses: ./.github/actions/maximize-build-space
       - name: Download backend-native artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: "native-linux-x64-glibc-${{ env.PYTHON_VERSION_CURRENT }}.node"
           path: ./packages/cubejs-backend-native/
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install Yarn
@@ -674,14 +681,14 @@ jobs:
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Restore yarn cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Yarn install
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -695,14 +702,14 @@ jobs:
       - name: Lerna tsc
         run: yarn tsc
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
       # current .dockerignore prevents use of native build
       - name: Unignore native from .dockerignore
         run: |
           grep -v -E "packages/cubejs-backend-native/((native)|(index.node))" .dockerignore > .dockerignore.tmp
           mv .dockerignore.tmp .dockerignore
       - name: Build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         timeout-minutes: 30
         with:
           context: .
@@ -768,7 +775,7 @@ jobs:
           yarn run cypress:install
           yarn run cypress:birdbox
       - name: Upload screenshots on failure
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: cypress-screenshots-docker-dev-${{ matrix.name }}
@@ -783,7 +790,7 @@ jobs:
       actions: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 2
       - name: Install Codecov CLI
@@ -791,7 +798,7 @@ jobs:
           curl -Os https://uploader.codecov.io/latest/linux/codecov
           chmod +x codecov
       - name: Download all coverage artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: all-coverage
       - name: Merge all coverage files

@@ -85,7 +85,7 @@ export class CubejsServer {
     return new CubeCore(config, systemOptions);
   }
 
-  public async listen(options: http.ServerOptions = {}): Promise<{app: Express, port: number, server: GracefulHttpServer, version: any }> {
+  public async listen(options: http.ServerOptions = {}): Promise<{ app: Express, port: number, server: GracefulHttpServer, version: any }> {
     try {
       if (this.server) {
         throw new Error('CubeServer is already listening');

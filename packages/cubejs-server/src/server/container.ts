@@ -1,4 +1,5 @@
 import path from 'path';
+import { pathToFileURL } from 'url';
 import fs from 'fs';
 import fsAsync from 'fs/promises';
 import color from '@oclif/color';
@@ -309,16 +310,17 @@ export class ServerContainer {
   }
 
   protected async loadConfigurationFromFile(): Promise<CreateOptions> {
-    const file = await import(
-      path.join(process.cwd(), 'cube.js')
-    );
+    const file = await import(pathToFileURL(path.join(process.cwd(), 'cube.js')).href);
 
     if (this.configuration.debug) {
       console.log('Loaded js configuration file', file);
     }
 
-    if (file.default) {
-      return file.default;
+    const exported = file.default;
+    const config = exported?.__esModule ? exported.default : exported;
+
+    if (config) {
+      return config;
     }
 
     throw new Error(

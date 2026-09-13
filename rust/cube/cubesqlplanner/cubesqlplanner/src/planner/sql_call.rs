@@ -147,6 +147,10 @@ impl SqlCallArg {
 #[derive(Debug, Clone)]
 pub struct SqlCallFilterParamsItem {
     pub filter_symbol_name: String,
+    /// The time shift this binding addresses. Only a stage where that shift is
+    /// active renders it; `None` binds the member as the query filters it,
+    /// which a calendar mapping cannot restate over the source column.
+    pub time_shift_name: Option<String>,
     pub column: FilterParamsColumn,
     /// The column callback compiled into a call of its own, when the
     /// data model gave one. Its placeholders index its own
@@ -521,17 +525,19 @@ impl SqlCall {
                     .map(|itm| &itm.filter_symbol_name)
                     .collect_vec();
                 if let Some(subtree) = filter_item.find_subtree_for_members(&symbols) {
-                    let mut filter_params_columns = HashMap::new();
+                    let mut filter_params_columns: HashMap<String, Vec<_>> = HashMap::new();
                     for itm in items {
                         filter_params_columns
-                            .insert(itm.filter_symbol_name.clone(), (*itm).clone());
+                            .entry(itm.filter_symbol_name.clone())
+                            .or_default()
+                            .push((*itm).clone());
                     }
 
                     let context = VisitorContext::new_for_filter_params(
                         query_tools.clone(),
                         &SqlNodesFactory::new(),
                         filter_params_columns,
-                        visitor.time_shifts().clone(),
+                        visitor.filter_params_time_shifts().clone(),
                     );
                     return crate::physical_plan::filter::render_filter_item(
                         &context, &subtree, templates,
