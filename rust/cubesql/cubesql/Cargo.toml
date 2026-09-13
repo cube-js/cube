@@ -23,7 +23,7 @@ tokio = { version = "^1.35", features = ["full", "rt", "tracing"] }
 serde = { version = "^1.0", features = ["derive"] }
 itertools = "0.14.0"
 serde_json = "^1.0"
-bytes = "1.2"
+bytes = "1.11"
 futures = "0.3.31"
 rand = "0.8.3"
 hashbrown = "0.14.3"
