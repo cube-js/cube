@@ -1,5 +1,6 @@
 import { Space, tasty, Text, TooltipProvider, ViewIcon, CubeIcon } from '@cube-dev/ui-kit';
 import { PlusOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { ReactElement } from 'react';
 
 import { CubeStats } from '../types';
 import { ChevronIcon } from '../icons/ChevronIcon';
@@ -47,43 +48,45 @@ export function ListCube({
   isSelected,
   onItemSelect,
 }: CubeListItemProps) {
+  let icon = <ViewIcon color="#purple" />;
+
+  if (isMissing) {
+    icon = <QuestionCircleOutlined style={{ color: 'var(--danger-text-color)' }} />;
+  } else if (type === 'cube') {
+    icon = <CubeIcon color="#purple" />;
+  }
+
+  let trailingIcon: ReactElement | undefined;
+
+  if (!isMissing && rightIcon === 'arrow') {
+    trailingIcon = (
+      <ChevronIcon
+        direction={!isSelected ? 'right' : 'top'}
+        style={{ color: 'var(--purple-color)' }}
+      />
+    );
+  } else if (!isMissing && rightIcon === 'plus') {
+    trailingIcon = <PlusOutlined style={{ color: 'var(--purple-color)' }} />;
+  }
+
   return (
     <TooltipProvider
-      title={
+      title={(
         <>
           <b>{title || name}</b>
           {description ? <> – {description}</> : undefined}
         </>
-      }
+      )}
       width="max-content"
       placement="right"
     >
       <CubeListButton
         qa={`Playground-${name}`}
-        icon={
-          isMissing ? (
-            <QuestionCircleOutlined style={{ color: 'var(--danger-text-color)' }} />
-          ) : type === 'cube' ? (
-            <CubeIcon color="#purple" />
-          ) : (
-            <ViewIcon color="#purple" />
-          )
-        }
+        icon={icon}
         type={isSelected ? 'outline' : 'clear'}
         isDisabled={isDisabled}
         mods={{ selected: isSelected, missing: isMissing }}
-        rightIcon={
-          !isMissing ? (
-            rightIcon === 'arrow' ? (
-              <ChevronIcon
-                direction={!isSelected ? 'right' : 'top'}
-                style={{ color: 'var(--purple-color)' }}
-              />
-            ) : rightIcon === 'plus' ? (
-              <PlusOutlined style={{ color: 'var(--purple-color)' }} />
-            ) : undefined
-          ) : undefined
-        }
+        rightIcon={trailingIcon}
         onPress={() => !isMissing && onItemSelect?.()}
       >
         <Text ellipsis>{name}</Text>

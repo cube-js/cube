@@ -29,8 +29,11 @@ yarn tsc:watch
 # Clean build artifacts
 yarn clean
 
-# Run linting across all packages
+# Run linting (oxlint over the whole repo) plus the package.json linter
 yarn lint
+
+# oxlint only
+yarn lint:js
 
 # Fix linting issues
 yarn lint:fix
@@ -51,9 +54,8 @@ yarn test
 
 ### Documentation Development
 
-**IMPORTANT: `/docs-mintlify` is the active documentation site. `/docs` is the legacy
-docs site and is deprecated — do NOT add or edit content there.** When asked to write or
-update documentation, work in `/docs-mintlify` unless the user explicitly says otherwise.
+Documentation lives in `/docs-mintlify`. When asked to write or update documentation,
+work there unless the user explicitly says otherwise.
 
 ```bash
 cd docs-mintlify
@@ -79,8 +81,7 @@ yarn dev    # Start the Mintlify dev server
   - Database drivers: `cubejs-postgres-driver`, `cubejs-bigquery-driver`, etc.
   - API layer: `cubejs-api-gateway`
 - **`/rust`**: Rust components including CubeSQL (SQL interface) and CubeStore (distributed storage)
-- **`/docs-mintlify`**: Mintlify documentation site — **the active docs site** (author docs here)
-- **`/docs`**: Legacy Next.js/Nextra documentation site — **deprecated**, do not edit
+- **`/docs-mintlify`**: Mintlify documentation site
 - **`/examples`**: Example implementations and recipes
 
 ### Key Components
@@ -147,8 +148,7 @@ Include scope in parentheses when applicable, e.g., `fix(tesseract):` or `feat(d
 
 ## Important Notes
 
-- Documentation lives in `/docs-mintlify` (active, Mintlify). `/docs` is the legacy docs
-  site and is deprecated — do not add or edit content there. See `docs-mintlify/CLAUDE.md`.
+- Documentation lives in `/docs-mintlify` (Mintlify). See `docs-mintlify/CLAUDE.md`.
 - The main Cube application development happens in `/packages`
 - For data model changes, focus on `cubejs-schema-compiler` package
 - For query execution changes, focus on `cubejs-query-orchestrator` package

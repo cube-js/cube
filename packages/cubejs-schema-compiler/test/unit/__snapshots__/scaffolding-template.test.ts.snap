@@ -30,7 +30,7 @@ exports[`ScaffoldingTemplate JavaScript formatter big query nested fields: order
   
   pre_aggregations: {
     // Pre-aggregation definitions go here.
-    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
   }
 });
 "
@@ -70,7 +70,7 @@ exports[`ScaffoldingTemplate JavaScript formatter escaping back tick: some_order
   
   pre_aggregations: {
     // Pre-aggregation definitions go here.
-    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
   }
 });
 "
@@ -108,7 +108,7 @@ exports[`ScaffoldingTemplate JavaScript formatter should add options if passed: 
   
   pre_aggregations: {
     // Pre-aggregation definitions go here.
-    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
   }
 });
 "
@@ -153,7 +153,7 @@ exports[`ScaffoldingTemplate JavaScript formatter template with snake case: acco
   
   pre_aggregations: {
     // Pre-aggregation definitions go here.
-    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
   }
 });
 "
@@ -196,7 +196,7 @@ exports[`ScaffoldingTemplate JavaScript formatter template with snake case: cust
   
   pre_aggregations: {
     // Pre-aggregation definitions go here.
-    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
   }
 });
 "
@@ -234,7 +234,7 @@ exports[`ScaffoldingTemplate JavaScript formatter template with snake case: orde
   
   pre_aggregations: {
     // Pre-aggregation definitions go here.
-    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
   }
 });
 "
@@ -279,7 +279,7 @@ exports[`ScaffoldingTemplate JavaScript formatter template: Accounts.js 1`] = `
   
   preAggregations: {
     // Pre-aggregation definitions go here.
-    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
   }
 });
 "
@@ -322,7 +322,7 @@ exports[`ScaffoldingTemplate JavaScript formatter template: Customers.js 1`] = `
   
   preAggregations: {
     // Pre-aggregation definitions go here.
-    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
   }
 });
 "
@@ -360,7 +360,7 @@ exports[`ScaffoldingTemplate JavaScript formatter template: Orders.js 1`] = `
   
   preAggregations: {
     // Pre-aggregation definitions go here.
-    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
   }
 });
 "
@@ -395,7 +395,7 @@ exports[`ScaffoldingTemplate JavaScript formatter uses dimension refs instead of
   
   pre_aggregations: {
     // Pre-aggregation definitions go here.
-    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
   }
 });
 "
@@ -444,7 +444,7 @@ exports[`ScaffoldingTemplate JavaScript formatter uses dimension refs instead of
   
   pre_aggregations: {
     // Pre-aggregation definitions go here.
-    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
   }
 });
 "
@@ -481,7 +481,7 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema for MySQL driver: a
 
     pre_aggregations:
       # Pre-aggregation definitions go here.
-      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+      # Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
 
 "
 `;
@@ -517,7 +517,7 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema for base driver: ac
 
     pre_aggregations:
       # Pre-aggregation definitions go here.
-      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+      # Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
 
 "
 `;
@@ -552,7 +552,7 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema for base driver: cu
 
     pre_aggregations:
       # Pre-aggregation definitions go here.
-      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+      # Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
 
 "
 `;
@@ -583,7 +583,7 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema for base driver: or
 
     pre_aggregations:
       # Pre-aggregation definitions go here.
-      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+      # Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
 
 "
 `;
@@ -619,7 +619,7 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema with a catalog: acc
 
     pre_aggregations:
       # Pre-aggregation definitions go here.
-      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+      # Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
 
 "
 `;
@@ -647,7 +647,7 @@ exports[`ScaffoldingTemplate Yaml formatter uses dimension refs instead of table
 
     pre_aggregations:
       # Pre-aggregation definitions go here.
-      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+      # Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
 
 "
 `;
@@ -687,7 +687,7 @@ exports[`ScaffoldingTemplate Yaml formatter uses dimension refs instead of table
 
     pre_aggregations:
       # Pre-aggregation definitions go here.
-      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+      # Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
 
 "
 `;

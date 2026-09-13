@@ -28,9 +28,12 @@ tags:
   - name: GitHub
   - name: GitHub Connection
   - name: dbt Sync
+  - name: Databricks Metric View Publication
+  - name: Databricks Metric View Integration
   - name: Folders
   - name: Reports
   - name: Workbooks
+  - name: Dashboard Exports
   - name: Notifications
   - name: Workspace
   - name: Users
@@ -268,6 +271,329 @@ paths:
       summary: Reset a deployment to the first onboarding step (project)
       tags:
         - Deployments
+  /api/v1/deployments/{deploymentId}/dashboard-exports:
+    post:
+      operationId: startExport
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the dashboard.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartDashboardExportInput'
+        description: StartDashboardExportInput
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardExportJobResponse'
+          description: ''
+      summary: Export a dashboard as PNG or PDF
+      tags:
+        - Dashboard Exports
+      x-mint:
+        content: >-
+          Submit a render of a published dashboard. Identify it with either `dashboardId` (numeric)
+          or `dashboardPublicId` (string) — supply exactly one; it must belong to this deployment,
+          otherwise `404` is returned.
+
+
+          Returns as soon as the job is accepted, because a render waits for every widget to finish
+          querying. Poll `GET /dashboard-exports/{jobId}` until `status` is `completed`, then fetch
+          the file from `GET /dashboard-exports/{jobId}/download`. The job and its file are dropped
+          at `expiresAt` (5 minutes) — download before then or submit again.
+
+
+          Pass `filters`, `timeGrains` and `memberSwitchers` to render the board with specific
+          control values, exactly as a scheduled notification does; omit them to render its saved
+          defaults.
+
+
+          By default the dashboard renders under the calling user's own security context, so the
+          file shows what that user would see. Requires **manage** access to the dashboard's
+          workbook — the same permission the console's own "Download as PNG / PDF" actions require,
+          because a whole-dashboard render is a bulk data export.
+
+
+          To export on someone else's behalf, pass `renderAs`: the queries behind the image then run
+          under that user's security context instead of yours. **Requires the caller to be a tenant
+          administrator.** Name a console user by `userId` or `email` (`type: USER`), or an embed
+          user by `embedTenantName` + `externalId` (`type: EMBED_USER`). A deactivated console user
+          is not a valid subject and returns `404`; an email is matched case-insensitively.
+
+
+          An embed subject is provisioned if it does not exist yet, and `groups`, `userAttributes`
+          and `securityContext` apply to **this render only** — they are carried on the render's own
+          session and are NOT written to the user's stored context, so exporting for someone never
+          changes what their live embedded sessions see. (Use the embed-tenant users API to change a
+          user's stored context.) An embed subject additionally requires the dashboard's workbook to
+          be shared with that embed tenant, otherwise `403` is returned.
+
+
+          Returns `403` when the workspace has data downloads restricted — including for an
+          on-behalf-of export, which deliberately does **not** bypass that setting the way a
+          built-in scheduled notification does — and `429` when there are already too many exports
+          in flight for the identity being rendered as.
+  /api/v1/deployments/{deploymentId}/dashboard-exports/{jobId}:
+    get:
+      operationId: getExportStatus
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the dashboard.
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: string
+          description: Job id returned when the export was submitted.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardExportStatusResponse'
+          description: ''
+      summary: Get the status of a dashboard export
+      tags:
+        - Dashboard Exports
+      x-mint:
+        content: >-
+          Progress of a submitted render. Poll until `status` is `completed` (then download it) or
+          `failed` (then read `error`); `pending` and `processing` both mean keep waiting.
+
+
+          Returns `404` once the job has expired, and for a job submitted by a different user — a
+          job is only ever visible to whoever started it.
+  /api/v1/deployments/{deploymentId}/dashboard-exports/{jobId}/download:
+    get:
+      operationId: downloadExport
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          description: Numeric id of the deployment that owns the dashboard.
+          schema:
+            type: integer
+        - in: path
+          name: jobId
+          required: true
+          description: Job id returned when the export was submitted.
+          schema:
+            type: string
+        - in: query
+          name: filename
+          required: false
+          description: Filename stem for the attachment, without extension. Defaults to `dashboard`.
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/pdf:
+              schema:
+                format: binary
+                type: string
+            image/png:
+              schema:
+                format: binary
+                type: string
+          description: The rendered dashboard.
+      summary: Download a completed dashboard export
+      tags:
+        - Dashboard Exports
+      x-mint:
+        content: >-
+          Stream the rendered file as an attachment, named `dashboard.png` / `dashboard.pdf` unless
+          `?filename=` supplies a different stem (the extension always follows the rendered format).
+
+
+          Returns `409` while the job is still rendering — poll `GET /dashboard-exports/{jobId}`
+          first — `422` if the render failed (terminal: submit a new export rather than retrying
+          this one), and `404` once the job has expired or if it belongs to a different user.
+  /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}:
+    get:
+      operationId: getIntegration
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: dataSourceName
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewIntegrationResponse'
+          description: ''
+      summary: Get Databricks Metric View publication settings
+      tags:
+        - Databricks Metric View Integration
+      x-mint:
+        content: >-
+          Requires a Databricks datasource. This is currently in preview — reach out to the Cube
+          support team to activate it for your account.
+    put:
+      operationId: saveIntegration
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: dataSourceName
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveDatabricksMetricViewIntegrationInput'
+        description: SaveDatabricksMetricViewIntegrationInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewIntegrationResponse'
+          description: ''
+      summary: Create or update Databricks Metric View publication settings
+      tags:
+        - Databricks Metric View Integration
+      x-mint:
+        content: >-
+          Uses optimistic configuration versioning. Pass `expectedConfigurationVersion` 0 to create.
+          Requires a Databricks datasource. This is currently in preview — reach out to the Cube
+          support team to activate it for your account.
+  /api/v1/deployments/{deploymentId}/databricks-metric-view-previews:
+    post:
+      operationId: startPreview
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewInput'
+        description: DatabricksMetricViewPublicationPreviewInput
+        required: true
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewStartResponse'
+          description: ''
+      summary: Start a Databricks Metric View publication preview
+      tags:
+        - Databricks Metric View Publication
+      x-mint:
+        content: >-
+          Queues an offline conversion of static YAML from the deployment's latest successful build
+          and returns polling URLs immediately. Exact retries while the same content-addressed
+          preview is running reuse that work; a later submission starts a fresh execution. Preview
+          payloads and results are retained for at most seven days. The conversion supports scalar
+          dimensions, common and calculated measures, and acyclic many-to-one equi-joins from one
+          Databricks datasource. Access policies, templating, extends, unsafe fanout, unsupported
+          expressions, multiple datasources, and converter loss are blocked per view. Two-part
+          schema.table sources are qualified with `CUBEJS_DB_DATABRICKS_CATALOG` for the selected
+          datasource; without that setting they fail closed with an actionable issue. Requires
+          `SchemaRead` or `SchemaUpdate` access. This is currently in preview — reach out to the
+          Cube support team to activate it for your account.
+  /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}:
+    delete:
+      operationId: cancelPreview
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: previewId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Cancel a Databricks Metric View preview
+      tags:
+        - Databricks Metric View Publication
+    get:
+      operationId: previewStatus
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: previewId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewStatusResponse'
+          description: ''
+      summary: Get Databricks Metric View preview status
+      tags:
+        - Databricks Metric View Publication
+  /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}/result:
+    get:
+      operationId: previewResult
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: previewId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewResultResponse'
+          description: ''
+      summary: Get a completed Databricks Metric View preview result
+      tags:
+        - Databricks Metric View Publication
+      x-mint:
+        content: Returns 409 while the preview is still running or if it ended without a conversion result.
   /api/v1/deployments/{deploymentId}/dbt-sync:
     get:
       operationId: listDbtSyncs
@@ -428,6 +754,74 @@ paths:
       summary: Get the result of a completed dbt sync
       tags:
         - dbt Sync
+  /api/v1/deployments/{deploymentId}/embed-tenants/{embedTenantName}/workbooks:
+    get:
+      operationId: listEmbedTenantWorkbooks
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: accessSource
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/EmbedTenantWorkbooksListQueryAccessSource'
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedTenantWorkbooksListResponse'
+          description: ''
+      summary: List workbooks accessible to an embed tenant
+      tags:
+        - Dashboard Embed Access
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Return every workbook the named embed tenant can access in this deployment. Effective
+          access includes workbooks shared directly with the tenant, workbooks shared with all embed
+          users, and workbooks inherited from shared folders. Supports `first`/`after` cursor
+          pagination.
+
+
+          Filter workbooks by how access is granted:
+
+
+          - `tenant`: the workbook itself is explicitly shared with the named embed tenant. Excludes
+          workbooks available only through the all-embed-users group or a shared folder.
+
+          - `allEmbedUsers`: the workbook itself is explicitly shared with the built-in
+          all-embed-users group, making it available to every embed tenant. Excludes tenant-specific
+          direct shares and folder-inherited access.
+
+          - `folder`: access is inherited because the workbook is inside a shared folder or any of
+          its descendant folders. The folder may be shared specifically with the named tenant or
+          with all embed users.
+
+
+          Omit this parameter to return the union of all three access sources. A workbook can match
+          more than one source.
   /api/v1/deployments/{deploymentId}/env-vars:
     get:
       operationId: getEnvVariables
@@ -3309,6 +3703,256 @@ paths:
 
           Note that the flag alone does not make a dashboard embeddable — it must also be published
           and shared with the embed tenant. Returns `404` if the dashboard does not exist.
+  /api/v1/embed/dashboard/{publicId}/comments:
+    get:
+      operationId: listDashboardComments
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: includeResolved
+          schema:
+            oneOf:
+              - type: boolean
+              - type: 'null'
+        - in: query
+          name: resolvedOnly
+          schema:
+            oneOf:
+              - type: boolean
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedDashboardCommentThreadsListResponse'
+          description: ''
+      summary: List comment threads on an embeddable dashboard
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Returns one page of comment threads — each a root comment plus its replies, oldest first —
+          for the dashboard identified by its `publicId`, scoped to the caller's embed tenant.
+
+
+          Threads are ordered newest-first by when they started, so a thread holds its place while
+          it is being replied to. Open threads are returned by default; pass `includeResolved` to
+          widen the page to resolved ones too, or `resolvedOnly` to replace the set with just those.
+
+
+          A comment whose author deleted it is returned with an empty `body` and `removedAt` set, so
+          a thread keeps its shape and the surviving replies stay readable.
+
+
+          Requires a signed embed session scoped to an embed tenant. Every comment endpoint does: a
+          conversation lives inside one embed tenant's partition, so a credential that names no
+          tenant — an API key, a console session — has no conversation to be served and receives
+          `403`.
+    post:
+      operationId: createDashboardComment
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEmbedDashboardCommentBody'
+        description: CreateEmbedDashboardCommentBody
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedDashboardCommentDto'
+          description: ''
+      summary: Post a comment on an embeddable dashboard
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Starts a thread, or replies to one when `parentId` names a thread root.
+
+
+          The comment is attributed to the calling embed user — the author is taken from the signed
+          session, never from the request body. Nesting is one level deep: replying to a reply
+          returns `400`, and `404` covers a `parentId` that names a comment on another dashboard, a
+          deleted thread, or nothing at all.
+  /api/v1/embed/dashboard/{publicId}/comments/mentionable-users:
+    get:
+      operationId: listMentionableEmbedUsers
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: search
+          schema:
+            oneOf:
+              - maxLength: 255
+                type: string
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedMentionableUsersListResponse'
+          description: ''
+      summary: List embed users mentionable in a dashboard comment
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Returns one page of the caller's fellow embed users, for a mention autocomplete, ordered
+          by username.
+
+
+          Scoped to the caller's own embed tenant and to embed users only — console users of the
+          host tenant are never returned. Pass `search` to filter by username or email. `email` may
+          be `null`: `username` is the only identity field an embed user is guaranteed to have.
+  /api/v1/embed/dashboard/{publicId}/comments/{commentId}:
+    delete:
+      operationId: removeDashboardComment
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: commentId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Delete a comment on an embeddable dashboard
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Soft-deletes a comment. Author only.
+
+
+          Deleting a thread root takes its replies with it, so a deleted thread leaves nothing
+          behind. Deleting a reply re-derives its thread's last-activity marker, so the thread does
+          not keep its position on the strength of a message that is gone.
+    patch:
+      operationId: updateDashboardComment
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: commentId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEmbedDashboardCommentBody'
+        description: UpdateEmbedDashboardCommentBody
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedDashboardCommentDto'
+          description: ''
+      summary: Edit a comment on an embeddable dashboard
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Replaces a comment's body and stamps `editedAt`.
+
+
+          Author only: another embed user's comment returns `403`, and a comment that is not on this
+          dashboard returns `404` rather than revealing that it exists elsewhere.
+  /api/v1/embed/dashboard/{publicId}/comments/{commentId}/resolve:
+    post:
+      operationId: setDashboardCommentResolved
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: commentId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetEmbedDashboardCommentResolvedBody'
+        description: SetEmbedDashboardCommentResolvedBody
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedDashboardCommentThreadDto'
+          description: ''
+      summary: Resolve or re-open a comment thread
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Marks a thread resolved, or re-opens it. Author only — the embed user who started the
+          thread.
+
+
+          The console surface is wider: there, a workbook editor may also resolve someone else's
+          thread. That branch has no analogue here, because an embed viewer holds no workbook rights
+          at all, so authorship is the whole rule.
+
+
+          Threads only — a reply has no resolve state of its own, and one carrying it would put two
+          answers on the same thread, so `400` is returned for a reply's id. A thread whose root was
+          deleted while replies survive is still resolvable, or it would sit in the unresolved list
+          forever.
   /api/v1/embed/dashboard/{publicId}/python-run:
     post:
       operationId: postDashboardPythonRun
@@ -3858,7 +4502,7 @@ paths:
           The token is scoped to your account: it carries the same server-resolved security context
           as the embedded Usage Analytics page, so queries only ever see your own data. Send it as
           `Authorization: Bearer <token>` on requests to the returned `apiUrl` (the deployment's
-          [Cube REST API](https://cube.dev/docs/product/apis-integrations/rest-api)).
+          [Cube REST API](/reference/core-data-apis/rest-api)).
 
 
           Tokens expire after 1 hour (see `expiresAt`). Issue a fresh one per session or scheduled
@@ -4931,6 +5575,8 @@ components:
           oneOf:
             - $ref: '#/components/schemas/EmbedSettings'
             - type: 'null'
+        sheetsAgentChatEnabled:
+          type: boolean
         sheetsUi:
           oneOf:
             - $ref: '#/components/schemas/SheetsUiSettings'
@@ -4941,6 +5587,7 @@ components:
             - type: 'null'
       required:
         - applyThemeGlobally
+        - sheetsAgentChatEnabled
       type: object
     AppTheme:
       properties:
@@ -5355,6 +6002,10 @@ components:
       type: object
     ConnectReportToWorkbookInput:
       properties:
+        addressOnly:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         anchorCell:
           oneOf:
             - type: string
@@ -5372,6 +6023,10 @@ components:
         placementId:
           oneOf:
             - type: string
+            - type: 'null'
+        resultChecksum:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementResultChecksumInput'
             - type: 'null'
         resultLocation:
           type: string
@@ -5551,6 +6206,19 @@ components:
             24 hours (86400). Callers that hold the token outside a browser session — scripts, BI
             tools, scheduled jobs — should request a short lifetime and re-issue tokens instead.
       type: object
+    CreateEmbedDashboardCommentBody:
+      properties:
+        body:
+          maxLength: 10000
+          minLength: 1
+          type: string
+        parentId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - body
+      type: object
     CreateEmbedGroupInput:
       properties:
         description:
@@ -5630,6 +6298,13 @@ components:
             - type: integer
             - type: 'null'
           description: Hour of the day (0-23)
+        memberSwitchers:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardMemberSwitcherInput'
+              type: array
+            - type: 'null'
+          description: Field-switcher selections applied to the dashboard when the notification is rendered.
         minute:
           oneOf:
             - type: integer
@@ -5778,7 +6453,8 @@ components:
             - type: 'null'
         name:
           oneOf:
-            - type: string
+            - maxLength: 255
+              type: string
             - type: 'null'
         pivotItems:
           oneOf:
@@ -5790,6 +6466,10 @@ components:
               type: string
               minLength: 12
               maxLength: 12
+            - type: 'null'
+        resultChecksum:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementResultChecksumInput'
             - type: 'null'
         resultLocation:
           oneOf:
@@ -5809,7 +6489,8 @@ components:
             - type: 'null'
         title:
           oneOf:
-            - type: string
+            - maxLength: 255
+              type: string
             - type: 'null'
         workbookId:
           oneOf:
@@ -6258,6 +6939,49 @@ components:
               type: array
             - type: 'null'
       type: object
+    DashboardConfigDraftInput:
+      properties:
+        app:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardAppSourceInput'
+            - type: 'null'
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        kind:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardConfigDraftInputKind'
+            - type: 'null'
+        layout:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardLayoutInput'
+            - type: 'null'
+        settings:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        theme:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardThemeInput'
+            - type: 'null'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        widgets:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardWidgetDraftInput'
+              type: array
+            - type: 'null'
+      type: object
+    DashboardConfigDraftInputKind:
+      enum:
+        - CLASSIC
+        - APP
+      type: string
     DashboardConfigInput:
       properties:
         app:
@@ -6322,6 +7046,50 @@ components:
         - publicId
         - allowEmbed
       type: object
+    DashboardExportJobResponse:
+      properties:
+        expiresAt:
+          description: >-
+            When the job (and its rendered file) is evicted from the renderer cache. Download before
+            this, or submit a new export.
+          format: date-time
+          type: string
+        jobId:
+          description: Job id to poll for status and to download the finished file with.
+          type: string
+      required:
+        - jobId
+        - expiresAt
+      type: object
+    DashboardExportStatusResponse:
+      properties:
+        contentType:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: MIME type of the rendered file. Present once `status` is `completed`.
+        error:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: Why the render failed. Present only when `status` is `failed`.
+        progress:
+          oneOf:
+            - type: number
+            - type: 'null'
+          description: Rendering progress, 0-100, when the renderer reports one.
+        status:
+          $ref: '#/components/schemas/DashboardExportStatusResponseStatus'
+      required:
+        - status
+      type: object
+    DashboardExportStatusResponseStatus:
+      enum:
+        - pending
+        - processing
+        - completed
+        - failed
+      type: string
     DashboardFilter:
       properties:
         caseSensitive:
@@ -6490,6 +7258,29 @@ components:
             - type: integer
             - type: 'null'
       type: object
+    DashboardMemberSwitcher:
+      properties:
+        member:
+          type: string
+        selected:
+          type: string
+      required:
+        - member
+        - selected
+      type: object
+    DashboardMemberSwitcherInput:
+      properties:
+        member:
+          description: Path of the member the control replaces, e.g. "Orders.status"
+          pattern: .+\..+
+          type: string
+        selected:
+          description: Name of the member to show in its place, e.g. "city" (no view prefix)
+          type: string
+      required:
+        - member
+        - selected
+      type: object
     DashboardResponsiveLayouts:
       properties:
         lg:
@@ -6628,6 +7419,48 @@ components:
         - type
         - position
       type: object
+    DashboardWidgetDraftInput:
+      properties:
+        config:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        id:
+          oneOf:
+            - maxLength: 128
+              type: string
+            - type: 'null'
+        position:
+          $ref: '#/components/schemas/DashboardWidgetPositionInput'
+        responsiveLayouts:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardResponsiveLayoutsInput'
+            - type: 'null'
+        style:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        type:
+          $ref: '#/components/schemas/DashboardWidgetDraftInputType'
+      required:
+        - type
+        - position
+      type: object
+    DashboardWidgetDraftInputType:
+      enum:
+        - CHART
+        - TEXT
+        - FILTER
+        - AI
+        - TIME_GRAIN
+        - FIELD
+        - PARENT
+        - SPACER
+        - DIVIDER
+        - CONTAINER
+      type: string
     DashboardWidgetDtoType:
       enum:
         - CHART
@@ -6789,6 +7622,451 @@ components:
       required:
         - success
       type: object
+    DatabricksMetricViewIntegrationConfigurationResponse:
+      properties:
+        deletionPolicy:
+          $ref: '#/components/schemas/DatabricksMetricViewIntegrationConfigurationResponseDeletionPolicy'
+        enabled:
+          type: boolean
+        selectionMode:
+          $ref: '#/components/schemas/DatabricksMetricViewIntegrationConfigurationResponseSelectionMode'
+        sourceOverrides:
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
+        targetCatalog:
+          type: string
+        targetNamePrefix:
+          oneOf:
+            - type: string
+            - type: 'null'
+        targetNames:
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
+        targetSchema:
+          type: string
+        version:
+          $ref: '#/components/schemas/DatabricksMetricViewIntegrationConfigurationResponseVersion'
+        viewNameRegex:
+          oneOf:
+            - type: string
+            - type: 'null'
+        viewNames:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+      required:
+        - version
+        - enabled
+        - targetCatalog
+        - targetSchema
+        - selectionMode
+        - deletionPolicy
+      type: object
+    DatabricksMetricViewIntegrationConfigurationResponseDeletionPolicy:
+      enum:
+        - retain
+        - delete-managed
+      type: string
+    DatabricksMetricViewIntegrationConfigurationResponseSelectionMode:
+      enum:
+        - all
+        - selected
+        - pattern
+      type: string
+    DatabricksMetricViewIntegrationConfigurationResponseVersion:
+      enum:
+        - 1
+      type: number
+    DatabricksMetricViewIntegrationResponse:
+      properties:
+        accessTest:
+          oneOf:
+            - type: object
+            - type: 'null'
+        configuration:
+          $ref: '#/components/schemas/DatabricksMetricViewIntegrationConfigurationResponse'
+        configurationVersion:
+          type: integer
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        dataSourceName:
+          type: string
+        deploymentId:
+          type: integer
+        publicId:
+          type: string
+        updatedAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+      required:
+        - publicId
+        - deploymentId
+        - dataSourceName
+        - configurationVersion
+        - configuration
+        - createdAt
+        - updatedAt
+      type: object
+    DatabricksMetricViewPublicationCounts:
+      properties:
+        dimensions:
+          type: integer
+        errors:
+          type: integer
+        joins:
+          type: integer
+        measures:
+          type: integer
+        warnings:
+          type: integer
+      required:
+        - dimensions
+        - measures
+        - joins
+        - warnings
+        - errors
+      type: object
+    DatabricksMetricViewPublicationDatasetSource:
+      properties:
+        dataSource:
+          type: string
+        dataset:
+          type: string
+        originalSource:
+          type: string
+        resolvedSource:
+          type: string
+      required:
+        - dataset
+        - dataSource
+        - originalSource
+        - resolvedSource
+      type: object
+    DatabricksMetricViewPublicationIssue:
+      properties:
+        code:
+          type: string
+        element:
+          oneOf:
+            - type: string
+            - type: 'null'
+        message:
+          type: string
+        severity:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationIssueSeverity'
+        stage:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationIssueStage'
+      required:
+        - code
+        - severity
+        - stage
+        - message
+      type: object
+    DatabricksMetricViewPublicationIssueSeverity:
+      enum:
+        - ERROR
+        - WARNING
+      type: string
+    DatabricksMetricViewPublicationIssueStage:
+      enum:
+        - INPUT
+        - VIEW_PROJECTION
+        - OSSIE_VALIDATION
+        - OSSIE_TO_DATABRICKS
+        - OUTPUT_VALIDATION
+        - EXECUTION
+      type: string
+    DatabricksMetricViewPublicationPreviewInput:
+      properties:
+        dataSourceName:
+          type: string
+        selectionMode:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewInputSelectionMode'
+        sourceOverrides:
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
+          description: >-
+            Optional map of Cube view name to the root source dataset the view projects from, for
+            view projections where that root would otherwise be ambiguous.
+        targetNames:
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
+          description: Optional Cube view name to Databricks Metric View name overrides.
+        viewNameRegex:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            A safe, bounded regex subset for view names. Supports literals, ^, $, dot, and one .*
+            wildcard; grouping, alternation, lookaround, and backreferences are rejected.
+        viewNames:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+          description: Required only when selectionMode is 'selected'.
+      required:
+        - dataSourceName
+        - selectionMode
+      type: object
+    DatabricksMetricViewPublicationPreviewInputSelectionMode:
+      enum:
+        - all
+        - selected
+        - pattern
+      type: string
+    DatabricksMetricViewPublicationPreviewResultResponse:
+      properties:
+        buildJobId:
+          type: integer
+        commit:
+          oneOf:
+            - type: string
+            - type: 'null'
+        completedAt:
+          pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+          type: string
+        dataSourceName:
+          type: string
+        deploymentId:
+          type: integer
+        durationMs:
+          type: integer
+        outcome:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewResultResponseOutcome'
+        previewId:
+          type: string
+        runtime:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationRuntime'
+        sourceSha256:
+          type: string
+        version:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewResultResponseVersion'
+        views:
+          items:
+            $ref: '#/components/schemas/DatabricksMetricViewPublicationViewResult'
+          type: array
+      required:
+        - previewId
+        - deploymentId
+        - dataSourceName
+        - buildJobId
+        - completedAt
+        - durationMs
+        - version
+        - outcome
+        - sourceSha256
+        - views
+        - runtime
+      type: object
+    DatabricksMetricViewPublicationPreviewResultResponseOutcome:
+      enum:
+        - success
+        - partial
+        - failed
+      type: string
+    DatabricksMetricViewPublicationPreviewResultResponseVersion:
+      enum:
+        - 2
+      type: integer
+    DatabricksMetricViewPublicationPreviewStartResponse:
+      properties:
+        buildJobId:
+          type: integer
+        commit:
+          oneOf:
+            - type: string
+            - type: 'null'
+        dataSourceName:
+          type: string
+        deploymentId:
+          type: integer
+        previewId:
+          type: string
+        resultUrl:
+          type: string
+        reused:
+          type: boolean
+        status:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewStartResponseStatus'
+        statusUrl:
+          type: string
+      required:
+        - previewId
+        - deploymentId
+        - dataSourceName
+        - buildJobId
+        - reused
+        - status
+        - statusUrl
+        - resultUrl
+      type: object
+    DatabricksMetricViewPublicationPreviewStartResponseStatus:
+      enum:
+        - QUEUED
+      type: string
+    DatabricksMetricViewPublicationPreviewStatusResponse:
+      properties:
+        dataSourceName:
+          type: string
+        deploymentId:
+          type: integer
+        error:
+          oneOf:
+            - type: string
+            - type: 'null'
+        previewId:
+          type: string
+        progress:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationProgress'
+        resultAvailable:
+          type: boolean
+        startedAt:
+          pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+          type: string
+        status:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewStatusResponseStatus'
+        updatedAt:
+          pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+          type: string
+      required:
+        - previewId
+        - deploymentId
+        - dataSourceName
+        - status
+        - progress
+        - resultAvailable
+        - startedAt
+        - updatedAt
+      type: object
+    DatabricksMetricViewPublicationPreviewStatusResponseStatus:
+      enum:
+        - QUEUED
+        - RUNNING
+        - COMPLETED
+        - FAILED
+        - CANCELLED
+      type: string
+    DatabricksMetricViewPublicationProgress:
+      properties:
+        message:
+          type: string
+        percentComplete:
+          type: integer
+        stage:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationProgressStage'
+      required:
+        - stage
+        - percentComplete
+        - message
+      type: object
+    DatabricksMetricViewPublicationProgressStage:
+      enum:
+        - QUEUED
+        - RUNNING
+        - COMPLETED
+        - FAILED
+        - CANCELLED
+      type: string
+    DatabricksMetricViewPublicationRuntime:
+      properties:
+        bridgeCommit:
+          type: string
+        bridgeVersion:
+          type: string
+        cubeConverterVersion:
+          type: string
+        databricksConverterVersion:
+          type: string
+        ossieCommit:
+          type: string
+        ossieCoreVersion:
+          type: string
+        policyVersion:
+          type: integer
+        runnerVersion:
+          type: string
+        templateName:
+          type: string
+      required:
+        - bridgeCommit
+        - bridgeVersion
+        - ossieCommit
+        - ossieCoreVersion
+        - databricksConverterVersion
+        - cubeConverterVersion
+        - templateName
+        - runnerVersion
+        - policyVersion
+      type: object
+    DatabricksMetricViewPublicationViewResult:
+      properties:
+        counts:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationCounts'
+        cubeViewName:
+          type: string
+        datasetSources:
+          items:
+            $ref: '#/components/schemas/DatabricksMetricViewPublicationDatasetSource'
+          type: array
+        eligibleForPublication:
+          type: boolean
+        issues:
+          items:
+            $ref: '#/components/schemas/DatabricksMetricViewPublicationIssue'
+          type: array
+        metricViewName:
+          type: string
+        metricViewSha256:
+          oneOf:
+            - type: string
+            - type: 'null'
+        metricViewYaml:
+          oneOf:
+            - type: string
+            - type: 'null'
+        outcome:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationViewResultOutcome'
+        source:
+          oneOf:
+            - type: string
+            - type: 'null'
+      required:
+        - cubeViewName
+        - metricViewName
+        - outcome
+        - eligibleForPublication
+        - issues
+        - datasetSources
+        - counts
+      type: object
+    DatabricksMetricViewPublicationViewResultOutcome:
+      enum:
+        - success
+        - failed
+      type: string
     DbtSyncCancelResponse:
       properties:
         message:
@@ -6972,6 +8250,12 @@ components:
               type: array
             - type: 'null'
           description: Per-phase timings, in the order they ran. Absent while the sync is running.
+        source:
+          description: >-
+            Where this sync got its dbt metadata: `git` (Cube cloned the dbt repository and ran dbt)
+            or `manifest` (the caller uploaded a `manifest.json` and no repository was accessed).
+            Runs predating the manifest source report `git`.
+          type: string
         startedAt:
           description: >-
             When the sync started, as an ISO 8601 timestamp. See completedAt before comparing the
@@ -7009,6 +8293,7 @@ components:
         - deploymentId
         - status
         - trigger
+        - source
         - branchName
         - startedAt
       type: object
@@ -7051,6 +8336,13 @@ components:
             - type: integer
             - type: 'null'
           description: How many cubes the sync generated.
+        dbtVersion:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            The dbt version that produced the converted manifest, from its `metadata` block.
+            Advisory — absent when the producer omitted it.
         generatedFileCount:
           oneOf:
             - type: integer
@@ -7061,6 +8353,14 @@ components:
             - type: integer
             - type: 'null'
           description: dbt macros found in the manifest.
+        manifestGeneratedAt:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            When dbt generated the converted manifest, as an ISO 8601 timestamp. For an uploaded
+            manifest this is how you tell a stale upload from a fresh one; it is NOT when the sync
+            ran.
         models:
           oneOf:
             - type: integer
@@ -7722,6 +9022,85 @@ components:
         - read
         - none
       type: string
+    EmbedDashboardCommentDto:
+      properties:
+        body:
+          type: string
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        dashboardId:
+          type: string
+        editedAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        id:
+          type: integer
+        isOwn:
+          type: boolean
+        removedAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        userId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - id
+        - dashboardId
+        - body
+        - createdAt
+        - isOwn
+      type: object
+    EmbedDashboardCommentThreadDto:
+      properties:
+        replies:
+          items:
+            $ref: '#/components/schemas/EmbedDashboardCommentDto'
+          type: array
+        resolvedAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        resolvedBy:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        root:
+          $ref: '#/components/schemas/EmbedDashboardCommentDto'
+      required:
+        - root
+        - replies
+      type: object
+    EmbedDashboardCommentThreadsListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/EmbedDashboardCommentThreadDto'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
     EmbedGroupMemberInput:
       properties:
         embedUserId:
@@ -7765,6 +9144,36 @@ components:
         - addedMembers
         - unchangedMembers
       type: object
+    EmbedMentionableUserDto:
+      properties:
+        email:
+          oneOf:
+            - type: string
+            - type: 'null'
+        firstName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: integer
+        username:
+          type: string
+      required:
+        - id
+        - username
+      type: object
+    EmbedMentionableUsersListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/EmbedMentionableUserDto'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
     EmbedPythonFilteredRunInput:
       properties:
         reportId:
@@ -7780,6 +9189,20 @@ components:
       type: object
     EmbedSessionSettings:
       properties:
+        allowAi:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether this session may use AI at all. This is the master switch over every AI surface
+            in the embed: the dashboard agent, the workbook chat, the AI summary widgets and the
+            standalone embedded chat. Omit to inherit the account-wide embed setting (allowed by
+            default); `false` disables AI even if it is enabled account-wide. Unlike the `show*`
+            keys below it is enforced server-side — the session cannot obtain AI Chat credentials at
+            all, so no request made with it can consume AI tokens — and it outranks them: a `false`
+            here disables a surface whose own `show*` key is `true`. It does not change user roles
+            or permissions for non-AI API calls. `null` is accepted and means the same as omitting
+            it.
         allowChatWorkspaceAuthoring:
           oneOf:
             - type: boolean
@@ -7793,6 +9216,28 @@ components:
             `true` to preserve the session user's role-derived authoring capabilities; `true` never
             grants access the user does not already have. This setting changes only AI Chat tools
             and instructions. It does not change user roles or permissions for direct API calls.
+        locale:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            UI language for every embed viewed with this session, as a BCP-47 code — a full code
+            (`es-ES`), a short code (`es`) or a regional variant all resolve to a shipped locale.
+            Sits between the per-iframe `?locale=` parameter, which still wins because it is the
+            more specific answer, and the account-wide default under Embed → Settings. A language
+            Cube does not ship falls through to that default rather than failing the session.
+        showAiWidgets:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether AI summary widgets are authorable and refreshable with this session: the "AI
+            widget" entry in the dashboard editor's Add widgets menu, and the prompt input plus
+            Generate/Regenerate controls on an existing widget. An already-generated summary still
+            renders, so a published dashboard keeps its content — it simply cannot be regenerated.
+            Omit to inherit the account-wide embed setting (enabled by default); `false` disables
+            them even if they are enabled account-wide, `true` enables them even if they are
+            disabled account-wide.
         showDashboardChat:
           oneOf:
             - type: boolean
@@ -7801,10 +9246,81 @@ components:
             Whether embedded published dashboards viewed with this session show the AI chat (agent
             panel and launcher bubble). Omit to inherit the account-wide embed setting (shown by
             default); `false` hides the chat even if it is enabled account-wide, `true` shows it
-            even if it is disabled account-wide. Only affects the dashboard surface.
+            even if it is disabled account-wide. Only affects the dashboard surface, and only hides
+            the entry point — use `allowAi` to withhold AI from the session.
+        showDashboardSettings:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether the dashboard editor viewed with this session offers its settings panel — the
+            gear button and the sidebar behind it. That panel is the ONLY place an embed user can
+            reach the dashboard slug, the per-dashboard time zone, the per-dashboard agent, the grid
+            behaviour switches and the dashboard theme, so `false` withdraws all of them together.
+            Omit or set to `true` to keep the panel (the default).
+        showGroupByCube:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether the workbook data pane viewed with this session offers the "Group by Cube" /
+            "Group by Folder" item in its more-actions menu. `false` hides the item AND pins the
+            pane to the grouping it would have defaulted to — by folder when the view defines
+            folders, by cube otherwise. The choice is remembered per browser, so pinning is what
+            makes the pane look the same for every user of the session rather than freezing whatever
+            each of them last picked. No content is withdrawn either way. Omit or set to `true` to
+            leave the choice with the user (the default).
+        showMemberNames:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether the workbook data pane viewed with this session may display raw member NAMES
+            instead of their titles (the "Show Member Names" item in the pane's more-actions menu).
+            Member names are the data model's own identifiers, so this is a schema-protection
+            setting in the same family as the account-wide Show Generated SQL switch. `false` hides
+            the menu item AND pins the pane to titles, so a user who already switched to names is
+            returned to titles — hiding the control alone would leave them stuck on names with no
+            way back. Omit or set to `true` to leave the choice with the user (the default).
+        showWorkbookChat:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether the Creator Mode workbook viewed with this session shows its AI entry points:
+            the chat side panel and its toggle, the launchpad's "Ask Cube Agent" button and the "Fix
+            in chat" action on a failed report. Omit to inherit the account-wide embed setting
+            (shown by default); `false` hides them even if they are enabled account-wide, `true`
+            shows them even if they are disabled account-wide. Hides entry points only — use
+            `allowAi` to withhold AI from the session.
+        showWorkbookShare:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether the Creator Mode workspace viewed with this session offers sharing: the workbook
+            header's Share button and the Share action on a workbook, dashboard, exploration or
+            folder row in the workspace list. Set to `false` for a deployment where each embed user
+            should only ever see their own content. Omit or set to `true` to keep sharing available
+            (the default). Hides the entry points only — it does not revoke access already granted,
+            and it never widens what the session's own permissions allow.
+        timezone:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            IANA time zone the agent runs its queries in for every embed viewed with this session
+            (e.g. `America/New_York`). Sits between the per-iframe `?timezone=` parameter and the
+            account-wide default, and remains subject to the tenant time-zone policy — it is not a
+            way around it. A bare UTC offset or an unknown name falls through to the account default
+            rather than failing the session, because Cube would compute in UTC and report nothing.
       type: object
     EmbedSettings:
       properties:
+        allowAi:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         enableDashboardComments:
           oneOf:
             - type: boolean
@@ -7813,7 +9329,15 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        showAiWidgets:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         showDashboardChat:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        showWorkbookChat:
           oneOf:
             - type: boolean
             - type: 'null'
@@ -7853,6 +9377,24 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+      type: object
+    EmbedTenantWorkbooksListQueryAccessSource:
+      enum:
+        - tenant
+        - allEmbedUsers
+        - folder
+      type: string
+    EmbedTenantWorkbooksListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Workbook'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
       type: object
     EmbedTenantsPublicResponse:
       properties:
@@ -8009,6 +9551,70 @@ components:
         - items
         - data
       type: object
+    ExportSubjectInput:
+      properties:
+        email:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            Main user email (for type=USER; provide this OR userId). For type=EMBED_USER it is the
+            email recorded on the provisioned embed user, and the externalId is used when it is
+            omitted.
+        embedTenantName:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: Embed tenant name (for type=EMBED_USER)
+        externalId:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            Embed user external id (for type=EMBED_USER). The user is provisioned if it does not
+            exist yet.
+        groups:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+          description: >-
+            Embed user groups (type=EMBED_USER). Must reference groups that already exist; drives
+            what the rendered dashboard is allowed to show.
+        securityContext:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+          description: >-
+            Security context applied to the embed user before rendering (type=EMBED_USER) — the same
+            object a generate-session call takes. Row-level rules in the data model see exactly
+            this.
+        type:
+          $ref: '#/components/schemas/ExportSubjectInputType'
+        userAttributes:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/UserAttributeInput'
+              type: array
+            - type: 'null'
+          description: >-
+            Embed user attribute values (type=EMBED_USER). Names must reference attribute
+            definitions that already exist.
+        userId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: Main user id (for type=USER; provide this OR email)
+      required:
+        - type
+      type: object
+    ExportSubjectInputType:
+      enum:
+        - USER
+        - EMBED_USER
+      type: string
     FileHash:
       properties:
         hash:
@@ -8559,6 +10165,13 @@ components:
           type: integer
         isEnabled:
           type: boolean
+        memberSwitchers:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardMemberSwitcher'
+              type: array
+            - type: 'null'
+          description: Field-switcher selections applied when the notification is rendered.
         notificationAiSummary:
           description: Whether this notification carries an AI-generated "what changed" summary in its body.
           type: boolean
@@ -8901,6 +10514,10 @@ components:
           items:
             type: string
           type: array
+        displayScale:
+          oneOf:
+            - $ref: '#/components/schemas/PivotItemsDisplayScale'
+            - type: 'null'
         filters:
           items:
             type: string
@@ -8921,18 +10538,34 @@ components:
           items:
             type: string
           type: array
+        showColumnTotals:
+          oneOf:
+            - type: boolean
+            - type: 'null'
       required:
         - columns
         - measures
         - rows
         - filters
       type: object
+    PivotItemsDisplayScale:
+      enum:
+        - model
+        - absolute
+        - thousands
+        - millions
+        - billions
+      type: string
     PivotItemsInput:
       properties:
         columns:
           items:
             type: string
           type: array
+        displayScale:
+          oneOf:
+            - $ref: '#/components/schemas/PivotItemsInputDisplayScale'
+            - type: 'null'
         filters:
           items:
             type: string
@@ -8953,12 +10586,24 @@ components:
           items:
             type: string
           type: array
+        showColumnTotals:
+          oneOf:
+            - type: boolean
+            - type: 'null'
       required:
         - columns
         - measures
         - rows
         - filters
       type: object
+    PivotItemsInputDisplayScale:
+      enum:
+        - model
+        - absolute
+        - thousands
+        - millions
+        - billions
+      type: string
     PivotItemsInputMeasuresAxis:
       enum:
         - columns
@@ -9239,6 +10884,10 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        resultChecksum:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementResultChecksumInput'
+            - type: 'null'
         resultLocation:
           oneOf:
             - type: string
@@ -9434,6 +11083,7 @@ components:
               additionalProperties: true
             - type: 'null'
         name:
+          maxLength: 255
           type: string
         pivotItems:
           oneOf:
@@ -9555,6 +11205,10 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        resultChecksum:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementResultChecksum'
+            - type: 'null'
         resultLocation:
           type: string
         sheetId:
@@ -9584,6 +11238,72 @@ components:
         - GOOGLE_SHEETS
         - EXCEL
       type: string
+    ReportPlacementResultChecksum:
+      properties:
+        chunks:
+          items:
+            $ref: '#/components/schemas/ReportPlacementResultChunk'
+          maxItems: 2000
+          type: array
+        v:
+          minimum: 1
+          type: integer
+      required:
+        - v
+        - chunks
+      type: object
+    ReportPlacementResultChecksumInput:
+      properties:
+        chunks:
+          items:
+            $ref: '#/components/schemas/ReportPlacementResultChunkInput'
+          maxItems: 2000
+          type: array
+        v:
+          minimum: 1
+          type: integer
+      required:
+        - v
+        - chunks
+      type: object
+    ReportPlacementResultChunk:
+      properties:
+        from:
+          minimum: 0
+          type: integer
+        hash:
+          maxLength: 64
+          minLength: 1
+          type: string
+        to:
+          oneOf:
+            - minimum: 0
+              type: integer
+            - type: 'null'
+          deprecated: true
+      required:
+        - from
+        - hash
+      type: object
+    ReportPlacementResultChunkInput:
+      properties:
+        from:
+          minimum: 0
+          type: integer
+        hash:
+          maxLength: 64
+          minLength: 1
+          type: string
+        to:
+          oneOf:
+            - minimum: 0
+              type: integer
+            - type: 'null'
+          deprecated: true
+      required:
+        - from
+        - hash
+      type: object
     ReportPlacementSyncStatus:
       enum:
         - UP_TO_DATE
@@ -9789,6 +11509,61 @@ components:
         - name
         - actions
       type: object
+    SaveDatabricksMetricViewIntegrationInput:
+      properties:
+        deletionPolicy:
+          $ref: '#/components/schemas/SaveDatabricksMetricViewIntegrationInputDeletionPolicy'
+        enabled:
+          type: boolean
+        expectedConfigurationVersion:
+          description: Use 0 to create; otherwise pass the configurationVersion returned by GET.
+          minimum: 0
+          type: integer
+        selectionMode:
+          $ref: '#/components/schemas/SaveDatabricksMetricViewIntegrationInputSelectionMode'
+        sourceOverrides:
+          additionalProperties:
+            type: string
+          type: object
+        targetCatalog:
+          maxLength: 255
+          type: string
+        targetNamePrefix:
+          maxLength: 255
+          type: string
+        targetNames:
+          additionalProperties:
+            type: string
+          type: object
+        targetSchema:
+          maxLength: 255
+          type: string
+        viewNameRegex:
+          maxLength: 128
+          type: string
+        viewNames:
+          items:
+            type: string
+          maxItems: 128
+          type: array
+      required:
+        - expectedConfigurationVersion
+        - enabled
+        - targetCatalog
+        - targetSchema
+        - selectionMode
+      type: object
+    SaveDatabricksMetricViewIntegrationInputDeletionPolicy:
+      enum:
+        - retain
+        - delete-managed
+      type: string
+    SaveDatabricksMetricViewIntegrationInputSelectionMode:
+      enum:
+        - all
+        - selected
+        - pattern
+      type: string
     SetBranchStagingEnvironmentRequest:
       properties:
         branchId:
@@ -9810,6 +11585,13 @@ components:
           $ref: '#/components/schemas/BranchResponse'
       required:
         - data
+      type: object
+    SetEmbedDashboardCommentResolvedBody:
+      properties:
+        resolved:
+          type: boolean
+      required:
+        - resolved
       type: object
     SetEnvVariablesInput:
       properties:
@@ -9872,12 +11654,77 @@ components:
         - items
         - data
       type: object
+    StartDashboardExportInput:
+      properties:
+        dashboardId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: >-
+            Numeric id of the dashboard to export. Provide either this or `dashboardPublicId`, not
+            both.
+        dashboardPublicId:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: Public id of the dashboard to export. Provide either this or `dashboardId`, not both.
+        filters:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardFilterInput'
+              type: array
+            - type: 'null'
+          description: >-
+            Dimension filters applied to the dashboard while it renders. Same shape the
+            scheduled-notification API uses.
+        format:
+          $ref: '#/components/schemas/StartDashboardExportInputFormat'
+        memberSwitchers:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardMemberSwitcherInput'
+              type: array
+            - type: 'null'
+          description: Field-switcher selections applied to the dashboard while it renders.
+        renderAs:
+          oneOf:
+            - $ref: '#/components/schemas/ExportSubjectInput'
+            - type: 'null'
+          description: >-
+            Render the dashboard as this user instead of the caller — the queries behind the image
+            run under THEIR security context. Requires the caller to be a tenant admin. Omit to
+            render as the API key's own user.
+        timeGrains:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardTimeGrainInput'
+              type: array
+            - type: 'null'
+          description: Time-grain overrides applied to the dashboard while it renders.
+      required:
+        - format
+      type: object
+    StartDashboardExportInputFormat:
+      enum:
+        - png
+        - pdf
+      type: string
     StartDbtSyncInput:
       properties:
         branchName:
           oneOf:
             - type: string
             - type: 'null'
+        manifest:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+          description: >-
+            The contents of your dbt `target/manifest.json`, as JSON. Required when `source` is
+            `manifest` and ignored otherwise. Produced by `dbt parse`, `dbt compile` or `dbt build`,
+            so a CI job can POST the manifest it just validated and be sure Cube converts exactly
+            that — no re-parse of a branch tip that may already have moved.
         ref:
           oneOf:
             - type: string
@@ -9887,7 +11734,16 @@ components:
             Overrides the branch saved on the deployment’s dbt git integration for this sync only,
             so CI can sync the ref under review (e.g. a pull request’s head branch) instead of the
             tracked branch. The generated Cube branch is named after it.
+        source:
+          oneOf:
+            - $ref: '#/components/schemas/StartDbtSyncInputSource'
+            - type: 'null'
       type: object
+    StartDbtSyncInputSource:
+      enum:
+        - git
+        - manifest
+      type: string
     StartDevModeRequest:
       properties:
         branchName:
@@ -10159,6 +12015,15 @@ components:
         - read
         - none
       type: string
+    UpdateEmbedDashboardCommentBody:
+      properties:
+        body:
+          maxLength: 10000
+          minLength: 1
+          type: string
+      required:
+        - body
+      type: object
     UpdateEmbedGroupInput:
       properties:
         description:
@@ -10212,6 +12077,15 @@ components:
             - type: boolean
             - type: 'null'
           description: Enable or disable the schedule
+        memberSwitchers:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardMemberSwitcherInput'
+              type: array
+            - type: 'null'
+          description: >-
+            Field-switcher selections applied to the dashboard when the notification is rendered.
+            Replaces the existing set when provided.
         minute:
           oneOf:
             - type: integer
@@ -10371,7 +12245,8 @@ components:
             - type: 'null'
         name:
           oneOf:
-            - type: string
+            - maxLength: 255
+              type: string
             - type: 'null'
         pivotItems:
           oneOf:
@@ -10388,6 +12263,10 @@ components:
               minLength: 12
               maxLength: 12
             - type: 'null'
+        resultChecksum:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementResultChecksumInput'
+            - type: 'null'
         resultLocation:
           oneOf:
             - type: string
@@ -10402,7 +12281,8 @@ components:
             - type: 'null'
         title:
           oneOf:
-            - type: string
+            - maxLength: 255
+              type: string
             - type: 'null'
         workbookId:
           oneOf:
@@ -11252,7 +13132,7 @@ components:
       properties:
         dashboardDraft:
           oneOf:
-            - $ref: '#/components/schemas/DashboardConfigInput'
+            - $ref: '#/components/schemas/DashboardConfigDraftInput'
             - type: 'null'
       type: object
     WorkbookDtoType:

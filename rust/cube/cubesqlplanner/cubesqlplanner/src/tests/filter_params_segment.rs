@@ -167,3 +167,46 @@ fn segment_referencing_a_dimension_does_not_activate_that_dimensions_binding() {
         sql
     );
 }
+
+// A segment is not shifted by anything, so a binding written for a time shift
+// has no segment to state — and reads as the modelling mistake it is, the same
+// way it would on a dimension.
+#[test]
+fn a_segment_binding_naming_a_time_shift_is_rejected() {
+    let schema = MockSchema::from_yaml(indoc! {"
+        cubes:
+            - name: orders
+              sql: \"SELECT * FROM orders WHERE {FILTER_PARAMS:orders.completed@some_shift:status = 'completed'}\"
+              dimensions:
+                  - name: id
+                    type: number
+                    sql: id
+                    primary_key: true
+                  - name: status
+                    type: string
+                    sql: status
+              measures:
+                  - name: count
+                    type: count
+              segments:
+                  - name: completed
+                    sql: \"{CUBE}.status = 'completed'\"
+    "})
+    .unwrap();
+    let ctx = TestContext::new(schema).unwrap();
+
+    let err = ctx
+        .build_sql(indoc! {"
+            measures:
+              - orders.count
+            segments:
+              - orders.completed
+        "})
+        .unwrap_err();
+
+    assert!(
+        err.message.contains("nothing shifts a segment"),
+        "unexpected error: {}",
+        err.message
+    );
+}

@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/filter_directive.rs
+expression: result
+---
+orders__status | orders__amount_category_day_share_percent | orders__total_amount
+---------------+-------------------------------------------+---------------------
+completed      | 62.2222222222222222                       | 1400.00

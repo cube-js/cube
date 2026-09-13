@@ -1038,12 +1038,12 @@ describe('Single datasources', () => {
   });
 
   test('getEnv("fireboltAccount")', () => {
-    process.env.CUBEJS_FIREBOLT_ACCOUNT = "default1";
+    process.env.CUBEJS_FIREBOLT_ACCOUNT = 'default1';
     expect(getEnv('fireboltAccount', { dataSource: 'default' })).toEqual('default1');
     expect(getEnv('fireboltAccount', { dataSource: 'postgres' })).toEqual('default1');
     expect(getEnv('fireboltAccount', { dataSource: 'wrong' })).toEqual('default1');
 
-    process.env.CUBEJS_FIREBOLT_ACCOUNT = "default2";
+    process.env.CUBEJS_FIREBOLT_ACCOUNT = 'default2';
     expect(getEnv('fireboltAccount', { dataSource: 'default' })).toEqual('default2');
     expect(getEnv('fireboltAccount', { dataSource: 'postgres' })).toEqual('default2');
     expect(getEnv('fireboltAccount', { dataSource: 'wrong' })).toEqual('default2');

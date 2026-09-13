@@ -246,24 +246,24 @@ export const retryWithTimeout = <T>(
   fn: (token: CancelToken) => Promise<T>,
   { timeout, intervalPause }: RetryWithTimeoutOptions,
 ) => withTimeoutRace(
-    createCancelablePromise<T | null>(async (token) => {
-      let i = 0;
+  createCancelablePromise<T | null>(async (token) => {
+    let i = 0;
 
-      while (!token.isCanceled()) {
-        i++;
+    while (!token.isCanceled()) {
+      i++;
 
-        const result = await fn(token);
-        if (result) {
-          return result;
-        }
-
-        await token.with(pausePromise(intervalPause(i)));
+      const result = await fn(token);
+      if (result) {
+        return result;
       }
 
-      return null;
-    }),
-    timeout
-  );
+      await token.with(pausePromise(intervalPause(i)));
+    }
+
+    return null;
+  }),
+  timeout
+);
 
 export type AsyncDebounceOptions = {
   max?: number;

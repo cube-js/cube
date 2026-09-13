@@ -1290,7 +1290,7 @@ describe('PreAggregations', () => {
           {
             indexName: 'm_x_c_actionable_hourly_agg_main_with_index_month1_device_tag_description_index',
             sql: [
-              "CREATE INDEX m_x_c_actionable_hourly_agg_main_with_index_month1_device_tag_description_index ON prod_pre_aggregations_mxc.m_x_c_actionable_hourly_agg_main_with_index_month120260112 (`m_x_c_actionable_hourly_agg__device_name`, `m_x_c_actionable_hourly_agg__tag_name`, `m_x_c_actionable_hourly_agg__description`, `m_x_c_actionable_hourly_agg__timestamp_hour`)",
+              'CREATE INDEX m_x_c_actionable_hourly_agg_main_with_index_month1_device_tag_description_index ON prod_pre_aggregations_mxc.m_x_c_actionable_hourly_agg_main_with_index_month120260112 (`m_x_c_actionable_hourly_agg__device_name`, `m_x_c_actionable_hourly_agg__tag_name`, `m_x_c_actionable_hourly_agg__description`, `m_x_c_actionable_hourly_agg__timestamp_hour`)',
               [],
               {}
             ]
@@ -1298,7 +1298,7 @@ describe('PreAggregations', () => {
           {
             indexName: 'm_x_c_actionable_hourly_agg_main_with_index_month1_tag_description_device_index',
             sql: [
-              "CREATE INDEX m_x_c_actionable_hourly_agg_main_with_index_month1_tag_description_device_index ON prod_pre_aggregations_mxc.m_x_c_actionable_hourly_agg_main_with_index_month120260112 (`m_x_c_actionable_hourly_agg__tag_name`, `m_x_c_actionable_hourly_agg__description`, `m_x_c_actionable_hourly_agg__device_name`)",
+              'CREATE INDEX m_x_c_actionable_hourly_agg_main_with_index_month1_tag_description_device_index ON prod_pre_aggregations_mxc.m_x_c_actionable_hourly_agg_main_with_index_month120260112 (`m_x_c_actionable_hourly_agg__tag_name`, `m_x_c_actionable_hourly_agg__description`, `m_x_c_actionable_hourly_agg__device_name`)',
               [],
               {}
             ]

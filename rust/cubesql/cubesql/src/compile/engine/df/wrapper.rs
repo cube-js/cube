@@ -845,6 +845,9 @@ impl CubeScanWrapperNode {
                         .inputs
                         .iter()
                         .any(|input| Self::has_ungrouped_wrapped_node(input))
+                } else if let Some(wrapper) = node.as_any().downcast_ref::<CubeScanWrapperNode>() {
+                    // A query of a pushed down union
+                    Self::has_ungrouped_wrapped_node(wrapper.wrapped_plan.as_ref())
                 } else {
                     false
                 }
@@ -1222,6 +1225,20 @@ impl CubeScanWrapperNode {
                             parent_data_source,
                         )
                         .await
+                } else if let Some(wrapper) = node_any.downcast_ref::<CubeScanWrapperNode>() {
+                    // The queries of a pushed down union are the wrappers they were pulled
+                    // up into, and each renders as the query it holds
+                    Self::generate_sql_for_node_rec(
+                        meta,
+                        transport,
+                        load_request_meta,
+                        state,
+                        wrapper.wrapped_plan.clone(),
+                        can_rename_columns,
+                        values,
+                        parent_data_source,
+                    )
+                    .await
                 } else {
                     return Err(CubeError::internal(format!(
                         "Can't generate SQL for node: {node:?}"
@@ -2022,11 +2039,64 @@ impl WrappedSelectNode {
         )
         .await?;
 
+        // Sort pushdown can replace a select-list alias with the literal expression.
+        // Integer literals in ORDER BY are interpreted as select-list positions by some SQL
+        // dialects, so restore the generated alias when the literal is selected in this query.
+        fn unalias(mut expr: &Expr) -> &Expr {
+            while let Expr::Alias(inner, _) = expr {
+                expr = inner;
+            }
+            expr
+        }
+        // Push-to-Cube discards this `order` and builds its own from `self.order_expr`, so
+        // there is nothing to fix there, and a generated alias is not a scan member.
+        let literal_aliases = if push_to_cube_context.is_some() {
+            vec![]
+        } else {
+            self.projection_expr
+                .iter()
+                .zip(projection.iter())
+                .chain(flat_group_expr.iter().zip(group_by.iter()))
+                .filter_map(|(selected_expr, (aliased_column, _))| {
+                    let expr = unalias(selected_expr);
+                    matches!(expr, Expr::Literal(_)).then(|| (expr, &aliased_column.alias))
+                })
+                .collect::<Vec<_>>()
+        };
+        let order_expr = if literal_aliases.is_empty() {
+            self.order_expr.clone()
+        } else {
+            self.order_expr
+                .iter()
+                .map(|order_expr| {
+                    let Expr::Sort {
+                        expr,
+                        asc,
+                        nulls_first,
+                    } = order_expr
+                    else {
+                        return order_expr.clone();
+                    };
+                    let Some((_, alias)) = literal_aliases
+                        .iter()
+                        .find(|(literal, _)| *literal == unalias(expr))
+                    else {
+                        return order_expr.clone();
+                    };
+                    Expr::Sort {
+                        expr: Box::new(Expr::Column(Column::from_name(*alias))),
+                        asc: *asc,
+                        nulls_first: *nulls_first,
+                    }
+                })
+                .collect()
+        };
+
         // Sort expressions can reference window expressions computed in this same select
         // by their full DataFusion name. Those columns don't exist in the source SQL, so
         // rewrite them to the generated window aliases, which ORDER BY can reference by name.
         let order_expr = if window.is_empty() {
-            self.order_expr.clone()
+            order_expr
         } else {
             let window_columns = self
                 .window_expr
@@ -2040,9 +2110,9 @@ impl WrappedSelectNode {
                 })
                 .collect::<result::Result<HashMap<_, _>, CubeError>>()?;
             let window_columns_ref = window_columns.iter().collect();
-            self.order_expr
-                .iter()
-                .map(|e| replace_col(e.clone(), &window_columns_ref))
+            order_expr
+                .into_iter()
+                .map(|e| replace_col(e, &window_columns_ref))
                 .collect::<Result<Vec<_>>>()?
         };
 
@@ -2257,6 +2327,12 @@ impl WrappedSelectNode {
         };
 
         let sql_type = Self::generate_sql_type(sql_generator.clone(), data_type)?;
+        let sql_type = sql_generator
+            .get_sql_templates()
+            .nullable_type(sql_type)
+            .map_err(|e| {
+                DataFusionError::Internal(format!("Can't generate SQL for nullable type: {}", e))
+            })?;
         let result = Self::generate_sql_cast_expr(sql_generator, "NULL".to_string(), sql_type)?;
         Ok(result)
     }

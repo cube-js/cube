@@ -16,7 +16,7 @@ export function playgroundFetch(url, options: any = {}) {
         try {
           const json = JSON.parse(errorText);
           errorText = json.error;
-        } catch (e: any) {
+        } catch {
           // Nothing
         }
         throw errorText;
@@ -31,7 +31,6 @@ export function playgroundFetch(url, options: any = {}) {
     });
 }
 
-
 type OpenWindowOptions = {
   url: string;
   width?: number;
@@ -45,21 +44,11 @@ export function openWindow({
   width = 640,
   height = 720,
 }: OpenWindowOptions) {
-  const dualScreenLeft =
-    window.screenLeft !== undefined ? window.screenLeft : window.screenX;
-  const dualScreenTop =
-    window.screenTop !== undefined ? window.screenTop : window.screenY;
+  const dualScreenLeft = window.screenLeft !== undefined ? window.screenLeft : window.screenX;
+  const dualScreenTop = window.screenTop !== undefined ? window.screenTop : window.screenY;
 
-  const w = window.innerWidth
-    ? window.innerWidth
-    : document.documentElement.clientWidth
-    ? document.documentElement.clientWidth
-    : screen.width;
-  const h = window.innerHeight
-    ? window.innerHeight
-    : document.documentElement.clientHeight
-    ? document.documentElement.clientHeight
-    : screen.height;
+  const w = window.innerWidth || document.documentElement.clientWidth || screen.width;
+  const h = window.innerHeight || document.documentElement.clientHeight || screen.height;
 
   const systemZoom = w / window.screen.availWidth;
   const left = (w - width) / 2 / systemZoom + dualScreenLeft;

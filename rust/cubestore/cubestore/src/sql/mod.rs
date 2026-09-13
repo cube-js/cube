@@ -4878,13 +4878,24 @@ mod tests {
                     config.max_partition_split_threshold = 200;
                     config
                 }).start_test_worker(async move |_| {
-                    let url = "https://data.wprdc.org/dataset/0b584c84-7e35-4f4d-a5a2-b01697470c0f/resource/e95dd941-8e47-4460-9bd8-1e51c194370b/download/bikepghpublic.csv";
+                    // The threshold is derived from the size of the location,
+                    // not from its contents: see ImportServiceImpl::estimate_rows.
+                    // Rows are padded so the estimate lands above
+                    // max_partition_split_threshold per select worker, which is
+                    // what makes the cap observable.
+                    let path = env::temp_dir().join(format!("{}.csv", test_name));
+                    let padding = "x".repeat(256);
+                    let mut csv = "Response ID,Start Date,End Date\n".to_string();
+                    for id in 0..813 {
+                        csv += &format!("{},2020-01-01T00:00:00.000Z,{}\n", id, padding);
+                    }
+                    tokio::fs::write(&path, csv).await?;
 
                     service
                         .exec_query("CREATE SCHEMA IF NOT EXISTS foo")
                         .await?.collect().await?;
 
-                    let create_table_sql = format!("CREATE TABLE foo.bikes (`Response ID` int, `Start Date` text, `End Date` text) LOCATION '{}'", url);
+                    let create_table_sql = format!("CREATE TABLE foo.bikes (`Response ID` int, `Start Date` text, `End Date` text) LOCATION '{}'", path.to_string_lossy());
 
                     service.exec_query(&create_table_sql).await?.collect().await?;
 

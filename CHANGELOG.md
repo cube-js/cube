@@ -3,6 +3,46 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.37](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.37) (2026-09-10)
+
+### Bug Fixes
+
+- **ci:** Unbreak release, yarn fails on ${NODE_AUTH_TOKEN} in setup-node@v7 npmrc ([#11816](https://github.com/cube-js/cube/issues/11816)) ([72d2823](https://github.com/cube-js/cube/commit/72d28237ea608d401d7b1e76870a67351890dc2b)), closes [#11792](https://github.com/cube-js/cube/issues/11792)
+- **cross:** Restore host Python interpreter in aarch64 images ([#11823](https://github.com/cube-js/cube/issues/11823)) ([e9d267f](https://github.com/cube-js/cube/commit/e9d267f8f09df616a7203531081db936d706c5ff))
+- **cubesql:** Allow SQL pushdown for views spanning several data sources ([#11802](https://github.com/cube-js/cube/issues/11802)) ([185c1a9](https://github.com/cube-js/cube/commit/185c1a9b6139f3290faf042b2bc8f85d492282f6))
+- **cubesql:** Build a pushed down union over its queries' classes, not their forms ([#11801](https://github.com/cube-js/cube/issues/11801)) ([7b24714](https://github.com/cube-js/cube/commit/7b24714522d0bb22cb239512fbf3866cddce38ef))
+- **cubestore:** Report a websocket peer that goes away as debug, not error ([#11786](https://github.com/cube-js/cube/issues/11786)) ([fe263b9](https://github.com/cube-js/cube/commit/fe263b9243c8b1e6c37cb05837dcd0e0b758a48b))
+- **schema-compiler:** resolve a rollup join only when rendering needs it ([#11784](https://github.com/cube-js/cube/issues/11784)) ([42fe83b](https://github.com/cube-js/cube/commit/42fe83b31e0579c5a072f19729971b97bfbb34dc))
+- **tesseract:** generate the time series in SQL on Snowflake ([#11785](https://github.com/cube-js/cube/issues/11785)) ([bd426cb](https://github.com/cube-js/cube/commit/bd426cb1c1d431eccd2c35958e5a1e1574335b6a))
+
+### Features
+
+- **clickhouse-driver:** identify Cube in the ClickHouse User-Agent ([#11837](https://github.com/cube-js/cube/issues/11837)) ([047b457](https://github.com/cube-js/cube/commit/047b4572badd182ac8dfa593fc9e9f84fe657009))
+- Migrate to TypeScript 6.0.3 (prepare for 7) ([#11767](https://github.com/cube-js/cube/issues/11767)) ([98ac580](https://github.com/cube-js/cube/commit/98ac58039be36e7392ac617562d0dad03f17de3c))
+- Support named ESM exports across all drivers ([#11838](https://github.com/cube-js/cube/issues/11838)) ([1699910](https://github.com/cube-js/cube/commit/1699910ef05c808ba9e114fcb4cd02432bd3767e))
+
+## [1.7.36](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.36) (2026-09-09)
+
+### Bug Fixes
+
+- **cubesql:** Build a pushed down union over its queries' classes, not their forms ([#11801](https://github.com/cube-js/cube/issues/11801)) ([7b24714](https://github.com/cube-js/cube/commit/7b24714522d0bb22cb239512fbf3866cddce38ef))
+- **schema-compiler:** resolve a rollup join only when rendering needs it ([#11784](https://github.com/cube-js/cube/issues/11784)) ([42fe83b](https://github.com/cube-js/cube/commit/42fe83b31e0579c5a072f19729971b97bfbb34dc))
+- **tesseract:** generate the time series in SQL on Snowflake ([#11785](https://github.com/cube-js/cube/issues/11785)) ([bd426cb](https://github.com/cube-js/cube/commit/bd426cb1c1d431eccd2c35958e5a1e1574335b6a))
+
+### Features
+
+- Migrate to TypeScript 6.0.3 (prepare for 7) ([#11767](https://github.com/cube-js/cube/issues/11767)) ([98ac580](https://github.com/cube-js/cube/commit/98ac58039be36e7392ac617562d0dad03f17de3c))
+
+## [1.7.35](https://github.com/cube-js/cube/compare/v1.7.34...v1.7.35) (2026-09-07)
+
+### Bug Fixes
+
+- **tesseract:** resolve rollup-join keys kept as a rollup's time dimension ([#11747](https://github.com/cube-js/cube/issues/11747)) ([1d08fc0](https://github.com/cube-js/cube/commit/1d08fc0ea3c1af0b5030641ea482303fce41092d)), closes [#11362](https://github.com/cube-js/cube/issues/11362)
+
+### Features
+
+- **tesseract:** address a calendar time shift from FILTER_PARAMS ([#11787](https://github.com/cube-js/cube/issues/11787)) ([3cd88a6](https://github.com/cube-js/cube/commit/3cd88a6a156069e81d299048a5d1425437d71b24))
+
 ## [1.7.34](https://github.com/cube-js/cube/compare/v1.7.33...v1.7.34) (2026-09-04)
 
 ### Bug Fixes

@@ -3,6 +3,38 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.37](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.37) (2026-09-10)
+
+### Bug Fixes
+
+- **schema-compiler:** resolve a rollup join only when rendering needs it ([#11784](https://github.com/cube-js/cube/issues/11784)) ([42fe83b](https://github.com/cube-js/cube/commit/42fe83b31e0579c5a072f19729971b97bfbb34dc))
+- **tesseract:** generate the time series in SQL on Snowflake ([#11785](https://github.com/cube-js/cube/issues/11785)) ([bd426cb](https://github.com/cube-js/cube/commit/bd426cb1c1d431eccd2c35958e5a1e1574335b6a))
+
+### Features
+
+- Migrate to TypeScript 6.0.3 (prepare for 7) ([#11767](https://github.com/cube-js/cube/issues/11767)) ([98ac580](https://github.com/cube-js/cube/commit/98ac58039be36e7392ac617562d0dad03f17de3c))
+
+## [1.7.36](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.36) (2026-09-09)
+
+### Bug Fixes
+
+- **schema-compiler:** resolve a rollup join only when rendering needs it ([#11784](https://github.com/cube-js/cube/issues/11784)) ([42fe83b](https://github.com/cube-js/cube/commit/42fe83b31e0579c5a072f19729971b97bfbb34dc))
+- **tesseract:** generate the time series in SQL on Snowflake ([#11785](https://github.com/cube-js/cube/issues/11785)) ([bd426cb](https://github.com/cube-js/cube/commit/bd426cb1c1d431eccd2c35958e5a1e1574335b6a))
+
+### Features
+
+- Migrate to TypeScript 6.0.3 (prepare for 7) ([#11767](https://github.com/cube-js/cube/issues/11767)) ([98ac580](https://github.com/cube-js/cube/commit/98ac58039be36e7392ac617562d0dad03f17de3c))
+
+## [1.7.35](https://github.com/cube-js/cube/compare/v1.7.34...v1.7.35) (2026-09-07)
+
+### Bug Fixes
+
+- **tesseract:** resolve rollup-join keys kept as a rollup's time dimension ([#11747](https://github.com/cube-js/cube/issues/11747)) ([1d08fc0](https://github.com/cube-js/cube/commit/1d08fc0ea3c1af0b5030641ea482303fce41092d)), closes [#11362](https://github.com/cube-js/cube/issues/11362)
+
+### Features
+
+- **tesseract:** address a calendar time shift from FILTER_PARAMS ([#11787](https://github.com/cube-js/cube/issues/11787)) ([3cd88a6](https://github.com/cube-js/cube/commit/3cd88a6a156069e81d299048a5d1425437d71b24))
+
 ## [1.7.34](https://github.com/cube-js/cube/compare/v1.7.33...v1.7.34) (2026-09-04)
 
 ### Bug Fixes

@@ -18,7 +18,7 @@
 
 import 'cypress-localstorage-commands';
 import '@4tw/cypress-drag-drop';
-import { addMatchImageSnapshotCommand } from 'cypress-image-snapshot/command';
+import { addMatchImageSnapshotCommand } from '@simonsmith/cypress-image-snapshot/command';
 
 import './commands';
 

@@ -45,8 +45,10 @@ export type PreAggregationForQuery = {
   references: PreAggregationReferences;
   preAggregationsToJoin?: PreAggregationForQuery[];
   referencedPreAggregations?: PreAggregationForQuery[];
+  // Resolved on demand: only rendering the pre-aggregation's own SQL needs the
+  // join, and the native planner resolves its own.
   // eslint-disable-next-line no-use-before-define
-  rollupJoin?: RollupJoin;
+  resolveRollupJoin?: () => RollupJoin;
   sqlAlias?: string;
 };
 
@@ -1200,7 +1202,6 @@ export class PreAggregations {
       preAggregationsToJoin.forEach(preAgg => {
         references.rollupsReferences.push(preAgg.references);
       });
-      const rollupJoin = this.buildRollupJoin(preAggObj, preAggregationsToJoin);
       const joinResult = canUsePreAggregation(references);
 
       return {
@@ -1208,7 +1209,7 @@ export class PreAggregations {
         canUsePreAggregation: joinResult.canUse,
         leafMeasureMatch: joinResult.leafMeasureMatch,
         preAggregationsToJoin,
-        rollupJoin,
+        resolveRollupJoin: () => this.buildRollupJoin(preAggObj, preAggregationsToJoin),
       };
     } else if (preAggregation.type === 'rollupLambda') {
       // TODO evaluation optimizations. Should be cached or moved to compile time.
@@ -1595,7 +1596,7 @@ export class PreAggregations {
     });
 
     if (preAggregationForQuery.preAggregation.type === 'rollupJoin') {
-      const join = preAggregationForQuery.rollupJoin!;
+      const join = preAggregationForQuery.resolveRollupJoin!();
 
       toJoin = [
         sqlAndAlias(join[0].fromPreAggObj),

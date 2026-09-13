@@ -4,6 +4,7 @@ import { BaseDriver } from '@cubejs-backend/base-driver';
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import WebSocketTransport from '@cubejs-client/ws-transport';
 import { BirdBox, Env, getBirdbox } from '../src';
+import { stopIfStarted } from './smoke-tests';
 
 type SupportedDriverType =
   'postgres' |
@@ -87,9 +88,9 @@ export function executeTestSuite({ type, config = {}, driver }: TestSuite) {
         //     overridedConfig.CUBEJS_PRE_AGGREGATIONS_SCHEMA
         //   } cascade;`
         // );
-        await driver.release();
-        await transport.close();
-        await box.stop();
+        await stopIfStarted('driver', () => driver.release());
+        await stopIfStarted('transport', transport && (() => transport.close()));
+        await stopIfStarted('birdbox', box);
       });
 
       test('/cubejs-system/v1/pre-aggregations/jobs', async () => {
@@ -99,7 +100,7 @@ export function executeTestSuite({ type, config = {}, driver }: TestSuite) {
          */
         async function preAggregationsJob(selector: any): Promise<any> {
           type PostResponse = string[];
-          type GetResponse = {[token: string]: {
+          type GetResponse = { [token: string]: {
             status: string;
             table: string;
             selector: {
@@ -109,7 +110,7 @@ export function executeTestSuite({ type, config = {}, driver }: TestSuite) {
               cubes?: string[],
               preAggregations?: string[],
             };
-          }};
+          } };
     
           const url = `${systemUrl}/pre-aggregations/jobs`;
           let response;

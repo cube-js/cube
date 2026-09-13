@@ -59,20 +59,18 @@ export default function GraphiQLSandbox({
 
   const token = securityContextToken || playgroundToken;
 
-  const fetcher = useMemo(() => {
-    return createGraphiQLFetcher({
-      url: apiUrl.replace('/v1', '/graphql'),
-      headers: token
-        ? {
-            authorization: token,
-          }
-        : {},
-    });
-  }, [apiUrl, token]);
+  const fetcher = useMemo(() => createGraphiQLFetcher({
+    url: apiUrl.replace('/v1', '/graphql'),
+    headers: token
+      ? {
+        authorization: token,
+      }
+      : {},
+  }),
+  [apiUrl, token]);
 
-  const types = useMemo(() => {
-    return metaToTypes(meta);
-  }, [meta]);
+  const types = useMemo(() => metaToTypes(meta),
+    [meta]);
 
   const gqlQuery = useDeepMemo(() => {
     if (!types) {

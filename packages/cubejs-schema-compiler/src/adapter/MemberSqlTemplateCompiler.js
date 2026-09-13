@@ -11,7 +11,7 @@
  *   {
  *     template: string | string[],
  *     symbolPaths: string[][],                       // {arg:N}
- *     filterParams: [{ cube_name, name, column }],   // {fp:N}
+ *     filterParams: [{ cube_name, name, time_shift_name, column }],   // {fp:N}
  *     filterGroups: [{ filterParams: [...] }],       // {fg:N}
  *     securityContextValues: string[]                // {sv:N}
  *   }
@@ -197,24 +197,60 @@ function compileColumnCallback(column, state) {
   }
 }
 
-function filterParamsItemProxy(cubeName, name, state) {
-  return {
-    filter(column) {
-      const item = {
-        cube_name: cubeName,
-        name,
-        column: typeof column === 'function' ? compileColumnCallback(column, state) : column,
-      };
-      const toString = () => {
-        const index = state.target.filterParams.length;
-        state.target.filterParams.push(item);
-        return placeholder(FILTER_PARAM_PREFIX, index);
-      };
-      // `__member` lets FILTER_GROUP recover the item; `toString` records and
-      // yields the {fp:N} placeholder on coercion.
-      return { __member: item, toString };
-    },
+// Under `time_shifts` every string reads as the name of a shift, so the
+// properties JS reads when it coerces an object to a string are reserved, and
+// so is `filter` — writing it there is the plain form with `time_shifts.`
+// inserted by mistake.
+const NOT_SHIFT_NAMES = new Set(['toString', 'valueOf', 'filter']);
+
+// A `.filter(...)` binding on one member, optionally addressing one of the
+// member's time shifts.
+function filterBinding(cubeName, name, timeShiftName, state) {
+  return (column) => {
+    const item = {
+      cube_name: cubeName,
+      name,
+      time_shift_name: timeShiftName,
+      column: typeof column === 'function' ? compileColumnCallback(column, state) : column,
+    };
+    const toString = () => {
+      const index = state.target.filterParams.length;
+      state.target.filterParams.push(item);
+      return placeholder(FILTER_PARAM_PREFIX, index);
+    };
+    // `__member` lets FILTER_GROUP recover the item; `toString` records and
+    // yields the {fp:N} placeholder on coercion.
+    return { __member: item, toString };
   };
+}
+
+// `FILTER_PARAMS.<cube>.<member>` binds the member as the query filters it;
+// `.time_shifts.<name>` under it binds the member as a stage shifted by that
+// name reads it.
+function filterParamsItemProxy(cubeName, name, state) {
+  return new Proxy({}, {
+    get(_t, prop) {
+      if (prop === 'filter') {
+        return filterBinding(cubeName, name, null, state);
+      }
+      if (prop === 'time_shifts' || prop === 'timeShifts') {
+        return new Proxy({}, {
+          get(_t2, timeShiftName) {
+            if (typeof timeShiftName !== 'string' || NOT_SHIFT_NAMES.has(timeShiftName)) {
+              return () => {
+                throw new Error(
+                  `FILTER_PARAMS.${cubeName}.${name}.time_shifts needs the name of a time shift: `
+                  + 'FILTER_PARAMS.<cube>.<member>.time_shifts.<name>.filter(...)'
+                );
+              };
+            }
+            return { filter: filterBinding(cubeName, name, timeShiftName, state) };
+          },
+        });
+      }
+      return Reflect.get(_t, prop);
+    },
+  });
 }
 
 function filterParamsProxy(state) {

@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/firebolt-driver",
   "description": "Cube.js Firebolt database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.7.34",
+  "version": "1.7.37",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -16,6 +16,15 @@
     "index.js"
   ],
   "main": "index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js",
+      "require": "./index.js"
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
   "typings": "dist/src/index.d.ts",
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
@@ -23,21 +32,21 @@
     "watch": "tsc -w",
     "test": "yarn integration",
     "integration": "npm run integration:firebolt",
-    "integration:firebolt": "jest --verbose dist/test --runInBand",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "integration:firebolt": "jest --verbose dist/test --runInBand"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.7.34",
-    "@cubejs-backend/schema-compiler": "1.7.34",
-    "@cubejs-backend/shared": "1.7.34",
+    "@cubejs-backend/base-driver": "1.7.37",
+    "@cubejs-backend/schema-compiler": "1.7.37",
+    "@cubejs-backend/shared": "1.7.37",
     "firebolt-sdk": "1.10.0"
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.34",
-    "@cubejs-backend/testing-shared": "1.7.34",
-    "typescript": "~5.2.2"
+    "@cubejs-backend/linter": "1.7.37",
+    "@cubejs-backend/testing-shared": "1.7.37",
+    "@types/jest": "^29",
+    "@types/node": "^22",
+    "typescript": "~6.0.3"
   },
   "publishConfig": {
     "access": "public"
@@ -47,8 +56,5 @@
     "setupFiles": [
       "./test/test-env.js"
     ]
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

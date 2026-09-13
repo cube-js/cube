@@ -22,8 +22,8 @@ export function movePivotItem(
   if (id === 'measures') {
     destinationIndex = lastIndex + 1;
   } else if (
-    destinationIndex >= lastIndex &&
-    nextPivotConfig[destinationAxis][lastIndex] === 'measures'
+    destinationIndex >= lastIndex
+    && nextPivotConfig[destinationAxis][lastIndex] === 'measures'
   ) {
     destinationIndex = lastIndex - 1;
   }

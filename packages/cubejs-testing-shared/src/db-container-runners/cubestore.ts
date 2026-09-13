@@ -1,6 +1,7 @@
 import { GenericContainer } from 'testcontainers';
 
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
+import { startContainerWithRetry } from './start-with-retry';
 
 export class CubeStoreDBRunner extends DbRunnerAbstract {
   public static startContainer(options: DBRunnerContainerOptions) {
@@ -15,6 +16,6 @@ export class CubeStoreDBRunner extends DbRunnerAbstract {
       container.withBindMounts(binds);
     }
 
-    return container.start();
+    return startContainerWithRetry(container);
   }
 }

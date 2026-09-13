@@ -29,15 +29,16 @@ export function MemberSection({
         ) : undefined}
       </Title>
       <Flex gap="1bw" flow="column">
-        {!totalItems ? (
+        {!totalItems && (
           <Block padding="1.5x left" color="#minor">
             No {name}s
           </Block>
-        ) : hasFilter && !totalShownItems ? (
+        )}
+        {!!totalItems && hasFilter && !totalShownItems && (
           <Block padding="1.5x left" color="#minor">
             Nothing found
           </Block>
-        ) : undefined}
+        )}
         {children}
       </Flex>
     </Flex>

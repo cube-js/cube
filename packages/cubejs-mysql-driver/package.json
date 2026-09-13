@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/mysql-driver",
   "description": "Cube.js Mysql database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.7.34",
+  "version": "1.7.37",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -16,32 +16,37 @@
     "index.js"
   ],
   "main": "index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js",
+      "require": "./index.js"
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
   "typings": "dist/src/index.d.ts",
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
     "integration": "npm run integration:mysql",
-    "integration:mysql": "jest --verbose dist/test",
-    "lint": "eslint src/* test/* --ext .ts,.js",
-    "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
+    "integration:mysql": "jest --verbose dist/test"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.7.34",
-    "@cubejs-backend/shared": "1.7.34",
+    "@cubejs-backend/base-driver": "1.7.37",
+    "@cubejs-backend/shared": "1.7.37",
     "mysql2": "^3.16.1"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.34",
-    "@cubejs-backend/testing-shared": "1.7.34",
+    "@cubejs-backend/linter": "1.7.37",
+    "@cubejs-backend/testing-shared": "1.7.37",
     "@types/jest": "^29",
+    "@types/node": "^22",
     "jest": "^29",
     "stream-to-array": "^2.3.0",
     "testcontainers": "^10.28.0",
-    "typescript": "~5.2.2"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
+    "typescript": "~6.0.3"
   },
   "license": "Apache-2.0",
   "publishConfig": {

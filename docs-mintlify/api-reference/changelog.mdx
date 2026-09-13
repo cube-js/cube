@@ -5,7 +5,43 @@ rss: true
 ---
 
 {/* GENERATED FILE — do not edit by hand. */}
-{/* Run scripts/extract-changelog.js against the platform client CHANGELOG.md. */}
+{/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
+
+<Update label="2026-09-12" description="v0.9.0" tags={["Added","Fixed"]}>
+  ### Added
+
+  - New public REST API for managing Databricks Metric View publication settings (CUB-4443): `GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}` (`DatabricksMetricViewIntegrationPublicController.getIntegration`) reads the current configuration and requires `SchemaRead` or `SchemaUpdate` access; `PUT` (`saveIntegration`) creates or updates it using optimistic `configurationVersion`-based concurrency (pass `expectedConfigurationVersion: 0` to create) and requires `SchemaUpdate` access. Both require a Databricks datasource; this is currently in preview — reach out to the Cube support team to activate it for your account. New schemas: `DatabricksMetricViewIntegrationResponse`, `DatabricksMetricViewIntegrationConfigurationResponse`, `SaveDatabricksMetricViewIntegrationInput`.
+  - New public REST API for listing the workbooks an embed tenant can access (CUB-4509): `GET /api/v1/deployments/{deploymentId}/embed-tenants/{embedTenantName}/workbooks` (`DashboardEmbedAccessPublicController.listEmbedTenantWorkbooks`) returns the tenant's effective access — direct tenant shares, all-embed-user shares, and access inherited from shared folders — with optional `accessSource` (`tenant` | `allEmbedUsers` | `folder`) filtering and cursor pagination. Requires administrator privileges. New schema: `EmbedTenantWorkbooksListResponse`.
+  - New public REST API for commenting on embeddable dashboards (CUB-3637): `GET /api/v1/embed/dashboard/{publicId}/comments` (`EmbedPublicController.listDashboardComments`) lists comment threads; `POST` (`createDashboardComment`) starts a thread or replies to one; `PATCH .../comments/{commentId}` (`updateDashboardComment`) and `DELETE .../comments/{commentId}` (`removeDashboardComment`) edit or soft-delete a comment (author only); `POST .../comments/{commentId}/resolve` (`setDashboardCommentResolved`) resolves or re-opens a thread (author only); `GET .../comments/mentionable-users` (`listMentionableEmbedUsers`) lists the caller's fellow embed users for a mention autocomplete. Requires a signed embed session scoped to an embed tenant. New schemas: `EmbedDashboardCommentDto`, `EmbedDashboardCommentThreadDto`, `EmbedDashboardCommentThreadsListResponse`, `CreateEmbedDashboardCommentBody`, `UpdateEmbedDashboardCommentBody`, `SetEmbedDashboardCommentResolvedBody`, `EmbedMentionableUserDto`, `EmbedMentionableUsersListResponse`.
+  - `EmbedSessionSettings` gained `locale` and `timezone` (CUB-4604) — a session's own language and time zone, resolved host message → launch param → session → account → built-in default; and four per-session Creator Mode opt-outs (CUB-4147): `showWorkbookShare`, `showDashboardSettings`, `showMemberNames`, `showGroupByCube`.
+  - `AppConfigResponse` gained `sheetsAgentChatEnabled` (CUB-4574) — whether the Sheets add-in's chat can act on the spreadsheet (run a query into cells, read a range) rather than only describe changes it cannot make.
+
+  ### Fixed
+
+  - `DatabricksMetricViewPublicationPublicController.startPreview` and the new Databricks Metric View integration endpoints no longer name the internal `useDatabricksMetricViewsPush` feature flag (or an internal codename) in their descriptions — both now point readers at the Cube support team to activate the preview feature, matching every other preview-gated endpoint.
+</Update>
+
+<Update label="2026-09-11" description="v0.8.0" tags={["Added"]}>
+  ### Added
+
+  - New public REST API for previewing a Databricks Metric View publication (CUB-4442): `POST /api/v1/deployments/{deploymentId}/databricks-metric-view-previews` (`DatabricksMetricViewPublicationPublicController.startPreview`) queues an offline conversion of the deployment's latest successful build and returns `202` with polling URLs; `GET .../databricks-metric-view-previews/{previewId}` (`previewStatus`) polls progress; `GET .../databricks-metric-view-previews/{previewId}/result` (`previewResult`) returns the completed result (`409` while still running or if it ended without one); `DELETE .../databricks-metric-view-previews/{previewId}` (`cancelPreview`) requests cancellation. Requires `SchemaRead` or `SchemaUpdate` access; this is currently in preview — reach out to the Cube support team to activate it for your account. Preview payloads and results are retained for at most seven days. New schemas: `DatabricksMetricViewPublicationPreviewInput`, `DatabricksMetricViewPublicationPreviewStartResponse`, `DatabricksMetricViewPublicationPreviewStatusResponse`, `DatabricksMetricViewPublicationPreviewResultResponse`, `DatabricksMetricViewPublicationViewResult`, `DatabricksMetricViewPublicationIssue`, `DatabricksMetricViewPublicationCounts`, `DatabricksMetricViewPublicationDatasetSource`, `DatabricksMetricViewPublicationRuntime`, `DatabricksMetricViewPublicationProgress`.
+  - `StartDbtSyncInput` gained `source` (`"git"` | `"manifest"`) and `manifest` — pass an uploaded `manifest.json` directly instead of having Cube clone the dbt repository and run dbt itself (CUB-4492). The corresponding `DbtSyncRun` response gained `source` (which pull path a run used), and `DbtSyncRunStats` gained `dbtVersion` and `manifestGeneratedAt`, populated for manifest-sourced runs.
+  - `EmbedSessionSettings` / `EmbedSettings` gained `allowAi`, `showAiWidgets`, and `showWorkbookChat` (CUB-2615) — per-session AI opt-outs for embeds. `allowAi` disables every AI surface, including the standalone embed chat, and is enforced server-side so a client holding the token can't work around it; the `show*` keys (alongside the existing `showDashboardChat`) only hide specific entry points — the dashboard agent, workspace chat, and AI-summary widget generation, respectively.
+</Update>
+
+<Update label="2026-09-09" description="v0.7.0" tags={["Added","Changed"]}>
+  ### Added
+
+  - New public REST API for rendering a published dashboard to PNG or PDF (CUB-4302): `POST /api/v1/deployments/{deploymentId}/dashboard-exports` (`DashboardExportsPublicController.startExport`) submits a render, `GET .../dashboard-exports/{jobId}` (`getExportStatus`) polls its status, and `GET .../dashboard-exports/{jobId}/download` (`downloadExport`) streams the finished file. Asynchronous because a render waits for every widget to finish querying — the job and its file are dropped 5 minutes after submission. By default the render runs under the caller's own security context (requires manage access to the dashboard's workbook); a tenant admin can instead pass `renderAs` to render as another console or embed user, the same subject vocabulary a scheduled notification's recipients use. New schemas: `StartDashboardExportInput`, `DashboardExportJobResponse`, `DashboardExportStatusResponse`, `ExportSubjectInput`.
+  - `CreateNotificationInput` / `UpdateNotificationInput` gained `memberSwitchers` — Field-switcher selections applied when the notification's dashboard is rendered — read back on the notification response too. New schema: `DashboardMemberSwitcherInput` / `DashboardMemberSwitcher`.
+  - `ConnectReportToWorkbookInput`, `CreateReportInput`, `UpdateReportInput` and `RefreshReportInput` gained `resultChecksum` — a client-computed fingerprint of the cells a write just placed on the sheet, echoed back on `ReportPlacement.resultChecksum` so a client can tell whether a placement has been hand-edited since. New schemas: `ReportPlacementResultChecksumInput` / `ReportPlacementResultChecksum`, `ReportPlacementResultChunkInput` / `ReportPlacementResultChunk`. `ConnectReportToWorkbookInput` also gained `addressOnly`, for an address-only correction (e.g. a renamed sheet tab) that should not erase the stored fingerprint.
+  - `PivotItems` / `PivotItemsInput` gained `displayScale` (`"model"` | `"absolute"` | `"thousands"` | `"millions"` | `"billions"`) and `showColumnTotals`.
+  - `WorkbookDashboardInput.dashboardDraft` now accepts a widget without an `id` — the server assigns one. New schema `DashboardConfigDraftInput` (with `DashboardWidgetDraftInput`); publishing or creating a dashboard still requires an `id` on every widget via the existing `DashboardConfigInput`.
+
+  ### Changed
+
+  - `CreateReportInput.name` / `.title`, `UpdateReportInput.name` / `.title`, and the `Report.name` response field now enforce `maxLength: 255` (CUB-4440) — matching the column's real storage limit, so a name or title over that limit now returns `400` instead of failing less predictably downstream.
+</Update>
 
 <Update label="2026-09-02" description="v0.6.0" tags={["Added","Changed","Deprecated"]}>
   ### Added

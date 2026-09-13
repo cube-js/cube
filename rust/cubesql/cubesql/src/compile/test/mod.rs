@@ -889,6 +889,113 @@ pub fn get_test_tenant_ctx_with_cube_data_sources(
     ))
 }
 
+/// The standard test meta plus `MultiSourceView`, a view over `KibanaSampleDataEcommerce`
+/// and `Logs` with `Logs` reaching a second data source. Every view member reaches the data
+/// source of the member it aliases, so the view as a whole spans two data sources.
+pub fn get_test_tenant_ctx_with_multi_data_source_view() -> Arc<MetaContext> {
+    get_test_tenant_ctx_with_multi_data_source_view_and_templates(vec![])
+}
+
+/// [`get_test_tenant_ctx_with_multi_data_source_view`] with custom templates per data source
+/// (`default` and `other`), so an empty template removes it from that data source only.
+pub fn get_test_tenant_ctx_with_multi_data_source_view_and_templates(
+    custom_templates: Vec<(&str, Vec<(String, String)>)>,
+) -> Arc<MetaContext> {
+    let view_dimension = |name: &str, alias_member: &str, r#type: &str| CubeMetaDimension {
+        name: format!("MultiSourceView.{name}"),
+        r#type: r#type.to_string(),
+        alias_member: Some(alias_member.to_string()),
+        ..CubeMetaDimension::default()
+    };
+    let view_measure = |name: &str, alias_member: &str, agg_type: &str| CubeMetaMeasure {
+        name: format!("MultiSourceView.{name}"),
+        title: None,
+        short_title: None,
+        description: None,
+        r#type: "number".to_string(),
+        agg_type: Some(agg_type.to_string()),
+        meta: None,
+        alias_member: Some(alias_member.to_string()),
+        format: None,
+        format_description: None,
+        currency: None,
+    };
+
+    let mut meta = get_test_meta();
+    meta.push(CubeMeta {
+        name: "MultiSourceView".to_string(),
+        description: None,
+        title: None,
+        r#type: V1CubeMetaType::View,
+        dimensions: vec![
+            view_dimension(
+                "customer_gender",
+                "KibanaSampleDataEcommerce.customer_gender",
+                "string",
+            ),
+            view_dimension("order_date", "KibanaSampleDataEcommerce.order_date", "time"),
+            view_dimension("content", "Logs.content", "string"),
+        ],
+        measures: vec![
+            view_measure("sumPrice", "KibanaSampleDataEcommerce.sumPrice", "sum"),
+            view_measure("agentCount", "Logs.agentCount", "countDistinct"),
+        ],
+        segments: vec![],
+        joins: None,
+        folders: None,
+        nested_folders: None,
+        hierarchies: None,
+        meta: None,
+    });
+
+    let data_source_for_cube = |cube: &str| if cube == "Logs" { "other" } else { "default" };
+    // A member reaches the data source of the cube that owns it, which for a view member
+    // is the cube of the member it aliases
+    let data_source_for_member = |name: &String, alias_member: Option<&String>| {
+        let owner = alias_member.unwrap_or(name);
+        let cube = owner
+            .split_once('.')
+            .map_or(owner.as_str(), |(cube, _)| cube);
+        (name.clone(), data_source_for_cube(cube).to_string())
+    };
+    let member_to_data_source: HashMap<_, _> = meta
+        .iter()
+        .flat_map(|cube| {
+            cube.dimensions
+                .iter()
+                .map(|d| data_source_for_member(&d.name, d.alias_member.as_ref()))
+                .chain(
+                    cube.measures
+                        .iter()
+                        .map(|m| data_source_for_member(&m.name, m.alias_member.as_ref())),
+                )
+                .chain(
+                    cube.segments
+                        .iter()
+                        .map(|s| data_source_for_member(&s.name, None)),
+                )
+        })
+        .collect();
+
+    let data_source_to_sql_generator = member_to_data_source
+        .values()
+        .map(|data_source| {
+            let templates = custom_templates
+                .iter()
+                .find(|(name, _)| *name == data_source)
+                .map_or_else(Vec::new, |(_, templates)| templates.clone());
+            (data_source.clone(), sql_generator(templates))
+        })
+        .collect();
+
+    Arc::new(MetaContext::new(
+        meta,
+        member_to_data_source,
+        data_source_to_sql_generator,
+        Uuid::new_v4(),
+    ))
+}
+
 pub async fn get_test_session(
     protocol: DatabaseProtocol,
     meta_context: Arc<MetaContext>,

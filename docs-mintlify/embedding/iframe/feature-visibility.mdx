@@ -1,0 +1,279 @@
+---
+title: Show and hide features
+description: Every switch that shows, hides, or withholds a feature in an embedded Cube surface — account settings, session settings, and iframe URL parameters — with the rule for which one to use.
+---
+
+Embedded surfaces can be trimmed down to the feature set you want each of your
+users to see: hide the AI chat, drop a duplicate back button, take sharing away
+from a single-tenant deployment, allow chart downloads.
+
+Those switches live in three configuration layers, and which layer a switch
+belongs to is not arbitrary — it follows from **what the switch answers**:
+
+| Layer | Set where | Applies to | Can the viewer change it? |
+| --- | --- | --- | --- |
+| [Account settings](#account-settings) | **Embed → Settings** in the Cube console | Every embed in the account | No for the switches. **Language** / **Time Zone** yield to a URL parameter |
+| [Session settings](#session-settings) | The `settings` object of the [Generate Session API][ref-generate-session] | Every embed opened with that session — i.e. one viewer | No for the switches — they are signed into the session token. `locale` / `timezone` yield to a URL parameter |
+| [URL parameters](#url-parameters) | The query string of the iframe `src` | That one iframe | Yes — it is a URL in their browser |
+
+A fourth channel, [host messages](/embedding/iframe/events), changes a few of
+the same values at runtime (language, time zone, theme) after the iframe has
+already loaded.
+
+## Which layer to use {#which-layer}
+
+<Note>
+**The rule.** A session setting answers *what is this customer entitled to*. A
+URL parameter answers *what should this particular placement look like*. An
+account setting is the default behind both.
+</Note>
+
+That is why the layers are not interchangeable, and why a given switch usually
+exists in exactly one of them:
+
+- **Session settings are per-viewer, and the switches are tamper-proof.** Your
+  backend decides them when it mints the session, and they are signed into the
+  session token, so a viewer cannot switch on something you withheld. (The two
+  value settings, `locale` and `timezone`, are deliberately softer: a URL
+  parameter overrides them, because neither grants anything.) Everything that
+  differs *per customer* — whether sharing exists, whether the AI agent may
+  write to the workspace, whether raw member names may be revealed — is a
+  session setting. Some of them are enforced on the server, not merely hidden in
+  the UI (see [What hiding does and does not do](#what-hiding-does-and-does-not-do)).
+- **URL parameters are per-placement and cheap.** The same session can be
+  rendered in two places in your product that need different chrome — a full
+  page with its own header, and a compact card in a sidebar. Changing a query
+  string needs no new session, but the viewer can also edit it, so nothing that
+  must hold against a determined viewer is expressed this way.
+- **Account settings are the default.** Use them when the answer is the same for
+  every customer you embed for.
+
+Two consequences worth internalising:
+
+- **Private embedding has no session layer.** A [private embed](/embedding/iframe/auth/private)
+  carries no session token, so session settings do not exist there; only account
+  settings and URL parameters apply, and the viewer's own Cube permissions decide
+  the rest.
+- **Outside an embed, none of this applies.** On the Cube console itself every
+  control is governed by the user's role, not by these switches.
+
+## Session settings
+
+Pass `settings` to the [Generate Session API][ref-generate-session]. Every key
+inherits the layer below it when you omit it — the account setting where one
+exists, otherwise the built-in default. The switches are **tri-state**: `true` /
+`false` pins the behavior for every embed opened with that session. Two keys
+(`locale`, `timezone`) carry a value instead, and an unusable one falls through
+to the layer below rather than failing the session.
+
+```javascript
+body: JSON.stringify({
+  deploymentId: DEPLOYMENT_ID,
+  externalId: "user@example.com",
+  settings: {
+    allowAi: false,
+    showWorkbookShare: false,
+  },
+}),
+```
+
+### AI
+
+All but the last inherit an account-wide default from **Embed → Settings**, so a
+session value there is an override of what the account already says;
+`allowChatWorkspaceAuthoring` has no account-wide counterpart.
+
+| Setting | Governs | Default |
+| --- | --- | --- |
+| `allowAi` | **Master switch** over every AI surface in the embed. Enforced on the server: a session with `allowAi: false` cannot obtain AI Chat credentials at all, so it cannot spend AI tokens. Outranks every key below — `false` here disables a surface whose own key is `true`. | Account setting, then allowed |
+| `showDashboardChat` | The AI chat on embedded published dashboards — agent panel and launcher bubble. | Account setting, then shown |
+| `showWorkbookChat` | The [Creator Mode](/embedding/iframe/creator-mode) workbook's AI entry points: the chat side panel and its toggle, the launchpad's **Ask Cube Agent** button, and **Fix in chat** on a failed report. | Account setting, then shown |
+| `showAiWidgets` | Authoring and refreshing AI summary widgets: the **AI widget** entry in the dashboard editor's Add widgets menu, and a widget's prompt input plus Generate/Regenerate. An already-generated summary keeps rendering, so switching this off never blanks a published dashboard — it only stops it being regenerated. | Account setting, then enabled |
+| `allowChatWorkspaceAuthoring` | Whether AI Chat authenticated with this session may create or modify persistent workspace content. `false` keeps ad-hoc analysis and inline tables/charts, but the agent cannot save or update explorations and reports, create or modify workbooks, create or publish dashboards, or point users at those surfaces — for headless chat integrations that render answers in their own UI. `true` never grants authoring the user's role does not already allow. | Allowed |
+
+### Language and time zone
+
+These two carry a value rather than a switch, and they are the answer for a
+viewer rather than for a placement: set them once when you mint the session and
+every iframe that session opens uses them. A runtime [host
+message](/embedding/iframe/events) and the per-iframe `?locale=` / `?timezone=`
+parameters both still win where a host sends one, and the account-wide default
+applies where none does. Neither setting grants anything, which is why a
+viewer-editable URL parameter is allowed to override them.
+
+| Setting | Governs |
+| --- | --- |
+| `locale` | The embed's UI language, as a BCP-47 code. A full code (`es-ES`), a short code (`es`), and an unshipped regional variant all resolve to a shipped language; one Cube does not ship falls through to the account default rather than failing the session. See [Localization](/embedding/iframe/localization). |
+| `timezone` | The IANA zone the agent runs its queries in (`America/New_York`). It outranks a zone the dashboard's author pinned, so every dashboard this session opens is bucketed in it — set it when the viewer's zone should win, not to nudge a default. Still subject to the account's user-time-zone policy, and a bare UTC offset or unknown name falls through. See [Time zones](/embedding/iframe/time-zones). |
+
+### Creator Mode controls
+
+These have no account-wide counterpart: what they answer is a per-customer
+question, so the session is the only place to answer it. All default to shown.
+
+| Setting | Governs |
+| --- | --- |
+| `showWorkbookShare` | Sharing in the Creator Mode workspace: the workbook header's **Share** button and the **Share** action on a workbook, dashboard, exploration, or folder row. Set `false` for a deployment where each embed user should only ever see their own content. Hides the entry points — it does not revoke access already granted. |
+| `showDashboardSettings` | The dashboard editor's settings panel — the gear button and the sidebar behind it. That panel is the only place an embed user can reach the dashboard slug, the per-dashboard time zone, the per-dashboard agent, the grid behavior switches, and the dashboard theme, so `false` withdraws all of them together. |
+| `showMemberNames` | The **Show Member Names** item in the data pane's more-actions menu. Member names are your data model's own identifiers, so this belongs to the same schema-protection family as **Show Generated SQL**. `false` hides the item **and** pins the pane to titles, so a user who had already switched to names is returned to them. |
+| `showGroupByCube` | The **Group by Cube** / **Group by Folder** item in the data pane's more-actions menu. `false` hides the item **and** pins the pane to the grouping it would have defaulted to — by folder when the view defines folders, by cube otherwise. No content is withdrawn either way. |
+
+<Note>
+The [Chat API](/reference/embed-apis/chat-api)'s own session exchange accepts
+`allowChatWorkspaceAuthoring` as a **top-level** field of the request body rather
+than inside a `settings` object. It means exactly the same thing.
+</Note>
+
+## URL parameters
+
+Add these to the iframe `src`. They are read from the URL the host loaded the
+embed with and stay pinned for the life of the embed, so they survive in-app
+navigation — opening a dashboard from the home page, or publishing a draft — and
+they are ignored outside `/embed/*`.
+
+| Parameter | Effect | Surface |
+| --- | --- | --- |
+| `allowExport=true` | Offers per-widget **Download as CSV / PNG / PDF** on chart widgets. The single switch for all three formats. | Dashboards |
+| `showDashboardExportMenu=false` | Hides the whole-dashboard download menu (in the Creator Mode dashboard header; floating over a published-dashboard embed). A hide switch, not the grant — `allowExport=true` is still what hands out export at all. | Dashboards |
+| `showDashboardHeader=false` | Hides the entire dashboard header bar. | Dashboards |
+| `showDashboardBackButton=false` | Hides the dashboard header's back button. | Dashboards |
+| `showDashboardTitle=false` | Hides the dashboard title. | Dashboards |
+| `showDashboardEditButton=false` | Hides the **Edit** action. Can only hide it — it never shows one to a viewer without edit permission. | Dashboards |
+| `showDashboardDuplicateButton=false` | Hides the **Duplicate** action. | Dashboards |
+| `showWorkbookBackButton=false` | Hides the back button in the Creator Mode **workbook** header. The rest of that header is the authoring flow (name, tabs, Publish, Share), so there is no master switch for it. The workbook actions menu keeps its **View all** item, which reaches the same place. | Creator Mode |
+| `locale=es-MX` | Sets the embed's UI language, overriding `settings.locale`. See [Localization](/embedding/iframe/localization). | All |
+| `timezone=America/New_York` | Sets the time zone agent queries run in, overriding `settings.timezone`. See [Time zones](/embedding/iframe/time-zones). | All |
+
+The dashboard header switches exist because a host that already frames the embed
+in its own chrome otherwise ends up with two of everything — most visibly two
+back buttons that navigate to different places. Each control is its own switch
+because which of them duplicate yours is your decision; `showDashboardHeader=false`
+is the shortcut for all of them, and hiding the last remaining control collapses
+the bar for you.
+
+### How values are parsed {#parsing}
+
+Every parameter falls back to whatever the embed would have done without it, so a
+typo never buys something you did not ask for. Which direction that is depends on
+what the parameter does:
+
+- **A parameter that grants** (`allowExport`) requires the exact literal string
+  `true`. `allowExport=1`, `allowExport=TRUE`, and a bare `?allowExport` all
+  leave downloads hidden.
+- **A parameter that hides** (every `show…`) requires the exact literal string
+  `false`. `=0`, `=False`, `=FALSE`, and a bare `?showDashboardTitle` all leave
+  the control visible.
+- **A parameter that selects a value** (`locale`, `timezone`) falls through to
+  the next source in the ladder when the value is one Cube cannot use — the
+  session setting first, then (for `timezone`) a zone the dashboard's author
+  pinned, then the account default.
+
+Note that the two boolean conventions are inverses of each other: `allowExport`
+must be turned *on*, `show…` must be turned *off*.
+
+## Account settings
+
+**Embed → Settings** in the Cube console holds the account-wide defaults. They
+apply to every embed, including [private embeds](/embedding/iframe/auth/private),
+and the AI ones are what a session's own AI keys override.
+
+| Setting | Governs | Default |
+| --- | --- | --- |
+| **Allow AI features in embeds** | `allowAi` for the whole account. | On |
+| **Show AI chat on embedded dashboards** | `showDashboardChat`. | On |
+| **Show AI chat in the embedded workspace** | `showWorkbookChat`. | On |
+| **Allow AI summary widgets in embeds** | `showAiWidgets`. | On |
+| **Allow comments on embedded dashboards** | Commenting on embedded published dashboards. Separate from commenting in the Cube app, which has its own setting. | Off |
+| **Language** | Default UI language for embedded surfaces, below a host message, `?locale=`, and `settings.locale`. | English |
+| **Time Zone** | Time zone agent queries run in, below a host message, `?timezone=`, `settings.timezone`, and a dashboard's own pinned zone. | Account-wide zone |
+
+The same page carries the account-wide [Creator
+Mode](/embedding/iframe/creator-mode) settings: the workspace header title (with
+per-language overrides) and whether that header is shown at all, plus whether
+embed users may see **Semantic SQL** (shown by default) and **Generated SQL**
+(hidden by default, because it exposes physical table and schema names).
+
+## Analytics Chat parameters
+
+The standalone [Analytics Chat](/embedding/iframe/analytics-chat) embed has three
+URL parameters of its own.
+
+| Parameter | Effect |
+| --- | --- |
+| `showNewChat=false` | Hides the **New chat** button. |
+| `showChatInput=false` | Hides the message input, for a read-only transcript. |
+| `showChatHistory=false` | Hides the **Chat History** button. |
+
+They follow the same rule as every other `show…` parameter: only the literal
+`false` hides. Each also has an older `hide…` spelling that still works — see
+[Analytics Chat → Customize the chat](/embedding/iframe/analytics-chat#customize-the-chat).
+
+Whether the chat surface is available at all is a session question, not a URL
+one: `settings.allowAi: false` withholds it.
+
+## What hiding does and does not do {#what-hiding-does-and-does-not-do}
+
+Most of these switches take an **entry point** out of the UI. They are how you
+shape the product your users see; they are not a replacement for permissions.
+
+- **Permissions still apply underneath.** None of these switches widens what a
+  session may do. `showDashboardEditButton` cannot give edit rights;
+  `showWorkbookShare: true` cannot share content the user may not share;
+  `allowChatWorkspaceAuthoring: true` grants nothing the user's role withholds.
+- **Two of them are enforced on the server, not merely hidden.** `allowAi: false`
+  stops the session obtaining AI credentials at all. `allowChatWorkspaceAuthoring:
+  false` changes the tools and instructions the agent is given.
+- **Two more reset state as well as hiding a control**, in the browser rather
+  than on the server: `showMemberNames: false` and `showGroupByCube: false` pin
+  the data pane so a user who had already switched cannot stay switched. That
+  keeps the pane consistent for every viewer of the session; it is not a
+  server-side guarantee about what the data model reveals.
+- **URL parameters are visible to the viewer.** They are chrome and layout
+  decisions, made per placement. Anything a viewer must not be able to turn back
+  on belongs in the session settings.
+- **Export is client-side.** A widget's CSV is serialized in the browser from
+  data the widget has already loaded, so `allowExport` decides whether the action
+  is offered, not whether the viewer's browser holds the rows. The account-wide
+  **Allow data downloads** switch outranks it — see [Restricting data
+  downloads](/admin/users-and-permissions/roles-and-permissions#restricting-data-downloads),
+  which also notes that the per-user **Download data** role action is bypassed by
+  anonymous embed viewers.
+
+## Recipes
+
+**A dashboard inside your own chrome.** Your page already has a header and a back
+link:
+
+```text
+https://your-tenant.cubecloud.dev/embed/dashboard/PUBLIC_ID?session=SESSION_ID&showDashboardHeader=false
+```
+
+**A customer whose plan has no AI.** Decide it on your backend, so it holds
+wherever the embed is rendered:
+
+```javascript
+settings: { allowAi: false }
+```
+
+**A single-tenant deployment with no sharing UI**, and a data pane pinned to
+titles rather than the model's raw identifiers:
+
+```javascript
+settings: { showWorkbookShare: false, showMemberNames: false }
+```
+
+**A chat integration that renders answers in your own UI**, with no Cube
+workspace behind it:
+
+```javascript
+settings: { allowChatWorkspaceAuthoring: false }
+```
+
+**Downloads for one placement only.** Grant export on the iframe that should
+have it, and leave it off the others:
+
+```text
+https://your-tenant.cubecloud.dev/embed/dashboard/PUBLIC_ID?session=SESSION_ID&allowExport=true
+```
+
+[ref-generate-session]: /reference/embed-apis/generate-session#session-settings

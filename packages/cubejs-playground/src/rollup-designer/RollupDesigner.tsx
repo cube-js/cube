@@ -79,7 +79,7 @@ const RollupQueryBox = styled.div`
 function getSelectedKeys(references: PreAggregationReferences) {
   const keys = new Set<string>();
 
-  ['measures', 'dimensions', 'timeDimensions', 'segments'].map((memberKey) => {
+  ['measures', 'dimensions', 'timeDimensions', 'segments'].forEach((memberKey) => {
     if (memberKey === 'timeDimensions') {
       const { dimension } = references[memberKey]?.[0] || {};
 
@@ -87,7 +87,11 @@ function getSelectedKeys(references: PreAggregationReferences) {
         keys.add(`td:${dimension}`);
       }
     } else {
-      references[memberKey]?.map((key) => key != null && keys.add(key));
+      references[memberKey]?.forEach((key) => {
+        if (key != null) {
+          keys.add(key);
+        }
+      });
     }
   });
 
@@ -112,8 +116,7 @@ export function RollupDesigner({
   const token = appToken || designerToken;
 
   const { isCloud, ...cloud } = useCloud();
-  const { query, transformedQuery, isLoading, error, toggleModal, defaultSchemaFormat } =
-    useRollupDesignerContext();
+  const { query, transformedQuery, isLoading, error, toggleModal, defaultSchemaFormat } = useRollupDesignerContext();
 
   const [isCronValid, setCronValidity] = useState<boolean>(true);
   const [settings, setSettings] = useState<RollupSettings>({});
@@ -156,15 +159,15 @@ export function RollupDesigner({
   }, [matching, transformedQuery, references, segments, initialMatching]);
 
   useDeepEffect(() => {
-    const references = getPreAggregationReferences(transformedQuery, segments);
+    const nextReferences = getPreAggregationReferences(transformedQuery, segments);
 
-    setReferences(references);
+    setReferences(nextReferences);
 
-    const openKeys = getSelectedKeys(references).map(
+    const nextOpenKeys = getSelectedKeys(nextReferences).map(
       (key) => key.split('.')[0]
     );
-    setOpenKeys(openKeys);
-    setFirstOpenCubeName(openKeys[0] || null);
+    setOpenKeys(nextOpenKeys);
+    setFirstOpenCubeName(nextOpenKeys[0] || null);
 
     if (transformedQuery?.measureToLeafMeasures != null) {
       for (const [measure, leafMeasures] of Object.entries(
@@ -179,14 +182,14 @@ export function RollupDesigner({
   }, [transformedQuery, segments]);
 
   const selectedKeys = useDeepMemo(() => {
-    const selectedKeys = getSelectedKeys(references);
+    const nextSelectedKeys = getSelectedKeys(references);
 
-    return selectedKeys;
+    return nextSelectedKeys;
   }, [references]);
 
   useDeepEffect(() => {
     let active = true;
-    const { measures, segments, dimensions, timeDimensions } = references;
+    const { measures, segments: referenceSegments, dimensions, timeDimensions } = references;
 
     async function load() {
       const { json } = await request(
@@ -198,7 +201,7 @@ export function RollupDesigner({
             transformedQuery,
             references: {
               measures,
-              dimensions: dimensions.concat(segments),
+              dimensions: dimensions.concat(referenceSegments),
               timeDimensions,
             },
           },
@@ -208,8 +211,7 @@ export function RollupDesigner({
       if (isMounted() && active) {
         setMatching((prevMatching) => {
           if (prevMatching === undefined) {
-            initialMatching.current =
-              json.canUsePreAggregationForTransformedQuery;
+            initialMatching.current = json.canUsePreAggregationForTransformedQuery;
           }
           return json.canUsePreAggregationForTransformedQuery;
         });
@@ -220,24 +222,30 @@ export function RollupDesigner({
       load();
     }
 
-    return () => (active = false);
+    return () => {
+      active = false;
+    };
   }, [isMounted, references, token, transformedQuery]);
 
   const cubeName = useMemo(() => {
-    let cubeName: string | null = null;
-
     if (transformedQuery) {
-      cubeName = (
-        transformedQuery?.leafMeasures[0] ||
-        transformedQuery?.ownedDimensions[0] ||
-        'CubeName'
-      ).split('.')[0];
-    } else if (!areReferencesEmpty(references)) {
-      const [key] = getSelectedKeys(references);
-      cubeName = key.split('.')[0] || null;
+      const [measureCube] = (
+        transformedQuery?.leafMeasures[0]
+        || transformedQuery?.ownedDimensions[0]
+        || 'CubeName'
+      ).split('.');
+
+      return measureCube;
     }
 
-    return cubeName;
+    if (!areReferencesEmpty(references)) {
+      const [key] = getSelectedKeys(references);
+      const [keyCube] = key.split('.');
+
+      return keyCube || null;
+    }
+
+    return null;
   }, [transformedQuery, references]);
 
   const [
@@ -247,12 +255,12 @@ export function RollupDesigner({
   ] = useDeepMemo(() => {
     const { measureToLeafMeasures = {} } = transformedQuery || {};
 
-    let showDecomposedMeasureAlert = false;
-    let showNonAdditiveMeasureAlert = false;
-    let showCountDistinctAlert = false;
+    let hasDecomposedMeasure = false;
+    let hasNonAdditiveMeasure = false;
+    let hasCountDistinct = false;
 
     if (nonAdditiveMeasure && measureToLeafMeasures[nonAdditiveMeasure]) {
-      showDecomposedMeasureAlert = measureToLeafMeasures[
+      hasDecomposedMeasure = measureToLeafMeasures[
         nonAdditiveMeasure
       ].every(({ additive }) => additive);
     }
@@ -263,9 +271,9 @@ export function RollupDesigner({
         []
       );
 
-      showNonAdditiveMeasureAlert = references.measures.some((measure) => {
+      hasNonAdditiveMeasure = references.measures.some((measure) => {
         const leafMeasure = allLeafMeasures.find(
-          (leafMeasure) => leafMeasure.measure === measure
+          (candidateLeafMeasure) => candidateLeafMeasure.measure === measure
         );
 
         if (!leafMeasure) {
@@ -277,7 +285,7 @@ export function RollupDesigner({
 
       const hasCountDistinctMeasures = references.measures.some((measure) => {
         const leafMeasure = allLeafMeasures.find(
-          (leafMeasure) => leafMeasure.measure === measure
+          (candidateLeafMeasure) => candidateLeafMeasure.measure === measure
         );
 
         if (!leafMeasure) {
@@ -287,14 +295,13 @@ export function RollupDesigner({
         return leafMeasure.type === 'countDistinct';
       });
 
-      showCountDistinctAlert =
-        hasCountDistinctMeasures && !references.timeDimensions[0]?.granularity;
+      hasCountDistinct = hasCountDistinctMeasures && !references.timeDimensions[0]?.granularity;
     }
 
     return [
-      showDecomposedMeasureAlert,
-      showNonAdditiveMeasureAlert,
-      showCountDistinctAlert,
+      hasDecomposedMeasure,
+      hasNonAdditiveMeasure,
+      hasCountDistinct,
     ];
   }, [references, transformedQuery, nonAdditiveMeasure]);
 
@@ -340,9 +347,9 @@ export function RollupDesigner({
         showSuccessMessage();
         toggleModal();
       } else {
-        const { error } = response.json;
+        const { error: responseError } = response.json;
         notification.error({
-          message: error,
+          message: responseError,
         });
       }
     } else {
@@ -350,13 +357,13 @@ export function RollupDesigner({
         throw new Error('cloud.addPreAggregationToSchema is not defined');
       }
 
-      const { error } = await cloud.addPreAggregationToSchema(definition);
-      if (!error) {
+      const { error: addError } = await cloud.addPreAggregationToSchema(definition);
+      if (!addError) {
         showSuccessMessage();
         toggleModal();
       } else {
         notification.error({
-          message: error,
+          message: addError,
         });
       }
     }
@@ -384,7 +391,7 @@ export function RollupDesigner({
         />
 
         {cubeName ? (
-          <Space direction="vertical" style={{width: '100%'}} size={32}>
+          <Space direction="vertical" style={{ width: '100%' }} size={32}>
             <Flex justifyContent="end" gap={2} alignItems="center">
               <Box>
                 <Typography.Text>Data Model Format</Typography.Text>
@@ -596,34 +603,34 @@ export function RollupDesigner({
                 <Box style={{ marginBottom: 24 }}>
                   <Alert
                     type="info"
-                    message={
+                    message={(
                       <Text>
                         Because <b>{nonAdditiveMeasure}</b> is a non-additive
                         measure that is calculated with additive measures, this
                         rollup is configured with the additive measures that
                         calculate this non-additive measure. See more info in{' '}
                         <Typography.Link
-                          href="https://cube.dev/recipes/pre-aggregations/non-additivity"
+                          href="https://docs.cube.dev/recipes/pre-aggregations/non-additivity"
                           target="_blank"
                         >
                           our docs
                         </Typography.Link>
                         .
                       </Text>
-                    }
+                    )}
                   />
                 </Box>
               )}
 
-              {!areReferencesEmpty(references) &&
-                !references.timeDimensions.length && (
-                  <Box style={{ marginBottom: 24 }}>
-                    <Alert
-                      type="warning"
-                      message="This rollup has no time dimension so it cannot be partitioned"
-                    />
-                  </Box>
-                )}
+              {!areReferencesEmpty(references)
+                && !references.timeDimensions.length && (
+                <Box style={{ marginBottom: 24 }}>
+                  <Alert
+                    type="warning"
+                    message="This rollup has no time dimension so it cannot be partitioned"
+                  />
+                </Box>
+              )}
 
               <Box style={{ marginBottom: 16 }}>
                 {!areReferencesEmpty(references) ? (
@@ -672,13 +679,13 @@ export function RollupDesigner({
                     {showCountDistinctAlert && (
                       <Alert
                         type="warning"
-                        message={
+                        message={(
                           <Text>
                             This query does not have any time dimension
                             granularity, which prevents pre-aggregating any
                             count distinct measures.
                           </Text>
-                        }
+                        )}
                       />
                     )}
 
@@ -689,12 +696,12 @@ export function RollupDesigner({
                         <Alert
                           data-testid="rd-incompatible-query"
                           type="warning"
-                          message={
+                          message={(
                             <Text>
                               This rollup does <b>NOT</b> match the following
                               query:
                             </Text>
-                          }
+                          )}
                         />
 
                         {!hideMatchRollupButton && (

@@ -80,33 +80,33 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
    * Class constructor.
    */
   public constructor(config: MSSqlDriverConfiguration & {
-      /**
+    /**
        * Data source name.
        */
-      dataSource?: string,
+    dataSource?: string,
 
-      /**
+    /**
        * Whether this driver is used for pre-aggregations.
        */
-      preAggregations?: boolean,
+    preAggregations?: boolean,
 
-      /**
+    /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
-      maxPoolSize?: number,
+    maxPoolSize?: number,
 
-      /**
+    /**
        * Min pool size value for the [cube]<-->[db] pool.
        */
-      minPoolSize?: number,
+    minPoolSize?: number,
 
-      /**
+    /**
        * Time to wait for a response from a connection after validation
        * request before determining it as not valid. Default - 10000 ms.
        */
-      testConnectionTimeout?: number,
-      server?: string,
-    } = {}) {
+    testConnectionTimeout?: number,
+    server?: string,
+  } = {}) {
     super({
       testConnectionTimeout: config.testConnectionTimeout,
     });
@@ -395,7 +395,7 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
     return !!this.config.readOnly;
   }
 
-  public wrapQueryWithLimit(query: { query: string, limit: number}) {
+  public wrapQueryWithLimit(query: { query: string, limit: number }) {
     query.query = `SELECT TOP ${query.limit} * FROM (${query.query}) AS t`;
   }
 

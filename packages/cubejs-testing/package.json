@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing",
-  "version": "1.7.34",
+  "version": "1.7.37",
   "description": "Cube.js e2e tests",
   "author": "Cube Dev, Inc.",
   "repository": {
@@ -19,8 +19,6 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint src/* test/ test/bin --ext .ts",
-    "lint:fix": "eslint --fix src/* test/ test/bin --ext .ts",
     "dataset:minimal": "node dist/test/bin/download-dataset.js",
     "birdbox": "jest --runInBand --verbose dist/test",
     "birdbox:snapshot": "jest --runInBand --updateSnapshot --verbose dist/test",
@@ -92,50 +90,46 @@
     "birdbox-fixtures"
   ],
   "dependencies": {
-    "@cubejs-backend/cubestore-driver": "1.7.34",
+    "@cubejs-backend/cubestore-driver": "1.7.37",
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/ksql-driver": "1.7.34",
-    "@cubejs-backend/postgres-driver": "1.7.34",
-    "@cubejs-backend/query-orchestrator": "1.7.34",
-    "@cubejs-backend/schema-compiler": "1.7.34",
-    "@cubejs-backend/shared": "1.7.34",
-    "@cubejs-backend/testing-shared": "1.7.34",
-    "@cubejs-client/ws-transport": "1.7.34",
+    "@cubejs-backend/ksql-driver": "1.7.37",
+    "@cubejs-backend/postgres-driver": "1.7.37",
+    "@cubejs-backend/query-orchestrator": "1.7.37",
+    "@cubejs-backend/schema-compiler": "1.7.37",
+    "@cubejs-backend/shared": "1.7.37",
+    "@cubejs-backend/testing-shared": "1.7.37",
+    "@cubejs-client/ws-transport": "1.7.37",
     "dedent": "^0.7.0",
-    "fs-extra": "^8.1.0",
+    "fs-extra": "^11.1.1",
     "http-proxy": "^1.18.1",
-    "node-fetch": "^2.6.1",
+    "node-fetch": "^2.7.0",
     "ramda": "^0.27.2",
     "testcontainers": "^10.28.0",
-    "yargs": "^17.3.1"
+    "yargs": "^17.7.1"
   },
   "devDependencies": {
     "@4tw/cypress-drag-drop": "^1.6.0",
-    "@cubejs-backend/linter": "1.7.34",
-    "@cubejs-client/core": "1.7.34",
+    "@cubejs-backend/linter": "1.7.37",
+    "@cubejs-client/core": "1.7.37",
     "@jest/globals": "^29",
+    "@simonsmith/cypress-image-snapshot": "^11.0.0",
     "@types/dedent": "^0.7.0",
     "@types/http-proxy": "^1.17.5",
     "@types/jest": "^29",
     "@types/node": "^22",
-    "cypress": "14.0.0",
-    "cypress-image-snapshot": "^4.0.1",
+    "cypress": "15.21.1",
     "cypress-localstorage-commands": "^1.4.5",
     "cypress-plugin-snapshots": "^1.4.4",
     "cypress-wait-until": "^1.7.2",
-    "eslint-plugin-cypress": "^2.12.1",
     "globby": "^11.0.4",
     "jest": "^29",
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^3.1.2",
-    "pg": "^8.7.3",
-    "typescript": "~5.2.2",
-    "yaml": "^1.10.2"
+    "pg": "^8.18.0",
+    "typescript": "~6.0.3",
+    "yaml": "^2.7.1"
   },
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

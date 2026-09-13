@@ -16,7 +16,7 @@ export class BaseMeasure {
 
   public readonly joinHint: Array<string> = [];
 
-  protected preparePatchedMeasure(sourceMeasure: string, newMeasureType: string | null, addFilters: Array<{sql: Function}>): MeasureDefinition {
+  protected preparePatchedMeasure(sourceMeasure: string, newMeasureType: string | null, addFilters: Array<{ sql: Function }>): MeasureDefinition {
     const source = this.query.cubeEvaluator.measureByPath(sourceMeasure);
     const aggType = source.aggType ?? source.type;
 

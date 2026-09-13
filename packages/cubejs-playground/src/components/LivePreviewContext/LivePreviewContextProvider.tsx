@@ -24,8 +24,7 @@ export type LivePreviewContextProps = {
   startLivePreview: () => Promise<Boolean>;
 };
 
-export const LivePreviewContextContext =
-  createContext<LivePreviewContextProps | null>(null);
+export const LivePreviewContextContext = createContext<LivePreviewContextProps | null>(null);
 
 const useLivePreview = (disabled = false) => {
   const activeRef = useRef<boolean>(false);
@@ -35,6 +34,38 @@ const useLivePreview = (disabled = false) => {
     active: false,
     deploymentUrl: null,
   });
+
+  const fetchStatus = () => fetch('playground/live-preview/status')
+    .then((res) => res.json())
+    .then((nextStatus) => {
+      setStatus({
+        loading: false,
+        ...nextStatus,
+      });
+    });
+
+  const createTokenWithPayload = async (payload): Promise<any> => {
+    const res = await fetch('playground/live-preview/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  };
+
+  const handleChange = async () => {
+    if (status?.active) {
+      const { token } = await createTokenWithPayload({});
+      setCredentials({
+        token: token?.token || null,
+        apiUrl: status?.deploymentUrl || null,
+      });
+    } else {
+      setCredentials(null);
+    }
+  };
 
   useEffect(() => {
     if (disabled) {
@@ -69,40 +100,6 @@ const useLivePreview = (disabled = false) => {
   //   }
   // }, [status]);
 
-  const fetchStatus = () => {
-    return fetch('playground/live-preview/status')
-      .then((res) => res.json())
-      .then((status) => {
-        setStatus({
-          loading: false,
-          ...status,
-        });
-      });
-  };
-
-  const createTokenWithPayload = async (payload): Promise<any> => {
-    const res = await fetch('playground/live-preview/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-    return res.json();
-  };
-
-  const handleChange = async () => {
-    if (status?.active) {
-      const { token } = await createTokenWithPayload({});
-      setCredentials({
-        token: token?.token || null,
-        apiUrl: status?.deploymentUrl || null,
-      });
-    } else {
-      setCredentials(null);
-    }
-  };
-
   return {
     credentials,
     statusLivePreview: status,
@@ -112,34 +109,31 @@ const useLivePreview = (disabled = false) => {
       await fetchStatus();
       return true;
     },
-    startLivePreview: (): Promise<Boolean> => {
-      return new Promise((resolve, reject) => {
-        const callbackUrl = encodeURIComponent(window.location.origin);
-        const params: any =
-          window.location.origin !== 'http://localhost:4000' &&
-          new URLSearchParams({ callbackUrl }).toString();
+    startLivePreview: (): Promise<Boolean> => new Promise((resolve, reject) => {
+      const callbackUrl = encodeURIComponent(window.location.origin);
+      const params: any = window.location.origin !== 'http://localhost:4000'
+          && new URLSearchParams({ callbackUrl }).toString();
 
-        const wn = openWindow({
-          url: `https://cubecloud.dev/auth/live-preview${
-            params ? `?${params}` : ''
-          }`,
-        });
-
-        if (!wn) {
-          console.error('The popup was blocked by the browser');
-          reject();
-          return;
-        }
-
-        const interval = setInterval(() => {
-          if (wn.closed) {
-            clearInterval(interval);
-            resolve(true);
-            fetchStatus();
-          }
-        }, 1000);
+      const wn = openWindow({
+        url: `https://cubecloud.dev/auth/live-preview${
+          params ? `?${params}` : ''
+        }`,
       });
-    },
+
+      if (!wn) {
+        console.error('The popup was blocked by the browser');
+        reject();
+        return;
+      }
+
+      const interval = setInterval(() => {
+        if (wn.closed) {
+          clearInterval(interval);
+          resolve(true);
+          fetchStatus();
+        }
+      }, 1000);
+    }),
   };
 };
 

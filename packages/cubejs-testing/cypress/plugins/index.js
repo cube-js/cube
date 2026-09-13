@@ -13,13 +13,13 @@
 // the project's config changing)
 
 // const { initPlugin } = require('cypress-plugin-snapshots/plugin');
-const { addMatchImageSnapshotPlugin } = require('cypress-image-snapshot/plugin');
+const { addMatchImageSnapshotPlugin } = require('@simonsmith/cypress-image-snapshot/plugin');
 
 /**
  * @type {Cypress.PluginConfig}
  */
 module.exports = (on, config) => {
-  addMatchImageSnapshotPlugin(on, config);
+  addMatchImageSnapshotPlugin(on);
 
   return config;
 };

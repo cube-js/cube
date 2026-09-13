@@ -82,7 +82,7 @@ describe('Python Configuration Loading', () => {
     // It should help to identify any potential issues with GIL
     'checkAuth - sync version (parallel 50x)': async () => {
       await Promise.all(
-          Array.from({ length: 50 }, () => configPy.checkAuth!({ requestId: 'sync-bench' }, 'SYNC_TOKEN'))
+        Array.from({ length: 50 }, () => configPy.checkAuth!({ requestId: 'sync-bench' }, 'SYNC_TOKEN'))
       );
     },
 
@@ -93,7 +93,7 @@ describe('Python Configuration Loading', () => {
     // It should help to identify any potential issues with GIL
     'checkAuth - async version (parallel 50x)': async () => {
       await Promise.all(
-          Array.from({ length: 50 }, () => configAsyncPy.checkAuth!({ requestId: 'async-bench' }, 'ASYNC_TOKEN'))
+        Array.from({ length: 50 }, () => configAsyncPy.checkAuth!({ requestId: 'async-bench' }, 'ASYNC_TOKEN'))
       );
     },
 

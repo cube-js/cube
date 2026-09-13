@@ -1,0 +1,37 @@
+<Warning>
+
+**Development mode is an authentication bypass.** Cube is in development mode when
+`CUBEJS_DEV_MODE=true`, and also whenever `NODE_ENV` is not `production`. When Cube
+is started through the `cubejs` CLI — which is what the official Docker images run —
+setting `CUBEJS_DEV_MODE=true` additionally forces `NODE_ENV=development`, which
+switches off JWT verification on the
+[REST (JSON)](/reference/core-data-apis/rest-api) and
+[GraphQL](/reference/core-data-apis/graphql-api) APIs: they then accept requests with
+no token at all.
+
+Development mode also mounts [Playground](/docs/explore-analyze/playground) and its
+supporting endpoints with no authentication whatsoever. Anyone who can reach the
+instance is handed a ready-to-use API token, and can mint further ones carrying any
+security context signed with your API secret — and so query every data API as any user,
+bypassing [member-level access
+control](/docs/data-modeling/access-control/member-level-security) and [row-level
+security](/docs/data-modeling/access-control/row-level-security). The same endpoints
+read your data model files and the table schema of every connected data source, and
+overwrite your data model and your `.env`. With `CUBEJS_DEV_MODE=true` and no
+[`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password)
+set, the SQL API accepts any credentials as well, allowing arbitrary SQL against
+connected data sources.
+
+This is intentional. Development mode is designed to run on a developer's local
+machine for ease of use and debugging. Never run it where anyone else can reach it,
+never expose it to the internet, and never use it in production. Using development
+mode in the Cube cloud platform is highly discouraged — it bypasses the platform's
+security model.
+
+To keep it off: `cubejs server` and the official Docker images already set
+`NODE_ENV=production`, so leaving `CUBEJS_DEV_MODE` unset — its default — is enough
+there. If you embed `@cubejs-backend/server-core` directly rather than starting Cube
+through the `cubejs` CLI, set `NODE_ENV=production` yourself, since an unset `NODE_ENV`
+puts the instance in development mode whatever the flag says.
+
+</Warning>

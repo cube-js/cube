@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/jdbc-driver",
   "description": "Cube.js JDBC database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.7.34",
+  "version": "1.7.37",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -12,38 +12,43 @@
     "node": ">=20.0.0"
   },
   "main": "index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js",
+      "require": "./index.js"
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
   "typings": "dist/src/index.d.ts",
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "unit": "jest --verbose dist/test/unit",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "unit": "jest --verbose dist/test/unit"
   },
   "files": [
     "dist/src",
     "index.js"
   ],
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.7.34",
+    "@cubejs-backend/base-driver": "1.7.37",
     "@cubejs-backend/node-java-maven": "^0.1.3",
-    "@cubejs-backend/shared": "1.7.34"
+    "@cubejs-backend/shared": "1.7.37"
   },
   "optionalDependencies": {
     "@cubejs-backend/jdbc": "^0.9.0",
     "java": "^0.18.0"
   },
   "license": "Apache-2.0",
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
-  },
   "jest": {
     "testEnvironment": "node"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.34",
+    "@cubejs-backend/linter": "1.7.37",
+    "@types/jest": "^29",
     "@types/node": "^22",
-    "typescript": "~5.2.2"
+    "typescript": "~6.0.3"
   }
 }

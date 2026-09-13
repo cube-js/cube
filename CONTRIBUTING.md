@@ -23,11 +23,11 @@ By contributing to Cube Dev, Inc., You accept and agree to the terms and conditi
 ## Step-by-step guide to contributing
 
 1. Find [issues](https://github.com/cube-js/cube/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) where we need help. Search for issues with either [`good first issue`](https://github.com/cube-js/cube/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22good+first+issue%22+) and/or [`help wanted`](https://github.com/cube-js/cube/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22help+wanted%22) labels.
-2. Follow the directions in the [Getting Started guide](https://docs.cube.dev/docs/getting-started) to get Cube up and running (incl. the [Developer Playground](https://docs.cube.dev/docs/explore-analyze/playground)). 
+2. Follow the directions in the [Getting Started guide](https://docs.cube.dev/cube-core/getting-started) to get Cube up and running (incl. the [Developer Playground](https://docs.cube.dev/docs/explore-analyze/playground)). 
 3. Clone the [Cube repo](https://github.com/cube-js/cube).
 4. Submit your Pull Request. 
 5. Testing: Please include test(s) for your code contribution. Depending on a change it can be tested by unit, integration or E2E test. See some of the test examples for [drivers](https://github.com/cube-js/cube/pull/1333/commits/56dadccd62ac4eaceafe650d2853406f5d3d9d43) and [backend](https://github.com/cube-js/cube/tree/master/packages/cubejs-backend-shared/test). There're separate packages for [E2E testing](https://github.com/cube-js/cube/tree/master/packages/cubejs-testing/) and [E2E driver testing](https://github.com/cube-js/cube/tree/master/packages/cubejs-testing-drivers/). **Tests are required for most of the contributions.**
-6. Documentation: When new features are added or there are changes to existing features that require updates to documentation, we encourage you to add/update any missing documentation in the [`/docs` folder](https://github.com/cube-js/cube/tree/master/docs). To update an existing documentation page, you can simply click on the `Edit this page` button on the top right corner of the documentation page. 
+6. Documentation: When new features are added or there are changes to existing features that require updates to documentation, we encourage you to add/update any missing documentation in the [`/docs-mintlify` folder](https://github.com/cube-js/cube/tree/master/docs-mintlify). 
 7. Relevant team(s) will be pinged automatically for a review based on information in the `CODEOWNERS` file. 
 
 ## Development Workflow
@@ -206,10 +206,13 @@ Following these guidelines is not a requirement, but you can save some time for 
 
 ### Code
 
-1. Run `yarn lint` in package before committing your changes.
-If package doesn't have lint script, please add it and run.
-There's one root `.eslintrc.js` file for all packages except client ones.
-Client packages has it's own `.eslintrc.js` files.
+1. Run `yarn lint` from the repository root before committing your changes.
+Linting is a whole-repo operation now (oxlint covers every package in about a second),
+so packages don't carry their own lint scripts.
+The shared rule set lives in `packages/cubejs-linter/.oxlintrc.json` and is wired up by the
+root `.oxlintrc.json`. A package that needs to diverge gets its own `.oxlintrc.json`
+extending the root one - see `packages/cubejs-client-react` for an example.
+Use `yarn lint:fix` to apply the fixable violations.
 2. Run `yarn test` before committing if package has tests.
 3. Please use [conventional commits name](https://www.conventionalcommits.org/) for your PR.
 It'll be used to build change logs.

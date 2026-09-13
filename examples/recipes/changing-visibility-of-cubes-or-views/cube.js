@@ -1,6 +1,6 @@
 const jwtDecode = require('jwt-decode');
 
-// Cube.js configuration options: https://cube.dev/docs/config
+// Cube.js configuration options: https://docs.cube.dev/reference/configuration/config
 module.exports = {
   contextToAppId: ({ securityContext }) => {
     return `CUBEJS_APP_${securityContext.company}`;

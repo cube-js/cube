@@ -107,9 +107,7 @@ const TimeGroup = ({
               data-testid="TimeDimension"
               disabled={disabled}
               availableCubes={availableMembers}
-              onClick={(updateWith) =>
-                updateMethods.update(m, { ...m, dimension: updateWith })
-              }
+              onClick={(updateWith) => updateMethods.update(m, { ...m, dimension: updateWith })}
             >
               {m.dimension.title}
             </MemberDropdown>
@@ -117,7 +115,7 @@ const TimeGroup = ({
         );
 
         return (
-          <Fragment key={index}>
+          <Fragment key={m.dimension.name}>
             {isMissing ? (
               <MissingMemberTooltip>{buttonGroup}</MissingMemberTooltip>
             ) : (
@@ -162,17 +160,17 @@ const TimeGroup = ({
             <ButtonDropdown
               show={granularityShown}
               disabled={disabled}
-              overlay={granularityMenu(m.dimension, (granularity) =>
+              overlay={granularityMenu(m.dimension, (granularity) => (
                 updateMethods.update(m, { ...m, granularity: granularity.name })
-              )}
+              ))}
               onOverlayOpen={() => setGranularityShown(true)}
               onOverlayClose={() => setGranularityShown(false)}
               onItemClick={() => setGranularityShown(false)}
             >
               {m.dimension.granularities.find(
                 (g) => g.name === m.granularity
-              ) &&
-                m.dimension.granularities.find((g) => g.name === m.granularity)
+              )
+                && m.dimension.granularities.find((g) => g.name === m.granularity)
                   .title}
             </ButtonDropdown>
           </Fragment>
@@ -186,9 +184,7 @@ const TimeGroup = ({
           availableCubes={availableMembers}
           type="dashed"
           icon={<PlusOutlined />}
-          onClick={(member) =>
-            updateMethods.add({ dimension: member, granularity: 'day' })
-          }
+          onClick={(member) => updateMethods.add({ dimension: member, granularity: 'day' })}
         >
           {addMemberName}
         </MemberDropdown>

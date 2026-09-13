@@ -118,8 +118,8 @@ export class QueryQueue {
   protected readonly streamEvents = new EventEmitter();
 
   public constructor(
-      protected readonly redisQueuePrefix: string,
-      options: QueryQueueOptions
+    protected readonly redisQueuePrefix: string,
+    options: QueryQueueOptions
   ) {
     this.concurrency = options.concurrency || 2;
     this.continueWaitTimeout = options.continueWaitTimeout || 10;

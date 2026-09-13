@@ -34,18 +34,26 @@ priority first:
    message sent from the host page (see [At runtime](#at-runtime)).
 2. **URL parameter** — the `?timezone=` query parameter on the embed URL (see
    [Per embed via URL](#per-embed-via-url)).
-3. **Dashboard's own zone** — a dashboard pinned to a named zone, or set to resolve per
+3. **Session setting** — `settings.timezone` on the [Generate Session
+   API](/reference/embed-apis/generate-session#session-settings), for a zone that belongs
+   to the viewer rather than to one placement. Set it once when you mint the session and
+   every iframe that session opens buckets time in it.
+4. **Dashboard's own zone** — a dashboard pinned to a named zone, or set to resolve per
    viewer (see [dashboard time zone](/admin/time-zones#dashboard-time-zone)). In
    [signed embedding](/embedding/iframe/auth/signed) the viewer has no Cube account and
    therefore no personal zone, so a viewer-resolved dashboard falls through to the next
-   step — supply `?timezone=` if you want each end user's own zone.
-4. **Account default** — the zone configured in **Embed → Settings** (see
+   step — supply `settings.timezone` or `?timezone=` if you want each end user's own zone.
+5. **Account default** — the zone configured in **Embed → Settings** (see
    [Account-wide default](#account-wide-default)).
-5. **Account-wide zone**, then the deployment's default time zone.
+6. **Account-wide zone**, then the deployment's default time zone.
 
-A host override outranks a dashboard's pinned zone by design: the integrator is speaking
-for the whole frame, and you know your user's zone better than the dashboard's author
-does.
+A bare UTC offset (`+05:00`) or an unknown zone name falls through to the next source
+rather than failing. Cube cannot compute in such a zone — it would fall back to UTC and
+report nothing about it — so ignoring the value is safer than forwarding it.
+
+Everything the integrator supplies — the runtime message, the URL parameter, the session
+setting — outranks a dashboard's pinned zone by design: you are speaking for the whole
+frame, and you know your user's zone better than the dashboard's author does.
 
 <Note>
   If the account policy is disabled, none of this applies — Cube sends no zone and the
@@ -59,8 +67,10 @@ Set a default time zone for all embedded surfaces:
 1. Go to **Embed → Settings**.
 2. In the **Time Zone** card, pick a zone from the dropdown.
 
-The selected zone applies to every embedded surface across the account, unless a specific
-embed overrides it. Re-selecting the account-wide zone clears the embed-specific value, so
+The selected zone applies to every embedded surface across the account, unless something
+higher in the ladder above overrides it: a session's own `settings.timezone`, a
+`?timezone=` URL parameter, a runtime `cube:action:set-timezone` message, or a zone the
+dashboard's author pinned. Re-selecting the account-wide zone clears the embed-specific value, so
 embeds follow the account-wide zone again.
 
 The picker is inert while user time zones are off for the account — a zone stored there
@@ -80,14 +90,17 @@ navigation won't drop it.
 
 Values must be [IANA time zone names](/admin/time-zones#valid-time-zone-values). An
 unusable value — including a bare UTC offset like `+05:30` — is ignored, and the embed
-falls back to the account default rather than quietly shifting every number.
+falls through to the next source in the ladder above (`settings.timezone`, then the
+dashboard's own zone, then the account default) rather than quietly shifting every
+number.
 
 ## At runtime
 
 Switch the zone after the embed has loaded by sending a
 [`cube:action:set-timezone`](/embedding/iframe/events#cube-action-set-timezone) message
-from the host page. This takes precedence over both the URL parameter and the account
-default — use it when your own user changes their zone:
+from the host page. This takes precedence over every other source — the URL parameter, a
+session's `settings.timezone`, a dashboard's own pinned zone, and the account default —
+use it when your own user changes their zone:
 
 ```js
 sendAction("cube:action:set-timezone", { timezone: "Asia/Tokyo" });

@@ -1081,6 +1081,15 @@ impl SqlTemplates {
         self.render_template("params/param", context! { param_index => param_index })
     }
 
+    /// The type a cast has to name to produce a NULL of `sql_type`.
+    pub fn nullable_type(&self, sql_type: String) -> Result<String, CubeError> {
+        if !self.contains_template("types/nullable") {
+            return Ok(sql_type);
+        }
+
+        self.render_template("types/nullable", context! { data_type => sql_type })
+    }
+
     pub fn sql_type(&self, data_type: DataType) -> Result<String, CubeError> {
         let data_type = match data_type {
             DataType::Decimal(precision, scale) => {
@@ -1173,16 +1182,40 @@ mod tests {
     use super::*;
     use chrono::TimeZone;
 
+    fn sql_templates_with(entries: Vec<(&str, &str)>) -> SqlTemplates {
+        let templates = entries
+            .into_iter()
+            .map(|(name, template)| (name.to_string(), template.to_string()))
+            .collect();
+        SqlTemplates::new(templates, false).unwrap()
+    }
+
+    #[test]
+    fn nullable_type_is_the_type_itself_where_the_dialect_names_nothing() {
+        let templates = sql_templates_with(vec![("types/string", "TEXT")]);
+
+        assert_eq!(templates.nullable_type("TEXT".to_string()).unwrap(), "TEXT");
+    }
+
+    #[test]
+    fn nullable_type_is_the_form_the_dialect_names() {
+        let templates = sql_templates_with(vec![
+            ("types/string", "String"),
+            ("types/nullable", "Nullable({{ data_type }})"),
+        ]);
+
+        assert_eq!(
+            templates.nullable_type("String".to_string()).unwrap(),
+            "Nullable(String)"
+        );
+    }
+
     #[test]
     fn float_literal_override_does_not_require_cast_templates() {
-        let templates = SqlTemplates::new(
-            HashMap::from([(
-                "expressions/float_literal".to_string(),
-                "{% if value is none %}(NULL + 0e0){% else %}{{ value }}{% endif %}".to_string(),
-            )]),
-            false,
-        )
-        .unwrap();
+        let templates = sql_templates_with(vec![(
+            "expressions/float_literal",
+            "{% if value is none %}(NULL + 0e0){% else %}{{ value }}{% endif %}",
+        )]);
         for data_type in [DataType::Float32, DataType::Float64] {
             assert_eq!(
                 templates

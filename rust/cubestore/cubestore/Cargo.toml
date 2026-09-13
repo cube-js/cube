@@ -1,11 +1,11 @@
 [package]
 name = "cubestore"
-version = "1.7.34"
+version = "1.7.37"
 authors = ["Cube Dev, Inc."]
 edition = "2021"
 license = "Apache-2.0"
 description = "Cube.js pre-aggregation storage layer"
-documentation = "https://cube.dev/docs"
+documentation = "https://docs.cube.dev"
 homepage = "https://cube.dev"
 repository = "https://github.com/cube-js/cube.js"
 

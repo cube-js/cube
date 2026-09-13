@@ -3,6 +3,8 @@ title: Deploying Cube Core with Docker
 description: This guide walks you through deploying Cube with Docker.
 ---
 
+import DevModeWarning from '/snippets/dev-mode-warning.mdx';
+
 <Warning>
 
 This is an example of a production-ready deployment, but real-world deployments
@@ -388,21 +390,30 @@ deployment.
 ### Disable Development Mode
 
 When running Cube in production environments, make sure development mode is
-disabled both on API Instances and Refresh Worker. Running Cube in development
-mode in a production environment can lead to security vulnerabilities. Enabling
-Development Mode in Cube Cloud is not recommended. Development Mode will expose
-your data to the internet. You can read more on the differences between
-[production and development mode here][link-cubejs-dev-vs-prod].
+disabled both on API Instances and Refresh Worker. You can read more about what
+development mode changes [here][link-cubejs-dev-vs-prod].
+
+<DevModeWarning />
 
 <Info>
 
-Development mode is disabled by default.
+`CUBEJS_DEV_MODE` defaults to `false`, and the official Docker images already set
+`NODE_ENV=production` — as does `cubejs server` itself — so on a Docker deployment
+leaving the flag unset is enough. Setting `NODE_ENV` below as well is belt-and-braces;
+it matters only if you embed `@cubejs-backend/server-core` directly, where an unset
+`NODE_ENV` puts the instance in development mode whatever the flag says.
 
 </Info>
 
 ```dotenv
-# Set this to false or leave unset to disable development mode
+# Keep development mode off. Under the `cubejs` CLI and the official images,
+# setting this to `true` also forces NODE_ENV=development, switching off JWT
+# verification on the data APIs
 CUBEJS_DEV_MODE=false
+
+# Already set by the official images and by `cubejs server`; set it explicitly if
+# you start Cube some other way
+NODE_ENV=production
 ```
 
 ### Set up Refresh Worker
@@ -520,7 +531,7 @@ data source usage.
 [blog-migrate-to-cube-cloud]:
   https://cube.dev/blog/migrating-from-self-hosted-to-cube-cloud/
 [link-cube-cloud]: https://cubecloud.dev
-[link-cubejs-dev-vs-prod]: /docs/data-modeling/dev-mode
+[link-cubejs-dev-vs-prod]: /reference/configuration/environment-variables#cubejs_dev_mode
 [link-k8s-healthcheck-api]:
   https://kubernetes.io/docs/reference/using-api/health-checks/
 [ref-config-connect-db]: /admin/connect-to-data/data-sources

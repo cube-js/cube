@@ -522,7 +522,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns the list of the tables for the specified schema.
    */
-  public async getTablesQuery(schemaName: string): Promise<{ 'table_name': string }[]> {
+  public async getTablesQuery(schemaName: string): Promise<{ table_name: string }[]> {
     const response = await this.query(
       `SHOW TABLES IN ${this.getSchemaFullName(schemaName)}`,
       [],
@@ -701,7 +701,7 @@ export class DatabricksDriver extends JDBCDriver {
     const result = [];
 
     // eslint-disable-next-line camelcase
-    const response = await this.query<{col_name: string; data_type: string}>(
+    const response = await this.query<{ col_name: string; data_type: string }>(
       `DESCRIBE QUERY ${sql}`,
       params || []
     );

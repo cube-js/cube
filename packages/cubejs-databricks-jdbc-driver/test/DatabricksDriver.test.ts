@@ -25,7 +25,7 @@ jest.mock('@aws-sdk/s3-request-presigner', () => ({
 }));
 
 jest.spyOn(ContainerClient.prototype, 'listBlobsFlat').mockImplementation(
-  jest.fn().mockReturnValue([{name: 'product.csv/test.csv'}])
+  jest.fn().mockReturnValue([{ name: 'product.csv/test.csv' }])
 );
 jest.spyOn(BlobServiceClient.prototype, 'getUserDelegationKey').mockImplementation(
   jest.fn().mockReturnValue('mockKey')
@@ -33,8 +33,8 @@ jest.spyOn(BlobServiceClient.prototype, 'getUserDelegationKey').mockImplementati
 
 describe('DatabricksDriver', () => {
   const mockTableName = 'product';
-  const mockSql = 'SELECT * FROM ' + mockTableName;
-  const mockParams = [1]
+  const mockSql = `SELECT * FROM ${mockTableName}`;
+  const mockParams = [1];
   const mockOptions: UnloadOptions = {
     maxFileSize: 3,
     query: {
@@ -46,15 +46,15 @@ describe('DatabricksDriver', () => {
   const mockUnloadWithSql = jest.fn().mockResolvedValue('mockType');
 
   beforeAll(() => {
-    process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY='true';
-    process.env.CUBEJS_DB_DATABRICKS_URL='jdbc:databricks://adb-123456789.10.azuredatabricks.net:443';
-    process.env.CUBEJS_DB_EXPORT_BUCKET_TYPE='azure';
-    process.env.CUBEJS_DB_EXPORT_BUCKET='wasbs://cube-export@mock.blob.core.windows.net';
-    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY='azure-key';
-    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_TENANT_ID='azure-tenant-id';
-    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_ID='azure-client-id';
-    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET='azure-client-sceret'
-    process.env.CUBEJS_DB_DATABRICKS_TOKEN='token';
+    process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY = 'true';
+    process.env.CUBEJS_DB_DATABRICKS_URL = 'jdbc:databricks://adb-123456789.10.azuredatabricks.net:443';
+    process.env.CUBEJS_DB_EXPORT_BUCKET_TYPE = 'azure';
+    process.env.CUBEJS_DB_EXPORT_BUCKET = 'wasbs://cube-export@mock.blob.core.windows.net';
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY = 'azure-key';
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_TENANT_ID = 'azure-tenant-id';
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_ID = 'azure-client-id';
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET = 'azure-client-sceret';
+    process.env.CUBEJS_DB_DATABRICKS_TOKEN = 'token';
   });
 
   afterEach(() => {
@@ -71,7 +71,7 @@ describe('DatabricksDriver', () => {
   });
 
   test('should get signed URLs of unloaded csv files by azure client secret', async () => {
-    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY='';
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY = '';
     databricksDriver = new DatabricksDriver();
     databricksDriver['unloadWithSql'] = mockUnloadWithSql;
 

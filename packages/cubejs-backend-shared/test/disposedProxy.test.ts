@@ -43,7 +43,7 @@ describe('disposedProxy', () => {
     const proxy = disposedProxy('testProperty', 'test instance');
 
     expect(() => 'someProperty' in proxy).toThrow(
-      "Cannot check property existence on test instance. " +
+      'Cannot check property existence on test instance. ' +
       "The 'testProperty' has been cleaned up and is no longer available."
     );
   });
@@ -52,7 +52,7 @@ describe('disposedProxy', () => {
     const proxy = disposedProxy('testProperty', 'test instance');
 
     expect(() => Object.keys(proxy)).toThrow(
-      "Cannot enumerate properties on test instance. " +
+      'Cannot enumerate properties on test instance. ' +
       "The 'testProperty' has been cleaned up and is no longer available."
     );
   });
@@ -61,7 +61,7 @@ describe('disposedProxy', () => {
     const proxy = disposedProxy('testProperty', 'test instance');
 
     expect(() => Object.getPrototypeOf(proxy)).toThrow(
-      "Cannot get prototype of test instance. " +
+      'Cannot get prototype of test instance. ' +
       "The 'testProperty' has been cleaned up and is no longer available."
     );
   });

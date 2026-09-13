@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/cubestore",
-  "version": "1.7.34",
+  "version": "1.7.37",
   "description": "Cube.js pre-aggregation storage layer.",
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -14,8 +14,6 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint js-wrapper/* --ext .ts,.js",
-    "lint:fix": "eslint --fix js-wrapper/* --ext .ts,js",
     "unit": "jest",
     "unit:debug": "jest --runInBand",
     "version": "node scripts/sync-cargo-version.js",
@@ -33,22 +31,19 @@
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.34",
+    "@cubejs-backend/linter": "1.7.37",
     "@types/jest": "^29",
-    "@types/node": "^18",
+    "@types/node": "^22",
     "jest": "^29",
-    "typescript": "~5.2.2"
+    "typescript": "~6.0.3"
   },
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
-    "@cubejs-backend/shared": "1.7.34",
+    "@cubejs-backend/shared": "1.7.37",
     "@octokit/core": "^3.2.5",
     "source-map-support": "^0.5.19"
-  },
-  "eslintConfig": {
-    "extends": "../../packages/cubejs-linter"
   },
   "jest": {
     "roots": [

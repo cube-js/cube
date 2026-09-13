@@ -30,14 +30,14 @@ interface RedshiftDriverExportRequiredAWS {
   region: string,
 }
 
-interface RedshiftDriverExportArnAWS extends RedshiftDriverExportRequiredAWS{
+interface RedshiftDriverExportArnAWS extends RedshiftDriverExportRequiredAWS {
   // ARN used to access S3 unload data from e.g. EC2 instances, instead of explicit key/secret credentials.
   // See https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2.html
   // Resources needing to read these files will need proper read permissions on their role as well.
   unloadArn?: string,
 }
 
-interface RedshiftDriverExportKeySecretAWS extends RedshiftDriverExportRequiredAWS{
+interface RedshiftDriverExportKeySecretAWS extends RedshiftDriverExportRequiredAWS {
   keyId?: string,
   secretKey?: string,
 }

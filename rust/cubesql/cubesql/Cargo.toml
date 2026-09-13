@@ -5,7 +5,7 @@ authors = ["Cube Dev, Inc."]
 edition = "2018"
 license = "Apache-2.0"
 description = "SQL API for Cube as proxy over PostgreSQL protocol"
-documentation = "https://cube.dev/docs"
+documentation = "https://docs.cube.dev"
 homepage = "https://cube.dev"
 
 [dependencies]

@@ -114,7 +114,7 @@ query LoadModels($jobId: Int!) {
 
 // For reference:
 // - dbt Metrics types: https://docs.getdbt.com/docs/building-a-dbt-project/metrics, https://github.com/dbt-labs/dbt-core/issues/4071#issue-102758091
-// - Cube measure types: https://cube.dev/docs/schema/reference/types-and-formats#measures-types
+// - Cube measure types: https://docs.cube.dev/reference/data-modeling/measures#type
 const dbtToCubeMetricTypeMap: Record<string, string> = {
   count: 'count',
   count_distinct: 'countDistinct',
