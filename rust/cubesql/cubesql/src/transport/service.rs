@@ -842,6 +842,21 @@ impl SqlTemplates {
         self.render_template("expressions/not", context! { expr => expr })
     }
 
+    /// Native-boolean dialects need no conversion. Other dialects opt in with
+    /// templates for the two SQL expression contexts.
+    pub fn boolean_context_expr(&self, expr: String, predicate: bool) -> Result<String, CubeError> {
+        let template = if predicate {
+            "expressions/scalar_to_predicate"
+        } else {
+            "expressions/predicate_to_scalar"
+        };
+        if self.contains_template(template) {
+            self.render_template(template, context! { expr => expr })
+        } else {
+            Ok(expr)
+        }
+    }
+
     pub fn sort_expr(
         &self,
         expr: String,

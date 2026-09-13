@@ -4250,6 +4250,32 @@ async fn test_wrapper_multi_arg_aggregate_function_without_template() {
     );
 }
 
+#[tokio::test]
+async fn boolean_context_wrapper_plans() {
+    use crate::compile::{
+        test::{LogicalPlanTestUtils, TestContext},
+        DatabaseProtocol,
+    };
+    let context = TestContext::with_custom_templates(
+        DatabaseProtocol::PostgreSQL,
+        crate::compile::test::mssql_boolean_templates(),
+    )
+    .await;
+    for (query, fragment) in [
+        ("SELECT COUNT(DISTINCT customer_gender) = 2 AS flag FROM KibanaSampleDataEcommerce", "CAST(CASE WHEN"),
+        ("SELECT has_subscription IS NULL AS missing, MEASURE(count) FROM KibanaSampleDataEcommerce GROUP BY 1", "CAST(CASE WHEN"),
+        ("SELECT customer_gender, SUM(CASE WHEN has_subscription THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce GROUP BY 1", "= CAST(1 AS BIT)"),
+        ("SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE NOT has_subscription GROUP BY 1", "= CAST(1 AS BIT)"),
+        ("SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription = CAST(0 AS BOOLEAN) GROUP BY 1", "CAST(0 AS BIT)"),
+    ] {
+        let plan = context.convert_sql_to_cube_query(query).await.unwrap().as_logical_plan();
+        let sql = plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains(fragment), "{}: {}", query, sql);
+        assert!(!sql.contains("TRUE") && !sql.contains("FALSE"), "{}", sql);
+        println!("MSSQL_BOOLEAN_PLAN {}", serde_json::json!({"query": query, "sql": sql}));
+    }
+}
+
 /// A pivot with subtotals on both axes: a four-way union of
 /// aggregations, one per grouping set, each filtered before and after aggregating and
 /// projected with literals, under a grouping, sort and limit that read the union. Every
