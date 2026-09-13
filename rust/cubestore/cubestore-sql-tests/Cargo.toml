@@ -53,7 +53,7 @@ serde_derive = "1.0.115"
 tokio = { version = "1", features = ["full", "rt"] }
 indoc = "1.0"
 tempfile = "3.2.0"
-tar = "0.4.38"
+tar = "0.4.46"
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["async_tokio", "html_reports"] }
