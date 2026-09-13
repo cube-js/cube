@@ -6,7 +6,7 @@ use crate::logical_plan::PreAggregationUsage;
 use crate::logical_plan::{PreAggregation, PreAggregationSource, PreAggregationTable};
 use crate::physical_plan::filter::ToSql;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
-use crate::physical_plan::{SqlEvaluatorVisitor, VisitorContext};
+use crate::physical_plan::{QualifiedColumnName, SqlEvaluatorVisitor, VisitorContext};
 use crate::planner::filter::base_segment::BaseSegment;
 use crate::planner::filter::Filter;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -382,6 +382,33 @@ impl TestContext {
     ) -> Result<String, CubeError> {
         let mut nodes_factory = SqlNodesFactory::default();
         nodes_factory.set_group_by_members(group_by_members.into_iter().collect());
+        let cube_ref_evaluator = Rc::new(nodes_factory.cube_ref_evaluator());
+        let visitor = SqlEvaluatorVisitor::new(
+            self.query_tools.query_tools().clone(),
+            cube_ref_evaluator,
+            None,
+        );
+        let base_tools = self.query_tools.base_tools();
+        let driver_tools = base_tools.driver_tools(false)?;
+        let templates = PlanSqlTemplates::try_new(driver_tools, false)?;
+        let node_processor = nodes_factory.default_node_processor(self.query_tools.query_tools());
+
+        visitor.apply(symbol, node_processor, &templates)
+    }
+
+    /// Like `evaluate_symbol`, but with render references configured on the
+    /// node factory — the map through which a join condition resolves the
+    /// members it names, since it is rendered outside any select's symbol
+    /// environment.
+    pub fn evaluate_symbol_with_render_references(
+        &self,
+        symbol: &Rc<MemberSymbol>,
+        references: Vec<(String, QualifiedColumnName)>,
+    ) -> Result<String, CubeError> {
+        let mut nodes_factory = SqlNodesFactory::default();
+        for (name, column) in references {
+            nodes_factory.add_render_reference(name, column);
+        }
         let cube_ref_evaluator = Rc::new(nodes_factory.cube_ref_evaluator());
         let visitor = SqlEvaluatorVisitor::new(
             self.query_tools.query_tools().clone(),

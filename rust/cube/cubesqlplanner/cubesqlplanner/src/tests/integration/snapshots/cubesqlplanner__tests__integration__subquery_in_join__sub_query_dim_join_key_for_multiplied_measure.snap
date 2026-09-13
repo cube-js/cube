@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/subquery_in_join.rs
+expression: result
+---
+b__id | c__bar_id | b__sum_foo_id
+------+-----------+--------------
+100   | NULL      | 1            
+101   | NULL      | 2            
+102   | NULL      | 3            
+103   | 452       | 4            
+104   | 478       | 5

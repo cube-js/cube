@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/bucketing.rs
+expression: result
+---
+orders__change_type | orders__report_mode | orders__count
+--------------------+---------------------+--------------
+Revenue is Down     | summary             | 36

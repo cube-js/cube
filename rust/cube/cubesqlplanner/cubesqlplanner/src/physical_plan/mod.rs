@@ -29,7 +29,7 @@ pub use join::{Join, JoinCondition, JoinItem, RegularRollingWindowJoinCondition}
 pub use optimizers::collapse_trivial_subqueries;
 pub use order::OrderBy;
 pub use query_plan::QueryPlan;
-pub use references_builder::ReferencesBuilder;
+pub use references_builder::{ReferenceSubstitutions, ReferencesBuilder};
 pub use schema::{QualifiedColumnName, Schema, SchemaColumn};
 pub use select::{AliasedExpr, Select};
 pub use sql_visitor::SqlEvaluatorVisitor;
