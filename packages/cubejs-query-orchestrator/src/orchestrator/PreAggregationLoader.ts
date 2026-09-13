@@ -854,7 +854,7 @@ export class PreAggregationLoader {
 
     if (externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
       tableData = await saveCancelFn(
-        client.unload(table, this.getUnloadOptions()),
+        client.unload(table, { ...this.getUnloadOptions(), parquetImport: externalDriverCapabilities.parquetImport }),
       );
     } else if (externalDriverCapabilities.streamImport && client.stream) {
       tableData = await saveCancelFn(
@@ -898,7 +898,7 @@ export class PreAggregationLoader {
       return saveCancelFn(
         client.unload(
           table,
-          { ...this.getUnloadOptions(), query: { sql, params } },
+          { ...this.getUnloadOptions(), query: { sql, params }, parquetImport: externalDriverCapabilities.parquetImport },
         )
       );
     } else if (externalDriverCapabilities.streamImport && client.stream) {

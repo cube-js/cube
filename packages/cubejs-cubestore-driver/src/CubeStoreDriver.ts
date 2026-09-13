@@ -8,6 +8,7 @@ import {
   BaseDriver,
   CreateTableIndex,
   DownloadTableCSVData,
+  TableParquetData,
   DownloadTableMemoryData,
   DriverInterface,
   ExternalCreateTableOptions,
@@ -271,6 +272,8 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
     if (tableData.rowStream) {
       await this.importStream(columns, tableData, table, indexes, aggregations, queryTracingObj);
+    } else if (tableData.parquetFile) {
+      await this.importParquetFile(tableData, table, columns, indexes, aggregations, queryTracingObj);
     } else if (tableData.csvFile) {
       await this.importCsvFile(tableData, table, columns, indexes, aggregations, queryTracingObj);
     } else if (tableData.streamingSource) {
@@ -319,6 +322,25 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       await this.dropTable(table);
       throw e;
     }
+  }
+
+  private async importParquetFile(tableData: TableParquetData, table: string, columns: Column[], indexes: string, aggregations: string, queryTracingObj?: any) {
+    if (!columns || columns.length === 0) {
+      throw new Error('Unable to import (as parquet) in Cube Store: empty columns. Most probably, introspection has failed.');
+    }
+    if (!Array.isArray(tableData.parquetFile) || tableData.parquetFile.some(file => typeof file !== 'string' || !file)) {
+      throw new Error('Parquet locations must be an array of non-empty strings');
+    }
+    const options: CreateTableOptions = {
+      buildRangeEnd: queryTracingObj?.buildRangeEnd,
+      indexes,
+      aggregations,
+    };
+    if (tableData.parquetFile.length) {
+      options.inputFormat = 'parquet';
+      options.files = tableData.parquetFile;
+    }
+    return this.createTableWithOptions(table, columns, options, queryTracingObj);
   }
 
   private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: Column[], indexes: any, aggregations: any, queryTracingObj?: any) {
@@ -492,6 +514,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   public capabilities(): ExternalDriverCompatibilities {
     return {
       csvImport: true,
+      parquetImport: true,
       streamImport: true,
     };
   }
