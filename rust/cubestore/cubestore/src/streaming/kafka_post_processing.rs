@@ -2,6 +2,7 @@ use crate::metastore::Column;
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
 use crate::queryplanner::pretty_printers::{pp_plan_ext, PPOptions};
 use crate::queryplanner::{sql_to_rel_options, try_make_memory_data_source, QueryPlannerImpl};
+use crate::sql::parser::sql_parser_recursion_limit;
 use crate::sql::MySqlDialectWithBackTicks;
 use crate::streaming::topic_table_provider::TopicTableProvider;
 use crate::CubeError;
@@ -222,7 +223,10 @@ impl KafkaPostProcessPlanner {
         let dialect = &MySqlDialectWithBackTicks {};
         let mut tokenizer = Tokenizer::new(dialect, &select_statement);
         let tokens = tokenizer.tokenize().unwrap();
-        let statement = Parser::new(dialect).with_tokens(tokens).parse_statement()?;
+        let statement = Parser::new(dialect)
+            .with_recursion_limit(sql_parser_recursion_limit())
+            .with_tokens(tokens)
+            .parse_statement()?;
         let statement = self.rewrite_statement(statement);
 
         match &statement {

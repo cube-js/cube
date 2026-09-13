@@ -211,7 +211,17 @@ impl From<std::io::Error> for CubeError {
 
 impl From<ParserError> for CubeError {
     fn from(v: ParserError) -> Self {
-        CubeError::from_error(format!("{:?}", v))
+        match v {
+            // This variant carries no message of its own, so name what ran out and what the
+            // budget was. It stays a user error: the query is the thing that has to change.
+            ParserError::RecursionLimitExceeded => CubeError::user(format!(
+                "Query is nested too deeply to parse: it exceeds the {} levels of nested \
+                 expressions, subqueries and parenthesised groups this node accepts. Flatten \
+                 the query, or raise CUBESTORE_SQL_PARSER_RECURSION_LIMIT.",
+                crate::sql::parser::sql_parser_recursion_limit()
+            )),
+            v => CubeError::from_error(format!("{:?}", v)),
+        }
     }
 }
 
