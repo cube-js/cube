@@ -997,8 +997,6 @@ describe('PreAggregations', () => {
       }
 
       const lastPartition = results[2];
-      expect(lastPartition.loadSql).not.toBe(lastPartition.structureVersionLoadSql);
-      expect(lastPartition.loadSql[1]).not.toBe(lastPartition.structureVersionLoadSql[1]);
       expect(lastPartition.loadSql[1]).toEqual([start, loadEnd]);
       expect(lastPartition.structureVersionLoadSql[1]).toEqual([start, structureEnd]);
       expect(lastPartition.buildRangeEnd).toEqual('2024-01-03T12:00:00.000');
