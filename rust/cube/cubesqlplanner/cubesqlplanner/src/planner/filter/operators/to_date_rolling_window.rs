@@ -1,4 +1,5 @@
 use crate::planner::Granularity;
+use crate::planner::SeriesSpan;
 
 /// `ToDateRollingWindow` filter operation: bounds a "since the start
 /// of <granularity>" window — e.g. month-to-date, year-to-date.
@@ -11,7 +12,7 @@ use crate::planner::Granularity;
 #[derive(Clone)]
 pub struct ToDateRollingWindowOp {
     pub(crate) granularity: Granularity,
-    pub(crate) window_range: Option<(String, String)>,
+    pub(crate) window_range: Option<SeriesSpan>,
 }
 
 impl std::fmt::Debug for ToDateRollingWindowOp {
@@ -24,7 +25,7 @@ impl std::fmt::Debug for ToDateRollingWindowOp {
 }
 
 impl ToDateRollingWindowOp {
-    pub fn new(granularity: Granularity, window_range: Option<(String, String)>) -> Self {
+    pub fn new(granularity: Granularity, window_range: Option<SeriesSpan>) -> Self {
         Self {
             granularity,
             window_range,

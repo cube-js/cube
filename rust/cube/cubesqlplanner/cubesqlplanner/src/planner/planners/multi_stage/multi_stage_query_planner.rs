@@ -32,6 +32,7 @@ use crate::planner::QueryDateTime;
 use crate::planner::QueryDateTimeHelper;
 use crate::planner::QueryProperties;
 use crate::planner::QueryTimeSeries;
+use crate::planner::SeriesSpan;
 use crate::planner::TimeDimensionSymbol;
 use chrono::Duration;
 use cubenativeutils::CubeError;
@@ -1230,7 +1231,7 @@ impl MultiStageQueryPlanner {
     fn rolling_series_bounds(
         &self,
         time_dimension: &Rc<TimeDimensionSymbol>,
-    ) -> Result<Option<(String, String)>, CubeError> {
+    ) -> Result<Option<SeriesSpan>, CubeError> {
         let Some(granularity) = time_dimension.granularity_obj() else {
             return Ok(None);
         };
@@ -1260,15 +1261,14 @@ impl MultiStageQueryPlanner {
     }
 
     /// [`Self::rolling_series_bounds`] for a custom granularity, whose buckets
-    /// are placed by stepping its interval from its origin. The lower bound
-    /// aligns to that origin the way the series itself is placed; the upper one
-    /// reaches an interval past the range end, which covers the last bucket of
-    /// either series shape.
+    /// are placed by stepping its interval from its origin. Both ends align to
+    /// that origin the way the series itself is placed, which is where either
+    /// series shape puts its points — so the two upper bounds coincide.
     fn custom_series_bounds(
         &self,
         granularity: &Granularity,
         date_range: &[String],
-    ) -> Result<(String, String), CubeError> {
+    ) -> Result<SeriesSpan, CubeError> {
         let interval = granularity.granularity_interval();
         if interval.is_zero() {
             return Err(CubeError::user(format!(
@@ -1279,13 +1279,18 @@ impl MultiStageQueryPlanner {
         let tz = self.query_tools.query_tools().timezone();
         let first =
             granularity.align_date_to_origin(QueryDateTime::from_date_str(tz, &date_range[0])?)?;
-        let past_end = QueryDateTime::from_date_str(tz, &date_range[1])?
+        let last =
+            granularity.align_date_to_origin(QueryDateTime::from_date_str(tz, &date_range[1])?)?;
+        let past_end = last
             .add_interval(interval)?
             .add_duration(Duration::seconds(-1))?;
-        Ok((
-            first.default_format(),
-            format!("{}.999", past_end.format("%Y-%m-%dT%H:%M:%S")),
-        ))
+        let past_end = format!("{}.999", past_end.format("%Y-%m-%dT%H:%M:%S"));
+        Ok(SeriesSpan {
+            from: first.default_format(),
+            to_aligned: past_end.clone(),
+            to_stepped: past_end,
+            predefined_granularity: false,
+        })
     }
 
     /// The `Granularity` a `to_date` window counts its period in. The compiler
@@ -1323,17 +1328,21 @@ impl MultiStageQueryPlanner {
         &self,
         time_dimension: &Rc<TimeDimensionSymbol>,
         rolling_window: &RollingWindow,
-    ) -> Result<Option<(String, String)>, CubeError> {
-        let Some((series_from, series_to)) = self.rolling_series_bounds(time_dimension)? else {
+    ) -> Result<Option<SeriesSpan>, CubeError> {
+        let Some(series) = self.rolling_series_bounds(time_dimension)? else {
             return Ok(None);
         };
         let tz = self.query_tools.query_tools().timezone();
-        Ok(Some((
-            shift_bound_wall_clock(tz, &series_from, &rolling_window.trailing, true)?
-                .unwrap_or(series_from.clone()),
-            shift_bound_wall_clock(tz, &series_to, &rolling_window.leading, false)?
-                .unwrap_or(series_to.clone()),
-        )))
+        let shift = |bound: &String, interval: &Option<String>, backwards: bool| {
+            shift_bound_wall_clock(tz, bound, interval, backwards)
+                .map(|shifted| shifted.unwrap_or_else(|| bound.clone()))
+        };
+        Ok(Some(SeriesSpan {
+            from: shift(&series.from, &rolling_window.trailing, true)?,
+            to_aligned: shift(&series.to_aligned, &rolling_window.leading, false)?,
+            to_stepped: shift(&series.to_stepped, &rolling_window.leading, false)?,
+            predefined_granularity: series.predefined_granularity,
+        }))
     }
 
     /// Span the base scan of a `to_date` window over `time_dimension` reads:
@@ -1347,8 +1356,8 @@ impl MultiStageQueryPlanner {
         &self,
         time_dimension: &Rc<TimeDimensionSymbol>,
         granularity: &str,
-    ) -> Result<Option<(String, String)>, CubeError> {
-        let Some((series_from, series_to)) = self.rolling_series_bounds(time_dimension)? else {
+    ) -> Result<Option<SeriesSpan>, CubeError> {
+        let Some(series) = self.rolling_series_bounds(time_dimension)? else {
             return Ok(None);
         };
         let Some(period) = self.to_date_period_granularity(time_dimension, granularity)? else {
@@ -1360,16 +1369,19 @@ impl MultiStageQueryPlanner {
         let period_start = if period.is_predefined_granularity() {
             QueryTimeSeries::period_start_predefined(
                 period.granularity(),
-                &series_from,
+                &series.from,
                 QueryTimeSeries::MILLISECOND_PRECISION,
             )?
         } else {
             let tz = self.query_tools.query_tools().timezone();
             period
-                .align_date_to_origin(QueryDateTime::from_date_str(tz, &series_from)?)?
+                .align_date_to_origin(QueryDateTime::from_date_str(tz, &series.from)?)?
                 .default_format()
         };
-        Ok(Some((period_start, series_to)))
+        Ok(Some(SeriesSpan {
+            from: period_start,
+            ..series
+        }))
     }
 
     /// The granularity of a `to_date` rolling window whose period boundary is

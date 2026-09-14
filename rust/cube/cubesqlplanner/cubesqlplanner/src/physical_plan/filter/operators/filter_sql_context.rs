@@ -1,7 +1,7 @@
 use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::{PlanSqlTemplates, TemplateProjectionColumn};
-use crate::planner::time_dimension::UNBOUNDED_INTERVAL;
+use crate::planner::time_dimension::{SeriesSpan, UNBOUNDED_INTERVAL};
 use crate::planner::QueryDateTimeHelper;
 use crate::utils::sql_expression_scanner::{ends_in_line_comment, is_top_level_compound};
 use cubenativeutils::CubeError;
@@ -210,18 +210,31 @@ impl<'a> FilterSqlContext<'a> {
     /// allocated as parameters, which a bound cannot be rendered as.
     pub fn date_range_literals(
         &self,
-        range: &Option<(String, String)>,
+        span: &Option<SeriesSpan>,
     ) -> Result<Option<(String, String)>, CubeError> {
-        let Some((from, to)) = range else {
+        let Some(span) = span else {
             return Ok(None);
         };
         if self.use_raw_values {
             return Ok(None);
         }
         Ok(Some((
-            self.format_and_allocate_date_impl(from, DateBound::From, true, false)?,
-            self.format_and_allocate_date_impl(to, DateBound::To, true, false)?,
+            self.format_and_allocate_date_impl(&span.from, DateBound::From, true, false)?,
+            self.format_and_allocate_date_impl(
+                self.series_span_end(span)?,
+                DateBound::To,
+                true,
+                false,
+            )?,
         )))
+    }
+
+    /// Upper bound of `span` for the series shape this dialect renders.
+    pub fn series_span_end<'s>(&self, span: &'s SeriesSpan) -> Result<&'s String, CubeError> {
+        let generated = self
+            .plan_templates
+            .supports_generated_time_series(span.predefined_granularity)?;
+        Ok(span.to(generated))
     }
 
     pub fn date_range_from_time_series(&self) -> Result<(String, String), CubeError> {

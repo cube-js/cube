@@ -11,7 +11,7 @@ use crate::planner::filter::typed_filter::{resolve_base_symbol, FilterOp, TypedF
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_call::SqlCallFilterParamsItem;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::time_dimension::{shift_bound_wall_clock, UNBOUNDED_INTERVAL};
+use crate::planner::time_dimension::{shift_bound_wall_clock, SeriesSpan, UNBOUNDED_INTERVAL};
 use crate::planner::FiltersContext;
 use crate::planner::QueryDateTimeHelper;
 use crate::planner::QueryTimeSeries;
@@ -209,7 +209,8 @@ impl TypedFilter {
             FilterOp::RegularRollingWindow(_)
             | FilterOp::RollingWindowOffset(_)
             | FilterOp::ToDateRollingWindow(_) => {
-                let Some((from, to)) = self.rolling_window_band(query_tools.timezone())? else {
+                let Some((from, to)) = self.rolling_window_band(&ctx, query_tools.timezone())?
+                else {
                     return Ok(None);
                 };
                 vec![
@@ -231,10 +232,21 @@ impl TypedFilter {
     /// `None` where either end is not derivable here — an unbounded side has no
     /// bound to state, and a window whose series is only known at run time
     /// carries no dates to shift.
-    fn rolling_window_band(&self, tz: Tz) -> Result<Option<(String, String)>, CubeError> {
+    fn rolling_window_band(
+        &self,
+        ctx: &FilterSqlContext,
+        tz: Tz,
+    ) -> Result<Option<(String, String)>, CubeError> {
+        let span_band = |span: &Option<SeriesSpan>| match span {
+            Some(span) => Ok(Some((
+                span.from.clone(),
+                ctx.series_span_end(span)?.clone(),
+            ))),
+            None => Ok(None),
+        };
         match self.operation() {
             FilterOp::ToDateRollingWindow(ToDateRollingWindowOp { window_range, .. }) => {
-                Ok(window_range.clone())
+                span_band(window_range)
             }
             FilterOp::RegularRollingWindow(RegularRollingWindowOp {
                 trailing,
@@ -246,7 +258,7 @@ impl TypedFilter {
                 if is_unbounded(trailing) || is_unbounded(leading) {
                     return Ok(None);
                 }
-                Ok(scan_range.clone())
+                span_band(scan_range)
             }
             // Without a granularity the window is anchored by one end of the
             // date range rather than by a series, and both its bounds are that

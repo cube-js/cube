@@ -18,6 +18,37 @@ pub fn is_predefined_granularity(name: &str) -> bool {
     PREDEFINED_GRANULARITIES.contains(&name)
 }
 
+/// Bounds a rolling window's base scan reads, derived from the series the
+/// window walks.
+///
+/// The upper bound depends on the shape the series takes: one materialized as
+/// rows snaps its points to bucket boundaries and stops at the bucket the range
+/// end falls in, while one generated in SQL steps the interval from the range
+/// start and can end past that boundary. Which shape a dialect renders is
+/// decided from its templates, so both ends travel together and the filter
+/// picks between them.
+#[derive(Clone, Debug)]
+pub struct SeriesSpan {
+    pub from: String,
+    pub to_aligned: String,
+    pub to_stepped: String,
+    /// Whether the series granularity is a predefined one — half of the
+    /// dialect's answer about which shape it renders.
+    pub predefined_granularity: bool,
+}
+
+impl SeriesSpan {
+    /// Upper bound for the shape the series takes, `generated_series` telling
+    /// which.
+    pub fn to(&self, generated_series: bool) -> &String {
+        if generated_series {
+            &self.to_stepped
+        } else {
+            &self.to_aligned
+        }
+    }
+}
+
 pub struct QueryTimeSeries;
 
 impl QueryTimeSeries {
@@ -65,20 +96,15 @@ impl QueryTimeSeries {
         Ok(buckets)
     }
 
-    /// Span every series over `date_range` at this granularity fits inside:
-    /// from the start of the bucket the range opens in, to one interval past
-    /// its end.
-    ///
-    /// The tail reaches past the range because the span must cover both series
-    /// shapes — one materialized here snaps its points to bucket boundaries,
-    /// one generated in SQL steps from the range start — and their last buckets
-    /// end on either side of the range end.
+    /// Bounds of a series over `date_range` at this granularity: it opens at
+    /// the start of the bucket the range opens in, and ends where
+    /// [`SeriesSpan`] describes.
     pub fn covering_bounds_predefined(
         granularity: &str,
         interval: &SqlInterval,
         date_range: &[String; 2],
         timestamp_precision: u32,
-    ) -> Result<(String, String), CubeError> {
+    ) -> Result<SeriesSpan, CubeError> {
         check_precision(timestamp_precision)?;
         if !is_predefined_granularity(granularity) {
             return Err(CubeError::user(format!(
@@ -93,9 +119,15 @@ impl QueryTimeSeries {
         let range_start = QueryDateTimeHelper::parse_native_date_time(&date_range[0])?;
         let range_end = QueryDateTimeHelper::parse_native_date_time(&date_range[1])?;
         let first = predefined_bucket(granularity, range_start, timestamp_precision)?;
+        let last = predefined_bucket(granularity, range_end, timestamp_precision)?;
         let past_end = add_interval_to_dt(range_end, interval)? - Duration::seconds(1);
         let nines = "9".repeat(timestamp_precision as usize);
-        Ok((first.start_str, format_with_padding(past_end, &nines)))
+        Ok(SeriesSpan {
+            from: first.start_str,
+            to_aligned: last.end_str,
+            to_stepped: format_with_padding(past_end, &nines),
+            predefined_granularity: true,
+        })
     }
 
     /// Start of the `granularity` period `date` falls in — the lower bound a
@@ -618,11 +650,11 @@ mod tests {
         SqlInterval::from_str(s).unwrap()
     }
 
-    // The lower bound is the series' own first edge, so it must agree with a
-    // walked series wherever one can be walked; the upper one reaches past the
-    // last on purpose.
+    // A materialized series is walked bucket by bucket, so the span has to
+    // reproduce both of its edges exactly — anything wider is rows read for
+    // nothing, anything narrower cuts the window short.
     #[test]
-    fn covering_bounds_predefined_start_where_the_walked_series_does() {
+    fn covering_bounds_predefined_match_the_walked_series_exactly() {
         for range in [
             dr("2024-01-10", "2024-01-12"),
             dr("2024-01-10T15:30:00", "2024-01-11T03:00:00"),
@@ -637,39 +669,42 @@ mod tests {
                 ("year", "1 year"),
             ] {
                 let series = QueryTimeSeries::generate_predefined(granularity, &range, 3).unwrap();
-                let (from, to) = QueryTimeSeries::covering_bounds_predefined(
+                let span = QueryTimeSeries::covering_bounds_predefined(
                     granularity,
                     &iv(interval),
                     &range,
                     3,
                 )
                 .unwrap();
-                assert_eq!(from, series[0][0], "{granularity} over {range:?}");
+                assert_eq!(span.from, series[0][0], "{granularity} over {range:?}");
+                assert_eq!(
+                    span.to_aligned,
+                    series[series.len() - 1][1],
+                    "{granularity} over {range:?}"
+                );
                 assert!(
-                    to >= series[series.len() - 1][1],
-                    "{granularity} over {range:?}: {to}"
+                    span.to_stepped >= span.to_aligned,
+                    "{granularity} over {range:?}: {}",
+                    span.to_stepped
                 );
             }
         }
     }
 
-    // A range whose end is already a bucket end needs nothing past it, and the
-    // bound stops exactly there.
+    // A range whose end is already a bucket end needs nothing past it, and both
+    // bounds stop exactly there.
     #[test]
     fn covering_bounds_predefined_stop_at_a_bucket_aligned_end() {
-        assert_eq!(
-            QueryTimeSeries::covering_bounds_predefined(
-                "day",
-                &iv("1 day"),
-                &dr("2026-08-01", "2026-09-02"),
-                3
-            )
-            .unwrap(),
-            (
-                "2026-08-01T00:00:00.000".to_string(),
-                "2026-09-02T23:59:59.999".to_string()
-            )
-        );
+        let span = QueryTimeSeries::covering_bounds_predefined(
+            "day",
+            &iv("1 day"),
+            &dr("2026-08-01", "2026-09-02"),
+            3,
+        )
+        .unwrap();
+        assert_eq!(span.from, "2026-08-01T00:00:00.000");
+        assert_eq!(span.to_aligned, "2026-09-02T23:59:59.999");
+        assert_eq!(span.to_stepped, "2026-09-02T23:59:59.999");
     }
 
     #[test]
@@ -684,22 +719,29 @@ mod tests {
                 3
             )
             .unwrap()
-            .0,
+            .from,
             "2024-01-08T00:00:00.000"
         );
     }
 
-    // A series generated in SQL steps from the range start, so its buckets are
-    // offset from the boundaries a materialized series snaps to. The span has
-    // to cover the further of the two.
+    // A series generated in SQL steps the interval from the range start, so its
+    // buckets are offset from the boundaries a materialized one snaps to and its
+    // last bucket ends later. Only the stepped bound has to cover that.
     #[test]
     fn covering_bounds_predefined_cover_an_unaligned_series() {
         let range = dr("2026-08-01", "2026-09-06T23:59:59.999");
-        let (_, to) =
+        let span =
             QueryTimeSeries::covering_bounds_predefined("week", &iv("1 week"), &range, 3).unwrap();
         // Stepping weeks from Aug 1 (a Saturday) puts the last point on Sep 5,
         // whose week runs to Sep 11.
-        assert!(to.as_str() >= "2026-09-11T23:59:59.999", "{to}");
+        assert!(
+            span.to_stepped.as_str() >= "2026-09-11T23:59:59.999",
+            "{}",
+            span.to_stepped
+        );
+        // The week Sep 6 falls in ends that same day, and a materialized series
+        // stops there.
+        assert_eq!(span.to_aligned, "2026-09-06T23:59:59.999");
     }
 
     #[test]
