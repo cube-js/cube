@@ -196,13 +196,18 @@ export class PreAggregationPartitionRangeLoader {
     const sealAt = addSecondsToLocalTimestamp(
       loadRange[1], this.preAggregation.timezone, this.preAggregation.updateWindowSeconds || 0
     ).toISOString();
+    const structureVersionLoadSql = this.preAggregation.loadSql &&
+      this.replacePartitionSqlAndParams(this.preAggregation.loadSql, range, partitionTableName);
+    // Full partitions use the same SQL and parameters for loading and structure versioning.
+    // Reuse the tuple to avoid duplicate allocations; a clipped load range needs its own parameters.
+    const loadSql = range[0] === loadRange[0] && range[1] === loadRange[1]
+      ? structureVersionLoadSql
+      : this.preAggregation.loadSql && this.replacePartitionSqlAndParams(this.preAggregation.loadSql, loadRange, partitionTableName);
     return {
       ...this.preAggregation,
       tableName: partitionTableName,
-      structureVersionLoadSql: this.preAggregation.loadSql &&
-        this.replacePartitionSqlAndParams(this.preAggregation.loadSql, range, partitionTableName),
-      loadSql: this.preAggregation.loadSql &&
-        this.replacePartitionSqlAndParams(this.preAggregation.loadSql, loadRange, partitionTableName),
+      structureVersionLoadSql,
+      loadSql,
       sql: this.preAggregation.sql &&
         this.replacePartitionSqlAndParams(this.preAggregation.sql, loadRange, partitionTableName),
       invalidateKeyQueries: (this.preAggregation.invalidateKeyQueries || [])
