@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.38](https://github.com/cube-js/cube/compare/v1.7.37...v1.7.38) (2026-09-14)
+
+### Bug Fixes
+
+- **cubestore:** Build with large pagesize support for AMR64, thanks [@vltmn](https://github.com/vltmn) ([#10152](https://github.com/cube-js/cube/issues/10152)) ([460173d](https://github.com/cube-js/cube/commit/460173dd498f3c3bc7346b102d4c15ab137d5440))
+
 ## [1.7.37](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.37) (2026-09-10)
 
 ### Bug Fixes

@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.38](https://github.com/cube-js/cube/compare/v1.7.37...v1.7.38) (2026-09-14)
+
+### Bug Fixes
+
+- **deps:** Bump/align 24 transitive deps to clear 97 Dependabot alerts ([#11846](https://github.com/cube-js/cube/issues/11846)) ([eb11ecf](https://github.com/cube-js/cube/commit/eb11ecf696e052b042fb882fbc6b3bc6680602ae))
+
 ## [1.7.37](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.37) (2026-09-10)
 
 ### Features

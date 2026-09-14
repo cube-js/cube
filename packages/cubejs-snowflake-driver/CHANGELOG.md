@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.38](https://github.com/cube-js/cube/compare/v1.7.37...v1.7.38) (2026-09-14)
+
+### Bug Fixes
+
+- **snowflake-driver:** Support TIMESTAMP_TZ/TIMESTAMP_LTZ, thanks [@npwalker](https://github.com/npwalker) ([#11404](https://github.com/cube-js/cube/issues/11404)) ([81d2d23](https://github.com/cube-js/cube/commit/81d2d23fd174b425929e94e19f636594951e2227))
+
 ## [1.7.37](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.37) (2026-09-10)
 
 ### Features
