@@ -32,7 +32,9 @@ Because a stack owns its children's layout, you work with the **container as a u
 
 A **grid** is a container whose children each hold a fixed cell position and size, unlike a stack's evenly shared space. A grid is a window into the same uniform cell grid as the board that holds it, so a child keeps the exact footprint you give it — nothing is auto-compacted, swapped, resized, or moved to make room. Dragging, resizing, or dropping a widget onto a cell that's already occupied is rejected and the widget stays where it was.
 
-Click the grid's header to select it and drag its resize grip to change its size; resizing only crops or restores empty rows and columns (a grid can't shrink below 2×2 or cut into an occupied cell). Give the grid a title by clicking into the header once it's selected.
+A new grid is added as a square matching the column count of the board or grid it's placed in — for example, 12×12 on a 12-column dashboard. Add a widget to it by dragging one in from the canvas, the **Add Widgets** menu, or another container; the widget keeps its size and lands on the cell you drop it on, as long as that cell is free.
+
+Click the grid's header to select it, then drag its resize grip to change its size, or open its **⋯** menu for **Edit title**, **Resize**, and **Delete**. Resizing only crops or restores empty rows and columns: a grid can't shrink below 2×2 or cut into an occupied cell. To name a grid, click into its header once it's selected and type a title.
 
 A grid can be nested inside the root board or inside another grid, but not inside a stack.
 
