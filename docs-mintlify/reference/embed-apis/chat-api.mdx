@@ -224,6 +224,9 @@ When Cube token authentication is used:
 | `sessionSettings.securityContext` | object | No | Custom security context object passed to Cube queries. Not allowed with `internalId`. |
 | `activeBranchName` | string | No | Name of a development branch to use for the chat session. When provided, queries run against the specified branch instead of the main branch. |
 | `isDefaultBranch` | boolean | No | Whether the specified `activeBranchName` is the default branch. Defaults to `true` when `activeBranchName` is not set, and `false` when it is. Set to `true` if passing the main/production branch name. |
+| `allowChatWorkspaceAuthoring` | boolean | No | Restricts this session from creating or modifying persistent Cube Workspace content when set to `false`. Omitted or `true` preserves the user's role-derived authoring capabilities. Equivalent to `settings.allowChatWorkspaceAuthoring` below; when both are sent, this one wins. |
+| `settings` | object | No | Per-session [embed settings](/reference/embed-apis/generate-session#session-settings), the same object the Embed API's Generate Session endpoint takes. Of that object, only `allowAi` and `allowChatWorkspaceAuthoring` are acted on by this endpoint; other keys are carried on the session for whichever embedded surface reads them later. |
+| `timezone` | string | No | IANA time zone this session's chat turns run their queries in (e.g. `America/New_York`), so relative filters and time buckets land on the viewer's day. Equivalent to `settings.timezone`; when both are sent, this one wins. Omitted or unusable falls back to the deployment default. |
 
 <Info>
 
