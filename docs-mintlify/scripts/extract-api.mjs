@@ -171,6 +171,11 @@ const EXCLUDE_OPERATIONS = new Set([
   'GET /api/v1/ai-engineer/settings',
   // Report folders listing — not part of the public docs surface.
   'GET /api/v1/deployments/{deploymentId}/report-folders',
+  // Gated behind the useDatabricksMetricViewsPush flag, not GA (CUB-4443).
+  // Its sibling get/save endpoints on this controller are already published
+  // with hedged "in preview" wording from an earlier sync; this one is new
+  // and stays out until the feature ships.
+  'POST /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/access-test',
 ]);
 
 // Cube-staff-only operations (provisioning real cloud infrastructure — Regions,
