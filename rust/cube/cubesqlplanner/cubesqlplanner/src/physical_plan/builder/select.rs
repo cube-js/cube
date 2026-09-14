@@ -17,6 +17,7 @@ pub struct SelectBuilder {
     projection_columns: Vec<AliasedExpr>,
     from: Rc<From>,
     filter: Option<Filter>,
+    filter_params_filters: Option<Filter>,
     group_by: Vec<Expr>,
     having: Option<Filter>,
     order_by: Vec<OrderBy>,
@@ -33,6 +34,7 @@ impl SelectBuilder {
             projection_columns: vec![],
             from,
             filter: None,
+            filter_params_filters: None,
             group_by: vec![],
             having: None,
             order_by: vec![],
@@ -41,22 +43,6 @@ impl SelectBuilder {
             limit: None,
             offset: None,
             result_schema: Schema::empty(),
-        }
-    }
-
-    pub fn new_from_select(select: Rc<Select>) -> Self {
-        Self {
-            projection_columns: select.projection_columns.clone(),
-            from: select.from.clone(),
-            filter: select.filter.clone(),
-            group_by: select.group_by.clone(),
-            having: select.having.clone(),
-            order_by: select.order_by.clone(),
-            ctes: select.ctes.clone(),
-            is_distinct: select.is_distinct,
-            limit: select.limit,
-            offset: select.offset,
-            result_schema: Schema::clone(&select.schema),
         }
     }
 
@@ -252,6 +238,14 @@ impl SelectBuilder {
         self.filter = filter;
     }
 
+    /// The filters that `FILTER_PARAMS` and `FILTER_GROUP` bindings in this
+    /// select's sources bind against. Defaults to the WHERE filter; set it
+    /// where a select carries no WHERE of its own but its sources still have
+    /// to see the query's filters.
+    pub fn set_filter_params_filters(&mut self, filters: Option<Filter>) {
+        self.filter_params_filters = filters;
+    }
+
     pub fn set_group_by(&mut self, group_by: Vec<Expr>) {
         self.group_by = group_by;
     }
@@ -357,7 +351,7 @@ impl SelectBuilder {
             context: Rc::new(VisitorContext::new(
                 query_tools,
                 &nodes_factory,
-                self.filter,
+                self.filter_params_filters.or(self.filter),
             )),
             ctes: self.ctes,
             is_distinct: self.is_distinct,
