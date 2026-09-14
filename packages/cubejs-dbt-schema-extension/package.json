@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/dbt-schema-extension",
-  "description": "Cube.js dbt Schema Extension",
+  "description": "Cube dbt Schema Extension",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {

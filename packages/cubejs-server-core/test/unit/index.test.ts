@@ -738,7 +738,7 @@ describe('index.test', () => {
     expect(options.preAggregationsOptions.externalRefresh).toEqual(false);
   });
 
-  // Cube.js can override env
+  // Cube can override env
   testRefreshWorkerAndRollupModes(
     {
       testName: 'Override scheduledRefreshTimer (true) & rollupOnlyMode from cube.js',
@@ -759,7 +759,7 @@ describe('index.test', () => {
     }
   );
 
-  // Cube.js can override env
+  // Cube can override env
   testRefreshWorkerAndRollupModes(
     {
       testName: 'Override scheduledRefreshTimer (false) & rollupOnlyMode from cube.js',

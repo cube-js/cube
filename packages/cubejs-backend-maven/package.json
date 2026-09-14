@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/maven",
-  "description": "Cube.js Maven Wrapper for java dependencies downloading",
+  "description": "Cube Maven Wrapper for java dependencies downloading",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "license": "Apache-2.0",

@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/mysql-driver",
-  "description": "Cube.js Mysql database driver",
+  "description": "Cube Mysql database driver",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {

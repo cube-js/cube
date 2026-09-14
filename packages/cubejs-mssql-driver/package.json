@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/mssql-driver",
-  "description": "Cube.js MS SQL database driver",
+  "description": "Cube MS SQL database driver",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {

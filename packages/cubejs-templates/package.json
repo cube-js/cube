@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-backend/templates",
   "version": "1.7.37",
-  "description": "Cube.js Templates helpers",
+  "description": "Cube Templates helpers",
   "author": "Cube Dev, Inc.",
   "repository": {
     "type": "git",

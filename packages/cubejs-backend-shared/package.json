@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-backend/shared",
   "version": "1.7.37",
-  "description": "Shared code for Cube.js backend packages",
+  "description": "Shared code for Cube backend packages",
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
   "scripts": {

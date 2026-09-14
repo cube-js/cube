@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/athena-driver",
-  "description": "Cube.js Athena database driver",
+  "description": "Cube Athena database driver",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {

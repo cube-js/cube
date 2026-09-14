@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/snowflake-driver",
-  "description": "Cube.js Snowflake database driver",
+  "description": "Cube Snowflake database driver",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {

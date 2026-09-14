@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/linter",
-  "description": "Cube.js shared oxlint configuration (virtual package) for linting code",
+  "description": "Cube shared oxlint configuration (virtual package) for linting code",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {

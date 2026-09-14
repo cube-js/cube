@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/prestodb-driver",
-  "description": "Cube.js Presto database driver",
+  "description": "Cube Presto database driver",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {
