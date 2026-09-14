@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/crate-driver",
-  "description": "Cube.js Crate database driver",
+  "description": "Cube Crate database driver",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {

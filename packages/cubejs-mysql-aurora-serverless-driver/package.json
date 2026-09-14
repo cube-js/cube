@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/mysql-aurora-serverless-driver",
-  "description": "Cube.js Aurora Serverless Mysql database driver",
+  "description": "Cube Aurora Serverless Mysql database driver",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {

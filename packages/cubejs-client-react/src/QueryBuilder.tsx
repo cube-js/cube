@@ -78,7 +78,7 @@ const granularities: GranularityOption[] = [
 ];
 
 /**
- * `<QueryBuilder />` is used to build interactive analytics query builders. It abstracts state management and API calls to Cube.js Backend. It uses render prop technique and doesn’t render anything itself, but calls the render function instead.
+ * `<QueryBuilder />` is used to build interactive analytics query builders. It abstracts state management and API calls to Cube Backend. It uses render prop technique and doesn’t render anything itself, but calls the render function instead.
  *
  * **Example**
  *

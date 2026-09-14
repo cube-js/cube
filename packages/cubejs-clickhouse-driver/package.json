@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/clickhouse-driver",
-  "description": "Cube.js ClickHouse database driver",
+  "description": "Cube ClickHouse database driver",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {

@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/materialize-driver",
-  "description": "Cube.js Materialize database driver",
+  "description": "Cube Materialize database driver",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {

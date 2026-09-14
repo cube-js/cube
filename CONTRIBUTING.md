@@ -82,7 +82,7 @@ https://github.com/cube-js/cube/blob/master/packages/cubejs-jdbc-driver/README.m
 
 #### Development
 
-Cube.is written in a mixture of JavaScript, TypeScript, and Rust. TypeScript and Rust are preferred for new code.
+Cube is written in a mixture of JavaScript, TypeScript, and Rust. TypeScript and Rust are preferred for new code.
 
 > Attention: Cube uses TypeScript configured in incremental mode, which uses cache to speed up compilation,  
 > but in some cases, you can run into a problem with a not recompiled file. To fix it, we recommend running `$ yarn clean` and `$ yarn tsc`.
@@ -181,7 +181,7 @@ When it's up and running just use `yarn test` in `packages/cubejs-schema-compile
 
 ### Client Packages
 
-If you want to make changes to the Cube.js client packages and test them locally in your project you can do it the following way:
+If you want to make changes to the Cube client packages and test them locally in your project you can do it the following way:
 1. Make the desired changes and run `yarn build` in the root directory (you can also use `yarn watch`)
 2. Go to the `~/some-path/cube.js/packages/cubejs-client-core` directory and run `yarn link`. (You'll see the messages _Registered **"@cubejs-client/core"**_)
 3. Now you can link it in your project (e.g. _/my-project/dashboard-app_). You can do so running `yarn link "@cubejs-client/core"`

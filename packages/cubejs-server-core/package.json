@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/server-core",
-  "description": "Cube.js base component to wire all backend components together",
+  "description": "Cube base component to wire all backend components together",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {

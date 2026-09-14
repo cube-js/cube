@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/server",
-  "description": "Cube.js all-in-one server",
+  "description": "Cube all-in-one server",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "types": "index.d.ts",

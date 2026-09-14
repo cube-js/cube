@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/native",
   "version": "1.7.37",
   "author": "Cube Dev, Inc.",
-  "description": "Native module for Cube.js (binding to Rust codebase)",
+  "description": "Native module for Cube (binding to Rust codebase)",
   "main": "dist/js/index.js",
   "typings": "dist/js/index.d.ts",
   "repository": {

@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/ksql-driver",
-  "description": "Cube.js ksql database driver",
+  "description": "Cube ksql database driver",
   "author": "Cube Dev, Inc.",
   "version": "1.7.37",
   "repository": {
