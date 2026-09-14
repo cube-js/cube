@@ -64,6 +64,7 @@ describe('statements/union', () => {
       // Neither TOP nor OFFSET/FETCH attaches to a compound query in T-SQL
       ['MssqlQuery', 'SELECT TOP {{ limit }} * FROM ('],
     ];
+
     for (const [name, clause] of clauses) {
       expect(unionTemplate(dialect(name))).toContain(clause);
     }

@@ -684,6 +684,7 @@ export class QueryCache {
       sendHeaders: false,
     });
     let tableData;
+
     try {
       if (client.stream) {
         tableData = await client.stream(q.query, q.values, q);

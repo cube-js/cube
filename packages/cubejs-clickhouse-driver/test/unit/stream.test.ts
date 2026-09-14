@@ -155,6 +155,7 @@ describe('ClickHouseDriver stream', () => {
     ]);
 
     const received: Array<unknown> = [];
+
     for await (const row of rowStream) {
       received.push(row);
     }
@@ -176,6 +177,7 @@ describe('ClickHouseDriver stream', () => {
     const { rowStream, release } = await openStream({ highWaterMark: 100 });
 
     const received: Array<any> = [];
+
     for await (const row of rowStream) {
       received.push(row);
     }

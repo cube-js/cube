@@ -131,6 +131,7 @@ export class ServerContainer {
       const depsToCompareVersions = Object.keys(manifest.devDependencies).filter(
         isCubeNotServerPackage
       );
+
       // eslint-disable-next-line no-restricted-syntax
       for (const pkgName of depsToCompareVersions) {
         const pkgVersion = safetyParseSemver(

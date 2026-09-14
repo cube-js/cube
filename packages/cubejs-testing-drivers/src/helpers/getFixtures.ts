@@ -4,6 +4,7 @@ import { Fixture } from '../types/Fixture';
 
 function deepMerge(a: any, b: any): any {
   a = { ...a };
+
   for (const k of Object.keys(b)) {
     if (a[k] && typeof a[k] === 'object') {
       a[k] = deepMerge(a[k], b[k]);

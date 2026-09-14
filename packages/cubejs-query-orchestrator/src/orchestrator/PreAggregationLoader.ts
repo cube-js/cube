@@ -966,6 +966,7 @@ export class PreAggregationLoader {
 
   protected async createIndexes(driver: DriverInterface, newVersionEntry: VersionEntry, saveCancelFn: SaveCancelFn, queryOptions: QueryOptions) {
     const indexesSql = this.prepareIndexesSql(newVersionEntry, queryOptions);
+
     for (let i = 0; i < indexesSql.length; i++) {
       const [query, params] = indexesSql[i].sql;
       await saveCancelFn(driver.query(query, params, queryOptions));

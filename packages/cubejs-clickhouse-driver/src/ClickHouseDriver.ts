@@ -247,6 +247,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       abortController.abort();
       // Use separate client for kill query, usual pool may be busy
       const killClient = this.createClient(1);
+
       try {
         await killClient.command({
           query: formatMySql('KILL QUERY WHERE query_id = ?', [queryId]),
@@ -387,6 +388,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const transform = buildTransformFromMeta(res.meta);
 
     const rows: Array<R> = new Array(data.length);
+
     for (let i = 0; i < data.length; i++) {
       rows[i] = transformRow(data[i] as Array<unknown>, transform) as R;
     }
@@ -652,6 +654,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
 
   public override async createTable(quotedTableName: string, columns: TableColumn[]) {
     const createTableSql = this.createTableSql(quotedTableName, columns);
+
     try {
       await this.command(createTableSql);
     } catch (e) {

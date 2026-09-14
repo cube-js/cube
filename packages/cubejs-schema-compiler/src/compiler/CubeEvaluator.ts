@@ -337,6 +337,7 @@ export class CubeEvaluator extends CubeSymbols {
           { originalSorting: true }
         );
         const resolvedUnless: string[] = [];
+
         for (const ref of rawUnless) {
           const r = resolveViewMember('unless', ref);
           if (r !== null) {

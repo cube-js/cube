@@ -164,6 +164,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         // otherwise forces the client's configured host, so the view preserves
         // upstream's host-following behaviour.
         let href;
+
         try {
           href = new URL(opts);
         } catch (error) {
@@ -245,6 +246,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
           },
           data: (error: any, data: any[], columns: TableStructure) => {
             const normalData = this.normalizeResultOverColumns(data, columns);
+
             for (const obj of normalData) {
               rowStream.write(obj);
             }
@@ -457,6 +459,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
   public async queryColumnTypes(sql: string, params: unknown[]): Promise<{ name: string; type: string; }[]> {
     const response = await this.stream(`${sql} LIMIT 0`, params || [], { highWaterMark: 1 });
     const result = [];
+
     for (const column of response.types || []) {
       result.push({ name: column.name, type: this.toGenericType(column.type) });
     }

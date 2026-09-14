@@ -93,12 +93,14 @@ function addAggregate(into: Aggregate, from: Aggregate): Aggregate {
  */
 function subAggregate(a: Aggregate, b: Aggregate): Aggregate {
   const methods: Record<string, MethodCounter> = {};
+
   for (const [name, m] of Object.entries(a.methods)) {
     const base = b.methods[name] || { started: 0, finished: 0 };
     methods[name] = { started: m.started - base.started, finished: m.finished - base.finished };
   }
 
   const events: Record<string, number> = {};
+
   for (const [name, count] of Object.entries(a.events)) {
     events[name] = count - (b.events[name] || 0);
   }
@@ -313,6 +315,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
 
       function snapshotAggregate(): Aggregate {
         const total = toAggregate(counters);
+
         for (const ws of workerStates) {
           addAggregate(total, toAggregate(ws.latest));
         }
@@ -483,6 +486,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
         await collectWorkerSnapshots();
         baseline = snapshotAggregate();
         baselineMain = toAggregate(counters);
+
         for (const ws of workerStates) {
           ws.baseline = toAggregate(ws.latest);
         }

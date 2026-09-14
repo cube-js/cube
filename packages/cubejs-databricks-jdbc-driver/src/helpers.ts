@@ -62,6 +62,7 @@ export function parseDatabricksJdbcUrl(jdbcUrl: string): ParsedConnectionPropert
   const [host] = hostPortAndPath.split(':');
 
   const paramMap = new Map<string, string>();
+
   for (const param of params) {
     const [key, value] = param.split('=');
     if (key && value) {

@@ -120,6 +120,7 @@ export function executeTestSuite({ type, tests, config = {} }: TestSuite) {
           };
           if (t.expectArray) {
             const promiseInstance = promise();
+
             for (const expectFn of t.expectArray) {
               await promiseInstance.catch((e) => expectFn(e as Error));
             }
