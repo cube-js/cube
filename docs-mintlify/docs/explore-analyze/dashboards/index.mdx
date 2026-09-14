@@ -24,18 +24,20 @@ definitions in Git — see [Dashboards as code](/docs/explore-analyze/dashboards
 
 ## Publishing and versions
 
-A dashboard you build in the workbook is a **draft** until you publish it. Click
-**Publish** in the dashboard builder to publish the current draft as a new
-**version** — stakeholders always see the latest published version, never your
-in-progress edits.
+A workbook holds a single dashboard, which stays a **draft** until you publish
+it. Click **Publish** in the dashboard builder to publish the current draft as a
+new **version** — viewers always see the latest published version, never your
+in-progress edits. (Publishing is a workbook-level operation, so it's also
+available from source control — see [Dashboards as
+code](/docs/explore-analyze/dashboards/dashboards-as-code).)
 
-The button next to **Publish** reflects the dashboard's state:
+The button next to **Publish** reflects the dashboard's state — click it to open
+the [revision history](#revision-history):
 
-- Nothing is shown before the first publish.
-- **`v{N}`** once the published version and your draft match — click it to open
-  the [revision history](#revision-history).
-- **Draft** once you have unpublished changes — click it to open the same
-  revision history.
+- **`v{N}`** — the published version and your draft match.
+- **Draft** — you have unpublished changes.
+
+Before the first publish, no button is shown.
 
 While editing, **Undo** and **Redo** step through your draft changes, and
 **Revert** discards all unpublished changes to restore the currently published
@@ -43,18 +45,19 @@ version.
 
 ### Revision history
 
-Open the revision history from the **`v{N}`** / **Draft** button to browse every
-published version alongside the current draft. Each row shows the version number,
-when it was published, and by whom. Select a version to preview it, then
-**Restore** to make it your current draft — publish again to make it the live
-version.
+The revision history lists every published version alongside the current draft.
+Each row shows the version number, when it was published, and by whom. Select a
+version to preview it, then **Restore** to make it your current draft — publish
+again to make it the live version.
 
 ### What viewers see
 
-On a published dashboard, a version chip in the header shows the live version
-(e.g. `v3`). Opening it reveals when that version was published and a summary of
-what changed since the previous version — added, updated, or removed widgets — so
-viewers can tell at a glance whether the dashboard has moved on.
+When someone opens a published dashboard in Cube Cloud, a version chip in the
+header shows the live version (e.g. `v3`). Opening it reveals when that version
+was published and a summary of what changed since the previous version — added,
+updated, or removed widgets — so viewers can see which version they're looking at
+and what changed in it. (The chip is in-app only; it doesn't appear on
+[embedded dashboards](/embedding/iframe/dashboards).)
 
 ## Data freshness
 
