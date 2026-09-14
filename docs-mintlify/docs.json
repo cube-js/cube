@@ -329,7 +329,6 @@
                     "root": "admin/deployment/dedicated/aws/index",
                     "pages": [
                       "admin/deployment/dedicated/aws/private-link",
-                      "admin/deployment/dedicated/aws/vpc-peering",
                       "admin/deployment/dedicated/aws/private-api-connectivity",
                       "admin/deployment/dedicated/aws/byoc"
                     ]
@@ -339,7 +338,6 @@
                     "root": "admin/deployment/dedicated/azure/index",
                     "pages": [
                       "admin/deployment/dedicated/azure/private-link",
-                      "admin/deployment/dedicated/azure/vpc-peering",
                       "admin/deployment/dedicated/azure/byoc"
                     ]
                   },
@@ -348,7 +346,6 @@
                     "root": "admin/deployment/dedicated/gcp/index",
                     "pages": [
                       "admin/deployment/dedicated/gcp/private-service-connect",
-                      "admin/deployment/dedicated/gcp/vpc-peering",
                       "admin/deployment/dedicated/gcp/byoc"
                     ]
                   },
@@ -1255,7 +1252,11 @@
     },
     {
       "source": "/admin/deployment/vpc/aws/vpc-peering",
-      "destination": "/admin/deployment/dedicated/aws/vpc-peering"
+      "destination": "/admin/deployment/dedicated/aws"
+    },
+    {
+      "source": "/admin/deployment/dedicated/aws/vpc-peering",
+      "destination": "/admin/deployment/dedicated/aws"
     },
     {
       "source": "/admin/deployment/vpc/aws/private-api-connectivity",
@@ -1275,7 +1276,11 @@
     },
     {
       "source": "/admin/deployment/vpc/azure/vpc-peering",
-      "destination": "/admin/deployment/dedicated/azure/vpc-peering"
+      "destination": "/admin/deployment/dedicated/azure"
+    },
+    {
+      "source": "/admin/deployment/dedicated/azure/vpc-peering",
+      "destination": "/admin/deployment/dedicated/azure"
     },
     {
       "source": "/admin/deployment/vpc/azure/byoc",
@@ -1291,7 +1296,11 @@
     },
     {
       "source": "/admin/deployment/vpc/gcp/vpc-peering",
-      "destination": "/admin/deployment/dedicated/gcp/vpc-peering"
+      "destination": "/admin/deployment/dedicated/gcp"
+    },
+    {
+      "source": "/admin/deployment/dedicated/gcp/vpc-peering",
+      "destination": "/admin/deployment/dedicated/gcp"
     },
     {
       "source": "/admin/deployment/vpc/gcp/byoc",
