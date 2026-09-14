@@ -359,8 +359,7 @@ export class RefreshScheduler {
 
       // This method exists only to warm the shared refresh key cache, and a locally evaluated
       // key has no cache entry to warm — the getSql plus executeQuery per timezone below would
-      // be spent on a result that is thrown away. A `sql` key still hits the data source, and
-      // so do interval keys whenever the cache declines to evaluate them locally.
+      // be spent on a result that is thrown away. A `sql` key still hits the data source.
       const sqlRefreshKey = !!cubeFromPath.refreshKey && 'sql' in cubeFromPath.refreshKey;
       if (localRefreshKey && !sqlRefreshKey) {
         return;

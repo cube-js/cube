@@ -30,8 +30,15 @@ import {
   getCacheHash,
   evaluateLocalRefreshKey,
   isValidLocalRefreshKey,
+  refreshKeyPhaseSeed,
+  snapToRenewalThreshold,
 } from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
+
+/**
+ * Refresh key cache TTL in seconds, shared by the pre-aggregation loader and the local snap cap.
+ */
+export const REFRESH_KEY_CACHE_TTL = 60 * 60;
 
 export type CacheQueryResultOptions = {
   renewalThreshold?: number,
@@ -238,25 +245,32 @@ export class QueryCache {
    * run as queries and cached.
    */
   public isLocalRefreshKeyActive(): boolean {
-    return this.localRefreshKeyEnabled && !this.options.refreshKeyRenewalThreshold;
+    return this.localRefreshKeyEnabled;
   }
 
-  public localRefreshKeyResult(queryOptions?: QueryOptions): [{ refresh_key: string }] | null {
-    if (!this.localRefreshKeyEnabled || !isValidLocalRefreshKey(queryOptions?.localRefreshKey)) {
+  /**
+   * The snap window is capped at the refresh key entry TTL, since the SQL path re-read the entry
+   * once it expired whatever the threshold said, and phased by `cacheKey` so keys do not all
+   * advance together. Both derive from the key, not the caller: one identity, one value.
+   */
+  public localRefreshKeyResult(
+    queryOptions: QueryOptions | undefined,
+    cacheKey: CacheKey,
+  ): [{ refresh_key: string }] | null {
+    if (!this.isLocalRefreshKeyActive() || !isValidLocalRefreshKey(queryOptions?.localRefreshKey)) {
       return null;
     }
 
-    // `refreshKeyRenewalThreshold` throttles how often the SQL result is re-read, and that is
-    // also what bounds how often the key advances: a value cached for a day advances daily,
-    // whatever `every` says. A locally evaluated key has no cache entry to age out, so the only
-    // way to keep honouring the override is to leave these keys on the SQL path.
-    // TODO: support the two together by snapping the local value to the threshold instead of
-    // falling back to a query.
-    if (!this.isLocalRefreshKeyActive()) {
-      return null;
-    }
+    // The per-key `queryOptions.renewalThreshold` is deliberately not snapped to: it is a fraction
+    // of the interval (`BaseQuery.refreshKeyRenewalThresholdForInterval`), so the SQL path re-reads
+    // faster than the key can move and snapping would only delay the boundary.
+    const threshold = this.options.refreshKeyRenewalThreshold;
+    const window = threshold ? Math.min(threshold, REFRESH_KEY_CACHE_TTL) : undefined;
 
-    return evaluateLocalRefreshKey(<LocalRefreshKeyDescriptor>queryOptions?.localRefreshKey);
+    return evaluateLocalRefreshKey(
+      <LocalRefreshKeyDescriptor>queryOptions?.localRefreshKey,
+      snapToRenewalThreshold(Date.now(), window, refreshKeyPhaseSeed(cacheKey)),
+    );
   }
 
   public getCacheDriver(): CacheDriverInterface {
@@ -516,13 +530,12 @@ export class QueryCache {
     options: RefreshKeyCacheOptions,
   ) {
     const [query, values, queryOptions] = sqlQuery;
+    const cacheKey = QueryCache.refreshKeyIdentity(sqlQuery, options.dataSource);
 
-    const local = this.localRefreshKeyResult(queryOptions);
+    const local = this.localRefreshKeyResult(queryOptions, cacheKey);
     if (local) {
       return local;
     }
-
-    const cacheKey = QueryCache.refreshKeyIdentity(sqlQuery, options.dataSource);
 
     return this.cacheQueryResult(query, values, cacheKey, expiration, {
       ...options,
