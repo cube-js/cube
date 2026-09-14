@@ -64,6 +64,17 @@ describe('SnowflakeDriver', () => {
     try {
       const tableData = await driver.stream(QUERY_TO_TEST_HYDRATION, [], { highWaterMark: 100 });
       try {
+        // Every TIMESTAMP variant must reach Cube Store as the generic `timestamp`;
+        // TIMESTAMP_TZ/LTZ used to fall through as their raw Snowflake type name.
+        expect(tableData.types).toEqual([
+          { name: 'n', type: 'decimal' },
+          { name: 'ts_ntz', type: 'timestamp' },
+          { name: 'ts_tz', type: 'timestamp' },
+          { name: 'ts_tz_offset', type: 'timestamp' },
+          { name: 'ts_ltz', type: 'timestamp' },
+          { name: 'd', type: 'date' },
+        ]);
+
         const rows = await streamToArray(tableData.rowStream as any);
         assertHydrationResults(rows as any[]);
       } finally {
