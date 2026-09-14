@@ -263,6 +263,18 @@ impl<'a> FilterSqlContext<'a> {
         Ok(format!("({})", select))
     }
 
+    /// A date normalised to the dialect's precision, without allocating it —
+    /// for a caller that still has arithmetic to do on it.
+    pub fn format_from_date(&self, value: &str) -> Result<String, CubeError> {
+        let precision = self.plan_templates.timestamp_precision()?;
+        QueryDateTimeHelper::format_from_date(value, precision)
+    }
+
+    pub fn format_to_date(&self, value: &str) -> Result<String, CubeError> {
+        let precision = self.plan_templates.timestamp_precision()?;
+        QueryDateTimeHelper::format_to_date(value, precision)
+    }
+
     /// The bound, unless its side reaches without limit — which no date states.
     pub fn keep_bounded(&self, bound: String, interval: &Option<String>) -> Option<String> {
         match interval.as_deref() {

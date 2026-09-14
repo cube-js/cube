@@ -132,6 +132,12 @@ fn a_column_binding_widens_with_the_window() {
         bounds.iter().any(|bound| bound.starts_with("2024-01-31")),
         "the scan reaches back as far as the window does: {bounds:?}\npredicate: {predicate}"
     );
+    // Folded into the bound, not applied around it: a bound a dialect still has
+    // to evaluate is one it may fail to plan.
+    assert!(
+        !predicate.contains("interval"),
+        "the frame is still applied in SQL\npredicate: {predicate}"
+    );
 }
 
 // A callback binding is handed the band the stage reads rather than the period

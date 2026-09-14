@@ -17,7 +17,7 @@ use crate::planner::state::State;
 use crate::planner::symbols::deps::{collect_cube_refs, collect_deps, SymbolDeps};
 use crate::planner::symbols::transforms;
 use crate::planner::symbols::AggregationType;
-use crate::planner::time_dimension::SqlInterval;
+use crate::planner::time_dimension::shift_bound_wall_clock;
 use crate::planner::Case;
 use crate::planner::CaseSwitchDefinition;
 use crate::planner::CaseSwitchItem;
@@ -34,14 +34,12 @@ use crate::planner::QueryProperties;
 use crate::planner::QueryTimeSeries;
 use crate::planner::TimeDimensionSymbol;
 use chrono::Duration;
-use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
-use std::str::FromStr;
 
 /// Plans the multi-stage CTE tree of a query. For every multi-stage
 /// member it encounters in `all_used_symbols`, it recursively
@@ -1331,31 +1329,11 @@ impl MultiStageQueryPlanner {
         };
         let tz = self.query_tools.query_tools().timezone();
         Ok(Some((
-            Self::fold_frame(tz, &series_from, &rolling_window.trailing, true)?,
-            Self::fold_frame(tz, &series_to, &rolling_window.leading, false)?,
+            shift_bound_wall_clock(tz, &series_from, &rolling_window.trailing, true)?
+                .unwrap_or(series_from.clone()),
+            shift_bound_wall_clock(tz, &series_to, &rolling_window.leading, false)?
+                .unwrap_or(series_to.clone()),
         )))
-    }
-
-    /// `bound` moved by `interval` on the wall clock, the way the series places
-    /// its own points. An absent or `unbounded` interval leaves it alone.
-    fn fold_frame(
-        tz: Tz,
-        bound: &str,
-        interval: &Option<String>,
-        subtract: bool,
-    ) -> Result<String, CubeError> {
-        let interval = match interval.as_deref() {
-            None | Some("unbounded") => return Ok(bound.to_string()),
-            Some(interval) => SqlInterval::from_str(interval)?,
-        };
-        let interval = if subtract {
-            interval.inverse()
-        } else {
-            interval
-        };
-        Ok(QueryDateTime::from_date_str(tz, bound)?
-            .add_interval_wall_clock(&interval)?
-            .default_format())
     }
 
     /// Span the base scan of a `to_date` window over `time_dimension` reads:

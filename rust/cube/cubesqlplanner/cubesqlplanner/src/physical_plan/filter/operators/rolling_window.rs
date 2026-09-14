@@ -2,6 +2,7 @@ use super::{FilterOperationSql, FilterSqlContext};
 use crate::planner::filter::operators::rolling_window::{
     RegularRollingWindowOp, RollingWindowOffsetOp,
 };
+use crate::planner::time_dimension::shift_bound_wall_clock;
 use cubenativeutils::CubeError;
 
 impl FilterOperationSql for RegularRollingWindowOp {
@@ -43,25 +44,30 @@ impl FilterOperationSql for RollingWindowOffsetOp {
         let from_start = self.offset == "start";
         let member = ctx.member_sql().to_string();
 
-        // Anchor: range start (formatted to start-of-day) for offset 'start',
-        // range end (formatted to end-of-day) for 'end'. Both bounds share it.
+        // Anchor: range start for offset 'start', range end for 'end'. Both
+        // bounds are that anchor moved by the frame — folded in here rather
+        // than applied to it in SQL, so the predicate is a bare comparison a
+        // dialect has nothing left to fold. See `date_range_literals`.
         let anchor = if from_start {
             let from = self.from.as_deref().ok_or_else(|| {
                 CubeError::internal("Rolling window date range is missing its start".to_string())
             })?;
-            ctx.format_and_allocate_from_date(from)?
+            ctx.format_from_date(from)?
         } else {
             let to = self.to.as_deref().ok_or_else(|| {
                 CubeError::internal("Rolling window date range is missing its end".to_string())
             })?;
-            ctx.format_and_allocate_to_date(to)?
+            ctx.format_to_date(to)?
         };
+        let tz = ctx.query_tools.timezone();
 
         let mut conditions = Vec::new();
 
-        // trailing side -> lower bound (shifted back by the trailing interval;
-        // `unbounded` drops the bound, `None` keeps the anchor unshifted).
-        if let Some(bound) = ctx.extend_date_range_bound(anchor.clone(), &self.trailing, true)? {
+        // trailing side -> lower bound; leading side -> upper bound.
+        // Shifted on the wall clock first, then carried into the database's
+        // timezone — this operator compares an unconverted member.
+        if let Some(bound) = shift_bound_wall_clock(tz, &anchor, &self.trailing, true)? {
+            let bound = ctx.format_and_allocate_from_date(&bound)?;
             conditions.push(if from_start {
                 ctx.plan_templates.gte(member.clone(), bound)?
             } else {
@@ -69,8 +75,8 @@ impl FilterOperationSql for RollingWindowOffsetOp {
             });
         }
 
-        // leading side -> upper bound (shifted forward by the leading interval).
-        if let Some(bound) = ctx.extend_date_range_bound(anchor.clone(), &self.leading, false)? {
+        if let Some(bound) = shift_bound_wall_clock(tz, &anchor, &self.leading, false)? {
+            let bound = ctx.format_and_allocate_to_date(&bound)?;
             conditions.push(if from_start {
                 ctx.plan_templates.lt(member.clone(), bound)?
             } else {

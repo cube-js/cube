@@ -11,15 +11,14 @@ use crate::planner::filter::typed_filter::{resolve_base_symbol, FilterOp, TypedF
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_call::SqlCallFilterParamsItem;
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::time_dimension::{shift_bound_wall_clock, UNBOUNDED_INTERVAL};
 use crate::planner::FiltersContext;
-use crate::planner::QueryDateTime;
 use crate::planner::QueryDateTimeHelper;
 use crate::planner::QueryTimeSeries;
 use crate::planner::SqlInterval;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
-use std::str::FromStr;
 
 impl ToSql for TypedFilter {
     fn to_sql(
@@ -270,8 +269,8 @@ impl TypedFilter {
                 let Some(anchor) = anchor.transpose()? else {
                     return Ok(None);
                 };
-                let lower = shift_bound(tz, &anchor, trailing, true)?;
-                let upper = shift_bound(tz, &anchor, leading, false)?;
+                let lower = shift_bound_wall_clock(tz, &anchor, trailing, true)?;
+                let upper = shift_bound_wall_clock(tz, &anchor, leading, false)?;
                 Ok(lower.zip(upper))
             }
             _ => Ok(None),
@@ -280,31 +279,7 @@ impl TypedFilter {
 }
 
 fn is_unbounded(interval: &Option<String>) -> bool {
-    interval.as_deref() == Some("unbounded")
-}
-
-/// `date` moved by `interval`, or `None` for an `unbounded` side — which has no
-/// bound to state. A side with no interval keeps the date as it is.
-fn shift_bound(
-    tz: Tz,
-    date: &str,
-    interval: &Option<String>,
-    subtract: bool,
-) -> Result<Option<String>, CubeError> {
-    let interval = match interval.as_deref() {
-        Some("unbounded") => return Ok(None),
-        Some(interval) => SqlInterval::from_str(interval)?,
-        None => return Ok(Some(date.to_string())),
-    };
-    let interval = if subtract {
-        interval.inverse()
-    } else {
-        interval
-    };
-    let anchor = QueryDateTime::from_date_str(tz, date)?;
-    Ok(Some(
-        anchor.add_interval_wall_clock(&interval)?.default_format(),
-    ))
+    interval.as_deref() == Some(UNBOUNDED_INTERVAL)
 }
 
 fn dispatch_to_sql(op: &FilterOp, ctx: &FilterSqlContext) -> Result<String, CubeError> {
@@ -330,7 +305,7 @@ mod tests {
     use super::*;
 
     fn shifted(date: &str, interval: &str, subtract: bool) -> String {
-        shift_bound(
+        shift_bound_wall_clock(
             Tz::America__Los_Angeles,
             date,
             &Some(interval.to_string()),
@@ -381,7 +356,7 @@ mod tests {
     #[test]
     fn an_unbounded_side_states_no_bound() {
         assert_eq!(
-            shift_bound(
+            shift_bound_wall_clock(
                 Tz::America__Los_Angeles,
                 "2024-03-10T12:00:00.000",
                 &Some("unbounded".to_string()),

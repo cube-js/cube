@@ -79,6 +79,17 @@ fn test_base_scan_date_bound_is_literal() {
         "base scan date bound is a scalar sub-select over time_series:\n{sql}"
     );
 
+    // The frame is folded into the bound rather than applied around it. A bound
+    // a dialect still has to evaluate while planning is one it may fail on.
+    let base_scans = sql.split("FROM  rw_daily_activity").skip(1);
+    for scan in base_scans {
+        let predicate = &scan[..scan.find("GROUP BY").unwrap_or(scan.len())];
+        assert!(
+            !predicate.contains("interval"),
+            "the frame is still applied in SQL:\n{predicate}"
+        );
+    }
+
     // The range is whole days at day granularity, so both ends land on a bucket
     // boundary; each window's own frame is then folded into its lower bound,
     // seven days back for one and thirty for the other. The rolling join

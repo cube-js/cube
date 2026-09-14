@@ -4,6 +4,7 @@ use chrono::Duration;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::cmp::Ord;
+use std::str::FromStr;
 
 #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug)]
 pub struct QueryDateTime {
@@ -16,6 +17,38 @@ impl ToString for QueryDateTime {
     fn to_string(&self) -> String {
         self.default_format()
     }
+}
+
+/// The marker an interval carries when its side reaches without limit.
+pub const UNBOUNDED_INTERVAL: &str = "unbounded";
+
+/// `date` moved by `interval` on the wall clock, or `None` for an `unbounded`
+/// side — which no date states. A side with no interval keeps the date as it is.
+///
+/// Wall clock rather than absolute time because this is what SQL interval
+/// arithmetic over a naive local timestamp does, and where a series places its
+/// own points; across a daylight-saving transition the two differ by the offset.
+pub fn shift_bound_wall_clock(
+    tz: Tz,
+    date: &str,
+    interval: &Option<String>,
+    subtract: bool,
+) -> Result<Option<String>, CubeError> {
+    let interval = match interval.as_deref() {
+        Some(UNBOUNDED_INTERVAL) => return Ok(None),
+        Some(interval) => SqlInterval::from_str(interval)?,
+        None => return Ok(Some(date.to_string())),
+    };
+    let interval = if subtract {
+        interval.inverse()
+    } else {
+        interval
+    };
+    Ok(Some(
+        QueryDateTime::from_date_str(tz, date)?
+            .add_interval_wall_clock(&interval)?
+            .default_format(),
+    ))
 }
 
 impl QueryDateTime {
