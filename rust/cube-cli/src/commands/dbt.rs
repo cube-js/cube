@@ -1,4 +1,5 @@
 use std::io::Read;
+use std::path::{Component, Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context as _, Result};
@@ -50,6 +51,35 @@ enum Cmd {
         timeout: Duration,
         /// How often to poll while waiting
         #[arg(long, default_value = "5s", value_parser = util::parse_duration, requires = "wait")]
+        poll: Duration,
+    },
+    /// Generate cubes from a dbt manifest and write them locally, committing nothing
+    ///
+    /// The CI half of the dbt integration: your pipeline runs dbt, uploads the
+    /// manifest it produced, and gets the cube YAML back to commit through its own
+    /// review. Cube needs no access to the dbt repository, creates no branch, and
+    /// writes nothing to the Cube data model.
+    Generate {
+        /// Deployment id
+        deployment: i64,
+        /// Read and upload a dbt manifest from this path (`-` for stdin)
+        #[arg(long, value_name = "PATH", value_parser = util::nonempty_path)]
+        manifest: String,
+        /// Directory to write into — the ROOT of your data model project, since the
+        /// generated paths are project-relative (`model/cubes/dbt/...`) and are
+        /// honoured as they come
+        #[arg(long, value_name = "DIR", default_value = ".", value_parser = util::nonempty_path)]
+        out: String,
+        /// Compare with what is already on disk instead of writing, and exit
+        /// non-zero if anything differs — a PR gate for "the committed cubes match
+        /// the dbt project"
+        #[arg(long)]
+        check: bool,
+        /// Give up waiting for the run after this long
+        #[arg(long, default_value = "30m", value_parser = util::parse_duration)]
+        timeout: Duration,
+        /// How often to poll while waiting
+        #[arg(long, default_value = "5s", value_parser = util::parse_duration)]
         poll: Duration,
     },
     /// Show the status of a dbt sync
@@ -161,6 +191,117 @@ fn start_body(branch: &Option<String>, r#ref: &Option<String>, manifest: Option<
     }
 
     util::body(body)
+}
+
+/// Build the generate payload. `output: "files"` is what makes the run commit
+/// nothing; `source: "manifest"` is required alongside it because a generate run
+/// has no repository to read from.
+fn generate_body(manifest: Value) -> Value {
+    let mut body = serde_json::Map::new();
+    body.insert("source".to_string(), Value::String("manifest".to_string()));
+    body.insert("output".to_string(), Value::String("files".to_string()));
+    body.insert("manifest".to_string(), manifest);
+
+    util::body(body)
+}
+
+/// A server that predates `output` accepts the unknown field, then commits to a
+/// branch as usual — the same silent downgrade `ensure_manifest_source` guards
+/// against, and worse here, because by the time we notice, a branch exists in the
+/// customer's repository and the review notification has gone out.
+///
+/// The tell is available immediately and needs no extra request: a run that
+/// commits nothing reports no branch, so a branch name coming back means the
+/// server ignored what we asked for.
+fn ensure_nothing_was_committed(started: &Value) -> Result<()> {
+    let branch = output::field(started, "branchName");
+    if util::is_blank(&branch) {
+        return Ok(());
+    }
+
+    bail!(
+        "this deployment's Cube version does not support generating without committing: \
+         it created the branch {branch} and committed the generated cubes there. Delete \
+         that branch if it is unwanted, and upgrade before relying on `dbt generate`"
+    )
+}
+
+/// Resolve a server-supplied path beneath `root`, refusing anything that would
+/// land outside it.
+///
+/// These paths come from the API, and this is the only place in the CLI that
+/// writes remote-supplied paths to disk — an absolute path or a `..` component
+/// would put a file anywhere the shell user can write. Only plain relative
+/// segments are allowed; symlink resolution is deliberately not attempted, since
+/// the check is about what the SERVER can name, not about what already exists.
+fn resolve_within(root: &Path, raw: &str) -> Result<PathBuf> {
+    let candidate = Path::new(raw);
+    if candidate.is_absolute() {
+        bail!("refusing to write the absolute path {raw} returned by the server");
+    }
+
+    for component in candidate.components() {
+        match component {
+            Component::Normal(_) => {}
+            Component::CurDir => {}
+            _ => bail!(
+                "refusing to write {raw}: it points outside {}",
+                root.display()
+            ),
+        }
+    }
+
+    if candidate.components().next().is_none() {
+        bail!("the server returned an empty file path");
+    }
+
+    Ok(root.join(candidate))
+}
+
+/// The files a generate run produced, as (path, content) in the order returned.
+///
+/// Polled rather than fetched once, for the reason the result read above is: a
+/// run that has just reported COMPLETED is still closing, and a worker that
+/// cannot answer for a moment yields a 404. Here that matters more than it does
+/// there — these files are held only briefly and then dropped, so treating an
+/// early 404 as the answer would lose the entire output of the run.
+async fn fetch_generated_files(
+    api: &Client,
+    deployment: i64,
+    sync_job_id: &str,
+    poll: Duration,
+) -> Result<Vec<(String, String)>> {
+    let path = format!("{}/{}/generated-files", base(deployment), sync_job_id);
+
+    let payload = wait::poll(
+        Wait::new(
+            "dbt generated files",
+            RESULT_FETCH_TIMEOUT,
+            poll.min(RESULT_FETCH_POLL_MAX),
+        )
+        .advising_nothing(),
+        || async {
+            match api.get_optional(&path, &Vec::new()).await? {
+                Some(payload) if !output::items(&payload).is_empty() => Ok(Progress::Done(payload)),
+                _ => Ok(Progress::Waiting("files not available yet".to_string())),
+            }
+        },
+    )
+    .await?;
+
+    let files: Vec<(String, String)> = output::items(&payload)
+        .iter()
+        .map(|file| (output::field(file, "path"), output::field(file, "content")))
+        .collect();
+
+    if files.is_empty() {
+        bail!(
+            "dbt sync {sync_job_id} completed but returned no files. They are kept only \
+             briefly after a run finishes, so collect them right after it completes"
+        );
+    }
+
+    Ok(files)
 }
 
 /// A pre-manifest server accepts the unknown fields, then silently starts a Git sync.
@@ -777,6 +918,109 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 print_prune_hint(branch.is_none(), deployment, &branch_name);
             }
         }
+        Cmd::Generate {
+            deployment,
+            manifest,
+            out,
+            check,
+            timeout,
+            poll,
+        } => {
+            let manifest = read_manifest(&manifest)?;
+            let started = api
+                .post(&base(deployment), Some(&generate_body(manifest)))
+                .await?;
+
+            let sync_job_id = output::field(&started, "syncJobId");
+            if util::is_blank(&sync_job_id) {
+                bail!("Cube started the dbt generate run but did not return a sync job id");
+            }
+
+            // Both guards before waiting: each catches a server that accepted the
+            // request and is doing something other than what was asked, and finding
+            // that out after a 30-minute wait helps nobody.
+            ensure_nothing_was_committed(&started)?;
+            verify_manifest_source(&api, deployment, &sync_job_id).await?;
+
+            eprintln!("dbt generate {sync_job_id} started");
+            let status = wait_for_sync(&api, deployment, &sync_job_id, timeout, poll).await?;
+
+            if util::status_of(&status, "status") == FAILED {
+                return Err(failure(deployment, &sync_job_id, &status));
+            }
+
+            let files = fetch_generated_files(&api, deployment, &sync_job_id, poll).await?;
+            let root = Path::new(&out);
+
+            if check {
+                let mut differing = Vec::new();
+                for (path, content) in &files {
+                    let target = resolve_within(root, path)?;
+                    match std::fs::read_to_string(&target) {
+                        Ok(on_disk) if &on_disk == content => {}
+                        Ok(_) => differing.push(format!("{} differs", target.display())),
+                        Err(_) => differing.push(format!("{} is missing", target.display())),
+                    }
+                }
+
+                if !differing.is_empty() {
+                    for line in &differing {
+                        eprintln!("  {line}");
+                    }
+
+                    bail!(
+                        "{} of {} generated file(s) do not match what is committed. Re-run \
+                         without --check to write them, then commit the result",
+                        differing.len(),
+                        files.len()
+                    );
+                }
+
+                if ctx.json {
+                    output::print_json(&started);
+                } else {
+                    output::success(&format!(
+                        "all {} generated file(s) match what is committed",
+                        files.len()
+                    ));
+                }
+
+                return Ok(());
+            }
+
+            // Resolve every path BEFORE writing any of them, so a rejected path
+            // cannot leave a half-written tree behind.
+            let targets = files
+                .iter()
+                .map(|(path, content)| resolve_within(root, path).map(|t| (t, content)))
+                .collect::<Result<Vec<_>>>()?;
+
+            for (target, content) in &targets {
+                if let Some(parent) = target.parent() {
+                    std::fs::create_dir_all(parent)
+                        .with_context(|| format!("could not create {}", parent.display()))?;
+                }
+
+                std::fs::write(target, content)
+                    .with_context(|| format!("could not write {}", target.display()))?;
+            }
+
+            if ctx.json {
+                output::print_json(&started);
+            } else {
+                output::success(&format!(
+                    "wrote {} generated file(s) under {}",
+                    targets.len(),
+                    root.display()
+                ));
+                for (target, _) in &targets {
+                    println!("  {}", target.display());
+                }
+                println!(
+                    "Nothing was committed — review and commit these through your own workflow."
+                );
+            }
+        }
         Cmd::Status {
             deployment,
             sync_job_id,
@@ -1088,6 +1332,57 @@ mod tests {
         .err()
         .expect("manifest and ref should conflict");
         assert!(conflict.to_string().contains("cannot be used with"));
+    }
+
+    #[test]
+    fn a_generate_payload_asks_for_files_and_never_a_branch() {
+        let manifest = json!({"metadata": {}, "nodes": {}});
+
+        assert_eq!(
+            generate_body(manifest.clone()),
+            json!({"source": "manifest", "output": "files", "manifest": manifest})
+        );
+    }
+
+    #[test]
+    fn a_committed_branch_means_the_server_ignored_the_output_flag() {
+        // Blank is what a run that committed nothing reports.
+        assert!(ensure_nothing_was_committed(&json!({"branchName": ""})).is_ok());
+        assert!(ensure_nothing_was_committed(&json!({"syncJobId": "x"})).is_ok());
+
+        // A name means an older server did a normal sync: a branch exists in the
+        // customer's repository and the review mail has gone out, so this has to be
+        // loud rather than a warning.
+        let err = ensure_nothing_was_committed(&json!({"branchName": "dbt-sync/abc"}))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("does not support"), "{err}");
+        assert!(err.contains("dbt-sync/abc"), "{err}");
+    }
+
+    #[test]
+    fn generated_paths_stay_under_the_output_directory() {
+        let root = Path::new("/tmp/project");
+
+        assert_eq!(
+            resolve_within(root, "model/cubes/dbt/orders.yml").unwrap(),
+            Path::new("/tmp/project/model/cubes/dbt/orders.yml")
+        );
+
+        // The server names these paths, and this is the only place the CLI writes a
+        // remote-supplied path, so each of these would otherwise put a file wherever
+        // the shell user can write.
+        for hostile in [
+            "../outside.yml",
+            "model/../../outside.yml",
+            "/etc/passwd",
+            "",
+        ] {
+            assert!(
+                resolve_within(root, hostile).is_err(),
+                "{hostile} should have been refused"
+            );
+        }
     }
 
     #[test]
