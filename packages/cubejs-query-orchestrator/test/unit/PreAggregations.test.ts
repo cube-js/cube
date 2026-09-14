@@ -977,6 +977,33 @@ describe('PreAggregations', () => {
   });
 
   describe('partitionPreAggregations', () => {
+    test.each([
+      ['UTC', '2024-01-03T00:00:00.000', '2024-01-03T12:00:00.000', '2024-01-03T23:59:59.999'],
+      ['America/New_York', '2024-01-03T05:00:00.000', '2024-01-03T17:00:00.000', '2024-01-04T04:59:59.999'],
+    ])('should keep separate load and structure SQL parameters for a clipped partition in %s', async (timezone, start, loadEnd, structureEnd) => {
+      const loader = createLoader({
+        timezone,
+        partitionInvalidateKeyQueries: [['SELECT NOW()', [], {}]],
+      });
+      jest.spyOn(loader, 'loadBuildRange').mockResolvedValue([
+        '2024-01-01T00:00:00.000',
+        '2024-01-03T12:00:00.000',
+      ]);
+
+      const results = await loader.partitionPreAggregations();
+      expect(results).toHaveLength(3);
+      for (const partition of results.slice(0, -1)) {
+        expect(partition.loadSql).toBe(partition.structureVersionLoadSql);
+      }
+
+      const lastPartition = results[2];
+      expect(lastPartition.loadSql).not.toBe(lastPartition.structureVersionLoadSql);
+      expect(lastPartition.loadSql[1]).not.toBe(lastPartition.structureVersionLoadSql[1]);
+      expect(lastPartition.loadSql[1]).toEqual([start, loadEnd]);
+      expect(lastPartition.structureVersionLoadSql[1]).toEqual([start, structureEnd]);
+      expect(lastPartition.buildRangeEnd).toEqual('2024-01-03T12:00:00.000');
+    });
+
     test('should construct correct partitionPreAggregations for dateRange in UTC (Day partitions)', async () => {
       const loader = createLoader({
         timezone: 'UTC',

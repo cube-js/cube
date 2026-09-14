@@ -198,9 +198,9 @@ export class PreAggregationPartitionRangeLoader {
     ).toISOString();
     const structureVersionLoadSql = this.preAggregation.loadSql &&
       this.replacePartitionSqlAndParams(this.preAggregation.loadSql, range, partitionTableName);
-    // Full partitions use the same SQL and parameters for loading and structure versioning.
-    // Reuse the tuple to avoid duplicate allocations; a clipped load range needs its own parameters.
-    const loadSql = range[0] === loadRange[0] && range[1] === loadRange[1]
+    // Unclipped partitions share the tuple for loading and structure versioning;
+    // consumers must not mutate the tuple, its parameters, or its options.
+    const loadSql = range[1] === loadRange[1]
       ? structureVersionLoadSql
       : this.preAggregation.loadSql && this.replacePartitionSqlAndParams(this.preAggregation.loadSql, loadRange, partitionTableName);
     return {
