@@ -521,12 +521,18 @@ on: [push]
 jobs:
   generate:
     runs-on: ubuntu-latest
+    # The job commits, so the default read-only GITHUB_TOKEN is not enough.
+    permissions:
+      contents: write
     env:
       CUBE_API_URL: https://your-tenant.cubecloud.dev
       CUBE_API_KEY: ${{ secrets.CUBE_API_KEY }}
       DEPLOYMENT_ID: ${{ vars.CUBE_DEPLOYMENT_ID }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install the Cube CLI
+        run: curl -fsSL https://raw.githubusercontent.com/cube-js/cube/master/install-cli.sh | sh
 
       # The dbt project does not need to be here. Only its manifest does.
       - uses: actions/download-artifact@v4
@@ -538,16 +544,19 @@ jobs:
 
       - name: Commit the regenerated cubes
         run: |
-          git add model/cubes/dbt
+          # `-A` rather than a hard-coded path: the CLI writes only under the
+          # deployment's Output path, and naming it here would stage nothing on a
+          # deployment configured with a different one — a green job over a
+          # working copy that quietly drifted.
+          git add -A
           git diff --cached --quiet && echo "no changes" && exit 0
           git -c user.name=ci -c user.email=ci@example.com \
             commit -m "chore: regenerate dbt cubes"
           git push
 ```
 
-Cube needs no access to your dbt repository on this path, and because no branch is
-created, the "dbt sync is ready for review" notification does not fire — which matters
-when the job runs on every pull request.
+Cube needs no access to your dbt repository on this path, and no branch is created in
+your Cube data model.
 
 <Note>
 
@@ -569,6 +578,10 @@ cube dbt generate "$DEPLOYMENT_ID" --manifest /tmp/manifest.json --out . --check
 `--check` walks the files the run generated, so it catches a cube that is out of date or
 absent — but not one left behind by a dbt model that was deleted, which neither `--check`
 nor the write path removes.
+
+Because this variant commits nothing and creates no branch, the "dbt sync is ready for
+review" notification never fires — which is what makes it usable on every pull request,
+where a sync would mail your team once per run.
 
 ### Trigger on every push
 
