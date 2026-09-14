@@ -205,14 +205,11 @@ fn generate_body(manifest: Value) -> Value {
     util::body(body)
 }
 
-/// A server that predates `output` accepts the unknown field, then commits to a
-/// branch as usual — the same silent downgrade `ensure_manifest_source` guards
-/// against, and worse here, because by the time we notice, a branch exists in the
-/// customer's repository and the review notification has gone out.
-///
-/// The tell is available immediately and needs no extra request: a run that
-/// commits nothing reports no branch, so a branch name coming back means the
-/// server ignored what we asked for.
+/// A server that predates `output` accepts the unknown field and commits to a branch
+/// as usual — the silent downgrade `ensure_manifest_source` guards against, worse
+/// here because by the time we notice, the branch exists in the customer's
+/// repository and the review mail has gone out. A run that commits nothing reports
+/// no branch, so a branch name coming back is the tell, and it costs no request.
 fn ensure_nothing_was_committed(started: &Value) -> Result<()> {
     let branch = output::field(started, "branchName");
     if util::is_blank(&branch) {
@@ -226,14 +223,9 @@ fn ensure_nothing_was_committed(started: &Value) -> Result<()> {
     )
 }
 
-/// Resolve a server-supplied path beneath `root`, refusing anything that would
-/// land outside it.
-///
-/// These paths come from the API, and this is the only place in the CLI that
-/// writes remote-supplied paths to disk — an absolute path or a `..` component
-/// would put a file anywhere the shell user can write. Only plain relative
-/// segments are allowed; symlink resolution is deliberately not attempted, since
-/// the check is about what the SERVER can name, not about what already exists.
+/// Resolve a server-supplied path beneath `root`, refusing anything that would land
+/// outside it. Lexical only, deliberately: the check is about what the SERVER can
+/// name, not about what already exists, so symlinks are not resolved.
 fn resolve_within(root: &Path, raw: &str) -> Result<PathBuf> {
     let candidate = Path::new(raw);
     if candidate.is_absolute() {
@@ -260,11 +252,14 @@ fn resolve_within(root: &Path, raw: &str) -> Result<PathBuf> {
 
 /// The files a generate run produced, as (path, content) in the order returned.
 ///
-/// Polled rather than fetched once, for the reason the result read above is: a
-/// run that has just reported COMPLETED is still closing, and a worker that
-/// cannot answer for a moment yields a 404. Here that matters more than it does
-/// there — these files are held only briefly and then dropped, so treating an
-/// early 404 as the answer would lose the entire output of the run.
+/// Polled because a run that has just reported COMPLETED is still closing and can
+/// answer 404 for a moment. That matters more here than for the result read: these
+/// files are held only briefly, so taking an early 404 as the answer loses the
+/// whole output of the run.
+///
+/// An ANSWER, empty or not, ends the poll — only absence is "not yet". Spinning on
+/// a legitimately empty response would report a 30s timeout for a condition the
+/// server stated immediately.
 async fn fetch_generated_files(
     api: &Client,
     deployment: i64,
@@ -282,17 +277,14 @@ async fn fetch_generated_files(
         .advising_nothing(),
         || async {
             match api.get_optional(&path, &Vec::new()).await? {
-                Some(payload) if !output::items(&payload).is_empty() => Ok(Progress::Done(payload)),
-                _ => Ok(Progress::Waiting("files not available yet".to_string())),
+                Some(payload) => Ok(Progress::Done(payload)),
+                None => Ok(Progress::Waiting("files not available yet".to_string())),
             }
         },
     )
     .await?;
 
-    let files: Vec<(String, String)> = output::items(&payload)
-        .iter()
-        .map(|file| (output::field(file, "path"), output::field(file, "content")))
-        .collect();
+    let files = read_generated_files(&payload, sync_job_id)?;
 
     if files.is_empty() {
         bail!(
@@ -302,6 +294,79 @@ async fn fetch_generated_files(
     }
 
     Ok(files)
+}
+
+/// The `--json` document for a generate run.
+///
+/// `sync --wait` sets the precedent that the machine path carries at least what
+/// the human path prints. What a pipeline actually needs here is the file list —
+/// so it can `git add` exactly what was generated — and the start payload alone
+/// carries none of it.
+fn generate_json(
+    started: &Value,
+    out: &str,
+    files: &[(String, String)],
+    outcome: &str,
+    differing: &[String],
+) -> Value {
+    let paths: Vec<Value> = files
+        .iter()
+        .map(|(path, _)| Value::String(path.clone()))
+        .collect();
+
+    let mut doc = serde_json::Map::new();
+    doc.insert(
+        "syncJobId".to_string(),
+        Value::String(output::field(started, "syncJobId")),
+    );
+    doc.insert("outputDir".to_string(), Value::String(out.to_string()));
+    doc.insert("outcome".to_string(), Value::String(outcome.to_string()));
+    doc.insert("fileCount".to_string(), Value::from(files.len()));
+    doc.insert("files".to_string(), Value::Array(paths));
+
+    if !differing.is_empty() {
+        doc.insert(
+            "differing".to_string(),
+            Value::Array(
+                differing
+                    .iter()
+                    .map(|line| Value::String(line.clone()))
+                    .collect(),
+            ),
+        );
+    }
+
+    Value::Object(doc)
+}
+
+/// Read the (path, content) pairs out of a generated-files payload.
+///
+/// `content` is taken as a REQUIRED string rather than through `output::field`,
+/// which yields `""` for an absent key. A file arriving without content would
+/// otherwise be written as a zero-byte file over the committed one, and the
+/// command would exit 0 — destroying working-copy content it was asked to
+/// produce. An absent key is a protocol error, the way `sync` treats a blank
+/// `syncJobId` as one.
+fn read_generated_files(payload: &Value, sync_job_id: &str) -> Result<Vec<(String, String)>> {
+    output::items(payload)
+        .iter()
+        .map(|file| {
+            let path = output::field(file, "path");
+            let Some(content) = file.get("content").and_then(Value::as_str) else {
+                bail!(
+                    "dbt sync {sync_job_id} returned a file with no content{}. Refusing to \
+                     write it, since doing so would empty a file you are about to commit",
+                    if path.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" ({path})")
+                    }
+                );
+            };
+
+            Ok((path, content.to_string()))
+        })
+        .collect()
 }
 
 /// A pre-manifest server accepts the unknown fields, then silently starts a Git sync.
@@ -959,13 +1024,32 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     match std::fs::read_to_string(&target) {
                         Ok(on_disk) if &on_disk == content => {}
                         Ok(_) => differing.push(format!("{} differs", target.display())),
-                        Err(_) => differing.push(format!("{} is missing", target.display())),
+                        // Only NotFound is "not committed yet". A permissions error or a
+                        // directory in the way reported as "missing" would send the reader
+                        // to re-run the write, which fails the same way.
+                        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                            differing.push(format!("{} is missing", target.display()))
+                        }
+                        Err(err) => {
+                            return Err(anyhow::Error::new(err)
+                                .context(format!("could not read {}", target.display())));
+                        }
                     }
                 }
 
                 if !differing.is_empty() {
-                    for line in &differing {
-                        eprintln!("  {line}");
+                    if ctx.json {
+                        output::print_json(&generate_json(
+                            &started,
+                            &out,
+                            &files,
+                            "differing",
+                            &differing,
+                        ));
+                    } else {
+                        for line in &differing {
+                            eprintln!("  {line}");
+                        }
                     }
 
                     bail!(
@@ -977,7 +1061,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 }
 
                 if ctx.json {
-                    output::print_json(&started);
+                    output::print_json(&generate_json(&started, &out, &files, "matched", &[]));
                 } else {
                     output::success(&format!(
                         "all {} generated file(s) match what is committed",
@@ -1006,7 +1090,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             }
 
             if ctx.json {
-                output::print_json(&started);
+                output::print_json(&generate_json(&started, &out, &files, "written", &[]));
             } else {
                 output::success(&format!(
                     "wrote {} generated file(s) under {}",
@@ -1358,6 +1442,52 @@ mod tests {
             .to_string();
         assert!(err.contains("does not support"), "{err}");
         assert!(err.contains("dbt-sync/abc"), "{err}");
+    }
+
+    #[test]
+    fn a_file_with_no_content_is_refused_rather_than_written_empty() {
+        // `output::field` yields "" for an absent key, so without an explicit read
+        // this item would be written as a zero-byte file OVER the committed one,
+        // and the command would exit 0 reporting success.
+        let payload = json!({"items": [
+            {"path": "model/cubes/dbt/orders.yml", "content": "cubes: []\n"},
+            {"path": "model/cubes/dbt/customers.yml"}
+        ]});
+
+        let err = read_generated_files(&payload, "job-1")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("no content"), "{err}");
+        assert!(err.contains("customers.yml"), "{err}");
+    }
+
+    #[test]
+    fn files_read_back_as_the_pairs_they_arrived_as() {
+        let payload = json!({"items": [
+            {"path": "model/cubes/dbt/orders.yml", "content": "cubes:\n  - name: orders\n"}
+        ]});
+
+        assert_eq!(
+            read_generated_files(&payload, "job-1").unwrap(),
+            vec![(
+                "model/cubes/dbt/orders.yml".to_string(),
+                "cubes:\n  - name: orders\n".to_string()
+            )]
+        );
+    }
+
+    #[test]
+    fn the_generate_json_document_carries_the_file_list() {
+        // The machine path must not print strictly less than the human one: a CI
+        // step parses this to `git add` exactly what was generated.
+        let files = vec![("model/cubes/dbt/orders.yml".to_string(), "x".to_string())];
+        let doc = generate_json(&json!({"syncJobId": "job-1"}), ".", &files, "written", &[]);
+
+        assert_eq!(doc["syncJobId"], json!("job-1"));
+        assert_eq!(doc["outcome"], json!("written"));
+        assert_eq!(doc["fileCount"], json!(1));
+        assert_eq!(doc["files"], json!(["model/cubes/dbt/orders.yml"]));
+        assert_eq!(doc["outputDir"], json!("."));
     }
 
     #[test]

@@ -415,8 +415,11 @@ the Cube data model, and the "dbt sync is ready for review" notification does no
 fire. That last one matters when the command runs on every pull request.
 
 `--check` compares the generated cubes against what is already on disk and exits
-non-zero if anything is missing or differs, without writing. Use it to fail a PR
-whose committed cubes no longer match its dbt project:
+non-zero if any of them is missing or differs, without writing. It walks the files
+the run generated, so it detects a cube that is out of date or absent — but not a
+cube left behind by a dbt model that was deleted, which neither `--check` nor the
+write path removes. Use it to fail a PR whose committed cubes no longer match the
+models its dbt project still has:
 
 ```bash
 cube dbt generate DEPLOYMENT_ID --manifest target/manifest.json --out . --check
