@@ -115,11 +115,12 @@ export class PreAggregationPartitionRangeLoader {
     const partitionTableName = PreAggregationPartitionRangeLoader.partitionTableName(
       this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
     );
+    const utcRange = this.utcDateRange(range);
     return Promise.all(
       (this.preAggregation.invalidateKeyQueries || []).map(
         (sqlQuery) => (
           this.loadCache.keyQueryResult(
-            this.replacePartitionSqlAndParams(sqlQuery, range, partitionTableName), this.waitForRenew, this.priority(QueuePriority.Interactive)
+            this.replacePartitionSqlAndParams(sqlQuery, range, partitionTableName, utcRange), this.waitForRenew, this.priority(QueuePriority.Interactive)
           )
         )
       )
@@ -148,10 +149,18 @@ export class PreAggregationPartitionRangeLoader {
     return null;
   }
 
+  private utcDateRange(range: QueryDateRange): QueryDateRange {
+    return [
+      localTimestampToUtc(this.preAggregation.timezone, this.preAggregation.timestampFormat, range[0]),
+      localTimestampToUtc(this.preAggregation.timezone, this.preAggregation.timestampFormat, range[1]),
+    ];
+  }
+
   private replacePartitionSqlAndParams(
     query: QueryWithParams,
     dateRange: QueryDateRange,
-    partitionTableName: string
+    partitionTableName: string,
+    utcDateRange: QueryDateRange
   ): QueryWithParams {
     const [sql, params, options] = query;
     const updateWindowToBoundary = options?.incremental && addSecondsToLocalTimestamp(
@@ -160,10 +169,9 @@ export class PreAggregationPartitionRangeLoader {
     return [sql.replace(this.preAggregation.tableName, partitionTableName), params?.map(
       param => {
         if (dateRange && param === FROM_PARTITION_RANGE) {
-          // Timestamp is in local timezone, so we need to convert to utc with desired format
-          return localTimestampToUtc(this.preAggregation.timezone, this.preAggregation.timestampFormat, dateRange[0]);
+          return utcDateRange[0];
         } else if (dateRange && param === TO_PARTITION_RANGE) {
-          return localTimestampToUtc(this.preAggregation.timezone, this.preAggregation.timestampFormat, dateRange[1]);
+          return utcDateRange[1];
         } else {
           return param;
         }
@@ -193,29 +201,34 @@ export class PreAggregationPartitionRangeLoader {
     if ((!partitionInvalidateKeyQueries || partitionInvalidateKeyQueries.length > 0) && buildRangeEnd < range[1]) {
       loadRange[1] = buildRangeEnd;
     }
+    const utcRange = this.utcDateRange(range);
+    const utcLoadRange: QueryDateRange = loadRange[1] === range[1] ? utcRange : [
+      utcRange[0],
+      localTimestampToUtc(this.preAggregation.timezone, this.preAggregation.timestampFormat, loadRange[1]),
+    ];
     const sealAt = addSecondsToLocalTimestamp(
       loadRange[1], this.preAggregation.timezone, this.preAggregation.updateWindowSeconds || 0
     ).toISOString();
     const structureVersionLoadSql = this.preAggregation.loadSql &&
-      this.replacePartitionSqlAndParams(this.preAggregation.loadSql, range, partitionTableName);
+      this.replacePartitionSqlAndParams(this.preAggregation.loadSql, range, partitionTableName, utcRange);
     // Reuse the SQL tuple for unclipped partitions to reduce computation and memory allocations.
     const loadSql = range[1] === loadRange[1]
       ? structureVersionLoadSql
-      : this.preAggregation.loadSql && this.replacePartitionSqlAndParams(this.preAggregation.loadSql, loadRange, partitionTableName);
+      : this.preAggregation.loadSql && this.replacePartitionSqlAndParams(this.preAggregation.loadSql, loadRange, partitionTableName, utcLoadRange);
     return {
       ...this.preAggregation,
       tableName: partitionTableName,
       structureVersionLoadSql,
       loadSql,
       sql: this.preAggregation.sql &&
-        this.replacePartitionSqlAndParams(this.preAggregation.sql, loadRange, partitionTableName),
+        this.replacePartitionSqlAndParams(this.preAggregation.sql, loadRange, partitionTableName, utcLoadRange),
       invalidateKeyQueries: (this.preAggregation.invalidateKeyQueries || [])
-        .map(q => this.replacePartitionSqlAndParams(q, range, partitionTableName)),
-      partitionInvalidateKeyQueries: this.preAggregation.partitionInvalidateKeyQueries?.map(q => this.replacePartitionSqlAndParams(q, range, partitionTableName)),
+        .map(q => this.replacePartitionSqlAndParams(q, range, partitionTableName, utcRange)),
+      partitionInvalidateKeyQueries: this.preAggregation.partitionInvalidateKeyQueries?.map(q => this.replacePartitionSqlAndParams(q, range, partitionTableName, utcRange)),
       indexesSql: (this.preAggregation.indexesSql || [])
-        .map(q => ({ ...q, sql: this.replacePartitionSqlAndParams(q.sql, range, partitionTableName) })),
+        .map(q => ({ ...q, sql: this.replacePartitionSqlAndParams(q.sql, range, partitionTableName, utcRange) })),
       previewSql: this.preAggregation.previewSql &&
-        this.replacePartitionSqlAndParams(this.preAggregation.previewSql, range, partitionTableName),
+        this.replacePartitionSqlAndParams(this.preAggregation.previewSql, range, partitionTableName, utcRange),
       buildRangeStart: loadRange[0],
       buildRangeEnd: loadRange[1],
       sealAt, // Used only for kSql pre aggregations
