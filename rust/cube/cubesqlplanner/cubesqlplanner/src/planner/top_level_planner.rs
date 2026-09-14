@@ -58,7 +58,7 @@ impl TopLevelPlanner {
         // by a rollup holding one of them. Moved above `try_pre_aggregations`,
         // a model storing one rollup per rolling measure silently falls back to
         // the fact table for all of them.
-        let optimized_plan = RollingBaseScanOptimizer::new().optimize(optimized_plan)?;
+        let optimized_plan = RollingBaseScanOptimizer::new().optimize(optimized_plan);
 
         let is_external = if !usages.is_empty() {
             usages.iter().all(|usage| usage.pre_aggregation.external())

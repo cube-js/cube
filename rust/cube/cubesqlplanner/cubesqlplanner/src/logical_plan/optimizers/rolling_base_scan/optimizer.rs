@@ -2,7 +2,6 @@ use super::same_rows::{reads_same_rows, same_members};
 use crate::logical_plan::*;
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::MemberSymbol;
-use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -29,10 +28,10 @@ impl RollingBaseScanOptimizer {
         Self
     }
 
-    pub fn optimize(&self, root: Rc<RootQuery>) -> Result<Rc<RootQuery>, CubeError> {
+    pub fn optimize(&self, root: Rc<RootQuery>) -> Rc<RootQuery> {
         let groups = self.group_shareable_scans(&root);
         if groups.iter().all(|group| group.absorbed.is_empty()) {
-            return Ok(root);
+            return root;
         }
 
         let mut merged_at: HashMap<usize, &MergeGroup> = HashMap::new();
@@ -55,16 +54,16 @@ impl RollingBaseScanOptimizer {
             .filter(|(_, cte)| !renames.contains_key(&cte.name))
             .map(|(position, cte)| match merged_at.get(&position) {
                 Some(group) => Self::widen_leaf(cte, group),
-                None => Ok(Self::rename_measure_input(cte, &renames)),
+                None => Self::rename_measure_input(cte, &renames),
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Vec<_>>();
 
-        Ok(Rc::new(
+        Rc::new(
             RootQuery::builder()
                 .ctes(ctes)
                 .query(root.query().clone())
                 .build(),
-        ))
+        )
     }
 
     /// Base scans that may share a CTE, each with the measures it will carry.
@@ -129,7 +128,7 @@ impl RollingBaseScanOptimizer {
     fn widen_leaf(
         cte: &Rc<LogicalMultiStageMember>,
         group: &MergeGroup,
-    ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
+    ) -> Rc<LogicalMultiStageMember> {
         let query = &group.leaf.query;
         let schema = LogicalSchema {
             time_dimensions: query.schema().time_dimensions.clone(),
@@ -143,14 +142,14 @@ impl RollingBaseScanOptimizer {
             .source(query.source().clone())
             .build();
 
-        Ok(Rc::new(LogicalMultiStageMember {
+        Rc::new(LogicalMultiStageMember {
             name: cte.name.clone(),
             member_type: MultiStageMemberLogicalType::LeafMeasure(Rc::new(MultiStageLeafMeasure {
                 measures: group.measures.clone(),
                 evaluation_context: group.leaf.evaluation_context.clone(),
                 query: Rc::new(widened),
             })),
-        }))
+        })
     }
 
     /// Points a rolling window at the scan its own was folded into.
