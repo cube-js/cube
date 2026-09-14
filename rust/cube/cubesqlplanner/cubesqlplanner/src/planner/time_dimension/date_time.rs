@@ -347,6 +347,36 @@ impl QueryDateTime {
 }
 
 #[cfg(test)]
+mod shift_bound_tests {
+    use super::*;
+
+    // A bound folded out of an end-of-day anchor stays an end-of-day, and on a
+    // dialect keeping microseconds it has to survive being normalised again:
+    // read back as a range start it would lose its sub-second tail, and the
+    // window — whose frame this predicate *is* — would silently widen.
+    #[test]
+    fn an_end_of_day_bound_keeps_its_tail_at_microsecond_precision() {
+        let anchor = QueryDateTimeHelper::format_to_date("2024-01-20", 6).unwrap();
+        assert_eq!(anchor, "2024-01-20T23:59:59.999999");
+
+        let shifted = shift_bound_wall_clock(Tz::UTC, &anchor, &Some("7 day".to_string()), true)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(
+            QueryDateTimeHelper::format_to_date(&shifted, 6).unwrap(),
+            "2024-01-13T23:59:59.999999",
+            "normalised as the anchor was"
+        );
+        assert_eq!(
+            QueryDateTimeHelper::format_from_date(&shifted, 6).unwrap(),
+            "2024-01-13T23:59:59.999000",
+            "normalised as a range start instead, which is what the bug did"
+        );
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

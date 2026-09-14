@@ -13,8 +13,8 @@ impl FilterOperationSql for RegularRollingWindowOp {
         // fallback still applies the frame in SQL.
         let (from, to) = match ctx.date_range_literals(&self.scan_range)? {
             Some((from, to)) => (
-                ctx.keep_bounded(from, &self.trailing),
-                ctx.keep_bounded(to, &self.leading),
+                FilterSqlContext::keep_bounded(from, &self.trailing),
+                FilterSqlContext::keep_bounded(to, &self.leading),
             ),
             None => {
                 let (from, to) = ctx.date_range_from_time_series()?;
@@ -61,13 +61,25 @@ impl FilterOperationSql for RollingWindowOffsetOp {
         };
         let tz = ctx.query_tools.timezone();
 
+        // Both bounds are the anchor moved, so both are normalised the way the
+        // anchor was: an end-of-day anchor shifted by whole days is another
+        // end-of-day, and reading it as a range start would round its
+        // sub-second tail down on a dialect that keeps more than milliseconds.
+        let allocate = |bound: &str| {
+            if from_start {
+                ctx.format_and_allocate_from_date(bound)
+            } else {
+                ctx.format_and_allocate_to_date(bound)
+            }
+        };
+
         let mut conditions = Vec::new();
 
         // trailing side -> lower bound; leading side -> upper bound.
         // Shifted on the wall clock first, then carried into the database's
         // timezone — this operator compares an unconverted member.
         if let Some(bound) = shift_bound_wall_clock(tz, &anchor, &self.trailing, true)? {
-            let bound = ctx.format_and_allocate_from_date(&bound)?;
+            let bound = allocate(&bound)?;
             conditions.push(if from_start {
                 ctx.plan_templates.gte(member.clone(), bound)?
             } else {
@@ -76,7 +88,7 @@ impl FilterOperationSql for RollingWindowOffsetOp {
         }
 
         if let Some(bound) = shift_bound_wall_clock(tz, &anchor, &self.leading, false)? {
-            let bound = ctx.format_and_allocate_to_date(&bound)?;
+            let bound = allocate(&bound)?;
             conditions.push(if from_start {
                 ctx.plan_templates.lt(member.clone(), bound)?
             } else {

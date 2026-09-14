@@ -1,6 +1,7 @@
 use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::{PlanSqlTemplates, TemplateProjectionColumn};
+use crate::planner::time_dimension::UNBOUNDED_INTERVAL;
 use crate::planner::QueryDateTimeHelper;
 use crate::utils::sql_expression_scanner::{ends_in_line_comment, is_top_level_compound};
 use cubenativeutils::CubeError;
@@ -276,9 +277,9 @@ impl<'a> FilterSqlContext<'a> {
     }
 
     /// The bound, unless its side reaches without limit — which no date states.
-    pub fn keep_bounded(&self, bound: String, interval: &Option<String>) -> Option<String> {
+    pub fn keep_bounded(bound: String, interval: &Option<String>) -> Option<String> {
         match interval.as_deref() {
-            Some("unbounded") => None,
+            Some(UNBOUNDED_INTERVAL) => None,
             _ => Some(bound),
         }
     }
@@ -290,7 +291,7 @@ impl<'a> FilterSqlContext<'a> {
         is_sub: bool,
     ) -> Result<Option<String>, CubeError> {
         match interval {
-            Some(interval) if interval != "unbounded" => {
+            Some(interval) if interval != UNBOUNDED_INTERVAL => {
                 if is_sub {
                     Ok(Some(
                         self.plan_templates
