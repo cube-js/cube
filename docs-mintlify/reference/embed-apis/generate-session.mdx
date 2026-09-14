@@ -113,9 +113,12 @@ both layers together and the rule for choosing between them.
 
 <Note>
 The [Chat API](/reference/embed-apis/chat-api) has no `settings` object of its
-own. Its `sessionSettings.allowChatWorkspaceAuthoring` and
-`sessionSettings.timezone` fields mean the same thing as `settings.allowChatWorkspaceAuthoring`
-and `settings.timezone` here, just nested under a differently-named object.
+own. Of the keys above, its `sessionSettings` object accepts
+`allowChatWorkspaceAuthoring` and `timezone`, which mean the same thing there as
+`settings.allowChatWorkspaceAuthoring` and `settings.timezone` do here — except
+`sessionSettings.timezone` has no `cube:action:set-timezone` message, `?timezone=`
+parameter, or dashboard-pinned zone above it to lose to; an unusable value still
+falls through to the account default rather than failing the session.
 </Note>
 
 ## User profile
