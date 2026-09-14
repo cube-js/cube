@@ -163,8 +163,11 @@ impl QueryDateTime {
 
     pub fn add_interval(&self, interval: &SqlInterval) -> Result<Self, CubeError> {
         // For time-only intervals (hour, minute, second), use UTC arithmetic to avoid DST issues
-        let is_time_only =
-            interval.year == 0 && interval.month == 0 && interval.week == 0 && interval.day == 0;
+        let is_time_only = interval.year == 0
+            && interval.quarter == 0
+            && interval.month == 0
+            && interval.week == 0
+            && interval.day == 0;
 
         if is_time_only {
             // Use UTC-based arithmetic for time intervals
@@ -178,9 +181,11 @@ impl QueryDateTime {
         // For date-based intervals, use local time arithmetic
         let date = self.naive_local().date();
 
-        // Step 1: add years and months with fallback logic
+        // Step 1: add years and months with fallback logic. A quarter is three
+        // months — `SqlInterval` keeps it in a field of its own and never folds
+        // it in, so anything reading `month` alone would drop it silently.
         let mut year = date.year() + interval.year;
-        let mut month = date.month() as i32 + interval.month;
+        let mut month = date.month() as i32 + interval.quarter * 3 + interval.month;
 
         while month > 12 {
             year += 1;

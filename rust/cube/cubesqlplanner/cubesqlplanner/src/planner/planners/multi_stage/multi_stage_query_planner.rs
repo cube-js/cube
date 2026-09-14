@@ -1287,16 +1287,6 @@ impl MultiStageQueryPlanner {
         ))
     }
 
-    /// Span the base scan of a `to_date` window over `time_dimension` reads:
-    /// from the start of the period the series opens in, to the series' own
-    /// end. Both follow from the time dimension's granularity and date range
-    /// plus the window's own period, so both are known here and the filter
-    /// renders them as literals instead of reading them back off the series.
-    ///
-    /// `None` wherever the series itself is not derivable
-    /// ([`Self::rolling_series_bounds`]), and for a period whose boundaries are
-    /// rows of a calendar cube — no interval math reproduces those, so the
-    /// lower bound has to stay a sub-select over the series that read them.
     /// The `Granularity` a `to_date` window counts its period in. The compiler
     /// borrow lives no longer than the build, so a caller is free to reach for
     /// it again — `change_date_range_filter_impl` takes the same one right
@@ -1317,6 +1307,13 @@ impl MultiStageQueryPlanner {
         )
     }
 
+    /// Span the base scan of a `to_date` window over `time_dimension` reads:
+    /// from the start of the period the series opens in, to the series' own
+    /// end, rendered by the filter as literals.
+    ///
+    /// `None` wherever the series itself is not derivable
+    /// ([`Self::rolling_series_bounds`]), and for a period whose boundaries are
+    /// rows of a calendar cube — no interval math reproduces those.
     fn to_date_window_bounds(
         &self,
         time_dimension: &Rc<TimeDimensionSymbol>,

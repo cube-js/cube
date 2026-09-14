@@ -14,6 +14,7 @@ use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::FiltersContext;
 use crate::planner::QueryDateTime;
 use crate::planner::QueryDateTimeHelper;
+use crate::planner::QueryTimeSeries;
 use crate::planner::SqlInterval;
 use chrono::Duration;
 use chrono_tz::Tz;
@@ -259,7 +260,7 @@ impl TypedFilter {
                 leading,
                 offset,
             }) => {
-                let precision = 3;
+                let precision = QueryTimeSeries::MILLISECOND_PRECISION;
                 let anchor = if offset == "start" {
                     from.as_deref()
                         .map(|v| QueryDateTimeHelper::format_from_date(v, precision))
@@ -383,6 +384,20 @@ mod tests {
         assert_eq!(
             shifted("2024-03-11T09:00:00.000", "1 day", true),
             "2024-03-10T09:00:00.000"
+        );
+    }
+
+    // A quarter lives in a field of its own, so anything reading months alone
+    // drops it and the band comes back equal to the bare series bounds.
+    #[test]
+    fn a_quarter_shift_moves_three_months() {
+        assert_eq!(
+            shifted("2024-06-15T00:00:00.000", "1 quarter", true),
+            shifted("2024-06-15T00:00:00.000", "3 month", true)
+        );
+        assert_eq!(
+            shifted("2024-06-15T00:00:00.000", "2 quarter", true),
+            "2023-12-15T00:00:00.000"
         );
     }
 
