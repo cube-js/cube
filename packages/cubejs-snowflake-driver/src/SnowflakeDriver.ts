@@ -53,7 +53,10 @@ const SnowflakeToGenericType: Record<string, GenericDataBaseType> = {
   // For some reason, snowflake SDK returns `fixed` type for DWH types like NUMBER(38, 15)
   // @see https://docs.snowflake.com/en/sql-reference/data-types-numeric for more info on types
   fixed: 'decimal',
-  timestamp_ntz: 'timestamp'
+  // @see https://docs.snowflake.com/en/sql-reference/data-types-datetime
+  timestamp_ntz: 'timestamp',
+  timestamp_ltz: 'timestamp',
+  timestamp_tz: 'timestamp'
 };
 
 // User can create own stage to pass permission restrictions.
