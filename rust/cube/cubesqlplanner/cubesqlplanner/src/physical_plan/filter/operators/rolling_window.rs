@@ -6,7 +6,10 @@ use cubenativeutils::CubeError;
 
 impl FilterOperationSql for RegularRollingWindowOp {
     fn to_sql(&self, ctx: &FilterSqlContext) -> Result<String, CubeError> {
-        let (from, to) = ctx.date_range_from_time_series()?;
+        let (from, to) = match ctx.date_range_literals(&self.series_range)? {
+            Some(range) => range,
+            None => ctx.date_range_from_time_series()?,
+        };
 
         let from = ctx.extend_date_range_bound(from, &self.trailing, true)?;
         let to = ctx.extend_date_range_bound(to, &self.leading, false)?;

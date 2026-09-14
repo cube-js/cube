@@ -1,9 +1,10 @@
-use super::MultiStageMember;
+use super::{MultiStageLeafMemberType, MultiStageMember, MultiStageMemberType};
 use crate::logical_plan::LogicalSchema;
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::{MemberSymbol, QueryProperties};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::cell::RefCell;
 use std::rc::Rc;
 
 /// One CTE in the multi-stage tree as the planner sees it: the
@@ -12,6 +13,14 @@ use std::rc::Rc;
 /// it will be referenced by.
 pub struct MultiStageQueryDescription {
     member: Rc<MultiStageMember>,
+    /// Measures this CTE renders alongside `member`. Rolling windows whose
+    /// base scans would be identical share one, and each window then reads its
+    /// own measure column off it.
+    ///
+    /// Load-bearing, like the time series' granularity list: every description
+    /// is built before any is planned, so a window joining an existing base
+    /// scan is always visible to it.
+    co_measures: RefCell<Vec<Rc<MemberSymbol>>>,
     state: Rc<QueryProperties>,
     input: Vec<Rc<MultiStageQueryDescription>>,
     /// Dim-grid sources for the JOIN-based assembly. Empty for the
@@ -33,6 +42,7 @@ impl MultiStageQueryDescription {
     ) -> Rc<Self> {
         Rc::new(Self {
             member,
+            co_measures: RefCell::new(vec![]),
             state,
             input,
             keys_input,
@@ -44,8 +54,35 @@ impl MultiStageQueryDescription {
         LogicalSchema::default()
             .set_time_dimensions(self.state.time_dimensions().clone())
             .set_dimensions(self.state.dimensions().clone())
-            .set_measures(vec![self.member_node().clone()])
+            .set_measures(self.measures())
             .into_rc()
+    }
+
+    /// Every measure this CTE renders: its own member first, then the measures
+    /// riding along on it.
+    pub fn measures(&self) -> Vec<Rc<MemberSymbol>> {
+        let mut measures = vec![self.member_node().clone()];
+        measures.extend(self.co_measures());
+        measures
+    }
+
+    /// The measures riding along on this CTE, without its own member.
+    pub fn co_measures(&self) -> Vec<Rc<MemberSymbol>> {
+        self.co_measures.borrow().clone()
+    }
+
+    /// Registers `measure` to be rendered by this CTE as well. A measure
+    /// already rendered here is left alone.
+    pub fn add_co_measure(&self, measure: Rc<MemberSymbol>) {
+        let name = measure.full_name();
+        if self.member_name() == name {
+            return;
+        }
+        let mut co_measures = self.co_measures.borrow_mut();
+        if co_measures.iter().any(|m| m.full_name() == name) {
+            return;
+        }
+        co_measures.push(measure);
     }
 
     pub fn member_node(&self) -> &Rc<MemberSymbol> {
@@ -126,6 +163,24 @@ impl MultiStageQueryDescription {
         for child in self.input.iter() {
             child.collect_all_non_multi_stage_dimension_impl(dimensions, time_dimensions);
         }
+    }
+
+    /// True if this description is the base scan of a rolling window built for
+    /// an equivalent state. Such a scan is byte-identical whatever measure is
+    /// aggregated over it, so another window's measure can ride along instead
+    /// of scanning the fact table again.
+    pub fn is_match_rolling_window_base(
+        &self,
+        state: &Rc<QueryProperties>,
+        is_ungrouped: bool,
+    ) -> bool {
+        matches!(
+            self.member.member_type(),
+            MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure)
+        ) && self.member.has_aggregates_on_top()
+            && !self.member.is_without_member_leaf()
+            && self.member.is_ungrupped() == is_ungrouped
+            && state.eq_as_state(&self.state)
     }
 
     /// True if this description renders `member_node` under an

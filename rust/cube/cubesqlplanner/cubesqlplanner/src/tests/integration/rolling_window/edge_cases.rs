@@ -159,3 +159,31 @@ async fn test_multi_stage_rolling_without_date_range_with_gaps() {
         insta::assert_snapshot!(result);
     }
 }
+
+// Without a granularity the base CTE is the requested measure's own result, so
+// it answers for that measure alone — two measures are two CTEs, each joined
+// once.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_two_rolling_measures_without_granularity_keep_their_own_cte() {
+    let schema = MockSchema::from_yaml_file("common/integration_rolling_window.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.rolling_sum_trailing_7d
+          - orders.rolling_count_7d
+        dimensions:
+          - orders.status
+        time_dimensions:
+          - dimension: orders.created_at
+            dateRange:
+              - "2024-01-01"
+              - "2024-01-31"
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+
+    assert_eq!(sql.matches("rw_orders").count(), 2, "{sql}");
+    assert_eq!(sql.matches("LEFT JOIN  cte_0").count(), 1, "{sql}");
+    assert_eq!(sql.matches("LEFT JOIN  cte_1").count(), 1, "{sql}");
+}

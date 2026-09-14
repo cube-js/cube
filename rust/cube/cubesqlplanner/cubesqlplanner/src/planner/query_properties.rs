@@ -1027,17 +1027,26 @@ impl QueryProperties {
         Ok(())
     }
 
+    /// Rewrite the `InDateRange` filter on `member_name` into a regular
+    /// rolling-window filter. The filter carries
+    /// `[from, to, trailing, leading]`, followed by the series bounds when
+    /// those are known at plan time.
     pub fn replace_regular_date_range_filter(
         &mut self,
         member_name: &str,
         left_interval: Option<String>,
         right_interval: Option<String>,
+        series_range: Option<(String, String)>,
     ) -> Result<(), CubeError> {
         let operator = FilterOperator::RegularRollingWindowDateRange;
-        let values = vec![
+        let mut values = vec![
             FilterValue::from(left_interval),
             FilterValue::from(right_interval),
         ];
+        if let Some((series_from, series_to)) = series_range {
+            values.push(FilterValue::Str(series_from));
+            values.push(FilterValue::Str(series_to));
+        }
         self.time_dimensions_filters = self.change_date_range_filter_impl(
             member_name,
             &self.time_dimensions_filters,

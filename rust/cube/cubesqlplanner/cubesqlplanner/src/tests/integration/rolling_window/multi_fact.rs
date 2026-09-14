@@ -36,6 +36,33 @@ async fn test_two_rolling_from_different_facts() {
     }
 }
 
+// Windows over the same frame share one base scan, but only where the scan
+// itself is the same. Two facts are two scans however identical the frames.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_measures_of_different_facts_keep_their_own_scan() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - payments.rolling_sum_7d
+          - messages.rolling_count_7d
+        dimensions:
+          - customers.name
+        time_dimensions:
+          - dimension: customers.registered_at
+            granularity: day
+            dateRange:
+              - "2024-01-10"
+              - "2024-01-25"
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+
+    assert_eq!(sql.matches("mf_payments").count(), 1, "{sql}");
+    assert_eq!(sql.matches("mf_messages").count(), 1, "{sql}");
+    assert_eq!(sql.matches("mf_customers").count(), 2, "{sql}");
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rolling_and_regular_from_different_facts() {
     let ctx = create_context();

@@ -26,6 +26,7 @@ use cubenativeutils::CubeError;
 use cubenativeutils::CubeErrorCauseType;
 use itertools::Itertools;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::rc::Rc;
 
@@ -745,6 +746,38 @@ impl PreAggregationsCompiler {
             let pre_aggregation = self.compile_pre_aggregation(name)?;
             if !(disable_external_pre_aggregations && pre_aggregation.external == Some(true)) {
                 result.push(pre_aggregation);
+            }
+        }
+        Ok(result)
+    }
+
+    /// The measures each pre-aggregation of these cubes declares, by full name.
+    /// Read off the declarations alone — no source, join or union is built — so
+    /// a caller only asking which measures a rollup groups together does not
+    /// pay for compiling it.
+    ///
+    /// A `rollupLambda` declares none of its own; the rollups it unions are
+    /// themselves pre-aggregations of the cube and are listed in their own
+    /// right.
+    pub fn declared_measures(
+        query_tools: Rc<State>,
+        cube_names: &Vec<String>,
+    ) -> Result<Vec<HashSet<String>>, CubeError> {
+        let mut result = Vec::new();
+        for cube_name in cube_names.iter() {
+            let pre_aggregations = query_tools
+                .cube_evaluator()
+                .pre_aggregations_for_cube_as_array(cube_name.clone())?;
+            for pre_aggregation in pre_aggregations.iter() {
+                let Some(refs) = pre_aggregation.measure_references()? else {
+                    continue;
+                };
+                let name = PreAggregationFullName::new(
+                    cube_name.clone(),
+                    pre_aggregation.static_data().name.clone(),
+                );
+                let symbols = Self::symbols_from_ref(query_tools.clone(), &name, refs, |_| Ok(()))?;
+                result.push(symbols.iter().map(|s| s.full_name()).collect());
             }
         }
         Ok(result)
