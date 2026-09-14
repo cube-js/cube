@@ -557,7 +557,6 @@ describe('PreAggregations', () => {
         [REFRESH_KEY_SQL, [], { external: true, renewalThreshold: 60, localRefreshKey: descriptor }];
 
       const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(600_000);
-
       try {
         const first = await loadCache.keyQueryResult(key, false, 10);
         expect(first).toEqual([{ refresh_key: '1' }]);
@@ -989,6 +988,8 @@ describe('PreAggregations', () => {
     const utcStart = '2024-03-10T05:00:00.000';
     const utcNoon = '2024-03-10T16:00:00.000';
     const utcEnd = '2024-03-11T03:59:59.999';
+    // Widens the millisecond fraction of a fixture timestamp: .000 -> .000000, .999 -> .999999.
+    const withPrecision = (ts: string, precision: number) => ts + ts.slice(-1).repeat(precision - 3);
     const originalParams = [FROM_PARTITION_RANGE, TO_PARTITION_RANGE, FROM_PARTITION_RANGE, 'literal'];
     const query: QueryWithParams = [
       'SELECT * FROM test_table WHERE ts >= ? AND ts <= ? AND ts >= ? AND label = ?',
@@ -997,13 +998,17 @@ describe('PreAggregations', () => {
     ];
 
     test.each([
-      { name: 'unclipped', buildRangeEnd: end, partitionInvalidateKeyQueries: [query], loadEnd: end, utcLoadEnd: utcEnd, conversions: 2 },
-      { name: 'clipped', buildRangeEnd: noon, partitionInvalidateKeyQueries: [query], loadEnd: noon, utcLoadEnd: utcNoon, conversions: 4 },
+      { name: 'unclipped', precision: 3, buildRangeEnd: end, partitionInvalidateKeyQueries: [query], loadEnd: end, utcLoadEnd: utcEnd, sharesLoadSql: true, conversions: 2 },
+      { name: 'clipped', precision: 3, buildRangeEnd: noon, partitionInvalidateKeyQueries: [query], loadEnd: noon, utcLoadEnd: utcNoon, sharesLoadSql: false, conversions: 4 },
       // Real-time pre-aggregations never clip, so the build range end is ignored.
-      { name: 'real-time', buildRangeEnd: noon, partitionInvalidateKeyQueries: [], loadEnd: end, utcLoadEnd: utcEnd, conversions: 2 },
-    ])('shares converted boundaries across SQL queries of a $name partition', async ({ buildRangeEnd, partitionInvalidateKeyQueries, loadEnd, utcLoadEnd, conversions }) => {
+      { name: 'real-time', precision: 3, buildRangeEnd: noon, partitionInvalidateKeyQueries: [], loadEnd: end, utcLoadEnd: utcEnd, sharesLoadSql: true, conversions: 2 },
+      { name: 'microsecond-precision', precision: 6, buildRangeEnd: noon, partitionInvalidateKeyQueries: [query], loadEnd: noon, utcLoadEnd: utcNoon, sharesLoadSql: false, conversions: 4 },
+    ])('shares converted boundaries across SQL queries of a $name partition', async ({ precision, buildRangeEnd, partitionInvalidateKeyQueries, loadEnd, utcLoadEnd, sharesLoadSql, conversions }) => {
+      const at = (ts: string) => withPrecision(ts, precision);
       const loader = createLoader({
         timezone: 'America/New_York',
+        timestampFormat: `YYYY-MM-DDTHH:mm:ss.${'S'.repeat(precision)}`,
+        timestampPrecision: precision,
         loadSql: query,
         sql: query,
         invalidateKeyQueries: [query],
@@ -1011,14 +1016,14 @@ describe('PreAggregations', () => {
         indexesSql: [{ indexName: 'test_index', sql: query }],
         previewSql: query,
       });
-      jest.spyOn(loader, 'loadBuildRange').mockResolvedValue([start, buildRangeEnd]);
+      jest.spyOn(loader, 'loadBuildRange').mockResolvedValue([at(start), at(buildRangeEnd)]);
       const convert = jest.spyOn(PreAggregationPartitionRangeLoader, 'inDbTimeZone');
 
       const [partition] = await loader.partitionPreAggregations();
 
       const sql = query[0].replace('test_table', 'test_table20240310');
-      const loadTuple = [sql, [utcStart, utcLoadEnd, utcStart, 'literal'], { renewalThreshold: 60 }];
-      const fullTuple = [sql, [utcStart, utcEnd, utcStart, 'literal'], { renewalThreshold: 60 }];
+      const loadTuple = [sql, [at(utcStart), at(utcLoadEnd), at(utcStart), 'literal'], { renewalThreshold: 60 }];
+      const fullTuple = [sql, [at(utcStart), at(utcEnd), at(utcStart), 'literal'], { renewalThreshold: 60 }];
       expect(partition.loadSql).toEqual(loadTuple);
       expect(partition.sql).toEqual(loadTuple);
       expect(partition.structureVersionLoadSql).toEqual(fullTuple);
@@ -1026,9 +1031,9 @@ describe('PreAggregations', () => {
       expect(partition.partitionInvalidateKeyQueries).toEqual(partitionInvalidateKeyQueries.map(() => fullTuple));
       expect(partition.indexesSql[0].sql).toEqual(fullTuple);
       expect(partition.previewSql).toEqual(fullTuple);
-      expect(partition.buildRangeStart).toBe(start);
-      expect(partition.buildRangeEnd).toBe(loadEnd);
-      if (loadEnd === end) {
+      expect(partition.buildRangeStart).toBe(at(start));
+      expect(partition.buildRangeEnd).toBe(at(loadEnd));
+      if (sharesLoadSql) {
         expect(partition.loadSql).toBe(partition.structureVersionLoadSql);
       } else {
         expect(partition.loadSql).not.toBe(partition.structureVersionLoadSql);
@@ -1110,7 +1115,6 @@ describe('PreAggregations', () => {
 
       const results = await loader.partitionPreAggregations();
       expect(results).toHaveLength(3);
-
       for (const partition of results.slice(0, -1)) {
         expect(partition.loadSql).toBe(partition.structureVersionLoadSql);
       }
