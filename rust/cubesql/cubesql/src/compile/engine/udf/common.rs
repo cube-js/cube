@@ -463,7 +463,7 @@ pub fn create_if_udf() -> ScalarUDF {
         let base_type = common_type_coercion(&types[1], &types[2]).ok_or_else(|| {
             DataFusionError::Execution(format!(
                 "Positive and negative results must be the same type, actual: [{}, {}]",
-                &types[1], &types[2],
+                types[1], types[2],
             ))
         })?;
 
@@ -494,7 +494,7 @@ pub fn create_least_udf() -> ScalarUDF {
             base_type = common_type_coercion(&base_type, arg.data_type()).ok_or_else(|| {
                 DataFusionError::Execution(format!(
                     "Unable to coercion types, actual: [{}, {}]",
-                    &base_type,
+                    base_type,
                     arg.data_type(),
                 ))
             })?;
@@ -599,7 +599,7 @@ pub fn create_least_udf() -> ScalarUDF {
             base_type = common_type_coercion(&base_type, t).ok_or_else(|| {
                 DataFusionError::Execution(format!(
                     "Unable to coercion types, actual: [{}, {}]",
-                    &base_type, t,
+                    base_type, t,
                 ))
             })?;
         }
@@ -634,7 +634,7 @@ pub fn create_greatest_udf() -> ScalarUDF {
             base_type = common_type_coercion(&base_type, arg.data_type()).ok_or_else(|| {
                 DataFusionError::Execution(format!(
                     "Unable to coercion types, actual: [{}, {}]",
-                    &base_type,
+                    base_type,
                     arg.data_type(),
                 ))
             })?;
@@ -739,7 +739,7 @@ pub fn create_greatest_udf() -> ScalarUDF {
             base_type = common_type_coercion(&base_type, t).ok_or_else(|| {
                 DataFusionError::Execution(format!(
                     "Unable to coercion types, actual: [{}, {}]",
-                    &base_type, t,
+                    base_type, t,
                 ))
             })?;
         }

@@ -1139,13 +1139,7 @@ impl AsyncPostgresShim {
                     Ok(plan) => {
                         let description = plan
                             .to_row_description(&ResultFormat::AllText)?
-                            .and_then(|description| {
-                                if description.len() > 0 {
-                                    Some(description)
-                                } else {
-                                    None
-                                }
-                            });
+                            .filter(|description| description.len() > 0);
 
                         (
                             PreparedStatement::Query {

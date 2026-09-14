@@ -170,8 +170,7 @@ impl PgCatalogAttributeProvider {
         let mut builder = PgCatalogAttributeBuilder::new();
 
         for table in tables {
-            let mut column_id = 1;
-            for column in &table.columns {
+            for (column_id, column) in (1..).zip(&table.columns) {
                 builder.add_attribute(
                     table.oid,
                     &column.name,
@@ -180,7 +179,6 @@ impl PgCatalogAttributeProvider {
                     false,
                     !column.can_be_null,
                 );
-                column_id += 1;
             }
         }
 
