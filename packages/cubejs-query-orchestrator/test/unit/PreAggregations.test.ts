@@ -564,6 +564,7 @@ describe('PreAggregations', () => {
         [REFRESH_KEY_SQL, [], { external: true, renewalThreshold: 60, localRefreshKey: descriptor }];
 
       const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(600_000);
+
       try {
         const first = await loadCache.keyQueryResult(key, false, 10);
         expect(first).toEqual([{ refresh_key: '1' }]);
@@ -1122,6 +1123,7 @@ describe('PreAggregations', () => {
 
       const results = await loader.partitionPreAggregations();
       expect(results).toHaveLength(3);
+
       for (const partition of results.slice(0, -1)) {
         expect(partition.loadSql).toBe(partition.structureVersionLoadSql);
       }

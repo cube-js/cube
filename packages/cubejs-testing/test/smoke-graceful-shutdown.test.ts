@@ -84,6 +84,7 @@ describe('graceful shutdown', () => {
 
   const clientless = async (signal: 'SIGTERM' | 'SIGINT') => {
     const birdbox = await makeBirdbox(longGracefulTimeoutSecs);
+
     try {
       birdbox.killCube(signal);
       const code = await birdbox.onCubeExit();
@@ -103,6 +104,7 @@ describe('graceful shutdown', () => {
 
   const betweenQueries = async (signal: 'SIGTERM' | 'SIGINT') => {
     const birdbox = await makeBirdbox(longGracefulTimeoutSecs);
+
     try {
       const connection: PgClient = unconnectedPostgresClient('admin', 'admin_password');
 
@@ -123,6 +125,7 @@ describe('graceful shutdown', () => {
           console.log(err);
         }
       });
+
       try {
         const res = await connection.query(
           'SELECT COUNT(*) as cn, "status" FROM Orders GROUP BY 2 ORDER BY cn DESC'
@@ -155,6 +158,7 @@ describe('graceful shutdown', () => {
 
   const midTransaction = async (signal: 'SIGTERM' | 'SIGINT') => {
     const birdbox = await makeBirdbox(signal === 'SIGTERM' ? shortGracefulTimeoutSecs : longGracefulTimeoutSecs);
+
     try {
       const connection: PgClient = unconnectedPostgresClient('admin', 'admin_password');
 
@@ -180,6 +184,7 @@ describe('graceful shutdown', () => {
           console.log(err);
         }
       });
+
       try {
         const res = await connection.query(
           'BEGIN'
@@ -229,6 +234,7 @@ describe('graceful shutdown', () => {
 
   const waitForTransaction = async (signal: 'SIGTERM') => {
     const birdbox = await makeBirdbox(longGracefulTimeoutSecs);
+
     try {
       const connection: PgClient = unconnectedPostgresClient('admin', 'admin_password');
 
@@ -253,6 +259,7 @@ describe('graceful shutdown', () => {
           console.log(err);
         }
       });
+
       try {
         // 1. Begin a transaction
         const beginRes = await connection.query(

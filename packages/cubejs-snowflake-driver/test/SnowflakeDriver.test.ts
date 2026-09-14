@@ -51,6 +51,7 @@ function assertHydrationResults(rows: any[]) {
 describe('SnowflakeDriver', () => {
   test('query', async () => {
     const driver = new SnowflakeDriver({});
+
     try {
       const rows = await driver.query<any[]>(QUERY_TO_TEST_HYDRATION, []);
       assertHydrationResults(rows);
@@ -61,8 +62,10 @@ describe('SnowflakeDriver', () => {
 
   test('stream', async () => {
     const driver = new SnowflakeDriver({});
+
     try {
       const tableData = await driver.stream(QUERY_TO_TEST_HYDRATION, [], { highWaterMark: 100 });
+
       try {
         // Every TIMESTAMP variant must reach Cube Store as the generic `timestamp`;
         // TIMESTAMP_TZ/LTZ used to fall through as their raw Snowflake type name.
@@ -87,6 +90,7 @@ describe('SnowflakeDriver', () => {
 
   test('query() exposes cancel synchronously', async () => {
     const driver = new SnowflakeDriver({});
+
     try {
       // QueryCache reads `resultPromise.cancel` on the very next line after
       // calling the driver, so it must be there without awaiting anything.
@@ -103,6 +107,7 @@ describe('SnowflakeDriver', () => {
 
   test('query() cancel aborts a running statement', async () => {
     const driver = new SnowflakeDriver({});
+
     try {
       const promise = driver.query(LONG_RUNNING_QUERY, []);
       // Let the statement actually reach Snowflake before aborting it.
@@ -124,6 +129,7 @@ describe('SnowflakeDriver', () => {
 
   test('query() cancel before the connection is established', async () => {
     const driver = new SnowflakeDriver({});
+
     try {
       // No await in between: the driver is still connecting, so no statement
       // exists yet and there is nothing to abort - it must simply never issue one.
@@ -138,6 +144,7 @@ describe('SnowflakeDriver', () => {
 
   test('stream() cancel aborts a running statement', async () => {
     const driver = new SnowflakeDriver({});
+
     try {
       const promise = driver.stream(LONG_RUNNING_QUERY, [], { highWaterMark: 100 });
       expect(typeof promise.cancel).toBe('function');
@@ -153,6 +160,7 @@ describe('SnowflakeDriver', () => {
 
   test('downloadQueryResults() cancel aborts a running statement (memory)', async () => {
     const driver = new SnowflakeDriver({});
+
     try {
       const promise = driver.downloadQueryResults(LONG_RUNNING_QUERY, [], { highWaterMark: 100 });
       expect(typeof promise.cancel).toBe('function');
@@ -168,6 +176,7 @@ describe('SnowflakeDriver', () => {
 
   test('downloadQueryResults() cancel aborts a running statement (stream)', async () => {
     const driver = new SnowflakeDriver({});
+
     try {
       const promise = driver.downloadQueryResults(
         LONG_RUNNING_QUERY,
@@ -187,6 +196,7 @@ describe('SnowflakeDriver', () => {
 
   test('downloadQueryResults() returns memory data when not streaming', async () => {
     const driver = new SnowflakeDriver({});
+
     try {
       const tableData = <any> await driver.downloadQueryResults(
         QUERY_TO_TEST_HYDRATION,
@@ -201,6 +211,7 @@ describe('SnowflakeDriver', () => {
 
   test('stream() release() after normal completion does not abort', async () => {
     const driver = new SnowflakeDriver({});
+
     try {
       const tableData = await driver.stream(QUERY_TO_TEST_HYDRATION, [], { highWaterMark: 100 });
       const rows = await streamToArray(tableData.rowStream as any);

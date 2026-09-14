@@ -896,6 +896,7 @@ class ApiGateway {
     { query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }
   ) {
     const requestStarted = new Date();
+
     try {
       const refreshTimezones = this.scheduledRefreshTimeZones ? await this.scheduledRefreshTimeZones(context) : [];
       query = normalizeQueryPreAggregations(
@@ -959,6 +960,7 @@ class ApiGateway {
     { query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }
   ) {
     const requestStarted = new Date();
+
     try {
       query = normalizeQueryPreAggregationPreview(this.parseQueryParam(query));
       const { preAggregationId, versionEntry, timezone } = query;
@@ -993,6 +995,7 @@ class ApiGateway {
     { query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }
   ) {
     const requestStarted = new Date();
+
     try {
       query = normalizeQueryPreAggregations(this.parseQueryParam(query));
       const result = await this.refreshScheduler()
@@ -1055,6 +1058,7 @@ class ApiGateway {
     const context = <RequestContext>req.context;
     const query = <PreAggsJobsRequest>req.body;
     let result;
+
     try {
       await this.assertApiScope('jobs', req?.context?.securityContext);
 
@@ -1349,6 +1353,7 @@ class ApiGateway {
     { context, res }: { context: RequestContext, res: ResponseResultFn }
   ) {
     const requestStarted = new Date();
+
     try {
       const orchestratorApi = await this.getAdapterApi(context);
       await res({
@@ -1365,6 +1370,7 @@ class ApiGateway {
     { query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }
   ) {
     const requestStarted = new Date();
+
     try {
       const { queryKeys, dataSource } = normalizeQueryCancelPreAggregations(this.parseQueryParam(query));
       const orchestratorApi = await this.getAdapterApi(context);
@@ -1382,6 +1388,7 @@ class ApiGateway {
     { requestId, context, res }: { requestId: string, context: RequestContext, res: ResponseResultFn }
   ) {
     const requestStarted = new Date();
+
     try {
       const orchestratorApi = await this.getAdapterApi(context);
       const cancelled = await orchestratorApi.cancelQueryByRequestId(requestId);
@@ -2048,6 +2055,7 @@ class ApiGateway {
     stream: stream.Writable;
   }> {
     const requestStarted = new Date();
+
     try {
       this.log({ type: 'Load Request', query, streaming: true }, context);
       const [, normalizedQueries] = await this.getNormalizedQueries(query, context, true);
@@ -2379,6 +2387,7 @@ class ApiGateway {
     query, context, res, subscribe, subscriptionState, queryType, apiType
   }) {
     const requestStarted = new Date();
+
     try {
       this.log({
         type: 'Subscribe',

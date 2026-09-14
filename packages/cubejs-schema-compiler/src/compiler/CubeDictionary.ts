@@ -16,6 +16,7 @@ export class CubeDictionary implements TranspilerCubeResolver, CompilerInterface
 
   public compile(cubes: Cube[], errorReporter?: ErrorReporter): void {
     this.byId = new Map<string, Cube>();
+
     for (const cube of cubes) {
       if (errorReporter && this.byId.has(cube.name)) {
         const existing = this.byId.get(cube.name)!;

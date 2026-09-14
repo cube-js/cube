@@ -138,6 +138,7 @@ class HiveDriver extends BaseDriver {
   async testConnection() {
     // eslint-disable-next-line no-underscore-dangle
     const conn = await this.pool._factory.create();
+
     try {
       return await this.handleQuery('SELECT 1', [], conn);
     } finally {
@@ -160,6 +161,7 @@ class HiveDriver extends BaseDriver {
     values = values || [];
     const sql = SqlString.format(query, values);
     const connection = conn || await this.pool.acquire();
+
     try {
       const execResult = await connection.cursor.execute(sql);
       // eslint-disable-next-line no-constant-condition

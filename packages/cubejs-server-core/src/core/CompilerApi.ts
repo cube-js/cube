@@ -256,6 +256,7 @@ export class CompilerApi {
 
   public async compileSchema(compilerVersion: string, requestId?: string): Promise<Compiler> {
     const startCompilingTime = new Date().getTime();
+
     try {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
         version: compilerVersion,
@@ -511,6 +512,7 @@ export class CompilerApi {
     // When a cube is accessed via a view, we skip the cube's member-level restrictions
     // and only apply row-level filters. The view controls what members are exposed.
     const cubesAccessedViaView = new Set<string>();
+
     for (const cubeName of queryCubes) {
       const cube = cubeEvaluator.cubeFromPath(cubeName);
       if (cube.isView) {

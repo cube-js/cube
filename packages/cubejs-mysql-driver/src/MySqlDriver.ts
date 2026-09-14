@@ -442,6 +442,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
 
     try {
       const batchSize = 1000; // TODO make dynamic?
+
       for (let j = 0; j < Math.ceil(tableData.rows.length / batchSize); j++) {
         const currentBatchSize = Math.min(tableData.rows.length - j * batchSize, batchSize);
         const indexArray = Array.from({ length: currentBatchSize }, (v, i) => i);

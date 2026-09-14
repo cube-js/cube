@@ -52,6 +52,7 @@ const splitFilesToChunks = (files: FileContent[], chunksCount: number): FileCont
   } else {
     const baseSize = Math.floor(files.length / chunksCount);
     chunks = [];
+
     for (let i = 0; i < chunksCount; i++) {
       // For the last part, we take the remaining files so we don't lose the extra ones.
       const start = i * baseSize;
@@ -598,6 +599,7 @@ export class DataSchemaCompiler {
     }
 
     const hash = crypto.createHash('md5');
+
     for (const f of macroFiles) {
       hash.update(f.fileName);
       hash.update('\0');

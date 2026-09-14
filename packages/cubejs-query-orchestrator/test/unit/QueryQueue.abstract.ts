@@ -603,6 +603,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
       test('useExternalId should return true', async () => {
         const connection = await queue.queueDriver.createConnection();
+
         try {
           expect(await (connection as CubestoreQueueDriverConnection).useExternalId()).toBe(true);
         } finally {

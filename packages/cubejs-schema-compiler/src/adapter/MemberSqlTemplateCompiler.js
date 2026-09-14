@@ -57,6 +57,7 @@ function emptyRecording() {
 // value, so repeated references collapse to a single placeholder.
 function uniqueInsertPath(paths, path) {
   const key = JSON.stringify(path);
+
   for (let i = 0; i < paths.length; i++) {
     if (JSON.stringify(paths[i]) === key) {
       return i;
@@ -116,6 +117,7 @@ function declaredValueParams(fn) {
 
   let depth = 0;
   let close = -1;
+
   for (let i = open; i < source.length; i++) {
     const ch = source[i];
     if (ch === '(' || ch === '[' || ch === '{') depth++;
@@ -135,6 +137,7 @@ function declaredValueParams(fn) {
   const params = [];
   let start = 0;
   depth = 0;
+
   for (let i = 0; i <= inner.length; i++) {
     const ch = inner[i];
     if (ch === '(' || ch === '[' || ch === '{') depth++;
@@ -182,6 +185,7 @@ function compileColumnCallback(column, state) {
   }
 
   const values = [];
+
   for (let i = 0; i < count; i++) {
     values.push(placeholder(FILTER_VALUE_PREFIX, i));
   }
@@ -189,6 +193,7 @@ function compileColumnCallback(column, state) {
   const recording = emptyRecording();
   const outer = state.target;
   state.target = recording;
+
   try {
     const template = parseTemplateResult(column(...values));
     return { template, valueParamsCount: count, ...recording };

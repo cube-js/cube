@@ -1,0 +1,15 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": ["../cubejs-linter/node.json"],
+  "ignorePatterns": [
+    "dist/",
+    "lib/",
+    "build/",
+    "coverage/",
+    "gen/",
+    "**/*.d.ts",
+    // never covered by the ESLint setup this replaced
+    "cypress/",
+    "birdbox-fixtures/"
+  ]
+}

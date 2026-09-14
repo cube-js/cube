@@ -1,6 +1,12 @@
 // The rule set lives in the @cubejs-backend/linter package so it stays a publishable,
 // reviewable unit; this file adds the repo-wide ignores.
 //
+// Backend packages do not fall through to this config: each of them has its own
+// .oxlintrc.json extending packages/cubejs-linter/node.json, and a nested config replaces
+// this one outright for its subtree (it does not merge), so those packages restate the
+// ignores they need. This file governs the frontend packages and everything outside
+// packages/.
+//
 // `yarn lint` runs bare `oxlint`: passing -c/--config would disable nested config
 // discovery, and packages/cubejs-client-{dx,react} rely on it.
 {
@@ -19,19 +25,6 @@
     "**/*.d.ts",
     "docs-mintlify/",
     "examples/",
-    "rust/cubesql/",
-    // never covered by the ESLint setup this replaced
-    "packages/cubejs-testing/cypress/",
-    "packages/cubejs-testing/birdbox-fixtures/",
-    // a mongosh script, not Node: `db` is a shell global
-    "packages/cubejs-mongobi-driver/test/mongo-init.js",
-    // vendored Thrift output
-    "packages/cubejs-hive-driver/idl/",
-    // generated flatbuffers accessors
-    "packages/cubejs-cubestore-driver/codegen/",
-    // generated ANTLR parsers and SQL fixtures
-    "packages/cubejs-schema-compiler/src/parser/GenericSql*.ts",
-    "packages/cubejs-schema-compiler/src/parser/Python3*.ts",
-    "packages/cubejs-schema-compiler/test/unit/fixtures/"
+    "rust/cubesql/"
   ]
 }

@@ -31,6 +31,7 @@ describe('FireboltDriver', () => {
     const driver = new FireboltDriver({});
 
     let timedOut = false;
+
     try {
       await driver.query(slowQuery);
     } catch (e) {

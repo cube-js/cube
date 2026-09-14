@@ -1143,6 +1143,7 @@ filter_subq AS (
 
         // Wait for pg_sleep to appear in pg_stat_activity
         let sleepRunning = false;
+
         for (let i = 0; i < 20; i++) {
           await new Promise(resolve => setTimeout(resolve, 500));
           const { rows } = await pgConn.query(

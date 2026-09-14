@@ -1164,6 +1164,7 @@ describe('Refresh Scheduler', () => {
       refreshScheduler
     } = setupScheduler({ repository: repositoryWithRollupJoin, useOriginalSqlPreAggregations: true });
     const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
+
     for (let i = 0; i < 1000; i++) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1207,6 +1208,7 @@ describe('Refresh Scheduler', () => {
     // Run refresh until it tries to create foo_first table and fails
     const queryIteratorState = {};
     const maxIterations = 100;
+
     for (let i = 0; i < maxIterations; i++) {
       try {
         await refreshScheduler.runScheduledRefresh(ctx, {
@@ -1256,6 +1258,7 @@ describe('Refresh Scheduler', () => {
     // Step 1: Immediate retry - should skip due to backoff (10-second window)
     const beforeSkipAttempts = mockDriver.queryAttempts;
     const immediateRetryCount = 5;
+
     for (let i = 0; i < immediateRetryCount; i++) {
       try {
         await refreshScheduler.runScheduledRefresh(ctx, {

@@ -58,6 +58,7 @@ describe('FireboltDriver autostart', () => {
     });
 
     const engine = await firebolt.resourceManager.engine.getByName(engineName);
+
     try {
       await engine.stop();
 

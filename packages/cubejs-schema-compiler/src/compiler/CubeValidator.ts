@@ -331,6 +331,7 @@ const LinkItemSchema = Joi.object().keys({
 const LinksSchema = Joi.array().items(LinkItemSchema).custom((value, helpers) => {
   const names = value.map((link: any) => (typeof link.name === 'function' ? link.name() : link.name));
   const seen = new Set<string>();
+
   for (const name of names) {
     if (seen.has(name)) {
       return helpers.error('any.custom', { message: `Duplicate link name '${name}'` });

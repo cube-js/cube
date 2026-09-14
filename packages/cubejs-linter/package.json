@@ -17,6 +17,7 @@
   },
   "files": [
     ".oxlintrc.json",
+    "node.json",
     "airbnb-base.json",
     "airbnb-react.json"
   ],

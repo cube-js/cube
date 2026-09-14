@@ -475,6 +475,7 @@ export function getJsonQueryFromGraphQLQuery(query: string, metaConfig: any, var
   const fieldNodes = operation?.selectionSet.selections;
 
   let args = {};
+
   for (const argument of fieldNodes[0].arguments) {
     args = { ...args, [argument.name.value]: parseArgumentValue(argument.value, variableValues) };
   }

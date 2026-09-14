@@ -199,6 +199,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
 
   private hydrateRow = (row: Row, meta: Meta[]) => {
     const hydratedRow: Record<string, unknown> = {};
+
     for (let index = 0; index < meta.length; index++) {
       const column = meta[index];
       const key = column.name;
