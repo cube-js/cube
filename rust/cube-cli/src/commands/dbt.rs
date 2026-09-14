@@ -288,8 +288,9 @@ async fn fetch_generated_files(
 
     if files.is_empty() {
         bail!(
-            "dbt sync {sync_job_id} completed but returned no files. They are kept only \
-             briefly after a run finishes, so collect them right after it completes"
+            "dbt sync {sync_job_id} generated no cubes. Most likely its manifest had no \
+             models to convert, or the deployment's pull options filtered them all out. \
+             (Generated files are also dropped a while after a run finishes.)"
         );
     }
 
@@ -307,7 +308,7 @@ fn generate_json(
     out: &str,
     files: &[(String, String)],
     outcome: &str,
-    differing: &[String],
+    differing: &[(String, &str)],
 ) -> Value {
     let paths: Vec<Value> = files
         .iter()
@@ -325,12 +326,15 @@ fn generate_json(
     doc.insert("files".to_string(), Value::Array(paths));
 
     if !differing.is_empty() {
+        // Keyed the way `files` is — project-relative, as the server named them — so a
+        // gate can join the two arrays, and branch on `status` instead of matching an
+        // English suffix.
         doc.insert(
             "differing".to_string(),
             Value::Array(
                 differing
                     .iter()
-                    .map(|line| Value::String(line.clone()))
+                    .map(|(path, status)| serde_json::json!({"path": path, "status": status}))
                     .collect(),
             ),
         );
@@ -1010,11 +1014,29 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             eprintln!("dbt generate {sync_job_id} started");
             let status = wait_for_sync(&api, deployment, &sync_job_id, timeout, poll).await?;
 
+            // Every exit of this command emits exactly one `--json` document, the way
+            // `sync --wait` does. On a failure the syncJobId is the only machine-readable
+            // trace of the run, and it is what a pipeline needs to call `dbt logs`.
+            let failed_json = || generate_json(&started, &out, &[], "failed", &[]);
+
             if util::status_of(&status, "status") == FAILED {
+                if ctx.json {
+                    output::print_json(&failed_json());
+                }
+
                 return Err(failure(deployment, &sync_job_id, &status));
             }
 
-            let files = fetch_generated_files(&api, deployment, &sync_job_id, poll).await?;
+            let files = match fetch_generated_files(&api, deployment, &sync_job_id, poll).await {
+                Ok(files) => files,
+                Err(err) => {
+                    if ctx.json {
+                        output::print_json(&failed_json());
+                    }
+
+                    return Err(err);
+                }
+            };
             let root = Path::new(&out);
 
             if check {
@@ -1023,12 +1045,12 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     let target = resolve_within(root, path)?;
                     match std::fs::read_to_string(&target) {
                         Ok(on_disk) if &on_disk == content => {}
-                        Ok(_) => differing.push(format!("{} differs", target.display())),
+                        Ok(_) => differing.push((path.clone(), "differs")),
                         // Only NotFound is "not committed yet". A permissions error or a
                         // directory in the way reported as "missing" would send the reader
                         // to re-run the write, which fails the same way.
                         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                            differing.push(format!("{} is missing", target.display()))
+                            differing.push((path.clone(), "missing"))
                         }
                         Err(err) => {
                             return Err(anyhow::Error::new(err)
@@ -1047,8 +1069,8 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                             &differing,
                         ));
                     } else {
-                        for line in &differing {
-                            eprintln!("  {line}");
+                        for (path, status) in &differing {
+                            eprintln!("  {} {status}", root.join(path).display());
                         }
                     }
 
@@ -1488,6 +1510,20 @@ mod tests {
         assert_eq!(doc["fileCount"], json!(1));
         assert_eq!(doc["files"], json!(["model/cubes/dbt/orders.yml"]));
         assert_eq!(doc["outputDir"], json!("."));
+
+        // `differing` is keyed like `files` and carries a status to branch on, not an
+        // English sentence to string-match.
+        let drifted = generate_json(
+            &json!({"syncJobId": "job-1"}),
+            ".",
+            &files,
+            "differing",
+            &[("model/cubes/dbt/orders.yml".to_string(), "differs")],
+        );
+        assert_eq!(
+            drifted["differing"],
+            json!([{"path": "model/cubes/dbt/orders.yml", "status": "differs"}])
+        );
     }
 
     #[test]
