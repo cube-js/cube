@@ -103,6 +103,10 @@ yarn dev    # Start the Mintlify dev server
 - Most packages have Jest-based unit tests in `/test` directories
 - TypeScript packages use `jest.config.js` with TypeScript compilation
 - Snapshot testing for SQL compilation and query planning
+- To call a `protected` method from a test, subclass the class in the test file and widen the
+  method to `public` (`class TestFoo extends Foo { public bar() { return super.bar(); } }`)
+  instead of casting the instance to `any`. Casts hide signature changes from the compiler;
+  the subclass keeps the call type-checked. `private` members cannot be widened this way.
 
 ### Integration Tests
 - Driver-specific integration tests in `/packages/cubejs-testing-drivers`
