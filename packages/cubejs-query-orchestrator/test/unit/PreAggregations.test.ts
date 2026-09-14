@@ -557,6 +557,7 @@ describe('PreAggregations', () => {
         [REFRESH_KEY_SQL, [], { external: true, renewalThreshold: 60, localRefreshKey: descriptor }];
 
       const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(600_000);
+
       try {
         const first = await loadCache.keyQueryResult(key, false, 10);
         expect(first).toEqual([{ refresh_key: '1' }]);
@@ -1046,6 +1047,7 @@ describe('PreAggregations', () => {
 
       expect(result).toEqual(['refresh-key', 'refresh-key']);
       expect(keyQueryResult).toHaveBeenCalledTimes(2);
+
       for (const [sql] of keyQueryResult.mock.calls) {
         expect(sql[0]).toContain('test_table20240310');
         expect(sql[1]).toEqual([utcStart, utcEnd, utcStart, 'literal']);
@@ -1066,6 +1068,7 @@ describe('PreAggregations', () => {
   describe('partitionPreAggregations', () => {
     test('uses local load boundaries for incremental renewal and sealing', async () => {
       jest.useFakeTimers({ now: new Date('2024-03-10T17:30:00.000Z') });
+
       try {
         const query: QueryWithParams = ['SELECT * FROM test_table WHERE ts BETWEEN ? AND ?', [FROM_PARTITION_RANGE, TO_PARTITION_RANGE], {
           incremental: true,
@@ -1107,6 +1110,7 @@ describe('PreAggregations', () => {
 
       const results = await loader.partitionPreAggregations();
       expect(results).toHaveLength(3);
+
       for (const partition of results.slice(0, -1)) {
         expect(partition.loadSql).toBe(partition.structureVersionLoadSql);
       }
@@ -1498,6 +1502,7 @@ describe('PreAggregations', () => {
           shiftCounter += 8;
           // eslint-disable-next-line operator-assignment,no-bitwise
           residue = (byte << (shiftCounter - 8)) | residue;
+
           // eslint-disable-next-line no-bitwise
           while (residue >> 5) {
             result += hashCharset.charAt(residue % 32);
