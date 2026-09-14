@@ -263,6 +263,14 @@ impl<'a> FilterSqlContext<'a> {
         Ok(format!("({})", select))
     }
 
+    /// The bound, unless its side reaches without limit — which no date states.
+    pub fn keep_bounded(&self, bound: String, interval: &Option<String>) -> Option<String> {
+        match interval.as_deref() {
+            Some("unbounded") => None,
+            _ => Some(bound),
+        }
+    }
+
     pub fn extend_date_range_bound(
         &self,
         date: String,

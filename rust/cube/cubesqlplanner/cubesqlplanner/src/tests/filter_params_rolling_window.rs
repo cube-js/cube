@@ -119,17 +119,18 @@ const QUERY: &str = indoc! {r#"
 
 // A rolling window reads a period wider than the one reported, and a binding
 // passing its column carries that same widening — the stage's own bounds and
-// the scan's agree.
+// the scan's agree. The frame is folded into the bound rather than applied to
+// it in SQL, so the evidence is a date thirty days back, not an interval.
 #[test]
 fn a_column_binding_widens_with_the_window() {
     let ctx = TestContext::new(schema(Some(COLUMN))).unwrap();
-    let sql = ctx.build_sql(QUERY).unwrap();
+    let (sql, params) = ctx.build_sql_and_params(QUERY).unwrap();
     let predicate = fact_scan_predicate(&sql);
+    let bounds = predicate_values(&predicate, &params);
 
     assert!(
-        predicate.contains("interval '30 day'"),
-        "the scan reaches back as far as the window does\npredicate: {}",
-        predicate
+        bounds.iter().any(|bound| bound.starts_with("2024-01-31")),
+        "the scan reaches back as far as the window does: {bounds:?}\npredicate: {predicate}"
     );
 }
 

@@ -6,13 +6,23 @@ use cubenativeutils::CubeError;
 
 impl FilterOperationSql for RegularRollingWindowOp {
     fn to_sql(&self, ctx: &FilterSqlContext) -> Result<String, CubeError> {
-        let (from, to) = match ctx.date_range_literals(&self.series_range)? {
-            Some(range) => range,
-            None => ctx.date_range_from_time_series()?,
+        // A derived span already carries the frame, so the bound needs no
+        // interval around it: a bare literal is what an engine can both read
+        // while planning and eliminate partitions by. Only the sub-select
+        // fallback still applies the frame in SQL.
+        let (from, to) = match ctx.date_range_literals(&self.scan_range)? {
+            Some((from, to)) => (
+                ctx.keep_bounded(from, &self.trailing),
+                ctx.keep_bounded(to, &self.leading),
+            ),
+            None => {
+                let (from, to) = ctx.date_range_from_time_series()?;
+                (
+                    ctx.extend_date_range_bound(from, &self.trailing, true)?,
+                    ctx.extend_date_range_bound(to, &self.leading, false)?,
+                )
+            }
         };
-
-        let from = ctx.extend_date_range_bound(from, &self.trailing, true)?;
-        let to = ctx.extend_date_range_bound(to, &self.leading, false)?;
 
         let date_field = ctx.convert_tz(ctx.member_sql())?;
 

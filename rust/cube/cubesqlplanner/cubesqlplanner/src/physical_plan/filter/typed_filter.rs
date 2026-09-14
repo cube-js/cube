@@ -16,7 +16,6 @@ use crate::planner::QueryDateTime;
 use crate::planner::QueryDateTimeHelper;
 use crate::planner::QueryTimeSeries;
 use crate::planner::SqlInterval;
-use chrono::Duration;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -241,14 +240,14 @@ impl TypedFilter {
             FilterOp::RegularRollingWindow(RegularRollingWindowOp {
                 trailing,
                 leading,
-                series_range,
+                scan_range,
             }) => {
-                let Some((series_from, series_to)) = series_range else {
+                // The span already carries the frame, so it is the band. An
+                // unbounded side leaves it unstatable: no date says "no bound".
+                if is_unbounded(trailing) || is_unbounded(leading) {
                     return Ok(None);
-                };
-                let from = shift_bound(tz, series_from, trailing, true)?;
-                let to = shift_bound(tz, series_to, leading, false)?;
-                Ok(from.zip(to))
+                }
+                Ok(scan_range.clone())
             }
             // Without a granularity the window is anchored by one end of the
             // date range rather than by a series, and both its bounds are that
@@ -280,6 +279,10 @@ impl TypedFilter {
     }
 }
 
+fn is_unbounded(interval: &Option<String>) -> bool {
+    interval.as_deref() == Some("unbounded")
+}
+
 /// `date` moved by `interval`, or `None` for an `unbounded` side — which has no
 /// bound to state. A side with no interval keeps the date as it is.
 fn shift_bound(
@@ -300,34 +303,8 @@ fn shift_bound(
     };
     let anchor = QueryDateTime::from_date_str(tz, date)?;
     Ok(Some(
-        shift_wall_clock(&anchor, &interval)?.format("%Y-%m-%dT%H:%M:%S%.3f"),
+        anchor.add_interval_wall_clock(&interval)?.default_format(),
     ))
-}
-
-/// `anchor` moved by `interval` on the wall clock.
-///
-/// The band describes a span over the series' own points, and those are wall
-/// clock — so an hour of interval has to move the bound by an hour of wall
-/// clock, the way the stage's own SQL moves it. `add_interval` switches to
-/// absolute arithmetic for an interval carrying no date part, which across a
-/// daylight-saving transition lands an offset away from where the stage reads.
-fn shift_wall_clock(
-    anchor: &QueryDateTime,
-    interval: &SqlInterval,
-) -> Result<QueryDateTime, CubeError> {
-    let carries_date = interval.year != 0
-        || interval.quarter != 0
-        || interval.month != 0
-        || interval.week != 0
-        || interval.day != 0;
-    if carries_date {
-        return anchor.add_interval(interval);
-    }
-    anchor.add_duration(
-        Duration::hours(interval.hour as i64)
-            + Duration::minutes(interval.minute as i64)
-            + Duration::seconds(interval.second as i64),
-    )
 }
 
 fn dispatch_to_sql(op: &FilterOp, ctx: &FilterSqlContext) -> Result<String, CubeError> {

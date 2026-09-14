@@ -79,15 +79,19 @@ fn test_base_scan_date_bound_is_literal() {
         "base scan date bound is a scalar sub-select over time_series:\n{sql}"
     );
 
-    // The literals span the series exactly here — the range is whole days at
-    // day granularity, so both ends land on a bucket boundary. The trailing
-    // interval is subtracted from the lower bound in SQL, and the rolling join
+    // The range is whole days at day granularity, so both ends land on a bucket
+    // boundary; each window's own frame is then folded into its lower bound,
+    // seven days back for one and thirty for the other. The rolling join
     // applies the exact frame on top.
     let bounds = params
         .iter()
         .filter_map(|value| value.to_param_string())
         .collect_vec();
-    for edge in ["2026-08-01T00:00:00.000", "2026-09-02T23:59:59.999"] {
+    for edge in [
+        "2026-07-25T00:00:00.000",
+        "2026-07-02T00:00:00.000",
+        "2026-09-02T23:59:59.999",
+    ] {
         assert!(
             bounds.iter().any(|bound| bound == edge),
             "{edge} missing from the base scan bounds {bounds:?} in:\n{sql}"

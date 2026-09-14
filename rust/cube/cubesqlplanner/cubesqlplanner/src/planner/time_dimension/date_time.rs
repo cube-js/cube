@@ -228,6 +228,26 @@ impl QueryDateTime {
         Self::from_local_date_time(self.date_time.timezone(), naive)
     }
 
+    /// `add_interval`, but a time-only interval moves the wall clock rather
+    /// than the instant. An hour of interval is an hour of the clock, the way
+    /// a series places its points and the way SQL interval arithmetic reads it;
+    /// across a daylight-saving transition the two differ by the offset.
+    pub fn add_interval_wall_clock(&self, interval: &SqlInterval) -> Result<Self, CubeError> {
+        let carries_date = interval.year != 0
+            || interval.quarter != 0
+            || interval.month != 0
+            || interval.week != 0
+            || interval.day != 0;
+        if carries_date {
+            return self.add_interval(interval);
+        }
+        self.add_duration(
+            Duration::hours(interval.hour as i64)
+                + Duration::minutes(interval.minute as i64)
+                + Duration::seconds(interval.second as i64),
+        )
+    }
+
     pub fn sub_interval(&self, interval: &SqlInterval) -> Result<Self, CubeError> {
         self.add_interval(&interval.inverse())
     }

@@ -17,6 +17,7 @@ use crate::planner::state::State;
 use crate::planner::symbols::deps::{collect_cube_refs, collect_deps, SymbolDeps};
 use crate::planner::symbols::transforms;
 use crate::planner::symbols::AggregationType;
+use crate::planner::time_dimension::SqlInterval;
 use crate::planner::Case;
 use crate::planner::CaseSwitchDefinition;
 use crate::planner::CaseSwitchItem;
@@ -33,12 +34,14 @@ use crate::planner::QueryProperties;
 use crate::planner::QueryTimeSeries;
 use crate::planner::TimeDimensionSymbol;
 use chrono::Duration;
+use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
+use std::str::FromStr;
 
 /// Plans the multi-stage CTE tree of a query. For every multi-stage
 /// member it encounters in `all_used_symbols`, it recursively
@@ -1307,6 +1310,54 @@ impl MultiStageQueryPlanner {
         )
     }
 
+    /// Span a regular rolling window's base scan reads: the series' own bounds
+    /// with the window's frame folded in.
+    ///
+    /// Folded here rather than applied to the bound in SQL, so the predicate is
+    /// a bare literal comparison. A dialect that evaluates interval arithmetic
+    /// over a constant while planning the query cannot always do it — the
+    /// argument reaches its interval function before the surrounding cast does
+    /// — and a bare bound is the one every engine can both read and prune by.
+    ///
+    /// An `unbounded` side keeps the unshifted bound, which the filter drops:
+    /// no date states the absence of a bound.
+    fn regular_scan_span(
+        &self,
+        time_dimension: &Rc<TimeDimensionSymbol>,
+        rolling_window: &RollingWindow,
+    ) -> Result<Option<(String, String)>, CubeError> {
+        let Some((series_from, series_to)) = self.rolling_series_bounds(time_dimension)? else {
+            return Ok(None);
+        };
+        let tz = self.query_tools.query_tools().timezone();
+        Ok(Some((
+            Self::fold_frame(tz, &series_from, &rolling_window.trailing, true)?,
+            Self::fold_frame(tz, &series_to, &rolling_window.leading, false)?,
+        )))
+    }
+
+    /// `bound` moved by `interval` on the wall clock, the way the series places
+    /// its own points. An absent or `unbounded` interval leaves it alone.
+    fn fold_frame(
+        tz: Tz,
+        bound: &str,
+        interval: &Option<String>,
+        subtract: bool,
+    ) -> Result<String, CubeError> {
+        let interval = match interval.as_deref() {
+            None | Some("unbounded") => return Ok(bound.to_string()),
+            Some(interval) => SqlInterval::from_str(interval)?,
+        };
+        let interval = if subtract {
+            interval.inverse()
+        } else {
+            interval
+        };
+        Ok(QueryDateTime::from_date_str(tz, bound)?
+            .add_interval_wall_clock(&interval)?
+            .default_format())
+    }
+
     /// Span the base scan of a `to_date` window over `time_dimension` reads:
     /// from the start of the period the series opens in, to the series' own
     /// end, rendered by the filter as literals.
@@ -1482,7 +1533,7 @@ impl MultiStageQueryPlanner {
                 &time_dimension_base_name,
                 rolling_window.trailing.clone(),
                 rolling_window.leading.clone(),
-                self.rolling_series_bounds(&time_dimension_symbol)?,
+                self.regular_scan_span(&time_dimension_symbol, rolling_window)?,
             )?;
         }
 
