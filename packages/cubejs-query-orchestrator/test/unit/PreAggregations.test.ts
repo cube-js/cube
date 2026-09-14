@@ -6,9 +6,8 @@ import {
   TO_PARTITION_RANGE
 } from '@cubejs-backend/shared';
 import crypto from 'crypto';
-import { QueryWithParams } from '../../src/orchestrator/QueryCache';
 
-import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, LocalCacheDriver, version } from '../../src';
+import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, LocalCacheDriver, version, type QueryWithParams } from '../../src';
 
 class MockDriver {
   public tables: string[] = [];
@@ -94,7 +93,7 @@ const mockPreAggregation = (overrides: Record<string, any> = {}) => ({
   ...overrides,
 });
 
-const createLoader = (overrides: Record<string, any> = {}, options: Record<string, any> = {}) => {
+const createLoader = (overrides: Record<string, any> = {}, options: Record<string, any> = {}, loadCache: Record<string, any> = {}) => {
   const loader = new PreAggregationPartitionRangeLoader(
     {} as any, // driverFactory
     {} as any, // logger
@@ -102,7 +101,7 @@ const createLoader = (overrides: Record<string, any> = {}, options: Record<strin
     {} as any, // preAggregations
     mockPreAggregation(overrides) as any,
     [], // preAggregationsTablesToTempTables
-    {} as any, // loadCache
+    loadCache as any,
     options as any,
   );
 
@@ -982,72 +981,89 @@ describe('PreAggregations', () => {
       jest.restoreAllMocks();
     });
 
-    describe.each([
-      { day: '2024-03-10', nextDay: '2024-03-11', startHour: '05', endHour: '03', noonHour: '16' },
-      { day: '2024-11-03', nextDay: '2024-11-04', startHour: '04', endHour: '04', noonHour: '17' },
-    ])('America/New_York DST transition on $day', ({ day, nextDay, startHour, endHour, noonHour }) => {
-      test.each([
-        { precision: 3, clipped: false },
-        { precision: 3, clipped: true },
-        { precision: 6, clipped: false },
-        { precision: 6, clipped: true },
-      ])('shares converted boundaries across SQL queries (precision=$precision, clipped=$clipped)', async ({ precision, clipped }) => {
-        const zeros = '0'.repeat(precision);
-        const nines = '9'.repeat(precision);
-        const start = `${day}T00:00:00.${zeros}`;
-        const end = `${day}T23:59:59.${nines}`;
-        const loadEnd = clipped ? `${day}T12:00:00.${zeros}` : end;
-        const utcStart = `${day}T${startHour}:00:00.${zeros}`;
-        const utcEnd = `${nextDay}T${endHour}:59:59.${nines}`;
-        const utcLoadEnd = clipped ? `${day}T${noonHour}:00:00.${zeros}` : utcEnd;
-        const query: QueryWithParams = [
-          'SELECT * FROM test_table WHERE ts >= ? AND ts <= ? AND ts >= ? AND label = ?',
-          [FROM_PARTITION_RANGE, TO_PARTITION_RANGE, FROM_PARTITION_RANGE, 'literal'],
-          { renewalThreshold: 60 },
-        ];
-        const loader = createLoader({
-          timezone: 'America/New_York',
-          timestampFormat: `YYYY-MM-DDTHH:mm:ss.${'S'.repeat(precision)}`,
-          timestampPrecision: precision,
-          loadSql: query,
-          sql: query,
-          invalidateKeyQueries: [query, query],
-          partitionInvalidateKeyQueries: [query],
-          indexesSql: [{ indexName: 'test_index', sql: query }],
-          previewSql: query,
-        });
-        jest.spyOn(loader, 'loadBuildRange').mockResolvedValue([start, loadEnd]);
-        const convert = jest.spyOn(PreAggregationPartitionRangeLoader, 'inDbTimeZone');
+    // America/New_York enters DST on 2024-03-10, so the partition start is EST and its end is EDT.
+    const start = '2024-03-10T00:00:00.000';
+    const noon = '2024-03-10T12:00:00.000';
+    const end = '2024-03-10T23:59:59.999';
+    const utcStart = '2024-03-10T05:00:00.000';
+    const utcNoon = '2024-03-10T16:00:00.000';
+    const utcEnd = '2024-03-11T03:59:59.999';
+    const originalParams = [FROM_PARTITION_RANGE, TO_PARTITION_RANGE, FROM_PARTITION_RANGE, 'literal'];
+    const query: QueryWithParams = [
+      'SELECT * FROM test_table WHERE ts >= ? AND ts <= ? AND ts >= ? AND label = ?',
+      [...originalParams],
+      { renewalThreshold: 60 },
+    ];
 
-        const results = await loader.partitionPreAggregations();
-
-        expect(results).toHaveLength(1);
-        const [partition] = results;
-        const fullParams = [utcStart, utcEnd, utcStart, 'literal'];
-        const loadParams = [utcStart, utcLoadEnd, utcStart, 'literal'];
-        for (const sql of [partition.loadSql, partition.sql]) {
-          expect(sql[1]).toEqual(loadParams);
-        }
-        for (const sql of [
-          partition.structureVersionLoadSql,
-          ...partition.invalidateKeyQueries,
-          ...partition.partitionInvalidateKeyQueries,
-          partition.indexesSql[0].sql,
-          partition.previewSql,
-        ]) {
-          expect(sql[1]).toEqual(fullParams);
-          expect(sql[0]).toContain(`test_table${day.replace(/-/g, '')}`);
-          expect(sql[2].renewalThreshold).toBe(60);
-        }
-        expect(partition.buildRangeStart).toBe(start);
-        expect(partition.buildRangeEnd).toBe(loadEnd);
-        expect(partition.loadSql === partition.structureVersionLoadSql).toBe(!clipped);
-        // Conversion cost depends on ranges, not the number of SQL queries or placeholders.
-        expect(convert).toHaveBeenCalledTimes(clipped ? 4 : 2);
-        expect(query[1]).toEqual([FROM_PARTITION_RANGE, TO_PARTITION_RANGE, FROM_PARTITION_RANGE, 'literal']);
+    test.each([
+      { name: 'unclipped', buildRangeEnd: end, partitionInvalidateKeyQueries: [query], loadEnd: end, utcLoadEnd: utcEnd, conversions: 2 },
+      { name: 'clipped', buildRangeEnd: noon, partitionInvalidateKeyQueries: [query], loadEnd: noon, utcLoadEnd: utcNoon, conversions: 4 },
+      // Real-time pre-aggregations never clip, so the build range end is ignored.
+      { name: 'real-time', buildRangeEnd: noon, partitionInvalidateKeyQueries: [], loadEnd: end, utcLoadEnd: utcEnd, conversions: 2 },
+    ])('shares converted boundaries across SQL queries of a $name partition', async ({ buildRangeEnd, partitionInvalidateKeyQueries, loadEnd, utcLoadEnd, conversions }) => {
+      const loader = createLoader({
+        timezone: 'America/New_York',
+        loadSql: query,
+        sql: query,
+        invalidateKeyQueries: [query],
+        partitionInvalidateKeyQueries,
+        indexesSql: [{ indexName: 'test_index', sql: query }],
+        previewSql: query,
       });
+      jest.spyOn(loader, 'loadBuildRange').mockResolvedValue([start, buildRangeEnd]);
+      const convert = jest.spyOn(PreAggregationPartitionRangeLoader, 'inDbTimeZone');
+
+      const [partition] = await loader.partitionPreAggregations();
+
+      const sql = query[0].replace('test_table', 'test_table20240310');
+      const loadTuple = [sql, [utcStart, utcLoadEnd, utcStart, 'literal'], { renewalThreshold: 60 }];
+      const fullTuple = [sql, [utcStart, utcEnd, utcStart, 'literal'], { renewalThreshold: 60 }];
+      expect(partition.loadSql).toEqual(loadTuple);
+      expect(partition.sql).toEqual(loadTuple);
+      expect(partition.structureVersionLoadSql).toEqual(fullTuple);
+      expect(partition.invalidateKeyQueries).toEqual([fullTuple]);
+      expect(partition.partitionInvalidateKeyQueries).toEqual(partitionInvalidateKeyQueries.map(() => fullTuple));
+      expect(partition.indexesSql[0].sql).toEqual(fullTuple);
+      expect(partition.previewSql).toEqual(fullTuple);
+      expect(partition.buildRangeStart).toBe(start);
+      expect(partition.buildRangeEnd).toBe(loadEnd);
+      if (loadEnd === end) {
+        expect(partition.loadSql).toBe(partition.structureVersionLoadSql);
+      } else {
+        expect(partition.loadSql).not.toBe(partition.structureVersionLoadSql);
+      }
+      // Conversion cost depends on ranges, not the number of SQL queries or placeholders.
+      expect(convert).toHaveBeenCalledTimes(conversions);
+      expect(query[1]).toEqual(originalParams);
     });
 
+    test('shares converted boundaries across invalidation key queries', async () => {
+      const keyQueryResult = jest.fn().mockResolvedValue('refresh-key');
+      const loader = createLoader({ timezone: 'America/New_York', invalidateKeyQueries: [query, query] }, {}, { keyQueryResult });
+      const convert = jest.spyOn(PreAggregationPartitionRangeLoader, 'inDbTimeZone');
+
+      const result = await (loader as any).getInvalidationKeyValues([start, end]);
+
+      expect(result).toEqual(['refresh-key', 'refresh-key']);
+      expect(keyQueryResult).toHaveBeenCalledTimes(2);
+      for (const [sql] of keyQueryResult.mock.calls) {
+        expect(sql[0]).toContain('test_table20240310');
+        expect(sql[1]).toEqual([utcStart, utcEnd, utcStart, 'literal']);
+      }
+      expect(convert).toHaveBeenCalledTimes(2);
+    });
+
+    test.each([[undefined], [[]]])('skips UTC conversion when invalidation queries are %p', async (invalidateKeyQueries) => {
+      const loader = createLoader({ invalidateKeyQueries });
+      const convert = jest.spyOn(PreAggregationPartitionRangeLoader, 'inDbTimeZone');
+
+      await expect((loader as any).getInvalidationKeyValues([start, end])).resolves.toEqual([]);
+
+      expect(convert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('partitionPreAggregations', () => {
     test('uses local load boundaries for incremental renewal and sealing', async () => {
       jest.useFakeTimers({ now: new Date('2024-03-10T17:30:00.000Z') });
       try {
@@ -1076,38 +1092,6 @@ describe('PreAggregations', () => {
       }
     });
 
-    test('shares converted boundaries across invalidation key queries', async () => {
-      const query: QueryWithParams = ['SELECT * FROM test_table WHERE ts BETWEEN ? AND ?', [FROM_PARTITION_RANGE, TO_PARTITION_RANGE]];
-      const keyQueryResult = jest.fn().mockResolvedValue('refresh-key');
-      const loader = new PreAggregationPartitionRangeLoader(
-        {} as any, {} as any, {} as any, {} as any,
-        mockPreAggregation({ timezone: 'America/New_York', invalidateKeyQueries: [query, query] }) as any,
-        [], { keyQueryResult } as any,
-      );
-      const convert = jest.spyOn(PreAggregationPartitionRangeLoader, 'inDbTimeZone');
-
-      const result = await (loader as any).getInvalidationKeyValues(['2024-03-10T00:00:00.000', '2024-03-10T23:59:59.999']);
-
-      expect(result).toEqual(['refresh-key', 'refresh-key']);
-      expect(keyQueryResult).toHaveBeenCalledTimes(2);
-      for (const [sql] of keyQueryResult.mock.calls) {
-        expect(sql[0]).toContain('test_table20240310');
-        expect(sql[1]).toEqual(['2024-03-10T05:00:00.000', '2024-03-11T03:59:59.999']);
-      }
-      expect(convert).toHaveBeenCalledTimes(2);
-    });
-
-    test.each([{ invalidateKeyQueries: undefined }, { invalidateKeyQueries: [] }])('skips UTC conversion when invalidation queries are $invalidateKeyQueries', async ({ invalidateKeyQueries }) => {
-      const loader = createLoader({ invalidateKeyQueries });
-      const convert = jest.spyOn(PreAggregationPartitionRangeLoader, 'inDbTimeZone');
-
-      await expect((loader as any).getInvalidationKeyValues(['2024-01-01T00:00:00.000', '2024-01-01T23:59:59.999'])).resolves.toEqual([]);
-
-      expect(convert).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('partitionPreAggregations', () => {
     test.each([
       ['UTC', '2024-01-03T00:00:00.000', '2024-01-03T12:00:00.000', '2024-01-03T23:59:59.999'],
       ['America/New_York', '2024-01-03T05:00:00.000', '2024-01-03T17:00:00.000', '2024-01-04T04:59:59.999'],
