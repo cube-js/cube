@@ -1014,9 +1014,14 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             eprintln!("dbt generate {sync_job_id} started");
             let status = wait_for_sync(&api, deployment, &sync_job_id, timeout, poll).await?;
 
-            // Every exit of this command emits exactly one `--json` document, the way
-            // `sync --wait` does. On a failure the syncJobId is the only machine-readable
-            // trace of the run, and it is what a pipeline needs to call `dbt logs`.
+            // The two failures BELOW emit a `--json` document, the way `sync --wait` does:
+            // on either, the syncJobId is the only machine-readable trace of the run, and
+            // it is what a pipeline needs to call `dbt logs`.
+            //
+            // Not an invariant for the whole command. The wait above it fails silently,
+            // matching `sync --wait`; so do the write failures further down, where the
+            // tree is PARTIALLY written and `outcome: "failed"` would be a lie — telling
+            // that apart needs an outcome this command does not have yet.
             let failed_json = || generate_json(&started, &out, &[], "failed", &[]);
 
             if util::status_of(&status, "status") == FAILED {
@@ -1070,7 +1075,15 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                         ));
                     } else {
                         for (path, status) in &differing {
-                            eprintln!("  {} {status}", root.join(path).display());
+                            // `differs` / `is missing`: the stored status stays a token for
+                            // `differing[].status`, and only the human line reads as a
+                            // sentence.
+                            let phrase = if *status == "missing" {
+                                "is missing"
+                            } else {
+                                "differs"
+                            };
+                            eprintln!("  {} {phrase}", root.join(path).display());
                         }
                     }
 
