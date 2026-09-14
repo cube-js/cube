@@ -113,3 +113,73 @@ async fn test_calendar_period_start_stays_a_sub_select() {
         "expected the calendar period start to be read off the series:\n{sql}"
     );
 }
+
+/// The span must stop where the series does. A series materialized as rows
+/// walks bucket by bucket and its last bucket is the one the range end falls
+/// in, so a bound an interval past the range end would have the scan read a
+/// whole extra bucket of the fact table for rows no window frame can reach.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_base_scan_stops_at_the_last_bucket_of_a_walked_series() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.rolling_sum_trailing_7d
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-15"
+              - "2024-03-20"
+    "#};
+
+    let (sql, params) = ctx.build_sql_and_params(query).unwrap();
+
+    let bounds = params
+        .iter()
+        .filter_map(|value| value.to_param_string())
+        .collect::<Vec<_>>();
+    assert!(
+        bounds.contains(&"2024-03-31T23:59:59.999".to_string()),
+        "base scan does not stop at the last month the series walks: {bounds:?}\n{sql}"
+    );
+    assert!(
+        !bounds.iter().any(|bound| bound.starts_with("2024-04")),
+        "base scan reads a month past the series: {bounds:?}\n{sql}"
+    );
+}
+
+/// A series generated in SQL steps the interval from the range start instead of
+/// snapping to boundaries, so its last bucket can end past the one a walked
+/// series stops at, and the span has to reach that far.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_base_scan_covers_the_last_step_of_a_generated_series() {
+    let schema = MockSchema::from_yaml_file("common/integration_rolling_window.yaml");
+    let ctx = TestContext::new_with_generated_time_series(schema).unwrap();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.rolling_sum_trailing_7d
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-15"
+              - "2024-03-20"
+    "#};
+
+    let (sql, params) = ctx.build_sql_and_params(query).unwrap();
+
+    // Stepping months from Jan 15 puts the last point on Mar 15, whose bucket
+    // runs to Apr 14.
+    let bounds = params
+        .iter()
+        .filter_map(|value| value.to_param_string())
+        .collect::<Vec<_>>();
+    assert!(
+        bounds
+            .iter()
+            .any(|bound| bound.as_str() >= "2024-04-14T23:59:59.999"),
+        "base scan stops before the last generated bucket: {bounds:?}\n{sql}"
+    );
+}
