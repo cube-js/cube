@@ -1075,13 +1075,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                         ));
                     } else {
                         for (path, status) in &differing {
-                            // `differs` / `is missing`: the stored status stays a token for
-                            // `differing[].status`, and only the human line reads as a
-                            // sentence.
-                            let phrase = if *status == "missing" {
-                                "is missing"
-                            } else {
-                                "differs"
+                            let phrase = match *status {
+                                "missing" => "is missing",
+                                other => other,
                             };
                             eprintln!("  {} {phrase}", root.join(path).display());
                         }
