@@ -569,6 +569,11 @@ For each dbt model in your project:
   from the referencing side only, so nothing points back — enable **Also generate reverse
   joins** to emit a `one_to_many` join back to the referencing cube too.
 
+- **Visibility** carries over from dbt: a model or column with `meta: { cube:
+  { public: false } }` in its dbt schema YAML is generated as non-public
+  (`public: false`) in Cube, and stays that way across re-pulls — unlike
+  editing the generated file directly, which the next pull overwrites.
+
 Models named `metricflow_time_spine` and any non-model resources (sources, seeds,
 snapshots, etc.) are skipped.
 

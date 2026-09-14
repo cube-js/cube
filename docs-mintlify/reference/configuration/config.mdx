@@ -11,6 +11,14 @@ JavaScript (`basePath`).
 
 </Info>
 
+<Note>
+
+Configuration can only be defined in a `cube.js` or `cube.py` file. A `cube.ts`
+file is not supported — if it's present without a `cube.js` file, Cube fails to
+start with an error asking you to use `cube.js` or `cube.py` instead.
+
+</Note>
+
 Every configuration option that is a function (e.g., `query_rewrite`)
 can be defined as either synchronous or asynchronous. Cube will await for
 the completion of asynchronous functions.
