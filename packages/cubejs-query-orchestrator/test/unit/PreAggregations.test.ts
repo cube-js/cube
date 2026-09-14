@@ -3,7 +3,9 @@ import {
   BUILD_RANGE_END_LOCAL,
   BUILD_RANGE_START_LOCAL,
   FROM_PARTITION_RANGE,
-  TO_PARTITION_RANGE
+  TO_PARTITION_RANGE,
+  timeSeries,
+  QueryDateRange,
 } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 
@@ -121,6 +123,101 @@ const createLoader = (overrides: Record<string, any> = {}, options: Record<strin
 
   return loader;
 };
+
+describe('loadBuildRange', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
+
+  describe.each(['UTC', 'America/New_York'])('%s', (timezone) => {
+    describe.each([3, 6])('precision %i', (timestampPrecision) => {
+      const scenarios: { name: string; initial: [string | null, string | null]; renewed?: [string | null, string | null] }[] = [
+        { name: 'long range', initial: ['2021-01-01T12:00:00.000Z', '2024-01-05T12:00:00.000Z'] },
+        { name: 'spring DST', initial: ['2024-03-10T06:30:00.000Z', '2024-03-10T07:30:00.000Z'] },
+        { name: 'fall DST', initial: ['2024-11-03T05:30:00.000Z', '2024-11-03T06:30:00.000Z'] },
+        { name: 'renewed dates', initial: ['2024-03-10T06:30:00.000Z', '2024-11-03T06:30:00.000Z'], renewed: ['2024-03-11T06:30:00.000Z', '2024-11-04T06:30:00.000Z'] },
+        { name: 'empty', initial: [null, null] },
+        { name: 'empty start', initial: [null, '2024-03-10T07:30:00.000Z'] },
+        { name: 'empty end', initial: ['2024-03-10T06:30:00.000Z', null] },
+        { name: 'empty renewal', initial: ['2024-03-10T06:30:00.000Z', '2024-11-03T06:30:00.000Z'], renewed: [null, null] },
+        { name: 'empty renewed start', initial: ['2024-03-10T06:30:00.000Z', '2024-11-03T06:30:00.000Z'], renewed: [null, '2024-11-04T06:30:00.000Z'] },
+        { name: 'reversed', initial: ['2024-03-12T06:30:00.000Z', '2024-03-10T06:30:00.000Z'] },
+      ];
+
+      it.each(scenarios)('preserves both query stages, renewal keys and dates: $name', async ({ initial, renewed = initial }) => {
+        jest.useFakeTimers({ now: new Date('2024-07-01T12:34:56.789Z') });
+        const timestampFormat = `YYYY-MM-DDTHH:mm:ss.${'S'.repeat(timestampPrecision)}`;
+        const rows = (value: string | null) => (value ? [{ value }] : []);
+        const localize = (value: string | null) => PreAggregationPartitionRangeLoader.extractDate(rows(value), timezone, timestampFormat);
+        const fillEmpty = (values: [string | null, string | null]): QueryDateRange => {
+          const [start, end] = values.map(localize);
+          const now = PreAggregationPartitionRangeLoader.extractDate(rows(new Date().toISOString()), timezone);
+          return [start || end || now, end || start || now];
+        };
+        const preAggregation = mockPreAggregation({
+          timezone,
+          timestampPrecision,
+          timestampFormat,
+          invalidateKeyQueries: [['SELECT key FROM test_table WHERE ts BETWEEN ? AND ?', [FROM_PARTITION_RANGE, TO_PARTITION_RANGE], { renewalThreshold: 60 }]],
+        });
+        const cacheQueryResult = jest.fn();
+
+        for (const value of [...initial, ...renewed]) {
+          cacheQueryResult.mockResolvedValueOnce(rows(value));
+        }
+        const keyQueryResult = jest.fn().mockImplementation(async query => query[1]);
+        const loader = new TestPartitionRangeLoader(
+          {} as any, jest.fn(), { options: {}, cacheQueryResult } as any, {} as any,
+          preAggregation as any, [], { keyQueryResult } as any,
+          { maxPartitions: 10000, maxSourceRowLimit: 10000, waitForRenew: true, requestId: 'range-test' },
+        );
+        const invalidation = jest.spyOn(loader, 'getInvalidationKeyValues');
+        const series = timeSeries('day', fillEmpty(initial), { timestampPrecision });
+        const boundaries = [series[0], series[series.length - 1]];
+
+        expect(await loader.loadBuildRange(timestampFormat)).toEqual(fillEmpty(renewed));
+        expect(cacheQueryResult).toHaveBeenCalledTimes(4);
+        expect(invalidation.mock.calls).toEqual(boundaries.filter(Boolean).map(range => [range]));
+        expect(keyQueryResult).toHaveBeenCalledTimes(boundaries.filter(Boolean).length);
+
+        for (const [i, range] of boundaries.entries()) {
+          const [query, values] = preAggregation.preAggregationStartEndQueries[i] as QueryWithParams;
+          const initialCall = cacheQueryResult.mock.calls[i];
+          const renewedCall = cacheQueryResult.mock.calls[i + 2];
+          expect(initialCall).toEqual([
+            query, values,
+            QueryCache.queryCacheKey({ query, values, invalidate: QueryCache.buildRangeInvalidateKey(preAggregation as any) }),
+            86400,
+            { renewalThreshold: 86400, waitForRenew: true, priority: 10, requestId: 'range-test', dataSource: 'default', useInMemory: true, external: undefined, renewalKey: null },
+          ]);
+          const utcRange = range?.map(date => PreAggregationPartitionRangeLoader.inDbTimeZone(preAggregation as any, date));
+          expect(renewedCall).toEqual([...initialCall.slice(0, 4), { ...initialCall[4], renewalKey: range ? [utcRange] : null }]);
+          if (range) {
+            expect(keyQueryResult.mock.calls[i]).toEqual([
+              [`SELECT key FROM ${PreAggregationPartitionRangeLoader.partitionTableName('test_table', 'day', range)} WHERE ts BETWEEN ? AND ?`, utcRange, { renewalThreshold: 60 }],
+              true, 10,
+            ]);
+          }
+        }
+      });
+
+      it.each([false, true])('skips renewal queries without partitioning (empty: %s)', async (empty) => {
+        jest.useFakeTimers({ now: new Date('2024-07-01T12:34:56.789Z') });
+        const loader = createLoader({ timezone, timestampPrecision, partitionGranularity: undefined });
+        const query = jest.mocked((loader as any).loadRangeQuery);
+        if (empty) query.mockResolvedValue([]);
+        const invalidation = jest.spyOn(loader, 'getInvalidationKeyValues');
+        const result = await loader.loadBuildRange();
+        const dates = empty ? [new Date().toISOString(), new Date().toISOString()] : ['2024-01-01T00:00:00.000', '2024-01-03T23:59:59.999'];
+        expect(result).toEqual(dates.map(value => PreAggregationPartitionRangeLoader.extractDate([{ value }], timezone)));
+        expect(query).toHaveBeenCalledTimes(2);
+        expect(query.mock.calls.every(call => call.length === 1)).toBe(true);
+        expect(invalidation).not.toHaveBeenCalled();
+      });
+    });
+  });
+});
 
 describe('PreAggregations', () => {
   let mockDriver: MockDriver | null = null;

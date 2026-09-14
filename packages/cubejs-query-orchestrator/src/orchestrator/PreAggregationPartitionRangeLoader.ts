@@ -8,6 +8,7 @@ import {
   reformatInIsoLocal,
   utcToLocalTimeZone,
   timeSeries,
+  timeSeriesBoundaries,
   localTimestampToUtc,
   parseUtcIntoLocalDate,
   LoggerFn,
@@ -496,16 +497,16 @@ export class PreAggregationPartitionRangeLoader {
     }
 
     // startDate & endDate are `localized` here
-    const wholeSeriesRanges = PreAggregationPartitionRangeLoader.timeSeries(
+    const [firstPartition, lastPartition] = timeSeriesBoundaries(
       this.preAggregation.partitionGranularity,
       this.orNowIfEmpty([startDate, endDate]),
-      this.preAggregation.timestampPrecision,
+      { timestampPrecision: this.preAggregation.timestampPrecision },
     );
     const [rangeStart, rangeEnd] = await Promise.all(
       preAggregationStartEndQueries.map(
         async (rangeQuery, i) => PreAggregationPartitionRangeLoader.extractDate(
           await this.loadRangeQuery(
-            rangeQuery, i === 0 ? wholeSeriesRanges[0] : wholeSeriesRanges[wholeSeriesRanges.length - 1],
+            rangeQuery, i === 0 ? firstPartition : lastPartition,
           ),
           this.preAggregation.timezone,
           timestampFormat,
