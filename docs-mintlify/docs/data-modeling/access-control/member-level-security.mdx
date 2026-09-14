@@ -131,6 +131,11 @@ This configuration results in the following access:
 | `guest` | Only the `count_30d` measure |
 | All other users | No access to this view at all |
 
+Querying a member that a group has no access to is refused rather than silently
+ignored: the [REST][ref-rest-api] and [GraphQL][ref-graphql-api] APIs respond
+with `403 Forbidden`, naming the denied members the query asked for, and the
+[SQL API][ref-sql-api] returns an empty result.
+
 Access policies also respect member-level security restrictions configured via
 `public` parameters. For more details, see the [access policies
 reference][ref-dap-ref].
@@ -162,3 +167,6 @@ them entirely, see [data masking][ref-data-masking] in access policies.
 [ref-dynamic-data-modeling]: /docs/data-modeling/dynamic
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-data-masking]: /docs/data-modeling/data-access-policies#data-masking
+[ref-rest-api]: /reference/core-data-apis/rest-api
+[ref-graphql-api]: /reference/core-data-apis/graphql-api
+[ref-sql-api]: /reference/core-data-apis/sql-api

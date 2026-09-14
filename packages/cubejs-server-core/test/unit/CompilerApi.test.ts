@@ -106,4 +106,136 @@ describe('CompilerApi', () => {
       expect(() => compilers.cubeEvaluator).toThrow(/disposed CompilerApi instance/);
     });
   });
+
+  describe('applyRowLevelSecurity', () => {
+    let compilerApi: CompilerApi;
+
+    // `analyst` may read `count` and `status`; `secret` and `other_secret` are
+    // granted by no policy, so querying them is a member-level denial. `id` is
+    // granted too: policies are checked against the members the generated SQL
+    // references, which includes the cube's primary key.
+    const rbacRepository: SchemaFileRepository = {
+      localPath: () => '/mock/path',
+      dataSchemaFiles: () => Promise.resolve([
+        {
+          fileName: 'orders.js',
+          content: `
+            cube('orders', {
+              sql: 'SELECT * FROM orders',
+              measures: {
+                count: {
+                  type: 'count'
+                }
+              },
+              dimensions: {
+                id: {
+                  sql: 'id',
+                  type: 'number',
+                  primaryKey: true
+                },
+                status: {
+                  sql: 'status',
+                  type: 'string'
+                },
+                secret: {
+                  sql: 'secret',
+                  type: 'string'
+                },
+                other_secret: {
+                  sql: 'other_secret',
+                  type: 'string'
+                }
+              },
+              accessPolicy: [
+                {
+                  group: 'analyst',
+                  memberLevel: {
+                    includes: ['count', 'status', 'id']
+                  }
+                }
+              ]
+            });
+          `
+        }
+      ])
+    };
+
+    const analystContext = {
+      requestId: 'test-request',
+      securityContext: { groups: ['analyst'] },
+    };
+
+    beforeEach(() => {
+      compilerApi = new CompilerApi(
+        rbacRepository,
+        async () => 'postgres',
+        {
+          logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+          contextToGroups: (context: any) => context.securityContext?.groups || [],
+        }
+      );
+    });
+
+    afterEach(() => {
+      if (compilerApi) {
+        compilerApi.dispose();
+      }
+    });
+
+    test('allows a query that every member is granted for', async () => {
+      const query: any = {
+        measures: ['orders.count'],
+        dimensions: ['orders.status'],
+        timezone: 'UTC',
+        filters: [],
+      };
+
+      const result = await compilerApi.applyRowLevelSecurity(query, query, analystContext);
+
+      expect(result.denied).toBe(false);
+      expect(result.deniedMembers).toEqual([]);
+    });
+
+    test('denies a query and reports every member no policy grants', async () => {
+      const query: any = {
+        measures: ['orders.count'],
+        dimensions: ['orders.secret', 'orders.other_secret'],
+        timezone: 'UTC',
+        filters: [],
+      };
+
+      const result = await compilerApi.applyRowLevelSecurity(query, query, analystContext);
+
+      expect(result.denied).toBe(true);
+      // Both denied members are reported, not just the first one encountered
+      expect(result.deniedMembers).toEqual(
+        expect.arrayContaining(['orders.secret', 'orders.other_secret'])
+      );
+      // Granted members are not reported as denied
+      expect(result.deniedMembers).not.toContain('orders.count');
+      // The query is neutralized so an API that keeps serving it returns no rows
+      expect(result.query.segments).toContainEqual(
+        expect.objectContaining({ name: 'rlsAccessDenied', cubeName: 'orders' })
+      );
+    });
+
+    test('denies every member when no policy matches the user at all', async () => {
+      const query: any = {
+        measures: ['orders.count'],
+        dimensions: ['orders.status'],
+        timezone: 'UTC',
+        filters: [],
+      };
+
+      const result = await compilerApi.applyRowLevelSecurity(query, query, {
+        requestId: 'test-request',
+        securityContext: { groups: ['nobody'] },
+      });
+
+      expect(result.denied).toBe(true);
+      expect(result.deniedMembers).toEqual(
+        expect.arrayContaining(['orders.count', 'orders.status'])
+      );
+    });
+  });
 });

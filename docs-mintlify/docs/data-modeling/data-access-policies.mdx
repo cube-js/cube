@@ -111,8 +111,11 @@ every region granted by every matching policy:
 - **A member is masked** when no granting policy gives it unconditional full
   access through `member_level`, but some matching policy lists it under
   `member_masking`.
-- **Access is denied** (an empty result) only when a queried member is granted
-  by **no** matching policy at all.
+- **Access is denied** only when a queried member is granted by **no** matching
+  policy at all. The [REST API](/reference/core-data-apis/rest-api) and
+  [GraphQL API](/reference/core-data-apis/graphql-api) reject such a query with
+  `403 Forbidden`, naming the denied members it asked for; the
+  [SQL API](/reference/core-data-apis/sql-api) returns an empty result.
 
 #### Diagram and behavior
 
