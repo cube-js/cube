@@ -544,10 +544,8 @@ jobs:
 
       - name: Commit the regenerated cubes
         run: |
-          # `-A` rather than a hard-coded path: the CLI writes only under the
-          # deployment's Output path, and naming it here would stage nothing on a
-          # deployment configured with a different one — a green job over a
-          # working copy that quietly drifted.
+          # The CLI writes only under the deployment's Output path, so `-A` avoids
+          # hard-coding it here.
           git add -A
           git diff --cached --quiet && echo "no changes" && exit 0
           git -c user.name=ci -c user.email=ci@example.com \
