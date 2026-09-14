@@ -172,9 +172,7 @@ const EXCLUDE_OPERATIONS = new Set([
   // Report folders listing — not part of the public docs surface.
   'GET /api/v1/deployments/{deploymentId}/report-folders',
   // Gated behind the useDatabricksMetricViewsPush flag, not GA (CUB-4443).
-  // Its sibling get/save endpoints on this controller are already published
-  // with hedged "in preview" wording from an earlier sync; this one is new
-  // and stays out until the feature ships.
+  // Remove once the feature ships.
   'POST /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/access-test',
 ]);
 
