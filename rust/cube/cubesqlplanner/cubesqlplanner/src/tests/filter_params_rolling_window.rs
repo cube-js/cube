@@ -32,6 +32,12 @@ cubes:
             type: sum
             sql: amount
 
+          - name: amount_cumulative
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: unbounded
+
           - name: amount_trailing_30d
             type: sum
             sql: amount
@@ -250,4 +256,46 @@ async fn a_callback_binding_leaves_a_to_date_window_whole() {
 
     assert_eq!(pushed_down, full_scan);
     insta::assert_snapshot!(pushed_down);
+}
+
+// A cumulative window reaches back without limit, so nothing narrows the lower
+// end — that is what the measure asks for. The upper end is still the series'
+// own, and a column binding states it: the scan stops at the reporting period
+// rather than reading past it.
+const CUMULATIVE_QUERY: &str = indoc! {r#"
+    measures:
+      - fprw_sales.amount_cumulative
+    time_dimensions:
+      - dimension: fprw_sales.day_d
+        granularity: day
+        dateRange:
+          - "2024-03-01"
+          - "2024-03-07"
+"#};
+
+#[test]
+fn a_column_binding_keeps_the_upper_bound_of_a_cumulative_window() {
+    let ctx = TestContext::new(schema(Some(COLUMN))).unwrap();
+    let (sql, params) = ctx.build_sql_and_params(CUMULATIVE_QUERY).unwrap();
+    let predicate = fact_scan_predicate(&sql);
+
+    assert!(
+        !predicate.contains(">="),
+        "a cumulative window has no lower bound to state\npredicate: {predicate}"
+    );
+    assert_eq!(
+        predicate_values(&predicate, &params),
+        vec!["2024-03-07T23:59:59.999"],
+        "the upper bound is the series' own, as a literal\npredicate: {predicate}"
+    );
+}
+
+// A callback takes both bounds, so a band with only one is a band it cannot be
+// given: it states nothing rather than a bound it was never handed.
+#[test]
+fn a_callback_binding_states_nothing_for_a_cumulative_window() {
+    let ctx = TestContext::new(schema(Some(CALLBACK))).unwrap();
+    let sql = ctx.build_sql(CUMULATIVE_QUERY).unwrap();
+
+    assert_eq!(fact_scan_predicate(&sql), "(1 = 1)", "{sql}");
 }
