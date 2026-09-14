@@ -150,6 +150,47 @@ describe('snapToRenewalThreshold', () => {
   });
 });
 
+// A 10 minute key under a daily threshold, observed on day two at 03:10 (t = 97 800 s). The SQL
+// path re-read its cache entry hourly whatever the threshold said, so the hour cap is what the
+// threshold really meant; snapping to the raw day held the key 23 hours longer.
+describe('worked example: 10 minute key under a daily threshold', () => {
+  const tenMinutes = { interval: 600, utcOffset: 0, dayOffset: 0 };
+  const day = 24 * 60 * 60;
+  const hour = 60 * 60;
+  const at0310 = 97_800_000;
+  const keyAt = (ms: number, window?: number, phase = 0) => (
+    evaluateLocalRefreshKey(tenMinutes, snapToRenewalThreshold(ms, window, phase))[0].refresh_key
+  );
+
+  test('the four ways to read the key at 03:10', () => {
+    expect(keyAt(at0310)).toBe('163'); // exact: floor(97800 / 600)
+    expect(keyAt(at0310, day)).toBe('144'); // raw day snap: floor(86400 / 600)
+    expect(keyAt(at0310, hour)).toBe('162'); // hour cap: floor(97200 / 600)
+    expect(keyAt(at0310, Math.min(day, hour))).toBe(keyAt(at0310, hour));
+  });
+
+  test('over day two the hour cap yields 24 values, the raw day snap one', () => {
+    const hourly = Array.from({ length: 24 }, (_, h) => keyAt(86_400_000 + h * 3_600_000 + 600_000, hour));
+    const daily = Array.from({ length: 24 }, (_, h) => keyAt(86_400_000 + h * 3_600_000 + 600_000, day));
+
+    expect(hourly).toEqual(Array.from({ length: 24 }, (_, h) => String(144 + 6 * h)));
+    expect(new Set(hourly).size).toBe(24);
+    expect(new Set(daily)).toEqual(new Set(['144']));
+  });
+
+  test('a phase seed moves the hour boundary to hh:20:34.567 and keeps the value in the series', () => {
+    const phase = 1_234_567;
+
+    // 03:10 is before 03:20:34.567, so the window still opened at 02:20:34.567
+    expect(snapToRenewalThreshold(at0310, hour, phase)).toBe(94_834_567);
+    expect(keyAt(at0310, hour, phase)).toBe('158');
+
+    expect(snapToRenewalThreshold(98_434_567, hour, phase)).toBe(98_434_567);
+    expect(keyAt(98_434_567, hour, phase)).toBe('164');
+    expect(keyAt(98_434_567, hour, phase)).toBe(evaluateLocalRefreshKey(tenMinutes, 98_434_567)[0].refresh_key);
+  });
+});
+
 describe('refreshKeyPhaseSeed', () => {
   const identity = (sql: string): [string, string[], boolean, string] => [sql, [], true, 'default'];
 

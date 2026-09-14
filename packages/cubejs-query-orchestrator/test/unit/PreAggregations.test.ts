@@ -7,7 +7,7 @@ import {
 } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 
-import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, QueryCacheOptions, LocalCacheDriver, version } from '../../src';
+import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, QueryCacheOptions, REFRESH_KEY_CACHE_TTL, LocalCacheDriver, version } from '../../src';
 import { evaluateLocalRefreshKey, refreshKeyPhaseSeed, snapToRenewalThreshold } from '../../src/orchestrator/utils';
 
 class MockDriver {
@@ -518,8 +518,7 @@ describe('PreAggregations', () => {
       expect(mockDriver!.executedQueries).toEqual([]);
     });
 
-    // `keyQueryResult` caches refresh keys for an hour, so that is the window a daily threshold
-    // is capped to, phased by the key identity.
+    // A daily threshold is capped to the refresh key entry TTL, phased by the key identity.
     test('keyQueryResult evaluates locally under a refreshKeyRenewalThreshold', async () => {
       const day = 24 * 60 * 60;
       const loadCache = newLoadCache({ localRefreshKey: true, refreshKeyRenewalThreshold: day });
@@ -534,10 +533,30 @@ describe('PreAggregations', () => {
           10,
         );
 
-        expect(result).toEqual(evaluateLocalRefreshKey(descriptor, snapToRenewalThreshold(now, 60 * 60, phase)));
+        expect(result).toEqual(evaluateLocalRefreshKey(descriptor, snapToRenewalThreshold(now, REFRESH_KEY_CACHE_TTL, phase)));
         expect(mockDriver!.executedQueries).toEqual([]);
       } finally {
         nowSpy.mockRestore();
+      }
+    });
+
+    // The local snap window is capped at this same constant; a loader TTL that drifted from it
+    // would silently reopen the per-caller divergence.
+    test('keyQueryResult caches refresh keys for REFRESH_KEY_CACHE_TTL', async () => {
+      const loadCache = newLoadCache({ localRefreshKey: false });
+      const spy = jest.spyOn(loadCache['queryCache'], 'cacheRefreshKeyResult');
+
+      try {
+        await loadCache.keyQueryResult(
+          [REFRESH_KEY_SQL, [], { external: false, renewalThreshold: 60, localRefreshKey: descriptor }],
+          false,
+          10,
+        );
+
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy.mock.calls[0][1]).toBe(REFRESH_KEY_CACHE_TTL);
+      } finally {
+        spy.mockRestore();
       }
     });
 

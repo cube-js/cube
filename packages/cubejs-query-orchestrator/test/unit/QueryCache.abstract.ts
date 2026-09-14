@@ -2,7 +2,8 @@ import crypto from 'crypto';
 import { CacheMode, createCancelablePromise, pausePromise } from '@cubejs-backend/shared';
 import { QueuePriority } from '@cubejs-backend/base-driver';
 
-import { CacheKey, CacheKeyItem, ContinueWaitError, QueryCache, QueryCacheOptions } from '../../src';
+import { CacheKey, CacheKeyItem, ContinueWaitError, QueryCache, QueryCacheOptions, REFRESH_KEY_CACHE_TTL } from '../../src';
+import * as utils from '../../src/orchestrator/utils';
 import { evaluateLocalRefreshKey, refreshKeyPhaseSeed, snapToRenewalThreshold } from '../../src/orchestrator/utils';
 
 export type QueryCacheTestOptions = QueryCacheOptions & {
@@ -574,7 +575,6 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       const loadRefreshKey = async (
         queryOptions: any,
         additionalOptions: Partial<QueryCacheOptions> = {},
-        expireSecs = 60,
       ) => {
         const localCache = newCache(additionalOptions);
         const spy = jest.spyOn(localCache, 'queryWithRetryAndRelease')
@@ -584,7 +584,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           const [result] = await Promise.all(
             localCache.loadRefreshKeys(
               [[REFRESH_KEY_SQL, [], queryOptions]],
-              expireSecs,
+              60,
               { dataSource: 'default' },
             )
           );
@@ -634,29 +634,93 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(executed).toBe(1);
       });
 
-      // The window is the cache entry TTL, not the day: the SQL path re-read the key once its
-      // entry expired, whatever the threshold said.
+      // The window is the refresh key entry TTL, not the day: the SQL path re-read the key once
+      // its entry expired, whatever the threshold said.
       it('evaluates locally under a refreshKeyRenewalThreshold, snapped to the entry TTL', async () => {
         const day = 24 * 60 * 60;
-        const hour = 60 * 60;
+        const ttlMs = REFRESH_KEY_CACHE_TTL * 1000;
         const queryOptions = { external: true, renewalThreshold: 60, localRefreshKey: descriptor };
         const phase = refreshKeyPhaseSeed(QueryCache.refreshKeyIdentity([REFRESH_KEY_SQL, [], queryOptions], 'default'));
-        const expectedAt = (now: number) => evaluateLocalRefreshKey(descriptor, snapToRenewalThreshold(now, hour, phase));
+        const expectedAt = (now: number) => evaluateLocalRefreshKey(
+          descriptor,
+          snapToRenewalThreshold(now, REFRESH_KEY_CACHE_TTL, phase),
+        );
         const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(86_400_000 + 600_000);
 
         try {
-          const first = await loadRefreshKey(queryOptions, { localRefreshKey: true, refreshKeyRenewalThreshold: day }, hour);
+          const first = await loadRefreshKey(queryOptions, { localRefreshKey: true, refreshKeyRenewalThreshold: day });
 
           expect(first.executed).toBe(0);
           expect(first.result).toEqual(expectedAt(86_400_000 + 600_000));
 
-          nowSpy.mockReturnValue(86_400_000 + 600_000 + 3_600_000);
-          const second = await loadRefreshKey(queryOptions, { localRefreshKey: true, refreshKeyRenewalThreshold: day }, hour);
+          nowSpy.mockReturnValue(86_400_000 + 600_000 + ttlMs);
+          const second = await loadRefreshKey(queryOptions, { localRefreshKey: true, refreshKeyRenewalThreshold: day });
 
-          expect(second.result).toEqual(expectedAt(86_400_000 + 600_000 + 3_600_000));
+          expect(second.result).toEqual(expectedAt(86_400_000 + 600_000 + ttlMs));
           expect(second.result).not.toEqual(first.result);
         } finally {
           nowSpy.mockRestore();
+        }
+      });
+
+      // The SQL path shared one cache entry per identity, so every caller saw one value. The snap
+      // window is derived from the key rather than the caller's TTL to keep that.
+      it('yields one value per identity whatever expiration the caller passes', async () => {
+        const day = 24 * 60 * 60;
+        const queryOptions = { external: true, renewalThreshold: 60, localRefreshKey: descriptor };
+        const sqlQuery: [string, string[], any] = [REFRESH_KEY_SQL, [], queryOptions];
+        const localCache = newCache({ localRefreshKey: true, refreshKeyRenewalThreshold: day });
+        const spy = jest.spyOn(localCache, 'queryWithRetryAndRelease')
+          .mockImplementation(async () => [{ refresh_key: 12345 }]);
+        const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(86_400_000 + 3 * 3_600_000 + 600_000);
+
+        try {
+          const [preAggPath, queryPath] = await Promise.all([
+            localCache.cacheRefreshKeyResult(sqlQuery, REFRESH_KEY_CACHE_TTL, { dataSource: 'default' }),
+            localCache.cacheRefreshKeyResult(sqlQuery, day, { dataSource: 'default' }),
+          ]);
+
+          expect(spy).not.toHaveBeenCalled();
+          expect(queryPath).toEqual(preAggPath);
+          expect(preAggPath).toEqual(evaluateLocalRefreshKey(descriptor, snapToRenewalThreshold(
+            Date.now(),
+            REFRESH_KEY_CACHE_TTL,
+            refreshKeyPhaseSeed(QueryCache.refreshKeyIdentity(sqlQuery, 'default')),
+          )));
+        } finally {
+          nowSpy.mockRestore();
+          spy.mockRestore();
+          await localCache.cleanup();
+        }
+      });
+
+      // Day two, 03:10, a 10 minute key under a daily threshold. Capping the window at the
+      // caller's own TTL gave the pre-aggregation loader (TTL 3600) `162` and the query path
+      // (expireSecs 86400) `144` for the same key at the same instant; the shared TTL gives both
+      // `162`. Phase is zeroed so the literals hold.
+      it('gives the pre-aggregation loader and the query path the same value at 03:10', async () => {
+        const day = 24 * 60 * 60;
+        const sqlQuery: [string, string[], any] = [
+          REFRESH_KEY_SQL, [], { external: true, renewalThreshold: 60, localRefreshKey: descriptor },
+        ];
+        const localCache = newCache({ localRefreshKey: true, refreshKeyRenewalThreshold: day });
+        const spy = jest.spyOn(localCache, 'queryWithRetryAndRelease')
+          .mockImplementation(async () => [{ refresh_key: 12345 }]);
+        const phaseSpy = jest.spyOn(utils, 'refreshKeyPhaseSeed').mockReturnValue(0);
+        const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(97_800_000);
+
+        try {
+          const preAggPath = await localCache.cacheRefreshKeyResult(sqlQuery, 3600, { dataSource: 'default' });
+          const queryPath = await localCache.cacheRefreshKeyResult(sqlQuery, day, { dataSource: 'default' });
+
+          expect(spy).not.toHaveBeenCalled();
+          expect(preAggPath).toEqual([{ refresh_key: '162' }]);
+          expect(queryPath).toEqual([{ refresh_key: '162' }]);
+        } finally {
+          nowSpy.mockRestore();
+          phaseSpy.mockRestore();
+          spy.mockRestore();
+          await localCache.cleanup();
         }
       });
 
@@ -717,9 +781,10 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         };
 
         const queryOptions = (localRefreshKey?: unknown) => <any>{ localRefreshKey };
+        const cacheKey: CacheKey = [REFRESH_KEY_SQL, [], true, 'default'];
 
         it('evaluates a valid descriptor', () => withCache({ localRefreshKey: true }, localCache => {
-          expect(localCache.localRefreshKeyResult(queryOptions(descriptor)))
+          expect(localCache.localRefreshKeyResult(queryOptions(descriptor), cacheKey))
             .toEqual([{ refresh_key: String(Math.floor(Date.now() / 1000 / 600)) }]);
         }));
 
@@ -727,75 +792,56 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         // a string too or flipping the flag invalidates every pre-aggregation once.
         it('returns the key as a string', () => withCache({ localRefreshKey: true }, localCache => {
           const [{ refresh_key: value }] = localCache
-            .localRefreshKeyResult(queryOptions(descriptor))!;
+            .localRefreshKeyResult(queryOptions(descriptor), cacheKey)!;
 
           expect(typeof value).toBe('string');
         }));
 
         it('declines when the flag is off', () => withCache({ localRefreshKey: false }, localCache => {
-          expect(localCache.localRefreshKeyResult(queryOptions(descriptor))).toBeNull();
+          expect(localCache.localRefreshKeyResult(queryOptions(descriptor), cacheKey)).toBeNull();
         }));
 
         it('declines without a descriptor', () => withCache({ localRefreshKey: true }, localCache => {
-          expect(localCache.localRefreshKeyResult()).toBeNull();
-          expect(localCache.localRefreshKeyResult(queryOptions())).toBeNull();
+          expect(localCache.localRefreshKeyResult(undefined, cacheKey)).toBeNull();
+          expect(localCache.localRefreshKeyResult(queryOptions(), cacheKey)).toBeNull();
         }));
 
         it('declines a malformed descriptor', () => withCache({ localRefreshKey: true }, localCache => {
           expect(localCache.localRefreshKeyResult(
             queryOptions({ ...descriptor, interval: 0 }),
+            cacheKey,
           )).toBeNull();
         }));
 
-        // `144` is the value a 10 minute key really has at the start of day two: the throttled key
-        // stays in the un-throttled series instead of being renumbered.
-        it('snaps the value to refreshKeyRenewalThreshold without a bound', () => withCache(
-          { localRefreshKey: true, refreshKeyRenewalThreshold: 24 * 60 * 60 },
+        // The snapped instant is a real past moment, so the value is one the key genuinely had:
+        // the throttled key stays in the un-throttled series instead of being renumbered.
+        const snapCase = (threshold: number, windowMs: number) => withCache(
+          { localRefreshKey: true, refreshKeyRenewalThreshold: threshold },
           localCache => {
-            const nowSpy = jest.spyOn(Date, 'now');
-
-            try {
-              nowSpy.mockReturnValue(86_400_000 + 600_000);
-              expect(localCache.localRefreshKeyResult(queryOptions(descriptor)))
-                .toEqual([{ refresh_key: '144' }]);
-
-              nowSpy.mockReturnValue(2 * 86_400_000 - 1);
-              expect(localCache.localRefreshKeyResult(queryOptions(descriptor)))
-                .toEqual([{ refresh_key: '144' }]);
-
-              nowSpy.mockReturnValue(2 * 86_400_000);
-              expect(localCache.localRefreshKeyResult(queryOptions(descriptor)))
-                .toEqual([{ refresh_key: '288' }]);
-            } finally {
-              nowSpy.mockRestore();
-            }
-          },
-        ));
-
-        it('caps the window at the bound TTL and phases it by the bound identity', () => withCache(
-          { localRefreshKey: true, refreshKeyRenewalThreshold: 24 * 60 * 60 },
-          localCache => {
-            const hourMs = 3_600_000;
-            const cacheKey: CacheKey = [REFRESH_KEY_SQL, [], true, 'default'];
-            const bound = { expiration: 3600, cacheKey };
-            const phase = refreshKeyPhaseSeed(cacheKey) % hourMs;
-            const windowStart = 86_400_000 + phase;
+            const windowStart = 86_400_000 + refreshKeyPhaseSeed(cacheKey) % windowMs;
             const nowSpy = jest.spyOn(Date, 'now');
 
             try {
               const at = (now: number) => {
                 nowSpy.mockReturnValue(now);
-                return localCache.localRefreshKeyResult(queryOptions(descriptor), bound);
+                return localCache.localRefreshKeyResult(queryOptions(descriptor), cacheKey);
               };
 
               expect(at(windowStart)).toEqual(evaluateLocalRefreshKey(descriptor, windowStart));
-              expect(at(windowStart + hourMs - 1)).toEqual(evaluateLocalRefreshKey(descriptor, windowStart));
-              expect(at(windowStart + hourMs)).toEqual(evaluateLocalRefreshKey(descriptor, windowStart + hourMs));
-              expect(at(windowStart - 1)).toEqual(evaluateLocalRefreshKey(descriptor, windowStart - hourMs));
+              expect(at(windowStart + windowMs - 1)).toEqual(evaluateLocalRefreshKey(descriptor, windowStart));
+              expect(at(windowStart + windowMs)).toEqual(evaluateLocalRefreshKey(descriptor, windowStart + windowMs));
+              expect(at(windowStart - 1)).toEqual(evaluateLocalRefreshKey(descriptor, windowStart - windowMs));
             } finally {
               nowSpy.mockRestore();
             }
           },
+        );
+
+        it('snaps to a threshold below the entry TTL, phased by identity', () => snapCase(120, 120_000));
+
+        it('caps a threshold above the entry TTL at the TTL', () => snapCase(
+          24 * 60 * 60,
+          REFRESH_KEY_CACHE_TTL * 1000,
         ));
       });
     });

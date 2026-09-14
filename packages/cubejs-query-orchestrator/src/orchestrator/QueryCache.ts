@@ -35,6 +35,11 @@ import {
 } from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
 
+/**
+ * Refresh key cache TTL in seconds, shared by the pre-aggregation loader and the local snap cap.
+ */
+export const REFRESH_KEY_CACHE_TTL = 60 * 60;
+
 export type CacheQueryResultOptions = {
   renewalThreshold?: number,
   renewalKey?: any,
@@ -244,13 +249,13 @@ export class QueryCache {
   }
 
   /**
-   * `bound` is the cache entry the SQL path would have written for this key. Its TTL caps the
-   * snap window (the entry was re-read once it expired, whatever the threshold said) and its
-   * identity phases the window so keys do not all advance together.
+   * The snap window is capped at the refresh key entry TTL, since the SQL path re-read the entry
+   * once it expired whatever the threshold said, and phased by `cacheKey` so keys do not all
+   * advance together. Both derive from the key, not the caller: one identity, one value.
    */
   public localRefreshKeyResult(
-    queryOptions?: QueryOptions,
-    bound?: { expiration: number; cacheKey: CacheKey },
+    queryOptions: QueryOptions | undefined,
+    cacheKey: CacheKey,
   ): [{ refresh_key: string }] | null {
     if (!this.isLocalRefreshKeyActive() || !isValidLocalRefreshKey(queryOptions?.localRefreshKey)) {
       return null;
@@ -260,11 +265,11 @@ export class QueryCache {
     // of the interval (`BaseQuery.refreshKeyRenewalThresholdForInterval`), so the SQL path re-reads
     // faster than the key can move and snapping would only delay the boundary.
     const threshold = this.options.refreshKeyRenewalThreshold;
-    const window = threshold ? Math.min(threshold, bound?.expiration ?? threshold) : undefined;
+    const window = threshold ? Math.min(threshold, REFRESH_KEY_CACHE_TTL) : undefined;
 
     return evaluateLocalRefreshKey(
       <LocalRefreshKeyDescriptor>queryOptions?.localRefreshKey,
-      snapToRenewalThreshold(Date.now(), window, bound ? refreshKeyPhaseSeed(bound.cacheKey) : 0),
+      snapToRenewalThreshold(Date.now(), window, refreshKeyPhaseSeed(cacheKey)),
     );
   }
 
@@ -527,7 +532,7 @@ export class QueryCache {
     const [query, values, queryOptions] = sqlQuery;
     const cacheKey = QueryCache.refreshKeyIdentity(sqlQuery, options.dataSource);
 
-    const local = this.localRefreshKeyResult(queryOptions, { expiration, cacheKey });
+    const local = this.localRefreshKeyResult(queryOptions, cacheKey);
     if (local) {
       return local;
     }
