@@ -143,6 +143,19 @@ impl<'a> FilterSqlContext<'a> {
         bound: DateBound,
         cast: bool,
     ) -> Result<String, CubeError> {
+        self.format_and_allocate_date_impl(value, bound, cast, true)
+    }
+
+    /// `in_db_time_zone` false leaves the date in the query's own timezone, for
+    /// a caller comparing it against a member that is converted into that
+    /// timezone rather than read raw.
+    fn format_and_allocate_date_impl(
+        &self,
+        value: &str,
+        bound: DateBound,
+        cast: bool,
+        in_db_time_zone: bool,
+    ) -> Result<String, CubeError> {
         let allocate = |value: &str| {
             if cast {
                 self.allocate_timestamp_param(value)
@@ -161,8 +174,12 @@ impl<'a> FilterSqlContext<'a> {
             DateBound::From => QueryDateTimeHelper::format_from_date(value, precision)?,
             DateBound::To => QueryDateTimeHelper::format_to_date(value, precision)?,
         };
-        let with_tz = self.apply_db_time_zone(formatted)?;
-        allocate(&with_tz)
+        let formatted = if in_db_time_zone {
+            self.apply_db_time_zone(formatted)?
+        } else {
+            formatted
+        };
+        allocate(&formatted)
     }
 
     fn is_partition_range(&self, value: &str) -> bool {
@@ -184,11 +201,9 @@ impl<'a> FilterSqlContext<'a> {
     /// The rolling window's series bounds as literal parameters, or `None`
     /// when they can only be read back off the series itself.
     ///
-    /// Left in the query's own timezone, because a rolling filter compares them
-    /// against the member converted into that timezone — which is also where
-    /// the series these bounds describe places its points. A bound carried into
-    /// the database's timezone instead would sit an offset away from the column
-    /// it bounds.
+    /// Left in the query's own timezone: a rolling filter compares them against
+    /// the member converted into that timezone, and the series places its
+    /// points there too.
     ///
     /// Raw values are spliced into pre-aggregation SQL verbatim rather than
     /// allocated as parameters, which a bound cannot be rendered as.
@@ -203,31 +218,9 @@ impl<'a> FilterSqlContext<'a> {
             return Ok(None);
         }
         Ok(Some((
-            self.format_and_allocate_in_query_tz(from, DateBound::From)?,
-            self.format_and_allocate_in_query_tz(to, DateBound::To)?,
+            self.format_and_allocate_date_impl(from, DateBound::From, true, false)?,
+            self.format_and_allocate_date_impl(to, DateBound::To, true, false)?,
         )))
-    }
-
-    /// A date formatted and allocated as a timestamp parameter, without the
-    /// conversion into the database's timezone that a filter comparing against
-    /// an unconverted column needs.
-    fn format_and_allocate_in_query_tz(
-        &self,
-        value: &str,
-        bound: DateBound,
-    ) -> Result<String, CubeError> {
-        if self.use_raw_values {
-            return Ok(value.to_string());
-        }
-        if self.is_partition_range(value) {
-            return self.allocate_timestamp_param(value);
-        }
-        let precision = self.plan_templates.timestamp_precision()?;
-        let formatted = match bound {
-            DateBound::From => QueryDateTimeHelper::format_from_date(value, precision)?,
-            DateBound::To => QueryDateTimeHelper::format_to_date(value, precision)?,
-        };
-        self.allocate_timestamp_param(&formatted)
     }
 
     pub fn date_range_from_time_series(&self) -> Result<(String, String), CubeError> {

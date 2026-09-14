@@ -1219,16 +1219,13 @@ impl MultiStageQueryPlanner {
         Ok(description)
     }
 
-    /// Outer bounds of the series a rolling window over `time_dimension` walks.
-    /// The series is derived from the dimension's granularity and date range,
-    /// so both bounds are known here; the base-scan filter renders them as
-    /// literals instead of reading them back off the series.
+    /// Outer bounds of the series a rolling window over `time_dimension` walks,
+    /// rendered by the base-scan filter as literals instead of read back off
+    /// the series.
     ///
-    /// `None` where the series is not derivable at plan time: without a date
-    /// range the range itself is a query, a granularity whose periods come off
-    /// a calendar cube has boundaries no interval math reproduces, and a range
-    /// standing for a pre-aggregation's partition holds placeholders rather
-    /// than dates.
+    /// `None` where the series is not derivable at plan time: a date range that
+    /// is itself a query, a granularity whose periods come off a calendar cube,
+    /// and a range standing for a pre-aggregation's partition.
     fn rolling_series_bounds(
         &self,
         time_dimension: &Rc<TimeDimensionSymbol>,
@@ -1248,15 +1245,12 @@ impl MultiStageQueryPlanner {
         {
             return Ok(None);
         }
-        // Millisecond bounds; the filter pads them to the dialect's precision
-        // when it renders them.
-        let precision = 3;
         let bounds = if granularity.is_predefined_granularity() {
             QueryTimeSeries::covering_bounds_predefined(
                 granularity.granularity(),
                 granularity.granularity_interval(),
                 &[date_range[0].clone(), date_range[1].clone()],
-                precision,
+                QueryTimeSeries::MILLISECOND_PRECISION,
             )?
         } else {
             self.custom_series_bounds(&granularity, &date_range)?
@@ -1288,7 +1282,7 @@ impl MultiStageQueryPlanner {
             .add_interval(interval)?
             .add_duration(Duration::seconds(-1))?;
         Ok((
-            format!("{}.000", first.format("%Y-%m-%dT%H:%M:%S")),
+            first.default_format(),
             format!("{}.999", past_end.format("%Y-%m-%dT%H:%M:%S")),
         ))
     }
@@ -1303,6 +1297,26 @@ impl MultiStageQueryPlanner {
     /// ([`Self::rolling_series_bounds`]), and for a period whose boundaries are
     /// rows of a calendar cube — no interval math reproduces those, so the
     /// lower bound has to stay a sub-select over the series that read them.
+    /// The `Granularity` a `to_date` window counts its period in. The compiler
+    /// borrow lives no longer than the build, so a caller is free to reach for
+    /// it again — `change_date_range_filter_impl` takes the same one right
+    /// after this returns.
+    fn to_date_period_granularity(
+        &self,
+        time_dimension: &Rc<TimeDimensionSymbol>,
+        granularity: &str,
+    ) -> Result<Option<Granularity>, CubeError> {
+        let compiler_cell = self.query_tools.compiler().clone();
+        let mut compiler = compiler_cell.borrow_mut();
+        GranularityHelper::make_granularity_obj(
+            self.query_tools.cube_evaluator().clone(),
+            &mut compiler,
+            &time_dimension.cube_name(),
+            &time_dimension.name(),
+            Some(granularity.to_string()),
+        )
+    }
+
     fn to_date_window_bounds(
         &self,
         time_dimension: &Rc<TimeDimensionSymbol>,
@@ -1311,31 +1325,23 @@ impl MultiStageQueryPlanner {
         let Some((series_from, series_to)) = self.rolling_series_bounds(time_dimension)? else {
             return Ok(None);
         };
-        let compiler_cell = self.query_tools.compiler().clone();
-        let mut compiler = compiler_cell.borrow_mut();
-        let Some(period) = GranularityHelper::make_granularity_obj(
-            self.query_tools.cube_evaluator().clone(),
-            &mut compiler,
-            &time_dimension.cube_name(),
-            &time_dimension.name(),
-            Some(granularity.to_string()),
-        )?
-        else {
+        let Some(period) = self.to_date_period_granularity(time_dimension, granularity)? else {
             return Ok(None);
         };
         if period.calendar_sql().is_some() {
             return Ok(None);
         }
-        // Millisecond bounds; the filter pads them to the dialect's precision
-        // when it renders them.
-        let precision = 3;
         let period_start = if period.is_predefined_granularity() {
-            QueryTimeSeries::period_start_predefined(period.granularity(), &series_from, precision)?
+            QueryTimeSeries::period_start_predefined(
+                period.granularity(),
+                &series_from,
+                QueryTimeSeries::MILLISECOND_PRECISION,
+            )?
         } else {
             let tz = self.query_tools.query_tools().timezone();
-            let start =
-                period.align_date_to_origin(QueryDateTime::from_date_str(tz, &series_from)?)?;
-            format!("{}.000", start.format("%Y-%m-%dT%H:%M:%S"))
+            period
+                .align_date_to_origin(QueryDateTime::from_date_str(tz, &series_from)?)?
+                .default_format()
         };
         Ok(Some((period_start, series_to)))
     }
@@ -1352,16 +1358,7 @@ impl MultiStageQueryPlanner {
             return Ok(None);
         };
         let time_dimension = time_dimension.as_time_dimension()?;
-
-        let compiler_cell = self.query_tools.compiler().clone();
-        let mut compiler = compiler_cell.borrow_mut();
-        let granularity_obj = GranularityHelper::make_granularity_obj(
-            self.query_tools.cube_evaluator().clone(),
-            &mut compiler,
-            &time_dimension.cube_name(),
-            &time_dimension.name(),
-            Some(granularity.clone()),
-        )?;
+        let granularity_obj = self.to_date_period_granularity(&time_dimension, &granularity)?;
 
         Ok(granularity_obj
             .filter(|obj| obj.calendar_sql().is_some())

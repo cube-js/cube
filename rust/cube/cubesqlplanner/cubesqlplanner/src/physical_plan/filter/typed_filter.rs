@@ -15,6 +15,7 @@ use crate::planner::FiltersContext;
 use crate::planner::QueryDateTime;
 use crate::planner::QueryDateTimeHelper;
 use crate::planner::SqlInterval;
+use chrono::Duration;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -291,13 +292,41 @@ fn shift_bound(
         Some(interval) => SqlInterval::from_str(interval)?,
         None => return Ok(Some(date.to_string())),
     };
-    let anchor = QueryDateTime::from_date_str(tz, date)?;
-    let shifted = if subtract {
-        anchor.sub_interval(&interval)?
+    let interval = if subtract {
+        interval.inverse()
     } else {
-        anchor.add_interval(&interval)?
+        interval
     };
-    Ok(Some(shifted.format("%Y-%m-%dT%H:%M:%S%.3f")))
+    let anchor = QueryDateTime::from_date_str(tz, date)?;
+    Ok(Some(
+        shift_wall_clock(&anchor, &interval)?.format("%Y-%m-%dT%H:%M:%S%.3f"),
+    ))
+}
+
+/// `anchor` moved by `interval` on the wall clock.
+///
+/// The band describes a span over the series' own points, and those are wall
+/// clock — so an hour of interval has to move the bound by an hour of wall
+/// clock, the way the stage's own SQL moves it. `add_interval` switches to
+/// absolute arithmetic for an interval carrying no date part, which across a
+/// daylight-saving transition lands an offset away from where the stage reads.
+fn shift_wall_clock(
+    anchor: &QueryDateTime,
+    interval: &SqlInterval,
+) -> Result<QueryDateTime, CubeError> {
+    let carries_date = interval.year != 0
+        || interval.quarter != 0
+        || interval.month != 0
+        || interval.week != 0
+        || interval.day != 0;
+    if carries_date {
+        return anchor.add_interval(interval);
+    }
+    anchor.add_duration(
+        Duration::hours(interval.hour as i64)
+            + Duration::minutes(interval.minute as i64)
+            + Duration::seconds(interval.second as i64),
+    )
 }
 
 fn dispatch_to_sql(op: &FilterOp, ctx: &FilterSqlContext) -> Result<String, CubeError> {
@@ -315,5 +344,59 @@ fn dispatch_to_sql(op: &FilterOp, ctx: &FilterSqlContext) -> Result<String, Cube
         FilterOp::RegularRollingWindow(op) => op.to_sql(ctx),
         FilterOp::RollingWindowOffset(op) => op.to_sql(ctx),
         FilterOp::ToDateRollingWindow(op) => op.to_sql(ctx),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn shifted(date: &str, interval: &str, subtract: bool) -> String {
+        shift_bound(
+            Tz::America__Los_Angeles,
+            date,
+            &Some(interval.to_string()),
+            subtract,
+        )
+        .unwrap()
+        .unwrap()
+    }
+
+    // An hour of interval is an hour of wall clock, on both sides of a
+    // spring-forward. Absolute arithmetic would answer 17:00 / 13:00 here,
+    // putting the band an hour inside the one the stage's SQL reads.
+    #[test]
+    fn a_sub_day_shift_moves_the_wall_clock_across_a_dst_boundary() {
+        assert_eq!(
+            shifted("2024-03-10T12:00:00.000", "18 hour", true),
+            "2024-03-09T18:00:00.000"
+        );
+        assert_eq!(
+            shifted("2024-03-09T18:00:00.000", "18 hour", false),
+            "2024-03-10T12:00:00.000"
+        );
+    }
+
+    // A day is a calendar day, which the spring-forward makes 23 hours long.
+    #[test]
+    fn a_day_shift_stays_on_the_same_clock_time() {
+        assert_eq!(
+            shifted("2024-03-11T09:00:00.000", "1 day", true),
+            "2024-03-10T09:00:00.000"
+        );
+    }
+
+    #[test]
+    fn an_unbounded_side_states_no_bound() {
+        assert_eq!(
+            shift_bound(
+                Tz::America__Los_Angeles,
+                "2024-03-10T12:00:00.000",
+                &Some("unbounded".to_string()),
+                true
+            )
+            .unwrap(),
+            None
+        );
     }
 }

@@ -21,6 +21,10 @@ pub fn is_predefined_granularity(name: &str) -> bool {
 pub struct QueryTimeSeries;
 
 impl QueryTimeSeries {
+    /// Sub-second digits a bound derived while planning carries. The dialect's
+    /// own precision is not known there; the filter pads to it when it renders.
+    pub const MILLISECOND_PRECISION: u32 = 3;
+
     /// Snaps the range start to the bucket boundary for the given granularity,
     /// then emits one `[start, end]` pair per bucket until the bucket boundary
     /// passes the range end. The sub-second part of each timestamp is padded
@@ -65,14 +69,10 @@ impl QueryTimeSeries {
     /// from the start of the bucket the range opens in, to one interval past
     /// its end.
     ///
-    /// The tail reaches past the range on purpose. A series materialized here
-    /// snaps its points to bucket boundaries, so its last bucket ends at most
-    /// an interval past the range end; one generated in SQL steps from the
-    /// range start instead, and its last point sits at most an interval before
-    /// the range end. The span has to cover both, and a rolling window reads no
-    /// rows outside its own frame regardless — the join applies that frame
-    /// exactly. Derived from the two ends rather than by walking the series, so
-    /// a range of any width costs the same.
+    /// The tail reaches past the range because the span must cover both series
+    /// shapes — one materialized here snaps its points to bucket boundaries,
+    /// one generated in SQL steps from the range start — and their last buckets
+    /// end on either side of the range end.
     pub fn covering_bounds_predefined(
         granularity: &str,
         interval: &SqlInterval,

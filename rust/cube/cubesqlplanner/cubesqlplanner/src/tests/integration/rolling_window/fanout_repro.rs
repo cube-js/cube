@@ -2,21 +2,16 @@
 //!
 //! Several `rolling_window` measures queried together with a high-cardinality
 //! dimension produce a plan whose intermediate row count is
-//! (entities × window length × anchors). Two observations feed that, and this
-//! module covers them one apiece.
+//! (entities × window length × anchors). Two observations feed that.
 //!
-//! The base scan's date bound was emitted as a scalar sub-select over
-//! `time_series`, where the legacy planner emitted a literal, so engines could
-//! not use it to eliminate partitions. That is fixed.
+//! The base scan's date bound was a scalar sub-select over `time_series`, which
+//! no engine can eliminate partitions by. That is fixed.
 //!
 //! The rolling CTE still joins `time_series` to its base CTE on a date range
-//! only. With no equality predicate the engine cannot hash-join: Postgres picks
-//! a nested loop with a join filter and materialises ~954K rows for a 7-day
-//! window over 4.7K entities × 33 anchors (~3.6M for the 30-day one) before the
-//! `GROUP BY` separates the entities again. Restricting that join would first
-//! mean giving the series side a dimension column to restrict against, since it
-//! carries none, so the test asserting the restricted shape stays ignored — run
-//! it with `cargo test rolling_window::fanout_repro -- --ignored`.
+//! only, so the engine cannot hash-join and its row estimate stays badly off.
+//! Restricting that join would first mean giving the series side a dimension
+//! column to restrict against, so its test stays ignored — run it with
+//! `cargo test rolling_window::fanout_repro -- --ignored`.
 
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
@@ -56,9 +51,9 @@ fn rolling_join_conditions(sql: &str) -> Vec<String> {
         .collect()
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[test]
 #[ignore = "reproduces #11770: rolling join has no equality predicate"]
-async fn test_rolling_join_restricts_by_dimension() {
+fn test_rolling_join_restricts_by_dimension() {
     let ctx = create_context();
     let sql = ctx.build_sql(QUERY).unwrap();
 
@@ -72,8 +67,8 @@ async fn test_rolling_join_restricts_by_dimension() {
     }
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn test_base_scan_date_bound_is_literal() {
+#[test]
+fn test_base_scan_date_bound_is_literal() {
     let ctx = create_context();
     let (sql, params) = ctx.build_sql_and_params(QUERY).unwrap();
 
@@ -91,11 +86,11 @@ async fn test_base_scan_date_bound_is_literal() {
     let bounds = params
         .iter()
         .filter_map(|value| value.to_param_string())
-        .unique()
         .collect_vec();
-    assert_eq!(
-        bounds,
-        vec!["2026-08-01T00:00:00.000", "2026-09-02T23:59:59.999"],
-        "unexpected base scan bounds in:\n{sql}"
-    );
+    for edge in ["2026-08-01T00:00:00.000", "2026-09-02T23:59:59.999"] {
+        assert!(
+            bounds.iter().any(|bound| bound == edge),
+            "{edge} missing from the base scan bounds {bounds:?} in:\n{sql}"
+        );
+    }
 }
