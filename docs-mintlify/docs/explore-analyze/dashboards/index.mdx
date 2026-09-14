@@ -27,9 +27,9 @@ definitions in Git — see [Dashboards as code](/docs/explore-analyze/dashboards
 A workbook holds a single dashboard, which stays a **draft** until you publish
 it. Click **Publish** in the dashboard builder to publish the current draft as a
 new **version** — viewers always see the latest published version, never your
-in-progress edits. (Publishing is a workbook-level operation, so it's also
-available from source control — see [Dashboards as
-code](/docs/explore-analyze/dashboards/dashboards-as-code).)
+in-progress edits. Publishing is a workbook-level operation — the same one the
+[as-code flow](/docs/explore-analyze/dashboards/dashboards-as-code#4-publish)
+performs over the API.
 
 The button next to **Publish** reflects the dashboard's state — click it to open
 the [revision history](#revision-history):
@@ -52,7 +52,7 @@ again to make it the live version.
 
 ### What viewers see
 
-When someone opens a published dashboard in Cube Cloud, a version chip in the
+When someone opens a published dashboard, a version chip in the
 header shows the live version (e.g. `v3`). Opening it reveals when that version
 was published and a summary of what changed since the previous version — added,
 updated, or removed widgets — so viewers can see which version they're looking at
