@@ -93,8 +93,15 @@ const mockPreAggregation = (overrides: Record<string, any> = {}) => ({
   ...overrides,
 });
 
+// Widens the protected entry point that the invalidation key tests drive directly.
+class TestPartitionRangeLoader extends PreAggregationPartitionRangeLoader {
+  public getInvalidationKeyValues(range: [string, string]) {
+    return super.getInvalidationKeyValues(range);
+  }
+}
+
 const createLoader = (overrides: Record<string, any> = {}, options: Record<string, any> = {}, loadCache: Record<string, any> = {}) => {
-  const loader = new PreAggregationPartitionRangeLoader(
+  const loader = new TestPartitionRangeLoader(
     {} as any, // driverFactory
     {} as any, // logger
     { options: {} } as any, // queryCache
@@ -930,7 +937,7 @@ describe('PreAggregations', () => {
   describe('replaceQueryBuildRangeParams', () => {
     test('should replace BUILD_RANGE params with actual dates', async () => {
       const loader = createLoader();
-      jest.spyOn(loader as any, 'loadBuildRange').mockResolvedValue([
+      jest.spyOn(loader, 'loadBuildRange').mockResolvedValue([
         '2023-01-01T00:00:00.000',
         '2023-01-31T23:59:59.999',
       ]);
@@ -1048,7 +1055,7 @@ describe('PreAggregations', () => {
       const loader = createLoader({ timezone: 'America/New_York', invalidateKeyQueries: [query, query] }, {}, { keyQueryResult });
       const convert = jest.spyOn(PreAggregationPartitionRangeLoader, 'inDbTimeZone');
 
-      const result = await (loader as any).getInvalidationKeyValues([start, end]);
+      const result = await loader.getInvalidationKeyValues([start, end]);
 
       expect(result).toEqual(['refresh-key', 'refresh-key']);
       expect(keyQueryResult).toHaveBeenCalledTimes(2);
@@ -1064,7 +1071,7 @@ describe('PreAggregations', () => {
       const loader = createLoader({ invalidateKeyQueries });
       const convert = jest.spyOn(PreAggregationPartitionRangeLoader, 'inDbTimeZone');
 
-      await expect((loader as any).getInvalidationKeyValues([start, end])).resolves.toEqual([]);
+      await expect(loader.getInvalidationKeyValues([start, end])).resolves.toEqual([]);
 
       expect(convert).not.toHaveBeenCalled();
     });
