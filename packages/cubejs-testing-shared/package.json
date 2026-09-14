@@ -27,10 +27,10 @@
     "@cubejs-backend/query-orchestrator": "1.7.37",
     "@cubejs-backend/schema-compiler": "1.7.37",
     "@cubejs-backend/shared": "1.7.37",
-    "@testcontainers/kafka": "~10.28.0",
+    "@testcontainers/kafka": "~12.1.0",
     "dedent": "^0.7.0",
     "node-fetch": "^2.7.0",
-    "testcontainers": "^10.28.0"
+    "testcontainers": "^12.1.0"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "1.7.37",
