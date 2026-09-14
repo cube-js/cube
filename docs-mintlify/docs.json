@@ -864,6 +864,7 @@
                   "POST /api/v1/deployments/{deploymentId}/dbt-sync",
                   "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}",
                   "DELETE /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}",
+                  "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/generated-files",
                   "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/logs",
                   "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/result"
                 ]
