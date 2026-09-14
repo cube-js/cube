@@ -387,7 +387,7 @@ const variables: Record<string, (...args: any) => any> = {
     return timezone;
   },
   preciseDecimalInCubestore: () => get('CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE')
-    .default('false')
+    .default('true')
     .asBoolStrict(),
   refreshKeyLocalTime: () => get('CUBEJS_REFRESH_KEY_LOCAL_TIME')
     .default('false')
