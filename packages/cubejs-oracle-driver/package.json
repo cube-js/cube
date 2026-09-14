@@ -21,7 +21,7 @@
     "@types/oracledb": "^6.2.3"
   },
   "optionalDependencies": {
-    "oracledb": "^6.2.0"
+    "oracledb": "^6.3.0"
   },
   "jest": {
     "testEnvironment": "node"
