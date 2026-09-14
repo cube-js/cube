@@ -423,6 +423,7 @@ class CubeApi {
       response = (response as Response);
       let body: BodyResponse = {};
       let text = '';
+
       try {
         text = await response.text();
         body = JSON.parse(text);
@@ -582,6 +583,7 @@ class CubeApi {
           const { columns, members } = result.data as unknown as { columns: any[][]; members: string[] };
           const rowCount = columns[0]?.length ?? 0;
           const data: Record<string, any>[] = [];
+
           for (let i = 0; i < rowCount; i++) {
             const row: Record<string, any> = {};
             members.forEach((m, k) => {
@@ -855,6 +857,7 @@ class CubeApi {
         const [schema, ...data] = response.error.split('\n');
 
         let parsedSchema: any;
+
         try {
           parsedSchema = JSON.parse(schema);
         } catch (err) {
@@ -867,6 +870,7 @@ class CubeApi {
         for (const line of data) {
           if (line.trim().length) {
             let parsed: any;
+
             try {
               parsed = JSON.parse(line);
             } catch (err) {

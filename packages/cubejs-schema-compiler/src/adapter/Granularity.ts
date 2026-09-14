@@ -190,6 +190,7 @@ export class Granularity {
 
     // We can't simply compare interval milliseconds because of DSTs.
     const testDate = msFrom.clone();
+
     while (testDate.isBefore(msTo)) {
       testDate.add(grIntervalDuration);
     }

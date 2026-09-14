@@ -76,6 +76,7 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
 
   async loadDBSchema() {
     this.setState({ schemaLoading: true });
+
     try {
       const res = await playgroundFetch('playground/db-schema');
       const result = await res.json();

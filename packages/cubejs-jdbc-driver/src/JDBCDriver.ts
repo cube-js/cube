@@ -275,8 +275,10 @@ export class JDBCDriver extends BaseDriver {
 
     try {
       const conn = await this.pool.acquire();
+
       try {
         const prepareConnectionQueries = options.prepareConnectionQueries || [];
+
         for (let i = 0; i < prepareConnectionQueries.length; i++) {
           await this.executeStatement(conn, prepareConnectionQueries[i]);
         }

@@ -612,6 +612,7 @@ describe('Multiple join paths', () => {
         ],
       },
     ];
+
     for (const { preAggregationId, addTimeRange, expectedData } of preAggregationTests) {
       if (!getEnv('nativeSqlPlanner')) {
         // eslint-disable-next-line no-loop-func

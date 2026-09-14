@@ -66,6 +66,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
 
   private async installExtensions(extensions: string[], execAsync: (sql: string, ...params: any[]) => Promise<void>, repository: string = ''): Promise<void> {
     repository = repository ? ` FROM ${repository}` : '';
+
     for (const extension of extensions) {
       try {
         await execAsync(`INSTALL ${extension}${repository}`);

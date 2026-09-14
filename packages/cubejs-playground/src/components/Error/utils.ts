@@ -37,12 +37,14 @@ export function generateAnsiHTML(txt: string) {
 
   let result = '';
   let open = false;
+
   for (let index = 0; index < arr.length; ++index) {
     const c = arr[index];
     const { content } = c;
     const { fg } = c;
 
     const contentParts = content.split('\n');
+
     for (let j = 0; j < contentParts.length; ++j) {
       if (!open) {
         result += '<span data-ansi-line="true">';

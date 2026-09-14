@@ -109,6 +109,7 @@ export function EditQueryDialogForm(props: PasteQueryDialogFormProps) {
 
     const jsonQuery = form.getFieldValue('jsonQuery');
     let sanitizedQuery = {};
+
     try {
       sanitizedQuery = validateQuery(BestEffortJsonParse(jsonQuery));
     } catch {

@@ -539,6 +539,7 @@ export class PreAggregations {
 
     function allValuesEq1(map) {
       if (!map) return false;
+
       // eslint-disable-next-line no-restricted-syntax
       for (const v of map?.values()) {
         if (v !== 1) return false;
@@ -1429,6 +1430,7 @@ export class PreAggregations {
   private enrichMembersCubeJoinPath(cubeName: string, joinsMap: Record<string, string>): string[] {
     const path = [cubeName];
     const parentMap = joinsMap;
+
     while (parentMap[cubeName]) {
       cubeName = parentMap[cubeName];
       path.push(cubeName);

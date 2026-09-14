@@ -52,6 +52,7 @@ export const isDriver = (val: any): boolean => {
   if (!isDriverInstance && val?.constructor) {
     let end = false;
     let obj = val.constructor;
+
     while (!isDriverInstance && !end) {
       obj = Object.getPrototypeOf(obj);
       end = !obj;

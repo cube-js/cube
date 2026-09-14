@@ -84,6 +84,7 @@ const ROW_COUNTS = [5_000, 10_000, 25_000, 50_000, 100_000];
 
 // Pre-build all ResultSets outside benchmarks to avoid measuring construction time
 const pivotResultSets = new Map<number, ResultSet>();
+
 for (const count of ROW_COUNTS) {
   pivotResultSets.set(count, new ResultSet(generateLoadResponse(count) as any));
 }

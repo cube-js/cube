@@ -65,6 +65,7 @@ export function formatCanonicalDateTime(s: string): string | null {
 
   if (len > 19 && s.charCodeAt(19) === CHAR_DOT) {
     let end = 20;
+
     while (end < len && isDigit(s.charCodeAt(end))) {
       end++;
     }
@@ -228,6 +229,7 @@ function parseDateTimePrecision(inner: string): number {
   i++;
   let precision = 0;
   let digits = 0;
+
   while (isDigit(inner.charCodeAt(i))) {
     precision = precision * 10 + (inner.charCodeAt(i) - CHAR_0);
     digits++;
@@ -291,6 +293,7 @@ export function buildTransformFromNamesAndTypes(names: Array<string>, types: Arr
   }
 
   const converters: Array<ColumnConverter | null> = new Array(names.length);
+
   for (let i = 0; i < names.length; i++) {
     converters[i] = getColumnConverter(types[i]);
   }

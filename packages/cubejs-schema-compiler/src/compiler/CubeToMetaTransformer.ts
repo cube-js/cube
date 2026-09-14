@@ -435,6 +435,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
     const isCumulative = extendedMetricDef.cumulative || BaseMeasure.isCumulative(extendedMetricDef);
 
     const drillMembersGrouped: { measures: string[]; dimensions: string[] } = { measures: [], dimensions: [] };
+
     for (const member of drillMembersArray) {
       if (this.cubeEvaluator.isMeasure(member)) {
         drillMembersGrouped.measures.push(member);

@@ -147,6 +147,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
       if (!valuePath.isArrayExpression()) {
         return;
       }
+
       for (const element of valuePath.get('elements')) {
         if (element.isObjectExpression()) {
           // Nested view group: recurse into its own `includes` only.
@@ -200,6 +201,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
         if ((path.node.key.type === 'Identifier' && transpiledFields.has(path.node.key.name)) ||
           (path.node.key.type === 'StringLiteral' && transpiledFields.has(path.node.key.value))) {
           const fullPath = CubePropContextTranspiler.fullPath(path);
+
           // eslint-disable-next-line no-restricted-syntax
           for (const p of transpiledFieldsPatterns) {
             if (fullPath.match(p)) {
@@ -249,6 +251,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     // @ts-ignore
     let fp = path?.node?.key?.name || path?.node?.key?.value || '';
     let pp: NodePath<t.Node> | null | undefined = path?.parentPath;
+
     while (pp) {
       if (pp?.parentPath?.node?.type === 'ArrayExpression') {
         fp = `0.${fp}`;
@@ -332,6 +335,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
 
   private static isShadowedByFunctionParam(name: string, path: NodePath): boolean {
     let current: NodePath | null = path.parentPath;
+
     while (current) {
       const { node } = current;
       if (

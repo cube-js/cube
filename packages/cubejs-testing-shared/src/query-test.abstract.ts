@@ -203,6 +203,7 @@ export abstract class QueryTestAbstract<T extends BaseDriver> {
       expect(indexesMap[ind.name].type).toEqual(ind.index_type);
       indexesMap[ind.name].seen = true;
     });
+
     for (const [_, ind] of Object.entries(indexesMap)) {
       expect(ind.seen).toEqual(true);
     }

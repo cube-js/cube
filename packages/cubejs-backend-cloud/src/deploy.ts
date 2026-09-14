@@ -17,6 +17,7 @@ export class DeployDirectory {
     let result: Record<string, any> = {};
 
     const files = await fs.readdir(directory);
+
     // eslint-disable-next-line no-restricted-syntax
     for (const file of files) {
       const filePath = path.resolve(directory, file);

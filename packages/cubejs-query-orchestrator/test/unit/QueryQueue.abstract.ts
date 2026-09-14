@@ -278,6 +278,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       // Reconciliation is what cancels orphaned queries and nothing else triggers it while
       // the worker is busy.
       const deadline = Date.now() + 2000;
+
       while (cancelledQuery !== '123' && Date.now() < deadline) {
         await queue.reconcileQueue();
         await delayFn(null, 100);
@@ -603,6 +604,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
       test('useExternalId should return true', async () => {
         const connection = await queue.queueDriver.createConnection();
+
         try {
           expect(await (connection as CubestoreQueueDriverConnection).useExternalId()).toBe(true);
         } finally {

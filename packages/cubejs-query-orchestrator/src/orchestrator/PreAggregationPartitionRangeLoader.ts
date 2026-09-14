@@ -327,6 +327,7 @@ export class PreAggregationPartitionRangeLoader {
       let usageTargetTableNames: Record<string, string> | undefined;
       if (this.preAggregation.usageMapping) {
         usageTargetTableNames = {};
+
         for (const [suffix, usageInfo] of Object.entries(this.preAggregation.usageMapping)) {
           if (usageInfo.dateRange && this.preAggregation.partitionGranularity) {
             // Load partition ranges specific to this usage's dateRange.
@@ -386,6 +387,7 @@ export class PreAggregationPartitionRangeLoader {
       ).loadPreAggregation(true);
       if (result && this.preAggregation.usageMapping) {
         const usageTargetTableNames: Record<string, string> = {};
+
         for (const suffix of Object.keys(this.preAggregation.usageMapping)) {
           usageTargetTableNames[suffix] = result.targetTableName;
         }

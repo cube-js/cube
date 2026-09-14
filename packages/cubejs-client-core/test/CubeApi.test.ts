@@ -606,6 +606,7 @@ describe('CubeApi cubeSql', () => {
     });
 
     const chunks: unknown[] = [];
+
     for await (const chunk of cubeApi.cubeSqlStream('SELECT status FROM users', { timezone: 'America/Los_Angeles' })) {
       chunks.push(chunk);
     }
@@ -698,6 +699,7 @@ describe('CubeApi cubeSql', () => {
     });
 
     const chunks: any[] = [];
+
     for await (const chunk of cubeApi.cubeSqlStream('SELECT status FROM orders')) {
       chunks.push(chunk);
     }
@@ -727,6 +729,7 @@ describe('CubeApi cubeSql', () => {
     });
 
     const chunks: any[] = [];
+
     for await (const chunk of cubeApi.cubeSqlStream('SELECT status FROM orders')) {
       chunks.push(chunk);
     }

@@ -13,6 +13,7 @@ export function playgroundFetch(url, options: any = {}) {
     .then(async (r) => {
       if (r.status === 500) {
         let errorText = await r.text();
+
         try {
           const json = JSON.parse(errorText);
           errorText = json.error;

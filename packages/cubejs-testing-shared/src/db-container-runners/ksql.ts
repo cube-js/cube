@@ -35,6 +35,7 @@ export class KsqlDBRunner extends DbRunnerAbstract {
     const ksqlUrl = `http://${db.getHost()}:${db.getMappedPort(8088)}`;
 
     let attempts = 0;
+
     while (attempts < 10) {
       const res = await fetch(`${ksqlUrl}/ksql`, {
         method: 'POST',

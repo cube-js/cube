@@ -57,6 +57,7 @@ export function loadable(
     }
 
     toggle?.();
+
     try {
       await factory();
     } catch (error: any) {

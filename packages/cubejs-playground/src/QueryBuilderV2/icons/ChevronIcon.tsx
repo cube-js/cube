@@ -51,6 +51,7 @@ export const ChevronIcon = memo((props: ChevronIconProps) => {
       while (rotate - nextRotate > 180) {
         nextRotate += 360;
       }
+
       while (rotate - nextRotate < -180) {
         nextRotate -= 360;
       }

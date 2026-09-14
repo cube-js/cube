@@ -224,6 +224,7 @@ describe('PostgresDriver', () => {
 
   test('table name check', async () => {
     const tblName = 'really-really-really-looooooooooooooooooooooooooooooooooooooooooooooooooooong-table-name';
+
     try {
       await driver.createTable(tblName, [{ name: 'id', type: 'bigint' }]);
 

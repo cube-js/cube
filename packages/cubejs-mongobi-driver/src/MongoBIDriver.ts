@@ -184,6 +184,7 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
   public async testConnection() {
     // eslint-disable-next-line no-underscore-dangle
     const conn: Connection = await (<any> this.pool)._factory.create();
+
     try {
       await conn.promise().query('SELECT 1', []);
     } finally {

@@ -42,6 +42,7 @@ export function version(cacheKey) {
     // preventing negative values when high bits are set (byte >= 128 with shift >= 24)
     // eslint-disable-next-line operator-assignment,no-bitwise
     residue = ((byte << (shiftCounter - 8)) | residue) >>> 0;
+
     // eslint-disable-next-line no-bitwise
     // Use >>> (unsigned right shift) to ensure proper comparison and shifting
     // of unsigned values, preventing infinite loops with negative residues

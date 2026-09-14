@@ -33,6 +33,7 @@ class MockDriver {
       } else if (operation === 'METADATA:GET_TABLES_FOR_SCHEMAS') {
         // Parse parameters from the query array
         let params = {};
+
         try {
           params = query[1] && query[1].length > 0 ? JSON.parse(query[1][0]) : {};
         } catch (error) {
@@ -42,6 +43,7 @@ class MockDriver {
       } else if (operation === 'METADATA:GET_COLUMNS_FOR_TABLES') {
         // Parse parameters from the query array
         let params = {};
+
         try {
           params = query[1] && query[1].length > 0 ? JSON.parse(query[1][0]) : {};
         } catch (error) {
@@ -193,6 +195,7 @@ class ExternalMockDriver extends MockDriver {
     if (tableData.csvFile) {
       this.csvFiles.push(tableData.csvFile);
     }
+
     for (let i = 0; i < indexesSql.length; i++) {
       const [query, params] = indexesSql[i].sql;
       await this.query(query, params);
@@ -592,6 +595,7 @@ describe('QueryOrchestrator', () => {
       requestId: 'silent truncate'
     };
     let thrown = true;
+
     try {
       await queryOrchestrator.fetchQuery(query);
       thrown = false;
@@ -618,6 +622,7 @@ describe('QueryOrchestrator', () => {
       cacheMode: 'must-revalidate',
       requestId: 'cancel pre-aggregation'
     };
+
     try {
       await queryOrchestrator.fetchQuery(query);
     } catch (e) {
@@ -1676,6 +1681,7 @@ describe('QueryOrchestrator', () => {
       requestId: 'drop without touch does not affect tables in progress'
     });
     const promises = [firstQuery];
+
     for (let i = 0; i < 10; i++) {
       promises.push(queryOrchestratorDropWithoutTouch.fetchQuery({
         query: `SELECT * FROM stb_pre_aggregations.orders_d201811${i}`,
@@ -1772,8 +1778,10 @@ describe('QueryOrchestrator', () => {
 
   test('drop lock', async () => {
     mockDriver.tablesDropDelay = 300;
+
     for (let i = 0; i < 10; i++) {
       const promises = [];
+
       for (let j = 0; j < 10; j++) {
         // eslint-disable-next-line no-loop-func
         promises.push((async () => {

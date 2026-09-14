@@ -124,6 +124,7 @@ export default {
     },
     async loadQueries() {
       const { queries } = this;
+
       try {
         this.error = undefined;
         this.loading = true;

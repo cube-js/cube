@@ -44,7 +44,13 @@
     ],
     // oxlint's built-in fallthrough comment pattern is stricter than ESLint's default and
     // rejected the existing `// falls through, trick from 90x ...` comments.
-    "no-fallthrough": ["error", { "commentPattern": "falls?\\s?through" }]
+    "no-fallthrough": ["error", { "commentPattern": "falls?\\s?through" }],
+    // Loops and try blocks open a new control-flow region; a blank line in front of them
+    // keeps that boundary visible instead of letting the setup statements run into it.
+    "@stylistic/padding-line-between-statements": [
+      "error",
+      { "blankLine": "always", "prev": "*", "next": ["try", "while", "do", "for"] }
+    ]
   },
   "overrides": [
     {

@@ -256,6 +256,7 @@ export class BaseQuery {
     };
     this.maskedMembers = new Set();
     this.memberMaskFilters = {};
+
     for (const item of this.options.maskedMembers || []) {
       this.maskedMembers.add(item.member);
       if (item.filter) {
@@ -393,6 +394,7 @@ export class BaseQuery {
        * @type {Record<string, string[]>}
        */
       const queryJoinGraph = {};
+
       for (const { originalFrom, originalTo } of (this.join?.joins || [])) {
         if (!queryJoinGraph[originalFrom]) {
           queryJoinGraph[originalFrom] = [];
@@ -465,6 +467,7 @@ export class BaseQuery {
     const currentContext = this.safeEvaluateSymbolContext();
     if (contextPropNames) {
       const contextKey = {};
+
       for (const element of contextPropNames) {
         contextKey[element] = currentContext[element];
       }
@@ -549,6 +552,7 @@ export class BaseQuery {
     return joinHints.map(jh => {
       let cubeName = jh;
       const path = [cubeName];
+
       while (joinsMap[cubeName]) {
         cubeName = joinsMap[cubeName];
         path.push(cubeName);
@@ -3380,6 +3384,7 @@ export class BaseQuery {
     }
 
     this.safeEvaluateSymbolContext().currentMember = memberPath;
+
     try {
       if (this.maskedMembers && this.maskedMembers.has(memberPath) && !memberExpressionType &&
           !this.safeEvaluateSymbolContext().skipMasking) {
@@ -3850,6 +3855,7 @@ export class BaseQuery {
   evaluateSymbolSqlWithContext(fn, context) {
     const oldContext = this.evaluateSymbolContext;
     this.evaluateSymbolContext = oldContext ? Object.assign({}, oldContext, context) : context;
+
     try {
       const result = fn();
       this.evaluateSymbolContext = oldContext;
@@ -5655,6 +5661,7 @@ export class BaseQuery {
      * @type {Record<string, string>}
      */
     const res = {};
+
     for (const [original, alias] of Object.entries(aliases)) {
       const [cube, field] = original.split('.');
       const path = buildJoinPath(cube);
@@ -5698,6 +5705,7 @@ export class BaseQuery {
         visited.add(node);
 
         const neighbors = query.joinGraphPaths[node] || [];
+
         for (const neighbor of neighbors) {
           if (dfs(neighbor)) {
             path.unshift(node);

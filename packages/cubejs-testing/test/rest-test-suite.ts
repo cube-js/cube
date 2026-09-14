@@ -151,6 +151,7 @@ export function executeTestSuite({ type, config = {}, driver }: TestSuite) {
             let getted: GetResponse;
             let iter = true;
             let tbl = true;
+
             while (iter) {
               iter = false;
               response = await fetch(url, {

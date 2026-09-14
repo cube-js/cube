@@ -67,6 +67,7 @@ describe('CubeServer', () => {
         );
 
         const cubeServer = new CubeServer();
+
         // act
         try {
           await cubeServer.listen();
@@ -81,6 +82,7 @@ describe('CubeServer', () => {
     test('should not be able to listen if the server is already listening', async () => {
       // arrange
       const cubeServer = new CubeServer();
+
       // act
       try {
         await cubeServer.listen();
@@ -98,6 +100,7 @@ describe('CubeServer', () => {
   describe('close', () => {
     test('should not be able to close the server if the server isn\'t already listening', async () => {
       const cubeServer = new CubeServer();
+
       // act
       try {
         await cubeServer.listen();

@@ -211,6 +211,7 @@ export const agentCollect = async (event: LoggerFnParams, endpointUrl: string, l
   const flushAllByChunks = async () => {
     const agentFrameSize: number = getEnv('agentFrameSize');
     const toFlushArray = [];
+
     while (trackEvents.length > 0) {
       toFlushArray.push(trackEvents.splice(0, agentFrameSize));
     }
