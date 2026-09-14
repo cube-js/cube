@@ -61,8 +61,8 @@ impl PartialEq for OrderByItem {
     }
 }
 
-// Compare two member symbols by their reference-chain-resolved full name.
-fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
+/// Compare two member symbols by their reference-chain-resolved full name.
+pub fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
     a.clone().resolve_reference_chain().full_name()
         == b.clone().resolve_reference_chain().full_name()
 }
