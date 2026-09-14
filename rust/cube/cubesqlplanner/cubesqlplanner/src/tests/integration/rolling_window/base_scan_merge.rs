@@ -49,6 +49,9 @@ async fn test_measures_over_one_frame_share_a_base_scan() {
             dateRange:
               - "2024-01-01"
               - "2024-01-31"
+        order:
+          - id: orders.created_at
+          - id: orders.status
     "#};
 
     let sql = ctx.build_sql(query).unwrap();
@@ -84,6 +87,9 @@ async fn test_row_grain_measures_share_only_with_each_other() {
             dateRange:
               - "2024-01-01"
               - "2024-01-31"
+        order:
+          - id: orders.created_at
+          - id: orders.status
     "#};
 
     let sql = ctx.build_sql(query).unwrap();

@@ -1,25 +1,17 @@
-use super::same_rows::reads_same_rows;
+use super::same_rows::{reads_same_rows, same_members};
 use crate::logical_plan::*;
+use crate::planner::query_properties::member_chain_eq;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-/// Merges the base scans of rolling windows that read the same rows.
+/// Merges the base scans of rolling windows that read the same rows, so that
+/// windows differing only in the column they aggregate share one scan of the
+/// fact table and each reads its own column off it.
 ///
-/// A rolling window's base CTE aggregates one measure over the rows its frame
-/// can reach, and which rows those are is decided by the frame and the query's
-/// filters — not by the measure. Windows differing only in the column they
-/// aggregate therefore scan the fact table once each where one scan would do,
-/// and the cost of that shows up as (entities × window × anchors) once a
-/// high-cardinality dimension is grouped by.
-///
-/// Runs after pre-aggregations have been matched, which is what makes the
-/// merge safe to take unconditionally: a rollup answers only for a query whose
-/// every measure it carries, so a scan carrying two measures could not be
-/// served by a rollup holding one of them. By this point each base scan either
-/// already reads a rollup — a source this declines to merge — or was left on
-/// the fact table, where nothing is lost by sharing it.
+/// Must run after pre-aggregations are matched — see the call site, where that
+/// ordering is what someone editing could move.
 pub struct RollingBaseScanOptimizer;
 
 /// One base scan and the measures that will ride on it.
@@ -89,6 +81,14 @@ impl RollingBaseScanOptimizer {
             if !consumers.is_sole_input_of_a_window(&cte.name) {
                 continue;
             }
+            // The widened CTE takes its measures from the leaf and its
+            // dimensions from the leaf's query, so the two have to describe the
+            // same projection. A leaf whose query selects a bare dimension grid
+            // — its member rendered by the stage above rather than here — would
+            // otherwise gain a measure column it never selected.
+            if !same_members(&leaf.measures, &leaf.query.schema().measures) {
+                continue;
+            }
             match groups
                 .iter_mut()
                 .find(|group| reads_same_rows(&group.leaf, leaf))
@@ -96,12 +96,16 @@ impl RollingBaseScanOptimizer {
                 Some(group) => {
                     // A measure two scans have in common — a switch dispatching
                     // several stages onto one — is one column of the merged
-                    // scan, not two under the same alias.
+                    // scan, not two under the same alias. Identity is the
+                    // resolved reference chain, which is what the physical side
+                    // matches a column by: two symbols resolving to it render
+                    // the same column, and projecting both would leave each
+                    // window reading whichever came first.
                     for measure in leaf.measures.iter() {
                         if !group
                             .measures
                             .iter()
-                            .any(|carried| carried.full_name() == measure.full_name())
+                            .any(|carried| member_chain_eq(carried, measure))
                         {
                             group.measures.push(measure.clone());
                         }

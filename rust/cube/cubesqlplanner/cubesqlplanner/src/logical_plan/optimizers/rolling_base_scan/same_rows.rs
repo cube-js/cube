@@ -23,9 +23,19 @@ pub fn reads_same_rows(a: &MultiStageLeafMeasure, b: &MultiStageLeafMeasure) -> 
 // query aggregating at all. Both live here, and neither is visible in the
 // query the leaf holds.
 fn same_evaluation_context(a: &EvaluationContext, b: &EvaluationContext) -> bool {
-    a.measure_for_ungrouped == b.measure_for_ungrouped && a.time_shifts == b.time_shifts
+    // Destructured rather than read through fields: this comparison is the
+    // pass's whole safety argument, and a field added to one of these types
+    // must break the build rather than silently widen "reads the same rows".
+    let EvaluationContext {
+        measure_for_ungrouped,
+        time_shifts,
+    } = a;
+    *measure_for_ungrouped == b.measure_for_ungrouped && *time_shifts == b.time_shifts
 }
 
+// `Query` and `LogicalJoin` keep their fields private, so these two cannot be
+// destructured the way the rest are. A field added to either has to be added
+// here by hand, or two scans that read differently start comparing equal.
 fn same_query_rows(a: &Query, b: &Query) -> bool {
     same_grain(a.schema(), b.schema())
         && same_filter(a.filter(), b.filter())
@@ -38,15 +48,27 @@ pub fn same_members(a: &[Rc<MemberSymbol>], b: &[Rc<MemberSymbol>]) -> bool {
 }
 
 fn same_grain(a: &LogicalSchema, b: &LogicalSchema) -> bool {
-    same_members(&a.dimensions, &b.dimensions)
-        && same_members(&a.time_dimensions, &b.time_dimensions)
+    let LogicalSchema {
+        time_dimensions,
+        dimensions,
+        // The measures are what the merge widens, so they are deliberately
+        // not part of "reads the same rows".
+        measures: _,
+    } = a;
+    same_members(dimensions, &b.dimensions) && same_members(time_dimensions, &b.time_dimensions)
 }
 
 fn same_filter(a: &LogicalFilter, b: &LogicalFilter) -> bool {
-    same_filter_items(&a.dimensions_filters, &b.dimensions_filters)
-        && same_filter_items(&a.time_dimensions_filters, &b.time_dimensions_filters)
-        && same_filter_items(&a.measures_filter, &b.measures_filter)
-        && same_filter_items(&a.segments, &b.segments)
+    let LogicalFilter {
+        dimensions_filters,
+        time_dimensions_filters,
+        measures_filter,
+        segments,
+    } = a;
+    same_filter_items(dimensions_filters, &b.dimensions_filters)
+        && same_filter_items(time_dimensions_filters, &b.time_dimensions_filters)
+        && same_filter_items(measures_filter, &b.measures_filter)
+        && same_filter_items(segments, &b.segments)
 }
 
 fn same_filter_items(a: &[FilterItem], b: &[FilterItem]) -> bool {
@@ -57,10 +79,13 @@ fn same_filter_items(a: &[FilterItem], b: &[FilterItem]) -> bool {
 }
 
 fn same_modifiers(a: &LogicalQueryModifiers, b: &LogicalQueryModifiers) -> bool {
-    a.offset == b.offset
-        && a.limit == b.limit
-        && a.ungrouped == b.ungrouped
-        && a.order_by == b.order_by
+    let LogicalQueryModifiers {
+        offset,
+        limit,
+        ungrouped,
+        order_by,
+    } = a;
+    *offset == b.offset && *limit == b.limit && *ungrouped == b.ungrouped && *order_by == b.order_by
 }
 
 fn same_source(a: &QuerySource, b: &QuerySource) -> bool {
@@ -72,6 +97,7 @@ fn same_source(a: &QuerySource, b: &QuerySource) -> bool {
     }
 }
 
+// See the note on [`same_query_rows`]: private fields, compared by hand.
 fn same_join(a: &LogicalJoin, b: &LogicalJoin) -> bool {
     same_root(a.root(), b.root())
         && a.joins().len() == b.joins().len()
@@ -119,22 +145,34 @@ fn same_join_condition(a: &Rc<SqlCall>, b: &Rc<SqlCall>) -> bool {
 }
 
 fn same_subquery_join(a: &LogicalSubqueryJoinItem, b: &LogicalSubqueryJoinItem) -> bool {
-    a.sql == b.sql
-        && a.alias == b.alias
-        && a.join_type == b.join_type
-        && same_join_condition(&a.on_sql, &b.on_sql)
+    let LogicalSubqueryJoinItem {
+        sql,
+        alias,
+        join_type,
+        on_sql,
+    } = a;
+    *sql == b.sql
+        && *alias == b.alias
+        && *join_type == b.join_type
+        && same_join_condition(on_sql, &b.on_sql)
 }
 
 // A sub-query dimension contributes a joined-in CTE of its own, so the two
 // hosts read the same rows only if those CTEs do — measures included, since
 // the dimension's value is one of them.
 fn same_dimension_subquery(a: &DimensionSubQuery, b: &DimensionSubQuery) -> bool {
-    member_chain_eq(&a.subquery_dimension, &b.subquery_dimension)
+    let DimensionSubQuery {
+        query,
+        primary_keys_dimensions,
+        subquery_dimension,
+        measure_for_subquery_dimension,
+    } = a;
+    member_chain_eq(subquery_dimension, &b.subquery_dimension)
         && member_chain_eq(
-            &a.measure_for_subquery_dimension,
+            measure_for_subquery_dimension,
             &b.measure_for_subquery_dimension,
         )
-        && same_members(&a.primary_keys_dimensions, &b.primary_keys_dimensions)
-        && same_members(&a.query.schema().measures, &b.query.schema().measures)
-        && same_query_rows(&a.query, &b.query)
+        && same_members(primary_keys_dimensions, &b.primary_keys_dimensions)
+        && same_members(&query.schema().measures, &b.query.schema().measures)
+        && same_query_rows(query, &b.query)
 }

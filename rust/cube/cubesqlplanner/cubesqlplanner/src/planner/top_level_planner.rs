@@ -53,9 +53,11 @@ impl TopLevelPlanner {
             return Ok((String::new(), usages));
         }
 
-        // After the pre-aggregations, so that a rollup carrying one of two
-        // rolling measures still answers for its own scan: a merged scan
-        // carrying both could not be served by it.
+        // Ordering is load-bearing: merging is only safe once rollups have been
+        // matched, because a scan carrying two measures can no longer be served
+        // by a rollup holding one of them. Moved above `try_pre_aggregations`,
+        // a model storing one rollup per rolling measure silently falls back to
+        // the fact table for all of them.
         let optimized_plan = RollingBaseScanOptimizer::new().optimize(optimized_plan)?;
 
         let is_external = if !usages.is_empty() {
