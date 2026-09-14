@@ -10,7 +10,7 @@
 
 # CubeClient
 
-> API client for Cube.JS powered on Rust language
+> API client for Cube powered on Rust language
 
 Models are generated from [Cube Open API Specificiation](https://github.com/cube-js/cube.js/blob/master/packages/cubejs-api-gateway/openspec.yml).
 
