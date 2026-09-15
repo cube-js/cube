@@ -9357,25 +9357,31 @@ async fn nested_aggregate_limit_does_not_truncate(
 
     // LIMIT 3 counts the outer aggregate's groups, of which there are 5; the inner aggregate's 20
     // rows all contribute and none of them may be cut.
-    let derived = assert_limit_pushdown(
+    // Neither pushdown may fire here, so both mechanisms' markers are listed.
+    const NO_PUSHDOWN: &[&str] = &[
+        "GlobalLimit",
+        "InlinePartialAggregate, limit:",
+        "GroupByLimitAggregate",
+    ];
+    let derived = assert_limit_pushdown_using_search_strings(
         &service,
         "SELECT a, sum(v) FROM \
          (SELECT a, b, sum(v) v FROM s.na GROUP BY 1, 2) i \
          GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
         None,
         false,
-        false,
+        NO_PUSHDOWN,
     )
     .await?;
     assert_eq!(derived, expected);
 
-    let cte = assert_limit_pushdown(
+    let cte = assert_limit_pushdown_using_search_strings(
         &service,
         "WITH i AS (SELECT a, b, sum(v) v FROM s.na GROUP BY 1, 2) \
          SELECT a, sum(v) FROM i GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
         None,
         false,
-        false,
+        NO_PUSHDOWN,
     )
     .await?;
     assert_eq!(cte, expected);
@@ -9498,7 +9504,12 @@ async fn assert_limit_pushdown(
             &["TailLimit"]
         } else {
             // The worker limit is either a plain row limit or, for a partial aggregate running
-            // per partition below the merge, a group limit on the aggregate.
+            // per partition below the merge, a group limit on the aggregate. Deliberately not
+            // `GroupByLimitAggregate`: that is the other pushdown (the sort-and-limit descriptor),
+            // and the two are independent -- `limit_pushdown_unique_key` has a case where the row
+            // limit correctly stays away while the bounded worker sort correctly fires. A test that
+            // needs "no pushdown of any kind" passes the full list to
+            // [assert_limit_pushdown_using_search_strings].
             &["GlobalLimit", "InlinePartialAggregate, limit:"]
         },
     )

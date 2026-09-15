@@ -884,13 +884,18 @@ struct ChooseIndexContext {
 }
 
 impl ChooseIndexContext {
-    /// A limit entering the context starts a new scope: whichever aggregate sits nearest below it
-    /// owns it, even if an outer one already claimed an outer limit.
+    /// A limit entering the context starts a new scope: the relation below it is not the one the
+    /// enclosing query's `ORDER BY` or `WHERE` described, so nothing but the limit itself carries
+    /// over. The [Sort] arm re-sets the order right after calling this; the [Limit] arm has not
+    /// seen anything below yet.
+    ///
+    /// [single_value_filtered_cols] is the sharp one: it drops columns from both sides of the
+    /// index-prefix check, and a filter above a `LIMIT` does not constrain the rows below it, so
+    /// keeping it would relax that check for a relation where the column is not constant at all.
     fn update_limit(&self, limit: Option<usize>) -> Self {
         Self {
             limit,
-            limit_claimed: false,
-            ..self.clone()
+            ..Self::default()
         }
     }
     fn update_sort(
@@ -1045,17 +1050,16 @@ impl PlanRewriter for ChooseIndex<'_> {
                 };
                 Some(context.enter_aggregate(group_expr_to_column_names(group_expr, input)))
             }
-            // Row-preserving on the way down, so the limit still describes the relation below.
-            // `TableScan` belongs here because `enter_node`'s result is also the context
-            // [Self::rewrite] sees for this very node -- clearing it here kills every pushdown.
+            // Row-preserving: the limit still describes the relation below. `TableScan` is here
+            // because `enter_node`'s result is also what [Self::rewrite] sees for this very node,
+            // so clearing it here would kill every pushdown.
             LogicalPlan::Projection(_)
             | LogicalPlan::SubqueryAlias(_)
             | LogicalPlan::Union(_)
             | LogicalPlan::TableScan(_) => None,
-            // Everything else -- a join, a window, an unnest, a rolling-window extension -- is a
-            // different relation from the one the limit counts the rows of. This covers both sides
-            // of a join: `rewrite_plan_impl` enters the `Join` node itself before it splits, and
-            // hands each side the context produced here.
+            // Anything else is a different relation. This covers both sides of a join:
+            // `rewrite_plan_impl` enters the `Join` node before it splits and hands each side the
+            // context produced here.
             _ => Some(ChooseIndexContext::for_unrelated_relation()),
         }
     }
@@ -3079,14 +3083,15 @@ pub mod tests {
             vec!["ClusterSend, indices: [[2]]"]
         );
 
-        // An ORDER BY inside the aggregate's input would describe a relation the outer limit does
-        // not count, and reading it as the query's order would flip `reverse` and keep the wrong
-        // end of the index. DataFusion drops such a sort before we ever see it -- all three shapes
-        // optimize to the same plan -- so there is nothing to guard against; this pins that, so a
-        // DataFusion upgrade that starts keeping the sort fails here instead of silently.
+        // DataFusion drops an ORDER BY inside the aggregate's input before we ever see it, so
+        // there is no inner sort to mistake for the query's order. Pinned so a DataFusion upgrade
+        // that starts keeping it fails here instead of silently flipping `reverse`.
         for sql in [
             "SELECT order_id, sum(order_amount) FROM \
              (SELECT order_id, order_amount FROM s.Orders ORDER BY order_id DESC) i \
+             GROUP BY 1 ORDER BY 1 ASC LIMIT 10",
+            "SELECT order_id, sum(order_amount) FROM \
+             (SELECT order_id, order_amount FROM s.Orders ORDER BY order_id ASC) i \
              GROUP BY 1 ORDER BY 1 ASC LIMIT 10",
             "SELECT order_id, sum(order_amount) FROM \
              (SELECT order_id, order_amount FROM s.Orders) i \
@@ -3099,6 +3104,21 @@ pub mod tests {
                 sql
             );
         }
+
+        // An inner LIMIT starts a new scope, so the outer ORDER BY DESC does not reach the inner
+        // relation -- reading its index from the tail on account of an order that describes a
+        // different relation.
+        assert_eq!(
+            limit_pushdown_of(
+                "SELECT order_id, sum(v) FROM \
+                 (SELECT order_id, order_customer, sum(order_amount) v FROM s.Orders \
+                  GROUP BY 1, 2 LIMIT 5) i \
+                 GROUP BY 1 ORDER BY order_id DESC LIMIT 10",
+                &indices
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2]], limit: 5, reverse: false"]
+        );
 
         // The toggle has to actually remove the descriptor. Comparing results with it on and off
         // cannot show that: they stay equal when the flag is ignored entirely, which is exactly how
