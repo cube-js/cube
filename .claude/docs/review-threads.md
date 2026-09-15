@@ -27,11 +27,16 @@ will not help the subagent: it restates a whole past review round, several
 kilobytes of it, and none of that says whether a thread is still live. The code at
 the site and the thread's own replies say that.
 
-Three aliases are available to it; raw `gh api graphql` is not permitted:
+Four aliases are available to it; raw `gh api graphql` is not permitted:
 
   gh list-review-threads <owner> <repo> <pr> [thread-cursor]
   gh show-review-thread <thread-id> [comment-cursor]
+  gh reply-to-thread <thread-id> <body>
   gh resolve-thread <thread-id>
+
+`reply-to-thread` is the only way to write into a thread that already exists —
+the inline-comment tool opens a new one every time, which on a thread you are
+answering is a second unresolved entry rather than a reply.
 
 **Paging the threads:**
 
@@ -89,7 +94,9 @@ Where a human replied, what they are disputing decides. Pushing back on your
 verdict — the fix is not in, the concern still stands — keeps the thread open.
 Refuting the finding itself, with you agreeing, closes it: a withdrawn finding is
 not live, and leaving it open feeds it back to you every round as unresolved.
-Resolve it and say in the reply that you are withdrawing it.
+Resolve it, and say so on the thread with `gh reply-to-thread` — resolution alone
+does not distinguish a withdrawn finding from a fixed one, and the next round
+reads the thread, not this file.
 
 Do not resolve threads from human reviewers under any circumstance, even if the
 concern looks addressed — leave that decision to the reviewer. That includes the
@@ -108,7 +115,8 @@ Skip a finding when ALL of the following hold for any thread in the list:
 
 Report the skip so the review can note it in its top-level summary (e.g.
 "Re-affirmed N prior threads still apply"). Do not post a "still applies" reply
-on the thread — silence is fine; the unresolved state already communicates that.
+on the thread, `reply-to-thread` notwithstanding — the unresolved state already
+communicates that, and a reply per round buries the concern under its own echoes.
 
 If the finding is on a different line or the fix direction has shifted
 (different root cause), it is not a duplicate.

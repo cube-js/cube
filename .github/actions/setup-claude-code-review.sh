@@ -6,6 +6,7 @@
 # Aliases installed:
 #   gh list-review-threads <owner> <repo> <pr> [thread-cursor]
 #   gh show-review-thread <thread-id> [comment-cursor]
+#   gh reply-to-thread <thread-id> <body>
 #   gh resolve-thread <thread-id>
 
 set -euo pipefail
@@ -65,6 +66,22 @@ gh api graphql \
   ' \
   -F id="$1" -F cursor="${2:-null}" \
   --jq '.data.node'
+EOF
+)"
+
+# The inline-comment MCP tool only opens new threads, so replying to one of our own
+# — withdrawing a finding, answering a pushback — has no other route.
+gh alias set --clobber --shell reply-to-thread "$(cat <<'EOF'
+gh api graphql \
+  -f query='
+    mutation($id: ID!, $body: String!) {
+      addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: $id, body: $body }) {
+        comment { url }
+      }
+    }
+  ' \
+  -F id="$1" -F body="$2" \
+  --jq '.data.addPullRequestReviewThreadReply.comment.url'
 EOF
 )"
 
