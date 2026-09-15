@@ -550,7 +550,8 @@
             "pages": [
               "reference/embed-apis/index",
               "reference/embed-apis/chat-api",
-              "reference/embed-apis/generate-session"
+              "reference/embed-apis/generate-session",
+              "reference/embed-apis/dashboard-comments"
             ]
           },
           {
