@@ -171,8 +171,8 @@ async function writeZipEntry(
   }
 
   // The trailing slash is the convention, but a producer may mark a directory by mode
-  // alone; read as a file, it would land as an empty regular file and ENOTDIR every
-  // entry underneath it.
+  // alone; read as a file, it lands as an empty regular file and the first entry under
+  // it collides on `mkdir` with EEXIST.
   if (entry.fileName.endsWith('/') || unixFileType(entry) === UNIX_MODE_DIRECTORY) {
     await fs.promises.mkdir(dest, { recursive: true });
     return;
@@ -193,11 +193,8 @@ async function writeZipEntry(
 }
 
 /**
- * Extract a zip into `dir`, which must already exist and be resolved.
- *
- * Replaces `extract-zip`, whose GHSA-jmr9-qjv8-65gv has no fixed release. This is
- * the same engine (`yauzl`) that `extract-zip` wrapped, minus the symlink handling
- * that was the vulnerability.
+ * Extract a zip into `dir`, which must already exist and be resolved — the
+ * containment check in `writeZipEntry` compares against it verbatim.
  */
 async function extractZipArchive(archivePath: string, dir: string): Promise<void> {
   const zipfile = await yauzl.openPromise(archivePath, { lazyEntries: true });

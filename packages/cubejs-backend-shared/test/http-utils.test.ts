@@ -342,7 +342,7 @@ describe('extractArchive', () => {
 
     it('treats a zip entry marked a directory by mode alone as a directory', async () => {
       // The trailing slash is the convention, not the rule. Read as a file, this entry
-      // would land as an empty regular file and every entry under it would ENOTDIR.
+      // lands as an empty regular file and the entry under it collides on `mkdir`.
       const archive = path.join(work, 'moddir.zip');
       await writeZip(archive, [
         { name: 'plugins', content: '', mode: 0o040755 },
@@ -354,6 +354,24 @@ describe('extractArchive', () => {
 
       expect(fs.statSync(path.join(target, 'plugins')).isDirectory()).toBe(true);
       expect(fs.readFileSync(path.join(target, 'plugins', 'driver.txt'), 'utf8')).toBe('legit-content');
+    });
+
+    it('keeps an entry\'s exec bit, and leaves a mode-less entry to node\'s default', async () => {
+      // Both sides of the `mode ? { mode } : {}` branch in one fixture. A launcher that
+      // extracts as 0644 fails at exec time, far from here; and a DOS-made zip records
+      // no unix mode at all, where passing the 0 through would make the file unreadable.
+      const archive = path.join(work, 'modes.zip');
+      await writeZip(archive, [
+        { name: 'bin/run.sh', content: '#!/bin/sh\n', mode: 0o100755 },
+        { name: 'dos.txt', content: 'x', mode: 0 },
+      ]);
+
+      const target = targetDir();
+      await extractArchive(archive, target);
+
+      // eslint-disable-next-line no-bitwise
+      expect(fs.statSync(path.join(target, 'bin', 'run.sh')).mode & 0o111).not.toBe(0);
+      expect(fs.readFileSync(path.join(target, 'dos.txt'), 'utf8')).toBe('x');
     });
 
     it('detects an uncompressed tar from the ustar magic at offset 257', async () => {
