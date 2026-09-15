@@ -57,6 +57,12 @@ Perform a comprehensive code review with the following focus areas:
 Provide detailed feedback using inline comments for specific issues.
 Use top-level comments for general observations or praise.
 
+Write every comment in the Cube output style (`.claude/output-styles/cube.md`,
+selected for the CI review run): open with the defect itself, no preamble and no
+recap of what the diff does, and cite code as `path/to/file.ts:123`. A finding
+keeps whatever length it needs to be actionable — the concrete failing input,
+the full error output, the reason a security issue is exploitable.
+
 **Tracking comment formatting:**
 
 Applies only to the FINAL update of the tracking comment (the one that contains
