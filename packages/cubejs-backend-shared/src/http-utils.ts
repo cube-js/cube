@@ -191,6 +191,18 @@ type ZipExtraction = {
 };
 
 /**
+ * The archive's mode, narrowed by what `mkdir` was already allowed to create.
+ *
+ * `chmod` sets bits verbatim where `open` filters them through the umask, so applying a
+ * recorded mode unmasked would let an archive choose a world-writable directory under
+ * the target — something the file path cannot do. The umask is read off the directory
+ * rather than from `process.umask()`, which node implements as `umask(0); umask(old);`
+ * and which therefore drops the mask process-wide for the duration (DEP0139).
+ */
+// eslint-disable-next-line no-bitwise
+const maskedAgainst = (created: fs.Stats, mode: number) => created.mode & mode;
+
+/**
  * Apply recorded directory modes once every entry is written — a restrictive mode
  * cannot be set while there are still entries to write underneath it, and `mkdir`
  * will not chmod a directory a child entry already created. Deepest first, because
@@ -210,28 +222,25 @@ async function applyDirectoryModes(directoryModes: Map<string, number>): Promise
   // eslint-disable-next-line no-bitwise
   const flags = fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW;
 
-  // `chmod` sets bits verbatim where `open` filters them, so without this an archive
-  // could choose a world-writable directory under the target — the file path cannot.
-  const umask = process.umask();
-
   for (const [dest, mode] of deepestFirst) {
-    // eslint-disable-next-line no-bitwise
-    const masked = mode & ~umask;
-
     if (canOpenDirectory) {
       // eslint-disable-next-line no-await-in-loop
       const handle = await fs.promises.open(dest, flags);
 
       try {
         // eslint-disable-next-line no-await-in-loop
-        await handle.chmod(masked);
+        const created = await handle.stat();
+        // eslint-disable-next-line no-await-in-loop
+        await handle.chmod(maskedAgainst(created, mode));
       } finally {
         // eslint-disable-next-line no-await-in-loop
         await handle.close();
       }
     } else {
       // eslint-disable-next-line no-await-in-loop
-      await fs.promises.chmod(dest, masked);
+      const created = await fs.promises.stat(dest);
+      // eslint-disable-next-line no-await-in-loop
+      await fs.promises.chmod(dest, maskedAgainst(created, mode));
     }
   }
 }

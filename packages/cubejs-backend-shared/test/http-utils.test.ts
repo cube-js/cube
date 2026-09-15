@@ -583,14 +583,20 @@ describe('extractArchive', () => {
       ]);
 
       const target = targetDir();
-      await extractArchive(archive, target);
+      // Pinned rather than measured: computing the expectation from the live umask
+      // makes the test agree with itself on a host with `umask 000` — a root container
+      // — where it would then assert nothing, or fail for a reason unrelated to the
+      // code. Restored in `finally`, or it leaks into every later test in the worker.
+      const previousUmask = process.umask(0o022);
+
+      try {
+        await extractArchive(archive, target);
+      } finally {
+        process.umask(previousUmask);
+      }
 
       // eslint-disable-next-line no-bitwise
-      const expected = (0o777 & ~process.umask()).toString(8);
-      // eslint-disable-next-line no-bitwise
-      expect((fs.statSync(path.join(target, 'plugins')).mode & 0o777).toString(8)).toBe(expected);
-      // The point of the assertion, spelled out for the default umask of 022.
-      expect(expected).not.toBe('777');
+      expect((fs.statSync(path.join(target, 'plugins')).mode & 0o777).toString(8)).toBe('755');
     });
 
     it('keeps a directory entry\'s mode too, not just a file\'s', async () => {
