@@ -148,7 +148,9 @@ jobs:
               | map(select(.type == "assistant") | .message.content[]?
                     | select(.type == "text") | .text)
               | last) as $last_text |
-            ($r.result? // $r.error? // $last_text // "no error text in execution log")
+            ($r.result? // $r.error?
+              // ($r.errors? | select(length > 0) | join("\n"))
+              // $last_text // "no error text in execution log")
             | tostring
           ' "$EXECUTION_FILE")
           subtype=$(jq -r 'map(select(.type == "result")) | last | .subtype // "?"' "$EXECUTION_FILE")
