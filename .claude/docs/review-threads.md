@@ -12,8 +12,9 @@ preconfigured alias:
 
 This returns an index — `id`, `isResolved`, `isOutdated`, `path`, `line`,
 `originalLine`, the first comment's author and the thread's comment count — but
-no comment bodies. GitHub nulls `line` on an outdated thread, so fall back to
-`originalLine` whenever `line` is null.
+no comment bodies. GitHub nulls `line` once a thread goes outdated; the
+`originalLine` it keeps is the position before the edits that outdated it, so it
+is a tiebreaker between threads on one path and never a current-diff line.
 It pages 50 threads at a time; when `pageInfo.hasNextPage` is true, fetch the
 next page by passing `pageInfo.endCursor` as a fourth argument:
 
@@ -32,8 +33,7 @@ permitted.
 
 A thread is a candidate when ALL of the following hold in the index:
   - `isResolved` is false
-  - the first comment's `author.login` is yours — `claude` in CI, otherwise
-    the login `gh api user -q .login` returns
+  - the first comment's `author.login` is yours — `claude` in CI
 
 For each candidate, read the body with `gh show-review-thread` and resolve it
 when the concern is no longer applicable in the current diff (file/line gone,
@@ -58,16 +58,18 @@ Use the same index to deduplicate against your own prior comments. Before callin
 an existing thread already covers it. Skip creating a new inline comment when ALL
 of the following hold for any thread in the index:
   - `isResolved` is false
-  - the first comment's `author.login` is yours — `claude` in CI, otherwise
-    the login `gh api user -q .login` returns
-  - the thread is on the same `path` and line (`line`, or `originalLine` when
-    `line` is null) as the new issue you would post
+  - the first comment's `author.login` is yours — `claude` in CI
+  - the thread is on the same `path` as the new issue you would post
   - the existing comment's body raises substantively the same concern (same root
     cause, same fix direction — wording does not need to match)
 
-The first three are answerable from the index; fetch the body with
-`gh show-review-thread` only for the threads that survive them, which is at most
-one or two per finding.
+A thread with a non-null `line` also has to be on the same line as the finding;
+skip it from the index when it is not. An outdated thread has no line to test —
+the code it was written against has already moved — so it takes a body read
+whenever it shares a path with a finding.
+
+Everything but the body test is answerable from the index, which on a PR with
+dozens of threads leaves one or two to open per finding.
 
 When you skip, briefly note it in your top-level summary (e.g. "Re-affirmed N
 prior threads still apply") so the reader knows you considered the issue. Do not
