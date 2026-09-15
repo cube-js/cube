@@ -214,8 +214,10 @@ async function extractZipArchive(archivePath: string, dir: string): Promise<void
 
   const aborter = new AbortController();
   zipfile.on('error', (err: Error) => {
-    aborter.abort();
+    // Settle the race first: `abort()` dispatches synchronously, and losing to
+    // `pipeline`'s `AbortError` would swallow the reader's real error.
     raiseFatal(err);
+    aborter.abort();
   });
 
   try {
