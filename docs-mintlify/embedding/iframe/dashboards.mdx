@@ -190,11 +190,6 @@ of them individually with URL parameters on the embed iframe `src`:
 | `showDashboardEditButton=false` | The Edit action |
 | `showDashboardDuplicateButton=false` | The Duplicate action |
 
-The export menu has its own switch, `showDashboardExportMenu=false`, covered
-above under [Allow chart and dashboard export](#allow-csv-export) — unlike
-the controls in this table, it's hidden by default and needs `allowExport`
-before there's anything to hide.
-
 ```text
 https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&showDashboardBackButton=false&showDashboardTitle=false
 ```
@@ -203,6 +198,13 @@ Every one of these defaults to shown. Only the exact literal string `false`
 hides a control — `=0`, `=False`, `=FALSE`, and a bare `?showDashboardTitle`
 (no value) all leave it visible. Note this is the inverse of `allowExport`
 above, where only the literal string `true` opts in.
+
+The export menu has its own switch, `showDashboardExportMenu=false`, covered
+above under [Allow chart and dashboard export](#allow-csv-export) — unlike
+the controls in this table, it's hidden by default. It's also not part of
+this header bar the way the controls above are: in Creator Mode it's docked
+in the header, but on the published-dashboard embed it floats over the
+dashboard, so `showDashboardHeader=false` doesn't hide it there.
 
 <Note>
 These parameters are URL-only — they aren't accepted in the [Generate
