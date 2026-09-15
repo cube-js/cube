@@ -85,7 +85,7 @@ pub async fn choose_index(
     p: LogicalPlan,
     metastore: &dyn PlanIndexStore,
 ) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
-    choose_index_ext(p, metastore, true).await
+    choose_index_ext(p, metastore, true, true).await
 }
 
 /// Information required to distribute the logical plan into multiple workers.
@@ -123,6 +123,7 @@ pub async fn choose_index_ext(
     p: LogicalPlan,
     metastore: &dyn PlanIndexStore,
     enable_topk: bool,
+    limit_pushdown: bool,
 ) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
     // Prepare information to choose the index.
     let mut collector = CollectConstraints::default();
@@ -238,7 +239,7 @@ pub async fn choose_index_ext(
         chosen_indices: &indices,
         next_index: 0,
         enable_topk,
-        can_pushdown_limit: true,
+        can_pushdown_limit: limit_pushdown,
         cluster_send_next_id: 1,
     };
 

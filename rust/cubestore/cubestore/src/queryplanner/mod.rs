@@ -232,6 +232,7 @@ impl QueryPlanner for QueryPlannerImpl {
                 logical_plan,
                 &self.meta_store.as_ref(),
                 self.config.enable_topk(),
+                self.config.limit_pushdown(),
             )
             .await?;
             let workers = compute_workers(

@@ -601,6 +601,14 @@ pub trait ConfigObj: DIService {
     /// the subtree's schema and the partition count the router sees the same either way.
     fn group_by_limit_per_partition(&self) -> bool;
 
+    /// Push the query's `LIMIT` into the workers for `GROUP BY ... ORDER BY ... LIMIT`. Off makes
+    /// every worker emit all of its groups and leaves the cut to the router.
+    ///
+    /// Node-local and not part of [`PlanningFlags`]: it gates the descriptor `ChooseIndex` stamps
+    /// into the logical plan on the router, and that plan -- descriptor included -- is what the
+    /// worker receives, so the two halves cannot disagree.
+    fn limit_pushdown(&self) -> bool;
+
     /// Replace the sort-preserving merge feeding a grouped Linear (hash) aggregate with a plain
     /// partition coalesce (the hash aggregate ignores input order, so the per-row merge is wasted).
     fn coalesce_under_hash_aggregate(&self) -> bool;
@@ -775,6 +783,7 @@ pub struct ConfigObjImpl {
     pub repartition_check_overlapping_children: bool,
     pub group_by_limit_factor: usize,
     pub group_by_limit_per_partition: bool,
+    pub limit_pushdown: bool,
     pub coalesce_under_hash_aggregate: bool,
     pub topk_aggregate_strategy: TopKAggregateStrategy,
     pub allow_decimal128: bool,
@@ -1130,6 +1139,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn group_by_limit_per_partition(&self) -> bool {
         self.group_by_limit_per_partition
+    }
+
+    fn limit_pushdown(&self) -> bool {
+        self.limit_pushdown
     }
 
     fn coalesce_under_hash_aggregate(&self) -> bool {
@@ -1946,6 +1959,7 @@ impl Config {
                 ),
                 group_by_limit_factor: env_parse_lenient("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 2),
                 group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION", true),
+                limit_pushdown: env_flag("CUBESTORE_LIMIT_PUSHDOWN", true),
                 coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE", false),
                 topk_aggregate_strategy: env_topk_strategy("CUBESTORE_TOPK_STRATEGY"),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
@@ -2211,6 +2225,7 @@ impl Config {
                 repartition_check_overlapping_children: false,
                 group_by_limit_factor: 2,
                 group_by_limit_per_partition: true,
+                limit_pushdown: true,
                 coalesce_under_hash_aggregate: false,
                 topk_aggregate_strategy: TopKAggregateStrategy::FullMerge,
                 allow_decimal128: false,

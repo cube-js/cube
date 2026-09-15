@@ -3667,6 +3667,91 @@ mod tests {
         Ok(())
     }
 
+    /// The limit pushdown is an optimization: turning it off may only cost time, never change a
+    /// row. Runs the same queries with `CUBESTORE_LIMIT_PUSHDOWN` on and off and requires the two
+    /// results to be identical, which catches a pushdown applied to a relation whose rows the
+    /// limit does not count without having to know the right answer in advance.
+    #[tokio::test]
+    async fn limit_pushdown_differential() -> Result<(), CubeError> {
+        const QUERIES: &[&str] = &[
+            // Nested aggregate: the limit counts the outer groups, not the inner rows.
+            "SELECT a, sum(v) FROM (SELECT a, b, sum(v) v FROM s.d GROUP BY 1, 2) i GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+            "WITH i AS (SELECT a, b, sum(v) v FROM s.d GROUP BY 1, 2) SELECT a, sum(v) FROM i GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+            // Expression in the inner group key, so the inner keys are not captured as columns.
+            "SELECT k, sum(v) FROM (SELECT a + 1 k, b, sum(v) v FROM s.d GROUP BY 1, 2) i GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+            // Aggregate inside a join branch.
+            "SELECT x.a, sum(x.v) FROM (SELECT a, sum(v) v FROM s.d GROUP BY 1) x JOIN s.d y ON x.a = y.a GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+            // DISTINCT over a UNION ALL feeding an outer aggregate -- the multi-stage key grid.
+            "SELECT b, count(*) FROM (SELECT DISTINCT a, b FROM (SELECT a, b FROM s.d UNION ALL SELECT a, b FROM s.d) u) g GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+            // Single-level shapes, where the pushdown is legitimate and must not change anything.
+            "SELECT a, sum(v) FROM s.d GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+            "SELECT a, b, sum(v) FROM s.d GROUP BY 1, 2 ORDER BY 2 ASC LIMIT 3",
+            "SELECT a, sum(v) FROM s.d GROUP BY 1 HAVING sum(v) > 2 ORDER BY 1 ASC LIMIT 3",
+            "SELECT a, sum(v) FROM s.d GROUP BY 1 LIMIT 3",
+        ];
+
+        async fn run(name: &'static str, limit_pushdown: bool) -> Vec<String> {
+            let out = Arc::new(tokio::sync::Mutex::new(Vec::new()));
+            let collected = out.clone();
+            Config::test(name)
+                .update_config(move |mut c| {
+                    c.limit_pushdown = limit_pushdown;
+                    c
+                })
+                .start_test(async move |services| {
+                    let service = services.sql_service;
+                    service
+                        .exec_query("CREATE SCHEMA s")
+                        .await?
+                        .collect()
+                        .await?;
+                    service
+                        .exec_query("CREATE TABLE s.d (a int, b int, v int)")
+                        .await?
+                        .collect()
+                        .await?;
+                    let values = (1..=5)
+                        .flat_map(|a| (1..=4).map(move |b| format!("({}, {}, 1)", a, b)))
+                        .join(", ");
+                    service
+                        .exec_query(&format!("INSERT INTO s.d (a, b, v) VALUES {}", values))
+                        .await?
+                        .collect()
+                        .await?;
+                    for q in QUERIES {
+                        let r = service.exec_query(q).await?.collect().await?;
+                        // Compared as a multiset: several of these order by a column with ties, and
+                        // which of the tied rows a plan returns is not part of the answer. What must
+                        // not move is the set of rows -- a truncated or duplicated relation shows up
+                        // here whatever the order.
+                        let mut rows = r
+                            .get_rows()
+                            .iter()
+                            .map(|r| format!("{:?}", r))
+                            .collect::<Vec<_>>();
+                        rows.sort();
+                        collected
+                            .lock()
+                            .await
+                            .push(format!("{}\n  => {:?}", q, rows));
+                    }
+                    Ok::<(), CubeError>(())
+                })
+                .await;
+            let r = out.lock().await.clone();
+            r
+        }
+
+        let with = run("limit_pushdown_differential_on", true).await;
+        let without = run("limit_pushdown_differential_off", false).await;
+        assert_eq!(with.len(), QUERIES.len());
+        assert_eq!(without.len(), QUERIES.len());
+        for (a, b) in with.iter().zip(without.iter()) {
+            assert_eq!(a, b, "result changed when the limit pushdown was disabled");
+        }
+        Ok(())
+    }
+
     /// Regression test for https://github.com/cube-js/cube/issues/11545.
     ///
     /// Cube's Tesseract planner emits this shape for a `multi_stage` measure whose SQL
