@@ -884,14 +884,8 @@ struct ChooseIndexContext {
 }
 
 impl ChooseIndexContext {
-    /// A limit entering the context starts a new scope: the relation below it is not the one the
-    /// enclosing query's `ORDER BY` or `WHERE` described, so nothing but the limit itself carries
-    /// over. The [Sort] arm re-sets the order right after calling this; the [Limit] arm has not
-    /// seen anything below yet.
-    ///
-    /// [single_value_filtered_cols] is the sharp one: it drops columns from both sides of the
-    /// index-prefix check, and a filter above a `LIMIT` does not constrain the rows below it, so
-    /// keeping it would relax that check for a relation where the column is not constant at all.
+    /// A limit entering the context starts a new scope, so nothing but the limit itself carries
+    /// over. See [Self::for_unrelated_relation].
     fn update_limit(&self, limit: Option<usize>) -> Self {
         Self {
             limit,
@@ -931,11 +925,10 @@ impl ChooseIndexContext {
         }
     }
 
-    /// The context for a relation the enclosing query's `LIMIT` does not count the rows of: nothing
-    /// describing that query's output carries over. [single_value_filtered_cols] goes too -- a
-    /// `col = literal` above a join constrains the join's output, not an input's column of the same
-    /// name, so keeping it could strip columns from the index-prefix check for a relation it never
-    /// restricted.
+    /// The context for a relation the enclosing query's `LIMIT` does not count the rows of. Nothing
+    /// describing that query's output survives, [single_value_filtered_cols] included: a predicate
+    /// above the boundary does not constrain the relation below it, and that set drops columns from
+    /// both sides of the index-prefix check.
     fn for_unrelated_relation() -> Self {
         Self::default()
     }
@@ -1029,9 +1022,18 @@ impl PlanRewriter for ChooseIndex<'_> {
             LogicalPlan::Sort(Sort {
                 expr, input, fetch, ..
             }) => {
-                let base = fetch.as_ref().map(|f| context.update_limit(Some(*f)));
+                let base = match fetch.as_ref() {
+                    Some(f) => context.update_limit(Some(*f)),
+                    // A sort with no fetch below the aggregate that owns the limit orders that
+                    // aggregate's input, not the query's output -- reading it as the query's order
+                    // would flip `reverse` and keep the wrong end of the index. DataFusion drops
+                    // such a sort before we see it (pinned in `test_limit_pushdown_scope`), so this
+                    // makes the invariant structural instead of resting on that.
+                    None if context.limit_claimed => ChooseIndexContext::for_unrelated_relation(),
+                    None => context.clone(),
+                };
                 let (names, sort_is_asc, sort_nulls_first) = sort_to_column_names(expr, input);
-                let base = base.as_ref().unwrap_or(context);
+                let base = &base;
                 Some(if !names.is_empty() {
                     base.update_sort(names, sort_is_asc, sort_nulls_first)
                 } else {
@@ -1052,7 +1054,9 @@ impl PlanRewriter for ChooseIndex<'_> {
             }
             // Row-preserving: the limit still describes the relation below. `TableScan` is here
             // because `enter_node`'s result is also what [Self::rewrite] sees for this very node,
-            // so clearing it here would kill every pushdown.
+            // so clearing it here would kill every pushdown. `Union` is safe because
+            // `pull_up_cluster_send` rejects a union whose branches are not uniformly cluster
+            // sends, so a branch that skipped this scope cannot reach a worker.
             LogicalPlan::Projection(_)
             | LogicalPlan::SubqueryAlias(_)
             | LogicalPlan::Union(_)

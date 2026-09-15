@@ -430,14 +430,14 @@ fn resort_worker_subtree(
     group_by_limit_factor: usize,
     group_by_limit_per_partition: bool,
 ) -> Option<(Arc<dyn ExecutionPlan>, bool)> {
-    let partial = locate_partial_aggregate(worker_subtree)?;
+    let (partial, group_count) = locate_partial_aggregate(worker_subtree)?;
 
     // A descriptor of a different arity than this aggregate's group key is not ours, and skipping
     // the bound is always correct. Equal arity is not proof -- the scoping in `ChooseIndexContext`
     // is what guarantees the descriptor belongs to this aggregate; this only catches the case that
     // would silently index the wrong columns. Router and worker reach it with the same aggregate,
     // so the two halves of a split plan agree on whether it fired.
-    if cols.len() != group_column_count(&partial)? {
+    if cols.len() != group_count {
         return None;
     }
 
@@ -592,18 +592,21 @@ fn find_cluster_send(p: &Arc<dyn ExecutionPlan>) -> Option<Arc<dyn ExecutionPlan
     None
 }
 
-/// The partial aggregate inside a worker subtree, reached through merge/coalesce wrappers. Returns
-/// `None` for any other shape (including an already-rewritten subtree, whose partial now sits under
-/// a `SortExec` -- not a wrapper we descend -- keeping the pass idempotent).
-fn locate_partial_aggregate(p: &Arc<dyn ExecutionPlan>) -> Option<Arc<dyn ExecutionPlan>> {
+/// The partial aggregate inside a worker subtree, with its group-by column count, reached through
+/// merge/coalesce wrappers. Returns `None` for any other shape (including an already-rewritten
+/// subtree, whose partial now sits under a `SortExec` -- not a wrapper we descend -- keeping the
+/// pass idempotent).
+fn locate_partial_aggregate(p: &Arc<dyn ExecutionPlan>) -> Option<(Arc<dyn ExecutionPlan>, usize)> {
     let mut candidate = p.clone();
     loop {
         let any = candidate.as_any();
         if let Some(a) = any.downcast_ref::<InlineAggregateExec>() {
-            return (*a.mode() == InlineAggregateMode::Partial).then_some(candidate.clone());
+            return (*a.mode() == InlineAggregateMode::Partial)
+                .then(|| (candidate.clone(), a.group_expr().expr().len()));
         }
         if let Some(a) = any.downcast_ref::<AggregateExec>() {
-            return (*a.mode() == AggregateMode::Partial).then_some(candidate.clone());
+            return (*a.mode() == AggregateMode::Partial)
+                .then(|| (candidate.clone(), a.group_expr().expr().len()));
         }
         if any.is::<SortPreservingMergeExec>()
             || any.is::<CoalescePartitionsExec>()
@@ -614,16 +617,6 @@ fn locate_partial_aggregate(p: &Arc<dyn ExecutionPlan>) -> Option<Arc<dyn Execut
         }
         return None;
     }
-}
-
-/// Group-by column count of a partial aggregate of either kind, or `None` for anything else.
-fn group_column_count(p: &Arc<dyn ExecutionPlan>) -> Option<usize> {
-    let any = p.as_any();
-    if let Some(a) = any.downcast_ref::<InlineAggregateExec>() {
-        return Some(a.group_expr().expr().len());
-    }
-    any.downcast_ref::<AggregateExec>()
-        .map(|a| a.group_expr().expr().len())
 }
 
 pub fn ensure_partition_merge_helper(
