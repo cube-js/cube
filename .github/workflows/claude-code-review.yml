@@ -95,6 +95,12 @@ jobs:
           track_progress: true
           # Allow PRs opened by coding-agent bots (e.g. cursor) to trigger reviews.
           allowed_bots: "cursor[bot]"
+          # Every inline comment the action feeds back carries its full diff hunk,
+          # which for a comment on a newly added file spans the whole file. Across
+          # a few review rounds that alone outgrows the context window. Our own
+          # prior threads are read back through `gh list-review-threads`, which
+          # asks for no hunks, so dropping them here loses nothing.
+          exclude_comments_by_actor: "claude[bot]"
           prompt: |
             PR NUMBER: ${{ env.PR_NUMBER }}
 
