@@ -343,6 +343,30 @@ describe('extractArchive', () => {
       expect(fs.readFileSync(secret, 'utf8')).toBe('original');
     });
 
+    it('does not write through a pre-existing hardlink at the entry name', async () => {
+      // A hardlink is a second name for the inode, not a link the kernel follows, so
+      // `lstat` calls it a regular file, the parent resolves to the target, and
+      // `O_NOFOLLOW` has nothing to refuse. The tar backend extracts `Link` entries, so
+      // tar-then-zip into one `cwd` plants it.
+      const archive = path.join(work, 'hardlink.zip');
+      await writeZip(archive, [{ name: 'esc', content: 'overwritten', mode: 0o100777 }]);
+
+      const outside = path.join(work, 'outside');
+      fs.mkdirSync(outside);
+      const secret = path.join(outside, 'secret');
+      fs.writeFileSync(secret, 'original');
+      fs.chmodSync(secret, 0o600);
+
+      const target = targetDir();
+      fs.linkSync(secret, path.join(target, 'esc'));
+
+      await extractArchive(archive, target);
+
+      expect(fs.readFileSync(secret, 'utf8')).toBe('original');
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(secret).mode & 0o777).toString(8)).toBe('600');
+    });
+
     it('refuses a dangling symlink at the entry name, which would create its target', async () => {
       // `realpath` cannot see this one at all — it throws ENOENT and resolves to an
       // ancestor — yet `open(…, 'w')` through the link creates the file outside.
@@ -402,54 +426,6 @@ describe('extractArchive', () => {
         () => entryStreams[0].destroyed,
         "the abandoned entry stream to be destroyed, which is what unrefs the archive's descriptor"
       );
-    });
-
-    it('releases it when the mode fixup after the open throws', async () => {
-      // The open's own catch does not cover what follows it: `umaskAllowed`'s probe and
-      // the `chmod` both run before `pipeline` exists to tear anything down, and either
-      // can fail on a real filesystem (EACCES probing a read-only `cwd`, EPERM
-      // chmodding a file a previous run left under another uid).
-      const archive = path.join(work, 'chmodfail.zip');
-      await writeZip(archive, [{ name: 'driver.jar', content: 'new', mode: 0o100644 }]);
-
-      const target = targetDir();
-      fs.writeFileSync(path.join(target, 'driver.jar'), 'old');
-
-      const { openPromise } = jest.requireActual<typeof import('yauzl')>('yauzl');
-      const entryStreams: Readable[] = [];
-
-      (yauzl.openPromise as jest.MockedFunction<typeof yauzl.openPromise>).mockImplementationOnce(
-        async (file: string, options?: yauzl.Options) => {
-          const zipfile = await openPromise(file, options);
-          const openReadStreamPromise = zipfile.openReadStreamPromise.bind(zipfile);
-
-          zipfile.openReadStreamPromise = async (...args: Parameters<typeof openReadStreamPromise>) => {
-            const stream = await openReadStreamPromise(...args);
-            entryStreams.push(stream);
-            return stream;
-          };
-
-          return zipfile;
-        }
-      );
-
-      const open = fs.promises.open.bind(fs.promises);
-      jest.spyOn(fs.promises, 'open').mockImplementation(async (...args: Parameters<typeof fs.promises.open>) => {
-        const handle = await open(...args);
-        handle.chmod = async () => {
-          throw Object.assign(new Error('EPERM: operation not permitted, fchmod'), { code: 'EPERM' });
-        };
-        return handle;
-      });
-
-      try {
-        await expect(extractArchive(archive, target)).rejects.toThrow(/EPERM/);
-
-        expect(entryStreams).toHaveLength(1);
-        await waitUntil(() => entryStreams[0].destroyed, 'the abandoned entry stream to be destroyed');
-      } finally {
-        jest.restoreAllMocks();
-      }
     });
   });
 
@@ -662,17 +638,32 @@ describe('extractArchive', () => {
       // existing one's bits alone, so without an explicit chmod a re-extraction over a
       // wide file reports success and leaves it wide.
       const archive = path.join(work, 'overwrite.zip');
-      await writeZip(archive, [{ name: 'driver.jar', content: 'new', mode: 0o100644 }]);
+      await writeZip(archive, [
+        { name: 'driver.jar', content: 'new', mode: 0o100644 },
+        // A mode the umask has to cut down — 0o644 passes any mask unchanged, so on its
+        // own it cannot tell a masked write from an unmasked one.
+        { name: 'wide.jar', content: 'new', mode: 0o100777 },
+      ]);
 
       const target = targetDir();
       fs.writeFileSync(path.join(target, 'driver.jar'), 'old');
       fs.chmodSync(path.join(target, 'driver.jar'), 0o666);
+      fs.writeFileSync(path.join(target, 'wide.jar'), 'old');
+      fs.chmodSync(path.join(target, 'wide.jar'), 0o666);
 
-      await extractArchive(archive, target);
+      const previousUmask = process.umask(0o022);
+
+      try {
+        await extractArchive(archive, target);
+      } finally {
+        process.umask(previousUmask);
+      }
 
       expect(fs.readFileSync(path.join(target, 'driver.jar'), 'utf8')).toBe('new');
       // eslint-disable-next-line no-bitwise
       expect((fs.statSync(path.join(target, 'driver.jar')).mode & 0o777).toString(8)).toBe('644');
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(path.join(target, 'wide.jar')).mode & 0o777).toString(8)).toBe('755');
     });
 
     it('masks without probing when the archive created a directory of its own', async () => {

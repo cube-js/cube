@@ -359,6 +359,14 @@ async function writeZipEntry(extraction: ZipExtraction, entry: yauzl.Entry): Pro
 
   rememberCreated(extraction, await fs.promises.mkdir(path.dirname(dest), { recursive: true }));
 
+  // An existing non-directory `dest` is replaced, not written into. A hardlink to a
+  // file outside `dir` is a second name for that inode — `lstat` calls it a regular
+  // file and `O_NOFOLLOW` does not apply — so no path check can see it; unlinking
+  // breaks the alias. It also keeps `open` off a fifo, which would block for a reader.
+  if (existing && !existing.isDirectory()) {
+    await fs.promises.unlink(dest);
+  }
+
   const mode = unixPermissions(entry);
   const readStream = await zipfile.openReadStreamPromise(entry);
 
@@ -377,22 +385,6 @@ async function writeZipEntry(extraction: ZipExtraction, entry: yauzl.Entry): Pro
     // descriptor when the entry stream ends or is destroyed — so without this an
     // ELOOP here (the case `O_NOFOLLOW` exists to produce) leaks the archive's fd.
     readStream.destroy();
-    throw e;
-  }
-
-  try {
-    // `O_CREAT` sets `mode` only on a file it creates and `O_TRUNC` leaves an existing
-    // one's bits alone. Masked like the directory path, or an archive could widen past
-    // the umask where `open` would not have.
-    if (mode && existing) {
-      // eslint-disable-next-line no-bitwise
-      await handle.chmod(mode & (await umaskAllowed(extraction)));
-    }
-  } catch (e) {
-    // Same reason as the open's catch: nothing downstream exists yet to tear these
-    // down, and the archive's descriptor is held until the entry stream is destroyed.
-    readStream.destroy();
-    await handle.close();
     throw e;
   }
 
