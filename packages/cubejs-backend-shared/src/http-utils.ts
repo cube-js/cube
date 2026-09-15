@@ -176,11 +176,41 @@ async function realpathOfExistingAncestor(target: string): Promise<string> {
   }
 }
 
+type ZipExtraction = {
+  zipfile: yauzl.ZipFile;
+  /** Resolved target directory; every entry must land inside it. */
+  root: string;
+  signal: AbortSignal;
+  /** Directory modes to apply once every entry is written — see `applyDirectoryModes`. */
+  directoryModes: Map<string, number>;
+};
+
+/**
+ * Apply recorded directory modes, deepest first.
+ *
+ * Deferred rather than applied at `mkdir` time, because `mkdir` is the wrong moment
+ * twice over: `recursive: true` will not chmod a directory that a child entry already
+ * created (nothing in the format orders directories before their contents), and a
+ * restrictive mode like `0o500` would make every later write under it fail `EACCES`
+ * for a non-root user. `unzip(1)` defers for the same reasons.
+ *
+ * Deepest first because restricting an ancestor can take away the traversal bit its
+ * descendants are reached through.
+ */
+async function applyDirectoryModes(directoryModes: Map<string, number>): Promise<void> {
+  const deepestFirst = [...directoryModes.entries()].sort(
+    ([a], [b]) => b.split(path.sep).length - a.split(path.sep).length
+  );
+
+  for (const [dest, mode] of deepestFirst) {
+    // eslint-disable-next-line no-await-in-loop
+    await fs.promises.chmod(dest, mode);
+  }
+}
+
 async function writeZipEntry(
-  zipfile: yauzl.ZipFile,
-  entry: yauzl.Entry,
-  dir: string,
-  signal: AbortSignal
+  { zipfile, root: dir, signal, directoryModes }: ZipExtraction,
+  entry: yauzl.Entry
 ): Promise<void> {
   // Defence in depth. yauzl runs this itself inside `readEntry` while `decodeStrings`
   // is on, so a `..` name errors out of `nextZipEntry` and never reaches here; this
@@ -212,10 +242,15 @@ async function writeZipEntry(
   // alone; read as a file, it lands as an empty regular file and the first entry under
   // it collides on `mkdir` with EEXIST.
   if (entry.fileName.endsWith('/') || unixFileType(entry) === UNIX_MODE_DIRECTORY) {
+    await fs.promises.mkdir(dest, { recursive: true });
+
+    // Recorded now, applied after the last entry: a `0o700` directory has to end up
+    // `0o700` rather than inheriting the umask, but it cannot be restricted while
+    // there are still entries to write under it.
     const dirMode = unixPermissions(entry);
-    // Directories carry their mode like files do; without it a `0o700` directory in an
-    // archive extracts group- and other-readable.
-    await fs.promises.mkdir(dest, dirMode ? { recursive: true, mode: dirMode } : { recursive: true });
+    if (dirMode) {
+      directoryModes.set(dest, dirMode);
+    }
     return;
   }
 
@@ -257,20 +292,28 @@ async function extractZipArchive(archivePath: string, dir: string): Promise<void
     aborter.abort();
   });
 
+  const extraction: ZipExtraction = {
+    zipfile,
+    root,
+    signal: aborter.signal,
+    directoryModes: new Map(),
+  };
+
   try {
     for (;;) {
-      // Sequential on purpose: entries are read from one cursor, and a directory
-      // entry has to land before the files under it.
+      // Sequential on purpose: entries are read from one cursor.
       // eslint-disable-next-line no-await-in-loop
       const entry = await Promise.race([nextZipEntry(zipfile), fatal]);
       if (!entry) {
-        return;
+        break;
       }
       // Raced, not checked after: a failure can leave the read stream neither ending
       // nor erroring, and `pipeline` would then never settle.
       // eslint-disable-next-line no-await-in-loop
-      await Promise.race([writeZipEntry(zipfile, entry, root, aborter.signal), fatal]);
+      await Promise.race([writeZipEntry(extraction, entry), fatal]);
     }
+
+    await applyDirectoryModes(extraction.directoryModes);
   } finally {
     zipfile.close();
   }

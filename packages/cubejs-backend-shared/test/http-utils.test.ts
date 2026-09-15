@@ -396,6 +396,43 @@ describe('extractArchive', () => {
       expect(fs.readFileSync(path.join(target, 'dos.txt'), 'utf8')).toBe('x');
     });
 
+    it('applies a directory mode recorded after its own children', async () => {
+      // Nothing in the zip format orders a directory entry before its contents, and
+      // `mkdir({ recursive: true })` will not chmod one a child entry already made.
+      const archive = path.join(work, 'dirlate.zip');
+      await writeZip(archive, [
+        { name: 'private/file.txt', content: 'x' },
+        { name: 'private', content: '', mode: 0o040700 },
+      ]);
+
+      const target = targetDir();
+      await extractArchive(archive, target);
+
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(path.join(target, 'private')).mode & 0o777).toString(8)).toBe('700');
+      expect(fs.readFileSync(path.join(target, 'private', 'file.txt'), 'utf8')).toBe('x');
+    });
+
+    it('writes into a directory the archive marks unwritable, then restricts it', async () => {
+      // A `0o500` directory applied at `mkdir` time makes every later write under it
+      // fail EACCES for a non-root user — so the mode has to land after the contents.
+      const archive = path.join(work, 'dirreadonly.zip');
+      await writeZip(archive, [
+        { name: 'locked', content: '', mode: 0o040500 },
+        { name: 'locked/file.txt', content: 'x' },
+      ]);
+
+      const target = targetDir();
+      await extractArchive(archive, target);
+
+      expect(fs.readFileSync(path.join(target, 'locked', 'file.txt'), 'utf8')).toBe('x');
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(path.join(target, 'locked')).mode & 0o777).toString(8)).toBe('500');
+
+      // The restriction is real enough that `afterEach`'s rm cannot unlink through it.
+      fs.chmodSync(path.join(target, 'locked'), 0o700);
+    });
+
     it('keeps a directory entry\'s mode too, not just a file\'s', async () => {
       // Directories go through `mkdir`, which takes its own mode — so this is a
       // separate code path from the file bits above, and dropping it silently widens
