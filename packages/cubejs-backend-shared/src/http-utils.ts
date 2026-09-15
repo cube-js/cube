@@ -273,9 +273,10 @@ async function writeZipEntry(
 
     // Recorded now, applied after the last entry: a `0o700` directory has to end up
     // `0o700` rather than inheriting the umask, but it cannot be restricted while
-    // there are still entries to write under it.
+    // there are still entries to write under it. Never the root — that mode belongs to
+    // the caller, not to the archive, and `.` is a name `validateFileName` accepts.
     const dirMode = unixPermissions(entry);
-    if (dirMode) {
+    if (dirMode && dest !== dir) {
       directoryModes.set(dest, dirMode);
     }
     return;

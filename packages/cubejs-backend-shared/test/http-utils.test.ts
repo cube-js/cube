@@ -284,6 +284,23 @@ describe('extractArchive', () => {
       expect(fs.existsSync(path.join(outside, 'sub', 'PWNED.txt'))).toBe(false);
     });
 
+    it('never lets an archive set the mode of the target directory itself', async () => {
+      // `validateFileName` accepts a lone `.` — it only rejects backslashes, absolute
+      // paths and `..` — and it normalises to the target root. The mode recorded for a
+      // directory entry belongs to the archive; the root's belongs to the caller.
+      const archive = path.join(work, 'dotdir.zip');
+      await writeZip(archive, [{ name: '.', content: '', mode: 0o040777 }]);
+
+      const target = targetDir();
+      // eslint-disable-next-line no-bitwise
+      const before = (fs.statSync(target).mode & 0o777).toString(8);
+
+      await extractArchive(archive, target).catch(() => undefined);
+
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(target).mode & 0o777).toString(8)).toBe(before);
+    });
+
     it('refuses a trailing-slash entry over a pre-existing symlink', async () => {
       // `path.join` keeps the trailing separator and POSIX resolves it as if `/.`
       // followed, so `lstat('…/esc/')` stats the link's target and reports "not a
