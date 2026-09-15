@@ -603,6 +603,40 @@ describe('extractArchive', () => {
 
       // eslint-disable-next-line no-bitwise
       expect((fs.statSync(path.join(target, 'plugins')).mode & 0o777).toString(8)).toBe('755');
+      expect(fs.readdirSync(target).filter((e) => e.startsWith('.cube-umask-probe-'))).toEqual([]);
+    });
+
+    it('masks without probing when the archive created a directory of its own', async () => {
+      // The umask is read off a directory `mkdir` reported creating, so the common
+      // archive needs no probe — and leaves nothing behind in the caller's directory.
+      const archive = path.join(work, 'createdmask.zip');
+      await writeZip(archive, [
+        { name: 'plugins', content: '', mode: 0o040777 },
+        { name: 'plugins/driver.txt', content: 'x' },
+      ]);
+
+      const target = targetDir();
+      // Asserted on the `mkdir` calls, not on what is left on disk: the probe removes
+      // itself, so a leftover check passes whether or not one was ever made.
+      const mkdir = fs.promises.mkdir.bind(fs.promises);
+      const madeDirectories: string[] = [];
+      jest.spyOn(fs.promises, 'mkdir').mockImplementation((...args: Parameters<typeof fs.promises.mkdir>) => {
+        madeDirectories.push(String(args[0]));
+        return mkdir(...args);
+      });
+
+      const previousUmask = process.umask(0o022);
+
+      try {
+        await extractArchive(archive, target);
+      } finally {
+        process.umask(previousUmask);
+        jest.restoreAllMocks();
+      }
+
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(path.join(target, 'plugins')).mode & 0o777).toString(8)).toBe('755');
+      expect(madeDirectories.filter((d) => d.includes('.cube-umask-probe-'))).toEqual([]);
     });
 
     it('keeps a directory entry\'s mode too, not just a file\'s', async () => {

@@ -188,16 +188,30 @@ type ZipExtraction = {
   signal: AbortSignal;
   /** Directory modes to apply once every entry is written — see `applyDirectoryModes`. */
   directoryModes: Map<string, number>;
+  /**
+   * First directory this extraction created, which the umask has therefore filtered.
+   * `undefined` until one is, which `mkdir({ recursive: true })` reports by returning
+   * the path it made — and reports as `undefined` exactly when it made nothing.
+   */
+  createdDirectory?: string;
 };
 
 /**
- * The permission bits the umask currently allows, learned by creating a directory.
+ * The permission bits the umask currently allows.
  *
- * Not `process.umask()` (DEP0139), and not the stat of an extracted directory — that
+ * Not `process.umask()` (DEP0139), and not the stat of any extracted directory — that
  * equals `0o777 & ~umask` only where `mkdir` created it, so a pre-existing `0o777`
- * `dest` would hand the archive its mode verbatim.
+ * `dest` would hand the archive its mode verbatim. `createdDirectory` is one the umask
+ * demonstrably filtered; the probe is for an archive that created none, and is the only
+ * path that leaves anything behind in the caller's directory.
  */
-async function umaskAllowedBits(root: string): Promise<number> {
+async function umaskAllowedBits(root: string, createdDirectory?: string): Promise<number> {
+  if (createdDirectory) {
+    const { mode } = await fs.promises.stat(createdDirectory);
+    // eslint-disable-next-line no-bitwise
+    return mode & 0o777;
+  }
+
   const probe = path.join(root, `.cube-umask-probe-${crypto.randomBytes(8).toString('hex')}`);
 
   // Plain `mkdir`, not `mkdtemp` — that forces `0o700` and would answer its own question.
@@ -218,7 +232,9 @@ async function umaskAllowedBits(root: string): Promise<number> {
  * will not chmod a directory a child entry already created. Deepest first, because
  * restricting an ancestor takes away the traversal bit its descendants need.
  */
-async function applyDirectoryModes(directoryModes: Map<string, number>, root: string): Promise<void> {
+async function applyDirectoryModes(extraction: ZipExtraction): Promise<void> {
+  const { directoryModes, root, createdDirectory } = extraction;
+
   if (directoryModes.size === 0) {
     return;
   }
@@ -238,7 +254,7 @@ async function applyDirectoryModes(directoryModes: Map<string, number>, root: st
 
   // `chmod` sets bits verbatim where `open` filters them through the umask, so an
   // unmasked directory mode would let an archive pick one the file path cannot.
-  const allowed = await umaskAllowedBits(root);
+  const allowed = await umaskAllowedBits(root, createdDirectory);
 
   for (const [dest, mode] of deepestFirst) {
     // eslint-disable-next-line no-bitwise
@@ -262,10 +278,16 @@ async function applyDirectoryModes(directoryModes: Map<string, number>, root: st
   }
 }
 
-async function writeZipEntry(
-  { zipfile, root: dir, signal, directoryModes }: ZipExtraction,
-  entry: yauzl.Entry
-): Promise<void> {
+/** `mkdir` returns the first path it created, or `undefined` when it created nothing. */
+function rememberCreated(extraction: ZipExtraction, created: string | undefined): void {
+  if (created && !extraction.createdDirectory) {
+    extraction.createdDirectory = created;
+  }
+}
+
+async function writeZipEntry(extraction: ZipExtraction, entry: yauzl.Entry): Promise<void> {
+  const { zipfile, root: dir, signal, directoryModes } = extraction;
+
   // Defence in depth. yauzl runs this itself inside `readEntry` while `decodeStrings`
   // is on, so a `..` name errors out of `nextZipEntry` and never reaches here; this
   // keeps the check owned locally rather than by a default we do not set.
@@ -317,7 +339,7 @@ async function writeZipEntry(
   // alone; read as a file, it lands as an empty regular file and the first entry under
   // it collides on `mkdir` with EEXIST.
   if (entry.fileName.endsWith('/') || unixFileType(entry) === UNIX_MODE_DIRECTORY) {
-    await fs.promises.mkdir(dest, { recursive: true });
+    rememberCreated(extraction, await fs.promises.mkdir(dest, { recursive: true }));
 
     // Recorded, not applied: a restrictive mode cannot be set while there are still
     // entries to write underneath it.
@@ -328,7 +350,7 @@ async function writeZipEntry(
     return;
   }
 
-  await fs.promises.mkdir(path.dirname(dest), { recursive: true });
+  rememberCreated(extraction, await fs.promises.mkdir(path.dirname(dest), { recursive: true }));
 
   const mode = unixPermissions(entry);
   const readStream = await zipfile.openReadStreamPromise(entry);
@@ -406,7 +428,7 @@ async function extractZipArchive(archivePath: string, dir: string): Promise<void
       await Promise.race([writeZipEntry(extraction, entry), fatal]);
     }
 
-    await applyDirectoryModes(extraction.directoryModes, root);
+    await applyDirectoryModes(extraction);
   } finally {
     zipfile.close();
   }
