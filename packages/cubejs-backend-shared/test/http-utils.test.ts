@@ -339,6 +339,27 @@ describe('extractArchive', () => {
     });
   });
 
+  describe('does not leak the archive descriptor when an entry fails', () => {
+    it('releases it when opening the destination throws', async () => {
+      // `openReadStreamPromise` refs the archive's reader, and yauzl only unrefs on the
+      // entry stream's end or destroy — so a rejection between those two calls leaves
+      // `zipfile.close()` unrefing against a count the abandoned stream still holds.
+      // A directory entry followed by a file of the same name makes the open throw
+      // EISDIR, which is that window without needing a race.
+      const archive = path.join(work, 'eisdir.zip');
+      await writeZip(archive, [
+        { name: 'clash/', content: '', mode: 0o040755 },
+        { name: 'clash', content: 'x' },
+      ]);
+
+      const openFds = () => fs.readdirSync('/dev/fd').length;
+      const before = openFds();
+
+      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/EISDIR/);
+      await waitUntil(() => openFds() <= before, "the archive's descriptor to be released");
+    });
+  });
+
   describe('survives a reader failure rather than crashing the process', () => {
     it('rejects while the entry is still being written, not once the write settles', async () => {
       // The read stream never ends and never errors, so `pipeline` never settles and the
@@ -442,7 +463,7 @@ describe('extractArchive', () => {
     });
 
     it('keeps an entry\'s exec bit, and leaves a mode-less entry to node\'s default', async () => {
-      // Both sides of the `mode ? { mode } : {}` branch in one fixture. A launcher that
+      // Both sides of `mode || undefined` in one fixture. A launcher that
       // extracts as 0644 fails at exec time, far from here; and a DOS-made zip records
       // no unix mode at all, where passing the 0 through would make the file unreadable.
       const archive = path.join(work, 'modes.zip');

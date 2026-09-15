@@ -201,9 +201,24 @@ async function applyDirectoryModes(directoryModes: Map<string, number>): Promise
     ([a], [b]) => b.split(path.sep).length - a.split(path.sep).length
   );
 
+  // `O_DIRECTORY | O_NOFOLLOW` for the same reason the file path uses `O_NOFOLLOW`:
+  // the containment check happened when the entry was seen, and this runs after the
+  // whole archive. A link swapped in at `dest` since then would otherwise take an
+  // archive-chosen mode outside the target; opening it fails ELOOP instead.
+  // eslint-disable-next-line no-bitwise
+  const flags = fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW;
+
   for (const [dest, mode] of deepestFirst) {
     // eslint-disable-next-line no-await-in-loop
-    await fs.promises.chmod(dest, mode);
+    const handle = await fs.promises.open(dest, flags);
+
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await handle.chmod(mode);
+    } finally {
+      // eslint-disable-next-line no-await-in-loop
+      await handle.close();
+    }
   }
 }
 
@@ -276,7 +291,18 @@ async function writeZipEntry(
   // hand because `createWriteStream`'s `flags` is typed as a string.
   // eslint-disable-next-line no-bitwise
   const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW;
-  const handle = await fs.promises.open(dest, flags, mode || undefined);
+
+  let handle: fs.promises.FileHandle;
+
+  try {
+    handle = await fs.promises.open(dest, flags, mode || undefined);
+  } catch (e) {
+    // Nothing else will consume `readStream`, and yauzl only unrefs the archive's
+    // descriptor when the entry stream ends or is destroyed — so without this an
+    // ELOOP here (the case `O_NOFOLLOW` exists to produce) leaks the archive's fd.
+    readStream.destroy();
+    throw e;
+  }
 
   // The signal is what tears these two down when the zipfile errors out from under
   // them — losing the race only abandons this promise, it does not close anything.
