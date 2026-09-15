@@ -7,6 +7,14 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-09-15" description="v0.11.0" tags={["Added"]}>
+  ### Added
+
+  - `FolderDto` gained `user` (CUB-4611) — the folder's owner, resolved the same way workbook owners are; `null` on a folder shared from the main workspace, which stays masked. Fixes the embed workspace's Owner column always rendering a dash, including for a folder the caller just created.
+  - `GenerateSession` gained `branchName` (CUB-4151) — the deployment branch an embed session queries. Omit it (or pass the deployment's production branch) for the production environment, which stays the default; any other branch of the deployment — one with a staging environment enabled, a shared branch, or a personal dev branch — points every Cube query the embedded dashboards, Creator Mode workspace and chat make at that branch's runtime (`<deploymentUrl>/dev-mode/{branchName}/cubejs-api/v1`) instead. The branch must be served when the session is generated: a name that is not a branch of the deployment returns `404`, and a branch nothing is running returns `400` — a branch without a staging environment is only running while someone has it open in Cube, so enable its staging environment for a branch an embedded app should reach at any time. Content is not branch-scoped: the same dashboards and workbooks are rendered against the chosen branch's data model. The embedded chat and AI widgets follow the session onto the branch as well, so an agent answers from the same data model the dashboards show.
+  - New public REST endpoint `POST /api/v1/embed/session/revoke` (`EmbedPublicController.revokeSession`) (CUB-4508) ends a signed embed session from the server side — call it from your application's logout handler with the `sessionId` that `POST /api/v1/embed/generate-session` returned. Works on either state a session can be in: an unexchanged id can no longer be redeemed via `POST /api/v1/embed/session/token`, and a token an already-exchanged id produced is rejected with `401` from that point on. Idempotent — revoking an unknown, expired, or already-revoked id also responds `204`. Only sessions minted after this endpoint became available can be revoked; earlier tokens keep working until they expire. Requires admin access and that embedding be enabled for the account. New schema: `RevokeEmbedSessionInput`.
+</Update>
+
 <Update label="2026-09-14" description="v0.10.0" tags={["Added"]}>
   ### Added
 

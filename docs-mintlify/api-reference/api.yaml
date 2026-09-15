@@ -4091,6 +4091,49 @@ paths:
 
           `deploymentId` is required and the caller must have read access to it. Embedding must be
           enabled for the tenant, otherwise `403` is returned.
+  /api/v1/embed/session/revoke:
+    post:
+      operationId: revokeSession
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevokeEmbedSessionInput'
+        description: RevokeEmbedSessionInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+        '204':
+          description: Session revoked, or did not exist.
+      summary: Revoke an embed session
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Ends an embed session from the server side — call it from your application's logout
+          handler. Pass the `sessionId` that `POST /api/v1/embed/generate-session` returned.
+
+
+          Works in either state the session can be in: an id that has not been exchanged yet can no
+          longer be redeemed via `POST /api/v1/embed/session/token`, and the token an
+          already-exchanged id produced is rejected with `401` from this moment on. The embedded
+          iframe does not tear itself down — remove it on logout as before.
+
+
+          Idempotent: revoking an unknown, expired or already-revoked id also responds `204`. Only
+          sessions minted after this endpoint became available can be revoked; earlier tokens keep
+          working until they expire. A Cube API token the embed obtained from `POST
+          /api/v1/deployments/{deploymentId}/token` is a separate credential and is not affected.
+
+
+          Embedding must be enabled for the account, otherwise `403` is returned.
   /api/v1/embed/session/token:
     post:
       operationId: postTokenBySessionId
@@ -9766,6 +9809,10 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        user:
+          oneOf:
+            - $ref: '#/components/schemas/ResourceOwner'
+            - type: 'null'
       required:
         - name
         - position
@@ -9819,6 +9866,21 @@ components:
       type: object
     GenerateSession:
       properties:
+        branchName:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            Branch of `deploymentId` whose data model this session queries. Omit it — or pass the
+            deployment’s production branch — to query the production environment, which is the
+            default. Any other branch of the deployment is accepted: a branch with a staging
+            environment enabled, a shared branch, or a personal dev branch. The branch must be
+            served when the session is generated, otherwise the request is rejected: a branch
+            without a staging environment runs only while someone has it open in the console (dev
+            mode or the branch switcher), so enable its staging environment for a branch an embedded
+            app should be able to reach at any time. A name that is not a branch of the deployment
+            returns `404`. Content (dashboards, workbooks, reports) is not branch-scoped — the same
+            saved content is rendered against the branch’s data model.
         creatorMode:
           oneOf:
             - type: boolean
@@ -11511,6 +11573,17 @@ components:
       required:
         - id
         - email
+      type: object
+    RevokeEmbedSessionInput:
+      properties:
+        sessionId:
+          description: >-
+            The session id returned by `POST /api/v1/embed/generate-session`. Works whether or not
+            the session has already been exchanged for a token.
+          pattern: ^[0-9a-f]{32}$
+          type: string
+      required:
+        - sessionId
       type: object
     RoleWithAccess:
       properties:
