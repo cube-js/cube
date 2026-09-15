@@ -21,30 +21,49 @@ threads, resolves your stale ones, and returns the verdicts. Give it:
 - this file's rules, and a request for exactly two things back: the thread ids
   it resolved, and per finding POST or SKIP with the thread id behind a SKIP
 
+The tracking comment is not one of these threads — it is a top-level comment, so
+it never appears in the list below. Do not go looking for it with `gh pr view
+--comments` either: it restates a whole past review round, several kilobytes per
+round, and says nothing about which thread is live. That is decided by the code
+at the site and by the thread's own replies.
+
 Three aliases are available to it; raw `gh api graphql` is not permitted:
 
-  gh list-review-threads <owner> <repo> <pr> [cursor]
-  gh show-review-thread <thread-id>
+  gh list-review-threads <owner> <repo> <pr> [thread-cursor]
+  gh show-review-thread <thread-id> [comment-cursor]
   gh resolve-thread <thread-id>
 
 **Paging the threads:**
 
   gh list-review-threads cube-js cube <pr-number>
 
-Returns 50 threads a page — `id`, `isResolved`, `isOutdated`, `path`, `line`,
-`originalLine`, and the first comment's author, body and count. When
-`pageInfo.hasNextPage` is true, pass `pageInfo.endCursor` as a fourth argument
-for the next page:
+Returns the **unresolved** threads out of each page of 100 — `id`, `isOutdated`,
+`path`, `line`, `originalLine`, and the comment chain: every comment's author and
+body, up to 25, plus `comments.totalCount` and `comments.pageInfo`.
+
+Resolved threads are dropped before you see them, so every rule below is already
+satisfied on that count and nothing in this list is settled business. When the
+top-level `pageInfo.hasNextPage` is true — the one beside `nodes`, not a thread's
+own `comments.pageInfo` — pass its `endCursor` as a fourth argument for the next
+page:
 
   gh list-review-threads cube-js cube <pr-number> <endCursor>
 
 Page to the end before deciding anything — a thread that duplicates a finding is
-as likely to be on the last page as the first.
+as likely to be on the last page as the first, and because the filter is applied
+after the page is cut, a page can come back with two nodes or none and still have
+a next one.
 
-`comments.totalCount` above 1 means someone replied and you are seeing only the
-opening comment. Read the rest before judging that thread:
+You therefore judge a thread from the whole conversation, not its opening line —
+a reply is often where the concern was answered or pushed back on. You are missing
+part of it only where `comments.pageInfo.hasNextPage` is true, and then the
+thread's own `comments.pageInfo.endCursor` picks up from the last comment you have:
 
-  gh show-review-thread <thread-id>
+  gh show-review-thread <thread-id> <endCursor>
+
+That returns the next 25 with a `comments.pageInfo` of its own, so repeat until
+`hasNextPage` is false. Called without a cursor it re-reads the thread from the
+first comment, which you already have.
 
 GitHub nulls `line` once a thread goes outdated; the `originalLine` it keeps is
 the position before the edits that outdated it, so it is a tiebreaker between
@@ -52,8 +71,7 @@ threads on one path and never a current-diff line.
 
 **Resolving your own stale review threads:**
 
-For each thread where ALL of the following hold:
-  - `isResolved` is false
+For each thread where BOTH of the following hold:
   - the first comment's `author.login` is yours
   - the concern is no longer applicable in the current diff (file/line gone,
     code rewritten, issue addressed)
@@ -75,7 +93,6 @@ output of an earlier review round.
 **Avoiding duplicate inline comments:**
 
 Skip a finding when ALL of the following hold for any thread in the list:
-  - `isResolved` is false
   - the first comment's `author.login` is yours
   - the thread is on the same `path` as the finding, and on the same `line` when
     `line` is non-null — an outdated thread has no line to test, so it is judged
