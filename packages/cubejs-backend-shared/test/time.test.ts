@@ -282,6 +282,7 @@ describe('timeSeriesBoundaries', () => {
       const dateRange: QueryDateRange = [start.format(), start.clone().add(25, granularity as moment.unitOfTime.DurationConstructor).format()];
       const options = { timestampPrecision };
       const series = timeSeries(granularity, dateRange, options);
+      expect(series.length).toBeGreaterThan(1);
       expect(timeSeriesBoundaries(granularity, dateRange, options)).toEqual([series[0], series[series.length - 1]]);
     });
   });

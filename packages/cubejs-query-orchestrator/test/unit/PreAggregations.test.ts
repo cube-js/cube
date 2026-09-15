@@ -130,6 +130,7 @@ describe('loadBuildRange', () => {
     longEnd: '2024-01-05T12:00:00.000',
     springStart: '2024-03-10T06:30:00.000',
     springEnd: '2024-03-10T07:30:00.000',
+    fallBeforeTransition: '2024-11-03T04:30:00.000',
     fallStart: '2024-11-03T05:30:00.000',
     fallEnd: '2024-11-03T06:30:00.000',
     renewedStart: '2024-03-11T06:30:00.000',
@@ -154,6 +155,8 @@ describe('loadBuildRange', () => {
       longEnd: '2024-01-05T07:00:00.000',
       springStart: '2024-03-10T01:30:00.000',
       springEnd: '2024-03-10T03:30:00.000',
+      fallBeforeTransition: '2024-11-03T00:30:00.000',
+      // Distinct UTC instants intentionally share the repeated local hour (EDT/EST).
       fallStart: '2024-11-03T01:30:00.000',
       fallEnd: '2024-11-03T01:30:00.000',
       renewedStart: '2024-03-11T02:30:00.000',
@@ -168,7 +171,8 @@ describe('loadBuildRange', () => {
       const scenarios: { name: string; initial: QueryResultPair; renewed?: QueryResultPair; buildRange: DatePair; result: DatePair }[] = [
         { name: 'long range', initial: ['longStart', 'longEnd'], buildRange: ['longStart', 'longEnd'], result: ['longStart', 'longEnd'] },
         { name: 'spring DST', initial: ['springStart', 'springEnd'], buildRange: ['springStart', 'springEnd'], result: ['springStart', 'springEnd'] },
-        { name: 'fall DST', initial: ['fallStart', 'fallEnd'], buildRange: ['fallStart', 'fallEnd'], result: ['fallStart', 'fallEnd'] },
+        { name: 'fall DST', initial: ['fallBeforeTransition', 'fallEnd'], buildRange: ['fallBeforeTransition', 'fallEnd'], result: ['fallBeforeTransition', 'fallEnd'] },
+        { name: 'fall DST repeated local hour', initial: ['fallStart', 'fallEnd'], buildRange: ['fallStart', 'fallEnd'], result: ['fallStart', 'fallEnd'] },
         { name: 'renewed dates', initial: ['springStart', 'fallEnd'], renewed: ['renewedStart', 'renewedEnd'], buildRange: ['springStart', 'fallEnd'], result: ['renewedStart', 'renewedEnd'] },
         { name: 'empty', initial: [null, null], buildRange: ['now', 'now'], result: ['now', 'now'] },
         { name: 'empty start', initial: [null, 'springEnd'], buildRange: ['springEnd', 'springEnd'], result: ['springEnd', 'springEnd'] },
@@ -232,7 +236,9 @@ describe('loadBuildRange', () => {
         jest.useFakeTimers({ now: new Date(`${utcDates.now}Z`) });
         const loader = createLoader({ timezone, timestampPrecision, partitionGranularity: undefined });
         const query = jest.mocked((loader as any).loadRangeQuery);
-        if (empty) query.mockResolvedValue([]);
+        query
+          .mockResolvedValueOnce(empty ? [] : [{ value: utcDates.unpartitionedStart }])
+          .mockResolvedValueOnce(empty ? [] : [{ value: utcDates.unpartitionedEnd }]);
         const invalidation = jest.spyOn(loader, 'getInvalidationKeyValues');
         const result = await loader.loadBuildRange();
         const dates: DatePair = empty ? ['now', 'now'] : ['unpartitionedStart', 'unpartitionedEnd'];
