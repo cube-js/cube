@@ -5,11 +5,11 @@ description: HTTP reference for reading and writing comment threads on an embedd
 
 The Dashboard Comments API lets an embed viewer hold a conversation on an embedded [published dashboard](/embedding/iframe/dashboards): start a thread, reply to one, edit or delete their own message, and mark a thread resolved.
 
-<Info>
+<Note>
 
 The Dashboard Comments API is available on [Premium and Enterprise plans](https://cube.dev/pricing).
 
-</Info>
+</Note>
 
 ## Prerequisites
 
@@ -19,9 +19,9 @@ The Dashboard Comments API is available on [Premium and Enterprise plans](https:
 
 ## Authentication
 
-Every endpoint requires a **signed embed session scoped to an embed tenant**. Mint one with [Generate Session][ref-generate-session] using `externalId`, and **pass `embedTenantName`** — commenting requires it. The field is optional on Generate Session at large, but a session minted without it carries no embed tenant and is rejected here with `403 Forbidden`.
+Every endpoint requires a **signed embed session scoped to an embed tenant**. Mint one with [Generate Session][ref-generate-session] using `externalId`. The session is scoped to `embedTenantName`, or to the account's own tenant when you omit it, so either form reaches these endpoints.
 
-Any other credential that names no embed tenant is refused the same way, including a [Cube Cloud API key][ref-api-keys] and a console session.
+A credential that names no embed tenant is rejected with `403 Forbidden`: a [Cube Cloud API key][ref-api-keys], a console session, or a session minted with `internalId`, which resolves its user against Cube Cloud's own accounts and so carries no embed tenant at all.
 
 The calling embed user is taken from the session; no endpoint accepts an author in the request body.
 
