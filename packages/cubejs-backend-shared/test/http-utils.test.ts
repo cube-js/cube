@@ -420,12 +420,12 @@ describe('extractArchive', () => {
       ]);
 
       const { openPromise } = jest.requireActual<typeof import('yauzl')>('yauzl');
+      const stalled = new PassThrough();
 
       (yauzl.openPromise as jest.MockedFunction<typeof yauzl.openPromise>).mockImplementationOnce(
         async (file: string, options?: yauzl.Options) => {
           const zipfile = await openPromise(file, options);
 
-          const stalled = new PassThrough();
           zipfile.openReadStreamPromise = async () => stalled;
 
           zipfile.once('entry', () => {
@@ -464,6 +464,9 @@ describe('extractArchive', () => {
         // anything closed it.
         await waitUntil(() => opened.length === 1, 'the destination stream to be created');
         await waitUntil(() => opened[0].destroyed, 'the destination stream to be destroyed');
+        // The source too: `pipeline` is entered with the signal already aborted here,
+        // and destroying the entry stream is what unrefs the archive's descriptor.
+        await waitUntil(() => stalled.destroyed, 'the entry stream to be destroyed');
       } finally {
         jest.restoreAllMocks();
       }
@@ -604,6 +607,24 @@ describe('extractArchive', () => {
       // eslint-disable-next-line no-bitwise
       expect((fs.statSync(path.join(target, 'plugins')).mode & 0o777).toString(8)).toBe('755');
       expect(fs.readdirSync(target).filter((e) => e.startsWith('.cube-umask-probe-'))).toEqual([]);
+    });
+
+    it('narrows a pre-existing file to the mode the archive records', async () => {
+      // `O_CREAT` sets the mode only on a file it creates and `O_TRUNC` leaves an
+      // existing one's bits alone, so without an explicit chmod a re-extraction over a
+      // wide file reports success and leaves it wide.
+      const archive = path.join(work, 'overwrite.zip');
+      await writeZip(archive, [{ name: 'driver.jar', content: 'new', mode: 0o100644 }]);
+
+      const target = targetDir();
+      fs.writeFileSync(path.join(target, 'driver.jar'), 'old');
+      fs.chmodSync(path.join(target, 'driver.jar'), 0o666);
+
+      await extractArchive(archive, target);
+
+      expect(fs.readFileSync(path.join(target, 'driver.jar'), 'utf8')).toBe('new');
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(path.join(target, 'driver.jar')).mode & 0o777).toString(8)).toBe('644');
     });
 
     it('masks without probing when the archive created a directory of its own', async () => {

@@ -190,10 +190,12 @@ type ZipExtraction = {
   directoryModes: Map<string, number>;
   /**
    * First directory this extraction created, which the umask has therefore filtered.
-   * `undefined` until one is, which `mkdir({ recursive: true })` reports by returning
-   * the path it made — and reports as `undefined` exactly when it made nothing.
+   * `mkdir({ recursive: true })` returns the path it made, and `undefined` exactly when
+   * it made nothing — which is how a pre-existing directory is told apart.
    */
   createdDirectory?: string;
+  /** Memoised `umaskAllowedBits`; both entry kinds mask against the same answer. */
+  allowedBits?: Promise<number>;
 };
 
 /**
@@ -201,9 +203,7 @@ type ZipExtraction = {
  *
  * Not `process.umask()` (DEP0139), and not the stat of any extracted directory — that
  * equals `0o777 & ~umask` only where `mkdir` created it, so a pre-existing `0o777`
- * `dest` would hand the archive its mode verbatim. `createdDirectory` is one the umask
- * demonstrably filtered; the probe is for an archive that created none, and is the only
- * path that leaves anything behind in the caller's directory.
+ * `dest` would hand the archive its mode verbatim.
  */
 async function umaskAllowedBits(root: string, createdDirectory?: string): Promise<number> {
   if (createdDirectory) {
@@ -226,6 +226,14 @@ async function umaskAllowedBits(root: string, createdDirectory?: string): Promis
   }
 }
 
+function umaskAllowed(extraction: ZipExtraction): Promise<number> {
+  if (!extraction.allowedBits) {
+    extraction.allowedBits = umaskAllowedBits(extraction.root, extraction.createdDirectory);
+  }
+
+  return extraction.allowedBits;
+}
+
 /**
  * Apply recorded directory modes once every entry is written — a restrictive mode
  * cannot be set while there are still entries to write underneath it, and `mkdir`
@@ -233,7 +241,7 @@ async function umaskAllowedBits(root: string, createdDirectory?: string): Promis
  * restricting an ancestor takes away the traversal bit its descendants need.
  */
 async function applyDirectoryModes(extraction: ZipExtraction): Promise<void> {
-  const { directoryModes, root, createdDirectory } = extraction;
+  const { directoryModes } = extraction;
 
   if (directoryModes.size === 0) {
     return;
@@ -254,7 +262,7 @@ async function applyDirectoryModes(extraction: ZipExtraction): Promise<void> {
 
   // `chmod` sets bits verbatim where `open` filters them through the umask, so an
   // unmasked directory mode would let an archive pick one the file path cannot.
-  const allowed = await umaskAllowedBits(root, createdDirectory);
+  const allowed = await umaskAllowed(extraction);
 
   for (const [dest, mode] of deepestFirst) {
     // eslint-disable-next-line no-bitwise
@@ -278,7 +286,6 @@ async function applyDirectoryModes(extraction: ZipExtraction): Promise<void> {
   }
 }
 
-/** `mkdir` returns the first path it created, or `undefined` when it created nothing. */
 function rememberCreated(extraction: ZipExtraction, created: string | undefined): void {
   if (created && !extraction.createdDirectory) {
     extraction.createdDirectory = created;
@@ -373,8 +380,19 @@ async function writeZipEntry(extraction: ZipExtraction, entry: yauzl.Entry): Pro
     throw e;
   }
 
+  // `O_CREAT` applies `mode` only to a file it creates, and `O_TRUNC` leaves an
+  // existing file's bits alone — so without this, re-extracting over a `0o666`
+  // `driver.jar` would report success and leave it `0o666`. Masked like the directory
+  // path, or an archive could widen past the umask where `open` would not have.
+  if (mode && existing) {
+    // eslint-disable-next-line no-bitwise
+    await handle.chmod(mode & (await umaskAllowed(extraction)));
+  }
+
   // The signal is what tears these two down when the zipfile errors out from under
   // them — losing the race only abandons this promise, it does not close anything.
+  // Node destroys both when handed an already-aborted signal, which is how this is
+  // reached when the fatal race was lost while the open was in flight.
   // The handle closes with the stream it was turned into.
   await pipeline(readStream, handle.createWriteStream(), { signal });
 }
