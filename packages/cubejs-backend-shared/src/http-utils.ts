@@ -167,6 +167,13 @@ async function realpathOfExistingAncestor(target: string): Promise<string> {
       // eslint-disable-next-line no-await-in-loop
       return await fs.promises.realpath(current);
     } catch (e) {
+      // Only "does not exist yet" means keep walking. Anything else — EACCES on an
+      // intermediate directory, say — would otherwise approve the entry against a
+      // shallower ancestor than the one being checked.
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw e;
+      }
+
       const parent = path.dirname(current);
       if (parent === current) {
         throw e;
@@ -186,16 +193,10 @@ type ZipExtraction = {
 };
 
 /**
- * Apply recorded directory modes, deepest first.
- *
- * Deferred rather than applied at `mkdir` time, because `mkdir` is the wrong moment
- * twice over: `recursive: true` will not chmod a directory that a child entry already
- * created (nothing in the format orders directories before their contents), and a
- * restrictive mode like `0o500` would make every later write under it fail `EACCES`
- * for a non-root user. `unzip(1)` defers for the same reasons.
- *
- * Deepest first because restricting an ancestor can take away the traversal bit its
- * descendants are reached through.
+ * Apply recorded directory modes once every entry is written — a restrictive mode
+ * cannot be set while there are still entries to write underneath it, and `mkdir`
+ * will not chmod a directory a child entry already created. Deepest first, because
+ * restricting an ancestor takes away the traversal bit its descendants need.
  */
 async function applyDirectoryModes(directoryModes: Map<string, number>): Promise<void> {
   const deepestFirst = [...directoryModes.entries()].sort(
@@ -236,6 +237,15 @@ async function writeZipEntry(
   const parent = await realpathOfExistingAncestor(path.dirname(dest));
   if (parent !== dir && !parent.startsWith(dir + path.sep)) {
     throw new Error(`Refusing to extract zip entry out of bound path: ${entry.fileName}`);
+  }
+
+  // Resolving the parent cannot see the last component: a link there is written
+  // *through*, and a dangling one has its target created by the open. `lstat` is the
+  // only check that sees both, and it has to come before the directory branch, which
+  // would otherwise `mkdir` through the link and chmod a directory outside `dir`.
+  const existing = await fs.promises.lstat(dest).catch(() => null);
+  if (existing?.isSymbolicLink()) {
+    throw new Error(`Refusing to extract zip entry over a symlink: ${entry.fileName}`);
   }
 
   // The trailing slash is the convention, but a producer may mark a directory by mode

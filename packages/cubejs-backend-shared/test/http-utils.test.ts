@@ -286,6 +286,41 @@ describe('extractArchive', () => {
   });
 
   describe('survives a reader failure rather than crashing the process', () => {
+    it('refuses to write through a symlink already standing at the entry name', async () => {
+      // Resolving the parent leaves the last component unchecked, so this is the same
+      // escape one level shallower: the entry is named exactly like the link.
+      const archive = path.join(work, 'overlink.zip');
+      await writeZip(archive, [{ name: 'esc', content: 'overwritten' }]);
+
+      const outside = path.join(work, 'outside');
+      fs.mkdirSync(outside);
+      const secret = path.join(outside, 'secret');
+      fs.writeFileSync(secret, 'original');
+
+      const target = targetDir();
+      fs.symlinkSync(secret, path.join(target, 'esc'));
+
+      await expect(extractArchive(archive, target)).rejects.toThrow(/over a symlink/i);
+      expect(fs.readFileSync(secret, 'utf8')).toBe('original');
+    });
+
+    it('refuses a dangling symlink at the entry name, which would create its target', async () => {
+      // `realpath` cannot see this one at all — it throws ENOENT and resolves to an
+      // ancestor — yet `open(…, 'w')` through the link creates the file outside.
+      const archive = path.join(work, 'danglinglink.zip');
+      await writeZip(archive, [{ name: 'esc', content: 'created-outside' }]);
+
+      const outside = path.join(work, 'outside');
+      fs.mkdirSync(outside);
+      const notYetThere = path.join(outside, 'new');
+
+      const target = targetDir();
+      fs.symlinkSync(notYetThere, path.join(target, 'esc'));
+
+      await expect(extractArchive(archive, target)).rejects.toThrow(/over a symlink/i);
+      expect(fs.existsSync(notYetThere)).toBe(false);
+    });
+
     it('rejects while the entry is still being written, not once the write settles', async () => {
       // The read stream never ends and never errors, so `pipeline` never settles and the
       // zipfile's `error` is the only signal there is — which is what makes this pin
@@ -425,12 +460,22 @@ describe('extractArchive', () => {
       const target = targetDir();
       await extractArchive(archive, target);
 
-      expect(fs.readFileSync(path.join(target, 'locked', 'file.txt'), 'utf8')).toBe('x');
+      const locked = path.join(target, 'locked');
       // eslint-disable-next-line no-bitwise
-      expect((fs.statSync(path.join(target, 'locked')).mode & 0o777).toString(8)).toBe('500');
+      const mode = (fs.statSync(locked).mode & 0o777).toString(8);
+      const written = fs.readFileSync(path.join(locked, 'file.txt'), 'utf8');
 
-      // The restriction is real enough that `afterEach`'s rm cannot unlink through it.
-      fs.chmodSync(path.join(target, 'locked'), 0o700);
+      // Before the assertions, not after: a failure would otherwise leave a 0o500
+      // directory for `afterEach`'s rm to trip over, and its EACCES would be what
+      // surfaces instead of the assertion that actually failed.
+      fs.chmodSync(locked, 0o700);
+
+      expect(mode).toBe('500');
+      // Root ignores the missing write bit, so the EACCES half of this only exists for
+      // a non-root writer — under root the pre-deferral code passes here too.
+      if (process.getuid?.() !== 0) {
+        expect(written).toBe('x');
+      }
     });
 
     it('keeps a directory entry\'s mode too, not just a file\'s', async () => {
