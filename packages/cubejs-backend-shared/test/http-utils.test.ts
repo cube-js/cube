@@ -583,6 +583,12 @@ describe('extractArchive', () => {
       ]);
 
       const target = targetDir();
+      // Pre-created wide, which is the case a stat of the extracted directory cannot
+      // mask: `0o777 & ~umask` only describes a directory `mkdir` actually made, and
+      // `downloadAndExtractFile`'s `cwd` is not required to be empty.
+      fs.mkdirSync(path.join(target, 'plugins'), { mode: 0o777 });
+      fs.chmodSync(path.join(target, 'plugins'), 0o777);
+
       // Pinned rather than measured: computing the expectation from the live umask
       // makes the test agree with itself on a host with `umask 000` — a root container
       // — where it would then assert nothing, or fail for a reason unrelated to the

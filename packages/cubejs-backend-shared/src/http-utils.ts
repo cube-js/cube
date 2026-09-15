@@ -191,16 +191,26 @@ type ZipExtraction = {
 };
 
 /**
- * The archive's mode, narrowed by what `mkdir` was already allowed to create.
+ * The permission bits the umask currently allows, learned by creating a directory.
  *
- * `chmod` sets bits verbatim where `open` filters them through the umask, so applying a
- * recorded mode unmasked would let an archive choose a world-writable directory under
- * the target — something the file path cannot do. The umask is read off the directory
- * rather than from `process.umask()`, which node implements as `umask(0); umask(old);`
- * and which therefore drops the mask process-wide for the duration (DEP0139).
+ * Not `process.umask()` (DEP0139), and not the stat of an extracted directory — that
+ * equals `0o777 & ~umask` only where `mkdir` created it, so a pre-existing `0o777`
+ * `dest` would hand the archive its mode verbatim.
  */
-// eslint-disable-next-line no-bitwise
-const maskedAgainst = (created: fs.Stats, mode: number) => created.mode & mode;
+async function umaskAllowedBits(root: string): Promise<number> {
+  const probe = path.join(root, `.cube-umask-probe-${crypto.randomBytes(8).toString('hex')}`);
+
+  // Plain `mkdir`, not `mkdtemp` — that forces `0o700` and would answer its own question.
+  await fs.promises.mkdir(probe);
+
+  try {
+    const { mode } = await fs.promises.stat(probe);
+    // eslint-disable-next-line no-bitwise
+    return mode & 0o777;
+  } finally {
+    await fs.promises.rmdir(probe);
+  }
+}
 
 /**
  * Apply recorded directory modes once every entry is written — a restrictive mode
@@ -208,7 +218,11 @@ const maskedAgainst = (created: fs.Stats, mode: number) => created.mode & mode;
  * will not chmod a directory a child entry already created. Deepest first, because
  * restricting an ancestor takes away the traversal bit its descendants need.
  */
-async function applyDirectoryModes(directoryModes: Map<string, number>): Promise<void> {
+async function applyDirectoryModes(directoryModes: Map<string, number>, root: string): Promise<void> {
+  if (directoryModes.size === 0) {
+    return;
+  }
+
   const deepestFirst = [...directoryModes.entries()].sort(
     ([a], [b]) => b.split(path.sep).length - a.split(path.sep).length
   );
@@ -222,25 +236,28 @@ async function applyDirectoryModes(directoryModes: Map<string, number>): Promise
   // eslint-disable-next-line no-bitwise
   const flags = fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW;
 
+  // `chmod` sets bits verbatim where `open` filters them through the umask, so an
+  // unmasked directory mode would let an archive pick one the file path cannot.
+  const allowed = await umaskAllowedBits(root);
+
   for (const [dest, mode] of deepestFirst) {
+    // eslint-disable-next-line no-bitwise
+    const masked = mode & allowed;
+
     if (canOpenDirectory) {
       // eslint-disable-next-line no-await-in-loop
       const handle = await fs.promises.open(dest, flags);
 
       try {
         // eslint-disable-next-line no-await-in-loop
-        const created = await handle.stat();
-        // eslint-disable-next-line no-await-in-loop
-        await handle.chmod(maskedAgainst(created, mode));
+        await handle.chmod(masked);
       } finally {
         // eslint-disable-next-line no-await-in-loop
         await handle.close();
       }
     } else {
       // eslint-disable-next-line no-await-in-loop
-      const created = await fs.promises.stat(dest);
-      // eslint-disable-next-line no-await-in-loop
-      await fs.promises.chmod(dest, maskedAgainst(created, mode));
+      await fs.promises.chmod(dest, masked);
     }
   }
 }
@@ -389,7 +406,7 @@ async function extractZipArchive(archivePath: string, dir: string): Promise<void
       await Promise.race([writeZipEntry(extraction, entry), fatal]);
     }
 
-    await applyDirectoryModes(extraction.directoryModes);
+    await applyDirectoryModes(extraction.directoryModes, root);
   } finally {
     zipfile.close();
   }
