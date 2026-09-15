@@ -114,27 +114,51 @@ jobs:
         env:
           EXECUTION_FILE: ${{ steps.review.outputs.execution_file }}
         run: |
-          jq -r '
-            [.[] | select(.type == "result")] | last as $r |
-            ([.[] | select(.type == "assistant")] | length) as $turns |
-            ([.[] | select(.type == "assistant") | .message.usage.input_tokens // 0] | add) as $in_tok |
-            ([.[] | select(.type == "assistant") | .message.usage.output_tokens // 0] | add) as $out_tok |
-            ([.[] | select(.type == "assistant") | .message.usage.cache_read_input_tokens // 0] | add) as $cache_tok |
-            ([.[] | select(.type == "assistant") | .message.model] | last) as $model |
-            if $r then
+          # The action's own log line for the result message is sanitized down to
+          # counters, so the failure text is only reachable through this file.
+          # First output line is the `::error` annotation (empty on success), the
+          # rest is the step summary.
+          { IFS= read -r annotation; cat >> "$GITHUB_STEP_SUMMARY"; } < <(jq -r '
+            (map(select(.type == "result")) | last) as $r |
+            map(select(.type == "assistant")) as $a |
+            ($r == null or $r.is_error or $r.subtype != "success") as $failed |
+            (if $failed then
+              $r.result
+              // ($r.errors // [] | join("; ") | select(. != ""))
+              // ($a | map(.message.content[]? | select(.type == "text") | .text) | last)
+              // "no error text in execution log"
+            else null end) as $err |
+            (if $failed then
+              "::error title=Claude review failed (\($r.subtype // "no result message"))::\($err[:2000] | gsub("\n"; "%0A"))"
+            else "" end),
+            (if $r then
               "### Claude Code review run",
               "| Metric | Value |",
               "|---|---|",
-              "| Model | `\($model // "?")` |",
+              "| Model | `\($a | last | .message.model // "?")` |",
               "| Cost | $\($r.total_cost_usd) |",
               "| Wall time | \(($r.duration_ms / 1000) | floor)s |",
               "| API time | \((($r.duration_api_ms // 0) / 1000) | floor)s |",
-              "| Turns | \($turns) |",
-              "| Input tokens | \($in_tok) |",
-              "| Output tokens | \($out_tok) |",
-              "| Cache read tokens | \($cache_tok) |"
-            else empty end
-          ' "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
+              "| Turns | \($a | length) |",
+              "| Input tokens | \($a | map(.message.usage.input_tokens // 0) | add // 0) |",
+              "| Output tokens | \($a | map(.message.usage.output_tokens // 0) | add // 0) |",
+              "| Cache read tokens | \($a | map(.message.usage.cache_read_input_tokens // 0) | add // 0) |"
+            else empty end),
+            (if $failed then
+              "",
+              "### :x: Review failed",
+              "| | |",
+              "|---|---|",
+              "| Result subtype | `\($r.subtype // "no result message")` |",
+              "| Stop reason | `\($r.stop_reason // "?")` |",
+              "| Denied tools | \($r.permission_denials // [] | map(.tool_name) | unique | join(", ") | if . == "" then "none" else . end) |",
+              "",
+              "```",
+              $err,
+              "```"
+            else empty end)
+          ' "$EXECUTION_FILE")
+          if [ -n "$annotation" ]; then printf '%s\n' "$annotation"; fi
 
       - name: React to trigger comment (completion)
         if: always() && github.event_name == 'issue_comment'
