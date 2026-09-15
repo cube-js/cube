@@ -10,8 +10,9 @@
 
 set -euo pipefail
 
-# Index only — no comment bodies. Bodies are the bulk of the payload and most
-# threads never need one, so they are fetched per thread via show-review-thread.
+# Paged at 50 because the bodies dominate the payload — on a PR with a few review
+# rounds behind it the full list outweighs the diff. Callers page in a subagent so
+# that weight never lands in the review's own context.
 # `after: null` starts from the beginning; pass pageInfo.endCursor for the next page.
 gh alias set --clobber --shell list-review-threads "$(cat <<'EOF'
 gh api graphql \
@@ -30,7 +31,7 @@ gh api graphql \
               originalLine
               comments(first: 1) {
                 totalCount
-                nodes { author { login } }
+                nodes { author { login } body }
               }
             }
           }
