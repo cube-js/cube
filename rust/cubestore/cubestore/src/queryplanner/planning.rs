@@ -85,7 +85,10 @@ pub async fn choose_index(
     p: LogicalPlan,
     metastore: &dyn PlanIndexStore,
 ) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
-    choose_index_ext(p, metastore, true, true).await
+    choose_index_ext(
+        p, metastore, /* enable_topk */ true, /* limit_pushdown */ true,
+    )
+    .await
 }
 
 /// Information required to distribute the logical plan into multiple workers.
@@ -2938,7 +2941,7 @@ pub mod tests {
         limit_pushdown: bool,
     ) -> Vec<String> {
         let plan = initial_plan(sql, indices);
-        let plan = choose_index_ext(plan, indices, true, limit_pushdown)
+        let plan = choose_index_ext(plan, indices, /* enable_topk */ true, limit_pushdown)
             .await
             .unwrap()
             .0;
