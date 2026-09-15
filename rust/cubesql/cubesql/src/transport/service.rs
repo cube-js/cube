@@ -1059,39 +1059,52 @@ impl SqlTemplates {
         self.render_template("types/nullable", context! { data_type => sql_type })
     }
 
-    pub fn sql_type(&self, data_type: DataType) -> Result<String, CubeError> {
-        let data_type = match data_type {
-            DataType::Decimal(precision, scale) => {
-                return self.render_template(
-                    "types/decimal",
-                    context! {
-                        precision => precision,
-                        scale => scale,
-                    },
-                )
-            }
+    /// The `types/*` template a data type renders with, `None` for a type without one.
+    fn sql_type_template(data_type: &DataType) -> Option<&'static str> {
+        Some(match data_type {
+            DataType::Decimal(_, _) => "types/decimal",
             // NULL is not a type in databases. In PostgreSQL, untyped NULL is TEXT
-            DataType::Utf8 | DataType::LargeUtf8 | DataType::Null => "string",
-            DataType::Boolean => "boolean",
-            DataType::Int8 | DataType::UInt8 => "tinyint",
-            DataType::Int16 | DataType::UInt16 => "smallint",
-            DataType::Int32 | DataType::UInt32 => "integer",
-            DataType::Int64 | DataType::UInt64 => "bigint",
-            DataType::Float16 | DataType::Float32 => "float",
-            DataType::Float64 => "double",
-            DataType::Timestamp(_, _) => "timestamp",
-            DataType::Date32 | DataType::Date64 => "date",
-            DataType::Time32(_) | DataType::Time64(_) => "time",
-            DataType::Duration(_) | DataType::Interval(_) => "interval",
-            DataType::Binary | DataType::FixedSizeBinary(_) | DataType::LargeBinary => "binary",
-            dt => {
-                return Err(CubeError::unsupported(format!(
-                    "Can't generate SQL for type {:?}: not supported",
-                    dt
-                )))
+            DataType::Utf8 | DataType::LargeUtf8 | DataType::Null => "types/string",
+            DataType::Boolean => "types/boolean",
+            DataType::Int8 | DataType::UInt8 => "types/tinyint",
+            DataType::Int16 | DataType::UInt16 => "types/smallint",
+            DataType::Int32 | DataType::UInt32 => "types/integer",
+            DataType::Int64 | DataType::UInt64 => "types/bigint",
+            DataType::Float16 | DataType::Float32 => "types/float",
+            DataType::Float64 => "types/double",
+            DataType::Timestamp(_, _) => "types/timestamp",
+            DataType::Date32 | DataType::Date64 => "types/date",
+            DataType::Time32(_) | DataType::Time64(_) => "types/time",
+            DataType::Duration(_) | DataType::Interval(_) => "types/interval",
+            DataType::Binary | DataType::FixedSizeBinary(_) | DataType::LargeBinary => {
+                "types/binary"
             }
+            _ => return None,
+        })
+    }
+
+    /// Whether `sql_type` can render the data type: a lookup, no template is rendered.
+    pub fn contains_sql_type(&self, data_type: &DataType) -> bool {
+        Self::sql_type_template(data_type)
+            .map(|template| self.contains_template(template))
+            .unwrap_or(false)
+    }
+
+    pub fn sql_type(&self, data_type: DataType) -> Result<String, CubeError> {
+        let Some(template) = Self::sql_type_template(&data_type) else {
+            return Err(CubeError::unsupported(format!(
+                "Can't generate SQL for type {:?}: not supported",
+                data_type
+            )));
         };
-        self.render_template(&format!("types/{}", data_type), context! {})
+        let ctx = match data_type {
+            DataType::Decimal(precision, scale) => context! {
+                precision => precision,
+                scale => scale,
+            },
+            _ => context! {},
+        };
+        self.render_template(template, ctx)
     }
 
     pub fn left_join(&self) -> Result<String, CubeError> {
