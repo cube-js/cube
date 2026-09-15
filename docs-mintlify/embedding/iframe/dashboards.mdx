@@ -189,7 +189,11 @@ of them individually with URL parameters on the embed iframe `src`:
 | `showDashboardTitle=false` | The dashboard title |
 | `showDashboardEditButton=false` | The Edit action |
 | `showDashboardDuplicateButton=false` | The Duplicate action |
-| `showDashboardExportMenu=false` | The dashboard-level ⋮ download menu |
+
+The export menu has its own switch, `showDashboardExportMenu=false`, covered
+above under [Allow chart and dashboard export](#allow-csv-export) — unlike
+the controls in this table, it's hidden by default and needs `allowExport`
+before there's anything to hide.
 
 ```text
 https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&showDashboardBackButton=false&showDashboardTitle=false
@@ -208,14 +212,10 @@ under **Embed → Settings**.
 </Note>
 
 These parameters apply to the dashboard header only. Setting
-`showDashboardHeader=false` overrides the other five: the whole bar
+`showDashboardHeader=false` overrides the other four: the whole bar
 disappears regardless of their values. `showDashboardEditButton` can only
 hide the Edit action; it can never show one to a viewer who lacks edit
-permission. `showDashboardExportMenu` likewise only hides — the menu has to be
-granted by [`allowExport`](#allow-csv-export) first. On the published-dashboard
-embed there is no header bar and the menu floats over the dashboard, so
-`showDashboardHeader` doesn't reach it; `allowExport` and
-`showDashboardExportMenu` are the only switches that govern it there.
+permission.
 
 ### Creator Mode workbook header
 
