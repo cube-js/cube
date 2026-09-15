@@ -10,9 +10,11 @@ import { extractArchive } from '../src/http-utils';
  * `extractArchive` replaced the unmaintained `decompress`, which carries two
  * unfixed advisories — GHSA-mp2f-45pm-3cg9 ("archive extraction can create files
  * and links outside of the target directory") and GHSA-h39j-r5qq-r9mm (Zip Slip).
+ * Its zip backend then replaced `extract-zip`, which carries two more of the same
+ * class, also unfixed: GHSA-jmr9-qjv8-65gv (CVE-2026-56876) and
+ * GHSA-7pqw-9j4j-h8q3, both arbitrary file write through a symlink entry.
  *
- * These tests exist to prove the replacement is not vulnerable to the same class,
- * so they build genuinely hostile archives rather than asserting on library
+ * So these tests build genuinely hostile archives rather than asserting on library
  * version numbers. They also cover the happy paths, because dispatch is by magic
  * bytes: `streamWithProgress` saves downloads under a random hex name with no
  * extension, so there is nothing to dispatch on by filename.
@@ -35,15 +37,13 @@ describe('extractArchive', () => {
   };
 
   /**
-   * Assert the fixture really is hostile before extracting it.
+   * Assert a tar fixture really is hostile before extracting it.
    *
-   * The zip fixtures are safe by construction — the rejection itself proves the
-   * hostile name survived into the archive. The tar fixtures have no such witness:
-   * absolute-path stripping already happens in tar's `WriteEntry` constructor, and
+   * Absolute-path stripping already happens in tar's `WriteEntry` constructor, and
    * only ordering keeps the `..` name assigned in `onWriteEntry` intact. If a future
-   * tar normalises it, the fixture silently becomes benign and these tests keep
-   * passing while proving nothing — the exact trap the zip fixture is hand-rolled to
-   * avoid. So read the names back.
+   * tar normalises either, the fixture silently becomes benign and these tests keep
+   * passing while proving nothing. The zip fixtures need no such witness: the
+   * rejection itself proves the hostile name survived into the archive.
    */
   const storedNames = async (archive: string) => {
     const names: string[] = [];
@@ -54,11 +54,10 @@ describe('extractArchive', () => {
   /**
    * Build a .zip with entry names stored verbatim.
    *
-   * Hand-rolled (stored/uncompressed, so no deflate needed) rather than using a
-   * zip library, because every maintained writer *sanitises* what it stores:
-   * `archiver` silently rewrites `../ZIP_PWNED.txt` to `ZIP_PWNED.txt`, which
-   * would make the Zip Slip test below extract a perfectly benign archive and
-   * pass for the wrong reason. Byte control is the point.
+   * Hand-rolled (stored/uncompressed, so no deflate needed) rather than using a zip
+   * library, because every maintained writer *sanitises* what it stores: `archiver`
+   * silently rewrites `../ZIP_PWNED.txt` to `ZIP_PWNED.txt`, which would make the Zip
+   * Slip test below extract a benign archive and pass for the wrong reason.
    */
   const writeZip = async (file: string, entries: { name: string; content: string; mode?: number }[]) => {
     const local: Buffer[] = [];
@@ -82,10 +81,8 @@ describe('extractArchive', () => {
 
       const cdh = Buffer.alloc(46);
       cdh.writeUInt32LE(0x02014b50, 0); // central directory signature
-      // version made by: high byte is the host system. 3 = unix, which is what a
-      // producer capable of recording a symlink emits — with the default 0 (MS-DOS)
-      // the external-attributes field is formally DOS attribute bits and the unix
-      // mode below is not meant to be read at all.
+      // version made by: the high byte is the host system, and only 3 (unix) makes the
+      // external attributes below a unix mode rather than DOS attribute bits.
       // eslint-disable-next-line no-bitwise
       cdh.writeUInt16LE((3 << 8) | 20, 4);
       cdh.writeUInt16LE(10, 6); // version needed
@@ -94,9 +91,8 @@ describe('extractArchive', () => {
       cdh.writeUInt32LE(data.length, 20);
       cdh.writeUInt32LE(data.length, 24);
       cdh.writeUInt16LE(name.length, 28);
-      // External attributes carry the unix mode in the high 16 bits, which is how a
-      // zip records a symlink (`0o120000`). `>>> 0` because the shift overflows into a
-      // negative signed int32 otherwise.
+      // The unix mode goes in the high 16 bits, which is how a zip records a symlink
+      // (`0o120000`). `>>> 0` because the shift overflows into a negative int32.
       // eslint-disable-next-line no-bitwise
       cdh.writeUInt32LE((((entry.mode ?? 0o100644) << 16) >>> 0), 38);
       cdh.writeUInt32LE(offset, 42); // relative offset of local header
@@ -122,7 +118,6 @@ describe('extractArchive', () => {
     const names: string[] = [];
 
     for (const entry of entries) {
-      // Stage under a safe name, then rewrite the stored name via tar's own API.
       const safe = `entry-${names.length}`;
       if (entry.symlinkTo !== undefined) {
         fs.symlinkSync(entry.symlinkTo, path.join(stage, safe));
@@ -174,16 +169,15 @@ describe('extractArchive', () => {
       const escapeTo = path.join(work, 'ABS_PWNED.txt');
       await writeTarGz(archive, [{ name: escapeTo, content: 'pwned' }]);
 
-      // The absolute name survives verbatim into the archive — tar strips the leading
-      // `/` when *extracting*, not when writing — so the fixture really is hostile.
+      // tar strips the leading `/` when *extracting*, not when writing, so the absolute
+      // name survives verbatim into the archive and the fixture really is hostile.
       expect(await storedNames(archive)).toContain(escapeTo);
 
       const target = targetDir();
       await extractArchive(archive, target);
 
-      // tar strips the leading `/` rather than writing to the absolute location, so
-      // the entry lands *inside* the target, re-rooted at its otherwise-unchanged
-      // path. Assert that positively: "nothing escaped" alone cannot distinguish
+      // The entry lands *inside* the target, re-rooted at its otherwise-unchanged
+      // path. Asserted positively, because "nothing escaped" alone cannot distinguish
       // contained from dropped.
       expect(fs.existsSync(escapeTo)).toBe(false);
       expect(fs.existsSync(path.join(target, escapeTo))).toBe(true);
@@ -193,7 +187,7 @@ describe('extractArchive', () => {
       const archive = path.join(work, 'evil.zip');
       await writeZip(archive, [{ name: '../ZIP_PWNED.txt', content: 'pwned' }]);
 
-      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/invalid relative path/i);
+      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/malicious entry/i);
       expect(fs.existsSync(path.join(work, 'ZIP_PWNED.txt'))).toBe(false);
     });
 
@@ -219,9 +213,9 @@ describe('extractArchive', () => {
     });
 
     it('does not write through a zip symlink that points outside the target', async () => {
-      // The zip backend's containment is the half worth proving separately: a symlink
-      // entry has a clean relative *name*, so only a check on the resolved destination
-      // catches the entry written through it afterwards.
+      // Worth proving separately from Zip Slip above: a symlink entry has a clean
+      // relative *name*, so name validation says nothing about the entry written
+      // through the link afterwards.
       const archive = path.join(work, 'zipsym.zip');
       const outside = path.join(work, 'outside');
       fs.mkdirSync(outside);
@@ -231,7 +225,7 @@ describe('extractArchive', () => {
         { name: 'esc/PWNED.txt', content: 'pwned-through-symlink' },
       ]);
 
-      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/out of bound path/i);
+      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/symlink entries.*not allowed/i);
       expect(fs.existsSync(path.join(outside, 'PWNED.txt'))).toBe(false);
     });
   });
@@ -255,6 +249,24 @@ describe('extractArchive', () => {
       await extractArchive(archive, target);
 
       expect(fs.readFileSync(path.join(target, 'dir', 'file.txt'), 'utf8')).toBe('legit-content');
+    });
+
+    it('keeps the executable bit a zip entry records', async () => {
+      // A zipped binary is the reason anything here downloads an archive at all, and no
+      // backend so far has applied entry modes on its own.
+      const archive = path.join(work, 'binary.zip');
+      await writeZip(archive, [
+        { name: 'bin/tool', content: '#!/bin/sh\n', mode: 0o100755 },
+        { name: 'bin/data.txt', content: 'not executable', mode: 0o100644 },
+      ]);
+
+      const target = targetDir();
+      await extractArchive(archive, target);
+
+      // eslint-disable-next-line no-bitwise
+      expect(fs.statSync(path.join(target, 'bin', 'tool')).mode & 0o111).not.toBe(0);
+      // eslint-disable-next-line no-bitwise
+      expect(fs.statSync(path.join(target, 'bin', 'data.txt')).mode & 0o111).toBe(0);
     });
 
     it('detects an uncompressed tar from the ustar magic at offset 257', async () => {
