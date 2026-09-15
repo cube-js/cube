@@ -33,6 +33,7 @@
     "@types/node-fetch": "^2.5.8",
     "@types/shelljs": "^0.8.5",
     "@types/throttle-debounce": "^2.1.0",
+    "@types/yauzl": "^3.4.0",
     "jest": "^29",
     "ts-jest": "^29.4.12",
     "typescript": "~6.0.3"
@@ -43,7 +44,6 @@
     "cli-progress": "^3.10.0",
     "cross-spawn": "^7.0.3",
     "env-var": "^6.3.0",
-    "extract-zip": "^2.0.1",
     "fs-extra": "^11.1.1",
     "generic-pool": "^3.9.0",
     "lru-cache": "^11.1.0",
@@ -54,7 +54,8 @@
     "shelljs": "^0.8.5",
     "tar": "^7.5.22",
     "throttle-debounce": "^3.0.1",
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "yauzl": "^3.4.0"
   },
   "publishConfig": {
     "access": "public"
