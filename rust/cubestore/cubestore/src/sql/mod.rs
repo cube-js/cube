@@ -3675,15 +3675,15 @@ mod tests {
     /// DISTINCT key set built from their UNION ALL, a LEFT JOIN back to each leaf, and a
     /// top-level `ORDER BY ... LIMIT`.
     ///
-    /// Each single-month query returns the correct 1100. Widening the range so the join
-    /// input crosses a record batch boundary (> 2048 keys) makes the *same* query over the
-    /// *same* table return 1401 for March -- a sum larger than the number of keys that
-    /// feed it, which is impossible under this query's algebra.
+    /// Each month holds 1100 orders, so each must return 1100. Before the limit pushdown was
+    /// scoped to the aggregate that owns the limit, widening the range so the join input crossed a
+    /// record batch boundary (> 2048 keys) made the same query over the same table return 1401 for
+    /// March -- more than the number of keys feeding the sum, because the inner CTEs were reordered
+    /// under a merge that had been planned against their old order and the streaming DISTINCT above
+    /// it then emitted duplicate keys.
     ///
-    /// The corruption requires BOTH the top-level ORDER BY and the LIMIT. Removing either
-    /// one returns correct values, which points at the sort/limit pushdown into
-    /// ClusterSend rather than at the join itself. Reproduced on v1.7.4, v1.7.19 and the
-    /// current `latest` image; decimal measures behave identically to the int ones here.
+    /// It took BOTH the top-level ORDER BY and the LIMIT: the LIMIT is what made a descriptor exist
+    /// at all, the ORDER BY is what made it a non-trivial permutation of the group key.
     #[test]
     fn multi_stage_gated_join_with_sort_and_limit() {
         // Planning this query recurses deeply enough to overflow libtest's default 2 MiB
@@ -3830,7 +3830,7 @@ LIMIT 10000"#,
                     .await?;
                 assert_eq!(tickets(&march), vec![ORDERS_PER_MONTH as i64]);
 
-                // Same table, same query, wider range: currently returns [1100, 1401].
+                // Same table, same query, wider range: returned [1100, 1401] before the fix.
                 let both_months = service
                     .exec_query(&tickets_by_month(
                         "2026-02-01T00:00:00.000",

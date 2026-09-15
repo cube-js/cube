@@ -350,8 +350,16 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             "queue_result_ack_multiple_with_external_id",
             queue_result_ack_multiple_with_external_id,
         ),
+        t(
+            "nested_aggregate_limit_does_not_truncate",
+            nested_aggregate_limit_does_not_truncate,
+        ),
         t("limit_pushdown_group", limit_pushdown_group),
         t("limit_pushdown_group_having", limit_pushdown_group_having),
+        t(
+            "limit_pushdown_group_having_ordered",
+            limit_pushdown_group_having_ordered,
+        ),
         t(
             "limit_pushdown_group_nonprefix_order",
             limit_pushdown_group_nonprefix_order,
@@ -409,6 +417,8 @@ lazy_static::lazy_static! {
     // Also, some tests are new.  This should probably be a whitelist.
     static ref MIGRATION_TEST_EXCLUSION_SET: HashSet<String> = [
         // Tests that would fail and are useless as a migration test.
+        "nested_aggregate_limit_does_not_truncate",
+        "limit_pushdown_group_having_ordered",
         "aggregate_index_errors",
         // Old versions panic building an aggregating index over a decimal measure.
         "aggregate_index_decimal",
@@ -9311,6 +9321,109 @@ async fn build_range_end(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     Ok(())
 }
 
+// A LIMIT bounds the rows of the relation it sits on. With an aggregate nested under another
+// aggregate, the worker pushdown lands on the INNER one -- whose rows the limit does not count --
+// and truncates the outer aggregate's input, so both the values and the row count come out wrong.
+// Plain SQL: no Cube, no multi-stage, no join. The same defect reaches the inner aggregate whether
+// it is written as a derived table or as a CTE.
+async fn nested_aggregate_limit_does_not_truncate(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.na (a int, b int, v int)")
+        .await?;
+    // 5 values of `a` x 4 of `b`, so the inner aggregate has 20 rows and each `a` sums to 4. The
+    // index sorts on (a, b, v), so ORDER BY a is an index prefix and the limit rides the index --
+    // which is exactly what must not happen below the outer aggregate.
+    let mut values = Vec::new();
+    for a in 1..=5 {
+        for b in 1..=4 {
+            values.push(format!("({}, {}, 1)", a, b));
+        }
+    }
+    service
+        .exec_query(&format!(
+            "INSERT INTO s.na (a, b, v) VALUES {}",
+            values.join(", ")
+        ))
+        .await?;
+
+    let expected = vec![
+        Row::new(vec![TableValue::Int(1), TableValue::Int(4)]),
+        Row::new(vec![TableValue::Int(2), TableValue::Int(4)]),
+        Row::new(vec![TableValue::Int(3), TableValue::Int(4)]),
+    ];
+
+    // LIMIT 3 counts the outer aggregate's groups, of which there are 5; the inner aggregate's 20
+    // rows all contribute and none of them may be cut.
+    let derived = assert_limit_pushdown(
+        &service,
+        "SELECT a, sum(v) FROM \
+         (SELECT a, b, sum(v) v FROM s.na GROUP BY 1, 2) i \
+         GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+        None,
+        false,
+        false,
+    )
+    .await?;
+    assert_eq!(derived, expected);
+
+    let cte = assert_limit_pushdown(
+        &service,
+        "WITH i AS (SELECT a, b, sum(v) v FROM s.na GROUP BY 1, 2) \
+         SELECT a, sum(v) FROM i GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+        None,
+        false,
+        false,
+    )
+    .await?;
+    assert_eq!(cte, expected);
+
+    // The result may not depend on the limit: every one of these asks for all 5 groups or fewer,
+    // and the sums are the same either way.
+    for limit in [3, 4, 5, 100] {
+        let r = service
+            .exec_query(&format!(
+                "SELECT a, sum(v) FROM \
+                 (SELECT a, b, sum(v) v FROM s.na GROUP BY 1, 2) i \
+                 GROUP BY 1 ORDER BY 1 ASC LIMIT {}",
+                limit
+            ))
+            .await?;
+        let expected_len = std::cmp::min(limit, 5);
+        assert_eq!(
+            r.get_rows().len(),
+            expected_len,
+            "LIMIT {} returned {:?}",
+            limit,
+            r.get_rows()
+        );
+        for row in r.get_rows() {
+            assert_eq!(
+                row.values()[1],
+                TableValue::Int(4),
+                "LIMIT {} returned {:?}",
+                limit,
+                r.get_rows()
+            );
+        }
+    }
+
+    // Guard: with a single aggregate the limit does own the relation, so it still rides the index.
+    let single = assert_limit_pushdown(
+        &service,
+        "SELECT a, sum(v) FROM s.na GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+        None,
+        true,
+        false,
+    )
+    .await?;
+    assert_eq!(single, expected);
+
+    Ok(())
+}
+
 async fn assert_limit_pushdown_using_search_strings(
     service: &Box<dyn SqlClient>,
     query: &str,
@@ -9672,6 +9785,42 @@ async fn limit_pushdown_group_having(service: Box<dyn SqlClient>) -> Result<(), 
     let res = assert_limit_pushdown(
         &service,
         "SELECT id, SUM(n) FROM foo.having GROUP BY 1 HAVING SUM(n) > 50 LIMIT 3",
+        None,
+        false,
+        false,
+    )
+    .await?;
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![TableValue::Int(1), TableValue::Int(100)]),
+            Row::new(vec![TableValue::Int(3), TableValue::Int(100)]),
+            Row::new(vec![TableValue::Int(5), TableValue::Int(100)]),
+        ]
+    );
+    Ok(())
+}
+
+// Same as [limit_pushdown_group_having] but with an ORDER BY on the index sort prefix, which takes
+// a different branch of get_limit_for_pushdown. That branch checked only the index prefix and not
+// the HAVING, so the worker truncated before the router dropped groups.
+async fn limit_pushdown_group_having_ordered(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA foo").await?;
+    service
+        .exec_query("CREATE TABLE foo.having_ord (id int, n int)")
+        .await?;
+    let values = (1..=10).map(|id| format!("({}, {})", id, if id % 2 == 1 { 100 } else { 1 }));
+    service
+        .exec_query(&format!(
+            "INSERT INTO foo.having_ord (id, n) VALUES {}",
+            values.collect::<Vec<_>>().join(", ")
+        ))
+        .await?;
+
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT id, SUM(n) FROM foo.having_ord GROUP BY 1 HAVING SUM(n) > 50 ORDER BY 1 LIMIT 3",
         None,
         false,
         false,

@@ -430,6 +430,16 @@ fn resort_worker_subtree(
 ) -> Option<(Arc<dyn ExecutionPlan>, bool)> {
     let partial = locate_partial_aggregate(worker_subtree)?;
 
+    // The descriptor must be a permutation of THIS aggregate's full group key -- that is what makes
+    // the per-partition `fetch` sound, and what makes `cols` index the right columns at all. A
+    // shorter one comes from a different relation's key and would reorder this aggregate's output
+    // by whatever columns happen to sit at those positions. Skipping the bound is always correct,
+    // and both the router and the worker reach this check with the same aggregate, so the two
+    // halves of a split plan agree on whether it fired.
+    if cols.len() != group_column_count(&partial)? {
+        return None;
+    }
+
     // Hash path: trim during aggregation, emit unsorted for the router's hash final. Engaged only
     // when factor > 0; with it off, the hash aggregate falls through to the sorted-bounding path
     // below (a per-partition Sort(fetch) + merge), which is the pre-trim behavior -- so disabling
@@ -603,6 +613,16 @@ fn locate_partial_aggregate(p: &Arc<dyn ExecutionPlan>) -> Option<Arc<dyn Execut
         }
         return None;
     }
+}
+
+/// Group-by column count of a partial aggregate of either kind, or `None` for anything else.
+fn group_column_count(p: &Arc<dyn ExecutionPlan>) -> Option<usize> {
+    let any = p.as_any();
+    if let Some(a) = any.downcast_ref::<InlineAggregateExec>() {
+        return Some(a.group_expr().expr().len());
+    }
+    any.downcast_ref::<AggregateExec>()
+        .map(|a| a.group_expr().expr().len())
 }
 
 pub fn ensure_partition_merge_helper(
@@ -1249,14 +1269,63 @@ mod tests {
         input: Arc<dyn ExecutionPlan>,
         limit_and_reverse: Option<(usize, bool)>,
     ) -> Arc<dyn ExecutionPlan> {
+        worker_with_sort_and_limit(input, limit_and_reverse, None)
+    }
+
+    fn worker_with_sort_and_limit(
+        input: Arc<dyn ExecutionPlan>,
+        limit_and_reverse: Option<(usize, bool)>,
+        worker_sort_and_limit: Option<crate::queryplanner::planning::WorkerSortAndLimit>,
+    ) -> Arc<dyn ExecutionPlan> {
         Arc::new(WorkerExec::new(
             input,
             4096,
             limit_and_reverse,
             None,
-            None,
+            worker_sort_and_limit,
             1,
         ))
+    }
+
+    /// The descriptor is a permutation of the aggregate's own full group key. One that is shorter
+    /// belongs to a different relation, and applying it would reorder this aggregate's output by
+    /// whatever columns sit at those positions -- which breaks any parent that was planned against
+    /// the old order. Skipping the bound is always correct, so the pass leaves the plan alone.
+    #[test]
+    fn worker_sort_and_limit_skipped_for_a_descriptor_that_is_not_the_full_group_key() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let agg = sum_aggregate(AggregateMode::Partial, "k", source);
+        // `k` is the only group column, so a two-column descriptor cannot be this aggregate's.
+        let original = worker_with_sort_and_limit(
+            agg,
+            None,
+            Some((vec![(1, true, true), (0, true, true)], 10)),
+        );
+
+        let rewritten = push_worker_sort_and_limit(original.clone(), 2, true).unwrap();
+
+        assert!(
+            Arc::ptr_eq(&rewritten, &original),
+            "expected the plan to be left alone, got:\n{}",
+            crate::queryplanner::pretty_printers::pp_phys_plan(rewritten.as_ref())
+        );
+    }
+
+    /// The matching descriptor still applies, so the guard above is not simply disabling the pass.
+    #[test]
+    fn worker_sort_and_limit_applies_for_the_full_group_key() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let agg = sum_aggregate(AggregateMode::Partial, "k", source);
+        let original = worker_with_sort_and_limit(agg, None, Some((vec![(0, true, true)], 10)));
+
+        let rewritten = push_worker_sort_and_limit(original.clone(), 2, true).unwrap();
+
+        assert!(
+            !Arc::ptr_eq(&rewritten, &original),
+            "expected the descriptor to be applied"
+        );
     }
 
     /// Worker plan with the partial aggregate below the merge: merge of per-partition partial
