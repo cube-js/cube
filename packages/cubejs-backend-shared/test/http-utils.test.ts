@@ -4,6 +4,7 @@ import path from 'path';
 import * as tar from 'tar';
 import { crc32 } from 'zlib';
 
+import { PassThrough } from 'stream';
 import * as yauzl from 'yauzl';
 
 import { extractArchive } from '../src/http-utils';
@@ -251,14 +252,14 @@ describe('extractArchive', () => {
   });
 
   describe('survives a reader failure rather than crashing the process', () => {
-    it('rejects when the zipfile raises an error while an entry is being written', async () => {
-      // yauzl reports reader failures by emitting `error` on the ZipFile, and an
-      // EventEmitter that emits `error` with no listener throws — so this has to be a
-      // rejection, not an uncaught exception that takes the process with it.
+    it('rejects while the entry is still being written, not once the write settles', async () => {
+      // The read stream here never ends and never errors, so `pipeline` never settles
+      // and the zipfile's `error` is the only signal there is. That is what separates
+      // racing the write against it from checking afterwards: checking afterwards
+      // hangs here, and a hung driver download is worse to diagnose than a crash.
       //
-      // The window only exists *between* reads: the per-read listener comes off as
-      // soon as an entry resolves, so the error has to be raised while the entry is
-      // being written, which is what the `setImmediate` below lines it up with.
+      // The error is scheduled from an `entry` listener registered before
+      // `nextZipEntry`'s, so it lands after that per-read listener has come off again.
       const archive = path.join(work, 'two-entries.zip');
       await writeZip(archive, [
         { name: 'a.txt', content: 'first' },
@@ -271,8 +272,9 @@ describe('extractArchive', () => {
         async (file: string, options?: yauzl.Options) => {
           const zipfile = await openPromise(file, options);
 
-          // Registered before `nextZipEntry`'s, so it runs first and schedules the
-          // failure for after that listener has come off again.
+          const stalled = new PassThrough();
+          zipfile.openReadStreamPromise = async () => stalled;
+
           zipfile.once('entry', () => {
             setImmediate(() => zipfile.emit('error', new Error('reader exploded')));
           });

@@ -195,32 +195,31 @@ async function writeZipEntry(zipfile: yauzl.ZipFile, entry: yauzl.Entry, dir: st
 async function extractZipArchive(archivePath: string, dir: string): Promise<void> {
   const zipfile = await yauzl.openPromise(archivePath, { lazyEntries: true });
 
-  // yauzl reports reader failures by emitting `error` on the zipfile, and an
-  // EventEmitter that emits `error` with no listener *throws* — so the one
-  // `nextZipEntry` attaches is not enough: it comes off as soon as an entry
-  // resolves, leaving the whole of `writeZipEntry` uncovered. A failure there would
-  // crash the process instead of rejecting. This listener stays on for the zipfile's
-  // lifetime and the loop turns what it caught into a rejection.
-  let fatal: Error | undefined;
-  zipfile.on('error', (err: Error) => {
-    fatal = fatal ?? err;
+  // yauzl reports reader failures by emitting `error` on the zipfile, and an emit with
+  // no listener *throws* — `nextZipEntry`'s comes off between reads, so this one has to
+  // stay on for the zipfile's lifetime. Raced rather than checked after each step: a
+  // failure can leave the read stream neither ending nor erroring, and `pipeline` then
+  // never settles.
+  let raiseFatal!: (err: Error) => void;
+  const fatal = new Promise<never>((_resolve, reject) => {
+    raiseFatal = reject;
   });
+  // A clean extraction never awaits `fatal`, and an unobserved rejection is fatal in
+  // its own right.
+  fatal.catch(() => undefined);
+  zipfile.on('error', raiseFatal);
 
   try {
     for (;;) {
       // Sequential on purpose: entries are read from one cursor, and a directory
       // entry has to land before the files under it.
       // eslint-disable-next-line no-await-in-loop
-      const entry = await nextZipEntry(zipfile);
+      const entry = await Promise.race([nextZipEntry(zipfile), fatal]);
       if (!entry) {
         return;
       }
       // eslint-disable-next-line no-await-in-loop
-      await writeZipEntry(zipfile, entry, dir);
-
-      if (fatal) {
-        throw fatal;
-      }
+      await Promise.race([writeZipEntry(zipfile, entry, dir), fatal]);
     }
   } finally {
     zipfile.close();
