@@ -73,8 +73,9 @@ threads on one path and never a current-diff line.
 
 For each thread where BOTH of the following hold:
   - the first comment's `author.login` is yours
-  - the concern is no longer applicable in the current diff (file/line gone,
-    code rewritten, issue addressed)
+  - the concern is no longer live — the current diff addressed it (file/line
+    gone, code rewritten, issue fixed), or it was never real and you are
+    withdrawing the finding
 
 resolve it with:
 
@@ -82,8 +83,13 @@ resolve it with:
 
 `isOutdated` true means only that the surrounding code moved — on a file this
 round touches it is not evidence the concern was addressed, so read the code at
-the site before resolving. Where a human replied, do not resolve if they are
-pushing back.
+the site before resolving.
+
+Where a human replied, what they are disputing decides. Pushing back on your
+verdict — the fix is not in, the concern still stands — keeps the thread open.
+Refuting the finding itself, with you agreeing, closes it: a withdrawn finding is
+not live, and leaving it open feeds it back to you every round as unresolved.
+Resolve it and say in the reply that you are withdrawing it.
 
 Do not resolve threads from human reviewers under any circumstance, even if the
 concern looks addressed — leave that decision to the reviewer. That includes the
