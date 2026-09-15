@@ -261,6 +261,28 @@ describe('extractArchive', () => {
       expect(fs.existsSync(path.join(outside, 'PWNED.txt'))).toBe(false);
       expect(fs.existsSync(path.join(target, 'esc'))).toBe(false);
     });
+
+    it('refuses a zip entry whose parent is a symlink that was already there', async () => {
+      // The symlink refusal above only covers links *this* extraction would create.
+      // `downloadAndExtractFile` takes a caller-supplied `cwd` that is not required to
+      // be empty, and the tar backend does write symlink entries — so tar first, zip
+      // second into the same directory puts an escaping link in the path of a zip entry
+      // with a blameless relative name. A lexical containment check cannot see it.
+      const archive = path.join(work, 'preexisting.zip');
+      // Nested one deeper than the link so the refusal also has to happen *before*
+      // `mkdir`: resolving only after creating the parent would leave `outside/sub`
+      // behind on the way to rejecting.
+      await writeZip(archive, [{ name: 'esc/sub/PWNED.txt', content: 'pwned-through-preexisting' }]);
+
+      const outside = path.join(work, 'outside');
+      fs.mkdirSync(outside);
+      const target = targetDir();
+      fs.symlinkSync(outside, path.join(target, 'esc'));
+
+      await expect(extractArchive(archive, target)).rejects.toThrow(/out of bound path/i);
+      expect(fs.existsSync(path.join(outside, 'sub'))).toBe(false);
+      expect(fs.existsSync(path.join(outside, 'sub', 'PWNED.txt'))).toBe(false);
+    });
   });
 
   describe('survives a reader failure rather than crashing the process', () => {

@@ -150,6 +150,32 @@ function nextZipEntry(zipfile: yauzl.ZipFile): Promise<yauzl.Entry | null> {
   });
 }
 
+/**
+ * `realpath` of the deepest ancestor of `target` that exists.
+ *
+ * Containment cannot be decided lexically: a symlink already sitting in the target
+ * directory — one an earlier `tar` extraction into the same `cwd` wrote, say — makes a
+ * blameless relative name resolve anywhere on disk. Every such link is by definition in
+ * the part of the path that already exists, so resolving that prefix accounts for all
+ * of them, and doing it *before* `mkdir` means a rejected entry creates nothing.
+ */
+async function realpathOfExistingAncestor(target: string): Promise<string> {
+  let current = target;
+
+  for (;;) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      return await fs.promises.realpath(current);
+    } catch (e) {
+      const parent = path.dirname(current);
+      if (parent === current) {
+        throw e;
+      }
+      current = parent;
+    }
+  }
+}
+
 async function writeZipEntry(
   zipfile: yauzl.ZipFile,
   entry: yauzl.Entry,
@@ -171,7 +197,14 @@ async function writeZipEntry(
   }
 
   const dest = path.join(dir, entry.fileName);
+  // Lexical first: it costs nothing and refuses a hostile name before any filesystem
+  // call. It is not sufficient on its own — see `realpathOfExistingAncestor`.
   if (dest !== dir && !dest.startsWith(dir + path.sep)) {
+    throw new Error(`Refusing to extract zip entry out of bound path: ${entry.fileName}`);
+  }
+
+  const parent = await realpathOfExistingAncestor(path.dirname(dest));
+  if (parent !== dir && !parent.startsWith(dir + path.sep)) {
     throw new Error(`Refusing to extract zip entry out of bound path: ${entry.fileName}`);
   }
 
@@ -197,11 +230,14 @@ async function writeZipEntry(
 }
 
 /**
- * Extract a zip into `dir`, which must already exist and be resolved — the
- * containment check in `writeZipEntry` compares against it verbatim.
+ * Extract a zip into `dir`, which must already exist.
  */
 async function extractZipArchive(archivePath: string, dir: string): Promise<void> {
   const zipfile = await yauzl.openPromise(archivePath, { lazyEntries: true });
+
+  // Compared against resolved parents below, so it has to be resolved itself — on
+  // macOS a caller's `/tmp/...` is already a symlink to `/private/tmp/...`.
+  const root = await fs.promises.realpath(dir);
 
   // yauzl reports reader failures by emitting `error` on the zipfile, and an emit with
   // no listener *throws* — `nextZipEntry`'s comes off between reads, so this one has to
@@ -233,7 +269,7 @@ async function extractZipArchive(archivePath: string, dir: string): Promise<void
       // Raced, not checked after: a failure can leave the read stream neither ending
       // nor erroring, and `pipeline` would then never settle.
       // eslint-disable-next-line no-await-in-loop
-      await Promise.race([writeZipEntry(zipfile, entry, dir, aborter.signal), fatal]);
+      await Promise.race([writeZipEntry(zipfile, entry, root, aborter.signal), fatal]);
     }
   } finally {
     zipfile.close();
