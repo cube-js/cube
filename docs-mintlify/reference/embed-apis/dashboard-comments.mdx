@@ -69,7 +69,7 @@ A thread is one root comment plus its replies, oldest first. **Nesting is one le
 
 Threads are listed newest-first by last activity, so replying to a thread moves it back to the top. Open threads are returned by default. Pass `includeResolved=true` to widen the page to resolved threads as well, or `resolvedOnly=true` to return only those; `resolvedOnly` wins when both are set.
 
-Deleting is a soft delete, and the two cases differ. **A deleted reply is dropped from its thread.** **A deleted root is still listed** while a live reply survives under it, returned with an empty `body` and `removedAt` set — otherwise removing it would discard other people's replies along with it. A root with no surviving replies leaves the list entirely.
+Deleting is a soft delete, and the two cases differ. **Deleting a reply** drops it from its thread and moves the thread back to the time of the newest reply still standing, so a thread does not hold its position on the strength of a message that is gone. **Deleting a thread root takes the whole thread with it**, replies included — a deleted thread leaves nothing behind rather than a tombstone holding replies whose parent is gone.
 
 Resolving applies to threads only. Passing a reply's id returns `400`, because a reply carries no resolve state of its own.
 
