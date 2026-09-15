@@ -647,8 +647,11 @@ and `prod_pre_aggregations` in production.
 
 <Info>
 
-In Cube Cloud, all [environments][ref-environments] share the same pre-aggregations schema name by default.
-This allows reusing pre-aggregations across environments, saving both time and cost.
+In the Cube cloud platform, all [environments][ref-environments] of a deployment
+share the same pre-aggregations schema and Cube Store. This allows reusing
+pre-aggregations across environments, saving both time and cost. See [Deployment
+environments → Pre-aggregations][ref-environments-preaggs] for what to expect
+when a branch changes a pre-aggregation.
 
 </Info>
 
@@ -657,8 +660,9 @@ environment variable.
 
 <Warning>
 
-It's **strongly** recommended to use different pre-aggregation schemas in
-development and production environments to avoid pre-aggregation table clashes.
+In Cube Core, it's **strongly** recommended to use different pre-aggregation
+schemas in development and production environments to avoid pre-aggregation
+table clashes.
 
 </Warning>
 
@@ -1593,3 +1597,4 @@ module.exports = {
 [ref-dap-roles]: /docs/data-modeling/data-access-policies#data-access-roles
 [ref-auth-integration]: /docs/data-modeling/access-control#authentication-integration
 [ref-environments]: /admin/deployment/environments
+[ref-environments-preaggs]: /admin/deployment/environments#pre-aggregations

@@ -148,10 +148,21 @@ Scheduled refresh is also disabled in the Development API. If you need to test
 scheduled refreshes, we recommend creating a separate deployment using a
 different Git branch of the same repository.
 
+### Pre-aggregations
+
+Development environments share the production environment's Cube Store and
+pre-aggregations schema. Pre-aggregations you haven't changed are served from
+the production tables. Pre-aggregations you have changed are built separately
+when queried, and production never serves those tables. Building large
+pre-aggregations from development mode can remove older unused production
+tables, so test builds on a separate deployment instead. See [Deployment
+environments → Pre-aggregations][ref-environments-preaggs] for details.
+
 
 [ref-environments-dev]: /admin/deployment/environments#development-environments
 [ref-environments-endpoints]: /admin/deployment/environments#api-endpoints
 [ref-environments-staging]: /admin/deployment/environments#staging-environments
+[ref-environments-preaggs]: /admin/deployment/environments#pre-aggregations
 [ref-generate-session]: /reference/embed-apis/generate-session
 [ref-deploy-with-cli]: /admin/deployment/continuous-deployment#deploy-with-cli
 [ref-deploy-with-cli-dev-mode]: /admin/deployment/continuous-deployment#development-mode-with-cli-deployments
