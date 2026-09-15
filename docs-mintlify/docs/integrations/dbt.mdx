@@ -48,6 +48,11 @@ files to a review branch. How the manifest reaches Cube depends on the source:
   clone a repository, or run dbt, so this path usually takes seconds rather than
   minutes.
 
+Pulls triggered through the REST API can skip committing entirely: passing
+`output: 'files'` returns the generated cube files directly instead of
+creating a review branch, so your own CI can review and commit them. The
+default, `'branch'`, is unchanged.
+
 **Cube doesn't build your dbt models during either kind of pull.** A Git-based pull
 uses `dbt parse`, which doesn't query the warehouse. A manifest pull doesn't run dbt
 at all, although the pipeline command that produced the manifest might. The generated
