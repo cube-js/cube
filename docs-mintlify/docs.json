@@ -1055,6 +1055,7 @@
                   "POST /api/v1/embed/dashboard/{publicId}/comments/{commentId}/resolve",
                   "POST /api/v1/embed/dashboard/{publicId}/python-run",
                   "POST /api/v1/embed/generate-session",
+                  "POST /api/v1/embed/session/revoke",
                   "POST /api/v1/embed/session/token"
                 ]
               },
