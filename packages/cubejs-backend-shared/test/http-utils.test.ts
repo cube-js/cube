@@ -4,7 +4,7 @@ import path from 'path';
 import * as tar from 'tar';
 import { crc32 } from 'zlib';
 
-import { PassThrough, Writable } from 'stream';
+import { PassThrough, Readable, Writable } from 'stream';
 import * as yauzl from 'yauzl';
 
 import { extractArchive } from '../src/http-utils';
@@ -284,19 +284,24 @@ describe('extractArchive', () => {
       expect(fs.existsSync(path.join(outside, 'sub', 'PWNED.txt'))).toBe(false);
     });
 
-    it('never lets an archive set the mode of the target directory itself', async () => {
-      // `validateFileName` accepts a lone `.` — it only rejects backslashes, absolute
-      // paths and `..` — and it normalises to the target root. The mode recorded for a
-      // directory entry belongs to the archive; the root's belongs to the caller.
+    it('treats a `./` root entry as a no-op instead of an escape, and keeps the target\'s mode', async () => {
+      // `validateFileName` accepts a bare `.`, and `'./'` strips to it — both normalise
+      // to the target itself. Some jar-adjacent packagers emit one, so reading it as an
+      // escape would turn a working driver download into a hard failure; and the mode
+      // it carries belongs to the caller, not to the archive.
       const archive = path.join(work, 'dotdir.zip');
-      await writeZip(archive, [{ name: '.', content: '', mode: 0o040777 }]);
+      await writeZip(archive, [
+        { name: './', content: '', mode: 0o040777 },
+        { name: 'driver.txt', content: 'legit-content' },
+      ]);
 
       const target = targetDir();
       // eslint-disable-next-line no-bitwise
       const before = (fs.statSync(target).mode & 0o777).toString(8);
 
-      await extractArchive(archive, target).catch(() => undefined);
+      await extractArchive(archive, target);
 
+      expect(fs.readFileSync(path.join(target, 'driver.txt'), 'utf8')).toBe('legit-content');
       // eslint-disable-next-line no-bitwise
       expect((fs.statSync(target).mode & 0o777).toString(8)).toBe(before);
     });
@@ -369,11 +374,34 @@ describe('extractArchive', () => {
         { name: 'clash', content: 'x' },
       ]);
 
-      const openFds = () => fs.readdirSync('/dev/fd').length;
-      const before = openFds();
+      // Witnessed on the stream itself rather than by counting `/dev/fd`: that is
+      // POSIX-only and moves with anything else the worker happens to hold open, so a
+      // flake would point at the production code instead of at the measurement.
+      const { openPromise } = jest.requireActual<typeof import('yauzl')>('yauzl');
+      const entryStreams: Readable[] = [];
+
+      (yauzl.openPromise as jest.MockedFunction<typeof yauzl.openPromise>).mockImplementationOnce(
+        async (file: string, options?: yauzl.Options) => {
+          const zipfile = await openPromise(file, options);
+          const openReadStreamPromise = zipfile.openReadStreamPromise.bind(zipfile);
+
+          zipfile.openReadStreamPromise = async (...args: Parameters<typeof openReadStreamPromise>) => {
+            const stream = await openReadStreamPromise(...args);
+            entryStreams.push(stream);
+            return stream;
+          };
+
+          return zipfile;
+        }
+      );
 
       await expect(extractArchive(archive, targetDir())).rejects.toThrow(/EISDIR/);
-      await waitUntil(() => openFds() <= before, "the archive's descriptor to be released");
+
+      expect(entryStreams).toHaveLength(1);
+      await waitUntil(
+        () => entryStreams[0].destroyed,
+        "the abandoned entry stream to be destroyed, which is what unrefs the archive's descriptor"
+      );
     });
   });
 

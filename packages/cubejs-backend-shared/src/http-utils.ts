@@ -205,19 +205,32 @@ async function applyDirectoryModes(directoryModes: Map<string, number>): Promise
   // the containment check happened when the entry was seen, and this runs after the
   // whole archive. A link swapped in at `dest` since then would otherwise take an
   // archive-chosen mode outside the target; opening it fails ELOOP instead.
+  //
+  // Both constants are POSIX-only. On Windows they are `undefined`, which would
+  // collapse the flags to a bare `O_RDONLY` and make this an unsupported open-plus-
+  // fchmod of a directory — failing *after* the whole archive is already written. Fall
+  // back to a plain `chmod` there; a unix-made zip is the only kind that reaches here
+  // at all, and Windows symlinks need privilege to create.
+  const canOpenDirectory = typeof fs.constants.O_DIRECTORY === 'number'
+    && typeof fs.constants.O_NOFOLLOW === 'number';
   // eslint-disable-next-line no-bitwise
   const flags = fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW;
 
   for (const [dest, mode] of deepestFirst) {
-    // eslint-disable-next-line no-await-in-loop
-    const handle = await fs.promises.open(dest, flags);
+    if (canOpenDirectory) {
+      // eslint-disable-next-line no-await-in-loop
+      const handle = await fs.promises.open(dest, flags);
 
-    try {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await handle.chmod(mode);
+      } finally {
+        // eslint-disable-next-line no-await-in-loop
+        await handle.close();
+      }
+    } else {
       // eslint-disable-next-line no-await-in-loop
-      await handle.chmod(mode);
-    } finally {
-      // eslint-disable-next-line no-await-in-loop
-      await handle.close();
+      await fs.promises.chmod(dest, mode);
     }
   }
 }
@@ -251,6 +264,13 @@ async function writeZipEntry(
     throw new Error(`Refusing to extract zip entry out of bound path: ${entry.fileName}`);
   }
 
+  // `.` and `./` are names `validateFileName` accepts, and they normalise to the
+  // target itself. The parent of the root is outside the root by construction, so
+  // without this the check below reads them as an escape and aborts the archive.
+  if (dest === dir) {
+    return;
+  }
+
   const parent = await realpathOfExistingAncestor(path.dirname(dest));
   if (parent !== dir && !parent.startsWith(dir + path.sep)) {
     throw new Error(`Refusing to extract zip entry out of bound path: ${entry.fileName}`);
@@ -273,10 +293,10 @@ async function writeZipEntry(
 
     // Recorded now, applied after the last entry: a `0o700` directory has to end up
     // `0o700` rather than inheriting the umask, but it cannot be restricted while
-    // there are still entries to write under it. Never the root — that mode belongs to
-    // the caller, not to the archive, and `.` is a name `validateFileName` accepts.
+    // there are still entries to write under it. The root cannot reach here — an entry
+    // naming it returns above — so an archive can never set the caller's own mode.
     const dirMode = unixPermissions(entry);
-    if (dirMode && dest !== dir) {
+    if (dirMode) {
       directoryModes.set(dest, dirMode);
     }
     return;
@@ -289,7 +309,9 @@ async function writeZipEntry(
 
   // `O_NOFOLLOW` rather than trusting the `lstat` above: that is a check-then-open
   // race, and this makes the write refuse a link on its own terms (ELOOP). Opened by
-  // hand because `createWriteStream`'s `flags` is typed as a string.
+  // hand because `createWriteStream`'s `flags` is typed as a string. On Windows the
+  // constant is `undefined` and the flag is silently dropped, leaving the `lstat` as
+  // the only guard — acceptable there, where creating a symlink needs privilege.
   // eslint-disable-next-line no-bitwise
   const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW;
 
