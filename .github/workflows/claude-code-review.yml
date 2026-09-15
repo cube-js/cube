@@ -115,26 +115,57 @@ jobs:
           EXECUTION_FILE: ${{ steps.review.outputs.execution_file }}
         run: |
           jq -r '
-            [.[] | select(.type == "result")] | last as $r |
-            ([.[] | select(.type == "assistant")] | length) as $turns |
-            ([.[] | select(.type == "assistant") | .message.usage.input_tokens // 0] | add) as $in_tok |
-            ([.[] | select(.type == "assistant") | .message.usage.output_tokens // 0] | add) as $out_tok |
-            ([.[] | select(.type == "assistant") | .message.usage.cache_read_input_tokens // 0] | add) as $cache_tok |
-            ([.[] | select(.type == "assistant") | .message.model] | last) as $model |
+            . as $msgs |
+            ($msgs | map(select(.type == "result")) | last) as $r |
+            ($msgs | map(select(.type == "assistant"))) as $a |
+            ($a | map(.message.usage.input_tokens // 0) | add // 0) as $in_tok |
+            ($a | map(.message.usage.output_tokens // 0) | add // 0) as $out_tok |
+            ($a | map(.message.usage.cache_read_input_tokens // 0) | add // 0) as $cache_tok |
             if $r then
               "### Claude Code review run",
               "| Metric | Value |",
               "|---|---|",
-              "| Model | `\($model // "?")` |",
+              "| Model | `\($a | map(.message.model) | last // "?")` |",
               "| Cost | $\($r.total_cost_usd) |",
               "| Wall time | \(($r.duration_ms / 1000) | floor)s |",
               "| API time | \((($r.duration_api_ms // 0) / 1000) | floor)s |",
-              "| Turns | \($turns) |",
+              "| Turns | \($a | length) |",
               "| Input tokens | \($in_tok) |",
               "| Output tokens | \($out_tok) |",
               "| Cache read tokens | \($cache_tok) |"
             else empty end
           ' "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report review failure
+        if: failure() && steps.review.outputs.execution_file != ''
+        env:
+          EXECUTION_FILE: ${{ steps.review.outputs.execution_file }}
+        run: |
+          error_text=$(jq -r '
+            . as $msgs |
+            ($msgs | map(select(.type == "result")) | last) as $r |
+            ($msgs
+              | map(select(.type == "assistant") | .message.content[]?
+                    | select(.type == "text") | .text)
+              | last) as $last_text |
+            ($r.result? // $r.error? // $last_text // "no error text in execution log")
+            | tostring
+          ' "$EXECUTION_FILE")
+          subtype=$(jq -r 'map(select(.type == "result")) | last | .subtype // "?"' "$EXECUTION_FILE")
+
+          {
+            echo "### :x: Review failed"
+            echo
+            echo "Result subtype: \`$subtype\`"
+            echo
+            echo '```'
+            printf '%s\n' "$error_text"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Annotations are single-line; %0A keeps a multi-line error readable.
+          printf '::error title=Claude review failed (%s)::%s\n' \
+            "$subtype" "$(printf '%s' "$error_text" | head -c 2000 | awk '{printf "%s%%0A", $0}')"
 
       - name: React to trigger comment (completion)
         if: always() && github.event_name == 'issue_comment'
