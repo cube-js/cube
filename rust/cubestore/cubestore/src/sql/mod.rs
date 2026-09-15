@@ -3752,6 +3752,153 @@ mod tests {
         Ok(())
     }
 
+    /// Regression test for https://github.com/cube-js/cube/issues/11545, reduced.
+    ///
+    /// A `SELECT DISTINCT` over a `UNION ALL` stops deduplicating when the query also
+    /// carries a top-level `ORDER BY ... LIMIT` and the input crosses a record batch
+    /// (> 2048 rows): duplicate keys survive the DISTINCT, so any aggregate over it is
+    /// silently inflated. Here March returns 1401 rows for 1100 distinct keys.
+    ///
+    /// The issue was reported against a Tesseract `multi_stage` measure whose plan joins
+    /// two per-key leaf aggregations back to such a key set, but neither the join nor the
+    /// multi-stage shape is required -- a bare `count(*)` over the deduplicated key set
+    /// reproduces it. Removing either the `ORDER BY` or the `LIMIT` returns correct
+    /// values, which points at the sort/limit pushdown into `ClusterSend`
+    /// (`pull_up_cluster_send`'s `LogicalPlan::Sort` branch) rather than at the join.
+    ///
+    /// Cube emits `ORDER BY 1 ASC LIMIT 10000` on every query, so this is reachable from
+    /// any query over a pre-aggregation whose plan deduplicates a key set.
+    #[test]
+    fn distinct_over_union_with_sort_and_limit() {
+        // Planning this shape recurses deeply enough to overflow libtest's default 2 MiB
+        // stack in a debug build (production gives select workers 4 MiB via
+        // CUBESTORE_SELECT_WORKER_STACK_SIZE). Unrelated to the corruption under test.
+        std::thread::Builder::new()
+            .stack_size(32 * 1024 * 1024)
+            .spawn(|| {
+                tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .thread_stack_size(32 * 1024 * 1024)
+                    .build()
+                    .unwrap()
+                    .block_on(async {
+                        Config::test("distinct_over_union_with_sort_and_limit")
+                            .update_config(|mut c| {
+                                // Keep it in a single partition, as an unpartitioned
+                                // pre-aggregation table is.
+                                c.partition_split_threshold = 1000000;
+                                c.compaction_chunks_count_threshold = 50;
+                                c
+                            })
+                            .start_test(async move |services| {
+                                let service = services.sql_service;
+
+                                service
+                                    .exec_query("CREATE SCHEMA pre_aggregations")
+                                    .await?
+                                    .collect()
+                                    .await?;
+                                service
+                                    .exec_query(
+                                        "CREATE TABLE pre_aggregations.order_slices (
+                                             sale_orders__id int,
+                                             dates__date_day timestamp,
+                                             base_sales__sale int)",
+                                    )
+                                    .await?
+                                    .collect()
+                                    .await?;
+
+                                // 1100 orders in each of two months -- 2200 distinct
+                                // (order, month) keys, just over the 2048-row record
+                                // batch. Ids interleave across the months so scan order
+                                // (by id) and the leaves' ORDER BY (by month) disagree,
+                                // as they do for real order ids.
+                                const ORDERS_PER_MONTH: usize = 1100;
+                                let mut rows = Vec::with_capacity(ORDERS_PER_MONTH * 2);
+                                let mut id = 1;
+                                for i in 0..ORDERS_PER_MONTH {
+                                    for (month, days) in [("02", 28), ("03", 31)] {
+                                        rows.push(format!(
+                                            "({}, '2026-{}-{:02}T00:00:00.000', 100)",
+                                            id,
+                                            month,
+                                            1 + (i % days)
+                                        ));
+                                        id += 1;
+                                    }
+                                }
+                                for chunk in rows.chunks(1000) {
+                                    service
+                                        .exec_query(&format!(
+                                            "INSERT INTO pre_aggregations.order_slices (sale_orders__id, dates__date_day, base_sales__sale) VALUES {}",
+                                            chunk.iter().join(", ")
+                                        ))
+                                        .await?
+                                        .collect()
+                                        .await?;
+                                }
+
+                                let query = |suffix: &str| {
+                                    format!(
+                                        r#"WITH
+cte_0 AS (SELECT "sale_orders__id", date_trunc('month', "dates__date_day") "m", sum("base_sales__sale") "s"
+  FROM pre_aggregations.order_slices
+  GROUP BY 1, 2
+  ORDER BY 2 ASC),
+cte_1 AS (SELECT "sale_orders__id", date_trunc('month', "dates__date_day") "m", sum("base_sales__sale") "s"
+  FROM pre_aggregations.order_slices
+  GROUP BY 1, 2
+  ORDER BY 2 ASC),
+keys AS (SELECT DISTINCT "sale_orders__id", "m"
+  FROM (SELECT "sale_orders__id", "m" FROM cte_0
+        UNION ALL
+        SELECT "sale_orders__id", "m" FROM cte_1) AS "u")
+SELECT "m", count(*) "keys" FROM keys GROUP BY 1{}"#,
+                                        suffix
+                                    )
+                                };
+
+                                let counts = |result: &DataFrame| -> Vec<i64> {
+                                    result
+                                        .get_rows()
+                                        .iter()
+                                        .map(|row| match &row.values()[1] {
+                                            TableValue::Int(v) => *v,
+                                            v => panic!("unexpected count value: {:?}", v),
+                                        })
+                                        .collect()
+                                };
+
+                                let expected =
+                                    vec![ORDERS_PER_MONTH as i64, ORDERS_PER_MONTH as i64];
+
+                                // Controls: each alone deduplicates correctly.
+                                for suffix in [" ORDER BY 1 ASC", " LIMIT 10000", ""] {
+                                    let result =
+                                        service.exec_query(&query(suffix)).await?.collect().await?;
+                                    assert_eq!(counts(&result), expected, "suffix: {:?}", suffix);
+                                }
+
+                                // Together: currently returns [1100, 1401].
+                                let result = service
+                                    .exec_query(&query(" ORDER BY 1 ASC LIMIT 10000"))
+                                    .await?
+                                    .collect()
+                                    .await?;
+                                assert_eq!(counts(&result), expected);
+
+                                Ok::<(), CubeError>(())
+                            })
+                            .await;
+                    });
+            })
+            .unwrap()
+            .join()
+            // Re-raise the original panic so the assertion diff is what gets reported.
+            .unwrap_or_else(|e| std::panic::resume_unwind(e));
+    }
+
     /// Regression test for https://github.com/cube-js/cube/issues/11545.
     ///
     /// Cube's Tesseract planner emits this shape for a `multi_stage` measure whose SQL
