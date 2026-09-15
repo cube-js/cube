@@ -4670,3 +4670,243 @@ async fn test_wrapper_multi_data_source_view_cross_source_query_stays_plain() {
         );
     }
 }
+
+#[tokio::test]
+async fn test_wrapper_binary_expr_timestamp_computed_date_bound() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // The window function forces the SQL push down of the `DATE - INTERVAL` bound.
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender AS step,
+            MEASURE(count) AS total_conversions,
+            ROW_NUMBER() OVER (ORDER BY customer_gender) AS step_order
+        FROM KibanaSampleDataEcommerce
+        WHERE KibanaSampleDataEcommerce.order_date >= CURRENT_DATE - INTERVAL '28 days'
+        GROUP BY customer_gender
+        ORDER BY customer_gender
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    println!("Generated SQL: {sql}");
+
+    assert!(
+        sql.contains(
+            "${KibanaSampleDataEcommerce.order_date} >= CAST((CURRENT_DATE() - INTERVAL '28 DAY') AS TIMESTAMP)"
+        ),
+        "expected the DATE arithmetic explicitly casted to TIMESTAMP, got: {}",
+        sql
+    );
+}
+
+#[tokio::test]
+async fn test_wrapper_binary_expr_date_side_computed_date_bound() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // A DATE tested side is casted up to the TIMESTAMP the bound is typed as.
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender AS step,
+            MEASURE(count) AS total_conversions,
+            ROW_NUMBER() OVER (ORDER BY customer_gender) AS step_order
+        FROM KibanaSampleDataEcommerce
+        WHERE CAST(KibanaSampleDataEcommerce.order_date AS DATE) >= CURRENT_DATE - INTERVAL '28 days'
+        GROUP BY customer_gender
+        ORDER BY customer_gender
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    println!("Generated SQL: {sql}");
+
+    assert!(
+        sql.contains(
+            "CAST(CAST(${KibanaSampleDataEcommerce.order_date} AS DATE) AS TIMESTAMP) >= CAST((CURRENT_DATE() - INTERVAL '28 DAY') AS TIMESTAMP)"
+        ),
+        "expected both sides explicitly casted to TIMESTAMP, got: {}",
+        sql
+    );
+}
+
+#[tokio::test]
+async fn test_wrapper_binary_expr_computed_date_bound_bigquery_templates() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // BigQuery-shaped templates: `CURRENT_DATE - INTERVAL 28 DAY` is a DATETIME there, and
+    // `CAST(... AS TIMESTAMP)` is a valid DATETIME to TIMESTAMP conversion.
+    let query_plan = convert_select_to_query_plan_customized(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender AS step,
+            MEASURE(count) AS total_conversions,
+            ROW_NUMBER() OVER (ORDER BY customer_gender) AS step_order
+        FROM KibanaSampleDataEcommerce
+        WHERE KibanaSampleDataEcommerce.order_date >= CURRENT_DATE - INTERVAL '28 days'
+        GROUP BY customer_gender
+        ORDER BY customer_gender
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        vec![
+            (
+                "functions/CURRENTDATE".to_string(),
+                "CURRENT_DATE".to_string(),
+            ),
+            (
+                "expressions/binary".to_string(),
+                "{% if op == '%' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}".to_string(),
+            ),
+            (
+                "expressions/interval".to_string(),
+                "INTERVAL {{ interval }}".to_string(),
+            ),
+            (
+                "expressions/timestamp_literal".to_string(),
+                "TIMESTAMP('{{ value }}')".to_string(),
+            ),
+        ],
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    println!("Generated SQL: {sql}");
+
+    assert!(
+        sql.contains(
+            "${KibanaSampleDataEcommerce.order_date} >= CAST((CURRENT_DATE - INTERVAL 28 DAY) AS TIMESTAMP)"
+        ),
+        "expected BigQuery DATE arithmetic explicitly casted to TIMESTAMP, got: {}",
+        sql
+    );
+}
+
+#[tokio::test]
+async fn test_binary_expr_computed_date_bound_cube_scan_filter() {
+    init_testing_logger();
+
+    // Without a shape that needs the SQL push down, the explicit cast over the constant
+    // `DATE - INTERVAL` bound still folds to a literal and becomes a CubeScan date filter.
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender,
+            MEASURE(count)
+        FROM KibanaSampleDataEcommerce
+        WHERE KibanaSampleDataEcommerce.order_date >= CURRENT_DATE - INTERVAL '28 days'
+        GROUP BY customer_gender
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert!(
+        logical_plan.try_expect_root_cube_scan().is_some(),
+        "expected a plain CubeScan, got: {:?}",
+        logical_plan
+    );
+    let filters = logical_plan.find_cube_scan().request.filters.unwrap();
+    assert_eq!(filters.len(), 1, "filters: {:?}", filters);
+    assert_eq!(
+        filters[0].member.as_deref(),
+        Some("KibanaSampleDataEcommerce.order_date")
+    );
+    assert_eq!(filters[0].operator.as_deref(), Some("afterOrOnDate"));
+    // Midnight 28 days before the plan-time (UTC) date. The test may straddle midnight, so
+    // the previous day is accepted too.
+    let values = filters[0].values.clone().unwrap();
+    let today = chrono::Utc::now().date_naive();
+    let expected = [today, today - chrono::Duration::days(1)]
+        .iter()
+        .map(|day| {
+            (*day - chrono::Duration::days(28))
+                .format("%Y-%m-%dT00:00:00.000Z")
+                .to_string()
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        values.len() == 1 && expected.contains(&values[0]),
+        "expected one of {:?}, got: {:?}",
+        expected,
+        values
+    );
+}
+
+#[tokio::test]
+async fn test_wrapper_cast_without_template_folds_to_cube_scan_filter() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // Without a cast template the explicit cast cannot be pushed down; the bound folds to a
+    // CubeScan date filter instead.
+    let query_plan = convert_select_to_query_plan_customized(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender AS step,
+            MEASURE(count) AS total_conversions,
+            ROW_NUMBER() OVER (ORDER BY customer_gender) AS step_order
+        FROM KibanaSampleDataEcommerce
+        WHERE KibanaSampleDataEcommerce.order_date >= CURRENT_DATE - INTERVAL '28 days'
+        GROUP BY customer_gender
+        ORDER BY customer_gender
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        vec![("expressions/cast".to_string(), "".to_string())],
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    println!("Generated SQL: {sql}");
+    assert!(
+        !sql.contains("CAST("),
+        "no cast may reach the pushed down SQL without its template: {}",
+        sql
+    );
+    let filters = logical_plan.find_cube_scan().request.filters.unwrap();
+    assert_eq!(filters.len(), 1, "filters: {:?}", filters);
+    assert_eq!(
+        filters[0].member.as_deref(),
+        Some("KibanaSampleDataEcommerce.order_date")
+    );
+    assert_eq!(filters[0].operator.as_deref(), Some("afterOrOnDate"));
+}

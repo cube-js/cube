@@ -123,6 +123,8 @@ pub trait ConfigObj: DIService + Debug {
     fn no_implicit_order(&self) -> bool;
 
     fn enable_tesseract_sql_planner(&self) -> bool;
+
+    fn log_redaction(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -147,6 +149,7 @@ pub struct ConfigObjImpl {
     pub max_sessions: usize,
     pub no_implicit_order: bool,
     pub tesseract_sql_planner: bool,
+    pub log_redaction: bool,
 }
 
 impl ConfigObjImpl {
@@ -158,6 +161,10 @@ impl ConfigObjImpl {
         let sql_push_down = env_parse("CUBESQL_SQL_PUSH_DOWN", true);
 
         let db_query_limit: i32 = env_parse("CUBEJS_DB_QUERY_LIMIT", 50000);
+        // Development mode as server-core decides it (OptsHandler::isDevMode): there the
+        // console is the log sink and runnable SQL is wanted
+        let dev_mode = env::var("NODE_ENV").map_or(true, |node_env| node_env != "production")
+            || env_parse_bool("CUBEJS_DEV_MODE", false);
         let non_streaming_query_max_row_limit =
             match env_optparse("CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT") {
                 Some(limit) if limit > db_query_limit => {
@@ -212,6 +219,7 @@ impl ConfigObjImpl {
             max_sessions: env_parse("CUBEJS_MAX_SESSIONS", 1024),
             no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", true),
             tesseract_sql_planner: env_parse("CUBEJS_TESSERACT_SQL_PLANNER", true),
+            log_redaction: env_parse_bool("CUBEJS_LOG_REDACTION", !dev_mode),
         }
     }
 }
@@ -294,6 +302,10 @@ impl ConfigObj for ConfigObjImpl {
     fn enable_tesseract_sql_planner(&self) -> bool {
         self.tesseract_sql_planner
     }
+
+    fn log_redaction(&self) -> bool {
+        self.log_redaction
+    }
 }
 
 impl Config {
@@ -330,6 +342,7 @@ impl Config {
                 max_sessions: 1024,
                 no_implicit_order: true,
                 tesseract_sql_planner: false,
+                log_redaction: false,
             }),
         }
     }
@@ -456,6 +469,26 @@ where
             name, x, e
         ),
     })
+}
+
+/// A boolean variable read the way the JavaScript side reads one: `true` or
+/// `false` in any casing. Any other value is reported and the default used;
+/// a variable that only picks a default must not fail startup.
+fn env_parse_bool(name: &str, default: bool) -> bool {
+    match env::var(name) {
+        Err(_) => default,
+        Ok(value) => match value.trim().to_lowercase().as_str() {
+            "true" => true,
+            "false" => false,
+            other => {
+                warn!(
+                    "Environment variable '{}' has value '{}', expected true or false; using {}",
+                    name, other, default
+                );
+                default
+            }
+        },
+    }
 }
 
 pub fn env_parse_duration<T>(name: &str, default: T, max: Option<T>, min: Option<T>) -> T

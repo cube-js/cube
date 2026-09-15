@@ -22,8 +22,8 @@ use crate::{
         dataframe,
         postgres::copy::MAX_LENGTH_METADATA,
         statement::{
-            ApproximateCountDistinctVisitor, CastReplacer, RedshiftDatePartReplacer,
-            SensitiveDataSanitizer, SqlParser062Normalizer, ToTimestampReplacer,
+            redacted_statement, ApproximateCountDistinctVisitor, CastReplacer,
+            RedshiftDatePartReplacer, SqlParser062Normalizer, ToTimestampReplacer,
             UdfWildcardArgReplacer,
         },
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
@@ -263,9 +263,7 @@ impl QueryRouter {
                     ("query".to_string(), stmt.to_string()),
                     (
                         "sanitizedQuery".to_string(),
-                        SensitiveDataSanitizer::new()
-                            .replace(stmt.clone())
-                            .to_string(),
+                        redacted_statement(&stmt).to_string(),
                     ),
                 ]));
                 let msg = err.message();

@@ -177,7 +177,7 @@ Run `cube <command> --help` for the full options of any command.
 | `regions` | List available deployment regions |
 | `github` (`gh`) | GitHub integration: `status`, `installations`, `repos`, `branches`, `connect` |
 | `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `delete-branch`, `enable-branch`/`disable-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
-| `dbt` | dbt sync: `sync` (`--ref` or `--manifest`, `--wait`), `status`, `result`, `logs`, `history` (`--status`, `--trigger`), `cancel` |
+| `dbt` | dbt sync: `sync` (`--ref` or `--manifest`, `--wait`), `generate` (`--manifest`, `--out`, `--check`), `status`, `result`, `logs`, `history` (`--status`, `--trigger`), `cancel` |
 | `environments` | Deployment environments and environment tokens |
 | `variables` | Deployment environment variables |
 | `folders`, `workbooks`, `reports`, `workspace` | Workspace content management |
@@ -390,6 +390,47 @@ cube dbt sync DEPLOYMENT_ID --ref feature/orders-model --wait
 `--manifest`: the uploaded manifest already identifies the exact dbt state to convert.
 Git-based syncs provision a sandbox and parse the project, so prefer one per push over
 one per commit. Manifest syncs skip those phases.
+
+</Note>
+
+### Generate cubes without committing them
+
+`sync` commits the generated cubes to a Cube branch for review. `generate` does
+the opposite: it converts your manifest and writes the files to your working
+copy, committing nothing and creating no branch, so your own pipeline commits
+them through its normal review.
+
+```bash
+dbt parse
+cube dbt generate DEPLOYMENT_ID --manifest target/manifest.json --out .
+```
+
+`--out` is the **root of your data model project**, not the cube folder: the
+generated paths are project-relative (`model/cubes/dbt/…`) and are written
+beneath it as they come, so the output path configured on your dbt integration
+keeps deciding where the cubes live. `--out` defaults to the current directory.
+
+Cube never touches git on this path — no branch is created, nothing is written to
+the Cube data model, and the "dbt sync is ready for review" notification does not
+fire. That last one matters when the command runs on every pull request.
+
+`--check` compares the generated cubes against what is already on disk and exits
+non-zero if any of them is missing or differs, without writing. It walks the files
+the run generated, so it detects a cube that is out of date or absent — but not a
+cube left behind by a dbt model that was deleted, which neither `--check` nor the
+write path removes. Use it to fail a PR whose committed cubes no longer match the
+models its dbt project still has:
+
+```bash
+cube dbt generate DEPLOYMENT_ID --manifest target/manifest.json --out . --check
+```
+
+<Note>
+
+`generate` needs a deployment and an API key, because the conversion runs in Cube
+using that deployment's saved pull options — which is what keeps its output
+identical to the managed pull's. It does **not** need access to your dbt
+repository.
 
 </Note>
 

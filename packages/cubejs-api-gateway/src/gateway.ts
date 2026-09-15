@@ -19,6 +19,7 @@ import {
   ResultArrayWrapper,
   ResultMultiWrapper,
   ResultWrapper,
+  redactSqlLiterals,
   rowsToColumnar,
 } from '@cubejs-backend/native';
 import type {
@@ -116,6 +117,8 @@ type HandleErrorOptions = {
   res: ResponseResultFn,
   context?: any,
   query?: any,
+  /** The redacted twin of `query`, for the log sink to swap in when log redaction is on */
+  redactedQuery?: any,
   requestStarted?: Date
 };
 
@@ -569,6 +572,7 @@ class ApiGateway {
             query: {
               sql: query,
             },
+            redactedQuery: this.redactedSqlForLog(query),
             context: req.context,
             res: this.resToResultFn(res),
             requestStarted
@@ -2499,18 +2503,40 @@ class ApiGateway {
     next(e);
   };
 
+  /**
+   * The redacted twin of a SQL API statement for the log sink, the same one
+   * cubesql attaches to its own events. Nothing when redaction is off or when
+   * the body carried no statement (validation failed on it).
+   */
+  private redactedSqlForLog(query: unknown): { sql: string } | undefined {
+    if (!getEnv('logRedaction') || typeof query !== 'string') {
+      return undefined;
+    }
+
+    // Not guarded against the native module failing to load, on purpose: this
+    // endpoint runs the statement through that same module, so a platform
+    // without it cannot serve the endpoint at all, and the error may propagate.
+    // On such a platform this also turns a scope or validation error, raised
+    // before the statement ran, into a 500 with no event logged.
+    return { sql: redactSqlLiterals(query) };
+  }
+
   public handleError({
-    e, context, query, res, requestStarted
+    e, context, query, redactedQuery, res, requestStarted
   }: HandleErrorOptions) {
     const requestId = getEnv('devMode') || context?.signedWithPlaygroundAuthSecret ? context?.requestId : undefined;
     const stack = getEnv('devMode') ? e.stack : undefined;
 
     const plainError = e.plainMessages;
+    const loggedQuery = {
+      query: this.sanitizeQueryForLogging(query),
+      ...(redactedQuery ? { redactedQuery } : {}),
+    };
 
     if (e instanceof CubejsHandlerError) {
       this.log({
         type: e.type,
-        query: this.sanitizeQueryForLogging(query),
+        ...loggedQuery,
         error: e.message,
         duration: this.duration(requestStarted)
       }, context);
@@ -2518,7 +2544,7 @@ class ApiGateway {
     } else if (e.error === 'Continue wait') {
       this.log({
         type: 'Continue wait',
-        query: this.sanitizeQueryForLogging(query),
+        ...loggedQuery,
         error: e.message,
         duration: this.duration(requestStarted),
       }, context);
@@ -2526,7 +2552,7 @@ class ApiGateway {
     } else if (e.error) {
       this.log({
         type: 'Orchestrator error',
-        query: this.sanitizeQueryForLogging(query),
+        ...loggedQuery,
         error: e.error,
         duration: this.duration(requestStarted),
       }, context);
@@ -2534,7 +2560,7 @@ class ApiGateway {
     } else if (e.type === 'UserError') {
       this.log({
         type: e.type,
-        query: this.sanitizeQueryForLogging(query),
+        ...loggedQuery,
         error: e.message,
         duration: this.duration(requestStarted)
       }, context);
@@ -2552,6 +2578,7 @@ class ApiGateway {
       this.log({
         type: 'Internal Server Error',
         query,
+        ...(redactedQuery ? { redactedQuery } : {}),
         error: stack || e.toString(),
         duration: this.duration(requestStarted)
       }, context);

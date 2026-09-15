@@ -15,7 +15,7 @@ This is a Rust workspace containing three crates:
 
 ### Prerequisites
 ```bash
-# Install required Rust toolchain (1.90.0)
+# Install required Rust toolchain (1.98.1)
 rustup update
 
 # Install snapshot testing tool

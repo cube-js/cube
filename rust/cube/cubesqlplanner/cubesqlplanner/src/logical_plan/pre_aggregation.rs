@@ -198,8 +198,7 @@ impl PrettyPrint for PreAggregation {
         result.println(
             &format!(
                 "-time_dimensions: {}",
-                &self
-                    .time_dimensions()
+                self.time_dimensions()
                     .iter()
                     .map(|d| d.full_name())
                     .join(", ")

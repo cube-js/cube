@@ -208,11 +208,22 @@ function asBoolOrTime(input: string, envName: string): number | boolean {
   );
 }
 
+const devMode = () => get('CUBEJS_DEV_MODE')
+  .default('false')
+  .asBoolStrict();
+
 const variables: Record<string, (...args: any) => any> = {
-  devMode: () => get('CUBEJS_DEV_MODE')
-    .default('false')
-    .asBoolStrict(),
+  devMode,
   logLevel: () => get('CUBEJS_LOG_LEVEL').asString(),
+  logRedaction: () => {
+    // Off in development mode as OptsHandler.isDevMode decides it: there the console is
+    // the log sink and runnable SQL is wanted
+    const isDevMode = process.env.NODE_ENV !== 'production' || devMode();
+
+    return get('CUBEJS_LOG_REDACTION')
+      .default(isDevMode ? 'false' : 'true')
+      .asBoolStrict();
+  },
   port: () => asPortOrSocket(process.env.PORT || '4000', 'PORT'),
   tls: () => get('CUBEJS_ENABLE_TLS')
     .default('false')
