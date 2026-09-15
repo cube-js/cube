@@ -199,13 +199,6 @@ hides a control — `=0`, `=False`, `=FALSE`, and a bare `?showDashboardTitle`
 (no value) all leave it visible. Note this is the inverse of `allowExport`
 above, where only the literal string `true` opts in.
 
-The export menu has its own switch, `showDashboardExportMenu=false`, covered
-above under [Allow chart and dashboard export](#allow-csv-export) — unlike
-the controls in this table, it's hidden by default. It's also not part of
-this header bar the way the controls above are: in Creator Mode it's docked
-in the header, but on the published-dashboard embed it floats over the
-dashboard, so `showDashboardHeader=false` doesn't hide it there.
-
 <Note>
 These parameters are URL-only — they aren't accepted in the [Generate
 Session](/reference/embed-apis/generate-session#session-settings) `settings`
@@ -218,6 +211,13 @@ These parameters apply to the dashboard header only. Setting
 disappears regardless of their values. `showDashboardEditButton` can only
 hide the Edit action; it can never show one to a viewer who lacks edit
 permission.
+
+The export menu has its own switch, `showDashboardExportMenu=false`, covered
+above under [Allow chart and dashboard export](#allow-csv-export) — unlike
+the controls in this table, it's hidden by default. It also isn't part of
+the dashboard header the way those controls are: in Creator Mode it's docked
+in the header, but on the published-dashboard embed it floats over the
+dashboard, so `showDashboardHeader=false` doesn't hide it there.
 
 ### Creator Mode workbook header
 
