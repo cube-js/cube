@@ -108,9 +108,13 @@ const tarOptions = {
 };
 
 // A zip records a unix mode in the high 16 bits of the external attributes; the
-// file-type nibble there is what marks an entry a symlink.
+// file-type nibble there is what marks an entry a symlink or a directory.
 const UNIX_MODE_MASK = 0o170000;
 const UNIX_MODE_SYMLINK = 0o120000;
+const UNIX_MODE_DIRECTORY = 0o040000;
+
+// eslint-disable-next-line no-bitwise
+const unixFileType = (entry: yauzl.Entry) => (entry.externalFileAttributes >>> 16) & UNIX_MODE_MASK;
 
 /** Pull one entry, or `null` at the end of the archive. */
 function nextZipEntry(zipfile: yauzl.ZipFile): Promise<yauzl.Entry | null> {
@@ -142,19 +146,17 @@ function nextZipEntry(zipfile: yauzl.ZipFile): Promise<yauzl.Entry | null> {
 }
 
 async function writeZipEntry(zipfile: yauzl.ZipFile, entry: yauzl.Entry, dir: string): Promise<void> {
-  // yauzl's own name check: rejects backslashes, absolute paths and any `..` segment.
+  // Defence in depth. yauzl runs this itself inside `readEntry` while `decodeStrings`
+  // is on, so a `..` name errors out of `nextZipEntry` and never reaches here; this
+  // keeps the check owned locally rather than by a default we do not set.
   const invalid = yauzl.validateFileName(entry.fileName);
   if (invalid) {
     throw new Error(`Refusing to extract zip entry, ${invalid}`);
   }
 
-  // The advisory that cost us `extract-zip` (GHSA-jmr9-qjv8-65gv) is precisely this
-  // entry kind: it wrote the link verbatim, so a later entry could be written
-  // *through* it to anywhere on disk. Refusing outright is both the fix and a
-  // stronger guarantee than a containment check on the link target — with no symlink
-  // ever created, no later entry can resolve out of `dir` either.
-  // eslint-disable-next-line no-bitwise
-  if (((entry.externalFileAttributes >>> 16) & UNIX_MODE_MASK) === UNIX_MODE_SYMLINK) {
+  // Refused outright rather than containment-checked (GHSA-jmr9-qjv8-65gv): with no
+  // symlink ever created under `dir`, no later entry can resolve out of it either.
+  if (unixFileType(entry) === UNIX_MODE_SYMLINK) {
     throw new Error(`Refusing to extract symlink entry from zip: ${entry.fileName}`);
   }
 
@@ -163,7 +165,10 @@ async function writeZipEntry(zipfile: yauzl.ZipFile, entry: yauzl.Entry, dir: st
     throw new Error(`Refusing to extract zip entry out of bound path: ${entry.fileName}`);
   }
 
-  if (entry.fileName.endsWith('/')) {
+  // The trailing slash is the convention, but a producer may mark a directory by mode
+  // alone; read as a file, it would land as an empty regular file and ENOTDIR every
+  // entry underneath it.
+  if (entry.fileName.endsWith('/') || unixFileType(entry) === UNIX_MODE_DIRECTORY) {
     await fs.promises.mkdir(dest, { recursive: true });
     return;
   }
@@ -174,6 +179,7 @@ async function writeZipEntry(zipfile: yauzl.ZipFile, entry: yauzl.Entry, dir: st
   // a DOS-made zip leaves this 0, where node's default is the right answer.
   // eslint-disable-next-line no-bitwise
   const mode = (entry.externalFileAttributes >>> 16) & 0o777;
+
   const readStream = await zipfile.openReadStreamPromise(entry);
 
   await pipeline(readStream, fs.createWriteStream(dest, mode ? { mode } : {}));
@@ -189,6 +195,17 @@ async function writeZipEntry(zipfile: yauzl.ZipFile, entry: yauzl.Entry, dir: st
 async function extractZipArchive(archivePath: string, dir: string): Promise<void> {
   const zipfile = await yauzl.openPromise(archivePath, { lazyEntries: true });
 
+  // yauzl reports reader failures by emitting `error` on the zipfile, and an
+  // EventEmitter that emits `error` with no listener *throws* — so the one
+  // `nextZipEntry` attaches is not enough: it comes off as soon as an entry
+  // resolves, leaving the whole of `writeZipEntry` uncovered. A failure there would
+  // crash the process instead of rejecting. This listener stays on for the zipfile's
+  // lifetime and the loop turns what it caught into a rejection.
+  let fatal: Error | undefined;
+  zipfile.on('error', (err: Error) => {
+    fatal = fatal ?? err;
+  });
+
   try {
     for (;;) {
       // Sequential on purpose: entries are read from one cursor, and a directory
@@ -200,6 +217,10 @@ async function extractZipArchive(archivePath: string, dir: string): Promise<void
       }
       // eslint-disable-next-line no-await-in-loop
       await writeZipEntry(zipfile, entry, dir);
+
+      if (fatal) {
+        throw fatal;
+      }
     }
   } finally {
     zipfile.close();

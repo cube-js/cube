@@ -4,7 +4,17 @@ import path from 'path';
 import * as tar from 'tar';
 import { crc32 } from 'zlib';
 
+import * as yauzl from 'yauzl';
+
 import { extractArchive } from '../src/http-utils';
+
+// The module namespace object is frozen under the ESM interop, so `jest.spyOn` cannot
+// redefine `openPromise`. Replace the module with a passthrough whose one export is a
+// mock, which a single test swaps out to hand back a zipfile it can make misbehave.
+jest.mock('yauzl', () => {
+  const actual = jest.requireActual<typeof import('yauzl')>('yauzl');
+  return { ...actual, openPromise: jest.fn(actual.openPromise) };
+});
 
 /**
  * `extractArchive` replaced the unmaintained `decompress`, which carries two
@@ -219,14 +229,10 @@ describe('extractArchive', () => {
     });
 
     it('refuses a zip symlink entry outright, rather than the write through it', async () => {
-      // This is the exact shape of GHSA-jmr9-qjv8-65gv, the unfixed advisory that
-      // `extract-zip` was dropped for: a symlink entry has a clean relative *name*, so
-      // a name check alone waves it through and the next entry is written through it.
-      //
-      // The rejection has to land on the symlink, not on the file that follows: assert
-      // the link itself never appears in the target. Catching only the second entry
-      // would still leave an attacker-controlled link pointing out of the directory,
-      // and would pass just as green.
+      // A symlink entry has a clean relative *name*, so a name check waves it through
+      // and the next entry is written through it. Catching only that second entry
+      // still leaves an attacker-controlled link pointing out of the target, so assert
+      // the link itself never appears.
       const archive = path.join(work, 'zipsym.zip');
       const outside = path.join(work, 'outside');
       fs.mkdirSync(outside);
@@ -241,6 +247,41 @@ describe('extractArchive', () => {
 
       expect(fs.existsSync(path.join(outside, 'PWNED.txt'))).toBe(false);
       expect(fs.existsSync(path.join(target, 'esc'))).toBe(false);
+    });
+  });
+
+  describe('survives a reader failure rather than crashing the process', () => {
+    it('rejects when the zipfile raises an error while an entry is being written', async () => {
+      // yauzl reports reader failures by emitting `error` on the ZipFile, and an
+      // EventEmitter that emits `error` with no listener throws — so this has to be a
+      // rejection, not an uncaught exception that takes the process with it.
+      //
+      // The window only exists *between* reads: the per-read listener comes off as
+      // soon as an entry resolves, so the error has to be raised while the entry is
+      // being written, which is what the `setImmediate` below lines it up with.
+      const archive = path.join(work, 'two-entries.zip');
+      await writeZip(archive, [
+        { name: 'a.txt', content: 'first' },
+        { name: 'b.txt', content: 'second' },
+      ]);
+
+      const { openPromise } = jest.requireActual<typeof import('yauzl')>('yauzl');
+
+      (yauzl.openPromise as jest.MockedFunction<typeof yauzl.openPromise>).mockImplementationOnce(
+        async (file: string, options?: yauzl.Options) => {
+          const zipfile = await openPromise(file, options);
+
+          // Registered before `nextZipEntry`'s, so it runs first and schedules the
+          // failure for after that listener has come off again.
+          zipfile.once('entry', () => {
+            setImmediate(() => zipfile.emit('error', new Error('reader exploded')));
+          });
+
+          return zipfile;
+        }
+      );
+
+      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/reader exploded/);
     });
   });
 
@@ -263,6 +304,22 @@ describe('extractArchive', () => {
       await extractArchive(archive, target);
 
       expect(fs.readFileSync(path.join(target, 'dir', 'file.txt'), 'utf8')).toBe('legit-content');
+    });
+
+    it('treats a zip entry marked a directory by mode alone as a directory', async () => {
+      // The trailing slash is the convention, not the rule. Read as a file, this entry
+      // would land as an empty regular file and every entry under it would ENOTDIR.
+      const archive = path.join(work, 'moddir.zip');
+      await writeZip(archive, [
+        { name: 'plugins', content: '', mode: 0o040755 },
+        { name: 'plugins/driver.txt', content: 'legit-content' },
+      ]);
+
+      const target = targetDir();
+      await extractArchive(archive, target);
+
+      expect(fs.statSync(path.join(target, 'plugins')).isDirectory()).toBe(true);
+      expect(fs.readFileSync(path.join(target, 'plugins', 'driver.txt'), 'utf8')).toBe('legit-content');
     });
 
     it('detects an uncompressed tar from the ustar magic at offset 257', async () => {
