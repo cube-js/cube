@@ -17,6 +17,7 @@ use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::symbols::transforms;
+use crate::planner::time_dimension::SeriesSpan;
 use crate::planner::{DimensionTimeShift, JoinTree, MeasureTimeShifts};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -1027,17 +1028,23 @@ impl QueryProperties {
         Ok(())
     }
 
+    /// Rewrite the `InDateRange` filter on `member_name` into a regular
+    /// rolling-window filter. The filter carries
+    /// `[from, to, trailing, leading]`, followed by the span the base scan
+    /// reads when that is known at plan time.
     pub fn replace_regular_date_range_filter(
         &mut self,
         member_name: &str,
         left_interval: Option<String>,
         right_interval: Option<String>,
+        scan_range: Option<SeriesSpan>,
     ) -> Result<(), CubeError> {
         let operator = FilterOperator::RegularRollingWindowDateRange;
-        let values = vec![
+        let mut values = vec![
             FilterValue::from(left_interval),
             FilterValue::from(right_interval),
         ];
+        values.extend(series_span_values(scan_range));
         self.time_dimensions_filters = self.change_date_range_filter_impl(
             member_name,
             &self.time_dimensions_filters,
@@ -1050,13 +1057,18 @@ impl QueryProperties {
         Ok(())
     }
 
+    /// Rewrite the `InDateRange` filter on `member_name` into a `to_date`
+    /// rolling-window filter. The filter carries `[from, to, granularity]`,
+    /// followed by the span the window reads when that is known at plan time.
     pub fn replace_to_date_date_range_filter(
         &mut self,
         member_name: &str,
         granularity: &String,
+        window_range: Option<SeriesSpan>,
     ) -> Result<(), CubeError> {
         let operator = FilterOperator::ToDateRollingWindowDateRange;
-        let values = vec![FilterValue::Str(granularity.clone())];
+        let mut values = vec![FilterValue::Str(granularity.clone())];
+        values.extend(series_span_values(window_range));
         self.time_dimensions_filters = self.change_date_range_filter_impl(
             member_name,
             &self.time_dimensions_filters,
@@ -1273,5 +1285,20 @@ impl PartialEq for QueryProperties {
                         && a.join_type == b.join_type
                         && a.on_sql.struct_eq(&b.on_sql)
                 })
+    }
+}
+
+/// Tail a rolling-window filter carries its scan span in: the lower bound, the
+/// two upper bounds one per series shape, and whether the granularity is a
+/// predefined one. Empty where the span is not derivable while planning.
+fn series_span_values(span: Option<SeriesSpan>) -> Vec<FilterValue> {
+    match span {
+        Some(span) => vec![
+            FilterValue::Str(span.from),
+            FilterValue::Str(span.to_aligned),
+            FilterValue::Str(span.to_stepped),
+            FilterValue::Bool(span.predefined_granularity),
+        ],
+        None => vec![],
     }
 }
