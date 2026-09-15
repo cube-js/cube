@@ -189,19 +189,16 @@ type ZipExtraction = {
   /** Directory modes to apply once every entry is written — see `applyDirectoryModes`. */
   directoryModes: Map<string, number>;
   /**
-   * First directory this extraction created, which the umask has therefore filtered.
-   * `mkdir({ recursive: true })` returns the path it made, and `undefined` exactly when
-   * it made nothing — which is how a pre-existing directory is told apart.
+   * First directory this extraction created, so the umask has filtered its mode.
+   * `mkdir({ recursive: true })` returns the path it made, `undefined` when it made none.
    */
   createdDirectory?: string;
 };
 
 /**
- * The permission bits the umask currently allows.
- *
- * Not `process.umask()` (DEP0139), and not the stat of any extracted directory — that
- * equals `0o777 & ~umask` only where `mkdir` created it, so a pre-existing `0o777`
- * `dest` would hand the archive its mode verbatim.
+ * The permission bits the umask currently allows — not `process.umask()` (DEP0139),
+ * and not the stat of any extracted directory, which a pre-existing `0o777` `dest`
+ * would answer with the archive's own mode.
  */
 async function umaskAllowedBits(root: string, createdDirectory?: string): Promise<number> {
   if (createdDirectory) {
@@ -225,9 +222,7 @@ async function umaskAllowedBits(root: string, createdDirectory?: string): Promis
 }
 
 /**
- * Apply recorded directory modes once every entry is written — a restrictive mode
- * cannot be set while there are still entries to write underneath it, and `mkdir`
- * will not chmod a directory a child entry already created. Deepest first, because
+ * Apply recorded directory modes once every entry is written. Deepest first, because
  * restricting an ancestor takes away the traversal bit its descendants need.
  */
 async function applyDirectoryModes(extraction: ZipExtraction): Promise<void> {
@@ -418,6 +413,8 @@ async function extractZipArchive(archivePath: string, dir: string): Promise<void
     directoryModes: new Map(),
   };
 
+  let applied = false;
+
   try {
     for (;;) {
       // Sequential on purpose: entries are read from one cursor.
@@ -432,7 +429,18 @@ async function extractZipArchive(archivePath: string, dir: string): Promise<void
       await Promise.race([writeZipEntry(extraction, entry), fatal]);
     }
 
+    applied = true;
     await applyDirectoryModes(extraction);
+  } catch (e) {
+    // A refused entry leaves the tree it had already written, and nothing here removes
+    // it — so the directories the archive asked to keep private should still end up
+    // private. Best effort: the entry's error is the one worth reporting, and by now
+    // there is nothing left to write under a restrictive mode.
+    if (!applied) {
+      await applyDirectoryModes(extraction).catch(() => undefined);
+    }
+
+    throw e;
   } finally {
     zipfile.close();
   }

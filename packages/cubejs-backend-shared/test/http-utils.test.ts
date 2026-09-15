@@ -365,6 +365,9 @@ describe('extractArchive', () => {
       expect(fs.readFileSync(secret, 'utf8')).toBe('original');
       // eslint-disable-next-line no-bitwise
       expect((fs.statSync(secret).mode & 0o777).toString(8)).toBe('600');
+      // The other half: the entry still lands, so this passes because the alias was
+      // broken rather than because nothing was written.
+      expect(fs.readFileSync(path.join(target, 'esc'), 'utf8')).toBe('overwritten');
     });
 
     it('refuses a dangling symlink at the entry name, which would create its target', async () => {
@@ -632,6 +635,43 @@ describe('extractArchive', () => {
       // eslint-disable-next-line no-bitwise
       expect((fs.statSync(path.join(target, 'plugins')).mode & 0o777).toString(8)).toBe('755');
       expect(fs.readdirSync(target).filter((e) => e.startsWith('.cube-umask-probe-'))).toEqual([]);
+    });
+
+    it('still applies recorded directory modes when a later entry is refused', async () => {
+      // A refused entry leaves behind what was already written, and nothing removes it
+      // — so a directory the archive marked private must not be left at the default.
+      const archive = path.join(work, 'failpartial.zip');
+      const outside = path.join(work, 'outside');
+      fs.mkdirSync(outside);
+
+      await writeZip(archive, [
+        { name: 'private', content: '', mode: 0o040700 },
+        { name: 'private/key', content: 'secret-material' },
+        { name: 'esc', content: outside, mode: 0o120777 },
+      ]);
+
+      const target = targetDir();
+      await expect(extractArchive(archive, target)).rejects.toThrow(/symlink/i);
+
+      expect(fs.readFileSync(path.join(target, 'private', 'key'), 'utf8')).toBe('secret-material');
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(path.join(target, 'private')).mode & 0o777).toString(8)).toBe('700');
+    });
+
+    it('lets the last of two entries with the same name win', async () => {
+      // Legal, and emitted by real packagers — an updated zip can keep the superseded
+      // local header. Under `O_EXCL` the second entry only works because the first's
+      // output is unlinked, so this pins the branch that makes it so; `unzip -o` agrees.
+      const archive = path.join(work, 'duplicate.zip');
+      await writeZip(archive, [
+        { name: 'driver.jar', content: 'first' },
+        { name: 'driver.jar', content: 'second' },
+      ]);
+
+      const target = targetDir();
+      await extractArchive(archive, target);
+
+      expect(fs.readFileSync(path.join(target, 'driver.jar'), 'utf8')).toBe('second');
     });
 
     it('narrows a pre-existing file to the mode the archive records', async () => {
