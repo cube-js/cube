@@ -380,20 +380,24 @@ async function writeZipEntry(extraction: ZipExtraction, entry: yauzl.Entry): Pro
     throw e;
   }
 
-  // `O_CREAT` applies `mode` only to a file it creates, and `O_TRUNC` leaves an
-  // existing file's bits alone — so without this, re-extracting over a `0o666`
-  // `driver.jar` would report success and leave it `0o666`. Masked like the directory
-  // path, or an archive could widen past the umask where `open` would not have.
-  if (mode && existing) {
-    // eslint-disable-next-line no-bitwise
-    await handle.chmod(mode & (await umaskAllowed(extraction)));
+  try {
+    // `O_CREAT` sets `mode` only on a file it creates and `O_TRUNC` leaves an existing
+    // one's bits alone. Masked like the directory path, or an archive could widen past
+    // the umask where `open` would not have.
+    if (mode && existing) {
+      // eslint-disable-next-line no-bitwise
+      await handle.chmod(mode & (await umaskAllowed(extraction)));
+    }
+  } catch (e) {
+    // Same reason as the open's catch: nothing downstream exists yet to tear these
+    // down, and the archive's descriptor is held until the entry stream is destroyed.
+    readStream.destroy();
+    await handle.close();
+    throw e;
   }
 
   // The signal is what tears these two down when the zipfile errors out from under
   // them — losing the race only abandons this promise, it does not close anything.
-  // Node destroys both when handed an already-aborted signal, which is how this is
-  // reached when the fatal race was lost while the open was in flight.
-  // The handle closes with the stream it was turned into.
   await pipeline(readStream, handle.createWriteStream(), { signal });
 }
 

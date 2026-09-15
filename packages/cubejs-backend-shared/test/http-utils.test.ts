@@ -403,6 +403,54 @@ describe('extractArchive', () => {
         "the abandoned entry stream to be destroyed, which is what unrefs the archive's descriptor"
       );
     });
+
+    it('releases it when the mode fixup after the open throws', async () => {
+      // The open's own catch does not cover what follows it: `umaskAllowed`'s probe and
+      // the `chmod` both run before `pipeline` exists to tear anything down, and either
+      // can fail on a real filesystem (EACCES probing a read-only `cwd`, EPERM
+      // chmodding a file a previous run left under another uid).
+      const archive = path.join(work, 'chmodfail.zip');
+      await writeZip(archive, [{ name: 'driver.jar', content: 'new', mode: 0o100644 }]);
+
+      const target = targetDir();
+      fs.writeFileSync(path.join(target, 'driver.jar'), 'old');
+
+      const { openPromise } = jest.requireActual<typeof import('yauzl')>('yauzl');
+      const entryStreams: Readable[] = [];
+
+      (yauzl.openPromise as jest.MockedFunction<typeof yauzl.openPromise>).mockImplementationOnce(
+        async (file: string, options?: yauzl.Options) => {
+          const zipfile = await openPromise(file, options);
+          const openReadStreamPromise = zipfile.openReadStreamPromise.bind(zipfile);
+
+          zipfile.openReadStreamPromise = async (...args: Parameters<typeof openReadStreamPromise>) => {
+            const stream = await openReadStreamPromise(...args);
+            entryStreams.push(stream);
+            return stream;
+          };
+
+          return zipfile;
+        }
+      );
+
+      const open = fs.promises.open.bind(fs.promises);
+      jest.spyOn(fs.promises, 'open').mockImplementation(async (...args: Parameters<typeof fs.promises.open>) => {
+        const handle = await open(...args);
+        handle.chmod = async () => {
+          throw Object.assign(new Error('EPERM: operation not permitted, fchmod'), { code: 'EPERM' });
+        };
+        return handle;
+      });
+
+      try {
+        await expect(extractArchive(archive, target)).rejects.toThrow(/EPERM/);
+
+        expect(entryStreams).toHaveLength(1);
+        await waitUntil(() => entryStreams[0].destroyed, 'the abandoned entry stream to be destroyed');
+      } finally {
+        jest.restoreAllMocks();
+      }
+    });
   });
 
   describe('survives a reader failure rather than crashing the process', () => {
