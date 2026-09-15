@@ -193,6 +193,7 @@ impl QueryPlanner for QueryPlannerImpl {
                     show_aggregations: true,
                     show_output_hints: true,
                     show_check_memory_nodes: false,
+                    show_limit_pushdown: true,
                     ..PPOptions::none()
                 }
             )
@@ -218,6 +219,7 @@ impl QueryPlanner for QueryPlannerImpl {
                     show_aggregations: true,
                     show_output_hints: true,
                     show_check_memory_nodes: false,
+                    show_limit_pushdown: true,
                     ..PPOptions::none()
                 }
             )
@@ -232,6 +234,7 @@ impl QueryPlanner for QueryPlannerImpl {
                 logical_plan,
                 &self.meta_store.as_ref(),
                 self.config.enable_topk(),
+                self.config.limit_pushdown(),
             )
             .await?;
             let workers = compute_workers(
