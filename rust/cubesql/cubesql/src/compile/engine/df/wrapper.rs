@@ -60,10 +60,22 @@ use std::{
 #[path = "wrapper/boolean_context_tests.rs"]
 mod boolean_context_tests;
 
-struct RejectVolatileBoolean;
+struct RejectRepeatedBoolean<'a> {
+    subqueries: &'a HashMap<String, String>,
+}
 
-impl ExpressionVisitor for RejectVolatileBoolean {
+impl ExpressionVisitor for RejectRepeatedBoolean<'_> {
     fn pre_visit(self, expr: &Expr) -> Result<Recursion<Self>> {
+        let subquery = match expr {
+            Expr::InSubquery { .. } => true,
+            Expr::Column(column) => self.subqueries.contains_key(&column.flat_name()),
+            _ => false,
+        };
+        if subquery {
+            return Err(DataFusionError::NotImplemented(
+                "Scalar boolean SQL conversion cannot repeat an opaque subquery".to_string(),
+            ));
+        }
         let volatile = match expr {
             Expr::ScalarFunction { fun, .. } => fun.volatility() == Volatility::Volatile,
             Expr::ScalarUDF { fun, .. } => fun.signature.volatility == Volatility::Volatile,
@@ -2466,8 +2478,9 @@ impl WrappedSelectNode {
                 .contains_template("expressions/predicate_to_scalar")
         {
             // A three-way CASE can evaluate its predicate twice. Do not silently
-            // change the result of an expression containing a volatile function.
-            expr.accept(RejectVolatileBoolean)?;
+            // change the result of a volatile function or duplicate an opaque
+            // subquery whose cost and volatility cannot be inspected here.
+            expr.accept(RejectRepeatedBoolean { subqueries })?;
         }
         let (sql, query) = Self::generate_sql_for_expr_raw(
             sql_query,
@@ -2497,16 +2510,6 @@ impl WrappedSelectNode {
         subqueries: &HashMap<String, String>,
     ) -> Result<(String, SqlQuery)> {
         match expr {
-            Expr::Alias(expr, _) => {
-                let (expr, sql_query) = Self::generate_sql_for_expr(
-                    sql_query,
-                    sql_generator.clone(),
-                    *expr,
-                    push_to_cube_context,
-                    subqueries,
-                )?;
-                Ok((expr, sql_query))
-            }
             expr @ Expr::Column(_) => Self::generate_sql_for_column(
                 sql_query,
                 sql_generator,

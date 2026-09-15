@@ -1,5 +1,5 @@
 use super::*;
-use crate::compile::test::{mssql_boolean_templates, sql_generator};
+use crate::compile::test::{mssql_boolean_fixture, mssql_boolean_templates, sql_generator};
 use datafusion::{
     arrow::{
         array::{Array, BooleanArray},
@@ -80,6 +80,9 @@ async fn boolean_context_truth_tables() {
         Arc::new(MemTable::try_new(schema, vec![vec![batch]]).unwrap()),
     )
     .unwrap();
+    let fixture = mssql_boolean_fixture();
+    let cases = fixture["cases"].as_array().unwrap();
+    let mut tested_cases = 0;
     for expression in [
         "b",
         "TRUE",
@@ -100,6 +103,7 @@ async fn boolean_context_truth_tables() {
         "b IN (TRUE, FALSE)",
         "b BETWEEN FALSE AND TRUE",
     ] {
+        tested_cases += 1;
         let original = format!("SELECT {expression} FROM fixture");
         let plan = ctx.sql(&original).await.unwrap().to_logical_plan().unwrap();
         let LogicalPlan::Projection(projection) = plan else {
@@ -178,13 +182,22 @@ async fn boolean_context_truth_tables() {
                     "{}",
                     scalar
                 );
-                println!(
-                    "MSSQL_BOOLEAN_CASE {}",
-                    serde_json::json!({"expression": expression, "scalar": scalar, "predicate": predicate, "expected": expected})
+                let case = cases
+                    .iter()
+                    .find(|case| case["expression"] == expression)
+                    .unwrap();
+                assert_eq!(case["scalar"], scalar, "{}", expression);
+                assert_eq!(case["predicate"], predicate, "{}", expression);
+                assert_eq!(
+                    case["expected"],
+                    serde_json::json!(expected),
+                    "{}",
+                    expression
                 );
             }
         }
     }
+    assert_eq!(tested_cases, cases.len());
 }
 
 // The pinned DataFusion SQL planner translates IS [NOT] TRUE/FALSE to ordinary
@@ -224,14 +237,18 @@ fn boolean_context_aggregate_sql() {
         within_group: None,
     }
     .gt(lit(0_i64));
-    for (expr, expected_empty) in [(count, Some(false)), (sum, None)] {
+    let fixture = mssql_boolean_fixture();
+    let aggregates = fixture["aggregates"].as_array().unwrap();
+    assert_eq!(aggregates.len(), 2);
+    for ((expr, expected_empty), case) in
+        IntoIterator::into_iter([(count, Some(false)), (sum, None)]).zip(aggregates)
+    {
         let scalar = render(expr, false, true);
         assert!(scalar.starts_with("CAST(CASE WHEN"), "{}", scalar);
         assert!(scalar.ends_with("ELSE NULL END AS BIT)"), "{}", scalar);
-        println!(
-            "MSSQL_BOOLEAN_AGGREGATE {}",
-            serde_json::json!({"scalar": scalar, "expected": true, "expected_empty": expected_empty})
-        );
+        assert_eq!(case["scalar"], scalar);
+        assert_eq!(case["expected"], true);
+        assert_eq!(case["expected_empty"], serde_json::json!(expected_empty));
     }
 }
 
@@ -275,4 +292,43 @@ fn boolean_context_rejects_volatile_scalarization() {
         .unwrap_err()
         .to_string()
         .contains("cannot repeat a volatile expression"));
+}
+
+#[test]
+fn boolean_context_rejects_repeated_subqueries() {
+    use datafusion::logical_plan::{col, lit};
+    let subqueries = HashMap::from([("sq".to_string(), "SELECT 1".to_string())]);
+    let expressions = [
+        Expr::InSubquery {
+            expr: Box::new(col("b")),
+            subquery: Box::new(col("sq")),
+            negated: false,
+        },
+        col("sq").eq(lit(1_i64)),
+    ];
+    for expr in expressions {
+        for (mssql, predicate) in [(true, false), (true, true), (false, false)] {
+            let result = WrappedSelectNode::generate_sql_for_expr_context(
+                SqlQuery::new(String::new(), vec![]),
+                sql_generator(if mssql {
+                    mssql_boolean_templates()
+                } else {
+                    vec![]
+                }),
+                expr.clone(),
+                None,
+                &subqueries,
+                predicate,
+            );
+            if mssql && !predicate {
+                assert!(result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("cannot repeat an opaque subquery"));
+            } else {
+                let sql = result.unwrap().0;
+                assert_eq!(sql.matches("SELECT 1").count(), 1, "{}", sql);
+            }
+        }
+    }
 }
