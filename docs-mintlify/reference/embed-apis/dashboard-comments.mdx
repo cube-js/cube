@@ -13,17 +13,19 @@ The Dashboard Comments API is available on [Premium and Enterprise plans](https:
 
 ## Prerequisites
 
-**Commenting is off until the account enables it.** Turn on **Allow comments on embedded dashboards** under **Embed → Settings** in the Cube console — see [Show and hide features](/embedding/iframe/feature-visibility#account-settings). It is the host account's switch alone: an embed user is never an administrator of the account they view, so an embed tenant cannot turn commenting on for itself. There is no per-session override, so every embed of the account gets the same answer.
+**The account decides whether the comment UI appears.** Turn on **Allow comments on embedded dashboards** under **Embed → Settings** in the Cube console — see [Show and hide features](/embedding/iframe/feature-visibility#account-settings). The setting governs whether the built-in comment panel renders on an embedded dashboard. It is the host account's switch alone: an embed user cannot turn it on, and there is no per-session override.
 
-**The two commenting surfaces are independent.** Comments on embedded dashboards and comments inside the Cube app have separate storage and separate settings. Enabling one never enables the other, and a thread written on one surface is not visible on the other.
+**The two commenting surfaces are independent.** Comments on embedded dashboards and comments inside the Cube app have separate storage and separate settings, and a thread written on one surface is not visible on the other.
 
 ## Authentication
 
-Every endpoint requires a **signed embed session scoped to an embed tenant** — mint one with [Generate Session][ref-generate-session], passing `embedTenantName`. The calling embed user is taken from that session; no endpoint accepts an author in the request body.
+Every endpoint requires a **signed embed session scoped to an embed tenant**. Mint one with [Generate Session][ref-generate-session] using `externalId`, and **pass `embedTenantName`** — commenting requires it. The field is optional on Generate Session at large, but a session minted without it carries no embed tenant and is rejected here with `403 Forbidden`.
 
-A credential that names no embed tenant is rejected with `403 Forbidden`. That covers a [Cube Cloud API key][ref-api-keys], a console session, and a session minted with `internalId` — a conversation lives inside one embed tenant's partition, so a caller outside every partition has no conversation to be served.
+Any other credential that names no embed tenant is refused the same way, including a [Cube Cloud API key][ref-api-keys] and a console session.
 
-Beyond the session, the caller must be able to read the dashboard. The same access check guards `GET /dashboard/{publicId}`, so a viewer who cannot open a dashboard cannot reach its conversation either.
+The calling embed user is taken from the session; no endpoint accepts an author in the request body.
+
+The caller must also be able to read the dashboard. The same access check guards `GET /dashboard/{publicId}`, so a viewer who cannot open a dashboard cannot reach its conversation either.
 
 ## Endpoints
 
@@ -75,7 +77,7 @@ Resolving applies to threads only. Passing a reply's id returns `400`, because a
 
 ### Comment
 
-Returned by `POST` and `PATCH /dashboard/{publicId}/comments`, and nested inside every thread.
+Returned by `POST /dashboard/{publicId}/comments` and `PATCH /dashboard/{publicId}/comments/{commentId}`, and nested inside every thread.
 
 ```json
 {
@@ -136,7 +138,14 @@ Returned by `GET /dashboard/{publicId}/comments`.
 
 ```json
 {
-  "items": [ /* threads */ ],
+  "items": [
+    {
+      "root": { "id": 41, "body": "Revenue looks off for the EU region." },
+      "replies": [],
+      "resolvedAt": null,
+      "resolvedBy": null
+    }
+  ],
   "pageInfo": {
     "hasNextPage": true,
     "hasPreviousPage": false,
@@ -224,7 +233,8 @@ curl "https://your-account.cubecloud.dev/api/v1/embed/dashboard/PUBLIC_ID/commen
 | Status | When |
 | --- | --- |
 | `400` | Replying to a reply, resolving a reply's id, or a `body` that is empty or over 10,000 characters. |
-| `403` | The credential names no embed tenant; or the comment belongs to another embed user. |
+| `401` | The `Embed-Token` is invalid or expired. Exchange a fresh `sessionId` for a new one. |
+| `403` | The credential names no embed tenant; the caller cannot read the dashboard; or the comment belongs to another embed user. |
 | `404` | The dashboard, the comment, or a `parentId` does not exist on this dashboard. |
 
 [ref-generate-session]: /reference/embed-apis/generate-session
