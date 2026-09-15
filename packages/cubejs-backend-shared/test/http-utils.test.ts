@@ -4,7 +4,7 @@ import path from 'path';
 import * as tar from 'tar';
 import { crc32 } from 'zlib';
 
-import { PassThrough } from 'stream';
+import { PassThrough, Writable } from 'stream';
 import * as yauzl from 'yauzl';
 
 import { extractArchive } from '../src/http-utils';
@@ -283,9 +283,26 @@ describe('extractArchive', () => {
       expect(fs.existsSync(path.join(outside, 'sub'))).toBe(false);
       expect(fs.existsSync(path.join(outside, 'sub', 'PWNED.txt'))).toBe(false);
     });
-  });
 
-  describe('survives a reader failure rather than crashing the process', () => {
+    it('refuses a trailing-slash entry over a pre-existing symlink', async () => {
+      // `path.join` keeps the trailing separator and POSIX resolves it as if `/.`
+      // followed, so `lstat('…/esc/')` stats the link's target and reports "not a
+      // link" — the one name shape that reaches the directory branch past that guard.
+      // Left unstripped, `mkdir` resolves through the link and the deferred pass
+      // chmods a directory outside the target.
+      const archive = path.join(work, 'slashdir.zip');
+      await writeZip(archive, [{ name: 'esc/', content: '', mode: 0o040777 }]);
+
+      const outside = path.join(work, 'outside');
+      fs.mkdirSync(outside, { mode: 0o755 });
+      const target = targetDir();
+      fs.symlinkSync(outside, path.join(target, 'esc'));
+
+      await expect(extractArchive(archive, target)).rejects.toThrow(/symlink/i);
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(outside).mode & 0o777).toString(8)).toBe('755');
+    });
+
     it('refuses to write through a symlink already standing at the entry name', async () => {
       // Resolving the parent leaves the last component unchecked, so this is the same
       // escape one level shallower: the entry is named exactly like the link.
@@ -320,7 +337,9 @@ describe('extractArchive', () => {
       await expect(extractArchive(archive, target)).rejects.toThrow(/over a symlink/i);
       expect(fs.existsSync(notYetThere)).toBe(false);
     });
+  });
 
+  describe('survives a reader failure rather than crashing the process', () => {
     it('rejects while the entry is still being written, not once the write settles', async () => {
       // The read stream never ends and never errors, so `pipeline` never settles and the
       // zipfile's `error` is the only signal there is — which is what makes this pin
@@ -354,12 +373,21 @@ describe('extractArchive', () => {
       // Losing the race only abandons the write promise — nothing in `Promise.race`
       // closes what it was doing, so capture the destination stream and require that
       // the abort actually tore it down.
-      const createWriteStream = fs.createWriteStream.bind(fs);
-      const opened: fs.WriteStream[] = [];
-      jest.spyOn(fs, 'createWriteStream').mockImplementation((...args: Parameters<typeof fs.createWriteStream>) => {
-        const stream = createWriteStream(...args);
-        opened.push(stream);
-        return stream;
+      // Captured through `fs.promises.open`, since the entry is opened by hand for
+      // `O_NOFOLLOW` and turned into a stream off the handle.
+      const open = fs.promises.open.bind(fs.promises);
+      const opened: Writable[] = [];
+      jest.spyOn(fs.promises, 'open').mockImplementation(async (...args: Parameters<typeof fs.promises.open>) => {
+        const handle = await open(...args);
+        const createWriteStream = handle.createWriteStream.bind(handle);
+
+        handle.createWriteStream = (...streamArgs: Parameters<typeof handle.createWriteStream>) => {
+          const stream = createWriteStream(...streamArgs);
+          opened.push(stream);
+          return stream;
+        };
+
+        return handle;
       });
 
       try {

@@ -153,11 +153,9 @@ function nextZipEntry(zipfile: yauzl.ZipFile): Promise<yauzl.Entry | null> {
 /**
  * `realpath` of the deepest ancestor of `target` that exists.
  *
- * Containment cannot be decided lexically: a symlink already sitting in the target
- * directory — one an earlier `tar` extraction into the same `cwd` wrote, say — makes a
- * blameless relative name resolve anywhere on disk. Every such link is by definition in
- * the part of the path that already exists, so resolving that prefix accounts for all
- * of them, and doing it *before* `mkdir` means a rejected entry creates nothing.
+ * Any symlink on the path is by definition in the part that already exists, so
+ * resolving that prefix accounts for all of them — and doing it before `mkdir` means a
+ * rejected entry creates nothing.
  */
 async function realpathOfExistingAncestor(target: string): Promise<string> {
   let current = target;
@@ -227,7 +225,11 @@ async function writeZipEntry(
     throw new Error(`Refusing to extract symlink entry from zip: ${entry.fileName}`);
   }
 
-  const dest = path.join(dir, entry.fileName);
+  // Trailing separator stripped before it reaches the filesystem: `path.join` keeps it,
+  // and POSIX resolves a trailing slash as if `/.` followed — so `lstat` on `esc/`
+  // stats the link's target and reports it is not a link. It also makes
+  // `applyDirectoryModes` count a phantom segment when sorting by depth.
+  const dest = path.join(dir, entry.fileName.replace(/\/+$/, ''));
   // Lexical first: it costs nothing and refuses a hostile name before any filesystem
   // call. It is not sufficient on its own — see `realpathOfExistingAncestor`.
   if (dest !== dir && !dest.startsWith(dir + path.sep)) {
@@ -269,20 +271,30 @@ async function writeZipEntry(
   const mode = unixPermissions(entry);
   const readStream = await zipfile.openReadStreamPromise(entry);
 
+  // `O_NOFOLLOW` rather than trusting the `lstat` above: that is a check-then-open
+  // race, and this makes the write refuse a link on its own terms (ELOOP). Opened by
+  // hand because `createWriteStream`'s `flags` is typed as a string.
+  // eslint-disable-next-line no-bitwise
+  const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW;
+  const handle = await fs.promises.open(dest, flags, mode || undefined);
+
   // The signal is what tears these two down when the zipfile errors out from under
   // them — losing the race only abandons this promise, it does not close anything.
-  await pipeline(readStream, fs.createWriteStream(dest, mode ? { mode } : {}), { signal });
+  // The handle closes with the stream it was turned into.
+  await pipeline(readStream, handle.createWriteStream(), { signal });
 }
 
 /**
  * Extract a zip into `dir`, which must already exist.
  */
 async function extractZipArchive(archivePath: string, dir: string): Promise<void> {
-  const zipfile = await yauzl.openPromise(archivePath, { lazyEntries: true });
-
-  // Compared against resolved parents below, so it has to be resolved itself — on
-  // macOS a caller's `/tmp/...` is already a symlink to `/private/tmp/...`.
+  // Before the zipfile is opened: a throw here would otherwise leak its descriptor,
+  // which nothing closes until the `finally` further down. Resolved because it is
+  // compared against resolved parents below — on macOS a caller's `/tmp/...` is
+  // already a symlink to `/private/tmp/...`.
   const root = await fs.promises.realpath(dir);
+
+  const zipfile = await yauzl.openPromise(archivePath, { lazyEntries: true });
 
   // yauzl reports reader failures by emitting `error` on the zipfile, and an emit with
   // no listener *throws* — `nextZipEntry`'s comes off between reads, so this one has to
