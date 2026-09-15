@@ -1,6 +1,6 @@
 ---
 title: API keys
-description: Admins can manage API keys through Admin → API Keys.
+description: Create, scope, and revoke API keys through Admin → API Keys.
 ---
 
 Create and revoke API keys for your Cube organization.
@@ -21,6 +21,24 @@ Create and revoke API keys for your Cube organization.
   className="w-full aspect-video rounded-xl hidden dark:block"
   src="https://ucarecdn.com/aaa1eb9c-004d-417e-8c96-064ab0134ab1/523b2e1b-dark.mp4"
 ></video>
+
+## Personal API keys
+
+Only admins can hold API keys unless you turn on **Allow all users to create API
+keys** on the **Admin → Settings** page. With it on, every user reaches **Admin →
+API Keys** and manages their own keys there — an admin still sees every key in the
+account, while everyone else sees only theirs.
+
+A personal key carries exactly its owner's permissions, so it never reaches data
+or settings its owner can't reach in the app, and it can only be scoped to
+deployments its owner has access to. Because those permissions are what makes the
+key narrower than an admin's, the switch can only be turned on while role-based
+access control is enabled for the account. Turning it back off stops existing
+personal keys from working.
+
+Endpoints that act on behalf of someone else still require an admin's key —
+[generating an embed session](/reference/embed-apis/generate-session) is the main
+one.
 
 ## Deployment scope
 

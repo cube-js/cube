@@ -13,7 +13,7 @@ The Generate Session API is available on [Premium and Enterprise plans](https://
 
 ## Authentication
 
-The Generate Session API requires your [Cube Cloud API key][ref-api-keys] for authentication.
+The Generate Session API requires your [Cube Cloud API key][ref-api-keys] for authentication. The key must belong to an admin user: this endpoint mints a session for somebody else, choosing their identity and the groups and attributes their data access is resolved against, so a [personal key][ref-personal-api-keys] is rejected with `403 Forbidden`.
 
 If the API key is [scoped to specific deployments][ref-api-keys], the `deploymentId` in the request body must be within the key's scope; otherwise the request is rejected with `403 Forbidden`. Unscoped keys can mint sessions for any deployment.
 
@@ -410,6 +410,7 @@ curl -X POST "https://your-account.cubecloud.dev/api/v1/embed/generate-session" 
 Use session ID in [signed embedding][ref-signed-embedding].
 
 [ref-api-keys]: /admin/account-billing/api-keys
+[ref-personal-api-keys]: /admin/account-billing/api-keys#personal-api-keys
 [ref-signed-embedding]: /embedding/iframe/auth/signed
 [ref-creator-mode]: /embedding/iframe/creator-mode
 [ref-analytics-chat]: /embedding/iframe/analytics-chat

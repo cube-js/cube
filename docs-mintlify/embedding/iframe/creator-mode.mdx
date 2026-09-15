@@ -9,7 +9,7 @@ description: Embed the full Cube application so users can build and modify their
 
 Creator Mode embeds the full Cube application instead of an individual dashboard or chat. Users can create and modify workbooks, dashboards, and reports inside the iframe.
 
-To enable it, pass `creatorMode: true` to the [Generate Session API][ref-generate-session].
+To enable it, pass `creatorMode: true` to the [Generate Session API][ref-generate-session]. Add `branchName` alongside it to have everything authored in the session query a staging or development branch's data model rather than production.
 
 <Note>
   Creator Mode requires [Signed embedding](/embedding/iframe/auth/signed). Private embedding is not supported.
