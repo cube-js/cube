@@ -10,6 +10,9 @@ import { extractArchive } from '../src/http-utils';
  * `extractArchive` replaced the unmaintained `decompress`, which carries two
  * unfixed advisories — GHSA-mp2f-45pm-3cg9 ("archive extraction can create files
  * and links outside of the target directory") and GHSA-h39j-r5qq-r9mm (Zip Slip).
+ * Its zip backend then replaced `extract-zip`, which carries two more of the same
+ * class, also unfixed: GHSA-jmr9-qjv8-65gv (CVE-2026-56876) and
+ * GHSA-7pqw-9j4j-h8q3, both arbitrary file write through a symlink entry.
  *
  * These tests exist to prove the replacement is not vulnerable to the same class,
  * so they build genuinely hostile archives rather than asserting on library
@@ -193,7 +196,7 @@ describe('extractArchive', () => {
       const archive = path.join(work, 'evil.zip');
       await writeZip(archive, [{ name: '../ZIP_PWNED.txt', content: 'pwned' }]);
 
-      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/invalid relative path/i);
+      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/malicious entry/i);
       expect(fs.existsSync(path.join(work, 'ZIP_PWNED.txt'))).toBe(false);
     });
 
@@ -220,8 +223,8 @@ describe('extractArchive', () => {
 
     it('does not write through a zip symlink that points outside the target', async () => {
       // The zip backend's containment is the half worth proving separately: a symlink
-      // entry has a clean relative *name*, so only a check on the resolved destination
-      // catches the entry written through it afterwards.
+      // entry has a clean relative *name*, so the name validation that catches Zip Slip
+      // above says nothing about the entry written through the link afterwards.
       const archive = path.join(work, 'zipsym.zip');
       const outside = path.join(work, 'outside');
       fs.mkdirSync(outside);
@@ -231,7 +234,7 @@ describe('extractArchive', () => {
         { name: 'esc/PWNED.txt', content: 'pwned-through-symlink' },
       ]);
 
-      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/out of bound path/i);
+      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/symlink entries.*not allowed/i);
       expect(fs.existsSync(path.join(outside, 'PWNED.txt'))).toBe(false);
     });
   });
@@ -255,6 +258,25 @@ describe('extractArchive', () => {
       await extractArchive(archive, target);
 
       expect(fs.readFileSync(path.join(target, 'dir', 'file.txt'), 'utf8')).toBe('legit-content');
+    });
+
+    it('keeps the executable bit a zip entry records', async () => {
+      // A zipped binary is the reason anything here downloads an archive at all, and
+      // the current backend does not apply entry modes on its own, so the bit survives
+      // only as long as `extractZipArchive` keeps restoring it.
+      const archive = path.join(work, 'binary.zip');
+      await writeZip(archive, [
+        { name: 'bin/tool', content: '#!/bin/sh\n', mode: 0o100755 },
+        { name: 'bin/data.txt', content: 'not executable', mode: 0o100644 },
+      ]);
+
+      const target = targetDir();
+      await extractArchive(archive, target);
+
+      // eslint-disable-next-line no-bitwise
+      expect(fs.statSync(path.join(target, 'bin', 'tool')).mode & 0o111).not.toBe(0);
+      // eslint-disable-next-line no-bitwise
+      expect(fs.statSync(path.join(target, 'bin', 'data.txt')).mode & 0o111).toBe(0);
     });
 
     it('detects an uncompressed tar from the ustar magic at offset 257', async () => {
