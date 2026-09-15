@@ -183,7 +183,7 @@ Returned by `GET /dashboard/{publicId}/comments/mentionable-users`. Use it to ba
 | `email` | string \| null | May be `null`. |
 | `firstName` | string \| null | May be `null`. |
 
-**The directory is scoped to the caller's own embed tenant, and to embed users only.** An embed user can mention their colleagues in the same embed tenant. They cannot mention a Cube Cloud user of the host account, and they never see another embed tenant's users. Pass `search` to filter by username or email; results are ordered by username.
+**The directory is scoped to the caller's own embed tenant, and to embed users only.** An embed user can mention their colleagues in the same embed tenant. They cannot mention a Cube Cloud user of the host account, and they never see another embed tenant's users. Pass `search` to filter by username or email; results are ordered by username. Pagination works as it does for threads: pass `first` and `after` with the previous page's `endCursor`.
 
 ## Example: start a thread, reply, resolve
 
