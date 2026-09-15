@@ -114,60 +114,51 @@ jobs:
         env:
           EXECUTION_FILE: ${{ steps.review.outputs.execution_file }}
         run: |
-          jq -r '
-            . as $msgs |
-            ($msgs | map(select(.type == "result")) | last) as $r |
-            ($msgs | map(select(.type == "assistant"))) as $a |
-            ($a | map(.message.usage.input_tokens // 0) | add // 0) as $in_tok |
-            ($a | map(.message.usage.output_tokens // 0) | add // 0) as $out_tok |
-            ($a | map(.message.usage.cache_read_input_tokens // 0) | add // 0) as $cache_tok |
-            if $r then
+          # The action's own log line for the result message is sanitized down to
+          # counters, so the failure text is only reachable through this file.
+          # First output line is the `::error` annotation (empty on success), the
+          # rest is the step summary.
+          { IFS= read -r annotation; cat >> "$GITHUB_STEP_SUMMARY"; } < <(jq -r '
+            (map(select(.type == "result")) | last) as $r |
+            map(select(.type == "assistant")) as $a |
+            ($r == null or $r.is_error or $r.subtype != "success") as $failed |
+            (if $failed then
+              $r.result
+              // ($r.errors // [] | join("; ") | select(. != ""))
+              // ($a | map(.message.content[]? | select(.type == "text") | .text) | last)
+              // "no error text in execution log"
+            else null end) as $err |
+            (if $failed then
+              "::error title=Claude review failed (\($r.subtype // "no result message"))::\($err[:2000] | gsub("\n"; "%0A"))"
+            else "" end),
+            (if $r then
               "### Claude Code review run",
               "| Metric | Value |",
               "|---|---|",
-              "| Model | `\($a | map(.message.model) | last // "?")` |",
+              "| Model | `\($a | last | .message.model // "?")` |",
               "| Cost | $\($r.total_cost_usd) |",
               "| Wall time | \(($r.duration_ms / 1000) | floor)s |",
               "| API time | \((($r.duration_api_ms // 0) / 1000) | floor)s |",
               "| Turns | \($a | length) |",
-              "| Input tokens | \($in_tok) |",
-              "| Output tokens | \($out_tok) |",
-              "| Cache read tokens | \($cache_tok) |"
-            else empty end
-          ' "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Report review failure
-        if: failure() && steps.review.outputs.execution_file != ''
-        env:
-          EXECUTION_FILE: ${{ steps.review.outputs.execution_file }}
-        run: |
-          error_text=$(jq -r '
-            . as $msgs |
-            ($msgs | map(select(.type == "result")) | last) as $r |
-            ($msgs
-              | map(select(.type == "assistant") | .message.content[]?
-                    | select(.type == "text") | .text)
-              | last) as $last_text |
-            ($r.result? // $r.error?
-              // ($r.errors? | select(length > 0) | join("\n"))
-              // $last_text // "no error text in execution log")
-            | tostring
+              "| Input tokens | \($a | map(.message.usage.input_tokens // 0) | add // 0) |",
+              "| Output tokens | \($a | map(.message.usage.output_tokens // 0) | add // 0) |",
+              "| Cache read tokens | \($a | map(.message.usage.cache_read_input_tokens // 0) | add // 0) |"
+            else empty end),
+            (if $failed then
+              "",
+              "### :x: Review failed",
+              "| | |",
+              "|---|---|",
+              "| Result subtype | `\($r.subtype // "no result message")` |",
+              "| Stop reason | `\($r.stop_reason // "?")` |",
+              "| Denied tools | \($r.permission_denials // [] | map(.tool_name) | unique | join(", ") | if . == "" then "none" else . end) |",
+              "",
+              "```",
+              $err,
+              "```"
+            else empty end)
           ' "$EXECUTION_FILE")
-          subtype=$(jq -r 'map(select(.type == "result")) | last | .subtype // "?"' "$EXECUTION_FILE")
-
-          {
-            echo "### :x: Review failed"
-            echo
-            echo "Result subtype: \`$subtype\`"
-            echo
-            echo '```'
-            printf '%s\n' "$error_text"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          # Annotations are single-line; %0A keeps a multi-line error readable.
-          printf '::error title=Claude review failed (%s)::%s\n' \
-            "$subtype" "$(printf '%s' "$error_text" | head -c 2000 | awk '{printf "%s%%0A", $0}')"
+          if [ -n "$annotation" ]; then printf '%s\n' "$annotation"; fi
 
       - name: React to trigger comment (completion)
         if: always() && github.event_name == 'issue_comment'
