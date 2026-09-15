@@ -48,6 +48,17 @@ enum RowGrain {
     RawRows(Option<Rc<LogicalJoin>>),
 }
 
+// Outcome of one matching pass over a single set of candidate pre-aggregations.
+enum MultiStageMatch {
+    Matched(Rc<RootQuery>),
+    // A stage matched no candidate, so no subset of the candidates covers it
+    // either.
+    UnmatchedStage,
+    // Every stage matched, but the matches span both external types, so no one
+    // query can read them all.
+    ExternalTypesSplit,
+}
+
 pub struct PreAggregationOptimizer {
     query_tools: Rc<State>,
     allow_multi_stage: bool,
@@ -256,6 +267,37 @@ impl PreAggregationOptimizer {
         root: &Rc<RootQuery>,
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
     ) -> Result<Option<Rc<RootQuery>>, CubeError> {
+        match self.match_multistages(root, compiled_pre_aggregations)? {
+            MultiStageMatch::Matched(rewritten) => return Ok(Some(rewritten)),
+            MultiStageMatch::UnmatchedStage => return Ok(None),
+            MultiStageMatch::ExternalTypesSplit => {}
+        }
+
+        // Every stage is covered, just not by one engine. Retrying within a
+        // single external type gives up per-stage precision for a set that one
+        // query can actually read, and the alternative is reading the fact
+        // table. CubeStore goes first as the default and faster store.
+        for external in [true, false] {
+            let candidates: Vec<_> = compiled_pre_aggregations
+                .iter()
+                .filter(|pa| pa.external.unwrap_or(false) == external)
+                .cloned()
+                .collect();
+            if let MultiStageMatch::Matched(rewritten) =
+                self.match_multistages(root, &candidates)?
+            {
+                return Ok(Some(rewritten));
+            }
+        }
+
+        Ok(None)
+    }
+
+    fn match_multistages(
+        &mut self,
+        root: &Rc<RootQuery>,
+        compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
+    ) -> Result<MultiStageMatch, CubeError> {
         let query = root.query();
         let rewriter = LogicalPlanRewriter::new();
         let mut has_unrewritten_leaf = false;
@@ -357,7 +399,7 @@ impl PreAggregationOptimizer {
             // Rollback usages added during failed attempt
             self.usages.truncate(saved_usages_len);
             self.usage_counter = saved_counter;
-            return Ok(None);
+            return Ok(MultiStageMatch::UnmatchedStage);
         }
 
         let source = if let QuerySource::FullKeyAggregate(full_key_aggregate) = query.source() {
@@ -371,14 +413,15 @@ impl PreAggregationOptimizer {
             query.source().clone()
         };
 
-        // Reject mixed external/non-external pre-aggregation usages
+        // One query cannot read both external types, so a set that spans
+        // them is unusable as a whole.
         let new_usages = &self.usages[saved_usages_len..];
         if !new_usages.is_empty() {
             let first_external = new_usages[0].external();
             if new_usages.iter().any(|u| u.external() != first_external) {
                 self.usages.truncate(saved_usages_len);
                 self.usage_counter = saved_counter;
-                return Ok(None);
+                return Ok(MultiStageMatch::ExternalTypesSplit);
             }
         }
 
@@ -389,7 +432,7 @@ impl PreAggregationOptimizer {
             .source(source)
             .build();
 
-        Ok(Some(Rc::new(
+        Ok(MultiStageMatch::Matched(Rc::new(
             RootQuery::builder()
                 .ctes(rewritten_multistages)
                 .query(Rc::new(result))

@@ -1,3 +1,4 @@
+mod external_split;
 mod multi_fact;
 mod multi_stage;
 mod rollup_join_keys;
