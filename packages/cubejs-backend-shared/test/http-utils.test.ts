@@ -374,6 +374,22 @@ describe('extractArchive', () => {
       expect(fs.readFileSync(path.join(target, 'dos.txt'), 'utf8')).toBe('x');
     });
 
+    it('keeps a directory entry\'s mode too, not just a file\'s', async () => {
+      // Directories go through `mkdir`, which takes its own mode — so this is a
+      // separate code path from the file bits above, and dropping it silently widens
+      // a private directory to group- and other-readable.
+      const archive = path.join(work, 'dirmode.zip');
+      await writeZip(archive, [{ name: 'private', content: '', mode: 0o040700 }]);
+
+      const target = targetDir();
+      await extractArchive(archive, target);
+
+      const stat = fs.statSync(path.join(target, 'private'));
+      expect(stat.isDirectory()).toBe(true);
+      // eslint-disable-next-line no-bitwise
+      expect((stat.mode & 0o777).toString(8)).toBe('700');
+    });
+
     it('detects an uncompressed tar from the ustar magic at offset 257', async () => {
       const stage = fs.mkdtempSync(path.join(work, 'plain-'));
       fs.mkdirSync(path.join(stage, 'dir'));

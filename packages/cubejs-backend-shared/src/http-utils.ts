@@ -116,6 +116,11 @@ const UNIX_MODE_DIRECTORY = 0o040000;
 // eslint-disable-next-line no-bitwise
 const unixFileType = (entry: yauzl.Entry) => (entry.externalFileAttributes >>> 16) & UNIX_MODE_MASK;
 
+// 0 when the producer recorded no unix mode at all — a DOS-made zip — where node's
+// default is the right answer for both files and directories.
+// eslint-disable-next-line no-bitwise
+const unixPermissions = (entry: yauzl.Entry) => (entry.externalFileAttributes >>> 16) & 0o777;
+
 /** Pull one entry, or `null` at the end of the archive. */
 function nextZipEntry(zipfile: yauzl.ZipFile): Promise<yauzl.Entry | null> {
   return new Promise((resolve, reject) => {
@@ -174,17 +179,16 @@ async function writeZipEntry(
   // alone; read as a file, it lands as an empty regular file and the first entry under
   // it collides on `mkdir` with EEXIST.
   if (entry.fileName.endsWith('/') || unixFileType(entry) === UNIX_MODE_DIRECTORY) {
-    await fs.promises.mkdir(dest, { recursive: true });
+    const dirMode = unixPermissions(entry);
+    // Directories carry their mode like files do; without it a `0o700` directory in an
+    // archive extracts group- and other-readable.
+    await fs.promises.mkdir(dest, dirMode ? { recursive: true, mode: dirMode } : { recursive: true });
     return;
   }
 
   await fs.promises.mkdir(path.dirname(dest), { recursive: true });
 
-  // Permission bits only, and only when the producer recorded a unix mode at all —
-  // a DOS-made zip leaves this 0, where node's default is the right answer.
-  // eslint-disable-next-line no-bitwise
-  const mode = (entry.externalFileAttributes >>> 16) & 0o777;
-
+  const mode = unixPermissions(entry);
   const readStream = await zipfile.openReadStreamPromise(entry);
 
   // The signal is what tears these two down when the zipfile errors out from under
