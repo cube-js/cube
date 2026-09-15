@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.38](https://github.com/cube-js/cube/compare/v1.7.37...v1.7.38) (2026-09-14)
+
+### Bug Fixes
+
+- **server-core:** build one orchestrator api per id, not one per concurrent caller ([#11834](https://github.com/cube-js/cube/issues/11834)) ([97282f0](https://github.com/cube-js/cube/commit/97282f03ef381317b49df2d058e3350083885a00)), closes [#11661](https://github.com/cube-js/cube/issues/11661)
+
 ## [1.7.37](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.37) (2026-09-10)
 
 ### Features

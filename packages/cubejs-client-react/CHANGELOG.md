@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.38](https://github.com/cube-js/cube/compare/v1.7.37...v1.7.38) (2026-09-14)
+
+### Bug Fixes
+
+- **react:** ignore stale useCubeQuery responses ([#11848](https://github.com/cube-js/cube/issues/11848)) ([ae50256](https://github.com/cube-js/cube/commit/ae50256ad8c92571135056fadf7f5d9aa4d37bec))
+
 ## [1.7.37](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.37) (2026-09-10)
 
 ### Features

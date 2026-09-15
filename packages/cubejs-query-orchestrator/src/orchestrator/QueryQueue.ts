@@ -483,6 +483,7 @@ export class QueryQueue {
    */
   public async getQueries() {
     const queueConnection = await this.queueDriver.createConnection();
+
     try {
       const [stalledQueries, orphanedQueries, activeQueries, toProcessQueries] = await Promise.all([
         queueConnection.getStalledQueries(),
@@ -530,6 +531,7 @@ export class QueryQueue {
 
   public async cancelQuery(queryKey: QueryKeyHash, queueId: QueueId | null): Promise<boolean> {
     const queueConnection = await this.queueDriver.createConnection();
+
     try {
       const query = await queueConnection.cancelQuery(queryKey, queueId);
 
@@ -579,6 +581,7 @@ export class QueryQueue {
    */
   protected async reconcileQueueImpl() {
     const queueConnection = await this.queueDriver.createConnection();
+
     try {
       const toCancel = await queueConnection.getQueriesToCancel();
 
@@ -668,6 +671,7 @@ export class QueryQueue {
    */
   public async fetchQueryStageState(): Promise<QueryStageStateResponse> {
     const queueConnection = await this.queueDriver.createConnection();
+
     try {
       return queueConnection.getQueryStageState(false);
     } finally {
@@ -929,6 +933,7 @@ export class QueryQueue {
         },
         this.heartBeatInterval * 1000
       );
+
       try {
         const handler = query?.queryHandler;
         switch (handler) {
@@ -955,6 +960,7 @@ export class QueryQueue {
                   query.query,
                   async (cancelHandler) => {
                     localCancelHandler = cancelHandler;
+
                     try {
                       await queueConnection.optimisticQueryUpdate(queryKeyHashed, { cancelHandler }, queueId);
                     } catch (e: any) {

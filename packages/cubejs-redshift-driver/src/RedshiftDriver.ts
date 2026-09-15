@@ -183,6 +183,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       tablesSchema[externalSchema] = {};
       const tablesRes = await this.tablesForExternalSchema(externalSchema);
       const tables = tablesRes.map(t => t.table_name);
+
       for (const tableName of tables) {
         const columnRes = await this.columnsForExternalTable(externalSchema, tableName);
         tablesSchema[externalSchema][tableName] = columnRes.map(def => ({

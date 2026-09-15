@@ -60,7 +60,7 @@ export class ServerContainer {
 
     if (compareResult === 1) {
       console.log(
-        `${color.yellow('warning')} You are using old Cube.js packages (${getMajorityVersion(userVersion, true)}) `
+        `${color.yellow('warning')} You are using old Cube packages (${getMajorityVersion(userVersion, true)}) `
         + `with new Docker image (${getMajorityVersion(builtInVersion, true)})`
       );
     }
@@ -131,6 +131,7 @@ export class ServerContainer {
       const depsToCompareVersions = Object.keys(manifest.devDependencies).filter(
         isCubeNotServerPackage
       );
+
       // eslint-disable-next-line no-restricted-syntax
       for (const pkgName of depsToCompareVersions) {
         const pkgVersion = safetyParseSemver(
@@ -329,7 +330,7 @@ export class ServerContainer {
   }
 
   /**
-   * @param embedded Cube.js will start without https/ws/graceful shutdown + without timers
+   * @param embedded Cube will start without https/ws/graceful shutdown + without timers
    */
   public async start(embedded: boolean = false) {
     const makeInstance = async (override: boolean) => {

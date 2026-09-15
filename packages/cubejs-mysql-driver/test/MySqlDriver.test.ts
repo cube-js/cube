@@ -119,6 +119,7 @@ describe('MySqlDriver', () => {
 
   test('table name check', async () => {
     const tblName = 'really-really-really-looooooooooooooooooooooooooooooooooooooooooooooooooooong-table-name';
+
     try {
       await mySqlDriver.createTable(tblName, [{ name: 'id', type: 'bigint' }]);
 

@@ -219,6 +219,7 @@ export class MaterializeDriver extends PostgresDriver {
     { highWaterMark }: StreamOptions
   ): Promise<ReadableStreamTableDataWithTypes> {
     const conn = await this.pool.acquire();
+
     try {
       const cursorId = 'mz_cursor';
       await this.prepareConnection(conn);

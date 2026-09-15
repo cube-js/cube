@@ -1,4 +1,4 @@
-// Cube.js configuration options: https://docs.cube.dev/reference/configuration/config
+// Cube configuration options: https://docs.cube.dev/reference/configuration/config
 // It's a special configuration file for SQL API smoke's testing
 module.exports = {
   queryRewrite: (query, { securityContext }) => {

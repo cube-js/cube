@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.38](https://github.com/cube-js/cube/compare/v1.7.37...v1.7.38) (2026-09-14)
+
+### Bug Fixes
+
+- **schema-compiler:** name the ClickHouse types a cast can produce ([#11807](https://github.com/cube-js/cube/issues/11807)) ([c7dcc5c](https://github.com/cube-js/cube/commit/c7dcc5cfaa5094c5d7183e061b95f1051d442f1f))
+
 ## [1.7.37](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.37) (2026-09-10)
 
 ### Bug Fixes

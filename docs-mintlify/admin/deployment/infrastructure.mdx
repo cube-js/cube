@@ -26,7 +26,7 @@ scaling, and monitoring your Cube Deployments, as well as managing Cube Store
 and persisting pre-aggregated data. This option requires the least effort to
 set up.
 
-Please note that some Enterprise features, such as VPC peering or PrivateLink are
+Please note that some Enterprise features, such as PrivateLink, are
 not available on the multi-tenant infrastructure. There's also a possibility of
 resource contention ("noisy neighbor") problem.
 
@@ -147,7 +147,7 @@ The term "Cube Cloud Region" should **not** be confused with:
 Understanding your Cube Cloud Region is important for:
 
 1. **API endpoints**: Your deployment's API endpoints include the region identifier (e.g., `<deployment-id>.<region>.cubecloudapp.dev`)
-2. **Network configuration**: When setting up VPC peering, PrivateLink, or custom domains, you'll need the exact region identifier
+2. **Network configuration**: When setting up PrivateLink or custom domains, you'll need the exact region identifier
 3. **Support requests**: Providing the correct region identifier helps Cube support team quickly locate and assist with your deployment
 4. **Infrastructure planning**: Different region types offer different capabilities (e.g., PrivateLink is only available in single-tenant and BYOC regions)
 

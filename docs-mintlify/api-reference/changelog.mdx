@@ -7,6 +7,15 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-09-14" description="v0.10.0" tags={["Added"]}>
+  ### Added
+
+  - `GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/generated-files` (`DbtSyncPublicController.getDbtSyncGeneratedFiles`) returns the cube files a dbt sync generated when it did not commit them, with cursor pagination (CUB-4489). The files are held for one hour after the sync completes and then dropped, so collect them promptly; a sync that committed to a branch instead, or a stale/unknown job, gets a 404. Requires deployment read access. New schemas: `DbtSyncGeneratedFilesListResponse`, `DbtGeneratedFileContent`.
+  - `StartDbtSyncInput` gained `output` (CUB-4489): `'branch'` (the default, unchanged) commits the generated cubes to a new Cube branch for review; `'files'` commits nothing and creates no branch, so the files can be read back from the new `generated-files` endpoint and committed through your own CI's review instead.
+  - New RBAC action `ChatHistoryRead` (CUB-3277) for scoping read access to chat history independently of `ChatThreadRead`. Assignable wherever a policy action is: `Policy.actions`, `RoleWithAccess.actions`, and the resource/group/user policy DTOs.
+  - `PivotItems` / `PivotItemsInput` gained `showAppliedFilters` (CUB-4639): a per-exploration override for whether a report written to a worksheet carries the applied-filter summary, above the existing account- and user-level settings of the same name. Omitting it means the exploration has no opinion — the user's (or account's) setting stands — rather than turning the annotation off.
+</Update>
+
 <Update label="2026-09-12" description="v0.9.0" tags={["Added","Fixed"]}>
   ### Added
 

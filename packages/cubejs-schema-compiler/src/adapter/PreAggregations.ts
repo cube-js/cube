@@ -539,6 +539,7 @@ export class PreAggregations {
 
     function allValuesEq1(map) {
       if (!map) return false;
+
       // eslint-disable-next-line no-restricted-syntax
       for (const v of map?.values()) {
         if (v !== 1) return false;

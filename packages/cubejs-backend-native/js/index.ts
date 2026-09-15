@@ -217,6 +217,7 @@ function wrapNativeFunctionWithChannelCallback(
           e,
         });
       }
+
       try {
         channel.reject(e.message || 'Unknown JS exception');
       } catch (rejectErr: unknown) {
@@ -251,6 +252,7 @@ function wrapRawNativeFunctionWithChannelCallback(
           e,
         });
       }
+
       try {
         channel.reject(e.message || e.toString());
       } catch (error) {
@@ -281,6 +283,7 @@ function wrapNativeFunctionWithStream(
   );
   return async (extra: any, writerOrChannel: any) => {
     let response: any;
+
     try {
       response = await fn(JSON.parse(extra));
       if (response && response.stream) {

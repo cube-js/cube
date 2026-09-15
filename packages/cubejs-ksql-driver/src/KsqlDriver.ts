@@ -145,6 +145,7 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   private async apiQuery(path: string, body: any): Promise<AxiosResponse> {
     const url = `${this.config.url}${path}`;
+
     try {
       return await axios.post(url, body, {
         auth: {

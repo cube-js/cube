@@ -1,13 +1,13 @@
 {
   "name": "@cubejs-client/dx",
-  "version": "1.7.37",
+  "version": "1.7.38",
   "engines": {},
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-client-dx"
   },
-  "description": "Cube.js Client Developer eXperience",
+  "description": "Cube Client Developer eXperience",
   "main": "src/index.js",
   "module": "src/index.mjs",
   "types": "index.d.ts",

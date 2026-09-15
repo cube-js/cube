@@ -543,6 +543,7 @@ export async function startBirdBoxFromCli(
 
   if (options.cubejsConfig) {
     const configType = options.cubejsConfig.split('.').at(-1);
+
     for (const configFile of ['cube.js', 'cube.py']) {
       if (fs.existsSync(path.join(testDir, configFile))) {
         fs.removeSync(path.join(testDir, configFile));
@@ -645,6 +646,7 @@ export async function startBirdBoxFromCli(
       }
       if (cli.pid) {
         process.stdout.write(`[Birdbox] Killing process group '${cli.pid}'\n`);
+
         // Here, normally, we kill the process group by passing -cli.pid (a negative value), but
         // with killCube we just kill the main process, and then can't kill any process group --
         // maybe that test has poor cleanup actions.
@@ -750,6 +752,7 @@ export async function getBirdbox(
 
   // birdbox instantiation
   let birdbox;
+
   try {
     switch (mode) {
       case Mode.CLI:

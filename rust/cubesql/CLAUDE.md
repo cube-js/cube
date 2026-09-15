@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-CubeSQL is a SQL proxy server that enables SQL-based access to Cube.js semantic layer. It emulates the PostgreSQL wire protocol, allowing standard SQL clients and BI tools to query Cube.js deployments as if they were traditional databases. Note: MySQL protocol support has been deprecated and is no longer available.
+CubeSQL is a SQL proxy server that enables SQL-based access to Cube semantic layer. It emulates the PostgreSQL wire protocol, allowing standard SQL clients and BI tools to query Cube deployments as if they were traditional databases. Note: MySQL protocol support has been deprecated and is no longer available.
 
 This is a Rust workspace containing three crates:
 - **cubesql**: Main SQL proxy server with query compilation and protocol emulation
-- **cubeclient**: Rust client library for Cube.js API communication
+- **cubeclient**: Rust client library for Cube API communication
 - **pg-srv**: PostgreSQL wire protocol server implementation
 
 ## Development Commands
@@ -59,7 +59,7 @@ cargo test
 cargo test test_introspection
 cargo test test_udfs
 
-# Run integration tests (requires Cube.js instance)
+# Run integration tests (requires Cube instance)
 cargo test --test e2e
 
 # Review snapshot test changes
@@ -74,9 +74,9 @@ cargo bench
 ### Query Processing Pipeline
 1. **Protocol Layer**: Accepts PostgreSQL wire protocol connections
 2. **SQL Parser**: Modified sqlparser-rs parses incoming SQL queries
-3. **Query Rewriter**: egg-based rewrite engine transforms SQL to Cube.js queries
-4. **Compilation**: Generates Cube.js REST API calls or DataFusion execution plans
-5. **Execution**: DataFusion executes queries or proxies to Cube.js
+3. **Query Rewriter**: egg-based rewrite engine transforms SQL to Cube queries
+4. **Compilation**: Generates Cube REST API calls or DataFusion execution plans
+5. **Execution**: DataFusion executes queries or proxies to Cube
 6. **Result Formatting**: Converts results back to wire protocol format
 
 ### Key Components
@@ -191,6 +191,6 @@ cargo insta review  # Review and accept/reject changes
 
 - This codebase uses heavily modified forks of DataFusion and sqlparser-rs
 - Many clippy lints are disabled due to code generation and complex patterns
-- Integration tests require a running Cube.js instance
+- Integration tests require a running Cube instance
 - The rewrite engine is performance-critical and uses advanced optimization techniques
 - Protocol compatibility is paramount for BI tool support

@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.38](https://github.com/cube-js/cube/compare/v1.7.37...v1.7.38) (2026-09-14)
+
+### Performance Improvements
+
+- **query-orchestrator:** Reuse SQL tuples for full partitions ([#11866](https://github.com/cube-js/cube/issues/11866)) ([1fd87a3](https://github.com/cube-js/cube/commit/1fd87a3b3157ec97b8108986c539d83ad1496c87))
+- **query-orchestrator:** reuse UTC partition range boundaries ([#11867](https://github.com/cube-js/cube/issues/11867)) ([49e2dec](https://github.com/cube-js/cube/commit/49e2dec428589a25a4f3b9503f8c465397631bf2))
+
 ## [1.7.37](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.37) (2026-09-10)
 
 ### Features

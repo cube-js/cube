@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.38](https://github.com/cube-js/cube/compare/v1.7.37...v1.7.38) (2026-09-14)
+
+### Bug Fixes
+
+- **cubesql:** preserve literal ORDER BY aliases ([#11496](https://github.com/cube-js/cube/issues/11496)) ([5019312](https://github.com/cube-js/cube/commit/5019312c6559fecae7bafa51002126d6bdcef5f5))
+- **cubestore:** Build with large pagesize support for AMR64, thanks [@vltmn](https://github.com/vltmn) ([#10152](https://github.com/cube-js/cube/issues/10152)) ([460173d](https://github.com/cube-js/cube/commit/460173dd498f3c3bc7346b102d4c15ab137d5440))
+- **deps:** Bump/align 24 transitive deps to clear 97 Dependabot alerts ([#11846](https://github.com/cube-js/cube/issues/11846)) ([eb11ecf](https://github.com/cube-js/cube/commit/eb11ecf696e052b042fb882fbc6b3bc6680602ae))
+- **react:** ignore stale useCubeQuery responses ([#11848](https://github.com/cube-js/cube/issues/11848)) ([ae50256](https://github.com/cube-js/cube/commit/ae50256ad8c92571135056fadf7f5d9aa4d37bec))
+- **schema-compiler:** name the ClickHouse types a cast can produce ([#11807](https://github.com/cube-js/cube/issues/11807)) ([c7dcc5c](https://github.com/cube-js/cube/commit/c7dcc5cfaa5094c5d7183e061b95f1051d442f1f))
+- **server-core:** build one orchestrator api per id, not one per concurrent caller ([#11834](https://github.com/cube-js/cube/issues/11834)) ([97282f0](https://github.com/cube-js/cube/commit/97282f03ef381317b49df2d058e3350083885a00)), closes [#11661](https://github.com/cube-js/cube/issues/11661)
+- **snowflake-driver:** Support TIMESTAMP_TZ/TIMESTAMP_LTZ, thanks [@npwalker](https://github.com/npwalker) ([#11404](https://github.com/cube-js/cube/issues/11404)) ([81d2d23](https://github.com/cube-js/cube/commit/81d2d23fd174b425929e94e19f636594951e2227))
+
+### Features
+
+- **cube-cli:** upload dbt manifests for sync ([#11845](https://github.com/cube-js/cube/issues/11845)) ([accedf2](https://github.com/cube-js/cube/commit/accedf2593d4edc1b586dc97550c7f95d84ac03e))
+
+### Performance Improvements
+
+- **query-orchestrator:** Reuse SQL tuples for full partitions ([#11866](https://github.com/cube-js/cube/issues/11866)) ([1fd87a3](https://github.com/cube-js/cube/commit/1fd87a3b3157ec97b8108986c539d83ad1496c87))
+- **query-orchestrator:** reuse UTC partition range boundaries ([#11867](https://github.com/cube-js/cube/issues/11867)) ([49e2dec](https://github.com/cube-js/cube/commit/49e2dec428589a25a4f3b9503f8c465397631bf2))
+
 ## [1.7.37](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.37) (2026-09-10)
 
 ### Bug Fixes

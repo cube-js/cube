@@ -5,6 +5,7 @@ use super::QueryProperties;
 use crate::logical_plan::OriginalSqlCollector;
 use crate::logical_plan::PreAggregationOptimizer;
 use crate::logical_plan::PreAggregationUsage;
+use crate::logical_plan::RollingBaseScanOptimizer;
 use crate::logical_plan::RootQuery;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
@@ -51,6 +52,13 @@ impl TopLevelPlanner {
         if self.request.is_pre_aggregations_match_only() {
             return Ok((String::new(), usages));
         }
+
+        // Ordering is load-bearing: merging is only safe once rollups have been
+        // matched, because a scan carrying two measures can no longer be served
+        // by a rollup holding one of them. Moved above `try_pre_aggregations`,
+        // a model storing one rollup per rolling measure silently falls back to
+        // the fact table for all of them.
+        let optimized_plan = RollingBaseScanOptimizer::new().optimize(optimized_plan);
 
         let is_external = if !usages.is_empty() {
             usages.iter().all(|usage| usage.pre_aggregation.external())

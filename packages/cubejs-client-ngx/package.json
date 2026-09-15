@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/ngx",
-  "version": "1.7.37",
+  "version": "1.7.38",
   "author": "Cube Dev, Inc.",
   "engines": {},
   "repository": {
@@ -8,7 +8,7 @@
     "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-client-ngx"
   },
-  "description": "Cube.js client for Angular",
+  "description": "Cube client for Angular",
   "publishConfig": {
     "access": "public"
   },

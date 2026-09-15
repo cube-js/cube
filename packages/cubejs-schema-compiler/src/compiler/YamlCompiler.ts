@@ -307,6 +307,7 @@ export class YamlCompiler {
     const result: string[] = [];
     const stateStack: EscapeStateStack[] = [];
     const peek = () => stateStack[stateStack.length - 1] || { inStr: true, inFormattedStr: true };
+
     for (let i = 0; i < str.length; i++) {
       if (str[i] === 'f' && str[i + 1] === '"' && !peek().inStr) {
         i += 1;
@@ -406,6 +407,7 @@ export class YamlCompiler {
       .filter((name): name is string => name != null);
 
     const seen = new Set<string>();
+
     for (const name of names) {
       if (seen.has(name)) {
         errorsReport.error(message(name));

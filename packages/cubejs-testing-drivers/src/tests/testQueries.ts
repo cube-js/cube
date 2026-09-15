@@ -143,6 +143,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       if (type !== 'pinot') {
         queries = getCreateQueries(type, suffix);
         console.log(`Creating ${queries.length} fixture tables`);
+
         try {
           for (const q of queries) {
             await driver.createTableRaw(q);
@@ -170,6 +171,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         // Pinot has no dropTable; the cluster is torn down with the environment.
         if (type !== 'pinot') {
           console.log(`Dropping ${tables.length} fixture tables`);
+
           for (const t of tables) {
             await driver.dropTable(t);
           }

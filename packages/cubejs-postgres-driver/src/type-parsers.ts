@@ -23,6 +23,7 @@ export const timestampTzTypeParser = (val: string): string => {
 
   // Timezone sign sits past the HH:MM:SS portion (index 19).
   let tzIdx = 19;
+
   for (; tzIdx < len; tzIdx++) {
     const c = val.charCodeAt(tzIdx);
     if (c === 43 /* + */ || c === 45 /* - */) break;

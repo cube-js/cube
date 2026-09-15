@@ -130,6 +130,13 @@ export class CubejsServerCore {
 
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
 
+  /**
+   * In-flight orchestrator api builds, by id. Concurrent callers of a cold id must
+   * share one build: `OrchestratorStorage` releases a replaced entry, so a second
+   * build closes the Cube Store connection of the api the first caller is using.
+   */
+  protected readonly buildingOrchestratorApis: Map<string, Promise<OrchestratorApi>> = new Map();
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
 
@@ -446,7 +453,7 @@ export class CubejsServerCore {
     } else {
       app.get('/', (req, res) => {
         res.status(200)
-          .send('<html><body>Cube.js server is running in production mode. <a href="https://docs.cube.dev/cube-core/deployment#production-checklist">Learn more about production mode</a>.</body></html>');
+          .send('<html><body>Cube server is running in production mode. <a href="https://docs.cube.dev/cube-core/deployment#production-checklist">Learn more about production mode</a>.</body></html>');
       });
     }
   }
@@ -559,6 +566,10 @@ export class CubejsServerCore {
     await this.orchestratorStorage.releaseConnections();
 
     this.orchestratorStorage.clear();
+    // A build still in flight would otherwise keep handing its pre-reset api --
+    // built from the pre-reset context and the env this is about to reload -- to
+    // every caller arriving until it settles.
+    this.buildingOrchestratorApis.clear();
     this.compilerCache.clear();
 
     this.reloadEnvVariables();
@@ -576,6 +587,31 @@ export class CubejsServerCore {
       return this.orchestratorStorage.get(orchestratorId);
     }
 
+    const building = this.buildingOrchestratorApis.get(orchestratorId);
+
+    if (building) {
+      return building;
+    }
+
+    // Registered before the first `await` in the build, so nothing can interleave
+    // between the miss above and this line.
+    const pending = this.buildOrchestratorApi(orchestratorId, context)
+      .finally(() => {
+        // Dropped once settled: a success is in the cache by now, and a failure must
+        // not become the cached answer for this id. Identity-checked because
+        // `resetInstanceState()` clears the map mid-build, after which the entry
+        // belongs to a later caller's build rather than to this one.
+        if (this.buildingOrchestratorApis.get(orchestratorId) === pending) {
+          this.buildingOrchestratorApis.delete(orchestratorId);
+        }
+      });
+
+    this.buildingOrchestratorApis.set(orchestratorId, pending);
+
+    return pending;
+  }
+
+  protected async buildOrchestratorApi(orchestratorId: string, context: RequestContext): Promise<OrchestratorApi> {
     /**
      * Hash table to store promises which will be resolved with the
      * datasource drivers. DriverFactoryByDataSource function is closure
@@ -930,7 +966,7 @@ export class CubejsServerCore {
     console.error(e.stack || e);
 
     if (e.message && e.message.indexOf('Redis connection to') !== -1) {
-      console.log('🛑 Cube.js Server requires locally running Redis instance to connect to');
+      console.log('🛑 Cube Server requires locally running Redis instance to connect to');
       if (process.platform.indexOf('win') === 0) {
         console.log('💾 To install Redis on Windows please use https://github.com/MicrosoftArchive/redis/releases');
       } else if (process.platform.indexOf('darwin') === 0) {

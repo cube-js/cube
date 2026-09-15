@@ -490,6 +490,7 @@ export abstract class BaseDriver implements DriverInterface {
     }
 
     await this.createTable(table, columns);
+
     try {
       if (isDownloadTableMemoryData(tableData)) {
         for (let i = 0; i < tableData.rows.length; i++) {
@@ -500,6 +501,7 @@ export abstract class BaseDriver implements DriverInterface {
             columns.map(c => this.toColumnValue(tableData.rows[i][c.name] as string, c.type))
           );
         }
+
         for (let i = 0; i < indexesSql.length; i++) {
           const [query, params] = indexesSql[i].sql;
           await this.query(query, params);

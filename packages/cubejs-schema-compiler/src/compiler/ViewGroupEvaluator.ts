@@ -200,6 +200,7 @@ export class ViewGroupEvaluator implements CompilerInterface {
 
   private resolve(errorReporter?: ErrorReporter): void {
     const validViewNames = new Set<string>();
+
     for (const cube of this.cubeEvaluator.cubeList) {
       if (cube.isView) {
         validViewNames.add(cube.name);
@@ -207,6 +208,7 @@ export class ViewGroupEvaluator implements CompilerInterface {
     }
 
     const viewGroupMap = new Map<string, CompiledViewGroup>();
+
     for (const [name, def] of this.viewGroupDefinitions) {
       viewGroupMap.set(name, this.resolveGroup(def, validViewNames, errorReporter));
     }
@@ -240,6 +242,7 @@ export class ViewGroupEvaluator implements CompilerInterface {
 
     // Map each view to the most-specific group(s) it directly belongs to.
     this.viewToGroups = new Map();
+
     for (const group of this.resolvedViewGroups) {
       this.collectViewToGroups(group);
     }
@@ -286,6 +289,7 @@ export class ViewGroupEvaluator implements CompilerInterface {
         ? this.cubeEvaluator.evaluateReferences(null, cube.viewGroup)
         : cube.viewGroup;
       const names = Array.isArray(resolved) ? resolved : [resolved];
+
       for (const n of names) {
         if (!groupNames.includes(n)) {
           groupNames.push(n);
@@ -301,6 +305,7 @@ export class ViewGroupEvaluator implements CompilerInterface {
       } else {
         resolved = cube.viewGroups;
       }
+
       for (const n of resolved) {
         if (!groupNames.includes(n)) {
           groupNames.push(n);
