@@ -2311,7 +2311,7 @@ pub mod tests {
     use crate::metastore::table::{Table, TablePath};
     use crate::metastore::{Chunk, Column, ColumnType, IdRow, Index, Partition, Schema};
     use crate::queryplanner::planning::{
-        choose_index, try_extract_cluster_send, PlanIndexStore, Snapshot,
+        choose_index, choose_index_ext, try_extract_cluster_send, PlanIndexStore, Snapshot,
     };
     use crate::queryplanner::pretty_printers::PPOptions;
     use crate::queryplanner::query_executor::ClusterSendExec;
@@ -2929,8 +2929,19 @@ pub mod tests {
     /// lines. One line per `ClusterSend`, so a plan with several of them (a nested aggregate, a
     /// join) shows what each one got.
     async fn limit_pushdown_of(sql: &str, indices: &TestIndices) -> Vec<String> {
+        limit_pushdown_of_ext(sql, indices, true).await
+    }
+
+    async fn limit_pushdown_of_ext(
+        sql: &str,
+        indices: &TestIndices,
+        limit_pushdown: bool,
+    ) -> Vec<String> {
         let plan = initial_plan(sql, indices);
-        let plan = choose_index(plan, indices).await.unwrap().0;
+        let plan = choose_index_ext(plan, indices, true, limit_pushdown)
+            .await
+            .unwrap()
+            .0;
         let mut opts = PPOptions::none();
         opts.show_limit_pushdown = true;
         pretty_printers::pp_plan_ext(&plan, &opts)
@@ -3060,6 +3071,51 @@ pub mod tests {
             limit_pushdown_of(
                 "SELECT order_id FROM s.Orders ORDER BY 1 LIMIT 10",
                 &indices
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2]]"]
+        );
+
+        // An ORDER BY inside the aggregate's input would describe a relation the outer limit does
+        // not count, and reading it as the query's order would flip `reverse` and keep the wrong
+        // end of the index. DataFusion drops such a sort before we ever see it -- all three shapes
+        // optimize to the same plan -- so there is nothing to guard against; this pins that, so a
+        // DataFusion upgrade that starts keeping the sort fails here instead of silently.
+        for sql in [
+            "SELECT order_id, sum(order_amount) FROM \
+             (SELECT order_id, order_amount FROM s.Orders ORDER BY order_id DESC) i \
+             GROUP BY 1 ORDER BY 1 ASC LIMIT 10",
+            "SELECT order_id, sum(order_amount) FROM \
+             (SELECT order_id, order_amount FROM s.Orders) i \
+             GROUP BY 1 ORDER BY 1 ASC LIMIT 10",
+        ] {
+            assert_eq!(
+                limit_pushdown_of(sql, &indices).await,
+                vec!["ClusterSend, indices: [[2]], limit: 10, reverse: false"],
+                "{}",
+                sql
+            );
+        }
+
+        // The toggle has to actually remove the descriptor. Comparing results with it on and off
+        // cannot show that: they stay equal when the flag is ignored entirely, which is exactly how
+        // a newly threaded parameter fails.
+        assert_eq!(
+            limit_pushdown_of_ext(
+                "SELECT order_id, sum(order_amount) FROM s.Orders \
+                 GROUP BY 1 ORDER BY 1 LIMIT 10",
+                &indices,
+                false
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2]]"]
+        );
+        assert_eq!(
+            limit_pushdown_of_ext(
+                "SELECT order_id, order_customer, sum(order_amount) FROM s.Orders \
+                 GROUP BY 1, 2 ORDER BY 2 LIMIT 10",
+                &indices,
+                false
             )
             .await,
             vec!["ClusterSend, indices: [[2]]"]

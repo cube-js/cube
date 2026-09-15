@@ -290,8 +290,9 @@ pub fn push_worker_sort_and_limit(
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     // Worker side: bound the partial aggregate's output. A hash aggregate uses the trimming top-k
     // when factor > 0, otherwise (and for the sorted/inline aggregate, whose group count is unknown)
-    // it is bounded with a per-partition Sort(fetch). `resort_worker_subtree` returns None only when
-    // there is no locatable partial aggregate, leaving the plan as planned.
+    // it is bounded with a per-partition Sort(fetch). `resort_worker_subtree` returns None when there is
+    // no locatable partial aggregate, or when the descriptor's arity is not this aggregate's group
+    // key -- either way the plan is left as planned.
     if let Some(w) = p.as_any().downcast_ref::<WorkerExec>() {
         let Some((cols, fetch)) = w.worker_sort_and_limit.clone() else {
             return Ok(p);
@@ -418,7 +419,8 @@ fn worker_ordering(
 ///   partition with a sort. For hash this is the pre-trim behavior, kept as the `factor == 0`
 ///   fallback so disabling the trim still bounds the worker rather than leaving it unbounded.
 ///
-/// Returns `None` for an unrecognized subtree (no locatable partial aggregate), otherwise the
+/// Returns `None` for an unrecognized subtree (no locatable partial aggregate) and for a
+/// descriptor whose arity is not the aggregate's group key -- otherwise the
 /// rebuilt subtree paired with `is_hash` (true for the hash path) so the caller doesn't have to
 /// walk down to the partial aggregate a second time to decide the router shape.
 fn resort_worker_subtree(

@@ -67,9 +67,9 @@ pub struct PPOptions {
     pub show_partitions: bool,
     pub show_metrics: bool,
     pub traverse_past_clustersend: bool,
-    /// Print the worker limit-pushdown descriptors a `ClusterSend` carries. Off by default: the
-    /// descriptors are what the pushdown tests assert on, and every other test pins plan strings
-    /// that must not grow a new field.
+    /// Print the worker limit-pushdown descriptors a `ClusterSend` carries. Off in
+    /// [`Self::show_nonmeta`] and by default, because the tests that use them pin plan strings that
+    /// must not grow a new field; on in [`Self::show_most`], which nothing asserts on.
     pub show_limit_pushdown: bool,
 }
 
@@ -86,7 +86,7 @@ impl PPOptions {
             show_partitions: true,
             show_metrics: false, // yeah.  Is useful only after plan is evaluated, so defaults to false.
             traverse_past_clustersend: false,
-            show_limit_pushdown: false,
+            show_limit_pushdown: true,
         }
     }
 
