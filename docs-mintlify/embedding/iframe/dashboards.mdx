@@ -212,6 +212,13 @@ disappears regardless of their values. `showDashboardEditButton` can only
 hide the Edit action; it can never show one to a viewer who lacks edit
 permission.
 
+The export menu has its own switch, `showDashboardExportMenu=false`, covered
+above under [Allow chart and dashboard export](#allow-csv-export) — unlike
+the header controls above, it's hidden by default. It also isn't part of
+the dashboard header the way those controls are: in Creator Mode it's docked
+in the header, but on the published-dashboard embed it floats over the
+dashboard, so `showDashboardHeader=false` doesn't hide it there.
+
 ### Creator Mode workbook header
 
 The [Creator Mode](/embedding/iframe/creator-mode) workbook header — which

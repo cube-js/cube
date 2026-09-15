@@ -13,7 +13,7 @@ The Generate Session API is available on [Premium and Enterprise plans](https://
 
 ## Authentication
 
-The Generate Session API requires your [Cube Cloud API key][ref-api-keys] for authentication.
+The Generate Session API requires your [Cube Cloud API key][ref-api-keys] for authentication. The key must belong to an admin user: this endpoint mints a session for somebody else, choosing their identity and the groups and attributes their data access is resolved against, so a [personal key][ref-personal-api-keys] is rejected with `403 Forbidden`.
 
 If the API key is [scoped to specific deployments][ref-api-keys], the `deploymentId` in the request body must be within the key's scope; otherwise the request is rejected with `403 Forbidden`. Unscoped keys can mint sessions for any deployment.
 
@@ -47,6 +47,7 @@ POST https://{accountName}.cubecloud.dev/api/v1/embed/generate-session
 | `groupDefinitions`         | array    | No          | Idempotently upsert group definitions before assigning memberships. Requires `creatorMode: true`. See [Creator mode bootstrap](#creator-mode-bootstrapping-groups-and-user-attributes). |
 | `securityContext`          | object   | No          | Custom security context object passed to Cube queries. Not allowed with `internalId`.                                                                                                   |
 | `settings`                 | object   | No          | Per-session overrides for embed behavior, applied to every embed viewed with this session. See [Session settings](#session-settings).                                                   |
+| `branchName`               | string   | No          | Deployment branch this session queries. Omit it to query production. See [Branch selection](#branch-selection).                                                                         |
 
 <Info>
 
@@ -120,6 +121,27 @@ own. Of the keys above, its `sessionSettings` object accepts
 parameter, or dashboard-pinned zone above it to lose to; an unusable value still
 falls through to the deployment default rather than failing the session.
 </Note>
+
+## Branch selection
+
+Omit `branchName`, or pass the deployment's production branch, and the session queries
+production — the default.
+
+Pass any other branch and every Cube query the session makes — from embedded
+dashboards, the [Creator Mode][ref-creator-mode] workspace, and chat alike — runs
+against that branch's data model instead, which is how an embed previews data model
+changes before they ship.
+
+The branch is resolved when the session is generated, not when the iframe loads, so a
+bad branch fails the API call rather than the embed:
+
+- a name that isn't a branch of the deployment returns `404`;
+- a branch nothing is serving returns `400`. A branch is served while someone has it
+  open in Cube, or permanently once its [staging
+  environment][ref-environments-staging] is enabled.
+
+Content itself isn't branch-scoped: the same saved dashboards and workbooks render
+whichever branch the session selects.
 
 ## User profile
 
@@ -409,6 +431,8 @@ curl -X POST "https://your-account.cubecloud.dev/api/v1/embed/generate-session" 
 Use session ID in [signed embedding][ref-signed-embedding].
 
 [ref-api-keys]: /admin/account-billing/api-keys
+[ref-personal-api-keys]: /admin/account-billing/api-keys#personal-api-keys
 [ref-signed-embedding]: /embedding/iframe/auth/signed
 [ref-creator-mode]: /embedding/iframe/creator-mode
 [ref-analytics-chat]: /embedding/iframe/analytics-chat
+[ref-environments-staging]: /admin/deployment/environments#staging-environments
