@@ -201,36 +201,37 @@ async function applyDirectoryModes(directoryModes: Map<string, number>): Promise
     ([a], [b]) => b.split(path.sep).length - a.split(path.sep).length
   );
 
-  // `O_DIRECTORY | O_NOFOLLOW` for the same reason the file path uses `O_NOFOLLOW`:
-  // the containment check happened when the entry was seen, and this runs after the
-  // whole archive. A link swapped in at `dest` since then would otherwise take an
-  // archive-chosen mode outside the target; opening it fails ELOOP instead.
-  //
-  // Both constants are POSIX-only. On Windows they are `undefined`, which would
-  // collapse the flags to a bare `O_RDONLY` and make this an unsupported open-plus-
-  // fchmod of a directory — failing *after* the whole archive is already written. Fall
-  // back to a plain `chmod` there; a unix-made zip is the only kind that reaches here
-  // at all, and Windows symlinks need privilege to create.
+  // `O_DIRECTORY | O_NOFOLLOW` because this runs after the whole archive: a link
+  // swapped in at `dest` since the containment check would otherwise take an
+  // archive-chosen mode outside the target.
+  // Both constants are POSIX-only; on Windows they fold to 0, so chmod by path there.
   const canOpenDirectory = typeof fs.constants.O_DIRECTORY === 'number'
     && typeof fs.constants.O_NOFOLLOW === 'number';
   // eslint-disable-next-line no-bitwise
   const flags = fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW;
 
+  // `chmod` sets bits verbatim where `open` filters them, so without this an archive
+  // could choose a world-writable directory under the target — the file path cannot.
+  const umask = process.umask();
+
   for (const [dest, mode] of deepestFirst) {
+    // eslint-disable-next-line no-bitwise
+    const masked = mode & ~umask;
+
     if (canOpenDirectory) {
       // eslint-disable-next-line no-await-in-loop
       const handle = await fs.promises.open(dest, flags);
 
       try {
         // eslint-disable-next-line no-await-in-loop
-        await handle.chmod(mode);
+        await handle.chmod(masked);
       } finally {
         // eslint-disable-next-line no-await-in-loop
         await handle.close();
       }
     } else {
       // eslint-disable-next-line no-await-in-loop
-      await fs.promises.chmod(dest, mode);
+      await fs.promises.chmod(dest, masked);
     }
   }
 }
@@ -253,10 +254,8 @@ async function writeZipEntry(
     throw new Error(`Refusing to extract symlink entry from zip: ${entry.fileName}`);
   }
 
-  // Trailing separator stripped before it reaches the filesystem: `path.join` keeps it,
-  // and POSIX resolves a trailing slash as if `/.` followed — so `lstat` on `esc/`
-  // stats the link's target and reports it is not a link. It also makes
-  // `applyDirectoryModes` count a phantom segment when sorting by depth.
+  // Stripped before it reaches the filesystem: POSIX resolves a trailing slash as if
+  // `/.` followed, so `lstat('esc/')` stats the link's target and calls it not a link.
   const dest = path.join(dir, entry.fileName.replace(/\/+$/, ''));
   // Lexical first: it costs nothing and refuses a hostile name before any filesystem
   // call. It is not sufficient on its own — see `realpathOfExistingAncestor`.
@@ -276,11 +275,14 @@ async function writeZipEntry(
     throw new Error(`Refusing to extract zip entry out of bound path: ${entry.fileName}`);
   }
 
-  // Resolving the parent cannot see the last component: a link there is written
-  // *through*, and a dangling one has its target created by the open. `lstat` is the
-  // only check that sees both, and it has to come before the directory branch, which
-  // would otherwise `mkdir` through the link and chmod a directory outside `dir`.
-  const existing = await fs.promises.lstat(dest).catch(() => null);
+  // Resolving the parent cannot see the last component, and `realpath` cannot see a
+  // dangling link at all. Before the directory branch, which would `mkdir` through one.
+  const existing = await fs.promises.lstat(dest).catch((e) => {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw e;
+    }
+    return null;
+  });
   if (existing?.isSymbolicLink()) {
     throw new Error(`Refusing to extract zip entry over a symlink: ${entry.fileName}`);
   }
@@ -291,10 +293,8 @@ async function writeZipEntry(
   if (entry.fileName.endsWith('/') || unixFileType(entry) === UNIX_MODE_DIRECTORY) {
     await fs.promises.mkdir(dest, { recursive: true });
 
-    // Recorded now, applied after the last entry: a `0o700` directory has to end up
-    // `0o700` rather than inheriting the umask, but it cannot be restricted while
-    // there are still entries to write under it. The root cannot reach here — an entry
-    // naming it returns above — so an archive can never set the caller's own mode.
+    // Recorded, not applied: a restrictive mode cannot be set while there are still
+    // entries to write underneath it.
     const dirMode = unixPermissions(entry);
     if (dirMode) {
       directoryModes.set(dest, dirMode);
@@ -307,11 +307,9 @@ async function writeZipEntry(
   const mode = unixPermissions(entry);
   const readStream = await zipfile.openReadStreamPromise(entry);
 
-  // `O_NOFOLLOW` rather than trusting the `lstat` above: that is a check-then-open
-  // race, and this makes the write refuse a link on its own terms (ELOOP). Opened by
-  // hand because `createWriteStream`'s `flags` is typed as a string. On Windows the
-  // constant is `undefined` and the flag is silently dropped, leaving the `lstat` as
-  // the only guard — acceptable there, where creating a symlink needs privilege.
+  // `O_NOFOLLOW` because the `lstat` above is a check-then-open race. Opened by hand
+  // because `createWriteStream`'s `flags` is typed as a string. POSIX-only; on Windows
+  // it folds to 0 and the `lstat` is the only guard.
   // eslint-disable-next-line no-bitwise
   const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW;
 
@@ -337,10 +335,8 @@ async function writeZipEntry(
  * Extract a zip into `dir`, which must already exist.
  */
 async function extractZipArchive(archivePath: string, dir: string): Promise<void> {
-  // Before the zipfile is opened: a throw here would otherwise leak its descriptor,
-  // which nothing closes until the `finally` further down. Resolved because it is
-  // compared against resolved parents below — on macOS a caller's `/tmp/...` is
-  // already a symlink to `/private/tmp/...`.
+  // Before the zipfile is opened, or a throw here leaks its descriptor. Resolved
+  // because it is compared against resolved parents below.
   const root = await fs.promises.realpath(dir);
 
   const zipfile = await yauzl.openPromise(archivePath, { lazyEntries: true });

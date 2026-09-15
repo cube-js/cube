@@ -572,6 +572,27 @@ describe('extractArchive', () => {
       }
     });
 
+    it('filters a directory mode through the umask, as the file path already is', async () => {
+      // `chmod` sets bits verbatim where `open` filters them, so without masking an
+      // archive gets to choose a world-writable directory under the extraction target —
+      // somewhere Cube later loads code from.
+      const archive = path.join(work, 'worldwritable.zip');
+      await writeZip(archive, [
+        { name: 'plugins', content: '', mode: 0o040777 },
+        { name: 'plugins/driver.txt', content: 'x' },
+      ]);
+
+      const target = targetDir();
+      await extractArchive(archive, target);
+
+      // eslint-disable-next-line no-bitwise
+      const expected = (0o777 & ~process.umask()).toString(8);
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(path.join(target, 'plugins')).mode & 0o777).toString(8)).toBe(expected);
+      // The point of the assertion, spelled out for the default umask of 022.
+      expect(expected).not.toBe('777');
+    });
+
     it('keeps a directory entry\'s mode too, not just a file\'s', async () => {
       // Directories go through `mkdir`, which takes its own mode — so this is a
       // separate code path from the file bits above, and dropping it silently widens
