@@ -4,7 +4,7 @@
 # to list and resolve review threads without granting `gh api graphql:*` broadly.
 #
 # Aliases installed:
-#   gh list-review-threads <owner> <repo> <pr> [cursor]
+#   gh list-review-threads <owner> <repo> <pr> [thread-cursor]
 #   gh show-review-thread <thread-id> [comment-cursor]
 #   gh resolve-thread <thread-id>
 
