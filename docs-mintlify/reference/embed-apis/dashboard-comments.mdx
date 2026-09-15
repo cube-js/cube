@@ -11,7 +11,7 @@ The Dashboard Comments API is available on [Premium and Enterprise plans](https:
 
 </Note>
 
-## Prerequisites
+## Enable the comment panel
 
 **The account decides whether the comment UI appears.** Turn on **Allow comments on embedded dashboards** under **Embed → Settings** in the Cube console — see [Show and hide features](/embedding/iframe/feature-visibility#account-settings). The setting governs whether the built-in comment panel renders on an embedded dashboard. It is the host account's switch alone: an embed user cannot turn it on, and there is no per-session override.
 
@@ -47,7 +47,7 @@ All paths are relative to `https://{accountName}.cubecloud.dev/api/v1/embed`, an
 | `Content-Type` | `application/json` | For `POST` and `PATCH` |
 | `Authorization` | `Embed-Token YOUR_EMBED_TOKEN` | Yes |
 
-The embed token is the signed session's own JWT. Exchange the `sessionId` from [Generate Session][ref-generate-session] for one with `POST /api/v1/embed/session/token`. A session id is single-use and the token it returns lasts 24 hours. An embedded dashboard performs the exchange itself, so the comment UI inside an iframe is already authenticated — supply the header yourself only when you call these endpoints from your own code.
+The embed token is the signed session's own JWT. Exchange the `sessionId` from [Generate Session][ref-generate-session] for one with `POST /api/v1/embed/session/token`. A session id is single-use and expires 5 minutes after it is minted, so exchange it at once; the token it returns lasts 24 hours. An embedded dashboard performs the exchange itself, so the comment UI inside an iframe is already authenticated — supply the header yourself only when you call these endpoints from your own code.
 
 ## Who may edit, delete, and resolve
 
@@ -67,9 +67,9 @@ Reading is wider than writing: everyone who can open the dashboard sees the whol
 
 A thread is one root comment plus its replies, oldest first. **Nesting is one level deep** — pass `parentId` to reply to a thread root, and replying to a reply returns `400`. A `parentId` that names nothing, a deleted thread, or a comment on another dashboard returns `404`.
 
-Threads are listed newest-first by when they started, so a thread holds its place while it is being replied to. Open threads are returned by default. Pass `includeResolved=true` to widen the page to resolved threads as well, or `resolvedOnly=true` to return only those; `resolvedOnly` wins when both are set.
+Threads are listed newest-first by last activity, so replying to a thread moves it back to the top. Open threads are returned by default. Pass `includeResolved=true` to widen the page to resolved threads as well, or `resolvedOnly=true` to return only those; `resolvedOnly` wins when both are set.
 
-Deleting is a soft delete. A deleted comment is still returned, with an empty `body` and `removedAt` set, so a thread keeps its shape and the surviving replies stay readable. Deleting a thread root takes its replies with it.
+Deleting is a soft delete, and the two cases differ. **A deleted reply is dropped from its thread.** **A deleted root is still listed** while a live reply survives under it, returned with an empty `body` and `removedAt` set — otherwise removing it would discard other people's replies along with it. A root with no surviving replies leaves the list entirely.
 
 Resolving applies to threads only. Passing a reply's id returns `400`, because a reply carries no resolve state of its own.
 
