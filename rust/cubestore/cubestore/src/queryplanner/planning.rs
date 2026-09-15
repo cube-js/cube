@@ -881,9 +881,12 @@ struct ChooseIndexContext {
 }
 
 impl ChooseIndexContext {
+    /// A limit entering the context starts a new scope: whichever aggregate sits nearest below it
+    /// owns it, even if an outer one already claimed an outer limit.
     fn update_limit(&self, limit: Option<usize>) -> Self {
         Self {
             limit,
+            limit_claimed: false,
             ..self.clone()
         }
     }
@@ -920,12 +923,12 @@ impl ChooseIndexContext {
         }
     }
 
-    /// Drops everything describing the enclosing query's output for a relation whose rows that
-    /// limit does not count. [single_value_filtered_cols] goes too: a `col = literal` above a join
-    /// constrains the join's output, not an input's column of the same name, and a `LIMIT` deeper
-    /// down would otherwise let it strip columns from the index-prefix check for a relation it
-    /// never restricted.
-    fn clear_limit(&self) -> Self {
+    /// The context for a relation the enclosing query's `LIMIT` does not count the rows of: nothing
+    /// describing that query's output carries over. [single_value_filtered_cols] goes too -- a
+    /// `col = literal` above a join constrains the join's output, not an input's column of the same
+    /// name, so keeping it could strip columns from the index-prefix check for a relation it never
+    /// restricted.
+    fn for_unrelated_relation() -> Self {
         Self::default()
     }
     fn mark_filter_above(&self) -> Self {
@@ -1033,7 +1036,7 @@ impl PlanRewriter for ChooseIndex<'_> {
                 // Only the first aggregate below the limit owns it. A deeper one is the input of
                 // that aggregate, and bounding an input drops rows the owner still needs.
                 let context = if context.limit_claimed {
-                    context.clear_limit()
+                    ChooseIndexContext::for_unrelated_relation()
                 } else {
                     context.clone()
                 };
@@ -1050,7 +1053,7 @@ impl PlanRewriter for ChooseIndex<'_> {
             // different relation from the one the limit counts the rows of. This covers both sides
             // of a join: `rewrite_plan_impl` enters the `Join` node itself before it splits, and
             // hands each side the context produced here.
-            _ => Some(context.clear_limit()),
+            _ => Some(ChooseIndexContext::for_unrelated_relation()),
         }
     }
 
@@ -1243,8 +1246,11 @@ impl ChooseIndex<'_> {
         index_sort_on: Option<&Vec<String>>,
         ctx: &ChooseIndexContext,
     ) -> Option<usize> {
+        // A HAVING drops groups on the router after the workers already truncated to their first
+        // `limit` groups, so the result would be short of `limit` rows.
         if ctx.limit.is_none()
             || !self.can_pushdown_limit
+            || ctx.group_by_has_having
             || index_sort_on.is_none()
             || index_sort_on.unwrap().is_empty()
         {
@@ -1253,12 +1259,6 @@ impl ChooseIndex<'_> {
 
         let limit = ctx.limit.unwrap();
         let index_sort_on = index_sort_on.unwrap();
-
-        // A HAVING drops groups on the router after the workers already truncated to their first
-        // `limit` groups, so the result would be short of `limit` rows.
-        if ctx.group_by_has_having {
-            return None;
-        }
 
         let can_pushdown = match ctx.sort.as_ref().filter(|s| !s.is_empty()) {
             //We can push down limit only if resulting order by is the prefix of index sort on
@@ -3037,6 +3037,21 @@ pub mod tests {
             )
             .await,
             vec!["ClusterSend, indices: [[2]]", "ClusterSend, indices: [[0]]",]
+        );
+
+        // An inner LIMIT starts a new scope: the aggregate nearest below it owns that limit, even
+        // though an outer aggregate already claimed an outer one. Bounding the inner aggregate to
+        // its own 5 is sound, so the pushdown stays.
+        assert_eq!(
+            limit_pushdown_of(
+                "SELECT order_id, sum(v) FROM \
+                 (SELECT order_id, sum(order_amount) v FROM s.Orders \
+                  GROUP BY 1 ORDER BY 1 LIMIT 5) i \
+                 GROUP BY 1",
+                &indices
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2]], limit: 5, reverse: false"]
         );
 
         // No aggregate at all: no group key to bound, so no descriptor today either. Pinned so the

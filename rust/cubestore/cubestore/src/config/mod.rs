@@ -602,11 +602,8 @@ pub trait ConfigObj: DIService {
     fn group_by_limit_per_partition(&self) -> bool;
 
     /// Push the query's `LIMIT` into the workers for `GROUP BY ... ORDER BY ... LIMIT`. Off makes
-    /// every worker emit all of its groups and leaves the cut to the router.
-    ///
-    /// Node-local and not part of [`PlanningFlags`]: it gates the descriptor `ChooseIndex` stamps
-    /// into the logical plan on the router, and that plan -- descriptor included -- is what the
-    /// worker receives, so the two halves cannot disagree.
+    /// every worker emit all of its groups and leaves the cut to the router. Node-local and not in
+    /// [`PlanningFlags`]: the worker receives the router's plan, descriptor included.
     fn limit_pushdown(&self) -> bool;
 
     /// Replace the sort-preserving merge feeding a grouped Linear (hash) aggregate with a plain

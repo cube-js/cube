@@ -430,12 +430,11 @@ fn resort_worker_subtree(
 ) -> Option<(Arc<dyn ExecutionPlan>, bool)> {
     let partial = locate_partial_aggregate(worker_subtree)?;
 
-    // The descriptor must be a permutation of THIS aggregate's full group key -- that is what makes
-    // the per-partition `fetch` sound, and what makes `cols` index the right columns at all. A
-    // shorter one comes from a different relation's key and would reorder this aggregate's output
-    // by whatever columns happen to sit at those positions. Skipping the bound is always correct,
-    // and both the router and the worker reach this check with the same aggregate, so the two
-    // halves of a split plan agree on whether it fired.
+    // A descriptor of a different arity than this aggregate's group key is not ours, and skipping
+    // the bound is always correct. Equal arity is not proof -- the scoping in `ChooseIndexContext`
+    // is what guarantees the descriptor belongs to this aggregate; this only catches the case that
+    // would silently index the wrong columns. Router and worker reach it with the same aggregate,
+    // so the two halves of a split plan agree on whether it fired.
     if cols.len() != group_column_count(&partial)? {
         return None;
     }
