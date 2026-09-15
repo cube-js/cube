@@ -417,8 +417,6 @@ lazy_static::lazy_static! {
     // Also, some tests are new.  This should probably be a whitelist.
     static ref MIGRATION_TEST_EXCLUSION_SET: HashSet<String> = [
         // Tests that would fail and are useless as a migration test.
-        "nested_aggregate_limit_does_not_truncate",
-        "limit_pushdown_group_having_ordered",
         "aggregate_index_errors",
         // Old versions panic building an aggregating index over a decimal measure.
         "aggregate_index_decimal",
@@ -479,6 +477,8 @@ lazy_static::lazy_static! {
         "queue_add_and_retrieve",
         "queue_add_and_retrieve_backlog",
         "queue_add_external_id_max_len",
+        "nested_aggregate_limit_does_not_truncate",
+        "limit_pushdown_group_having_ordered",
     ].into_iter().map(ToOwned::to_owned).collect();
 }
 
