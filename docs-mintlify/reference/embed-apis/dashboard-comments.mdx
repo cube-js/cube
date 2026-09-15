@@ -19,9 +19,9 @@ The Dashboard Comments API is available on [Premium and Enterprise plans](https:
 
 ## Authentication
 
-Every endpoint requires a **signed embed session scoped to an embed tenant**. Mint one with [Generate Session][ref-generate-session] using `externalId`. The session is scoped to `embedTenantName`, or to the account's own tenant when you omit it, so either form reaches these endpoints.
+Every endpoint requires a **signed embed session scoped to an embed tenant**. Mint one with [Generate Session][ref-generate-session] using `externalId`. `embedTenantName` is optional: omit it and the session scopes to the Cube Cloud tenant's own name, which reaches these endpoints; pass it to scope the conversation to a specific embed tenant.
 
-A credential that names no embed tenant is rejected with `403 Forbidden`: a [Cube Cloud API key][ref-api-keys], a console session, or a session minted with `internalId`, which resolves its user against Cube Cloud's own accounts and so carries no embed tenant at all.
+A session minted with `internalId` cannot comment. Such a session resolves its user from Cube Cloud's own user table and so carries no embed tenant by design, and these endpoints reject it with `403 Forbidden`. A [Cube Cloud API key][ref-api-keys] and a console session are rejected the same way.
 
 The calling embed user is taken from the session; no endpoint accepts an author in the request body.
 
@@ -234,7 +234,7 @@ curl "https://your-account.cubecloud.dev/api/v1/embed/dashboard/PUBLIC_ID/commen
 | --- | --- |
 | `400` | Replying to a reply, resolving a reply's id, or a `body` that is empty or over 10,000 characters. |
 | `401` | The `Embed-Token` is invalid or expired. Exchange a fresh `sessionId` for a new one. |
-| `403` | The credential names no embed tenant; the caller cannot read the dashboard; or the comment belongs to another embed user. |
+| `403` | The credential carries no embed tenant — an API key, a console session, or an `internalId` session; the caller cannot read the dashboard; or the comment belongs to another embed user. |
 | `404` | The dashboard, the comment, or a `parentId` does not exist on this dashboard. |
 
 [ref-generate-session]: /reference/embed-apis/generate-session
