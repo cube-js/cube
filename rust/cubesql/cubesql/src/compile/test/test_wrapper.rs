@@ -4933,6 +4933,5 @@ async fn boolean_context_wrapper_plans() {
         let sql = plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains(fragment), "{}: {}", query, sql);
         assert!(!sql.contains("TRUE") && !sql.contains("FALSE"), "{}", sql);
-        println!("MSSQL_BOOLEAN_PLAN {}", serde_json::json!({"query": query, "sql": sql}));
     }
 }
