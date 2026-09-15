@@ -140,7 +140,7 @@ Returned by `GET /dashboard/{publicId}/comments`.
 {
   "items": [
     {
-      "root": { "id": 41, "body": "Revenue looks off for the EU region." },
+      "root": { "id": 41, "body": "Revenue looks off for the EU region.", "isOwn": true },
       "replies": [],
       "resolvedAt": null,
       "resolvedBy": null
@@ -167,7 +167,12 @@ Returned by `GET /dashboard/{publicId}/comments/mentionable-users`. Use it to ba
     { "id": 7, "username": "jane", "email": "jane@example.com", "firstName": "Jane" },
     { "id": 9, "username": "sam", "email": null, "firstName": null }
   ],
-  "pageInfo": { "hasNextPage": false, "hasPreviousPage": false }
+  "pageInfo": {
+    "hasNextPage": false,
+    "hasPreviousPage": false,
+    "startCursor": "MQ==",
+    "endCursor": "Mg=="
+  }
 }
 ```
 
