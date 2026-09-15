@@ -145,7 +145,12 @@ function nextZipEntry(zipfile: yauzl.ZipFile): Promise<yauzl.Entry | null> {
   });
 }
 
-async function writeZipEntry(zipfile: yauzl.ZipFile, entry: yauzl.Entry, dir: string): Promise<void> {
+async function writeZipEntry(
+  zipfile: yauzl.ZipFile,
+  entry: yauzl.Entry,
+  dir: string,
+  signal: AbortSignal
+): Promise<void> {
   // Defence in depth. yauzl runs this itself inside `readEntry` while `decodeStrings`
   // is on, so a `..` name errors out of `nextZipEntry` and never reaches here; this
   // keeps the check owned locally rather than by a default we do not set.
@@ -182,7 +187,9 @@ async function writeZipEntry(zipfile: yauzl.ZipFile, entry: yauzl.Entry, dir: st
 
   const readStream = await zipfile.openReadStreamPromise(entry);
 
-  await pipeline(readStream, fs.createWriteStream(dest, mode ? { mode } : {}));
+  // The signal is what tears these two down when the zipfile errors out from under
+  // them — losing the race only abandons this promise, it does not close anything.
+  await pipeline(readStream, fs.createWriteStream(dest, mode ? { mode } : {}), { signal });
 }
 
 /**
@@ -197,17 +204,19 @@ async function extractZipArchive(archivePath: string, dir: string): Promise<void
 
   // yauzl reports reader failures by emitting `error` on the zipfile, and an emit with
   // no listener *throws* — `nextZipEntry`'s comes off between reads, so this one has to
-  // stay on for the zipfile's lifetime. Raced rather than checked after each step: a
-  // failure can leave the read stream neither ending nor erroring, and `pipeline` then
-  // never settles.
+  // stay on for the zipfile's lifetime.
   let raiseFatal!: (err: Error) => void;
   const fatal = new Promise<never>((_resolve, reject) => {
     raiseFatal = reject;
   });
-  // A clean extraction never awaits `fatal`, and an unobserved rejection is fatal in
-  // its own right.
+  // An error arriving after the last read has no race left to observe it.
   fatal.catch(() => undefined);
-  zipfile.on('error', raiseFatal);
+
+  const aborter = new AbortController();
+  zipfile.on('error', (err: Error) => {
+    aborter.abort();
+    raiseFatal(err);
+  });
 
   try {
     for (;;) {
@@ -218,8 +227,10 @@ async function extractZipArchive(archivePath: string, dir: string): Promise<void
       if (!entry) {
         return;
       }
+      // Raced, not checked after: a failure can leave the read stream neither ending
+      // nor erroring, and `pipeline` would then never settle.
       // eslint-disable-next-line no-await-in-loop
-      await Promise.race([writeZipEntry(zipfile, entry, dir), fatal]);
+      await Promise.race([writeZipEntry(zipfile, entry, dir, aborter.signal), fatal]);
     }
   } finally {
     zipfile.close();

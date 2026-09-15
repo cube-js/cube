@@ -39,6 +39,18 @@ describe('extractArchive', () => {
     fs.rmSync(work, { recursive: true, force: true });
   });
 
+  /** Teardown after an abort is asynchronous, so poll rather than assert on the next tick. */
+  const waitUntil = async (condition: () => boolean, what: string, timeoutMs = 2000) => {
+    const deadline = Date.now() + timeoutMs;
+    while (!condition()) {
+      if (Date.now() > deadline) {
+        throw new Error(`Timed out waiting for ${what}`);
+      }
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => { setTimeout(resolve, 10); });
+    }
+  };
+
   const targetDir = () => {
     const dir = path.join(work, 'target');
     fs.mkdirSync(dir, { recursive: true });
@@ -253,10 +265,9 @@ describe('extractArchive', () => {
 
   describe('survives a reader failure rather than crashing the process', () => {
     it('rejects while the entry is still being written, not once the write settles', async () => {
-      // The read stream here never ends and never errors, so `pipeline` never settles
-      // and the zipfile's `error` is the only signal there is. That is what separates
-      // racing the write against it from checking afterwards: checking afterwards
-      // hangs here, and a hung driver download is worse to diagnose than a crash.
+      // The read stream never ends and never errors, so `pipeline` never settles and the
+      // zipfile's `error` is the only signal there is — which is what makes this pin
+      // racing the write rather than checking after it.
       //
       // The error is scheduled from an `entry` listener registered before
       // `nextZipEntry`'s, so it lands after that per-read listener has come off again.
@@ -283,7 +294,28 @@ describe('extractArchive', () => {
         }
       );
 
-      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/reader exploded/);
+      // Losing the race only abandons the write promise — nothing in `Promise.race`
+      // closes what it was doing, so capture the destination stream and require that
+      // the abort actually tore it down.
+      const createWriteStream = fs.createWriteStream.bind(fs);
+      const opened: fs.WriteStream[] = [];
+      jest.spyOn(fs, 'createWriteStream').mockImplementation((...args: Parameters<typeof fs.createWriteStream>) => {
+        const stream = createWriteStream(...args);
+        opened.push(stream);
+        return stream;
+      });
+
+      try {
+        await expect(extractArchive(archive, targetDir())).rejects.toThrow(/reader exploded/);
+
+        // The rejection outruns the write, which is the point of racing — so wait for
+        // the abandoned write to reach its destination stream before asking whether
+        // anything closed it.
+        await waitUntil(() => opened.length === 1, 'the destination stream to be created');
+        await waitUntil(() => opened[0].destroyed, 'the destination stream to be destroyed');
+      } finally {
+        jest.restoreAllMocks();
+      }
     });
   });
 
