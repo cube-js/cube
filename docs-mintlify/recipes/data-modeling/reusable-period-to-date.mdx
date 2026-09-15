@@ -1,0 +1,204 @@
+---
+title: Reusing period-to-date logic across measures
+description: Define week-, month-, quarter-, and year-to-date logic once in a Jinja macro and apply it to every measure that needs it, instead of writing each variant by hand.
+---
+
+## Use case
+
+Period-to-date metrics — week-to-date (WTD), month-to-date (MTD), quarter-to-date (QTD),
+and year-to-date (YTD) — multiply quickly. A model with 100 base measures and four
+periods needs 400 measure definitions, and each one repeats the same window logic. Adding
+a fifth period means touching every cube.
+
+The period logic itself does not vary. Only the base measure, its aggregation type, and
+the period change. That makes it a good fit for a [Jinja macro][ref-jinja-macros]: define
+the shape once, then call it per measure.
+
+<Note>
+
+This recipe generates measures at compile time, so the model still contains one member per
+(measure × period) pair. What it removes is the duplication in the source files. To let a
+data consumer choose the period at query time instead, see [Configurable rolling
+windows][ref-dynamic-rolling-windows].
+
+</Note>
+
+## Data modeling
+
+Period-to-date is a built-in [rolling window][ref-rolling-window] type. A single measure
+looks like this:
+
+```yaml
+measures:
+  - name: revenue_year_to_date
+    sql: amount
+    type: sum
+    rolling_window:
+      type: to_date
+      granularity: year
+```
+
+<Warning>
+
+Rolling windows of type `to_date` are powered by Tesseract, the [next-generation data
+modeling engine][link-tesseract]. In versions before v1.7.0, it was not enabled by
+default.
+
+</Warning>
+
+### Defining the macro
+
+Put the macro in a `.jinja` file under `model/macros` so that every cube can import it:
+
+```yaml title="model/macros/period_to_date.jinja"
+{#- Period-to-date measures for one base measure.
+
+    periods defaults to the four standard periods. Pass a shorter list to
+    generate fewer, or the name of a granularity defined on a calendar cube
+    to follow a fiscal or retail calendar. -#}
+{%- macro to_date_measures(name, sql, type='sum', periods=['week', 'month', 'quarter', 'year']) -%}
+{%- for period in periods %}
+      - name: {{ name | safe }}_{{ period | safe }}_to_date
+        sql: {{ sql | safe }}
+        type: {{ type | safe }}
+        description: {{ name | safe }}, accumulated from the start of the {{ period | safe }}
+        rolling_window:
+          type: to_date
+          granularity: {{ period | safe }}
+{% endfor -%}
+{%- endmacro -%}
+```
+
+<Warning>
+
+Apply the [`safe`][ref-jinja-escaping] filter to every value substituted into a name or a
+SQL expression. Without it, Cube escapes the value and the model fails to compile with
+`bad indentation of a mapping entry`, because `{{ name }}_{{ period }}` renders as
+`"revenue"_"week"`.
+
+The macro also emits its own leading indentation. Indenting the `{{ ... }}` call in the
+cube file instead only indents the first generated line.
+
+</Warning>
+
+### Applying it to a cube
+
+Import the macro and call it once per base measure:
+
+```yaml title="model/cubes/orders.yml"
+{%- import "macros/period_to_date.jinja" as ptd -%}
+
+cubes:
+  - name: orders
+    sql_table: orders
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: created_at
+        sql: created_at
+        type: time
+
+    measures:
+      - name: revenue
+        sql: amount
+        type: sum
+
+      - name: count
+        type: count
+{{ ptd.to_date_measures("revenue", "amount") }}
+{{ ptd.to_date_measures("count", "id", "count") }}
+```
+
+Two calls generate eight measures: `revenue_week_to_date` through
+`revenue_year_to_date`, and the same four for `count`. Adding a period is a one-token
+change to the macro's default list, not an edit to every cube.
+
+### Overriding the periods
+
+The `periods` parameter defaults to all four periods. Pass a list to generate a subset,
+which keeps the model free of members nobody queries:
+
+```yaml title="model/cubes/customer_signups.yml"
+{%- import "macros/period_to_date.jinja" as ptd -%}
+
+cubes:
+  - name: customer_signups
+    sql_table: signups
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: created_at
+        sql: created_at
+        type: time
+
+    measures:
+      - name: signups
+        type: count
+{{ ptd.to_date_measures("signups", "id", "count", ["month", "year"]) }}
+```
+
+## Result
+
+Querying the generated measures by day shows each window accumulating from the start of
+its own period and resetting at the boundary. In the following result, 1 January falls in
+the ISO week that began on 30 December, so WTD opens with the previous year's orders
+already counted, while MTD, QTD, and YTD all start fresh:
+
+| created_at | revenue |   WTD |   MTD |   QTD |   YTD |
+|------------|--------:|------:|------:|------:|------:|
+| 2025-01-01 |     100 |   130 |   100 |   100 |   100 |
+| 2025-01-02 |     200 |   330 |   300 |   300 |   300 |
+| 2025-01-05 |     400 |   730 |   700 |   700 |   700 |
+| 2025-01-06 |     800 |   800 |  1500 |  1500 |  1500 |
+| 2025-01-07 |    1600 |  2400 |  3100 |  3100 |  3100 |
+
+On 6 January, a Monday, WTD resets to that day's own revenue while the longer windows
+carry on. Grouping by month shows the same behavior one level up, where February resets
+MTD but not QTD or YTD:
+
+| created_at |   MTD |   QTD |   YTD |
+|------------|------:|------:|------:|
+| 2024-12    |    30 |    30 |    30 |
+| 2025-01    |  3100 |  3100 |  3100 |
+| 2025-02    |  5000 |  8100 |  8100 |
+
+## Following a fiscal or retail calendar
+
+The `granularity` of a `to_date` window accepts custom granularities, so the same macro
+covers fiscal and retail periods. Define the granularities on a [calendar
+cube][ref-calendar-cubes] and pass their names:
+
+```yaml
+{{ ptd.to_date_measures("revenue", "amount", "sum", ["retail_week", "retail_month"]) }}
+```
+
+Each window then opens on the retail period's own first day rather than a
+`DATE_TRUNC` boundary, so a five-week retail month accumulates over all five of its
+weeks. See [custom calendars][ref-custom-calendar] for the calendar cube itself.
+
+<Warning>
+
+A [pre-aggregation][ref-pre-aggregations] over an overridden granularity must declare that
+granularity. A rollup at a finer granularity is not a correct source: it holds
+`DATE_TRUNC` buckets that the overriding column cannot be recovered from, so the query
+either fails or returns Gregorian periods.
+
+</Warning>
+
+
+[link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
+[ref-rolling-window]: /reference/data-modeling/measures#rolling_window
+[ref-jinja-macros]: /docs/data-modeling/dynamic/jinja#macros
+[ref-jinja-escaping]: /docs/data-modeling/dynamic/jinja#escaping-unsafe-strings
+[ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
+[ref-custom-calendar]: /recipes/data-modeling/custom-calendar
+[ref-pre-aggregations]: /docs/pre-aggregations/matching-pre-aggregations
+[ref-dynamic-rolling-windows]: /recipes/data-modeling/dynamic-rolling-windows
