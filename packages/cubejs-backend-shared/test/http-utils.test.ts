@@ -391,7 +391,8 @@ describe('extractArchive', () => {
       // entry stream's end or destroy — so a rejection between those two calls leaves
       // `zipfile.close()` unrefing against a count the abandoned stream still holds.
       // A directory entry followed by a file of the same name makes the open throw
-      // EISDIR, which is that window without needing a race.
+      // EEXIST — `O_EXCL`, and the directory is not unlinked — which is that window
+      // without needing a race.
       const archive = path.join(work, 'eisdir.zip');
       await writeZip(archive, [
         { name: 'clash/', content: '', mode: 0o040755 },
@@ -419,7 +420,7 @@ describe('extractArchive', () => {
         }
       );
 
-      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/EISDIR/);
+      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/EEXIST/);
 
       expect(entryStreams).toHaveLength(1);
       await waitUntil(
@@ -634,9 +635,9 @@ describe('extractArchive', () => {
     });
 
     it('narrows a pre-existing file to the mode the archive records', async () => {
-      // `O_CREAT` sets the mode only on a file it creates and `O_TRUNC` leaves an
-      // existing one's bits alone, so without an explicit chmod a re-extraction over a
-      // wide file reports success and leaves it wide.
+      // An existing `dest` is replaced rather than written into, so `open` creates the
+      // file and sets its mode; `wide.jar` is the half that also pins the kernel's
+      // umask filtering.
       const archive = path.join(work, 'overwrite.zip');
       await writeZip(archive, [
         { name: 'driver.jar', content: 'new', mode: 0o100644 },

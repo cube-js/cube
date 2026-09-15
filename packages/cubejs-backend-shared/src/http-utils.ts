@@ -194,8 +194,6 @@ type ZipExtraction = {
    * it made nothing — which is how a pre-existing directory is told apart.
    */
   createdDirectory?: string;
-  /** Memoised `umaskAllowedBits`; both entry kinds mask against the same answer. */
-  allowedBits?: Promise<number>;
 };
 
 /**
@@ -226,14 +224,6 @@ async function umaskAllowedBits(root: string, createdDirectory?: string): Promis
   }
 }
 
-function umaskAllowed(extraction: ZipExtraction): Promise<number> {
-  if (!extraction.allowedBits) {
-    extraction.allowedBits = umaskAllowedBits(extraction.root, extraction.createdDirectory);
-  }
-
-  return extraction.allowedBits;
-}
-
 /**
  * Apply recorded directory modes once every entry is written — a restrictive mode
  * cannot be set while there are still entries to write underneath it, and `mkdir`
@@ -262,7 +252,7 @@ async function applyDirectoryModes(extraction: ZipExtraction): Promise<void> {
 
   // `chmod` sets bits verbatim where `open` filters them through the umask, so an
   // unmasked directory mode would let an archive pick one the file path cannot.
-  const allowed = await umaskAllowed(extraction);
+  const allowed = await umaskAllowedBits(extraction.root, extraction.createdDirectory);
 
   for (const [dest, mode] of deepestFirst) {
     // eslint-disable-next-line no-bitwise
@@ -359,10 +349,9 @@ async function writeZipEntry(extraction: ZipExtraction, entry: yauzl.Entry): Pro
 
   rememberCreated(extraction, await fs.promises.mkdir(path.dirname(dest), { recursive: true }));
 
-  // An existing non-directory `dest` is replaced, not written into. A hardlink to a
-  // file outside `dir` is a second name for that inode — `lstat` calls it a regular
-  // file and `O_NOFOLLOW` does not apply — so no path check can see it; unlinking
-  // breaks the alias. It also keeps `open` off a fifo, which would block for a reader.
+  // A hardlink at `dest` is a second name for a file outside `dir`: `lstat` calls it
+  // regular and `O_NOFOLLOW` does not apply, so unlinking is the only check there is.
+  // It also keeps `open` off a fifo, which would block for a reader.
   if (existing && !existing.isDirectory()) {
     await fs.promises.unlink(dest);
   }
@@ -370,11 +359,12 @@ async function writeZipEntry(extraction: ZipExtraction, entry: yauzl.Entry): Pro
   const mode = unixPermissions(entry);
   const readStream = await zipfile.openReadStreamPromise(entry);
 
-  // `O_NOFOLLOW` because the `lstat` above is a check-then-open race. Opened by hand
-  // because `createWriteStream`'s `flags` is typed as a string. POSIX-only; on Windows
-  // it folds to 0 and the `lstat` is the only guard.
+  // `O_EXCL` because the unlink above is a check-then-open race too, and a hardlink
+  // re-planted in that window is something `O_NOFOLLOW` cannot refuse. Opened by hand
+  // because `createWriteStream`'s `flags` is typed as a string. `O_NOFOLLOW` is
+  // POSIX-only; on Windows it folds to 0 and the `lstat` is the only guard.
   // eslint-disable-next-line no-bitwise
-  const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW;
+  const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW;
 
   let handle: fs.promises.FileHandle;
 
