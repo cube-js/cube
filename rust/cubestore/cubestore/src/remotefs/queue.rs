@@ -1,6 +1,8 @@
 use crate::config::ConfigObj;
 use crate::di_service;
-use crate::remotefs::{CommonRemoteFsUtils, ExtendedRemoteFs, RemoteFile, RemoteFs};
+use crate::remotefs::{
+    ensure_temp_file_is_dropped, CommonRemoteFsUtils, ExtendedRemoteFs, RemoteFile, RemoteFs,
+};
 use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
@@ -144,13 +146,22 @@ impl QueueRemoteFs {
                 temp_upload_path,
                 remote_path,
             } => {
+                // Staging files live under `uploads/`, which the local cleanup loop never
+                // scans: its walk is non-recursive, skips non-files, and skips anything not
+                // ending in `.parquet`. So a staged file that is not renamed away by a
+                // successful `upload_file` is never removed by anything and accumulates for
+                // the lifetime of the node. Guard it the way the chunk upload paths in
+                // `store` and `compaction` already do. The helper checks the file exists
+                // first, so it is a no-op once the upload has renamed it into place.
+                let temp_upload_path =
+                    scopeguard::guard(temp_upload_path, ensure_temp_file_is_dropped);
                 if !acquire_lock("upload loop deleted", self.deleted.read())
                     .await?
                     .contains(remote_path.as_str())
                 {
                     let res = self
                         .remote_fs
-                        .upload_file(temp_upload_path, remote_path.clone())
+                        .upload_file(temp_upload_path.clone(), remote_path.clone())
                         .await;
                     self.result_sender
                         .send(RemoteFsOpResult::Upload(remote_path, res))?;
