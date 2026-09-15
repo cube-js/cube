@@ -25,7 +25,7 @@ use crate::{
     config::ConfigObj,
     sql::{
         compiler_cache::{CompilerCache, CompilerCacheEntry},
-        statement::SensitiveDataSanitizer,
+        statement::redacted_statement,
         SessionManager, SessionState,
     },
     transport::{LoadRequestMeta, MetaContext, SpanId, TransportService},
@@ -564,7 +564,7 @@ impl QueryEngine for SqlQueryEngine {
     }
 
     fn sanitize_statement(&self, stmt: &Self::AstStatementType) -> Self::AstStatementType {
-        SensitiveDataSanitizer::new().replace(stmt.clone())
+        redacted_statement(stmt)
     }
 
     async fn get_cache_entry(

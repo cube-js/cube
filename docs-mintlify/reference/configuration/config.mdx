@@ -1492,6 +1492,12 @@ Accepts the following arguments:
 - `message`: the message to be logged
 - `params`: additional parameters
 
+Filter values, SQL parameters, and string literals in SQL API statements in `params`
+arrive as `redacted` when
+[`CUBEJS_LOG_REDACTION`](/reference/configuration/environment-variables#cubejs_log_redaction)
+is on (the default outside development mode); error messages from a data source arrive as
+returned, and a SQL API error that quotes the statement has it redacted.
+
 <CodeGroup>
 
 ```python title="Python"
