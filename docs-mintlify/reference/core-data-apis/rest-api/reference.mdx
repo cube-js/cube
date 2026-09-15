@@ -339,6 +339,112 @@ Successful response:
 }
 ```
 
+## `{base_path}/v1/sql-filters`
+
+Reads and edits the filters of a [SQL API](/reference/core-data-apis/sql-api) query,
+in the [REST (JSON) API filter format](/reference/core-data-apis/rest-api/query-format#filters-format).
+
+Only the outermost `SELECT` is read and rewritten, and only members available in
+it can be filtered. A filter living in a CTE or a subquery is left alone.
+
+### Reading filters
+
+`GET` returns the filters of a query, as the query planner resolves them.
+
+| Parameter, type | Description | Required |
+| --- | --- | --- |
+| `query`, `string` | SQL API query to read the filters of | ✅ Yes |
+
+```bash
+curl \
+  -H "Authorization: TOKEN" \
+  -G --data-urlencode "query=SELECT MEASURE(total_amount) FROM orders WHERE status = 'shipped'" \
+  http://localhost:4000/cubejs-api/v1/sql-filters
+```
+
+```json
+{
+  "status": "ok",
+  "filters": [
+    {
+      "member": "orders.status",
+      "operator": "equals",
+      "values": ["shipped"]
+    }
+  ]
+}
+```
+
+What comes back is what the planner made of the query rather than what the query
+spells out: two bounds on a time dimension are reported as a single
+`inDateRange` filter, and a relative date such as `CURRENT_DATE - INTERVAL '7 days'`
+is reported as the date it was worked out to be.
+
+### Editing filters
+
+`POST` rewrites the query and returns the result. Exactly one of `add`, `set`,
+`delete` or `replace` must be present.
+
+| Parameter, type | Description | Required |
+| --- | --- | --- |
+| `query`, `string` | SQL API query to rewrite | ✅ Yes |
+| `add`, `array` | Filters to add to the outermost `SELECT` | One of the four |
+| `set`, `array` | Filters to replace every outermost filter with | One of the four |
+| `delete`, `array` | Filters to remove; every occurrence of an equal filter is removed | One of the four |
+| `replace`, `object` | `{ "old": [...], "new": [...] }`; every occurrence of an equal filter in `old` is replaced | One of the four |
+
+A filter is either a single filter or an `and`/`or` filter group, exactly as in
+the [REST (JSON) API query format](/reference/core-data-apis/rest-api/query-format#filters-format).
+A request carries at most 500 filters, counting the ones nested inside a group
+rather than the entries of the array.
+
+The response carries the rewritten query and the filters it reports afterwards:
+
+| Property, type | Description |
+| --- | --- |
+| `status`, `string` | `ok` or `error` |
+| `sql`, `string` | Rewritten query (only present when `status` is `ok`) |
+| `filters`, `array` | Filters of the rewritten query (only present when `status` is `ok`) |
+| `error`, `string` | Error message (only present when `status` is `error`) |
+
+A query that cannot be planned, a member that is not available in the outermost
+`SELECT`, and a filter to `replace` that is not present are all answered with
+`400` and an `error`. Deleting a filter that is not there is not an error: the
+query comes back unchanged.
+
+### Example
+
+Replacing a status filter:
+
+```bash
+curl \
+  -X POST \
+  -H "Authorization: TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "SELECT MEASURE(total_amount) FROM orders WHERE status = '\''shipped'\''",
+    "replace": {
+      "old": [{"member": "orders.status", "operator": "equals", "values": ["shipped"]}],
+      "new": [{"member": "orders.status", "operator": "equals", "values": ["completed"]}]
+    }
+  }' \
+  http://localhost:4000/cubejs-api/v1/sql-filters
+```
+
+```json
+{
+  "status": "ok",
+  "sql": "SELECT MEASURE(total_amount) FROM orders WHERE status = 'completed'",
+  "filters": [
+    {
+      "member": "orders.status",
+      "operator": "equals",
+      "values": ["completed"]
+    }
+  ]
+}
+```
+
 ## `{base_path}/v1/meta`
 
 <Info>
