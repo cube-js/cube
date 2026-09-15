@@ -27,6 +27,7 @@ gh api graphql \
               isOutdated
               path
               line
+              originalLine
               comments(first: 1) {
                 totalCount
                 nodes { author { login } }

@@ -10,8 +10,10 @@ preconfigured alias:
 
   gh list-review-threads cube-js cube <pr-number>
 
-This returns an index — `id`, `isResolved`, `isOutdated`, `path`, `line`, the
-first comment's author and the thread's comment count — but no comment bodies.
+This returns an index — `id`, `isResolved`, `isOutdated`, `path`, `line`,
+`originalLine`, the first comment's author and the thread's comment count — but
+no comment bodies. GitHub nulls `line` on an outdated thread, so fall back to
+`originalLine` whenever `line` is null.
 It pages 50 threads at a time; when `pageInfo.hasNextPage` is true, fetch the
 next page by passing `pageInfo.endCursor` as a fourth argument:
 
@@ -58,7 +60,8 @@ of the following hold for any thread in the index:
   - `isResolved` is false
   - the first comment's `author.login` is yours — `claude` in CI, otherwise
     the login `gh api user -q .login` returns
-  - the thread is on the same `path` and `line` as the new issue you would post
+  - the thread is on the same `path` and line (`line`, or `originalLine` when
+    `line` is null) as the new issue you would post
   - the existing comment's body raises substantively the same concern (same root
     cause, same fix direction — wording does not need to match)
 
