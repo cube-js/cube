@@ -1,5 +1,5 @@
 import * as tar from 'tar';
-import extractZip from 'extract-zip';
+import * as yauzl from 'yauzl';
 import fetch, { Headers, Request, Response } from 'node-fetch';
 import bytes from 'bytes';
 import { throttle } from 'throttle-debounce';
@@ -10,6 +10,7 @@ import * as os from 'os';
 import crypto from 'crypto';
 import * as path from 'path';
 import { gunzipSync } from 'zlib';
+import { pipeline } from 'stream/promises';
 
 import { internalExceptions } from './errors';
 import { getHttpAgentForProxySettings } from './proxy';
@@ -106,6 +107,105 @@ const tarOptions = {
   },
 };
 
+// A zip records a unix mode in the high 16 bits of the external attributes; the
+// file-type nibble there is what marks an entry a symlink.
+const UNIX_MODE_MASK = 0o170000;
+const UNIX_MODE_SYMLINK = 0o120000;
+
+/** Pull one entry, or `null` at the end of the archive. */
+function nextZipEntry(zipfile: yauzl.ZipFile): Promise<yauzl.Entry | null> {
+  return new Promise((resolve, reject) => {
+    // `zipfile` outlives a single entry, so every listener has to come back off
+    // before settling — three entries in and the handlers would otherwise be
+    // stacked three deep, and the first `error` would settle every pending read.
+    const cleanups: Array<() => void> = [];
+    const settle = (finish: () => void) => {
+      cleanups.forEach((off) => off());
+      finish();
+    };
+
+    const onEntry = (entry: yauzl.Entry) => settle(() => resolve(entry));
+    const onEnd = () => settle(() => resolve(null));
+    const onError = (err: Error) => settle(() => reject(err));
+
+    cleanups.push(
+      () => zipfile.removeListener('entry', onEntry),
+      () => zipfile.removeListener('end', onEnd),
+      () => zipfile.removeListener('error', onError)
+    );
+
+    zipfile.once('entry', onEntry);
+    zipfile.once('end', onEnd);
+    zipfile.once('error', onError);
+    zipfile.readEntry();
+  });
+}
+
+async function writeZipEntry(zipfile: yauzl.ZipFile, entry: yauzl.Entry, dir: string): Promise<void> {
+  // yauzl's own name check: rejects backslashes, absolute paths and any `..` segment.
+  const invalid = yauzl.validateFileName(entry.fileName);
+  if (invalid) {
+    throw new Error(`Refusing to extract zip entry, ${invalid}`);
+  }
+
+  // The advisory that cost us `extract-zip` (GHSA-jmr9-qjv8-65gv) is precisely this
+  // entry kind: it wrote the link verbatim, so a later entry could be written
+  // *through* it to anywhere on disk. Refusing outright is both the fix and a
+  // stronger guarantee than a containment check on the link target — with no symlink
+  // ever created, no later entry can resolve out of `dir` either.
+  // eslint-disable-next-line no-bitwise
+  if (((entry.externalFileAttributes >>> 16) & UNIX_MODE_MASK) === UNIX_MODE_SYMLINK) {
+    throw new Error(`Refusing to extract symlink entry from zip: ${entry.fileName}`);
+  }
+
+  const dest = path.join(dir, entry.fileName);
+  if (dest !== dir && !dest.startsWith(dir + path.sep)) {
+    throw new Error(`Refusing to extract zip entry out of bound path: ${entry.fileName}`);
+  }
+
+  if (entry.fileName.endsWith('/')) {
+    await fs.promises.mkdir(dest, { recursive: true });
+    return;
+  }
+
+  await fs.promises.mkdir(path.dirname(dest), { recursive: true });
+
+  // Permission bits only, and only when the producer recorded a unix mode at all —
+  // a DOS-made zip leaves this 0, where node's default is the right answer.
+  // eslint-disable-next-line no-bitwise
+  const mode = (entry.externalFileAttributes >>> 16) & 0o777;
+  const readStream = await zipfile.openReadStreamPromise(entry);
+
+  await pipeline(readStream, fs.createWriteStream(dest, mode ? { mode } : {}));
+}
+
+/**
+ * Extract a zip into `dir`, which must already exist and be resolved.
+ *
+ * Replaces `extract-zip`, whose GHSA-jmr9-qjv8-65gv has no fixed release. This is
+ * the same engine (`yauzl`) that `extract-zip` wrapped, minus the symlink handling
+ * that was the vulnerability.
+ */
+async function extractZipArchive(archivePath: string, dir: string): Promise<void> {
+  const zipfile = await yauzl.openPromise(archivePath, { lazyEntries: true });
+
+  try {
+    for (;;) {
+      // Sequential on purpose: entries are read from one cursor, and a directory
+      // entry has to land before the files under it.
+      // eslint-disable-next-line no-await-in-loop
+      const entry = await nextZipEntry(zipfile);
+      if (!entry) {
+        return;
+      }
+      // eslint-disable-next-line no-await-in-loop
+      await writeZipEntry(zipfile, entry, dir);
+    }
+  } finally {
+    zipfile.close();
+  }
+}
+
 /**
  * Extract a downloaded archive into `cwd`, which is created if missing.
  *
@@ -119,11 +219,11 @@ const tarOptions = {
  * by.
  *
  * Neither backend writes outside `cwd`: `tar` strips a leading `/` on extraction and
- * drops entries containing `..`, and `extract-zip` rejects entries that resolve outside
- * the target.
+ * drops entries containing `..`, and the zip backend rejects absolute and `..` names
+ * outright and refuses symlink entries altogether.
  */
 export async function extractArchive(archivePath: string, cwd: string): Promise<void> {
-  // `extract-zip` creates its target but `tar.x` throws `CwdError` when it is
+  // The zip backend needs its target to exist and `tar.x` throws `CwdError` when it is
   // missing, so without this the contract would depend on the archive's format —
   // which callers cannot know in advance, that being the point of magic-byte dispatch.
   mkdirpSync(cwd);
@@ -151,7 +251,7 @@ export async function extractArchive(archivePath: string, cwd: string): Promise<
   // zip: the two-byte "PK" prefix, shared by a local file header and by the
   // end-of-central-directory record that an empty archive consists of.
   if (startsWith(0x50, 0x4b)) {
-    await extractZip(archivePath, { dir: path.resolve(cwd) });
+    await extractZipArchive(archivePath, path.resolve(cwd));
     return;
   }
 

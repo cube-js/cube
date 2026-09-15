@@ -218,10 +218,15 @@ describe('extractArchive', () => {
       expect(fs.existsSync(path.join(outside, 'SYM_PWNED.txt'))).toBe(false);
     });
 
-    it('does not write through a zip symlink that points outside the target', async () => {
-      // The zip backend's containment is the half worth proving separately: a symlink
-      // entry has a clean relative *name*, so only a check on the resolved destination
-      // catches the entry written through it afterwards.
+    it('refuses a zip symlink entry outright, rather than the write through it', async () => {
+      // This is the exact shape of GHSA-jmr9-qjv8-65gv, the unfixed advisory that
+      // `extract-zip` was dropped for: a symlink entry has a clean relative *name*, so
+      // a name check alone waves it through and the next entry is written through it.
+      //
+      // The rejection has to land on the symlink, not on the file that follows: assert
+      // the link itself never appears in the target. Catching only the second entry
+      // would still leave an attacker-controlled link pointing out of the directory,
+      // and would pass just as green.
       const archive = path.join(work, 'zipsym.zip');
       const outside = path.join(work, 'outside');
       fs.mkdirSync(outside);
@@ -231,8 +236,11 @@ describe('extractArchive', () => {
         { name: 'esc/PWNED.txt', content: 'pwned-through-symlink' },
       ]);
 
-      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/out of bound path/i);
+      const target = targetDir();
+      await expect(extractArchive(archive, target)).rejects.toThrow(/symlink/i);
+
       expect(fs.existsSync(path.join(outside, 'PWNED.txt'))).toBe(false);
+      expect(fs.existsSync(path.join(target, 'esc'))).toBe(false);
     });
   });
 
