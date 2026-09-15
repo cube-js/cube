@@ -107,3 +107,16 @@ def context_to_groups(ctx):
         "dev",
         "analytics",
     ]
+
+
+@config
+def chat_completion(request):
+    print("[python] chat_completion request=", request)
+
+    # A list of chunks: the whole response at once. Simplest form, and the one
+    # to use when the gateway call is not streamed.
+    return [
+        {"content": "Hello from "},
+        {"content": request["model"]},
+        {"usage_metadata": {"input_tokens": 3, "output_tokens": 4, "total_tokens": 7}},
+    ]

@@ -46,6 +46,9 @@ impl CubeConfigPy {
             "web_sockets_base_path",
             // functions
             "can_switch_sql_user",
+            // Unlisted names are dropped silently, with no error to point at
+            // the omission — so this entry is what makes the hook reach JS.
+            "chat_completion",
             "check_auth",
             "check_sql_auth",
             "context_to_api_scopes",

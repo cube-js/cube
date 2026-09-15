@@ -78,6 +78,10 @@ class Configuration:
     orchestrator_options: Union[Dict, Callable[[RequestContext], Dict]]
     context_to_groups: Callable[[RequestContext], list[str]]
     fast_reload: bool
+    # LLM Gateway hook. Must be a plain function, and its return value has to
+    # cross the Python->JS bridge: a list of chunk dicts, or {"next": fn} for a
+    # stream. Model objects and async generators cannot cross — use cube.js.
+    chat_completion: Callable[[Dict], Any]
 
     def __init__(self):
         self.web_sockets = None
@@ -126,6 +130,7 @@ class Configuration:
         self.pre_aggregations_schema = None
         self.orchestrator_options = None
         self.context_to_groups = None
+        self.chat_completion = None
         self.fast_reload = None
 
     def __call__(self, func):

@@ -55,6 +55,94 @@ suite('Python Config', () => {
     config = await loadConfigurationFile('config.py');
   });
 
+  // `chat_completion` only reaches JavaScript if it is BOTH declared on the
+  // Python `Configuration` class AND present in the Rust allow-list in
+  // `cube_config.rs`. Miss either and the attribute is dropped in silence —
+  // no error, no warning, just a hook that never runs. These two cases are
+  // what makes that omission loud.
+  test('chat_completion returning a list of chunks', async () => {
+    if (!config.chatCompletion) {
+      throw new Error('chatCompletion was not defined in config.py');
+    }
+
+    expect(await config.chatCompletion({ model: 'gateway-model', messages: [] })).toEqual([
+      { content: 'Hello from ' },
+      { content: 'gateway-model' },
+      { usage_metadata: { input_tokens: 3, output_tokens: 4, total_tokens: 7 } },
+    ]);
+  });
+
+  test('chat_completion returning a next() pull stream', async () => {
+    const streamConfig = await loadConfigurationFile('config-chat-completion-stream.py');
+
+    if (!streamConfig.chatCompletion) {
+      throw new Error('chatCompletion was not defined in config-chat-completion-stream.py');
+    }
+
+    const stream = (await streamConfig.chatCompletion({
+      model: 'gateway-model',
+      messages: [],
+    })) as { next: () => Promise<unknown> };
+
+    // A Python closure survives the bridge as a callable, which is the whole
+    // reason the streaming form is shaped as a pull function rather than as an
+    // async generator (an async generator object has no bridge representation).
+    expect(typeof stream.next).toEqual('function');
+
+    const chunks: unknown[] = [];
+    for (;;) {
+      // eslint-disable-next-line no-await-in-loop
+      const chunk = await stream.next();
+      if (chunk === undefined) {
+        break;
+      }
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual([
+      { content: 'strea' },
+      { content: 'med ' },
+      { content: 'gateway-model' },
+    ]);
+  });
+
+  // `CLRepr::Null` converts to `cx.undefined()`, so the Python `None` that ends
+  // a stream arrives as `undefined` and never as `null`. A consumer that stops
+  // on `null` alone loops forever on an already-finished stream — pinned here
+  // because the Python side says `return None` and nothing about writing it
+  // suggests the JavaScript side sees anything else.
+  test('a Python None crosses as undefined, not null', async () => {
+    const streamConfig = await loadConfigurationFile('config-chat-completion-stream.py');
+    const stream = (await streamConfig.chatCompletion!({
+      model: 'gateway-model',
+      messages: [],
+    })) as { next: () => Promise<unknown> };
+
+    await stream.next();
+    await stream.next();
+    await stream.next();
+
+    const terminator = await stream.next();
+    expect(terminator).toBeUndefined();
+    expect(terminator).not.toBeNull();
+  });
+
+  // The boundary the two supported forms exist to work around. A customer's
+  // first instinct is to hand back a model object the way `cube.js` can; this
+  // pins that it fails loudly at the bridge rather than producing an empty
+  // response.
+  test('chat_completion returning an arbitrary Python object is rejected', async () => {
+    const objectConfig = await loadConfigurationFile('config-chat-completion-object.py');
+
+    if (!objectConfig.chatCompletion) {
+      throw new Error('chatCompletion was not defined in config-chat-completion-object.py');
+    }
+
+    await expect(
+      objectConfig.chatCompletion({ model: 'gateway-model', messages: [] })
+    ).rejects.toThrow(/PyObject/);
+  });
+
   test('async checkAuth', async () => {
     expect(config).toEqual({
       schemaPath: 'models',
@@ -71,6 +159,7 @@ suite('Python Config', () => {
       contextToGroups: expect.any(Function),
       scheduledRefreshContexts: expect.any(Function),
       scheduledRefreshTimeZones: expect.any(Function),
+      chatCompletion: expect.any(Function),
     });
 
     if (!config.checkAuth) {
