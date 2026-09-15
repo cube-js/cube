@@ -258,7 +258,7 @@ describe('timeSeries', () => {
 });
 
 describe('timeSeriesBoundaries', () => {
-  const granularities = ['second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year'];
+  const granularities = Object.keys(TIME_SERIES);
   const ranges: QueryDateRange[] = [
     ['2024-02-29T12:34:56.123456', '2024-02-29T12:34:56.123456'],
     ['2024-01-31T23:59:58.123456', '2024-02-01T00:00:01.999999'],
