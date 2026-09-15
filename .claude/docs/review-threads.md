@@ -89,3 +89,9 @@ on the thread — silence is fine; the unresolved state already communicates tha
 
 If the finding is on a different line or the fix direction has shifted
 (different root cause), it is not a duplicate.
+
+Resolving a thread and skipping a finding as that thread's duplicate say
+opposite things about whether the concern is live, so no thread may end up in
+both lists. When one does, the code at the site decides: either the fix is in,
+which makes the finding stale — drop it and resolve the thread — or it is not,
+and the thread stays open with the finding folded into it.
