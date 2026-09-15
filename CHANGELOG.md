@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.39](https://github.com/cube-js/cube/compare/v1.7.38...v1.7.39) (2026-09-15)
+
+### Bug Fixes
+
+- **cubesql:** Cast `DATE +/- INTERVAL` explicitly in temporal comparisons ([#11831](https://github.com/cube-js/cube/issues/11831)) ([a819884](https://github.com/cube-js/cube/commit/a8198843aecb494b85ad8610712525773cf2d93b))
+- **schema-compiler:** correct MSSQL pushdown null ordering ([#11776](https://github.com/cube-js/cube/issues/11776)) ([6267552](https://github.com/cube-js/cube/commit/62675524a2d7eb9dd37a6e7c345ba4b795deba70))
+- **tesseract:** bound a rolling window's base scan by literals ([#11870](https://github.com/cube-js/cube/issues/11870)) ([af79bfe](https://github.com/cube-js/cube/commit/af79bfe4802277a34b5cc593917b83826238016d)), closes [#11770](https://github.com/cube-js/cube/issues/11770) [high-cardinality](https://github.com/hi/issues/cardinality)
+- **tesseract:** share a rolling window's base scan across measures ([#11852](https://github.com/cube-js/cube/issues/11852)) ([03377e2](https://github.com/cube-js/cube/commit/03377e2d6fdbd1dccde9ff4f941cffdd8e4cb670)), closes [high-cardinality](https://github.com/hi/issues/cardinality)
+
+### Features
+
+- **cube-cli:** add `cube dbt generate` for CI-side cube generation ([#11864](https://github.com/cube-js/cube/issues/11864)) ([a746ed3](https://github.com/cube-js/cube/commit/a746ed3547d7144fa9a7de34d9473640e9ba12bd))
+- **server-core:** Redact query values in log events ([#11854](https://github.com/cube-js/cube/issues/11854)) ([99cceac](https://github.com/cube-js/cube/commit/99cceac77f00c8c0a13c0f2c0f4b237b4d97460f))
+- Upgrade rust 1.90.0 -> 1.98.1 (stable) ([#11879](https://github.com/cube-js/cube/issues/11879)) ([da47602](https://github.com/cube-js/cube/commit/da4760206dbc86d2e987f184fc14b7fc4f5b884e))
+
 ## [1.7.38](https://github.com/cube-js/cube/compare/v1.7.37...v1.7.38) (2026-09-14)
 
 ### Bug Fixes

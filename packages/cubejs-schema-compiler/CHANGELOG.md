@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.39](https://github.com/cube-js/cube/compare/v1.7.38...v1.7.39) (2026-09-15)
+
+### Bug Fixes
+
+- **schema-compiler:** correct MSSQL pushdown null ordering ([#11776](https://github.com/cube-js/cube/issues/11776)) ([6267552](https://github.com/cube-js/cube/commit/62675524a2d7eb9dd37a6e7c345ba4b795deba70))
+
 ## [1.7.38](https://github.com/cube-js/cube/compare/v1.7.37...v1.7.38) (2026-09-14)
 
 ### Bug Fixes
