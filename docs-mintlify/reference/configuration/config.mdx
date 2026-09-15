@@ -11,6 +11,14 @@ JavaScript (`basePath`).
 
 </Info>
 
+<Warning>
+
+A `cube.ts` configuration file is no longer supported — use `cube.js` or
+`cube.py` instead. A server that finds only `cube.ts` fails to start with
+`Configuration in cube.ts is no longer supported`.
+
+</Warning>
+
 Every configuration option that is a function (e.g., `query_rewrite`)
 can be defined as either synchronous or asynchronous. Cube will await for
 the completion of asynchronous functions.
@@ -1491,6 +1499,12 @@ A function to define a custom logger.
 Accepts the following arguments:
 - `message`: the message to be logged
 - `params`: additional parameters
+
+Filter values, SQL parameters, and string literals in SQL API statements in `params`
+arrive as `redacted` when
+[`CUBEJS_LOG_REDACTION`](/reference/configuration/environment-variables#cubejs_log_redaction)
+is on (the default outside development mode); error messages from a data source arrive as
+returned, and a SQL API error that quotes the statement has it redacted.
 
 <CodeGroup>
 

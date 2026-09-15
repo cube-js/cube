@@ -269,8 +269,8 @@ pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
             let js_row = cx.execute_scoped(|mut cx| {
                 let js_row = JsObject::new(&mut cx);
 
-                for (col_idx, js_key) in js_keys.iter().enumerate() {
-                    let value = &columns[col_idx][row_idx];
+                for (js_key, column) in js_keys.iter().zip(columns.iter()) {
+                    let value = &column[row_idx];
                     let js_value: Handle<'_, JsValue> = match value {
                         DBResponsePrimitive::Null => cx.null().upcast(),
                         // For compatibility, we convert all primitives to strings

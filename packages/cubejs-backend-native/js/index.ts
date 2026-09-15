@@ -380,6 +380,12 @@ export const isFallbackBuild = (): boolean => {
   return native.isFallbackBuild();
 };
 
+/** The statement with its string literals replaced by 'redacted', as cubesql logs it. */
+export const redactSqlLiterals = (sql: string): string => {
+  const native = loadNative();
+  return native.redactSqlLiterals(sql);
+};
+
 export type SqlInterfaceInstance = { __typename: 'sqlinterfaceinstance' };
 
 export const registerInterface = async (options: SQLInterfaceOptions): Promise<SqlInterfaceInstance> => {

@@ -1,0 +1,51 @@
+cubes:
+    - name: daily_activity
+      sql: "SELECT * FROM rw_daily_activity"
+      dimensions:
+          - name: entity_id
+            type: string
+            sql: entity_id
+            primary_key: true
+          - name: activity_date
+            type: time
+            sql: activity_date
+      measures:
+          - name: events_7d
+            type: sum
+            sql: events
+            rolling_window:
+                trailing: 7 day
+                offset: start
+          - name: minutes_7d
+            type: sum
+            sql: duration_minutes
+            rolling_window:
+                trailing: 7 day
+                offset: start
+          - name: events_30d
+            type: sum
+            sql: events
+            rolling_window:
+                trailing: 30 day
+                offset: start
+          - name: minutes_30d
+            type: sum
+            sql: duration_minutes
+            rolling_window:
+                trailing: 30 day
+                offset: start
+          - name: errors_7d
+            type: sum
+            sql: errors
+            rolling_window:
+                trailing: 7 day
+                offset: start
+          - name: events_per_hour_7d
+            type: number
+            sql: "{events_7d} / NULLIF({minutes_7d} / 60.0, 0)"
+          - name: events_per_hour_30d
+            type: number
+            sql: "{events_30d} / NULLIF({minutes_30d} / 60.0, 0)"
+          - name: error_rate_7d
+            type: number
+            sql: "{errors_7d} / NULLIF({events_7d}, 0)"

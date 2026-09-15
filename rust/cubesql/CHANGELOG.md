@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.39](https://github.com/cube-js/cube/compare/v1.7.38...v1.7.39) (2026-09-15)
+
+### Bug Fixes
+
+- **cubesql:** Cast `DATE +/- INTERVAL` explicitly in temporal comparisons ([#11831](https://github.com/cube-js/cube/issues/11831)) ([a819884](https://github.com/cube-js/cube/commit/a8198843aecb494b85ad8610712525773cf2d93b))
+
+### Features
+
+- **server-core:** Redact query values in log events ([#11854](https://github.com/cube-js/cube/issues/11854)) ([99cceac](https://github.com/cube-js/cube/commit/99cceac77f00c8c0a13c0f2c0f4b237b4d97460f))
+- Upgrade rust 1.90.0 -> 1.98.1 (stable) ([#11879](https://github.com/cube-js/cube/issues/11879)) ([da47602](https://github.com/cube-js/cube/commit/da4760206dbc86d2e987f184fc14b7fc4f5b884e))
+
 ## [1.7.38](https://github.com/cube-js/cube/compare/v1.7.37...v1.7.38) (2026-09-14)
 
 ### Bug Fixes

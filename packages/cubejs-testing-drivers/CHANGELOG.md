@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.39](https://github.com/cube-js/cube/compare/v1.7.38...v1.7.39) (2026-09-15)
+
+### Bug Fixes
+
+- **tesseract:** bound a rolling window's base scan by literals ([#11870](https://github.com/cube-js/cube/issues/11870)) ([af79bfe](https://github.com/cube-js/cube/commit/af79bfe4802277a34b5cc593917b83826238016d)), closes [#11770](https://github.com/cube-js/cube/issues/11770) [high-cardinality](https://github.com/hi/issues/cardinality)
+
 ## [1.7.38](https://github.com/cube-js/cube/compare/v1.7.37...v1.7.38) (2026-09-14)
 
 **Note:** Version bump only for package @cubejs-backend/testing-drivers

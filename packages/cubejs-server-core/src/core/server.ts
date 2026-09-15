@@ -22,6 +22,7 @@ import {
   track,
   FileRepository,
   SchemaFileRepository,
+  withLogRedaction,
 } from '@cubejs-backend/shared';
 
 import type { Application as ExpressApplication } from 'express';
@@ -191,10 +192,13 @@ export class CubejsServerCore {
   ) {
     this.coreServerVersion = version;
 
-    this.logger = opts.logger || createLogger(
+    const logger = opts.logger || createLogger(
       process.env.NODE_ENV === 'production',
       getEnv('logLevel'),
     );
+    // Wraps the log sink only: the agent and telemetry wrappers installed below
+    // sit outside it and forward the original params
+    this.logger = getEnv('logRedaction') ? withLogRedaction(logger) : logger;
 
     this.optsHandler = new OptsHandler(this, opts, systemOptions);
     this.options = this.optsHandler.getCoreInitializedOptions();
@@ -299,7 +303,7 @@ export class CubejsServerCore {
           msg === 'Cube SQL Error'
         ) {
           const props = {
-            error: params.error,
+            error: params.redactedError ?? params.error,
             ...(params.apiType ? { apiType: params.apiType } : {}),
             ...(params.protocol ? { protocol: params.protocol } : {}),
             ...(params.appName ? { appName: params.appName } : {}),
@@ -328,7 +332,7 @@ export class CubejsServerCore {
           }
         } else if (msg === 'Cube SQL Error') {
           const props = {
-            error: params.error,
+            error: params.redactedError ?? params.error,
             apiType: params.apiType,
             protocol: params.protocol,
             ...(params.appName ? { appName: params.appName } : {}),

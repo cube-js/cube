@@ -2361,13 +2361,10 @@ impl LanguageToLogicalPlanConverter {
                     // TODO support joins schema
                     without_window_fields
                         .into_iter()
-                        .chain(
-                            exprlist_to_fields_from_schema(
-                                window_expr_rebased.iter(),
-                                &schema_with_subqueries,
-                            )?
-                            .into_iter(),
-                        )
+                        .chain(exprlist_to_fields_from_schema(
+                            window_expr_rebased.iter(),
+                            &schema_with_subqueries,
+                        )?)
                         .collect(),
                     HashMap::new(),
                 )?;

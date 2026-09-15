@@ -13,8 +13,8 @@ Available on [Premium and above plans](https://cube.dev/pricing).
 If your team already models data in [dbt](https://www.getdbt.com/), you can import
 those models into Cube as cubes instead of redefining them by hand. **dbt pull**
 converts each dbt model into a cube — including dimensions, measures, descriptions,
-and joins — and commits the generated files to a branch where you review them before
-they reach production.
+and joins — and, by default, commits the generated files to a branch where you review
+them before they reach production.
 
 Cube can either clone and parse your dbt project's Git repository, or accept the
 `target/manifest.json` your own CI job produced. Uploading the manifest converts the
@@ -36,8 +36,10 @@ available via [dbt push](#push-cubes-to-dbt), currently in preview.
 
 ## How it works
 
-Every pull converts a dbt manifest into cube definitions and commits the generated
-files to a review branch. How the manifest reaches Cube depends on the source:
+Every pull converts a dbt manifest into cube definitions and, by default, commits the
+generated files to a review branch — or [hands them back to your own
+pipeline](#generate-into-your-own-repository). How the manifest reaches Cube depends on
+the source:
 
 - **Git (default):** Cube creates a short-lived, isolated sandbox, clones the selected
   branch, installs dependencies with `dbt deps`, and runs `dbt parse`. It converts the
@@ -413,10 +415,18 @@ through your normal workflow.
 
 ## Keep Cube in sync automatically
 
-Automated syncs **create a fresh review branch** instead of committing to your working
-branch, so a person can approve the update before it reaches the live data model. CI
-can upload a manifest or ask Cube to clone a Git ref; repository webhooks use the Git
-source.
+There are two ways to run this, and the difference is **who commits the generated
+cubes**:
+
+- **Cube commits them** — a sync creates a fresh review branch in your Cube data model,
+  so a person can approve the update before it reaches production. Repository webhooks
+  and Analytics Chat always work this way.
+- **Your CI commits them** — [`cube dbt generate`](#generate-into-your-own-repository)
+  writes the cubes into your own working copy and commits nothing, so they go through
+  your repository's review, CODEOWNERS and branch protection like any other change.
+
+Pick the second when your data model lives in your own Git repository and you want
+Cube to stay out of it. Everything else below applies to both.
 
 ### Trigger from your CI/CD pipeline
 
@@ -485,6 +495,100 @@ This is useful when your platform policy won't issue Cube a repository credentia
 install, and `dbt parse` steps for a faster per-merge CI gate — Cube converts the
 manifest you already validated, with no re-parse of a branch tip that may have
 moved on. `source` defaults to `git`, so calls that omit it are unaffected.
+
+### Generate into your own repository
+
+`sync` hands the generated cubes to Cube, which commits them to a review branch.
+`generate` hands them back to you: Cube converts your manifest and the
+[Cube CLI](/reference/cli#generate-cubes-without-committing-them) writes the files into
+your working copy, creating no branch and writing nothing to the Cube data model.
+
+```bash
+dbt parse
+cube dbt generate DEPLOYMENT_ID --manifest target/manifest.json --out .
+```
+
+`--out` is the **root of your data model project**. The generated paths are
+project-relative (`model/cubes/dbt/…`), so they land beneath it exactly as the
+deployment's **Output path** setting defines them — the CLI does not re-derive where
+cubes belong.
+
+A complete job, with the manifest arriving as an artifact from the dbt pipeline rather
+than from a dbt project checked out beside it:
+
+```yaml
+name: Sync dbt models into the data model
+on: [push]
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    # The job commits, so the default read-only GITHUB_TOKEN is not enough.
+    permissions:
+      contents: write
+    env:
+      CUBE_API_URL: https://your-tenant.cubecloud.dev
+      CUBE_API_KEY: ${{ secrets.CUBE_API_KEY }}
+      DEPLOYMENT_ID: ${{ vars.CUBE_DEPLOYMENT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the Cube CLI
+        run: curl -fsSL https://raw.githubusercontent.com/cube-js/cube/master/install-cli.sh | sh
+
+      # The dbt project does not need to be here. Only its manifest does.
+      - uses: actions/download-artifact@v4
+        with:
+          name: dbt-manifest
+          path: /tmp
+
+      - run: cube dbt generate "$DEPLOYMENT_ID" --manifest /tmp/manifest.json --out .
+
+      - name: Commit the regenerated cubes
+        run: |
+          # The CLI writes only under the deployment's Output path, so `-A` avoids
+          # hard-coding it here.
+          git add -A
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git -c user.name=ci -c user.email=ci@example.com \
+            commit -m "chore: regenerate dbt cubes"
+          git push
+```
+
+Cube needs no access to your dbt repository on this path, and no branch is created in
+your Cube data model.
+
+<Note>
+
+`generate` still needs a deployment id and an API key: the conversion runs in Cube using
+that deployment's saved [pull settings](#configure-pull-settings), which is what keeps
+its output identical to a managed pull's. It is the **dbt repository** Cube does not
+need.
+
+</Note>
+
+To gate a pull request instead of committing to it, add `--check`. It compares the
+generated cubes with what is committed and exits non-zero if any of them is missing or
+differs, without writing:
+
+```bash
+cube dbt generate "$DEPLOYMENT_ID" --manifest /tmp/manifest.json --out . --check
+```
+
+`--check` walks the files the run generated, so it catches a cube that is out of date or
+absent — but not one left behind by a dbt model that was deleted, which neither `--check`
+nor the write path removes.
+
+Because this variant commits nothing and creates no branch, the "dbt sync is ready for
+review" notification never fires — which is what makes it usable on every pull request,
+where a sync would mail your team once per run.
+
+If you call the REST API directly instead of using the CLI, pass `"output": "files"` in
+the `dbt-sync` request body — the default, `"branch"`, commits as usual — then poll the
+sync status and, once it reports `COMPLETED`, collect the files from
+`GET /api/v1/deployments/DEPLOYMENT_ID/dbt-sync/SYNC_JOB_ID/generated-files`. Each item
+carries a project-relative `path` and its `content`. They are held only briefly after
+the sync finishes, so read them in the same job.
 
 ### Trigger on every push
 

@@ -379,7 +379,7 @@ mod tests {
         }
         init_testing_logger();
 
-        let supported_orders = vec![
+        let supported_orders = [
             // test_order_alias_for_dimension_default
             (
                 "SELECT taxful_total_price as total_price FROM KibanaSampleDataEcommerce ORDER BY total_price".to_string(),
@@ -2606,7 +2606,7 @@ limit
 
     #[tokio::test]
     async fn test_select_aggregations() {
-        let variants = vec![
+        let variants = [
             (
                 "SELECT COUNT(*) FROM KibanaSampleDataEcommerce".to_string(),
                 V1LoadRequestQuery {
@@ -2788,7 +2788,7 @@ limit
 
     #[tokio::test]
     async fn test_group_by_date_trunc() {
-        let supported_granularities = vec![
+        let supported_granularities = [
             // all variants
             [
                 "DATE_TRUNC('second', order_date)".to_string(),
@@ -2901,7 +2901,7 @@ limit
     async fn test_where_filter_daterange() {
         init_testing_logger();
 
-        let to_check = vec![
+        let to_check = [
             // Filter push down to TD (day) - Superset
             (
                 "COUNT(*), DATE(order_date) AS __timestamp".to_string(),
@@ -3523,7 +3523,7 @@ limit
     #[tokio::test]
     #[ignore]
     async fn test_filter_error() {
-        let to_check = vec![
+        let to_check = [
             // Binary expr
             (
                 "order_date >= 'WRONG_DATE'".to_string(),
@@ -3585,7 +3585,7 @@ limit
 
     #[tokio::test]
     async fn test_where_filter_complex() {
-        let to_check = vec![
+        let to_check = [
             (
                 "customer_gender = 'FEMALE' AND customer_gender = 'MALE'".to_string(),
                 vec![

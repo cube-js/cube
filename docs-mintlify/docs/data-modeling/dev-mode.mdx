@@ -112,6 +112,12 @@ They will be shown on the Overview page:
 
 Read more about the available endpoints on the [Environments][ref-environments-endpoints] page.
 
+An [embed session][ref-generate-session] can point at your branch as well: pass its
+name as `branchName` and the embedded content queries your development environment
+instead of production. That only holds while you're in development mode on the
+branch — for a branch an embedded app should reach at any time, enable its [staging
+environment][ref-environments-staging] instead.
+
 ## Behavior with CLI deployments
 
 Development mode is fully available on deployments that are configured to
@@ -145,5 +151,7 @@ different Git branch of the same repository.
 
 [ref-environments-dev]: /admin/deployment/environments#development-environments
 [ref-environments-endpoints]: /admin/deployment/environments#api-endpoints
+[ref-environments-staging]: /admin/deployment/environments#staging-environments
+[ref-generate-session]: /reference/embed-apis/generate-session
 [ref-deploy-with-cli]: /admin/deployment/continuous-deployment#deploy-with-cli
 [ref-deploy-with-cli-dev-mode]: /admin/deployment/continuous-deployment#development-mode-with-cli-deployments
