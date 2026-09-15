@@ -31,10 +31,12 @@ account, while everyone else sees only theirs.
 
 A personal key carries exactly its owner's permissions, so it never reaches data
 or settings its owner can't reach in the app, and it can only be scoped to
-deployments its owner has access to. Because those permissions are what makes the
-key narrower than an admin's, the switch can only be turned on while role-based
-access control is enabled for the account. Turning it back off stops existing
-personal keys from working.
+deployments its owner has access to. Those permissions are what keeps a personal
+key narrower than an admin's, so the switch can only be turned on while your
+account enforces [roles and
+permissions](/admin/users-and-permissions/roles-and-permissions). Turning it back
+off doesn't delete existing personal keys, but it stops them authenticating: every
+request made with one is rejected with `403 Forbidden` until it's turned on again.
 
 Endpoints that act on behalf of someone else still require an admin's key —
 [generating an embed session](/reference/embed-apis/generate-session) is the main

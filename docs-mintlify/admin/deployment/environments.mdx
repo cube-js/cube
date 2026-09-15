@@ -52,11 +52,6 @@ regardless of user activity.
   <img src="https://ucarecdn.com/e0dcce34-a53a-4087-b021-25dbaf730a92/" />
 </Frame>
 
-A staging environment can also be the target of an [embed session][ref-generate-session]:
-pass its branch name as `branchName` when generating the session and the embedded
-content queries that branch's data model. The environment has to be active at that
-moment, so leaving the toggle on is what makes a branch embeddable at any time.
-
 The same toggle is available in the [CLI][ref-cli] and the [Control Plane
 API][ref-control-plane-api-staging], so it can be scripted, e.g. from CI:
 
@@ -64,6 +59,12 @@ API][ref-control-plane-api-staging], so it can be scripted, e.g. from CI:
 cube data-model enable-branch DEPLOYMENT_ID BRANCH_NAME
 cube data-model disable-branch DEPLOYMENT_ID BRANCH_NAME
 ```
+
+A staging environment can also be the target of an [embed session][ref-generate-session]:
+pass its branch name as `branchName` and the embedded content queries that branch's data
+model. With the toggle on, the session is generated whether or not the environment has
+suspended for inactivity; with it off, it fails unless someone is viewing the branch at
+that moment.
 
 ### Resources and costs
 

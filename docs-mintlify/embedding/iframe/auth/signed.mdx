@@ -44,7 +44,7 @@ This ensures secure authentication while maintaining a smooth user experience.
 
 To use signed embedding, you need an [API key][ref-api-keys]:
 
-- Go to **Access → API Keys** in your Cube admin panel
+- Go to **Admin → API Keys** in your Cube admin panel
 - Generate or copy your existing API key
 - You'll use this key to authenticate API calls for generating embed sessions
 
@@ -52,7 +52,7 @@ To use signed embedding, you need an [API key][ref-api-keys]:
 
 Use the [Generate Session API][ref-generate-session] to create a session for your user. This endpoint will automatically create (insert) or update the external user based on the `externalId` provided.
 
-To point an embed at a staging or development branch instead of production — to preview data model changes before they ship, for example — pass that branch's name as `branchName`. Every query the session makes, from dashboards, Creator Mode, and chat alike, runs against that branch's data model; the same saved dashboards and workbooks are rendered, since content isn't branch-scoped. The iframe URL is unchanged: the branch is fixed when the session is generated, not by a URL parameter.
+To point the embed at a staging or development branch instead of production, pass that branch's name as `branchName` — see [Branch selection][ref-branch-selection].
 
 <Warning>
   Accounts are limited to 10,000 external users. To increase this limit, please
@@ -188,3 +188,4 @@ You can clone the repository, configure it with your Cube credentials, and run i
 
 [ref-api-keys]: /admin/account-billing/api-keys
 [ref-generate-session]: /reference/embed-apis/generate-session
+[ref-branch-selection]: /reference/embed-apis/generate-session#branch-selection

@@ -11,14 +11,13 @@ JavaScript (`basePath`).
 
 </Info>
 
-<Note>
+<Warning>
 
-A `cube.ts` configuration file is no longer supported. Use `cube.js` or
-`cube.py` instead; starting a server that finds only a `cube.ts` file fails
-with `Configuration in cube.ts is no longer supported. Please use cube.js or
-cube.py instead.`
+A `cube.ts` configuration file is no longer supported — use `cube.js` or
+`cube.py` instead. A server that finds only `cube.ts` fails to start with
+`Configuration in cube.ts is no longer supported`.
 
-</Note>
+</Warning>
 
 Every configuration option that is a function (e.g., `query_rewrite`)
 can be defined as either synchronous or asynchronous. Cube will await for

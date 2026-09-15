@@ -13,8 +13,8 @@ Available on [Premium and above plans](https://cube.dev/pricing).
 If your team already models data in [dbt](https://www.getdbt.com/), you can import
 those models into Cube as cubes instead of redefining them by hand. **dbt pull**
 converts each dbt model into a cube — including dimensions, measures, descriptions,
-and joins — and commits the generated files to a branch where you review them before
-they reach production.
+and joins — and, by default, commits the generated files to a branch where you review
+them before they reach production.
 
 Cube can either clone and parse your dbt project's Git repository, or accept the
 `target/manifest.json` your own CI job produced. Uploading the manifest converts the
@@ -36,8 +36,10 @@ available via [dbt push](#push-cubes-to-dbt), currently in preview.
 
 ## How it works
 
-Every pull converts a dbt manifest into cube definitions and commits the generated
-files to a review branch. How the manifest reaches Cube depends on the source:
+Every pull converts a dbt manifest into cube definitions and, by default, commits the
+generated files to a review branch — or [hands them back to your own
+pipeline](#generate-into-your-own-repository). How the manifest reaches Cube depends on
+the source:
 
 - **Git (default):** Cube creates a short-lived, isolated sandbox, clones the selected
   branch, installs dependencies with `dbt deps`, and runs `dbt parse`. It converts the
@@ -47,11 +49,6 @@ files to a review branch. How the manifest reaches Cube depends on the source:
   Cube validates and converts that artifact directly. It doesn't create a sandbox,
   clone a repository, or run dbt, so this path usually takes seconds rather than
   minutes.
-
-Pulls triggered through the REST API can skip committing entirely: passing
-`output: 'files'` returns the generated cube files directly instead of
-creating a review branch, so your own CI can review and commit them. The
-default, `'branch'`, is unchanged.
 
 **Cube doesn't build your dbt models during either kind of pull.** A Git-based pull
 uses `dbt parse`, which doesn't query the warehouse. A manifest pull doesn't run dbt
@@ -585,6 +582,13 @@ nor the write path removes.
 Because this variant commits nothing and creates no branch, the "dbt sync is ready for
 review" notification never fires — which is what makes it usable on every pull request,
 where a sync would mail your team once per run.
+
+If you call the REST API directly instead of using the CLI, pass `"output": "files"` in
+the `dbt-sync` request body — the default, `"branch"`, commits as usual — then poll the
+sync status and, once it reports `COMPLETED`, collect the files from
+`GET /api/v1/deployments/DEPLOYMENT_ID/dbt-sync/SYNC_JOB_ID/generated-files`. Each item
+carries a project-relative `path` and its `content`. They are held only briefly after
+the sync finishes, so read them in the same job.
 
 ### Trigger on every push
 
