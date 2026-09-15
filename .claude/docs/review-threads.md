@@ -22,10 +22,10 @@ threads, resolves your stale ones, and returns the verdicts. Give it:
   it resolved, and per finding POST or SKIP with the thread id behind a SKIP
 
 The tracking comment is not one of these threads — it is a top-level comment, so
-it never appears in the list below. Do not go looking for it with `gh pr view
---comments` either: it restates a whole past review round, several kilobytes per
-round, and says nothing about which thread is live. That is decided by the code
-at the site and by the thread's own replies.
+it never appears in the list below, and fetching the top-level comments to find it
+will not help the subagent: it restates a whole past review round, several
+kilobytes of it, and none of that says whether a thread is still live. The code at
+the site and the thread's own replies say that.
 
 Three aliases are available to it; raw `gh api graphql` is not permitted:
 
