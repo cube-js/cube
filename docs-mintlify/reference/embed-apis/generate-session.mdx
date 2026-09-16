@@ -78,9 +78,9 @@ The API returns a session object:
 | `sessionId` | string | Unique session identifier to use for embedding content |
 
 Use the `sessionId` directly in your embed URL to authenticate and load content securely.
-The token it's exchanged for is usable for about 23 hours — see [signed
-embedding][ref-signed-embedding] — unless you revoke it sooner; see [Revoke a
-session](#revoke-a-session).
+It is single-use and must be exchanged within 5 minutes; the token it's exchanged for is
+then usable for about 23 hours — see [signed embedding][ref-signed-embedding] — unless
+you revoke it sooner; see [Revoke a session](#revoke-a-session).
 
 ## Session settings
 
