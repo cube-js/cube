@@ -361,10 +361,14 @@ into the MCP server:
   `writeDataModelFile` and `deleteDataModelFile` require it. There is no way to write
   without going through it first.
 - **Publishing to production needs an explicit ask.** `mergeToDefaultBranch` — the tool
-  that makes a branch live — is marked destructive so a client always prompts for
-  confirmation, and its own description tells the agent to call it only when you've
-  asked to publish, never on its own initiative after a commit. See [Committing and
-  publishing changes](#committing-and-publishing-changes).
+  that publishes an already-committed branch — is marked destructive so a client always
+  prompts for confirmation. `commitDataModelChanges` is a second route to production: a
+  dev branch created from the deployment's default branch commits straight onto it, live,
+  when the call sets `confirmPublishToDefaultBranch`. That tool is **not** marked
+  destructive, so a client isn't guaranteed to prompt before calling it — the guard there
+  is the tool's own description, which tells the agent to set that flag only once you've
+  said so, never to retry a refusal on its own. See [Committing and publishing
+  changes](#committing-and-publishing-changes).
 - **Registration is permission-gated.** Every tool in the three sections above and below
   — the six model-editing tools, `getBranchDiff`, `getDeploymentEnv`, the six commit and
   branch tools, and both pre-aggregation tools — is offered only to users whose role
