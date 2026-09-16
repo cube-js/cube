@@ -37,7 +37,7 @@ The role builder uses a two-column layout. The left column (sticky as you scroll
 
 ### Name and description
 
-- **Name** is required and must be unique within the account. The names `Admin`, `Guest`, `Developer`, `None`, and `All` are reserved.
+- **Name** is required and must be unique within the account. The role builder reserves `Admin`, `Guest`, `Developer`, `None`, and `All` — the API reserves a different set, see [Validation](#validation).
 - **Description** is optional but recommended — it shows up alongside the role on the Custom Roles list and on user profile pages.
 
 ### Base Role
@@ -257,7 +257,7 @@ Custom roles can also be created, updated and assigned over the [REST API][ref-a
 
 <Warning>
 
-**The Base Role is required in the builder, but the API neither requires nor infers it.** A role sent without a `Global` tier policy is accepted with no error, and a user whose only role is that one holds the deployment grants yet has no license tier — nothing surfaces it until they sign in and cannot use the product. The auto-bump described above is a rule the builder applies before it submits, not one the server applies to what you send. This is deliberate: permissions stack, so a role that only adds a deployment scope beside another role carrying the tier is valid. Omit the `Global` policy only when you know another of the user's roles supplies it.
+**The Base Role is required in the builder, but the API neither requires nor infers it.** A role sent without a `Global` tier policy is accepted with no error, and a user whose only role is that one holds the deployment grants yet has no license tier — nothing surfaces it until they sign in and cannot use the product. This is deliberate: permissions stack, so a role that only adds a deployment scope beside another role carrying the tier is valid. Omit the `Global` policy only when you know another of the user's roles supplies it.
 
 </Warning>
 
