@@ -47,7 +47,7 @@ All paths are relative to `https://{accountName}.cubecloud.dev/api/v1/embed`, an
 | `Content-Type` | `application/json` | For `POST` and `PATCH` |
 | `Authorization` | `Embed-Token YOUR_EMBED_TOKEN` | Yes |
 
-The embed token is the signed session's own JWT. Exchange the `sessionId` from [Generate Session][ref-generate-session] for one with `POST /api/v1/embed/session/token`, which needs no `Authorization` header of its own — the session id is the credential. A session id is single-use and expires 5 minutes after it is minted, so exchange it at once; the token it returns lasts 24 hours. An embedded dashboard performs the exchange itself, so the comment UI inside an iframe is already authenticated — supply the header yourself only when you call these endpoints from your own code. **The iframe consumes the session id it was loaded with**, so mint a second session for your own calls rather than reusing that one: a redeemed id returns `401`.
+The embed token is the signed session's own JWT. Exchange the `sessionId` from [Generate Session][ref-generate-session] for one with [`POST /api/v1/embed/session/token`][ref-session-token], which needs no `Authorization` header of its own — the session id is the credential. A session id is single-use and expires 5 minutes after it is minted, so exchange it at once; the token it returns lasts 24 hours. An embedded dashboard performs the exchange itself, so the comment UI inside an iframe is already authenticated — supply the header yourself only when you call these endpoints from your own code. **The iframe consumes the session id it was loaded with**, so mint a second session for your own calls rather than reusing that one: a redeemed id returns `401`.
 
 `Bearer YOUR_EMBED_TOKEN` is accepted as well, and resolves the same embed user. Prefer `Embed-Token`: it names the credential you are actually presenting, and the prefix is matched case-sensitively either way.
 
@@ -159,7 +159,7 @@ Returned by `GET /dashboard/{publicId}/comments`.
 }
 ```
 
-Pagination is cursor-based: pass `first` for the page size and `after` with the previous page's `endCursor`. Filter server-side with `includeResolved` and `resolvedOnly` rather than filtering a page yourself — a page is a window, so a client-side filter can come back empty while matching threads sit below it.
+Pagination is cursor-based: pass `first` for the page size and `after` with the previous page's `endCursor`. Drive the loop off `hasNextPage` — only it and `hasPreviousPage` are guaranteed; the two cursors are `null` or absent on an empty page, and passing that back as `after` is a bogus cursor rather than a request to start over. Filter server-side with `includeResolved` and `resolvedOnly` rather than filtering a page yourself — a page is a window, so a client-side filter can come back empty while matching threads sit below it.
 
 ### Mentionable users
 
@@ -257,4 +257,5 @@ curl "https://your-account.cubecloud.dev/api/v1/embed/dashboard/PUBLIC_ID/commen
 | `404` | The dashboard, the comment, or a `parentId` does not exist on this dashboard. A dashboard is looked up before access is checked, so one that does not resolve is `404` and one the caller merely may not read is `403`. |
 
 [ref-generate-session]: /reference/embed-apis/generate-session
+[ref-session-token]: /api-reference/embed/exchange-a-session-for-an-embed-token
 [ref-api-keys]: /admin/account-billing/api-keys
