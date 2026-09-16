@@ -435,51 +435,16 @@ Use session ID in [signed embedding][ref-signed-embedding].
 ## Revoke a session
 
 Call this from your application's logout handler to end an embed session from the
-server side, rather than waiting the token out. Removing the embedded iframe on logout
-is still required — revoking a session doesn't tear it down.
+server side. Pass the `sessionId` that Generate Session returned, and still remove the
+embedded iframe on logout — revoking a session doesn't tear it down on its own. Unlike
+Generate Session, this accepts any admin key in the account regardless of its
+deployment scope.
 
-```text
-POST https://{accountName}.cubecloud.dev/api/v1/embed/session/revoke
-```
-
-### Revoke Request Body {#revoke-request-body}
-
-```json
-{ "sessionId": "abc123def456..." }
-```
-
-Pass the `sessionId` that Generate Session returned. It requires the same admin
-`Api-Key` authentication as Generate Session, but not the deployment scope check: a
-key scoped to one deployment can still revoke a session belonging to any deployment
-in your account.
-
-### Revoke Response {#revoke-response}
-
-Returns `204 No Content` on success, with no response body. It works on a session in
-either state: an id that hasn't been exchanged for a token yet can no longer be
-redeemed, and the token an already-exchanged id produced is rejected from that point on.
-
-The call is idempotent — revoking an unknown, expired, or already-revoked id also
-returns `204`, so the response alone doesn't tell you whether a token was actually
-revocable. Returns `403` if embedding isn't enabled for the account.
-
-```bash
-curl -X POST "https://your-account.cubecloud.dev/api/v1/embed/session/revoke" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Api-Key YOUR_API_KEY" \
-  -d '{"sessionId": "abc123def456..."}'
-```
-
-<Note>
-
-Revocation only affects the embed session token, not a Cube API token obtained from
-`POST /api/v1/deployments/{deploymentId}/token` — that's a separate credential. Embed
-tokens minted before your account received this feature aren't revocable, but expire on
-their own within 24 hours regardless.
-
-</Note>
+See [Revoke an Embed Session][ref-revoke-session] for the full request, response, and
+authentication reference.
 
 [ref-api-keys]: /admin/account-billing/api-keys
+[ref-revoke-session]: /api-reference/embed/revoke-an-embed-session
 [ref-personal-api-keys]: /admin/account-billing/api-keys#personal-api-keys
 [ref-signed-embedding]: /embedding/iframe/auth/signed
 [ref-creator-mode]: /embedding/iframe/creator-mode
