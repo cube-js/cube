@@ -13,7 +13,7 @@ The Dashboard Comments API is available on [Premium and above plans](https://cub
 
 ## Enable the comment panel
 
-**The account decides whether the comment UI appears.** Turn on **Allow comments on embedded dashboards** under **Embed → Settings** in the Cube console — see [Show and hide features](/embedding/iframe/feature-visibility#account-settings). The setting governs whether the built-in comment panel renders on an embedded dashboard. It is the host account's switch alone: an embed user cannot turn it on, and there is no per-session override.
+**The account decides whether the comment UI appears.** Turn on **Allow comments on embedded dashboards** under **Embed → Settings** in the Cube console — see [Show and hide features](/embedding/iframe/feature-visibility#account-settings). The setting governs whether the built-in comment panel renders on an embedded dashboard; **the endpoints below answer either way**, so a client building its own comment UI does not depend on it. It is the host account's switch alone: an embed user cannot turn it on, and there is no per-session override.
 
 **The two commenting surfaces are independent.** Comments on embedded dashboards and comments inside the Cube app have separate storage and separate settings, and a thread written on one surface is not visible on the other.
 
@@ -145,9 +145,7 @@ Returned by `GET /dashboard/{publicId}/comments`.
   "items": [
     {
       "root": { "id": 41, "body": "Revenue looks off for the EU region.", "isOwn": true },
-      "replies": [],
-      "resolvedAt": null,
-      "resolvedBy": null
+      "replies": []
     }
   ],
   "pageInfo": {
