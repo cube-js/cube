@@ -42,6 +42,7 @@ tags:
   - name: Users
   - name: Users Admin
   - name: API Keys
+  - name: Roles
   - name: User Attributes
   - name: User Attribute Values
   - name: Tenant Settings
@@ -5202,6 +5203,239 @@ paths:
           Lists the regions available to the account, cursor-paginated via `first`/`after`. The
           legacy `data` field returns the full, unpaginated list and is deprecated — use `items` +
           `pageInfo` instead.
+  /api/v1/roles:
+    get:
+      operationId: getRoles
+      parameters:
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RolesListResponse'
+          description: ''
+      summary: List custom roles
+      tags:
+        - Roles
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Lists the tenant's custom roles, newest first, cursor-paginated via `first`/`after`.
+          Cube's built-in roles are not included — they are not tenant data.
+    post:
+      operationId: createRole
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleCreateBody'
+        description: RoleCreateBody
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+          description: ''
+      summary: Create a custom role
+      tags:
+        - Roles
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Creates a role and returns it with the `id` to assign it by.
+
+
+          To scope the role to specific deployments, send a `Deployment` policy whose `resources`
+          are the deployment ids as strings:
+
+
+          ```json
+
+          {
+            "name": "team-analytics",
+            "policies": [
+              {
+                "resourceType": "Deployment",
+                "actions": ["DeploymentRead", "SchemaRead", "PlaygroundRead"],
+                "resources": ["1734"]
+              }
+            ]
+          }
+
+          ```
+
+
+          Use `["All"]` as `resources` to cover every deployment, and `"All"` as the single action
+          for full access to the deployments in scope. A policy is rejected when it grants no
+          action, when it names no resource, or when a `Deployment` resource is not a deployment id
+          — pass the numeric id returned by POST /build/api/v1/deployments, not a slug or a name.
+          Ids are checked for shape, not existence, so an id whose deployment was since deleted is
+          kept and simply grants nothing.
+  /api/v1/roles/{roleId}:
+    delete:
+      operationId: deleteRole
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Delete a custom role
+      tags:
+        - Roles
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Deletes the role and every assignment of it, from users and from groups. Built-in roles
+          cannot be deleted.
+    get:
+      operationId: getRole
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+          description: ''
+      summary: Get a custom role
+      tags:
+        - Roles
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Returns one custom role by id, with its policies.
+    put:
+      operationId: updateRole
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleUpdateBody'
+        description: RoleUpdateBody
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+          description: ''
+      summary: Update a custom role
+      tags:
+        - Roles
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Updates the fields present in the body and leaves the rest alone. Sending `policies`
+          replaces the role's policies outright, so read the role first if you mean to add one
+          rather than start over. Built-in roles cannot be updated.
+  /api/v1/roles/{roleId}/users/{userId}:
+    delete:
+      operationId: removeRoleFromUser
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Remove a role from a user
+      tags:
+        - Roles
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Takes the role away from the user. Idempotent — removing a role the user does not hold
+          changes nothing. Returns `404` if the user is unknown.
+    put:
+      operationId: assignRoleToUser
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Assign a role to a user
+      tags:
+        - Roles
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Gives the user everything the role grants. Idempotent — assigning a role the user already
+          holds changes nothing. Accepts a built-in role id as well as a custom one. Returns `404`
+          if either the user or the role is unknown.
   /api/v1/spec:
     get:
       operationId: getSpec
@@ -12923,6 +13157,73 @@ components:
       required:
         - sessionId
       type: object
+    Role:
+      properties:
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: integer
+        name:
+          type: string
+        policies:
+          items:
+            $ref: '#/components/schemas/Policy'
+          type: array
+      required:
+        - id
+        - name
+        - policies
+      type: object
+    RoleCreateBody:
+      properties:
+        description:
+          oneOf:
+            - maxLength: 255
+              type: string
+            - type: 'null'
+        name:
+          description: Unique role name. Cannot be one of the built-in role names (Admin, Developer, …).
+          maxLength: 255
+          minLength: 1
+          type: string
+        policies:
+          description: >-
+            What the role grants. Scope a policy to specific deployments by setting `resourceType`
+            to `Deployment` and listing the deployment ids — as returned by POST
+            /build/api/v1/deployments — in `resources`, or `["All"]` for every deployment. Pass `[]`
+            to create a role that grants nothing yet.
+          items:
+            $ref: '#/components/schemas/Policy'
+          maxItems: 200
+          type: array
+      required:
+        - name
+        - policies
+      type: object
+    RoleUpdateBody:
+      properties:
+        description:
+          oneOf:
+            - maxLength: 255
+              type: string
+            - type: 'null'
+        name:
+          oneOf:
+            - maxLength: 255
+              type: string
+              minLength: 1
+            - type: 'null'
+        policies:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/Policy'
+              type: array
+              maxItems: 200
+            - type: 'null'
+          description: Replaces the role's policies outright when present.
+      type: object
     RoleWithAccess:
       properties:
         actions:
@@ -12991,6 +13292,18 @@ components:
         - id
         - name
         - actions
+      type: object
+    RolesListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Role'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
       type: object
     RunScheduledTaskResponse:
       properties:
