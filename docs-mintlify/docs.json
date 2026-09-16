@@ -981,6 +981,19 @@
                 ]
               },
               {
+                "group": "Roles",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/roles",
+                  "POST /api/v1/roles",
+                  "GET /api/v1/roles/{roleId}",
+                  "PUT /api/v1/roles/{roleId}",
+                  "DELETE /api/v1/roles/{roleId}",
+                  "PUT /api/v1/roles/{roleId}/users/{userId}",
+                  "DELETE /api/v1/roles/{roleId}/users/{userId}"
+                ]
+              },
+              {
                 "group": "User Attributes",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
