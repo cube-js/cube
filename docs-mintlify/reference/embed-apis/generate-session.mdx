@@ -1,6 +1,6 @@
 ---
 title: Generate Session
-description: HTTP reference for minting short-lived embed sessions that authorize external viewers under signed embedding without sharing API keys.
+description: HTTP reference for minting and revoking short-lived embed sessions that authorize external viewers under signed embedding without sharing API keys.
 ---
 
 The Generate Session API provides secure, session-based authentication for [signed embedding][ref-signed-embedding]. This API creates temporary sessions that allow external users to access embedded dashboards and visualizations without exposing your API keys.
@@ -440,7 +440,7 @@ embedded iframe on logout is still required — revoking a session doesn't tear 
 POST https://{accountName}.cubecloud.dev/api/v1/embed/session/revoke
 ```
 
-### Request Body {#revoke-request-body}
+### Revoke request body {#revoke-request-body}
 
 ```json
 { "sessionId": "abc123def456..." }
@@ -449,7 +449,7 @@ POST https://{accountName}.cubecloud.dev/api/v1/embed/session/revoke
 Pass the `sessionId` that Generate Session returned. It requires the same admin
 `Api-Key` authentication as Generate Session.
 
-### Response {#revoke-response}
+### Revoke response {#revoke-response}
 
 Returns `204 No Content` on success, with no response body. It works on a session in
 either state: an id that hasn't been exchanged for a token yet can no longer be
