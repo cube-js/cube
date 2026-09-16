@@ -236,9 +236,10 @@ shape the product your users see; they are not a replacement for permissions.
   on belongs in the session settings.
 - **Chart-widget export is client-side.** A widget's CSV is serialized in the browser from
   data the widget has already loaded, so `allowExport` decides whether the action
-  is offered, not whether the viewer's browser holds the rows. The account-wide
-  **Allow data downloads** switch outranks `allowExport` on every surface it grants,
-  the Creator Mode report builder included — see [Restricting data
+  is offered, not whether the viewer's browser holds the rows.
+- **One account-wide switch outranks `allowExport`.** **Allow data downloads** wins on
+  every surface `allowExport` grants, the Creator Mode report builder included — see
+  [Restricting data
   downloads](/admin/users-and-permissions/roles-and-permissions#restricting-data-downloads),
   which also notes that the per-user **Download data** role action is bypassed by
   anonymous embed viewers.
