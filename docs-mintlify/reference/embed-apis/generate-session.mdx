@@ -470,6 +470,10 @@ against — an older token keeps working until its own signed expiry, 24 hours f
 mint (not the ~23-hour figure above, which is when the iframe itself stops
 trusting a token early). The `204` response is identical either way.
 
+Revocation covers the embed session only. A Cube API token the embed obtained from
+`POST /api/v1/deployments/{deploymentId}/token` is a separate credential and keeps
+working — revoke or expire it separately if your logout has to stop data-API access.
+
 See [Revoke an Embed Session][ref-revoke-session] for the full request and response
 reference, including the `204` idempotency behavior and the `403` when embedding isn't
 enabled for the account.
