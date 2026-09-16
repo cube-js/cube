@@ -5455,6 +5455,13 @@ paths:
 
           Gives the user everything the role grants. Idempotent — assigning a role the user already
           holds changes nothing. Returns `404` if either the user or the role is unknown.
+
+
+          Unlike the other endpoints here, this one is not limited to your custom roles: it also
+          accepts the id of a built-in role, and assigning one grants everything that role confers.
+          **Cube's Admin role is the exception and cannot be granted this way** — it is not among
+          the built-in roles this endpoint resolves, so its id returns `404`. No call to this
+          endpoint can make a user an account-wide administrator.
   /api/v1/spec:
     get:
       operationId: getSpec
