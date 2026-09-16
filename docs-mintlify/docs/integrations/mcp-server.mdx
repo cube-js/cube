@@ -406,7 +406,9 @@ without ever using the Cube UI.
 
 These mirror the "Commit & Sync", "Merge" / "Create a Pull Request", and branch-switching
 actions described in [Development mode][ref-dev-mode] — a client can now drive that same
-flow instead of asking you to click through it.
+flow instead of asking you to click through it. One difference: the UI's Merge button
+targets the branch's parent, whichever branch that is, while `mergeToDefaultBranch`
+always targets the deploy branch.
 
 Call `getBranchState` before editing, to see whether the MCP session's branch and the
 branch your Cube UI shows are the same, and again after committing, to see whether you
