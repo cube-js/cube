@@ -373,12 +373,13 @@ curl \
 
 ### `/api/v1/deployments/{deployment_id}/dashboard-exports`
 
-Request a server-rendered snapshot of a whole dashboard as PNG or PDF — the
-same rendering the [Download as PNG or PDF][ref-dashboard-download] action
-uses — without driving a browser through the console. Identify the dashboard
-with either `dashboardId` (numeric) or `dashboardPublicId` (string) — exactly
-one, not both. Requires **manage** access to the dashboard's workbook, the
-same permission the console's whole-dashboard download requires.
+Request a server-rendered snapshot of a whole published dashboard as PNG or
+PDF — the same rendering the [Download as PNG or PDF][ref-dashboard-download]
+action uses — without driving a browser through the console. A draft that has
+never been published can't be exported. Identify the dashboard with either
+`dashboardId` (numeric) or `dashboardPublicId` (string) — exactly one, not
+both. Requires **manage** access to the dashboard's workbook, the same
+permission the console's whole-dashboard download requires.
 
 Rendering happens asynchronously, since a capture waits for every widget on
 the dashboard to finish querying: submit a job, poll it until `status` is
