@@ -395,9 +395,9 @@ with one gap noted below:
 `commitDataModelChanges` is a second route to production: a dev branch created from the
 deploy branch commits straight onto it, live, when the call sets
 `confirmPublishToDefaultBranch`. That tool is **not** annotated destructive, so a client
-isn't guaranteed to prompt first — the only guard is the tool's own description, which
-tells the agent to set the flag only on your explicit say-so, never to retry a refusal on
-its own.
+isn't guaranteed to prompt first. For a role that holds full **Edit data model**, the
+tool's own description is the only thing standing in the way — it tells the agent to set
+the flag only on your explicit say-so, never to retry a refusal on its own.
 
 </Warning>
 

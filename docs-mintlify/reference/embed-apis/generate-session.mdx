@@ -437,9 +437,7 @@ Use session ID in [signed embedding][ref-signed-embedding].
 
 Call this from your application's logout handler to end an embed session from the
 server side. Pass the `sessionId` that Generate Session returned, and still remove the
-embedded iframe on logout — revoking a session doesn't tear it down on its own. Unlike
-Generate Session, this accepts any admin key in the account regardless of its
-deployment scope.
+embedded iframe on logout — revoking a session doesn't tear it down on its own.
 
 See [Revoke an Embed Session][ref-revoke-session] for the full request, response, and
 authentication reference.
