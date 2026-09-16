@@ -208,6 +208,17 @@ See [Manage users][ref-manage-users] for more.
 
 [ref-manage-users]: /admin/users-and-permissions/manage-users
 
+## Validation
+
+These are the **role builder's** rules, applied in the console before it submits. The API validates differently — see [Managing roles through the API](#managing-roles-through-the-api) below, where a policy with no actions is rejected rather than dropped.
+
+The role builder enforces a few rules client-side:
+
+- **Name** is required and must be unique. Reserved names (`Admin`, `Guest`, `Developer`, `None`, `All`) are rejected.
+- **Base Role** is required — Save is disabled until one is picked, and an inline error appears if you try to submit without one.
+- A deployment policy with **no actions selected** is silently dropped on save (treated as a no-op).
+- A deployment policy with **Specific deployments** scope but no deployments selected is also dropped on save.
+
 ## Managing roles through the API
 
 Custom roles can also be created, updated and assigned over the [REST API][ref-api-roles], so a team that provisions deployments from CI can grant access to the new deployment in the same pipeline instead of finishing in the console. The API works in the wire format — policies — rather than in the builder's Base Role / Global / Deployment cards, so the mapping is worth reading once before you script against it.
@@ -260,7 +271,7 @@ This is deliberate rather than an oversight: permissions stack, so a role that o
 
 </Warning>
 
-`GET`, `PUT` and `DELETE /api/v1/roles/{roleId}` read, update and remove a role; `PUT` replaces `policies` outright rather than merging, so read the role first if you mean to add a policy. All of these require administrator privileges, and they cover your custom roles only — the built-in roles are not listed or editable, though a built-in role id can still be assigned.
+`GET`, `PUT` and `DELETE /api/v1/roles/{roleId}` read, update and remove a role; `PUT` replaces `policies` outright rather than merging, so read the role first if you mean to add a policy. All of these require administrator privileges, and they cover your custom roles only: the built-in roles are not listed, editable or assignable through these endpoints.
 
 <Note>
 
@@ -270,15 +281,6 @@ Deployment ids are checked for shape, not existence: a slug or a name is rejecte
 
 [ref-api-roles]: /api-reference/roles/list-custom-roles
 [ref-api-create-deployment]: /api-reference/deployment-creation/create-a-deployment-with-an-empty-starter-project-and-trigger-its-first-build
-
-## Validation
-
-The role builder enforces a few rules client-side:
-
-- **Name** is required and must be unique. Reserved names (`Admin`, `Guest`, `Developer`, `None`, `All`) are rejected.
-- **Base Role** is required — Save is disabled until one is picked, and an inline error appears if you try to submit without one.
-- A deployment policy with **no actions selected** is silently dropped on save (treated as a no-op).
-- A deployment policy with **Specific deployments** scope but no deployments selected is also dropped on save.
 
 ## Reference: action catalog
 
