@@ -179,7 +179,7 @@ Returned by `GET /dashboard/{publicId}/comments`.
 
 Pagination is cursor-based: pass `first` for the page size and `after` with the previous page's `endCursor`. Drive the loop off `hasNextPage` — only it and `hasPreviousPage` are guaranteed; the two cursors are `null` or absent on an empty page, and passing that back as `after` is a bogus cursor rather than a request to start over. Filter server-side with `includeResolved` and `resolvedOnly` rather than filtering a page yourself — a page is a window, so a client-side filter can come back empty while matching threads sit below it.
 
-**`first` defaults to 100 and is capped at 200.** Omit it and you get up to 100 threads. A larger value is clamped rather than rejected, so `first=1000` returns 200 threads with `hasNextPage: true` — page through the rest rather than asking for them at once. A `first` below 1 is a `400`. The same default and ceiling apply to [mentionable users](#mentionable-users).
+**`first` defaults to 100 and is capped at 200** — the OpenAPI schema records only the floor, so the generated reference shows neither. Omit it and you get up to 100 threads. A larger value is clamped rather than rejected, so `first=1000` returns 200 threads with `hasNextPage: true` — page through the rest rather than asking for them at once. A `first` below 1 is a `400`. The same default and ceiling apply to [mentionable users](#mentionable-users).
 
 Only threads are paged. **A thread carries all of its replies**, so a page of 200 busy threads is a large response — keep `first` modest where threads run long.
 
