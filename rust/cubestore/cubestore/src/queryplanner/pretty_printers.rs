@@ -67,9 +67,10 @@ pub struct PPOptions {
     pub show_partitions: bool,
     pub show_metrics: bool,
     pub traverse_past_clustersend: bool,
-    /// Print the worker limit-pushdown descriptors a `ClusterSend` carries. Off in
-    /// [`Self::show_nonmeta`] and by default, because the tests that use them pin plan strings that
-    /// must not grow a new field; on in [`Self::show_most`], which nothing asserts on.
+    /// Print the worker limit-pushdown descriptors a `ClusterSend` carries. Off everywhere by
+    /// default: the tests that pin plan strings must not grow a new field, and the router's own
+    /// plan traces run before `choose_index_ext`, so no `ClusterSend` carries a descriptor yet.
+    /// `test_limit_pushdown_scope` turns it on explicitly.
     pub show_limit_pushdown: bool,
 }
 
@@ -86,7 +87,7 @@ impl PPOptions {
             show_partitions: true,
             show_metrics: false, // yeah.  Is useful only after plan is evaluated, so defaults to false.
             traverse_past_clustersend: false,
-            show_limit_pushdown: true,
+            show_limit_pushdown: false,
         }
     }
 
