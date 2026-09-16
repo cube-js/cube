@@ -56,7 +56,7 @@ Anything you build stays private unless you share it.
 
 | View | What it contains |
 | --- | --- |
-| **API Requests** | Every query hitting your deployments' data APIs, with timing, caching, and errors. `tenant_id` here is your own Cube account, not an embed tenant — row-level security pins every query to it, so this view can't compare customers. For per-request detail on one deployment, see [Query History](/admin/monitoring/query-history) instead. |
+| **API Requests** | Every query hitting your deployments' data APIs, with timing, caching, and errors. `tenant_id` here is your own Cube account, not an embed tenant — row-level security pins every query to it, so this view can't be used to compare your embed tenants against each other. For per-request detail on one deployment, see [Query History](/admin/monitoring/query-history) instead. |
 | **AI Usage** | AI messages grouped into conversations and sessions, with context, token consumption, estimated cost, and latency. |
 | **Users & Adoption** | Users and their engagement: sign-ups, active users, activity frequency, seat utilization, and dormant accounts. |
 | **Dashboard Usage** | Every dashboard in your account — opens, viewers, surface, and when it was last touched — including ones nobody has opened yet. |

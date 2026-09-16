@@ -450,6 +450,10 @@ to an admin user — but unlike Generate Session, an API key's scope is not chec
 the request body carries only a `sessionId`, so a key scoped to one deployment can
 revoke a session belonging to any deployment in the account.
 
+Only tokens issued after this endpoint shipped carry the claim revocation checks
+against — an older token keeps working until it expires on its own, within 24
+hours, and the `204` response is identical either way.
+
 See [Revoke an Embed Session][ref-revoke-session] for the full request and response
 reference, including the `204` idempotency behavior and the `403` when embedding isn't
 enabled for the account.
