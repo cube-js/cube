@@ -281,10 +281,8 @@ export const timeSeries = (granularity: string, dateRange: QueryDateRange, optio
 };
 
 /**
- * Returns the first and last partitions in O(1) for valid, non-reversed ranges.
- * The full input range is still subject to the timeSeries limit.
- * Invalid or reversed ranges retain the legacy timeSeries behavior and cost.
- * A single partition is returned twice; an empty series has undefined boundaries.
+ * Returns the first and last ranges of timeSeries() without materializing the ones in between.
+ * The input range is still validated against the same partition count limit.
  */
 export const timeSeriesBoundaries = (granularity: string, dateRange: QueryDateRange, options: TimeSeriesOptions = { timestampPrecision: 3 }): [QueryDateRange | undefined, QueryDateRange | undefined] => {
   checkTimeSeries(granularity, dateRange, options);
