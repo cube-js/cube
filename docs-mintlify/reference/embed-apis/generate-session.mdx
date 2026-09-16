@@ -445,9 +445,10 @@ Call this from your application's logout handler to end an embed session from th
 server side. Pass the `sessionId` that Generate Session returned, and still remove the
 embedded iframe on logout — revoking a session doesn't tear it down on its own.
 
-It requires an admin key, but unlike Generate Session, that key's scope is not
-checked: the request body carries only a `sessionId`, so a key scoped to one
-deployment can revoke a session belonging to any deployment in the account.
+It requires an admin principal — an API key, embed JWT, or bearer token belonging
+to an admin user — but unlike Generate Session, an API key's scope is not checked:
+the request body carries only a `sessionId`, so a key scoped to one deployment can
+revoke a session belonging to any deployment in the account.
 
 See [Revoke an Embed Session][ref-revoke-session] for the full request, response, and
 authentication reference.
