@@ -248,14 +248,15 @@ confirmation** before any of the nine destructive ones: `updateReport`, `deleteR
 `deleteDataModelFile`, `mergeToDefaultBranch`, and `discardDataModelChanges`. A tool
 annotated write, not destructive, may run without a prompt — including
 `commitDataModelChanges`, which can publish straight to production in one case; see [How
-model edits stay safe](#how-model-edits-stay-safe).
+model edits stay safe](#how-model-edits-stay-safe). A tool annotated read-only can still
+cause a write once it runs — `chat` is that case; see the warning below.
 
 ### Deployments and chat
 
 | Tool | Description | Access |
 | --- | --- | --- |
 | `listDeployments` | Lists the deployments and agents you can reach over MCP. | Read-only |
-| `chat` | Asks a question of a Cube agent, optionally targeting a specific deployment and agent. Pass `branchName` to have the agent answer from a dev branch's model instead of the deployed one. | Read-only |
+| `chat` | Asks a question of a Cube agent, optionally targeting a specific deployment and agent. Pass `branchName` to have the agent answer from a dev branch's model instead of the deployed one. | Read-only call — see warning below |
 | `loadQueryResults` | Paginates through the results of a previous query. | Read-only |
 
 See [Select a deployment and agent](#select-a-deployment-and-agent) for how these three
