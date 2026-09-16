@@ -249,7 +249,8 @@ confirmation** before any of the nine destructive ones: `updateReport`, `deleteR
 annotated write, not destructive, may run without a prompt — including
 `commitDataModelChanges`, which can publish straight to production in one case; see [How
 model edits stay safe](#how-model-edits-stay-safe). A tool annotated read-only can still
-cause a write once it runs — `chat` is that case; see the warning below.
+cause a write once it runs — `chat` is that case; see [Deployments and
+chat](#deployments-and-chat).
 
 ### Deployments and chat
 
@@ -384,7 +385,7 @@ with one gap noted below:
   `getDeploymentEnv`, the six commit and branch tools, and both pre-aggregation tools — is
   offered only to users whose role allows editing the semantic model. A Viewer never sees
   any of them.
-- **Deploy-branch writes are checked again at call time.** A role scoped to **Edit data
+- **Deploy-branch writes are permission-checked at call time.** A role scoped to **Edit data
   model on dev branches** still sees every tool listed above registered, but `mergeToDefaultBranch`
   and `commitDataModelChanges` with `confirmPublishToDefaultBranch` fail for that role, the
   same as any other write targeting the deploy branch.
