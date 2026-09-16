@@ -1026,29 +1026,28 @@ export class QueryQueue {
         executionError = { error: e, duration: ((new Date()).getTime() - startQueryTime) };
 
         if (e instanceof TimeoutError) {
-          try {
-            const queryWithCancelHandle = await queueConnection.getQueryDef(queryKeyHashed, queueId);
-            if (queryWithCancelHandle) {
-              this.logger('Cancelling query due to timeout', {
-                queueId,
-                queryKey: queryWithCancelHandle.queryKey,
-                queuePrefix: this.redisQueuePrefix,
-                requestId: queryWithCancelHandle.requestId,
-                metadata: queryWithCancelHandle.query?.metadata,
-                preAggregationId: queryWithCancelHandle.query?.preAggregation?.preAggregationId,
-                newVersionEntry: queryWithCancelHandle.query?.newVersionEntry,
-                preAggregation: queryWithCancelHandle.query?.preAggregation,
-                addedToQueueTime: queryWithCancelHandle.addedToQueueTime,
-              });
+          // A timeout fires on the clock rather than because anything cancelled the query, so it
+          // needs nothing from the ack to know it is a failure. Reporting it here keeps it one
+          // whether or not the item had already been reaped, and leaves nothing pending over the
+          // cancel below.
+          logExecutionError(executionError);
+          executionError = null;
 
-              await this.sendCancelMessageFn(queryWithCancelHandle, queueId);
-            }
-          } catch (cancelError: any) {
-            // Reporting happens after this block, so a failure to cancel would otherwise carry the
-            // query error out of the method unreported.
-            logExecutionError(executionError);
+          const queryWithCancelHandle = await queueConnection.getQueryDef(queryKeyHashed, queueId);
+          if (queryWithCancelHandle) {
+            this.logger('Cancelling query due to timeout', {
+              queueId,
+              queryKey: queryWithCancelHandle.queryKey,
+              queuePrefix: this.redisQueuePrefix,
+              requestId: queryWithCancelHandle.requestId,
+              metadata: queryWithCancelHandle.query?.metadata,
+              preAggregationId: queryWithCancelHandle.query?.preAggregation?.preAggregationId,
+              newVersionEntry: queryWithCancelHandle.query?.newVersionEntry,
+              preAggregation: queryWithCancelHandle.query?.preAggregation,
+              addedToQueueTime: queryWithCancelHandle.addedToQueueTime,
+            });
 
-            throw cancelError;
+            await this.sendCancelMessageFn(queryWithCancelHandle, queueId);
           }
         }
       } finally {

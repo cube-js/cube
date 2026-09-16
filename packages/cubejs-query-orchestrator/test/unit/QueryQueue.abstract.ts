@@ -241,9 +241,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
       expect(logger.mock.calls.length).toEqual(5);
       // assert that query queue is able to get query def by query key
-      expect(logger.mock.calls[3][0]).toEqual('Cancelling query due to timeout');
-      // a timeout cancels a query whose queue item stays active, so it is still reported as an error
-      expect(logger.mock.calls[4][0]).toEqual('Error while querying');
+      expect(logger.mock.calls[4][0]).toEqual('Cancelling query due to timeout');
+      expect(logger.mock.calls[3][0]).toEqual('Error while querying');
     });
 
     test('a failing cancel does not swallow the query error', async () => {
@@ -256,8 +255,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         await queue.executeInQueue('delay', query, { delay: 5 * 1000, result: '1', isJob: true });
         await awaitProcessing();
 
-        // the error is reported before the failing cancel carries it out of executeQuery, which the
-        // storage error below would otherwise be the only trace of
+        // the timeout is reported where it is raised, so a cancel which then fails carries it out of
+        // executeQuery with the error already logged rather than as only a storage error
         const events = logger.mock.calls.map(([message]) => message);
         expect(events).toContain('Error while querying');
         expect(events).toContain('Queue storage error');
