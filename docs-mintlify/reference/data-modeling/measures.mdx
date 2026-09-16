@@ -516,7 +516,8 @@ cube(`orders`, {
 </CodeGroup>
 
 A window of type `to_date` takes none of the `offset`, `trailing`, or `leading`
-parameters documented below; those apply to fixed-size windows only. To apply the same
+parameters documented below; those apply to fixed-size windows, which are selected by
+`type: fixed` — the default when `type` is omitted. To apply the same
 period-to-date logic across many measures without writing each one by hand, see
 [reusing period-to-date logic][ref-recipe-period-to-date].
 

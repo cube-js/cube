@@ -248,20 +248,18 @@ cubes:
 #### Emitting SQL from a macro
 
 When a macro takes a SQL expression as an argument, emit it as a
-[literal string][ref-yaml-literal] (`|-`) rather than inline. A SQL expression
-is arbitrary text, and inline it has to avoid everything YAML reads as syntax:
-`{CUBE}.amount` starts a flow mapping, `amount # note` truncates at the
-comment, and wrapping the whole thing in double quotes only moves the problem
-to expressions that contain one, such as `{CUBE}."amount"`. The literal form
-takes all of them, and — unlike the [folded form][ref-yaml-folded] (`>-`),
-which folds newlines into spaces — it keeps line breaks, so a leading `--`
-comment stays on its own line instead of swallowing the expression that
-follows it.
+[literal string](#folded-and-literal-strings) (`|-`) rather than inline. A SQL
+expression is arbitrary text, and inline it has to avoid everything YAML reads
+as syntax: `{CUBE}.amount` starts a flow mapping, `amount # note` truncates at
+the comment, and wrapping the whole thing in double quotes only moves the
+problem to expressions that contain one, such as `{CUBE}."amount"`.
 
 A block scalar ends at the first line indented less than its opening, so a
 multi-line expression also needs the [`indent`][jinja-docs-filters-indent]
 filter — without it, the second line of a `CASE` expression closes the block
-and is read as a mapping key.
+and is read as a mapping key. Set the width to the indentation of the block's
+value line, not to some fixed number: the `indent(10)` below is 10 because the
+macro emits `sql: |-` at 8 spaces and the value two further in.
 
 Apply `indent` *before* `safe`, not after. `indent` returns a fresh, unmarked
 string, so `sql | safe | indent(10)` throws the marker away and the SQL
