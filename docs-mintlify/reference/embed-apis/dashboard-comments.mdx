@@ -116,7 +116,7 @@ different person on each surface. Resolve it against
 
 ### Thread
 
-Returned by `POST /dashboard/{publicId}/comments/{commentId}/resolve`, and as each item of the thread list.
+Returned by `POST /dashboard/{publicId}/comments/{commentId}/resolve`, and as each item of the thread list. `root` and each reply carry the full [Comment](#comment) shape; the samples below abbreviate them.
 
 ```json
 {
@@ -187,7 +187,7 @@ Returned by `GET /dashboard/{publicId}/comments/mentionable-users`. Use it to ba
 | `email` | string \| null | May be `null`. |
 | `firstName` | string \| null | May be `null`. |
 
-**The directory is scoped to the caller's own embed tenant, and to embed users only.** An embed user can mention their colleagues in the same embed tenant. They cannot mention a Cube user of the host account, and they never see another embed tenant's users. Pass `search` to filter by username or email; results are ordered by username. Pagination works as it does for threads: pass `first` and `after` with the previous page's `endCursor`.
+**The directory is scoped to the caller's own embed tenant, and to embed users only.** An embed user can mention their colleagues in the same embed tenant. They cannot mention a Cube user of the host account, and they never see another embed tenant's users. Pass `search` to filter by username or email; results are ordered by username. Paginate as for [threads](#thread-list), `hasNextPage` included — a `search` that matches nobody returns an empty page whose cursors are `null` or absent.
 
 <Note>
 **There is no mention syntax to write.** `body` is stored and returned verbatim,
