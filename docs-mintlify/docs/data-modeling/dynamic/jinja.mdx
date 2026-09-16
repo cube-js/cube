@@ -244,6 +244,8 @@ with `bad indentation of a mapping entry`. Apply `safe` to every value that is
 concatenated with other text:
 
 ```yaml
+{%- set name = "revenue" -%}
+
 cubes:
   - name: {{ name | safe }}_daily
     description: Daily {{ name | safe }}, by region

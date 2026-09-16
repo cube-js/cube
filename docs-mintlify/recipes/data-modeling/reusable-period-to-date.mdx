@@ -43,7 +43,6 @@ measures:
 Put the macro in a `.jinja` file under `model/macros` so that every cube can import it:
 
 ```yaml title="model/macros/period_to_date.jinja"
-{#- Period-to-date measures for one base measure. -#}
 {%- macro to_date_measures(name, sql='', type='sum', periods=['week', 'month', 'quarter', 'year']) -%}
 {%- for period in periods %}
       - name: {{ name | safe }}_{{ period | safe }}_to_date
