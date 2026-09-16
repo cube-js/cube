@@ -269,24 +269,36 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     });
 
     test('a failing result ack does not swallow the query error', async () => {
+      // the flag is read when executeQuery opens its connection, so it has to be set before the
+      // query starts rather than once the handler is running
       failResultAck = true;
 
-      const query: QueryKey = ['select * from 5', []];
+      const queryKey: QueryKey = ['select * from 5', []];
 
       try {
-        // executionTimeout is 2s, so this fails and reaches the ack with an error to report
-        await queue.executeInQueue('delay', query, { delay: 5 * 1000, result: '1', isJob: true });
+        const pending = queue
+          .executeInQueue('cancelable', queryKey, { delay: 60 * 1000, result: '5' }, QueuePriority.Background)
+          .catch(e => e);
+
+        const deadline = Date.now() + 750;
+        while (cancelableRejects.size === 0 && Date.now() < deadline) {
+          await pausePromise(10);
+        }
+        expect(cancelableRejects.size).toEqual(1);
+
+        // a failure of the query's own rather than a timeout, which is reported where it is raised:
+        // only this leaves an error still pending when the ack throws
+        cancelableRejects.get('5')!(new Error('Query failed'));
+        await pending;
         await awaitProcessing();
 
-        // the ack is what tells a cancellation apart from a failure, so when it throws the error is
-        // reported before the storage failure carries it out of executeQuery
         const events = logger.mock.calls.map(([message]) => message);
         expect(events).toContain('Error while querying');
         expect(events).toContain('Queue storage error');
       } finally {
         failResultAck = false;
         // the ack threw, so the item is still active - see the failing-cancel test above
-        await queue.cancelQuery(queue.redisHash(query), null);
+        await queue.cancelQuery(queue.redisHash(queryKey), null);
       }
     });
 
