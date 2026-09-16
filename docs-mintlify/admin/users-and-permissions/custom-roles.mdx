@@ -251,7 +251,9 @@ Custom roles can also be created, updated and assigned over the [REST API][ref-a
     }
     ```
 
-    `"resources": ["All"]` covers every deployment and `"actions": ["All"]` is the Full access shortcut, as in the builder. Unlike the builder, which drops an incomplete policy on save, the API rejects one with `400` if it has no actions or names no resources. (An empty `policies` list is fine — that is a role granting nothing yet.) Role names are unique, so re-running this step for a role that already exists answers `409` rather than creating a second one — a pipeline that may run twice should treat that as "already provisioned" and `PUT` the role instead. Pick a tier that covers the actions you grant: the builder's [auto-bump](#auto-bump-to-developer) does not apply here, so a tier lower than the actions require yields a role the builder would not have let you save. The response carries the role's `id`.
+    `"resources": ["All"]` covers every deployment and `"actions": ["All"]` is the Full access shortcut, as in the builder. Unlike the builder, which drops an incomplete policy on save, the API rejects one with `400` if it has no actions or names no resources. (An empty `policies` list is fine — that is a role granting nothing yet.) Pick a tier that covers the actions you grant: the builder's [auto-bump](#auto-bump-to-developer) does not apply here, so a tier lower than the actions require yields a role the builder would not have let you save. The response carries the role's `id`.
+
+    Role names are unique, so re-running this step for a role that already exists answers `409` rather than creating a second one. That response carries no body, and the list endpoint has no lookup by name, so a pipeline treating `409` as "already provisioned" has to page `GET /api/v1/roles` and match on `name` to recover the `id` before it can `PUT`.
   </Step>
   <Step title="Assign it">
     `PUT /api/v1/roles/{roleId}/users/{userId}`. It is idempotent, and `DELETE` on the same path takes the role away again.
