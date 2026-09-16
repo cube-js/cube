@@ -531,9 +531,7 @@ period-to-date logic across many measures without writing each one by hand, see
 
 The `year_to_date`, `quarter_to_date`, and `month_to_date` types are deprecated. On the
 legacy planner they are equivalent to `to_date` with the matching `granularity`.
-Tesseract does not recognize them, and does not reject them either: it plans such a
-measure as a rolling window with no bounds, so the value accumulates over all history
-and never resets at the period boundary. Use `to_date` with an explicit `granularity`.
+Tesseract does not recognize them. Use `to_date` with an explicit `granularity`.
 
 #### `offset`
 

@@ -60,10 +60,10 @@ Put the macro in a `.jinja` file under `model/macros` so that every cube can imp
 <Warning>
 
 The `safe` filters and the `|-` block scalar above are load-bearing. Every value that is
-concatenated with other text needs `safe`, and a SQL argument has to be emitted as a
-literal string with `indent` applied before `safe` — see [escaping unsafe
-strings][ref-jinja-escaping]. Getting either wrong surfaces as a YAML parse error far from
-the macro that caused it.
+concatenated with other text needs `safe` — the macro applies it throughout for
+consistency — and a SQL argument has to be emitted as a literal string with `indent`
+applied before `safe` — see [escaping unsafe strings][ref-jinja-escaping]. Getting either
+wrong surfaces as a YAML parse error far from the macro that caused it.
 
 The macro also emits its own leading indentation. Indenting the `{{ ... }}` call in the
 cube file instead only indents the first generated line.
