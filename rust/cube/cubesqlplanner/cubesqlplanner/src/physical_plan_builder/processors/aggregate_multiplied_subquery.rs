@@ -84,6 +84,13 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             JoinBuilder::new_from_subselect(keys_query.clone(), keys_query_alias.clone());
 
         let mut context_factory = context.make_sql_nodes_factory()?;
+        // Everything rendered against the fact source below has to resolve its
+        // `FILTER_PARAMS` bindings against the same filters the keys side did,
+        // or the two copies of the source stop agreeing.
+        let filter_params_filters = aggregate_multiplied_subquery
+            .keys_subquery
+            .filter()
+            .all_filters();
         let primary_keys_dimensions = &aggregate_multiplied_subquery
             .keys_subquery
             .primary_keys_dimensions();
@@ -112,7 +119,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                 let join_visitor_context = Rc::new(VisitorContext::new(
                     query_tools.clone(),
                     &join_context_factory,
-                    None,
+                    filter_params_filters.clone(),
                 ));
 
                 let conditions = primary_keys_dimensions
@@ -187,17 +194,8 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         let from = From::new_from_join(join_builder.build());
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut select_builder = SelectBuilder::new(from.clone());
-        // The keys side already restricts the rows, so this select needs no
-        // WHERE of its own. Its sources still have to see the query's filters:
-        // a `FILTER_PARAMS` binding in the fact cube's `sql` would otherwise
-        // fall back to always-true and the join would be built against the
-        // whole unfiltered fact table.
-        select_builder.set_filter_params_filters(
-            aggregate_multiplied_subquery
-                .keys_subquery
-                .filter()
-                .all_filters(),
-        );
+        // Not a WHERE of its own - the keys side already restricts the rows.
+        select_builder.set_filter_params_filters(filter_params_filters);
         let mut group_by = Vec::new();
 
         self.builder.resolve_subquery_dimensions_references(
