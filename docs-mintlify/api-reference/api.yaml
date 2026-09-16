@@ -5269,7 +5269,10 @@ paths:
           To scope the role to specific deployments, send a `Deployment` policy whose `resources`
           are the deployment ids as strings. A role usually also needs a `Global` policy naming the
           holder's license tier — `AIBIView`, `AIBIExplore` or `AIBIDevelop` — which is what the
-          console calls the role's Base Role:
+          console calls the role's Base Role. Pick a tier that covers the deployment actions you
+          grant: the console forces Developer (`AIBIDevelop`) for every deployment action except
+          `DeploymentRead` and `DownloadData`, so a lower tier here produces a role its role builder
+          would not have let you save:
 
 
           ```json
@@ -5279,7 +5282,7 @@ paths:
             "policies": [
               {
                 "resourceType": "Global",
-                "actions": ["AIBIExplore"],
+                "actions": ["AIBIDevelop"],
                 "resources": ["All"]
               },
               {
@@ -13200,7 +13203,11 @@ components:
               type: string
             - type: 'null'
         name:
-          description: Unique role name. Cannot be one of the built-in role names (Admin, Developer, …).
+          description: >-
+            Unique role name. Cannot be one of the built-in role names, which are rejected with
+            `400`: `Admin`, `Developer`, `AIBIDeveloper`, `D3User`, `AIBIUser`, `AIBIViewer`,
+            `Guest`, `EmbedUser`. (The console additionally refuses `None` and `All` in its own role
+            builder; those are accepted here.)
           maxLength: 255
           minLength: 1
           type: string
