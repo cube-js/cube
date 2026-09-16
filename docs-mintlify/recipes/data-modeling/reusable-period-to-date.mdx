@@ -48,8 +48,8 @@ Put the macro in a `.jinja` file under `model/macros` so that every cube can imp
 {%- for period in periods %}
       - name: {{ name | safe }}_{{ period | safe }}_to_date
         description: {{ name | safe }}, accumulated from the start of the {{ period | safe }}
-        {% if sql %}sql: >-
-          {{ sql | safe | indent(10) }}
+        {% if sql %}sql: |-
+          {{ sql | indent(10) | safe }}
         {% endif %}type: {{ type | safe }}
         rolling_window:
           type: to_date
@@ -78,15 +78,23 @@ the model first — see [previewing YAML][ref-jinja-preview].
 
 <Note>
 
-The `sql` argument is emitted as a [folded string][ref-jinja-folded] (`>-`) rather than
+The `sql` argument is emitted as a [literal string][ref-jinja-literal] (`|-`) rather than
 inline. A SQL expression is arbitrary text, and inline it has to avoid everything YAML
 reads as syntax: `{CUBE}.amount` starts a flow mapping, `amount # note` truncates at the
 comment, and wrapping the whole thing in double quotes only moves the problem to
-expressions that contain one, such as `{CUBE}."amount"`.
+expressions that contain one, such as `{CUBE}."amount"`. The literal form takes all of
+them, and — unlike the folded form (`>-`), which folds newlines into spaces — it keeps
+line breaks, so a leading `--` comment stays on its own line instead of swallowing the
+expression that follows it.
 
 Jinja's [`indent`][link-jinja-indent] filter is what makes a multi-line expression work. A
-folded block ends at the first line indented less than its opening, so without it the
+block scalar ends at the first line indented less than its opening, so without it the
 second line of a `CASE` expression closes the block and is read as a mapping key.
+
+Apply `indent` *before* `safe`, not after. Cube's Jinja engine escapes values as JSON
+unless they are marked safe, and `indent` returns a fresh, unmarked string — so
+`sql | safe | indent(10)` throws the marker away and the SQL arrives quoted, as
+`"{CUBE}.amount"`. Marking the result of `indent` keeps the expression raw.
 
 </Note>
 
@@ -247,7 +255,7 @@ override falls back to `DATE_TRUNC` and returns Gregorian periods, with no error
 [ref-jinja-macros]: /docs/data-modeling/dynamic/jinja#macros
 [ref-jinja-escaping]: /docs/data-modeling/dynamic/jinja#escaping-unsafe-strings
 [ref-jinja-preview]: /docs/data-modeling/dynamic/jinja#previewing-yaml
-[ref-jinja-folded]: /docs/data-modeling/dynamic/jinja#folded-and-literal-strings
+[ref-jinja-literal]: /docs/data-modeling/dynamic/jinja#folded-and-literal-strings
 [ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
 [ref-custom-granularities]: /recipes/data-modeling/custom-granularity
 [ref-custom-calendar]: /recipes/data-modeling/custom-calendar
