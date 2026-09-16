@@ -437,6 +437,10 @@ Use session ID in [signed embedding][ref-signed-embedding].
 
 ## Revoke a session
 
+```text
+POST https://{accountName}.cubecloud.dev/api/v1/embed/session/revoke
+```
+
 Call this from your application's logout handler to end an embed session from the
 server side. Pass the `sessionId` that Generate Session returned, and still remove the
 embedded iframe on logout — revoking a session doesn't tear it down on its own.
