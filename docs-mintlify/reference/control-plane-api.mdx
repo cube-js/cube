@@ -371,6 +371,48 @@ curl \
   "https://YOUR_CUBE_CLOUD_HOST/api/v1/audit-logs/export?start=2024-01-01&end=2024-01-31&eventName=Logged+in&userEmail=user@example.com"
 ```
 
+### `/api/v1/deployments/{deployment_id}/dashboard-exports`
+
+Request a server-rendered snapshot of a whole dashboard as PNG or PDF — the
+same rendering the [Download as PNG or PDF][ref-dashboard-download] action
+uses — without driving a browser through the console. Requires the
+`WorkbookManage` permission.
+
+Rendering happens asynchronously, since a capture waits for every widget on
+the dashboard to finish querying: submit a job, poll it until it completes,
+then download the file.
+
+```bash
+# 1. Submit the export
+curl -X POST \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"dashboardPublicId": "abc123", "format": "pdf"}' \
+  "https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments/123/dashboard-exports"
+# -> { "jobId": "...", "expiresAt": "..." }
+
+# 2. Poll until it's done
+curl \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  "https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments/123/dashboard-exports/JOB_ID"
+
+# 3. Download the file
+curl \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -o dashboard.pdf \
+  "https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments/123/dashboard-exports/JOB_ID/download"
+```
+
+An admin can also render the dashboard as if a specific other user opened
+it — `renderAs` a console user or an embed user — so the file reflects that
+person's own row-level security. This is meant for scheduled, per-recipient
+reports: one API key produces a correctly-scoped file per person, instead of
+one key per person. See the [API reference][ref-api-reference] for the full
+request and response schema.
+
+[ref-dashboard-download]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
+[ref-api-reference]: /api-reference/introduction
+
 [ref-core-data-apis]: /reference/core-data-apis
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-metadata-api]: /reference/core-data-apis/rest-api/reference#metadata-api
