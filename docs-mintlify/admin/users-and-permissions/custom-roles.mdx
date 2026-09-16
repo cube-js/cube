@@ -208,6 +208,48 @@ See [Manage users][ref-manage-users] for more.
 
 [ref-manage-users]: /admin/users-and-permissions/manage-users
 
+## Managing roles through the API
+
+Everything above is also available over the [REST API][ref-api-roles], so a team that provisions deployments from CI can grant access to the new deployment in the same pipeline instead of finishing in the console.
+
+<Steps>
+  <Step title="Create the deployment">
+    [`POST /build/api/v1/deployments`][ref-api-create-deployment] returns the new deployment, including its numeric `id`.
+  </Step>
+  <Step title="Create a role scoped to it">
+    `POST /api/v1/roles` with a `Deployment` policy whose `resources` carry that id **as a string**:
+
+    ```json
+    {
+      "name": "team-analytics",
+      "policies": [
+        {
+          "resourceType": "Deployment",
+          "actions": ["DeploymentRead", "SchemaRead"],
+          "resources": ["1734"]
+        }
+      ]
+    }
+    ```
+
+    Use `"resources": ["All"]` to cover every deployment, and `"actions": ["All"]` for the Full access shortcut. The response carries the role's `id`.
+  </Step>
+  <Step title="Assign it">
+    `PUT /api/v1/roles/{roleId}/users/{userId}`. It is idempotent, and `DELETE` on the same path takes the role away again.
+  </Step>
+</Steps>
+
+`GET`, `PUT` and `DELETE /api/v1/roles/{roleId}` read, update and remove a role; `PUT` replaces `policies` outright rather than merging, so read the role first if you mean to add a policy. All of these require administrator privileges, and they cover your custom roles only — the built-in roles are not listed or editable, though a built-in role id can still be assigned.
+
+<Note>
+
+Deployment ids are checked for shape, not existence: a slug or a name is rejected, but an id whose deployment has since been deleted is kept and simply grants nothing.
+
+</Note>
+
+[ref-api-roles]: /api-reference/roles/list-custom-roles
+[ref-api-create-deployment]: /api-reference/deployment-creation/create-a-deployment-with-an-empty-starter-project-and-trigger-its-first-build
+
 ## Validation
 
 The role builder enforces a few rules client-side:

@@ -213,7 +213,7 @@ const TAG_ORDER = [
   'Data Model', 'Data Model Uploads', 'GitHub', 'GitHub Connection', 'dbt Sync',
   'Databricks Metric View Publication', 'Databricks Metric View Integration',
   'Folders', 'Reports', 'Workbooks', 'Dashboard Exports', 'Notifications', 'Workspace', 'Agents', 'Metadata',
-  'Users', 'Users Admin', 'Groups', 'User Groups',
+  'Users', 'Users Admin', 'Groups', 'User Groups', 'Roles',
   'User Attributes', 'User Attribute Values', 'Resource Policies', 'Tenant Settings',
   'OAuth Integrations', 'User OAuth Tokens', 'OIDC Token Configs',
   'App Theme', 'AI Engineer', 'Embed', 'Embed Tenants', 'Dashboard Embed Access',
