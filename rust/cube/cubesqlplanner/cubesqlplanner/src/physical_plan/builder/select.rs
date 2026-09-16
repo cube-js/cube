@@ -334,6 +334,10 @@ impl SelectBuilder {
     }
 
     pub fn build(self, query_tools: Rc<QueryTools>, mut nodes_factory: SqlNodesFactory) -> Select {
+        debug_assert!(
+            self.filter_params_filters.is_none() || self.filter.is_none(),
+            "filter_params_filters replaces the WHERE filter for binding resolution"
+        );
         let cube_references = Self::make_cube_references(self.from.clone());
         nodes_factory.set_cube_name_references(cube_references);
         let schema = if self.projection_columns.is_empty() {
