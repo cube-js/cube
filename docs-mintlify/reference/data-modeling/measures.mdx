@@ -472,6 +472,67 @@ BigQuery, Microsoft SQL Server, and Snowflake, the date range is still required.
 
 </Warning>
 
+#### `type` and `granularity`
+
+Set `type` to `to_date` to accumulate from the start of the period that contains each
+data point, instead of over a window of fixed size. A `to_date` window also requires
+`granularity`, which names that period: a default granularity such as `week`, `month`,
+`quarter`, or `year`, or a [custom granularity][ref-custom-granularities]. Omitting it
+fails validation.
+
+<Warning>
+
+A custom granularity here is only available in Tesseract, the [next-generation data
+modeling engine][link-tesseract]. In versions before v1.7.0, it was not enabled by
+default. Without Tesseract, the model still compiles and the query fails.
+
+</Warning>
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: revenue_year_to_date
+        sql: amount
+        type: sum
+        rolling_window:
+          type: to_date
+          granularity: year
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  measures: {
+    revenue_year_to_date: {
+      sql: `amount`,
+      type: `sum`,
+      rolling_window: {
+        type: `to_date`,
+        granularity: `year`
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+A window of type `to_date` takes none of the `offset`, `trailing`, or `leading`
+parameters documented below; those apply to fixed-size windows, which are selected by
+`type: fixed` — the default when `type` is omitted. To apply the same
+period-to-date logic across many measures without writing each one by hand, see
+[reusing period-to-date logic][ref-recipe-period-to-date].
+
+The `year_to_date`, `quarter_to_date`, and `month_to_date` types are deprecated. On the
+legacy planner they are equivalent to `to_date` with the matching `granularity`.
+Tesseract does not recognize them. Use `to_date` with an explicit `granularity`.
+
 #### `offset`
 
 The `offset` parameter is used to specify the starting point of the time window.
@@ -1518,3 +1579,4 @@ cube(`orders`, {
 [link-iso-4217]: https://en.wikipedia.org/wiki/ISO_4217
 [ref-calculated-measures]: /docs/data-modeling/measures#calculated-measures
 [ref-schema-ref-preaggs-rollup]: /reference/data-modeling/pre-aggregations#rollup
+[ref-recipe-period-to-date]: /recipes/data-modeling/reusable-period-to-date
