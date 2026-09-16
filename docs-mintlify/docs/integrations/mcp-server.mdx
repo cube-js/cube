@@ -507,10 +507,8 @@ from — the deploy branch itself, live, if that's where the dev branch came fro
 `commitToNewBranch` to put them on a new branch instead, optionally with a pull request.
 Use `switchUserBranch` to point your own Cube UI at the result so you can
 see it. `mergeToDefaultBranch` is the publish step: it makes the branch live for
-everyone, so call it only when you want the change in production — it can't be undone
-from the response it returns. Call `getBranchState` to see whether the MCP session's
-branch and the branch your Cube UI shows are the same, and `discardDataModelChanges` to
-throw away an edit that isn't working out.
+everyone, so call it only when you want the change in production — no tool reverts it
+afterwards. Use `discardDataModelChanges` to throw away an edit that isn't working out.
 
 ### Verify a pre-aggregation
 
