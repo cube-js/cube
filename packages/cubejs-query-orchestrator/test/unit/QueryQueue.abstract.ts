@@ -222,15 +222,22 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
       const query: QueryKey = ['select * from 4', []];
 
-      // executionTimeout is 2s, 5s is enough
-      await queue.executeInQueue('delay', query, { delay: 5 * 1000, result: '1', isJob: true });
-      await awaitProcessing();
+      try {
+        // executionTimeout is 2s, 5s is enough
+        await queue.executeInQueue('delay', query, { delay: 5 * 1000, result: '1', isJob: true });
+        await awaitProcessing();
 
-      // the error is reported before the failing cancel carries it out of executeQuery, which the
-      // storage error below would otherwise be the only trace of
-      const events = logger.mock.calls.map(([message]) => message);
-      expect(events).toContain('Error while querying');
-      expect(events).toContain('Queue storage error');
+        // the error is reported before the failing cancel carries it out of executeQuery, which the
+        // storage error below would otherwise be the only trace of
+        const events = logger.mock.calls.map(([message]) => message);
+        expect(events).toContain('Error while querying');
+        expect(events).toContain('Queue storage error');
+      } finally {
+        // the cancel threw before the result was set, so the item is still active: left behind it
+        // is reaped as an orphan during a later test, whose events and cancelled query it joins
+        failCancelMessage = false;
+        await queue.cancelQuery(queue.redisHash(query), null);
+      }
     });
 
     test('cancelled query is not reported as an error', async () => {
