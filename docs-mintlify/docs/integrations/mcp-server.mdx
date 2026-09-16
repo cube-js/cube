@@ -406,11 +406,11 @@ These mirror the "Commit & Sync", "Merge" / "Create a Pull Request", and branch-
 actions described in [Development mode][ref-dev-mode] — a client can now drive that same
 flow instead of asking you to click through it.
 
-Call `getBranchState` before editing, so work doesn't land on a branch you never look
-at, and again after committing, to see whether you still need `switchUserBranch` to see
-it. `mergeToDefaultBranch` is separate from committing: it publishes an already
-committed branch, and its description tells the agent to call it only when you've
-explicitly asked to publish or merge to production.
+Call `getBranchState` before editing, to see whether the MCP session's branch and the
+branch your Cube UI shows are the same, and again after committing, to see whether you
+still need `switchUserBranch` to see the result. `mergeToDefaultBranch` is separate from
+committing: it publishes an already committed branch, and its description tells the
+agent to call it only when you've explicitly asked to publish or merge to production.
 
 ### Pre-aggregations
 
@@ -504,10 +504,11 @@ Once `writeDataModelFile` edits compile and `runQuery` confirms they return the 
 data, call `commitDataModelChanges` to land them on the branch the dev branch forked
 from — or `commitToNewBranch` to put them on a new branch instead, optionally with a
 pull request. Use `switchUserBranch` to point your own Cube UI at the result so you can
-see it. Publish only when you've asked to: `mergeToDefaultBranch` makes the branch live
-for everyone and can't be undone from the response it returns. Call `getBranchState` at
-any point to check which branch you and the MCP session are each on, and
-`discardDataModelChanges` to throw away an edit that isn't working out.
+see it. `mergeToDefaultBranch` is the publish step: it makes the branch live for
+everyone, so call it only when you want the change in production — it can't be undone
+from the response it returns. Call `getBranchState` to see whether the MCP session's
+branch and the branch your Cube UI shows are the same, and `discardDataModelChanges` to
+throw away an edit that isn't working out.
 
 ### Verify a pre-aggregation
 
