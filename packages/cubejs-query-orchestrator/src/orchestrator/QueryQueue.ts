@@ -1052,6 +1052,7 @@ export class QueryQueue {
       // only succeeds while the item is still there, so a failure means the query was cancelled and
       // its rejection has to stay out of query history the way an orphaned query does.
       let queueItemWasActive: unknown;
+
       try {
         queueItemWasActive = await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, queueId);
       } catch (e: any) {
@@ -1075,7 +1076,14 @@ export class QueryQueue {
           newVersionEntry: query.query?.newVersionEntry,
           preAggregation: query.query?.preAggregation,
           addedToQueueTime: query.addedToQueueTime,
-          ...(executionError ? { cancellationError: (executionError.stack || executionError).toString() } : {}),
+          // `warning` rather than this event's own `warn` field, which the default logger does not
+          // route: without it the rejection would vanish from logs entirely, where it used to be
+          // printed as an error. Set only when there is one, so a plain orphaned result stays as
+          // quiet as it is today.
+          ...(executionError ? {
+            warning: 'Query execution was rejected because the query had been cancelled',
+            cancellationError: (executionError.stack || executionError).toString()
+          } : {}),
         });
       } else if (executionError) {
         logExecutionError(executionError);

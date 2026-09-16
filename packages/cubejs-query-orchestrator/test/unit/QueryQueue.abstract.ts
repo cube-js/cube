@@ -240,6 +240,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
       const [, orphanedPayload] = logger.mock.calls.find(([message]) => message === 'Orphaned execution result')!;
       expect(orphanedPayload.cancellationError).toContain('Query was cancelled');
+      // the default logger routes on `warning`, not on this event's own `warn` field, so without it
+      // the rejection is never written at the default level
+      expect(orphanedPayload.warning).toBeDefined();
     });
 
     test('stage reporting', async () => {
