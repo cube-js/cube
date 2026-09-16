@@ -375,9 +375,10 @@ curl \
 
 Request a server-rendered snapshot of a whole dashboard as PNG or PDF — the
 same rendering the [Download as PNG or PDF][ref-dashboard-download] action
-uses — without driving a browser through the console. Requires **manage**
-access to the dashboard's workbook, the same permission the console's own
-download actions require.
+uses — without driving a browser through the console. Identify the dashboard
+with either `dashboardId` (numeric) or `dashboardPublicId` (string) — exactly
+one, not both. Requires **manage** access to the dashboard's workbook, the
+same permission the console's own download actions require.
 
 Rendering happens asynchronously, since a capture waits for every widget on
 the dashboard to finish querying: submit a job, poll it until `status` is
@@ -417,7 +418,8 @@ per person, and only the identity that submitted a job can poll or download
 it.
 
 Submitting returns `404` for a dashboard that doesn't belong to the
-deployment or a deactivated console subject, and `403` when the account has
+deployment, a request that supplies both ids or neither, or a deactivated
+console subject, and `403` when the account has
 data downloads restricted (not bypassed for an on-behalf-of export, unlike a
 built-in scheduled notification) or when an embed subject's tenant doesn't
 have the dashboard's workbook shared with it. It returns `429` when too many
