@@ -11904,8 +11904,9 @@ components:
           description: >-
             What the role grants. Scope a policy to specific deployments by setting `resourceType`
             to `Deployment` and listing the deployment ids — as returned by POST
-            /build/api/v1/deployments — in `resources`, or `["All"]` for every deployment. Pass `[]`
-            to create a role that grants nothing yet.
+            /build/api/v1/deployments — in `resources`, or `["All"]` for every deployment. An empty
+            `policies` list is accepted and creates a role that grants nothing yet; an individual
+            policy with no actions, or none naming a resource, is rejected.
           items:
             $ref: '#/components/schemas/Policy'
           maxItems: 200
@@ -11921,12 +11922,14 @@ components:
             - maxLength: 255
               type: string
             - type: 'null'
+          description: Omit to leave the description unchanged; `null` clears it.
         name:
           oneOf:
             - maxLength: 255
               type: string
               minLength: 1
             - type: 'null'
+          description: Omit to leave the name unchanged. `null` is rejected.
         policies:
           oneOf:
             - items:
@@ -11934,7 +11937,10 @@ components:
               type: array
               maxItems: 200
             - type: 'null'
-          description: Replaces the role's policies outright when present.
+          description: >-
+            Replaces the role's policies outright when present — there is no per-policy merge. Omit
+            it to leave them unchanged, or send `[]` to remove them all. `null` is rejected, so a
+            partly-filled client object cannot strip a role's grants by accident.
       type: object
     RoleWithAccess:
       properties:
