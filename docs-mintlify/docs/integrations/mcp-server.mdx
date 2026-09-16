@@ -261,6 +261,18 @@ model edits stay safe](#how-model-edits-stay-safe).
 See [Select a deployment and agent](#select-a-deployment-and-agent) for how these three
 work together.
 
+<Warning>
+
+`chat`'s **Read-only** annotation covers only the MCP call itself, not what the agent
+does in response. It's the same agent Analytics Chat uses, with the same write-capable
+tools — creating reports, organizing workspace folders — when the caller's access allows
+it, and folder actions run with no confirmation step; see [Deleting
+folders][ref-deleting-folders]. A client that runs `chat` automatically because the
+annotation says read-only can still cause an unconfirmed write through the agent's own
+reply.
+
+</Warning>
+
 A chat conversation is pinned to whichever branch answered its first message — later
 messages in the same conversation stay on that branch, and `loadQueryResults` pages using
 it. Passing a different `branchName` while resuming an existing `chatId` fails rather than
@@ -416,9 +428,7 @@ always targets the deploy branch.
 
 Call `getBranchState` before editing, to see whether the MCP session's branch and the
 branch your Cube UI shows are the same, and again after committing, to see whether you
-still need `switchUserBranch` to see the result. `mergeToDefaultBranch` is separate from
-committing: it publishes an already committed branch, and its description tells the
-agent to call it only when you've explicitly asked to publish or merge to production.
+still need `switchUserBranch` to see the result.
 
 ### Pre-aggregations
 
