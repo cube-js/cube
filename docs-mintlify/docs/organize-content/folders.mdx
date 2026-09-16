@@ -138,11 +138,16 @@ Asking [Analytics Chat](/docs/explore-analyze/analytics-chat), the Excel or Goog
 Sheets chat pane, or an MCP client to delete a folder is narrower in what it destroys
 than deleting it here: it only removes the folder itself — contents move to the
 workspace root instead of being deleted — and it refuses a folder that still has
-subfolders, rather than deleting the whole subtree. It's not narrower in who can do
-it: this path only checks your access to the folder itself, not to what's inside, so
-it doesn't apply the content-permission check above — access to a folder is enough to
-scatter its contents to the workspace root, even contents you don't otherwise have
-access to.
+subfolders, rather than deleting the whole subtree.
+
+<Warning>
+
+It's not narrower in who can do it. This path only checks that you have **Full
+access** to the folder itself — it never applies the content-permission check
+above. Full access to a folder alone is enough to scatter its contents to the
+workspace root, even contents you don't otherwise have access to.
+
+</Warning>
 
 ## Folder permissions
 
