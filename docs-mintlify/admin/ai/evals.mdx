@@ -150,7 +150,7 @@ Verdicts:
 ## Limitations
 
 - Questions are authored as code only; the **Questions** tab is read-only.
-- Very large question sets can be slow to run — scope the run to a single
-  question file to cut it down.
+- Very large question sets can be slow to run — split them across
+  `agents/eval_questions/*.yml` files and scope the run to one file.
 - Grading is execution-based on the result set; it does not semantically judge
   prose answers.
