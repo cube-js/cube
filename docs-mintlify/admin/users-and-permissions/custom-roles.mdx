@@ -214,7 +214,7 @@ These are the **role builder's** rules, applied in the console before it submits
 
 The role builder enforces a few rules client-side:
 
-- **Name** is required and must be unique. Reserved names (`Admin`, `Guest`, `Developer`, `None`, `All`) are rejected.
+- **Name** is required and must be unique. Reserved names (`Admin`, `Guest`, `Developer`, `None`, `All`) are rejected. The API reserves a different set — every built-in role name, which includes `AIBIDeveloper`, `AIBIUser`, `AIBIViewer`, `D3User` and `EmbedUser`, but not `None` or `All`; see [`POST /api/v1/roles`][ref-api-create-role].
 - **Base Role** is required — Save is disabled until one is picked, and an inline error appears if you try to submit without one.
 - A deployment policy with **no actions selected** is silently dropped on save (treated as a no-op).
 - A deployment policy with **Specific deployments** scope but no deployments selected is also dropped on save.
@@ -248,7 +248,7 @@ Custom roles can also be created, updated and assigned over the [REST API][ref-a
     }
     ```
 
-    `"resources": ["All"]` covers every deployment and `"actions": ["All"]` is the Full access shortcut, as in the builder. Unlike the builder, which drops an incomplete policy on save, the API rejects one with `400` if it grants no action or names no resource. Pick a tier that covers the actions you grant — the [auto-bump rule](#auto-bump-to-developer) applies to your payload too, in the sense that a lower tier here yields a role the builder would not have let you save. The response carries the role's `id`.
+    `"resources": ["All"]` covers every deployment and `"actions": ["All"]` is the Full access shortcut, as in the builder. Unlike the builder, which drops an incomplete policy on save, the API rejects one with `400` if it grants no action or names no resource. Pick a tier that covers the actions you grant: the builder's [auto-bump](#auto-bump-to-developer) does not apply here, so a tier lower than the actions require yields a role the builder would not have let you save. The response carries the role's `id`.
   </Step>
   <Step title="Assign it">
     `PUT /api/v1/roles/{roleId}/users/{userId}`. It is idempotent, and `DELETE` on the same path takes the role away again.
@@ -270,6 +270,7 @@ Deployment ids are checked for shape, not existence: a slug or a name is rejecte
 </Note>
 
 [ref-api-roles]: /api-reference/roles/list-custom-roles
+[ref-api-create-role]: /api-reference/roles/create-a-custom-role
 [ref-api-create-deployment]: /api-reference/deployment-creation/create-a-deployment-with-an-empty-starter-project-and-trigger-its-first-build
 
 ## Reference: action catalog
