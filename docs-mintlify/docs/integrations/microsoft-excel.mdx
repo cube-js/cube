@@ -181,7 +181,10 @@ each measure gets its own total column; with measures on **Rows**, a single
 total column covers them all, since each row already holds one measure.
 
 Like column totals, each total comes from a separate query grouped by the
-opposite zone, so the caveats above apply unchanged. With both switches on,
+opposite zone, so the same caveats apply: correct for non-additive measures,
+window-function [calculations][ref-calculated-fields] excluded, measure
+filters dropped and dimension filters kept, and totals taken over the query's
+full result rather than the rows on the sheet. With both switches on,
 the cell where they meet holds a grand total across the whole result, from a
 third query with neither zone kept.
 
