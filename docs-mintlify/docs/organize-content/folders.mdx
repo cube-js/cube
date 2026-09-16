@@ -139,7 +139,8 @@ an MCP client to delete a folder is narrower than deleting it here: it only remo
 folder itself — contents move to the workspace root instead of being deleted — and it
 refuses a folder that still has subfolders, rather than deleting the whole subtree. In
 Analytics Chat and the Excel and Google Sheets chat panes, folder actions also run
-immediately, with no confirmation step.
+immediately, with no confirmation step; over MCP, `manageFolders` is annotated
+destructive, so a client prompts first.
 
 ## Folder permissions
 

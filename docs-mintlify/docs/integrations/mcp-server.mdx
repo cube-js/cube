@@ -388,10 +388,11 @@ its own.
 ### Committing and publishing changes
 
 Editing the model with the tools above only ever writes to a personal dev branch's
-working copy — visible to you in the Cube UI and on your dev branch's endpoints, but to
-nobody else until it's committed. These tools commit that work, publish it, or throw it
-away. They're registered under the same semantic-model permission as the data model
-tools above, and a client can call them without ever using the Cube UI.
+working copy — reachable on that branch's endpoints, and in the Cube UI once you've
+switched to it, but invisible to everyone else until it's committed. These tools commit
+that work, publish it, or throw it away. They're registered under the same
+semantic-model permission as the data model tools above, and a client can call them
+without ever using the Cube UI.
 
 | Tool | Description | Access |
 | --- | --- | --- |
