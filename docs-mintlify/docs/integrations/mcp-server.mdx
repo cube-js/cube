@@ -395,11 +395,11 @@ tools above, and a client can call them without ever using the Cube UI.
 | Tool | Description | Access |
 | --- | --- | --- |
 | `getBranchState` | Reports the branch this session works on, the branch you're looking at in the Cube UI, the deploy branch, and whether the session's branch has uncommitted edits. | Read-only |
-| `commitDataModelChanges` | Commits the dev branch's edits onto the branch it was created from. | Write |
+| `commitDataModelChanges` | Commits the dev branch's edits onto the branch it was created from — including the deploy branch, live, when the call sets `confirmPublishToDefaultBranch`. | Write — see warning above |
 | `commitToNewBranch` | Commits the dev branch's edits to a new branch instead, optionally opening a pull request. | Write |
 | `mergeToDefaultBranch` | Merges a committed branch into the deploy branch, making it live for everyone. | Destructive — prompts |
 | `discardDataModelChanges` | Resets the dev branch to its parent (or to a given commit hash), throwing away pending edits. | Destructive — prompts |
-| `switchUserBranch` | Switches your own Cube UI over to a branch, the same action as the branch switcher in the console, so you can see and test what was committed. | Write |
+| `switchUserBranch` | Switches your own Cube UI over to a branch, the same action as its branch switcher, so you can see and test what was committed. | Write |
 
 These mirror the "Commit & Sync", "Merge" / "Create a Pull Request", and branch-switching
 actions described in [Development mode][ref-dev-mode] — a client can now drive that same

@@ -459,7 +459,7 @@ The call is idempotent — revoking an unknown, expired, or already-revoked id a
 returns `204`, so the response alone doesn't tell you whether a token was actually
 revocable. Returns `403` if embedding isn't enabled for the account.
 
-```bash title="Bash" cURL
+```bash
 curl -X POST "https://your-account.cubecloud.dev/api/v1/embed/session/revoke" \
   -H "Content-Type: application/json" \
   -H "Authorization: Api-Key YOUR_API_KEY" \
