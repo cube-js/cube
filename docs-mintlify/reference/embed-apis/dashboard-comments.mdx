@@ -27,7 +27,7 @@ That is what makes the endpoints usable for your own comment UI. It also means *
 
 ## Authentication
 
-Every endpoint requires a **signed embed session scoped to an embed tenant**. Mint one with [Generate Session][ref-generate-session] using `externalId`. `embedTenantName` is optional: omit it and the session scopes to the Cube tenant's own name, which reaches these endpoints; pass it to scope the conversation to a specific embed tenant. That name decides which conversation the session sees — see [A conversation lives inside a single embed tenant](#a-conversation-lives-inside-a-single-embed-tenant).
+Every endpoint requires a **signed embed session scoped to an embed tenant**. Mint one with [Generate Session][ref-generate-session] using `externalId`. `embedTenantName` is optional and these endpoints answer either way — omit it and the session falls back to your own account's tenant name. **Pass it anyway if you embed for more than one customer:** that name is what separates one customer's conversation from another's, and sessions that omit it all share a single one. See [A conversation lives inside a single embed tenant](#a-conversation-lives-inside-a-single-embed-tenant).
 
 A session minted with `internalId` cannot comment. Such a session resolves its user from Cube's own user table and so carries no embed tenant by design, and these endpoints reject it with `403 Forbidden`. A [Cube API key][ref-api-keys] and a console session are rejected the same way.
 
@@ -75,9 +75,13 @@ Reading is wider than writing — but only inside one embed tenant. Every embed 
 
 ## A conversation lives inside a single embed tenant
 
-Threads are stored per embed tenant, and `GET /dashboard/{publicId}/comments` returns only the caller's own tenant's threads. Embed one published dashboard across several customers and each gets a separate, private conversation on it: a user in `acme` never sees a thread written in `globex`, and neither can reply to the other.
+Threads are stored per embed tenant, and `GET /dashboard/{publicId}/comments` returns only the caller's own tenant's threads. A user in `acme` never sees a thread written in `globex`, and neither can reply to the other. Expect an empty list on a dashboard your own tenant has not commented on yet, however busy it looks to someone else.
 
-Expect an empty list on a dashboard your own tenant has not commented on yet, however busy it looks to someone else. The embed tenant comes from the session — see [Authentication](#authentication).
+<Warning>
+
+**`embedTenantName` is what creates the separation.** Pass a distinct one per customer when you [generate a session](#authentication). It is optional, and a session that omits it falls back to your own account's tenant name — so **every session minted without it shares one embed tenant**, and therefore one conversation. Embed the same dashboard for two customers that way and each reads the other's threads, and each sees the other's users in [mentionable users](#mentionable-users).
+
+</Warning>
 
 ## Threads and replies
 
@@ -149,8 +153,8 @@ Returned by `POST /dashboard/{publicId}/comments/{commentId}/resolve`, and as ea
 | --- | --- | --- |
 | `root` | object | The thread's first comment, in the [Comment](#comment) shape. |
 | `replies` | array | Replies to the root, oldest first, each in the [Comment](#comment) shape. |
-| `resolvedAt` | string \| null | When the thread was resolved, or `null` while it is open. |
-| `resolvedBy` | number \| null | Embed user who resolved it, or `null`. |
+| `resolvedAt` | string \| null | When the thread was resolved. `null` or absent while it is open. |
+| `resolvedBy` | number \| null | Embed user who resolved it. `null` or absent while it is open. |
 
 ### Thread list
 
@@ -201,7 +205,7 @@ Returned by `GET /dashboard/{publicId}/comments/mentionable-users`. Use it to ba
 | `email` | string \| null | May be `null`. |
 | `firstName` | string \| null | May be `null`. |
 
-**The directory is scoped to the caller's own embed tenant, and to embed users only.** An embed user can mention their colleagues in the same embed tenant. They cannot mention a Cube user of the host account, and they never see another embed tenant's users. Pass `search` to filter by username or email; results are ordered by username. Paginate as for [threads](#thread-list), `hasNextPage` included — a `search` that matches nobody returns an empty page whose cursors are `null` or absent.
+**The directory is scoped to the caller's own embed tenant, and to embed users only.** An embed user can mention their colleagues in the same embed tenant. They cannot mention a Cube user of the host account, and they never see another embed tenant's users — which, as [above](#a-conversation-lives-inside-a-single-embed-tenant), depends on your minting sessions with a distinct `embedTenantName` per customer. Pass `search` to filter by username or email; results are ordered by username. Paginate as for [threads](#thread-list), `hasNextPage` included — a `search` that matches nobody returns an empty page whose cursors are `null` or absent.
 
 <Info>
 
