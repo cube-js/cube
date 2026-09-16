@@ -603,9 +603,9 @@ cube(`orders`, {
 
 </CodeGroup>
 
-A window of type `to_date` takes neither `trailing` nor `leading`. To apply the same
-period-to-date logic across many measures without writing each one by hand, see
-[reusing period-to-date logic][ref-recipe-period-to-date].
+A window of type `to_date` takes none of `trailing`, `leading`, or `offset`. To apply
+the same period-to-date logic across many measures without writing each one by hand,
+see [reusing period-to-date logic][ref-recipe-period-to-date].
 
 The `year_to_date`, `quarter_to_date`, and `month_to_date` types are deprecated
 equivalents of `to_date` with the matching `granularity`.

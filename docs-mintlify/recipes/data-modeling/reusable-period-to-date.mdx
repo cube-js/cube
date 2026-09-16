@@ -44,12 +44,12 @@ Put the macro in a `.jinja` file under `model/macros` so that every cube can imp
 
 ```yaml title="model/macros/period_to_date.jinja"
 {#- Period-to-date measures for one base measure. -#}
-{%- macro to_date_measures(name, sql, type='sum', periods=['week', 'month', 'quarter', 'year']) -%}
+{%- macro to_date_measures(name, sql='', type='sum', periods=['week', 'month', 'quarter', 'year']) -%}
 {%- for period in periods %}
       - name: {{ name | safe }}_{{ period | safe }}_to_date
-        sql: {{ sql | safe }}
-        type: {{ type | safe }}
         description: {{ name | safe }}, accumulated from the start of the {{ period | safe }}
+        {% if sql %}sql: {{ sql | safe }}
+        {% endif %}type: {{ type | safe }}
         rolling_window:
           type: to_date
           granularity: {{ period | safe }}
@@ -98,12 +98,16 @@ cubes:
       - name: count
         type: count
 {{ ptd.to_date_measures("revenue", "amount") }}
-{{ ptd.to_date_measures("count", "id", "count") }}
+{{ ptd.to_date_measures("count", type="count") }}
 ```
 
 Two calls generate eight measures: `revenue_week_to_date` through
 `revenue_year_to_date`, and the same four for `count`. Adding a period is a one-token
 change to the macro's default list, not an edit to every cube.
+
+`sql` is optional so that a `count` measure stays a `COUNT(*)`, matching its base
+measure. Passing a column to a `count` makes it a `COUNT(<column>)` instead, which skips
+rows where that column is null.
 
 ### Overriding the periods
 
@@ -130,7 +134,7 @@ cubes:
     measures:
       - name: signups
         type: count
-{{ ptd.to_date_measures("signups", "id", "count", ["month", "year"]) }}
+{{ ptd.to_date_measures("signups", type="count", periods=["month", "year"]) }}
 ```
 
 ## Result
@@ -190,7 +194,8 @@ override falls back to `DATE_TRUNC` and returns Gregorian periods, with no error
 
 Rolling windows over calendar granularities require Tesseract, the [next-generation data
 modeling engine][link-tesseract]. In versions before v1.7.0, it was not enabled by
-default.
+default. Querying a `to_date` window over an overridden granularity also requires
+v1.7.32 or later.
 
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [ref-rolling-window]: /reference/data-modeling/measures#type-and-granularity
