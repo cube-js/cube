@@ -324,8 +324,9 @@ published dashboard keeps serving its previous version until you approve
 Call `manageFolders` with `action: "list"` first to get a folder's numeric id — that id,
 not its name, is what `folderId` takes on `createReport` and `updateReport` to place a
 standalone exploration inside it. The annotation covers the whole tool, so a client
-prompts for `list` as it would for `delete`. Its delete is [narrower than deleting a
-folder from the Workspace page][ref-deleting-folders].
+prompts for `list` as it would for `delete`. Its delete destroys less than [deleting a
+folder from the Workspace page][ref-deleting-folders] but checks less too — it skips the
+content-permission check that path applies.
 
 **To change an existing report, use `updateReport` — never recreate it.** A dashboard's
 chart widget points at a specific `reportId`, so replacing a report with a new one orphans
