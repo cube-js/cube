@@ -541,7 +541,7 @@ window.addEventListener("message", (event) => {
 ### Ending a session on logout
 
 Letting the token expire isn't the same as logging the viewer out — for that,
-[revoke the embed session](/api-reference/embed/revoke-an-embed-session) from
+[revoke the embed session](/reference/embed-apis/generate-session#revoke-a-session) from
 your own logout handler. Every renewal mints a new session id, so track each
 one you've minted for that viewer and revoke all of them; an earlier one may
 still be a live, unexpired token. Revoking doesn't tear down a running
