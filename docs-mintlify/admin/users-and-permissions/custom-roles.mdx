@@ -248,7 +248,7 @@ Custom roles can also be created, updated and assigned over the [REST API][ref-a
     }
     ```
 
-    `"resources": ["All"]` covers every deployment and `"actions": ["All"]` is the Full access shortcut, as in the builder. Pick a tier that covers the actions you grant — the [auto-bump rule](#auto-bump-to-developer) applies to your payload too, in the sense that a lower tier here yields a role the builder would not have let you save. The response carries the role's `id`.
+    `"resources": ["All"]` covers every deployment and `"actions": ["All"]` is the Full access shortcut, as in the builder. Unlike the builder, which drops an incomplete policy on save, the API rejects one with `400` if it grants no action or names no resource. Pick a tier that covers the actions you grant — the [auto-bump rule](#auto-bump-to-developer) applies to your payload too, in the sense that a lower tier here yields a role the builder would not have let you save. The response carries the role's `id`.
   </Step>
   <Step title="Assign it">
     `PUT /api/v1/roles/{roleId}/users/{userId}`. It is idempotent, and `DELETE` on the same path takes the role away again.
@@ -257,7 +257,7 @@ Custom roles can also be created, updated and assigned over the [REST API][ref-a
 
 <Warning>
 
-**The Base Role is required in the builder, but the API neither requires nor infers it.** A role sent without a `Global` tier policy is accepted with no error, and a user whose only role is that one holds the deployment grants yet has no license tier — nothing surfaces it until they sign in and cannot use the product. This is deliberate: permissions stack, so a role that only adds a deployment scope beside another role carrying the tier is valid. Omit the `Global` policy only when you know another of the user's roles supplies it.
+**The Base Role is required in the builder, but the API neither requires nor infers it.** A role sent without a `Global` tier policy is accepted with no error, and a user whose only role is that one holds the deployment grants yet has no license tier — nothing surfaces it until they sign in and cannot use the product. The auto-bump described above is a rule the builder applies before it submits, not one the server applies to what you send. This is deliberate: permissions stack, so a role that only adds a deployment scope beside another role carrying the tier is valid. Omit the `Global` policy only when you know another of the user's roles supplies it.
 
 </Warning>
 
