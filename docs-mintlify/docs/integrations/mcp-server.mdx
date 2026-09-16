@@ -383,7 +383,7 @@ with one gap noted below:
   offered only to users whose role allows editing the semantic model. A Viewer never sees
   any of them.
 - **Deploy-branch writes are checked again at call time.** A role scoped to **Edit data
-  model on dev branches** still sees every tool above registered, but `mergeToDefaultBranch`
+  model on dev branches** still sees every tool listed above registered, but `mergeToDefaultBranch`
   and `commitDataModelChanges` with `confirmPublishToDefaultBranch` fail for that role, the
   same as any other write targeting the deploy branch.
 - **Verify on the branch, before a merge, not after.** Pass the dev `branchName` to
