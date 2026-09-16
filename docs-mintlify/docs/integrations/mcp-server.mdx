@@ -309,10 +309,8 @@ published dashboard keeps serving its previous version until you approve
 
 Call `manageFolders` with `action: "list"` first to get a folder's numeric id — that id,
 not its name, is what `folderId` takes on `createReport` and `updateReport` to place a
-standalone exploration inside it. This tool's delete is narrower than deleting a folder
-from the [Workspace page][ref-folders]: it only removes the folder itself — contents
-move to the workspace root instead of being deleted — and refuses when the folder still
-has sub-folders, rather than deleting the whole subtree.
+standalone exploration inside it. Its delete is [narrower than deleting a folder from
+the Workspace page][ref-deleting-folders].
 
 **To change an existing report, use `updateReport` — never recreate it.** A dashboard's
 chart widget points at a specific `reportId`, so replacing a report with a new one orphans
@@ -385,8 +383,6 @@ tells the agent to set the flag only on your explicit say-so, never to retry a r
 its own.
 
 </Warning>
-
-Review pending work with `getDataModelChanges` before you commit.
 
 ### Committing and publishing changes
 
@@ -539,3 +535,4 @@ and friends) are set.
 [ref-dashboards]: /docs/explore-analyze/dashboards
 [ref-dev-mode]: /docs/data-modeling/dev-mode
 [ref-folders]: /docs/organize-content/folders
+[ref-deleting-folders]: /docs/organize-content/folders#deleting-folders
