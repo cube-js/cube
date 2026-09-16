@@ -7772,13 +7772,6 @@
   dependencies:
     "@types/estree" "*"
 
-"@types/aws-sdk2-types@*":
-  version "0.0.6"
-  resolved "https://registry.yarnpkg.com/@types/aws-sdk2-types/-/aws-sdk2-types-0.0.6.tgz#f00f41efe801bf39ca1dfc9ceb5ff9846bb88ffb"
-  integrity sha512-ZHQZWxYt8s3EAeVZzw3k/GeBDcarJ2SHJAGjkBZexiTI5U2l41z+DMX4GlSHxSL3wzSpGrTrVsZEyBEUdVspoA==
-  dependencies:
-    "@types/node" "*"
-
 "@types/babel__code-frame@^7.0.6":
   version "7.0.6"
   resolved "https://registry.yarnpkg.com/@types/babel__code-frame/-/babel__code-frame-7.0.6.tgz#20a899c0d29fba1ddf5c2156a10a2bda75ee6f29"
@@ -7961,14 +7954,6 @@
   version "3.0.2"
   resolved "https://registry.yarnpkg.com/@types/d3-timer/-/d3-timer-3.0.2.tgz#70bbda77dc23aa727413e22e214afa3f0e852f70"
   integrity sha512-Ps3T8E8dZDam6fUyNiMkekK3XUsaUEik+idO9/YjPtfj2qruF8tFBXS7XhtE4iIXBLxhmLjP3SXpLhVf21I9Lw==
-
-"@types/data-api-client@^1.2.1":
-  version "1.2.11"
-  resolved "https://registry.yarnpkg.com/@types/data-api-client/-/data-api-client-1.2.11.tgz#897686eef93be7b78c928df06aa85977834cc65d"
-  integrity sha512-3vbLpos0PlwwYXxGW/7q0BEbApW3tGr7MY7wrFzPmgqUmdBjjb5ORUpXI4tFECYdr6lAM7Per4NFwC1UfhpGYw==
-  dependencies:
-    "@types/aws-sdk2-types" "*"
-    "@types/node" "*"
 
 "@types/dedent@^0.7.0":
   version "0.7.0"
