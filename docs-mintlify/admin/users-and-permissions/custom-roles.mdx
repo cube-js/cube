@@ -118,6 +118,9 @@ Either grant **Full access** (a shortcut that enables every current and future d
 | Data Model  | View data model                     | Read data model files and dev branches.                                                                                                                                   |
 | Data Model  | Edit data model                     | Edit the data model on any branch, including the main/deploy branch. Allows committing and merging to main, force-syncing main, and starting dev mode against main.       |
 | Data Model  | Edit data model on dev branches     | Edit the data model only on non-default branches. Blocks any write that targets the main/deploy branch (including merging to main).                                       |
+| Data Model  | Access SQL Runner                   | Open the SQL Runner and execute queries in it.                                                                                                                            |
+| AI          | Access AI agents                    | Use the AI agent in Analytics Chat, workbooks, the IDE, and dashboards.                                                                                                   |
+| Pre-aggregations | Build pre-aggregations         | Trigger pre-aggregation builds (**Build All** and bulk build actions). Withholding it prevents accidental large builds that put Cube Store under pressure.                |
 | Monitoring  | Access query history                | View deployment query history, performance, and traces.                                                                                                                   |
 | Monitoring  | Access chat history                 | View other users' chat conversations for the deployment, including Analytics Chat and the Excel/Google Sheets add-in panes (**Admin → Chats History**).                  |
 | Data Export | Download data                       | Download query results as CSV from workbooks, Analytics Chat, and published dashboards. Granted by default to the built-in Viewer, Explorer, and Developer roles. See [Data download controls][ref-data-download-controls]. |
@@ -128,7 +131,7 @@ When **Full access** is checked, the granular checkboxes appear checked and disa
 
 <Tip>
 
-**Access deployment** (`DeploymentRead`) and **Download data** (`DownloadData`) are special. They are the only deployment actions that do **not** auto-bump the Base Role to Developer, because Viewers also need them just to open a deployment and download data from it.
+**Access deployment** (`DeploymentRead`) and **Download data** (`DownloadData`) are exempt from the [auto-bump](#auto-bump-to-developer) because Viewers need them just to open a deployment and download data from it. That section lists the full set of exempt actions.
 
 </Tip>
 
@@ -311,6 +314,9 @@ This section lists every action a custom role can grant. The internal action nam
 | `SchemaRead`              | View data model                                             |
 | `SchemaUpdate`            | Edit data model                                             |
 | `SchemaUpdateDevBranches` | Edit data model on dev branches                             |
+| `SqlRunnerRead`           | Access SQL Runner                                           |
+| `DeploymentAgentRead`     | Access AI agents                                            |
+| `PreAggregationBuild`     | Build pre-aggregations                                      |
 | `APMRead`                 | Access query history                                        |
 | `ChatHistoryRead`         | Access chat history                                         |
 | `DownloadData`            | Download data                                               |
