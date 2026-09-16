@@ -68,11 +68,11 @@ The Base Role is required. Save is disabled until one is selected.
 
 #### Auto-bump to Developer
 
-If you check any deployment-scoped action stronger than **Access deployment** (`DeploymentRead`) — for example, **Edit deployment** or **Edit data model** — the Base Role is automatically forced to **Developer**, and the Viewer and Explorer options are disabled with a tooltip:
+Four deployment-scoped actions sit at every tier: **Access deployment** (`DeploymentRead`), **Access AI agents** (`DeploymentAgentRead`), **Download data** (`DownloadData`) and **Access chat history** (`ChatHistoryRead`). Check any other one — for example **Edit deployment** or **Edit data model** — and the Base Role is automatically forced to **Developer**, with the Viewer and Explorer options disabled behind a tooltip:
 
 > Selected actions require Developer role
 
-Removing the elevated action re-enables the lower tiers. This mirrors the server-side rule that any deployment write or data-model write requires the Developer license tier.
+Removing the elevated action re-enables the lower tiers. This is a rule of the builder, not of the server: nothing rejects a role whose tier is lower than its deployment actions, so a role written [through the API](#managing-roles-through-the-api) keeps whatever tier it was sent with.
 
 {/* TODO: Upload screenshot of the auto-bump state — Viewer originally selected, "Edit deployment" checked, Base Role bumped to Developer with tooltip */}
 
