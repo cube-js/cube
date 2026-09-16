@@ -515,14 +515,14 @@ with `writeDataModelFile` or `deleteDataModelFile`, passing that `branchName`. E
 recompiles the model and reports validation errors, so you can iterate until it compiles.
 Before committing, verify the change returns the right data: call `runQuery` with the same
 `branchName` and check the numbers, since a compiling model can still return wrong results.
-Review the result with `getDataModelChanges`, then see [Commit and publish a model
-edit](#commit-and-publish-a-model-edit) to land the change and make it live.
+Review the result with `getDataModelChanges`, then see [Ship a model
+edit](#ship-a-model-edit) to land the change and make it live.
 
 To review a branch you didn't author — a colleague's feature branch, say — call
 `getBranchDiff` with its name instead. It compares against the deploy branch and returns
 the full changed-file list even when the patch itself is trimmed.
 
-### Commit and publish a model edit
+### Ship a model edit
 
 Once `writeDataModelFile` edits compile and `runQuery` confirms they return the right
 data, call `commitDataModelChanges` to land them on the branch the dev branch forked
