@@ -1055,7 +1055,7 @@ export class QueryQueue {
 
       // Setting the result only succeeds while the queue item is still there, so a failure means a
       // cancellation - orphaned, stalled or explicit - removed it and rejected the in-flight query.
-      let queueItemWasActive: unknown;
+      let queueItemWasActive: boolean;
 
       try {
         queueItemWasActive = await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, queueId);

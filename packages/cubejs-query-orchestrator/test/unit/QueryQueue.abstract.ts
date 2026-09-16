@@ -331,9 +331,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       const startedCount = delayCount;
 
       // the delay handler resolves on its own timer and its cancel handler does not reject it, so
-      // this removes the queue item under a query which then succeeds - an orphaned result carrying
-      // no rejection, which has to stay as quiet as it was before the cancellation rode on it. The
-      // delay has to outlast the cancel round trip, which is a network call on the Cube Store driver
+      // the item is removed under a query which then succeeds. 1000ms because the delay has to
+      // outlast the cancel round trip, which is a network call on the Cube Store driver
       const pending = queue
         .executeInQueue('delay', queryKey, { delay: 1000, result: '1' }, QueuePriority.Background)
         .catch(e => e);
