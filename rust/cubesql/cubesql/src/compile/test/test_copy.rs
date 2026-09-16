@@ -72,7 +72,7 @@ async fn connect(port: u16) -> Client {
     client
 }
 
-fn error_to_string(err: &tokio_postgres::Error) -> String {
+fn pg_tokio_error_to_string(err: &tokio_postgres::Error) -> String {
     match std::error::Error::source(err) {
         Some(cause) => format!("{}: {}", err, cause),
         None => err.to_string(),
@@ -82,7 +82,7 @@ fn error_to_string(err: &tokio_postgres::Error) -> String {
 async fn query_err(client: &Client, query: &str) -> String {
     match client.simple_query(query).await {
         Ok(_) => panic!("expected an error for: {}", query),
-        Err(err) => error_to_string(&err),
+        Err(err) => pg_tokio_error_to_string(&err),
     }
 }
 
@@ -91,7 +91,7 @@ async fn query_rows(client: &Client, query: &str) -> Result<Vec<String>, CubeErr
     let messages = client
         .simple_query(query)
         .await
-        .map_err(|err| CubeError::internal(error_to_string(&err)))?;
+        .map_err(|err| CubeError::internal(pg_tokio_error_to_string(&err)))?;
 
     Ok(messages
         .into_iter()
@@ -252,7 +252,7 @@ async fn test_copy_from_stdin_errors() -> Result<(), CubeError> {
         .expect("must send data");
 
     let err = writer.as_mut().finish().await.expect_err("must fail");
-    let err = error_to_string(&err);
+    let err = pg_tokio_error_to_string(&err);
     assert!(
         err.contains("invalid input syntax for type integer"),
         "unexpected error: {}",
@@ -968,7 +968,7 @@ async fn test_copy_from_stdin_character_types() -> Result<(), CubeError> {
         .expect("must send data");
 
     let err = writer.as_mut().finish().await.expect_err("must fail");
-    let err = error_to_string(&err);
+    let err = pg_tokio_error_to_string(&err);
     assert!(
         err.contains("value too long for type character varying(3)"),
         "unexpected error: {}",
@@ -989,7 +989,7 @@ async fn test_copy_from_stdin_character_types() -> Result<(), CubeError> {
         .expect("must send data");
 
     let err = writer.as_mut().finish().await.expect_err("must fail");
-    let err = error_to_string(&err);
+    let err = pg_tokio_error_to_string(&err);
     assert!(
         err.contains(r#"invalid input syntax for type boolean: """#),
         "unexpected error: {}",
