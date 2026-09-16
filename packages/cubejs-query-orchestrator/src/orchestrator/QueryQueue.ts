@@ -1087,7 +1087,7 @@ export class QueryQueue {
           // `warning`, not this event's own `warn` field, which devLogger/prodLogger do not route.
           // Set only when there is a rejection, so a plain orphaned result stays silent.
           ...(executionError ? {
-            warning: 'Query execution was rejected because the query had been cancelled',
+            warning: 'Query execution was rejected after its queue item was already gone',
             cancellationError: (executionError.error.stack || executionError.error).toString()
           } : {}),
         });
