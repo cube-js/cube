@@ -47,7 +47,7 @@ All paths are relative to `https://{accountName}.cubecloud.dev/api/v1/embed`, an
 | `Content-Type` | `application/json` | For `POST` and `PATCH` |
 | `Authorization` | `Embed-Token YOUR_EMBED_TOKEN` | Yes |
 
-The embed token is the signed session's own JWT. Exchange the `sessionId` from [Generate Session][ref-generate-session] for one with `POST /api/v1/embed/session/token`, which needs no `Authorization` header of its own — the session id is the credential. A session id is single-use and expires 5 minutes after it is minted, so exchange it at once; the token it returns lasts 24 hours. An embedded dashboard performs the exchange itself, so the comment UI inside an iframe is already authenticated — supply the header yourself only when you call these endpoints from your own code.
+The embed token is the signed session's own JWT. Exchange the `sessionId` from [Generate Session][ref-generate-session] for one with `POST /api/v1/embed/session/token`, which needs no `Authorization` header of its own — the session id is the credential. A session id is single-use and expires 5 minutes after it is minted, so exchange it at once; the token it returns lasts 24 hours. An embedded dashboard performs the exchange itself, so the comment UI inside an iframe is already authenticated — supply the header yourself only when you call these endpoints from your own code. **The iframe consumes the session id it was loaded with**, so mint a second session for your own calls rather than reusing that one: a redeemed id returns `401`.
 
 `Bearer YOUR_EMBED_TOKEN` is accepted as well, and resolves the same embed user. Prefer `Embed-Token`: it names the credential you are actually presenting, and the prefix is matched case-sensitively either way.
 
@@ -103,7 +103,7 @@ Returned by `POST /dashboard/{publicId}/comments` and `PATCH /dashboard/{publicI
 | `userId` | number \| null | Identifier of the author's embed user. `null` once that embed user is deleted; the comment outlives them. |
 | `body` | string | The comment text, up to 10,000 characters. |
 | `editedAt` | string \| null | When the author last edited the comment, or `null` if never. |
-| `removedAt` | string \| null | Always `null` on a comment the list returns — a deleted comment is dropped rather than returned as a tombstone. |
+| `removedAt` | string \| null | `null` or absent on anything the API returns — a deleted comment is dropped rather than handed back as a tombstone. |
 | `createdAt` | string | When the comment was posted. |
 | `isOwn` | boolean | Whether the calling embed user wrote this comment. Stamped by the server — use it to decide which controls to render, rather than comparing `userId` yourself. |
 
@@ -250,7 +250,7 @@ curl "https://your-account.cubecloud.dev/api/v1/embed/dashboard/PUBLIC_ID/commen
 | Status | When |
 | --- | --- |
 | `400` | Replying to a reply, resolving a reply's id, or a `body` that is empty or over 10,000 characters. |
-| `401` | The `Embed-Token` is invalid or expired. Exchange a fresh `sessionId` for a new one. |
+| `401` | The `Embed-Token` is invalid or expired, or the `sessionId` you tried to exchange was already redeemed — an iframe spends its own. Mint a fresh session and exchange that. |
 | `403` | The credential carries no embed tenant — an API key, a console session, or an `internalId` session; the caller cannot read the dashboard; or the comment belongs to another embed user. |
 | `404` | The dashboard, the comment, or a `parentId` does not exist on this dashboard. |
 
