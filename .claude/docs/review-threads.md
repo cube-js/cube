@@ -11,16 +11,19 @@ thread, not the threads. So do the whole of this file in one `Task` subagent,
 launched after you have your findings and before you post any of them. Give it:
 
 - the repo and PR number, and your login — `claude` in CI
-- each finding you are about to post, as `path:line` plus a sentence of the
-  concern (the root cause, enough that a duplicate is recognisable)
-- this file's rules, and a request for exactly two things back: the thread ids
-  it resolved, and per finding POST or SKIP with the thread id behind a SKIP
+- each finding you have, as `path:line` plus a sentence of the concern (the root
+  cause, enough that a duplicate is recognisable) — including findings you have
+  decided not to post inline, since a prior thread may already carry them
+- this file's rules, and a request for exactly three things back: how many of
+  your own threads the listing returned (0 when it came back empty), the thread
+  ids it resolved, and per finding POST or SKIP with the thread id behind a SKIP
 
-A round with zero findings still launches it. Stale-thread resolution is about
+A round that posts nothing inline still launches it — whether you found nothing
+or judged none of it worth an inline comment. Stale-thread resolution is about
 what a *previous* round left behind, and the round that fixes everything is
-exactly the one that posts nothing inline — skip the subagent there and those
-threads stay open forever. Pass an empty findings list and ask only for the
-resolved ids.
+exactly the one that posts nothing inline; skip the subagent there and those
+threads stay open forever. With genuinely no findings, pass an empty list and
+ask for the thread count and the resolved ids.
 
 The tracking comment is a top-level comment, not a thread: it never appears in
 the list below, and reading it tells you nothing about whether a thread is still
