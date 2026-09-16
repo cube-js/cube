@@ -27,12 +27,15 @@ back out for a given customer or a given placement:
   (AI entry points), `allowChatWorkspaceAuthoring` (whether the agent may author
   workbooks, explorations, and dashboards at all), and `allowAi` (AI entirely).
 - **Per iframe**, via URL parameters: `showWorkbookBackButton=false` on the
-  workbook header, the dashboard header controls — which render the same in
-  Creator Mode as in a standalone dashboard embed — and `allowExport=true`,
-  which also grants **Download as CSV** in the report builder.
+  workbook header, and the dashboard header controls — which render the same in
+  Creator Mode as in a standalone dashboard embed.
 - **Account-wide**, under **Embed → Settings**: the workspace header title and
   whether it shows at all, and whether embed users may see Semantic SQL and
   Generated SQL.
+
+Export works the other way: it's hidden by default, and the iframe URL parameter
+`allowExport=true` grants it, adding **Download as CSV** in the report builder
+alongside the dashboard download actions it already controls.
 
 [Show and hide features](/embedding/iframe/feature-visibility) documents all of
 them, and the rule for which layer to use.
