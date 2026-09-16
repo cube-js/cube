@@ -17,7 +17,9 @@ The Dashboard Comments API is available on [Premium and above plans](https://cub
 
 <Warning>
 
-**The setting hides the panel; it does not close the API.** It governs whether the built-in comment panel renders on an embedded dashboard, and nothing more — **the endpoints below answer either way**. With the setting off, any embed session that can read the dashboard can still post and read comments through the API. That is convenient if you are building your own comment UI, but it means the switch is not a way to guarantee an account accepts no comments at all: to do that, withhold the capability upstream — do not mint embed sessions for users who must not comment.
+**The setting hides the panel; it does not close the API.** It governs whether the built-in comment panel renders on an embedded dashboard, and nothing more — **the endpoints below answer either way**. With the setting off, any embed session that can read the dashboard can still post and read comments through the API.
+
+That is what makes the endpoints usable for your own comment UI. It also means **there is no server-side switch that stops comments being written**: read access to the dashboard is the whole permission, so any session you mint for a viewer carries the ability to comment with it. If comments must not be accepted at all, do not embed that dashboard.
 
 </Warning>
 
@@ -25,7 +27,7 @@ The Dashboard Comments API is available on [Premium and above plans](https://cub
 
 ## Authentication
 
-Every endpoint requires a **signed embed session scoped to an embed tenant**. Mint one with [Generate Session][ref-generate-session] using `externalId`. `embedTenantName` is optional: omit it and the session scopes to the Cube tenant's own name, which reaches these endpoints; pass it to scope the conversation to a specific embed tenant. That name decides which conversation the session sees — see [A conversation lives inside a single embed tenant](#who-may-edit-delete-and-resolve).
+Every endpoint requires a **signed embed session scoped to an embed tenant**. Mint one with [Generate Session][ref-generate-session] using `externalId`. `embedTenantName` is optional: omit it and the session scopes to the Cube tenant's own name, which reaches these endpoints; pass it to scope the conversation to a specific embed tenant. That name decides which conversation the session sees — see [A conversation lives inside a single embed tenant](#a-conversation-lives-inside-a-single-embed-tenant).
 
 A session minted with `internalId` cannot comment. Such a session resolves its user from Cube's own user table and so carries no embed tenant by design, and these endpoints reject it with `403 Forbidden`. A [Cube API key][ref-api-keys] and a console session are rejected the same way.
 
@@ -71,7 +73,11 @@ This is narrower than commenting in the Cube app, where a user with edit rights 
 
 Reading is wider than writing — but only inside one embed tenant. Every embed user of the caller's own embed tenant sees the whole conversation, including threads they did not start.
 
-**A conversation lives inside a single embed tenant.** Threads are stored per embed tenant and `GET /dashboard/{publicId}/comments` returns only the caller's own tenant's threads. Embed one published dashboard across several customers and each gets a separate, private conversation on it: a user in `acme` never sees a thread written in `globex`, and neither can reply to the other. Expect an empty list on a dashboard your own tenant has not commented on yet, however busy it looks to someone else.
+## A conversation lives inside a single embed tenant
+
+Threads are stored per embed tenant, and `GET /dashboard/{publicId}/comments` returns only the caller's own tenant's threads. Embed one published dashboard across several customers and each gets a separate, private conversation on it: a user in `acme` never sees a thread written in `globex`, and neither can reply to the other.
+
+Expect an empty list on a dashboard your own tenant has not commented on yet, however busy it looks to someone else. The embed tenant comes from the session — see [Authentication](#authentication).
 
 ## Threads and replies
 
