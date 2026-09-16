@@ -72,11 +72,11 @@ cubes:
     sql: |
       SELECT
       {%- for prop in nested_properties %}
-        {{ prop }}_prop.value AS {{ prop }}
+        {{ prop | safe }}_prop.value AS {{ prop | safe }}
       {%- endfor %}
       FROM public.events
       {%- for prop in nested_properties %}
-      LEFT JOIN UNNEST(properties) AS {{ prop }}_prop ON {{ prop }}_prop.key = '{{ prop }}'
+      LEFT JOIN UNNEST(properties) AS {{ prop | safe }}_prop ON {{ prop | safe }}_prop.key = '{{ prop | safe }}'
       {%- endfor %}
 ```
 
@@ -216,8 +216,11 @@ The import path is relative to the `model/` directory.
 ### Escaping unsafe strings
 
 [Auto-escaping][jinja-docs-autoescaping] of unsafe string values in Jinja
-templates is enabled by default. It means that any strings coming from Python
-might get wrapped in quotes, potentially breaking YAML syntax.
+templates is enabled by default. Substituted values are escaped as JSON
+strings, so they get wrapped in quotes, potentially breaking YAML syntax. This
+applies to every substituted value — not only to strings coming from Python,
+but also to loop variables, macro arguments, and values set in the template
+itself.
 
 You can work around that by using the [`safe` Jinja
 filter][jinja-docs-filters-safe] with such string values:
@@ -227,6 +230,51 @@ cubes:
   - name: my_cube
     description: {{ get_unsafe_string() | safe }}
 ```
+
+Whether you need `safe` depends on where the value lands. When a value is the
+whole of a YAML value, the quotes are harmless and it compiles as written:
+`type: {{ type }}` renders as `type: "sum"`. As soon as anything is
+concatenated with it, the quotes end up inside the line and break it:
+`{{ name }}_{{ period }}` renders as `"revenue"_"week"`, and the model fails
+with `bad indentation of a mapping entry`. Apply `safe` to every value that is
+concatenated with other text:
+
+```yaml
+cubes:
+  - name: {{ name | safe }}_daily
+    description: Daily {{ name | safe }}, by region
+```
+
+#### Emitting SQL from a macro
+
+When a macro takes a SQL expression as an argument, emit it as a
+[literal string][ref-yaml-literal] (`|-`) rather than inline. A SQL expression
+is arbitrary text, and inline it has to avoid everything YAML reads as syntax:
+`{CUBE}.amount` starts a flow mapping, `amount # note` truncates at the
+comment, and wrapping the whole thing in double quotes only moves the problem
+to expressions that contain one, such as `{CUBE}."amount"`. The literal form
+takes all of them, and — unlike the [folded form][ref-yaml-folded] (`>-`),
+which folds newlines into spaces — it keeps line breaks, so a leading `--`
+comment stays on its own line instead of swallowing the expression that
+follows it.
+
+A block scalar ends at the first line indented less than its opening, so a
+multi-line expression also needs the [`indent`][jinja-docs-filters-indent]
+filter — without it, the second line of a `CASE` expression closes the block
+and is read as a mapping key.
+
+Apply `indent` *before* `safe`, not after. `indent` returns a fresh, unmarked
+string, so `sql | safe | indent(10)` throws the marker away and the SQL
+arrives quoted, as `"{CUBE}.amount"`. Marking the result of `indent` keeps the
+expression raw:
+
+```yaml
+        sql: |-
+          {{ sql | indent(10) | safe }}
+```
+
+Both mistakes surface as a YAML parse error far from the macro that caused
+them. Render the model first — see [previewing YAML](#previewing-yaml).
 
 Alternatively, you can wrap unsafe strings into instances of the following
 class in your Python code, effectively marking them as safe. This is
@@ -383,6 +431,7 @@ image][ref-docker-image-extension].
   https://jinja.palletsprojects.com/en/3.1.x/templates/#import
 [jinja-docs-autoescaping]: https://jinja.palletsprojects.com/en/3.1.x/api/#autoescaping
 [jinja-docs-filters-safe]: https://jinja.palletsprojects.com/en/3.1.x/templates/#jinja-filters.safe
+[jinja-docs-filters-indent]: https://jinja.palletsprojects.com/en/stable/templates/#jinja-filters.indent
 [ref-cube-dbt]: /reference/data-modeling/cube_dbt
 [ref-visual-model]: /docs/data-modeling/visual-modeler
 [ref-docker-image-extension]: /admin/deployment/core#extend-the-docker-image
