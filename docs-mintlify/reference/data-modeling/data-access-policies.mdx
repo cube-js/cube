@@ -420,7 +420,15 @@ cube(`orders`, {
 ### `row_level`
 
 The optional `row_level` parameter, when present, configures [row-level
-access][ref-dap-rls] for a policy by specifying `filters` that should apply to result set rows.
+access][ref-dap-rls] for a policy. Set exactly one of these parameters:
+
+| Parameter | Description |
+| --- | --- |
+| `filters` | The filters that apply to result set rows. The policy grants the rows that match them. |
+| `allow_all` | Set it to `true` to grant every row. The policy applies no row restriction. |
+
+A policy with no `row_level` also grants every row, so `allow_all: true` states
+that default explicitly.
 
 In the following example, users in the `manager` group are allowed to access only
 rows that have the `state` dimension matching the state from the [security context][ref-sec-ctx].
@@ -517,6 +525,39 @@ REST (JSON) API][ref-rest-query-filters] queries, allowing to use the same set o
 [filter operators][ref-rest-query-ops], e.g., `equals`, `contains`, `gte`, etc.
 You can also use `and` and `or` parameters to combine multiple filters into
 [boolean logical operators][ref-rest-boolean-ops].
+
+In the following example, users in the `auditor` group can access every row.
+Combining `allow_all` with `filters` in one `row_level` is an error.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+      - group: auditor
+        row_level:
+          allow_all: true
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      group: `auditor`,
+      row_level: {
+        allow_all: true
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
 
 Note that access policies also respect [row-level security][ref-rls] restrictions
 configured via the `query_rewrite` configuration option. See [row-level access][ref-dap-rls] to
