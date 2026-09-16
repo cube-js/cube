@@ -5451,8 +5451,7 @@ paths:
 
 
           Gives the user everything the role grants. Idempotent — assigning a role the user already
-          holds changes nothing. Accepts a built-in role id as well as a custom one. Returns `404`
-          if either the user or the role is unknown.
+          holds changes nothing. Returns `404` if either the user or the role is unknown.
   /api/v1/spec:
     get:
       operationId: getSpec
