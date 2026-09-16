@@ -3667,6 +3667,426 @@ mod tests {
         Ok(())
     }
 
+    /// The limit pushdown is an optimization: turning it off may only cost time, never change a
+    /// row. Runs the same queries with `CUBESTORE_LIMIT_PUSHDOWN` on and off and requires the two
+    /// results to be identical, which catches a pushdown applied to a relation whose rows the
+    /// limit does not count without having to know the right answer in advance.
+    #[tokio::test]
+    async fn limit_pushdown_differential() -> Result<(), CubeError> {
+        const QUERIES: &[&str] = &[
+            // Nested aggregate: the limit counts the outer groups, not the inner rows.
+            "SELECT a, sum(v) FROM (SELECT a, b, sum(v) v FROM s.d GROUP BY 1, 2) i GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+            "WITH i AS (SELECT a, b, sum(v) v FROM s.d GROUP BY 1, 2) SELECT a, sum(v) FROM i GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+            // Expression in the inner group key, so the inner keys are not captured as columns.
+            "SELECT k, sum(v) FROM (SELECT a + 1 k, b, sum(v) v FROM s.d GROUP BY 1, 2) i GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+            // Aggregate inside a join branch.
+            "SELECT x.a, sum(x.v) FROM (SELECT a, sum(v) v FROM s.d GROUP BY 1) x JOIN s.d y ON x.a = y.a GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+            // DISTINCT over a UNION ALL feeding an outer aggregate -- the multi-stage key grid.
+            "SELECT b, count(*) FROM (SELECT DISTINCT a, b FROM (SELECT a, b FROM s.d UNION ALL SELECT a, b FROM s.d) u) g GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+            // Single-level shapes, where the pushdown is legitimate and must not change anything.
+            "SELECT a, sum(v) FROM s.d GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+            "SELECT a, b, sum(v) FROM s.d GROUP BY 1, 2 ORDER BY 2 ASC LIMIT 3",
+            "SELECT a, sum(v) FROM s.d GROUP BY 1 HAVING sum(v) > 2 ORDER BY 1 ASC LIMIT 3",
+            "SELECT a, sum(v) FROM s.d GROUP BY 1 LIMIT 3",
+        ];
+
+        async fn run(name: &'static str, limit_pushdown: bool) -> Vec<String> {
+            let out = Arc::new(tokio::sync::Mutex::new(Vec::new()));
+            let collected = out.clone();
+            Config::test(name)
+                .update_config(move |mut c| {
+                    c.limit_pushdown = limit_pushdown;
+                    c
+                })
+                .start_test(async move |services| {
+                    let service = services.sql_service;
+                    service
+                        .exec_query("CREATE SCHEMA s")
+                        .await?
+                        .collect()
+                        .await?;
+                    service
+                        .exec_query("CREATE TABLE s.d (a int, b int, v int)")
+                        .await?
+                        .collect()
+                        .await?;
+                    let values = (1..=5)
+                        .flat_map(|a| (1..=4).map(move |b| format!("({}, {}, 1)", a, b)))
+                        .join(", ");
+                    service
+                        .exec_query(&format!("INSERT INTO s.d (a, b, v) VALUES {}", values))
+                        .await?
+                        .collect()
+                        .await?;
+                    for q in QUERIES {
+                        let r = service.exec_query(q).await?.collect().await?;
+                        // Compared as a multiset: several of these order by a column with ties, and
+                        // which of the tied rows a plan returns is not part of the answer. What must
+                        // not move is the set of rows -- a truncated or duplicated relation shows up
+                        // here whatever the order.
+                        let mut rows = r
+                            .get_rows()
+                            .iter()
+                            .map(|r| format!("{:?}", r))
+                            .collect::<Vec<_>>();
+                        rows.sort();
+                        collected
+                            .lock()
+                            .await
+                            .push(format!("{}\n  => {:?}", q, rows));
+                    }
+                    Ok::<(), CubeError>(())
+                })
+                .await;
+            let r = out.lock().await.clone();
+            r
+        }
+
+        let with = run("limit_pushdown_differential_on", true).await;
+        let without = run("limit_pushdown_differential_off", false).await;
+        assert_eq!(with.len(), QUERIES.len());
+        assert_eq!(without.len(), QUERIES.len());
+        for (a, b) in with.iter().zip(without.iter()) {
+            assert_eq!(a, b, "result changed when the limit pushdown was disabled");
+        }
+        Ok(())
+    }
+
+    /// Regression test for https://github.com/cube-js/cube/issues/11545, reduced.
+    ///
+    /// A `SELECT DISTINCT` over a `UNION ALL` stops deduplicating when the query also
+    /// carries a top-level `ORDER BY ... LIMIT` and the input crosses a record batch
+    /// (> 2048 rows): duplicate keys survive the DISTINCT, so a `count(*)` over the key
+    /// set exceeds the number of distinct keys -- which this query's algebra cannot produce.
+    ///
+    /// The issue was reported against a Tesseract `multi_stage` measure whose plan joins
+    /// two per-key leaf aggregations back to such a key set, but neither the join nor the
+    /// multi-stage shape is required -- a bare `count(*)` over the deduplicated key set
+    /// reproduces it. Removing either the `ORDER BY` or the `LIMIT` returns correct
+    /// values, which points at the sort/limit pushdown into `ClusterSend`
+    /// (`pull_up_cluster_send`'s `LogicalPlan::Sort` branch) rather than at the join.
+    ///
+    /// Cube emits `ORDER BY 1 ASC LIMIT 10000` on every query, so this is reachable from
+    /// any query over a pre-aggregation whose plan deduplicates a key set.
+    #[test]
+    fn distinct_over_union_with_sort_and_limit() {
+        // Planning this shape recurses deeply enough to overflow libtest's default 2 MiB
+        // stack in a debug build (production gives select workers 4 MiB via
+        // CUBESTORE_SELECT_WORKER_STACK_SIZE). Unrelated to the corruption under test.
+        std::thread::Builder::new()
+            .stack_size(32 * 1024 * 1024)
+            .spawn(|| {
+                tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .thread_stack_size(32 * 1024 * 1024)
+                    .build()
+                    .unwrap()
+                    .block_on(async {
+                        Config::test("distinct_over_union_with_sort_and_limit")
+                            .update_config(|mut c| {
+                                // Keep it in a single partition, as an unpartitioned
+                                // pre-aggregation table is.
+                                c.partition_split_threshold = 1000000;
+                                c.compaction_chunks_count_threshold = 50;
+                                c
+                            })
+                            .start_test(async move |services| {
+                                let service = services.sql_service;
+
+                                service
+                                    .exec_query("CREATE SCHEMA pre_aggregations")
+                                    .await?
+                                    .collect()
+                                    .await?;
+                                service
+                                    .exec_query(
+                                        "CREATE TABLE pre_aggregations.order_slices (
+                                             sale_orders__id int,
+                                             dates__date_day timestamp,
+                                             base_sales__sale int)",
+                                    )
+                                    .await?
+                                    .collect()
+                                    .await?;
+
+                                // 1100 orders in each of two months -- 2200 distinct
+                                // (order, month) keys, just over the 2048-row record
+                                // batch. Ids interleave across the months so scan order
+                                // (by id) and the leaves' ORDER BY (by month) disagree,
+                                // as they do for real order ids.
+                                const ORDERS_PER_MONTH: usize = 1100;
+                                let mut rows = Vec::with_capacity(ORDERS_PER_MONTH * 2);
+                                let mut id = 1;
+                                for i in 0..ORDERS_PER_MONTH {
+                                    for (month, days) in [("02", 28), ("03", 31)] {
+                                        rows.push(format!(
+                                            "({}, '2026-{}-{:02}T00:00:00.000', 100)",
+                                            id,
+                                            month,
+                                            1 + (i % days)
+                                        ));
+                                        id += 1;
+                                    }
+                                }
+                                for chunk in rows.chunks(1000) {
+                                    service
+                                        .exec_query(&format!(
+                                            "INSERT INTO pre_aggregations.order_slices (sale_orders__id, dates__date_day, base_sales__sale) VALUES {}",
+                                            chunk.iter().join(", ")
+                                        ))
+                                        .await?
+                                        .collect()
+                                        .await?;
+                                }
+
+                                let query = |suffix: &str| {
+                                    format!(
+                                        r#"WITH
+cte_0 AS (SELECT "sale_orders__id", date_trunc('month', "dates__date_day") "m", sum("base_sales__sale") "s"
+  FROM pre_aggregations.order_slices
+  GROUP BY 1, 2
+  ORDER BY 2 ASC),
+cte_1 AS (SELECT "sale_orders__id", date_trunc('month', "dates__date_day") "m", sum("base_sales__sale") "s"
+  FROM pre_aggregations.order_slices
+  GROUP BY 1, 2
+  ORDER BY 2 ASC),
+keys AS (SELECT DISTINCT "sale_orders__id", "m"
+  FROM (SELECT "sale_orders__id", "m" FROM cte_0
+        UNION ALL
+        SELECT "sale_orders__id", "m" FROM cte_1) AS "u")
+SELECT "m", count(*) "keys" FROM keys GROUP BY 1{}"#,
+                                        suffix
+                                    )
+                                };
+
+                                let counts = |result: &DataFrame| -> Vec<i64> {
+                                    result
+                                        .get_rows()
+                                        .iter()
+                                        .map(|row| match &row.values()[1] {
+                                            TableValue::Int(v) => *v,
+                                            v => panic!("unexpected count value: {:?}", v),
+                                        })
+                                        .collect()
+                                };
+
+                                let expected =
+                                    vec![ORDERS_PER_MONTH as i64, ORDERS_PER_MONTH as i64];
+
+                                // Controls: each alone deduplicates correctly.
+                                for suffix in [" ORDER BY 1 ASC", " LIMIT 10000", ""] {
+                                    let result =
+                                        service.exec_query(&query(suffix)).await?.collect().await?;
+                                    assert_eq!(counts(&result), expected, "suffix: {:?}", suffix);
+                                }
+
+                                // Both clauses together -- the case the controls above isolate.
+                                let result = service
+                                    .exec_query(&query(" ORDER BY 1 ASC LIMIT 10000"))
+                                    .await?
+                                    .collect()
+                                    .await?;
+                                assert_eq!(counts(&result), expected);
+
+                                Ok::<(), CubeError>(())
+                            })
+                            .await;
+                    });
+            })
+            .unwrap()
+            .join()
+            // Re-raise the original panic so the assertion diff is what gets reported.
+            .unwrap_or_else(|e| std::panic::resume_unwind(e));
+    }
+
+    /// Regression test for https://github.com/cube-js/cube/issues/11545.
+    ///
+    /// Cube's Tesseract planner emits this shape for a `multi_stage` measure whose SQL
+    /// gates one base measure on another (`CASE WHEN {a} > 0 THEN {b} END` with
+    /// `add_group_by`): two per-key leaf aggregations over the same rollup table, a
+    /// DISTINCT key set built from their UNION ALL, a LEFT JOIN back to each leaf, and a
+    /// top-level `ORDER BY ... LIMIT`.
+    ///
+    /// Each month holds 1100 orders, so each must return 1100 whatever date range is asked for.
+    /// The sum can only exceed the number of keys feeding it if the key set carries duplicates,
+    /// which happens when the CTEs are reordered under a merge planned against another ordering
+    /// and the streaming DISTINCT above it stops seeing equal keys adjacent.
+    ///
+    /// The shape needs BOTH the top-level ORDER BY and the LIMIT: the LIMIT is what makes a
+    /// descriptor exist at all, the ORDER BY is what makes it a non-trivial permutation of the
+    /// group key. Neither may be dropped when trimming this query.
+    #[test]
+    fn multi_stage_gated_join_with_sort_and_limit() {
+        // Planning this query recurses deeply enough to overflow libtest's default 2 MiB
+        // stack in a debug build (production gives select workers 4 MiB via
+        // CUBESTORE_SELECT_WORKER_STACK_SIZE, and release frames are much smaller), so run
+        // it on a thread sized for debug frames. Unrelated to the corruption below.
+        std::thread::Builder::new()
+            .stack_size(32 * 1024 * 1024)
+            .spawn(|| {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .thread_stack_size(32 * 1024 * 1024)
+            .build()
+            .unwrap()
+            .block_on(async {
+        Config::test("multi_stage_gated_join_with_sort_and_limit")
+            .update_config(|mut c| {
+                // Keep the rollup in a single partition, as a real unpartitioned
+                // pre-aggregation table is.
+                c.partition_split_threshold = 1000000;
+                c.compaction_chunks_count_threshold = 50;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                service
+                    .exec_query("CREATE SCHEMA pre_aggregations")
+                    .await?
+                    .collect()
+                    .await?;
+
+                // Column layout of a Cube rollup keyed on (client, order, staff, store, day).
+                service
+                    .exec_query(
+                        "CREATE TABLE pre_aggregations.order_slices (
+                             clients__id int,
+                             sale_orders__id int,
+                             staff__name text,
+                             stores__name text,
+                             dates__date_day timestamp,
+                             base_sales__sale int,
+                             base_sales__ticket_fraction int)",
+                    )
+                    .await?
+                    .collect()
+                    .await?;
+
+                // 1100 orders in each of two months -- 2200 distinct (order, month) keys,
+                // just over the 2048-row record batch. Order ids interleave across the two
+                // months, so scan order (by id) and the leaves' ORDER BY (by month) disagree,
+                // as they do for real order ids.
+                const ORDERS_PER_MONTH: usize = 1100;
+                let mut rows = Vec::with_capacity(ORDERS_PER_MONTH * 2);
+                let mut id = 1;
+                for i in 0..ORDERS_PER_MONTH {
+                    for (month, days) in [("02", 28), ("03", 31)] {
+                        rows.push(format!(
+                            "(1033, {}, 'Staff', 'Store', '2026-{}-{:02}T00:00:00.000', 100, 1)",
+                            id,
+                            month,
+                            1 + (i % days)
+                        ));
+                        id += 1;
+                    }
+                }
+                for chunk in rows.chunks(1000) {
+                    service
+                        .exec_query(&format!(
+                            "INSERT INTO pre_aggregations.order_slices (clients__id, sale_orders__id, staff__name, stores__name, dates__date_day, base_sales__sale, base_sales__ticket_fraction) VALUES {}",
+                            chunk.iter().join(", ")
+                        ))
+                        .await?
+                        .collect()
+                        .await?;
+                }
+
+                // Verbatim from Cube's /v1/sql for {measures: ["store_day.tickets"],
+                // timeDimensions: [{dimension: "store_day.date", granularity: "month",
+                // dateRange: [from, to]}]}, with the rollup table name substituted in.
+                let tickets_by_month = |from: &str, to: &str| {
+                    format!(
+                        r#"WITH
+cte_0 AS (  SELECT "sale_orders__id" "sale_orders__id", date_trunc('month', "dates__date_day") "store_day__date_month", sum("base_sales__sale") "base_sales__sale"
+  FROM  pre_aggregations.order_slices  AS "base_sales__order_slices"
+  WHERE ("dates__date_day" >= CAST('{from}' as TIMESTAMP) AND "dates__date_day" <= CAST('{to}' as TIMESTAMP)) AND ("clients__id" = '1033')
+  GROUP BY 1, 2
+  ORDER BY  2  ASC),
+cte_1 AS (  SELECT "sale_orders__id" "sale_orders__id", date_trunc('month', "dates__date_day") "store_day__date_month", sum("base_sales__ticket_fraction") "base_sales__ticket_fraction"
+  FROM  pre_aggregations.order_slices  AS "base_sales__order_slices"
+  WHERE ("dates__date_day" >= CAST('{from}' as TIMESTAMP) AND "dates__date_day" <= CAST('{to}' as TIMESTAMP)) AND ("clients__id" = '1033')
+  GROUP BY 1, 2
+  ORDER BY  2  ASC),
+cte_2 AS (  SELECT "fk_aggregate_keys"."store_day__date_month" "store_day__date_month", CASE WHEN "q_0"."base_sales__sale" > 0 THEN "q_1"."base_sales__ticket_fraction" END "sale_orders__order_slice_gated"
+  FROM (SELECT DISTINCT "sale_orders__id" "sale_orders__id", "store_day__date_month" "store_day__date_month"
+  FROM (SELECT DISTINCT "sale_orders__id" "sale_orders__id", "store_day__date_month" "store_day__date_month"
+  FROM  cte_0  AS "cte_0"
+   UNION ALL
+  SELECT DISTINCT "sale_orders__id" "sale_orders__id", "store_day__date_month" "store_day__date_month"
+  FROM  cte_1  AS "cte_1") AS "fk_aggregate_keys_source") AS "fk_aggregate_keys"
+  LEFT JOIN  cte_0  AS "q_0" ON (("fk_aggregate_keys"."sale_orders__id" IS NOT DISTINCT FROM "q_0"."sale_orders__id")) AND (("fk_aggregate_keys"."store_day__date_month" IS NOT DISTINCT FROM "q_0"."store_day__date_month"))
+  LEFT JOIN  cte_1  AS "q_1" ON (("fk_aggregate_keys"."sale_orders__id" IS NOT DISTINCT FROM "q_1"."sale_orders__id")) AND (("fk_aggregate_keys"."store_day__date_month" IS NOT DISTINCT FROM "q_1"."store_day__date_month"))),
+cte_3 AS (  SELECT "fk_aggregate"."store_day__date_month" "store_day__date_month", sum("fk_aggregate"."sale_orders__order_slice_gated") "sale_orders__tickets"
+  FROM  cte_2  AS "fk_aggregate"
+  GROUP BY 1
+  ORDER BY  1  ASC)
+SELECT "fk_aggregate"."store_day__date_month" "store_day__date_month", "fk_aggregate"."sale_orders__tickets" "store_day__tickets"
+FROM  cte_3  AS "fk_aggregate"
+ORDER BY  1  ASC
+LIMIT 10000"#,
+                        from = from,
+                        to = to
+                    )
+                };
+
+                let tickets = |result: &DataFrame| -> Vec<i64> {
+                    result
+                        .get_rows()
+                        .iter()
+                        .map(|row| match &row.values()[1] {
+                            TableValue::Int(v) => *v,
+                            v => panic!("unexpected tickets value: {:?}", v),
+                        })
+                        .collect()
+                };
+
+                let february = service
+                    .exec_query(&tickets_by_month(
+                        "2026-02-01T00:00:00.000",
+                        "2026-02-28T23:59:59.999",
+                    ))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(tickets(&february), vec![ORDERS_PER_MONTH as i64]);
+
+                let march = service
+                    .exec_query(&tickets_by_month(
+                        "2026-03-01T00:00:00.000",
+                        "2026-03-31T23:59:59.999",
+                    ))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(tickets(&march), vec![ORDERS_PER_MONTH as i64]);
+
+                // Same table and query as the two cases above; the range width is the only
+                // difference, and it is what pushes the key set across a record batch.
+                let both_months = service
+                    .exec_query(&tickets_by_month(
+                        "2026-02-01T00:00:00.000",
+                        "2026-03-31T23:59:59.999",
+                    ))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    tickets(&both_months),
+                    vec![ORDERS_PER_MONTH as i64, ORDERS_PER_MONTH as i64]
+                );
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+            });
+            })
+            .unwrap()
+            .join()
+            // Re-raise the original panic so the assertion diff is what gets reported.
+            .unwrap_or_else(|e| std::panic::resume_unwind(e));
+    }
+
     #[tokio::test]
     async fn file_size_consistency() -> Result<(), CubeError> {
         Config::test("file_size_consistency")
