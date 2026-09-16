@@ -398,7 +398,7 @@ without ever using the Cube UI.
 | Tool | Description | Access |
 | --- | --- | --- |
 | `getBranchState` | Reports the branch this session works on, the branch you're looking at in the Cube UI, the deploy branch, and whether the session's branch has uncommitted edits. | Read-only |
-| `commitDataModelChanges` | Commits the dev branch's edits onto the branch it was created from — including the deploy branch, live, when the call sets `confirmPublishToDefaultBranch`. | Write — see warning above |
+| `commitDataModelChanges` | Commits the dev branch's edits onto the branch it was created from — including the deploy branch, live, when the call sets `confirmPublishToDefaultBranch`. | Write — see [How model edits stay safe](#how-model-edits-stay-safe) |
 | `commitToNewBranch` | Commits the dev branch's edits to a new branch instead, optionally opening a pull request. | Write |
 | `mergeToDefaultBranch` | Merges a committed branch into the deploy branch, making it live for everyone. | Destructive — prompts |
 | `discardDataModelChanges` | Resets the dev branch to its parent (or to a given commit hash), throwing away pending edits. | Destructive — prompts |
