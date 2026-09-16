@@ -647,12 +647,12 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "chacha20"
-version = "0.10.1"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d524456ba66e72eb8b115ff89e01e497f8e6d11d78b70b1aa13c0fbd97540a81"
+checksum = "65c35e4b699c7e15ccbe7ee35c005e4fc0a278d22238a2857e6ce2dadeda1b06"
 dependencies = [
  "cfg-if",
- "cpufeatures 0.3.0",
+ "cpufeatures 0.3.1",
  "rand_core 0.10.1",
 ]
 
@@ -678,7 +678,7 @@ checksum = "29c39203181991a7dd4343b8005bd804e7a9a37afb8ac070e43771e8c820bbde"
 dependencies = [
  "chrono",
  "chrono-tz-build 0.0.3",
- "phf",
+ "phf 0.11.2",
 ]
 
 [[package]]
@@ -689,7 +689,7 @@ checksum = "d59ae0466b83e838b81a54256c39d5d7c20b9d7daa10510a242d9b75abd5936e"
 dependencies = [
  "chrono",
  "chrono-tz-build 0.2.1",
- "phf",
+ "phf 0.11.2",
 ]
 
 [[package]]
@@ -699,7 +699,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f509c3a87b33437b05e2458750a0700e5bdd6956176773e6c7d6dd15a283a0c"
 dependencies = [
  "parse-zoneinfo",
- "phf",
+ "phf 0.11.2",
  "phf_codegen",
 ]
 
@@ -710,7 +710,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "433e39f13c9a060046954e0592a8d0a4bcb1040125cbf91cb8ee58964cfb350f"
 dependencies = [
  "parse-zoneinfo",
- "phf",
+ "phf 0.11.2",
  "phf_codegen",
 ]
 
@@ -737,7 +737,7 @@ version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -839,9 +839,9 @@ dependencies = [
 
 [[package]]
 name = "cpufeatures"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b2a41393f66f16b0823bb79094d54ac5fbd34ab292ddafb9a0456ac9f87d201"
+checksum = "5ca28b0ae3115b884660db4118d803791fd6756b6e88f39c0f3f7859060d7566"
 dependencies = [
  "libc",
 ]
@@ -1738,9 +1738,9 @@ checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 
 [[package]]
 name = "hybrid-array"
-version = "0.4.10"
+version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3944cf8cf766b40e2a1a333ee5e9b563f854d5fa49d6a8ca2764e97c6eddb214"
+checksum = "27f864f10dfb56725ce5ce5472bc52252c8f93a4ab86327122cebf62c5f59a17"
 dependencies = [
  "typenum",
 ]
@@ -1796,7 +1796,7 @@ dependencies = [
  "http-body",
  "hyper",
  "pin-project-lite",
- "socket2",
+ "socket2 0.5.5",
  "tokio",
  "tower 0.4.13",
  "tower-service",
@@ -2213,7 +2213,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c2a198fb6b0eada2a8df47933734e6d35d350665a33a3593d7164fa52c75c19"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.0",
 ]
 
 [[package]]
@@ -2694,7 +2694,17 @@ version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ade2d8b8f33c7333b51bcf0428d37e217e9f32192ae4772156f65063b8ce03dc"
 dependencies = [
- "phf_shared",
+ "phf_shared 0.11.2",
+]
+
+[[package]]
+name = "phf"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1562dc717473dbaa4c1f85a36410e03c047b2e7df7f45ee938fbef64ae7fadf"
+dependencies = [
+ "phf_shared 0.13.1",
+ "serde",
 ]
 
 [[package]]
@@ -2704,7 +2714,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8d39688d359e6b34654d328e262234662d16cc0f60ec8dcbe5e718709342a5a"
 dependencies = [
  "phf_generator",
- "phf_shared",
+ "phf_shared 0.11.2",
 ]
 
 [[package]]
@@ -2713,7 +2723,7 @@ version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48e4cc64c2ad9ebe670cb8fd69dd50ae301650392e81c05f9bfcb2d5bdbc24b0"
 dependencies = [
- "phf_shared",
+ "phf_shared 0.11.2",
  "rand 0.8.5",
 ]
 
@@ -2723,8 +2733,17 @@ version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90fcb95eef784c2ac79119d1dd819e162b5da872ce6f3c3abe1e8ca1c082f72b"
 dependencies = [
- "siphasher",
+ "siphasher 0.3.11",
  "uncased",
+]
+
+[[package]]
+name = "phf_shared"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e57fef6bc5981e38c2ce2d63bfa546861309f875b8a75f092d1d54ae2d64f266"
+dependencies = [
+ "siphasher 1.0.3",
 ]
 
 [[package]]
@@ -2767,9 +2786,9 @@ checksum = "f84267b20a16ea918e43c6a88433c2d54fa145c92a811b5b047ccbe153674483"
 
 [[package]]
 name = "postgres"
-version = "0.19.7"
+version = "0.19.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7915b33ed60abc46040cbcaa25ffa1c7ec240668e0477c4f3070786f5916d451"
+checksum = "e7c48ece1c6cda0db61b058c1721378da76855140e9214339fa1317decacb176"
 dependencies = [
  "bytes",
  "fallible-iterator",
@@ -2799,9 +2818,9 @@ dependencies = [
 
 [[package]]
 name = "postgres-types"
-version = "0.2.6"
+version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d2234cdee9408b523530a9b6d2d6b373d1db34f6a8e51dc03ded1828d7fb67c"
+checksum = "851ca9db4932932d69f3ea811b1abe63087a0f740a47692619dd40d4899b68be"
 dependencies = [
  "bytes",
  "fallible-iterator",
@@ -2991,7 +3010,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls",
- "socket2",
+ "socket2 0.5.5",
  "thiserror 2.0.11",
  "tokio",
  "tracing",
@@ -3028,7 +3047,7 @@ dependencies = [
  "cfg_aliases 0.2.1",
  "libc",
  "once_cell",
- "socket2",
+ "socket2 0.5.5",
  "tracing",
  "windows-sys 0.52.0",
 ]
@@ -3061,8 +3080,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
 dependencies = [
  "libc",
- "rand_chacha",
+ "rand_chacha 0.3.1",
  "rand_core 0.6.4",
+]
+
+[[package]]
+name = "rand"
+version = "0.9.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9ef1d0d795eb7d84685bca4f72f3649f064e6641543d3a8c415898726a57b41"
+dependencies = [
+ "rand_chacha 0.9.0",
+ "rand_core 0.9.5",
 ]
 
 [[package]]
@@ -3087,12 +3116,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "rand_chacha"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3022b5f1df60f26e1ffddd6c66e8aa15de382ae63b3a0c1bfc0e4d3e3f325cb"
+dependencies = [
+ "ppv-lite86",
+ "rand_core 0.9.5",
+]
+
+[[package]]
 name = "rand_core"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom 0.2.11",
+]
+
+[[package]]
+name = "rand_core"
+version = "0.9.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76afc826de14238e6e8c374ddcc1fa19e374fd8dd986b0d2af0d02377261d83c"
+dependencies = [
+ "getrandom 0.3.1",
 ]
 
 [[package]]
@@ -3547,7 +3595,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "446ba717509524cb3f22f17ecc096f10f4822d76ab5c0b9822c5f9c284e825f4"
 dependencies = [
  "cfg-if",
- "cpufeatures 0.3.0",
+ "cpufeatures 0.3.1",
  "digest 0.11.3",
 ]
 
@@ -3592,6 +3640,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38b58827f4464d87d377d175e90bf58eb00fd8716ff0a62f80356b5e61555d0d"
 
 [[package]]
+name = "siphasher"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ee5873ec9cce0195efcb7a4e9507a04cd49aec9c83d0389df45b1ef7ba2e649"
+
+[[package]]
 name = "slab"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3614,6 +3668,16 @@ checksum = "7b5fac59a5cb5dd637972e5fca70daf0523c9067fcdc4842f053dae04a18f8e9"
 dependencies = [
  "libc",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "socket2"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
+dependencies = [
+ "libc",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3981,7 +4045,7 @@ dependencies = [
  "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
- "socket2",
+ "socket2 0.5.5",
  "tokio-macros",
  "tracing",
  "windows-sys 0.48.0",
@@ -4000,9 +4064,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-postgres"
-version = "0.7.10"
+version = "0.7.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d340244b32d920260ae7448cb72b6e238bddc3d4f7603394e7dd46ed8e48f5b8"
+checksum = "2b40d66d9b2cfe04b628173409368e58247e8eddbbd3b0e6c6ba1d09f20f6c9e"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -4013,12 +4077,12 @@ dependencies = [
  "log",
  "parking_lot",
  "percent-encoding",
- "phf",
+ "phf 0.13.1",
  "pin-project-lite",
  "postgres-protocol",
  "postgres-types",
- "rand 0.8.5",
- "socket2",
+ "rand 0.9.5",
+ "socket2 0.6.5",
  "tokio",
  "tokio-util",
  "whoami",
@@ -4211,9 +4275,9 @@ dependencies = [
 
 [[package]]
 name = "typenum"
-version = "1.17.0"
+version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
+checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 
 [[package]]
 name = "uncased"
@@ -4521,6 +4585,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d"
 dependencies = [
  "windows-targets 0.52.0",
+]
+
+[[package]]
+name = "windows-sys"
+version = "0.61.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
+dependencies = [
+ "windows-link",
 ]
 
 [[package]]
