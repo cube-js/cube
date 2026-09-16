@@ -445,7 +445,7 @@ Call this from your application's logout handler to end an embed session from th
 server side. Pass the `sessionId` that Generate Session returned, and still remove the
 embedded iframe on logout — revoking a session doesn't tear it down on its own.
 
-```bash title="Bash" cURL
+```bash
 curl -X POST "https://your-account.cubecloud.dev/api/v1/embed/session/revoke" \
   -H "Content-Type: application/json" \
   -H "Authorization: Api-Key YOUR_API_KEY" \

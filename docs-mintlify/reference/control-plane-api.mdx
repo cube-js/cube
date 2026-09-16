@@ -383,9 +383,10 @@ permission the console's whole-dashboard download requires.
 
 Rendering happens asynchronously, since a capture waits for every widget on
 the dashboard to finish querying: submit a job, poll it until `status` is
-`completed`, then download the file. The job and its file are dropped at the
-`expiresAt` the submit returns — 5 minutes out — so download before then or
-submit again. Only the identity that submitted a job can poll or download it.
+`completed` — or `failed`, whose `error` says why — then download the file.
+The job and its file are dropped at the `expiresAt` the submit returns —
+5 minutes out — so download before then or submit again. Only the identity
+that submitted a job can poll or download it.
 
 ```bash
 # 1. Submit the export
