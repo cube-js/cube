@@ -170,6 +170,28 @@ change.
 
 {/* TODO: screenshot — a pivoted exploration with the Total row on the sheet */}
 
+### Row totals
+
+The **Row totals** switch, next to **Column totals** on the **Display** tab,
+appends a bold **Total** column at the right of the written range, totaling
+each row across the pivot columns. It needs both a measure and a dimension on
+**Columns** to pivot across — it's disabled, with a tooltip explaining which
+is missing, until both are set. With measures on **Columns**, each measure
+gets its own total column; with measures on **Rows**, a single total column
+covers them all, since each row already holds one measure.
+
+Like column totals, each total comes from a separate query grouped by the
+opposite zone, so it's correct for non-additive measures. With both switches
+on, the cell where they meet holds a grand total across the whole result; a
+corner total that can't be derived is left blank rather than restating a row
+or column total.
+
+Row totals are saved with the exploration and survive **Refresh**; with
+auto-run off, toggling the switch waits for **Run** like any other display
+change.
+
+{/* TODO: screenshot — a pivoted exploration with the Total column on the sheet */}
+
 When your exploration is ready, click **Save** to add it to your workspace. You
 can then [work with the exploration](#work-with-explorations) from the add-in.
 To discard an unsaved exploration instead, choose **Delete exploration** from
@@ -253,7 +275,13 @@ The chat pane is currently in preview, and the tools it can call may still chang
 With chat enabled, the add-in's sidebar gains a pane that can act on the
 workbook, not just answer questions about it. Ask it to run a query and
 place the results, or refresh or clear a placed exploration. It can also
-create, rename, or delete a sheet.
+create, rename, or delete a sheet, and organize your saved explorations into
+[folders][ref-folders] — list, create, rename, move, or delete one on
+request. Deleting a folder this way doesn't delete what's inside it; its
+contents move to the workspace root.
+
+Drag a saved exploration or an unsaved draft from the workbook list onto the
+chat composer to attach it as context for your next question.
 
 Before any destructive or ambiguous action — writing over an occupied area,
 clearing a placement, renaming or deleting a sheet — the pane asks you to
@@ -261,9 +289,8 @@ confirm first. A query the agent places lands as an **unsaved** exploration;
 save it yourself if you want to keep it.
 
 Answers are tables, not charts — the chat pane doesn't render
-visualizations. Chat history is stored locally per workbook, on the device
-where you had the conversation — it isn't available if you open the file
-elsewhere.
+visualizations. Past conversations are listed under **Chat History** in the
+pane and sync with your Cube account, so they're available from any device.
 
 {/* TODO: screenshot — the chat pane open in the add-in sidebar */}
 
@@ -279,3 +306,4 @@ elsewhere.
 [link-ms-appsource]: https://appsource.microsoft.com/en-us/product/office/WA200008486
 [ref-explorations]: /docs/explore-analyze/explore#saving-explorations
 [ref-calculated-fields]: /docs/explore-analyze/workbooks/calculated-fields
+[ref-folders]: /docs/organize-content/folders

@@ -233,7 +233,7 @@ queried.
 
 ## Available actions
 
-The MCP server exposes 23 tools, grouped below.
+The MCP server exposes 30 tools, grouped below.
 
 Every tool runs as the authenticated user. Queries respect the same
 [permissions][ref-roles] as the rest of Cube, including row-level security — MCP is a new
@@ -243,10 +243,11 @@ way to reach your data, not a new access surface.
 
 Each tool is annotated as read-only or destructive. MCP clients that honor these
 annotations — including Claude — run read-only tools automatically and **always ask for
-confirmation** before any of the six destructive ones: `updateReport`, `deleteReport`,
-`updateDashboard`, `publishDashboard`, `writeDataModelFile`, and `deleteDataModelFile`.
-Nothing that changes a workbook report, an exploration, a dashboard, or your data model
-happens without an explicit approval.
+confirmation** before any of the nine destructive ones: `updateReport`, `deleteReport`,
+`manageFolders`, `updateDashboard`, `publishDashboard`, `writeDataModelFile`,
+`deleteDataModelFile`, `mergeToDefaultBranch`, and `discardDataModelChanges`. Nothing
+that changes a workbook report, an exploration, a dashboard, your data model, or a
+workspace folder happens without an explicit approval.
 
 ### Deployments and chat
 
@@ -297,12 +298,19 @@ programmatically. Creating and editing workbooks requires the Explorer role or h
 | `readReport` | Reads one workbook report or standalone exploration by id — its title, SQL, chart spec, placement, and a shareable URL. | Read-only |
 | `updateReport` | Edits an existing workbook report or exploration in place, keeping its `reportId`. Send only the fields you want to change. | Destructive — prompts |
 | `deleteReport` | Deletes a workbook report or exploration. | Destructive — prompts |
+| `manageFolders` | Lists, creates, renames, moves, or deletes the [workspace folders][ref-folders] standalone explorations, workbooks, and dashboards are filed in. | Destructive — prompts |
 | `updateDashboard` | Saves the dashboard layout to the workbook **draft**. Replaces the full widget set and does not go live. | Destructive — prompts |
 | `publishDashboard` | Publishes the current draft to make it live. Idempotent — republishing an unchanged draft is a no-op. | Destructive — prompts |
 
 Drafts are the safety net here: `updateDashboard` only ever writes to the draft, so a
 published dashboard keeps serving its previous version until you approve
 `publishDashboard`. See [Build a dashboard](#build-a-dashboard) for the full sequence.
+
+Call `manageFolders` with `action: "list"` first to get a folder's numeric id — that id,
+not its name, is what `folderId` takes on `createReport` and `updateReport` to place a
+standalone exploration inside it. Deleting a folder does not delete what's inside it;
+its contents move to the workspace root, and a folder that still holds sub-folders can't
+be deleted.
 
 **To change an existing report, use `updateReport` — never recreate it.** A dashboard's
 chart widget points at a specific `reportId`, so replacing a report with a new one orphans
@@ -343,7 +351,7 @@ variable is set without ever seeing what it is set to.
 
 #### How model edits stay safe
 
-Letting an AI client edit your semantic model is safe because of four constraints built
+Letting an AI client edit your semantic model is safe because of five constraints built
 into the MCP server:
 
 - **Edits never touch production.** Every write goes to a personal dev branch named
@@ -352,19 +360,50 @@ into the MCP server:
 - **`startDataModelEdit` is the only entry point.** It returns the dev `branchName`, and
   `writeDataModelFile` and `deleteDataModelFile` require it. There is no way to write
   without going through it first.
-- **Promotion is manual and human.** To publish model changes you commit the dev branch
-  from the Cube UI, as described in [Development mode][ref-dev-mode]. The MCP server
-  deliberately exposes no commit tool — an AI client can prepare changes, but only a
-  person can ship them.
-- **Registration is permission-gated.** Every tool in the two sections above — the six
-  model-editing tools, `getBranchDiff`, `getDeploymentEnv`, and both pre-aggregation
-  tools — is offered only to users whose role allows editing the semantic model. A Viewer
-  never sees them at all.
+- **Publishing to production needs an explicit ask.** `mergeToDefaultBranch` — the tool
+  that makes a branch live — is marked destructive so a client always prompts for
+  confirmation, and its own description tells the agent to call it only when you've
+  asked to publish, never on its own initiative after a commit. See [Committing and
+  publishing changes](#committing-and-publishing-changes).
+- **Registration is permission-gated.** Every tool in the three sections above and below
+  — the six model-editing tools, `getBranchDiff`, `getDeploymentEnv`, the six commit and
+  branch tools, and both pre-aggregation tools — is offered only to users whose role
+  allows editing the semantic model. A Viewer never sees any of them.
 - **Verification happens on the branch, before a merge, not after.** Pass the dev
   `branchName` to `runQuery` to check that an edit returns the right data — `valid: true`
   from `writeDataModelFile` only means the model compiles, not that it's correct.
 
 Review pending work with `getDataModelChanges` before you commit.
+
+### Committing and publishing changes
+
+Editing the model with the tools above only ever writes to a personal dev branch's
+working copy — until it's committed, the change exists nowhere a person can see it.
+These tools commit that work, publish it, or throw it away. They're registered under
+the same semantic-model permission as the data model tools above, and a client can call
+them without ever using the Cube UI.
+
+| Tool | Description | Access |
+| --- | --- | --- |
+| `getBranchState` | Reports the branch this session works on, the branch the user is looking at in the Cube console, the deployment's default branch, and whether the session's branch has uncommitted edits. | Read-only |
+| `commitDataModelChanges` | Commits the dev branch's edits onto the branch it was created from. | Write |
+| `commitToNewBranch` | Commits the dev branch's edits to a new branch instead, optionally opening a pull request. | Write |
+| `mergeToDefaultBranch` | Merges a committed branch into the deployment's default branch, making it live for everyone. | Destructive — prompts |
+| `discardDataModelChanges` | Resets the dev branch to its parent (or to a given commit hash), throwing away pending edits. | Destructive — prompts |
+| `switchUserBranch` | Switches the user's own console over to a branch, the same action as the branch switcher in the UI, so they can see and test what was committed. | Write |
+
+These mirror the "Commit & Sync", "Merge" / "Create a Pull Request", and branch-switching
+actions described in [Development mode][ref-dev-mode] — a client can now drive that same
+flow instead of asking you to click through it.
+
+Call `getBranchState` before editing, so work doesn't land on a branch the user never
+looks at, and again after committing, to see whether the user still needs
+`switchUserBranch` to see it. `commitDataModelChanges` refuses to commit a dev branch
+whose parent is the deployment's default branch unless the call also sets
+`confirmPublishToDefaultBranch` — publishing that way should only happen once you've
+said so. `mergeToDefaultBranch` is separate from committing: it publishes an already
+committed branch, and its description tells the agent to call it only when you've
+explicitly asked to publish or merge to production.
 
 ### Pre-aggregations
 
@@ -445,12 +484,23 @@ with `writeDataModelFile` or `deleteDataModelFile`, passing that `branchName`. E
 recompiles the model and reports validation errors, so you can iterate until it compiles.
 Before committing, verify the change returns the right data: call `runQuery` with the same
 `branchName` and check the numbers, since a compiling model can still return wrong results.
-Review the result with `getDataModelChanges`, then commit the branch from the Cube UI to
-publish it.
+Review the result with `getDataModelChanges`, then see [Commit and publish a model
+edit](#commit-and-publish-a-model-edit) to land the change and make it live.
 
 To review a branch you didn't author — a colleague's feature branch, say — call
 `getBranchDiff` with its name instead. It compares against the deploy branch and returns
 the full changed-file list even when the patch itself is trimmed.
+
+### Commit and publish a model edit
+
+Once `writeDataModelFile` edits compile and `runQuery` confirms they return the right
+data, call `commitDataModelChanges` to land them on the branch the dev branch forked
+from — or `commitToNewBranch` to put them on a new branch instead, optionally with a
+pull request. Offer `switchUserBranch` so you can see the result in the Cube console.
+Only call `mergeToDefaultBranch` once you've explicitly asked to publish; it makes the
+branch live for everyone and can't be undone from the response it returns. Call
+`getBranchState` at any point to check which branch you and the session are each on, and
+`discardDataModelChanges` to throw away an edit that isn't working out.
 
 ### Verify a pre-aggregation
 
@@ -475,3 +525,4 @@ and friends) are set.
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-dashboards]: /docs/explore-analyze/dashboards
 [ref-dev-mode]: /docs/data-modeling/dev-mode
+[ref-folders]: /docs/organize-content/folders
