@@ -384,7 +384,7 @@ Rendering happens asynchronously, since a capture waits for every widget on
 the dashboard to finish querying: submit a job, poll it until `status` is
 `completed`, then download the file. The job and its file are dropped at the
 `expiresAt` the submit returns — 5 minutes out — so download before then or
-submit again.
+submit again. Only the identity that submitted a job can poll or download it.
 
 ```bash
 # 1. Submit the export
@@ -407,15 +407,14 @@ curl \
   "https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments/123/dashboard-exports/JOB_ID/download"
 ```
 
-A tenant administrator can also render the dashboard as if a specific other
+An account administrator can also render the dashboard as if a specific other
 user opened it — `renderAs` a console user or an embed user — so the file
 reflects that person's own row-level security. An embed subject that doesn't
 exist yet is provisioned by the call; the `groups`/`userAttributes`/
 `securityContext` passed with it apply to that render only, never to the
 user's stored context. This is meant for scheduled, per-recipient reports:
 one API key produces a correctly-scoped file per person, instead of one key
-per person, and only the identity that submitted a job can poll or download
-it.
+per person.
 
 Submitting returns `404` for a dashboard that doesn't belong to the
 deployment, a request that supplies both ids or neither, or a deactivated
