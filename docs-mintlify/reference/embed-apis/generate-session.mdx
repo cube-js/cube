@@ -63,6 +63,25 @@ Accounts are limited to 10,000 external users. To increase this limit, please co
 
 </Warning>
 
+## Generate Session response {#response}
+
+The API returns a session object:
+
+```json
+{
+  "sessionId": "abc123def456..."
+}
+```
+
+| Field       | Type   | Description                                            |
+| ----------- | ------ | ------------------------------------------------------ |
+| `sessionId` | string | Unique session identifier to use for embedding content |
+
+Use the `sessionId` directly in your embed URL to authenticate and load content securely.
+The token it's exchanged for is usable for about 23 hours — see [signed
+embedding][ref-signed-embedding] — unless you revoke it sooner; see [Revoke a
+session](#revoke-a-session).
+
 ## Session settings
 
 `settings` is an object of per-session overrides for embed behavior, applied to
@@ -342,25 +361,6 @@ DELETE /api/v1/embed-tenants/{embedTenantName}/user-attributes/{id}
 ```
 
 These endpoints use the same `Api-Key` authentication as Generate Session and require admin access. List endpoints return cursor-paginated results (`?first=`, `?after=`).
-
-## Generate Session response {#response}
-
-The API returns a session object:
-
-```json
-{
-  "sessionId": "abc123def456..."
-}
-```
-
-| Field       | Type   | Description                                            |
-| ----------- | ------ | ------------------------------------------------------ |
-| `sessionId` | string | Unique session identifier to use for embedding content |
-
-Use the `sessionId` directly in your embed URL to authenticate and load content securely.
-The token it's exchanged for is usable for about 23 hours — see [signed
-embedding][ref-signed-embedding] — unless you revoke it sooner; see [Revoke a
-session](#revoke-a-session).
 
 ## Code Example
 
