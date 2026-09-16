@@ -7,7 +7,7 @@ The Dashboard Comments API lets an embed viewer hold a conversation on an embedd
 
 <Note>
 
-The Dashboard Comments API is available on [Premium and Enterprise plans](https://cube.dev/pricing).
+The Dashboard Comments API is available on [Premium and above plans](https://cube.dev/pricing).
 
 </Note>
 
@@ -19,9 +19,9 @@ The Dashboard Comments API is available on [Premium and Enterprise plans](https:
 
 ## Authentication
 
-Every endpoint requires a **signed embed session scoped to an embed tenant**. Mint one with [Generate Session][ref-generate-session] using `externalId`. `embedTenantName` is optional: omit it and the session scopes to the Cube Cloud tenant's own name, which reaches these endpoints; pass it to scope the conversation to a specific embed tenant.
+Every endpoint requires a **signed embed session scoped to an embed tenant**. Mint one with [Generate Session][ref-generate-session] using `externalId`. `embedTenantName` is optional: omit it and the session scopes to the Cube tenant's own name, which reaches these endpoints; pass it to scope the conversation to a specific embed tenant.
 
-A session minted with `internalId` cannot comment. Such a session resolves its user from Cube Cloud's own user table and so carries no embed tenant by design, and these endpoints reject it with `403 Forbidden`. A [Cube Cloud API key][ref-api-keys] and a console session are rejected the same way.
+A session minted with `internalId` cannot comment. Such a session resolves its user from Cube's own user table and so carries no embed tenant by design, and these endpoints reject it with `403 Forbidden`. A [Cube API key][ref-api-keys] and a console session are rejected the same way.
 
 The calling embed user is taken from the session; no endpoint accepts an author in the request body.
 
@@ -71,7 +71,7 @@ A thread is one root comment plus its replies, oldest first. **Nesting is one le
 
 Threads are listed **newest-first by when they started**, so a thread holds its place while it is being replied to — a busy thread does not climb back to the top. Open threads are returned by default. Pass `includeResolved=true` to widen the page to resolved threads as well, or `resolvedOnly=true` to return only those; `resolvedOnly` wins when both are set.
 
-Deleting is a soft delete, and the two cases differ. **Deleting a reply** drops it from its thread; the rest of the thread stands and keeps its position. **Deleting a thread root takes the whole thread with it**, replies included — the thread stops appearing in `GET /dashboard/{publicId}/comments` altogether, rather than staying on as a tombstone holding orphaned replies.
+Deletion is soft on the server, but **nothing deleted comes back from `GET /dashboard/{publicId}/comments`** — neither surfaces as a tombstone, so a client never has to render an empty bubble. **Deleting a reply** removes it from its thread's `replies`; the rest of the thread stands and keeps its position. **Deleting a thread root takes the whole thread with it**, replies included — the thread stops appearing in the list altogether.
 
 Resolving applies to threads only. Passing a reply's id returns `400`, because a reply carries no resolve state of its own.
 
@@ -99,15 +99,15 @@ Returned by `POST /dashboard/{publicId}/comments` and `PATCH /dashboard/{publicI
 | `id` | number | The comment's identifier. Pass it as `{commentId}`. |
 | `dashboardId` | string | The dashboard's `publicId`, not a numeric id — embed routes address a dashboard by `publicId` throughout. |
 | `userId` | number \| null | Identifier of the author's embed user. `null` once that embed user is deleted; the comment outlives them. |
-| `body` | string | The comment text, up to 10,000 characters. Empty when `removedAt` is set. |
+| `body` | string | The comment text, up to 10,000 characters. |
 | `editedAt` | string \| null | When the author last edited the comment, or `null` if never. |
-| `removedAt` | string \| null | When the comment was deleted, or `null`. |
+| `removedAt` | string \| null | Always `null` on a comment the list returns — a deleted comment is dropped rather than returned as a tombstone. |
 | `createdAt` | string | When the comment was posted. |
 | `isOwn` | boolean | Whether the calling embed user wrote this comment. Stamped by the server — use it to decide which controls to render, rather than comparing `userId` yourself. |
 
 <Note>
-**`userId` is an embed user's identifier, not a Cube Cloud user's.** Embed users
-and Cube Cloud users are numbered independently, so the same value names a
+**`userId` is an embed user's identifier, not a Cube user's.** Embed users
+and Cube users are numbered independently, so the same value names a
 different person on each surface. Resolve it against
 [mentionable users](#mentionable-users), which reads embed users only.
 </Note>
@@ -185,7 +185,7 @@ Returned by `GET /dashboard/{publicId}/comments/mentionable-users`. Use it to ba
 | `email` | string \| null | May be `null`. |
 | `firstName` | string \| null | May be `null`. |
 
-**The directory is scoped to the caller's own embed tenant, and to embed users only.** An embed user can mention their colleagues in the same embed tenant. They cannot mention a Cube Cloud user of the host account, and they never see another embed tenant's users. Pass `search` to filter by username or email; results are ordered by username. Pagination works as it does for threads: pass `first` and `after` with the previous page's `endCursor`.
+**The directory is scoped to the caller's own embed tenant, and to embed users only.** An embed user can mention their colleagues in the same embed tenant. They cannot mention a Cube user of the host account, and they never see another embed tenant's users. Pass `search` to filter by username or email; results are ordered by username. Pagination works as it does for threads: pass `first` and `after` with the previous page's `endCursor`.
 
 <Note>
 **There is no mention syntax to write.** `body` is stored and returned verbatim,
