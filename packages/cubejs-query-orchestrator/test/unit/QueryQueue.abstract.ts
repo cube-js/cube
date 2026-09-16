@@ -1,7 +1,7 @@
 import { Readable } from 'stream';
 import crypto from 'crypto';
 
-import type { QueryKey, QueueDriverInterface } from '@cubejs-backend/base-driver';
+import type { QueryKey, QueryKeyHash, QueueDriverInterface } from '@cubejs-backend/base-driver';
 import { QueuePriority } from '@cubejs-backend/base-driver';
 import { pausePromise } from '@cubejs-backend/shared';
 import { CubeStoreDriver, CubestoreQueueDriverConnection } from '@cubejs-backend/cubestore-driver';
@@ -42,12 +42,11 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     const processMessagePromises: Promise<any>[] = [];
     const processCancelPromises: Promise<any>[] = [];
     let cancelledQuery;
-    // Makes the cancel a queue storage failure, so that a throw on the way out of the timeout path
-    // can be asserted on.
-    let failCancelMessage = false;
-    // Same for the result ack, which is the other way a storage failure can carry a query error out
-    // of executeQuery unreported.
-    let failResultAck = false;
+    // Make the cancel, and the result ack, a queue storage failure for one query. Scoped by hash
+    // because reconcile cancels orphans too, so a process-wide flag would let an unrelated item
+    // reject a test's own executeInQueue before its assertions run.
+    let failCancelMessageFor: QueryKeyHash | null = null;
+    let failResultAckFor: QueryKeyHash | null = null;
     // Rejects of the in-flight `cancelable` queries, so that a cancellation can reject the
     // running handler the way a driver rejects a query it has stopped. Keyed by the handle the
     // handler registers with setCancelHandler, so a cancellation rejects only its own query.
@@ -97,7 +96,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         processMessagePromises.push(queue.executeQuery(queryKeyHash, queueId, retrieved));
       },
       sendCancelMessageFn: async (query) => {
-        if (failCancelMessage) {
+        if (failCancelMessageFor && queue.redisHash(query.queryKey) === failCancelMessageFor) {
           throw new Error('Queue storage failure while cancelling');
         }
 
@@ -122,21 +121,26 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       logger,
     });
 
-    // Wrapping the connection rather than a handler is what makes `failResultAck` reach both queue
+    // Wrapping the connection rather than a handler is what makes the ack failure reach both queue
     // drivers - `setResultAndRemoveQuery` is the driver's, not something the options surface exposes.
     const createQueueConnection = queue.queueDriver.createConnection.bind(queue.queueDriver);
     queue.queueDriver.createConnection = async () => {
       const connection = await createQueueConnection();
 
-      if (!failResultAck) {
+      if (!failResultAckFor) {
         return connection;
       }
 
       return new Proxy(connection, {
         get: (target, prop) => {
           if (prop === 'setResultAndRemoveQuery') {
-            return async () => {
-              throw new Error('Queue storage failure while setting the result');
+            // the hash is the ack's own first argument, so only the query under test fails
+            return async (hash: QueryKeyHash, executionResult: unknown, queueId: number) => {
+              if (hash === failResultAckFor) {
+                throw new Error('Queue storage failure while setting the result');
+              }
+
+              return target.setResultAndRemoveQuery(hash, executionResult, queueId);
             };
           }
 
@@ -167,8 +171,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       streamHandlerDelay = 250;
       streamCallOrder = [];
       cancelableRejects = new Map();
-      failCancelMessage = false;
-      failResultAck = false;
+      failCancelMessageFor = null;
+      failResultAckFor = null;
     });
 
     afterAll(async () => {
@@ -246,9 +250,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     });
 
     test('a timeout is reported before a failing cancel can lose it', async () => {
-      failCancelMessage = true;
-
       const query: QueryKey = ['select * from 4', []];
+
+      failCancelMessageFor = queue.redisHash(query);
 
       try {
         // executionTimeout is 2s, 5s is enough
@@ -263,17 +267,17 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       } finally {
         // the cancel threw before the result was set, so the item is still active - remove it here
         // or a later test picks it up as an orphan and inherits its events and cancelled query
-        failCancelMessage = false;
+        failCancelMessageFor = null;
         await queue.cancelQuery(queue.redisHash(query), null);
       }
     });
 
     test('a failing result ack does not swallow the query error', async () => {
-      // the flag is read when executeQuery opens its connection, so it has to be set before the
-      // query starts rather than once the handler is running
-      failResultAck = true;
-
       const queryKey: QueryKey = ['select * from 5', []];
+
+      // read when executeQuery opens its connection, so it is set before the query starts rather
+      // than once the handler is running
+      failResultAckFor = queue.redisHash(queryKey);
 
       try {
         const pending = queue
@@ -296,7 +300,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         expect(events).toContain('Error while querying');
         expect(events).toContain('Queue storage error');
       } finally {
-        failResultAck = false;
+        failResultAckFor = null;
         // the ack threw, so the item is still active - see the failing-cancel test above
         await queue.cancelQuery(queue.redisHash(queryKey), null);
       }
