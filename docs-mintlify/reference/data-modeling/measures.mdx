@@ -532,11 +532,6 @@ period-to-date logic across many measures without writing each one by hand, see
 The `year_to_date`, `quarter_to_date`, and `month_to_date` types are deprecated
 equivalents of `to_date` with the matching `granularity`.
 
-On the legacy planner, a `to_date` measure cannot be served from a pre-aggregation: only
-`fixed` rolling windows are supported there, and a query that tries to match one fails
-with `Only fixed rolling windows are supported by Cube Store`. Tesseract plans
-pre-aggregations itself and does not apply this restriction.
-
 #### `offset`
 
 The `offset` parameter is used to specify the starting point of the time window.

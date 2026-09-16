@@ -201,14 +201,6 @@ quarters next to retail months, with no error. Restrict the list to match:
 {{ ptd.to_date_measures("revenue", "amount", periods=["week", "month", "year"]) }}
 ```
 
-<Warning>
-
-**Group by the time dimension that carries the override.** The retail periods come from
-the calendar cube's overridden dimension. A query that groups by a dimension without the
-override falls back to `DATE_TRUNC` and returns Gregorian periods, with no error.
-
-</Warning>
-
 Do not pass a name like `retail_month`. A variable-length period is defined with `sql`,
 and a granularity defined that way must be named after a default granularity, so
 `retail_month` does not compile.
@@ -219,13 +211,21 @@ other period. This too requires Tesseract — on the legacy planner a custom gra
 name in a `to_date` window compiles but fails at query time.
 
 A name of your own also has to be declared under `granularities` on the very time
-dimension the query groups by. Unlike a default name, it has nothing to fall back to: the
-query fails with `Rolling window granularity '<name>' is not found in time dimension`
-rather than silently reporting Gregorian periods.
+dimension the query groups by. Unlike a default name, it has nothing to fall back to:
+Tesseract fails the query with `Rolling window granularity '<name>' is not found in time
+dimension` rather than silently reporting Gregorian periods.
 
 ```yaml
 {{ ptd.to_date_measures("revenue", "amount", periods=["fiscal_year"]) }}
 ```
+
+<Warning>
+
+**Group by the time dimension that carries the override.** The retail periods come from
+the calendar cube's overridden dimension. A query that groups by a dimension without the
+override falls back to `DATE_TRUNC` and returns Gregorian periods, with no error.
+
+</Warning>
 
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [ref-rolling-window]: /reference/data-modeling/measures#type-and-granularity
