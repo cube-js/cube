@@ -48,7 +48,7 @@ Put the macro in a `.jinja` file under `model/macros` so that every cube can imp
 {%- for period in periods %}
       - name: {{ name | safe }}_{{ period | safe }}_to_date
         description: {{ name | safe }}, accumulated from the start of the {{ period | safe }}
-        {% if sql %}sql: {{ sql | safe }}
+        {% if sql %}sql: "{{ sql | safe }}"
         {% endif %}type: {{ type | safe }}
         rolling_window:
           type: to_date
@@ -183,6 +183,15 @@ cube][ref-calendar-cubes] overrides what `week`, `month`, `quarter`, and `year` 
 the generated measures pick that up: `{{ ptd.to_date_measures("revenue", "amount") }}`
 already emits `granularity: week` and `granularity: month`, so a five-week retail month
 accumulates over all five of its weeks.
+
+Pass only the periods the calendar cube actually overrides. A calendar cube that defines
+`week`, `month`, and `year` but not `quarter` still accepts `granularity: quarter` — it
+falls back to `DATE_TRUNC` and reports Gregorian quarters next to retail months, with no
+error. Restrict the list to match:
+
+```yaml
+{{ ptd.to_date_measures("revenue", "amount", periods=["week", "month", "year"]) }}
+```
 
 Do not pass a name like `retail_month`. A variable-length period is defined with `sql`,
 and a granularity defined that way must be named after a default granularity, so
