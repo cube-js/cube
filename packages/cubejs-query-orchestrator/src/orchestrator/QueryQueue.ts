@@ -1047,10 +1047,8 @@ export class QueryQueue {
         clearInterval(heartBeatTimer);
       }
 
-      // A cancellation - orphaned, stalled or explicit - removes the queue item, and the driver then
-      // rejects the execution still in flight. Setting the result is where the two are told apart: it
-      // only succeeds while the item is still there, so a failure means the query was cancelled and
-      // its rejection has to stay out of query history the way an orphaned query does.
+      // Setting the result only succeeds while the queue item is still there, so a failure means a
+      // cancellation - orphaned, stalled or explicit - removed it and rejected the in-flight query.
       let queueItemWasActive: unknown;
 
       try {
