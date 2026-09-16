@@ -370,7 +370,10 @@ yours to apply:
   publishing changes, and Pre-aggregations — the six model-editing tools, `getBranchDiff`,
   `getDeploymentEnv`, the six commit and branch tools, and both pre-aggregation tools — is
   offered only to users whose role allows editing the semantic model. A Viewer never sees
-  any of them.
+  any of them. A role scoped to **Edit data model on dev branches** still sees them
+  registered, but `mergeToDefaultBranch` and `commitDataModelChanges` with
+  `confirmPublishToDefaultBranch` still fail for that role, the same as any other write
+  targeting the deploy branch.
 - **Verify on the branch, before a merge, not after.** Pass the dev `branchName` to
   `runQuery` to check that an edit returns the right data — `valid: true` from
   `writeDataModelFile` only means the model compiles, not that it's correct.

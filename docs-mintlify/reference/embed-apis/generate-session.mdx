@@ -356,6 +356,8 @@ The API returns a session object:
 | `sessionId` | string | Unique session identifier to use for embedding content |
 
 Use the `sessionId` directly in your embed URL to authenticate and load content securely.
+It expires automatically after 24 hours if you don't revoke it sooner — see [Revoke a
+session](#revoke-a-session).
 
 ## Code Example
 
