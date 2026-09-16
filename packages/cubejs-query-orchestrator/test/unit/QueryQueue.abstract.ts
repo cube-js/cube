@@ -302,6 +302,30 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       }
     });
 
+    test('a query failure on an active queue item is still an error', async () => {
+      const queryKey: QueryKey = ['select * from 7', []];
+
+      const pending = queue
+        .executeInQueue('cancelable', queryKey, { delay: 60 * 1000, result: '7' }, QueuePriority.Background)
+        .catch(e => e);
+
+      const deadline = Date.now() + 750;
+      while (cancelableRejects.size === 0 && Date.now() < deadline) {
+        await pausePromise(10);
+      }
+      expect(cancelableRejects.size).toEqual(1);
+
+      // nothing cancelled the query, so the item is still there and the ack succeeds - the ordinary
+      // path every driver error takes, which must not be routed onto the cancellation one
+      cancelableRejects.get('7')!(new Error('Query failed'));
+      await pending;
+      await awaitProcessing();
+
+      const events = logger.mock.calls.map(([message]) => message);
+      expect(events).toContain('Error while querying');
+      expect(events).not.toContain('Orphaned execution result');
+    });
+
     test('an orphaned result without a rejection stays quiet', async () => {
       const queryKey: QueryKey = ['select * from 6', []];
       const startedCount = delayCount;
