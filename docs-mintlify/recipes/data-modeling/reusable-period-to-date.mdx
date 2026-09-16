@@ -59,10 +59,13 @@ Put the macro in a `.jinja` file under `model/macros` so that every cube can imp
 
 <Warning>
 
-Apply the [`safe`][ref-jinja-escaping] filter to every value substituted into a name or a
-SQL expression. Without it, Cube escapes the value and the model fails to compile with
-`bad indentation of a mapping entry`, because `{{ name }}_{{ period }}` renders as
-`"revenue"_"week"`.
+Apply the [`safe`][ref-jinja-escaping] filter to every value that is concatenated with
+other text rather than substituted on its own. Cube escapes substituted values as JSON
+strings, which is harmless when the value is the whole of a YAML value — `type: {{ type }}`
+renders as `type: "sum"` and compiles — but breaks as soon as anything is appended to it.
+Here, `{{ name }}_{{ period }}_to_date` renders as `"revenue"_"week"_to_date` and the model
+fails with `bad indentation of a mapping entry`. The `description` line mixes values into
+prose and has the same problem. The macro applies `safe` throughout for consistency.
 
 The macro also emits its own leading indentation. Indenting the `{{ ... }}` call in the
 cube file instead only indents the first generated line.
@@ -140,9 +143,13 @@ cubes:
 ## Result
 
 Querying the generated measures by day shows each window accumulating from the start of
-its own period and resetting at the boundary. In the following result, 1 January falls in
-the ISO week that began on 30 December, so WTD opens with the previous year's orders
-already counted, while MTD, QTD, and YTD all start fresh:
+its own period and resetting at the boundary. The columns below are
+`revenue_week_to_date`, `revenue_month_to_date`, `revenue_quarter_to_date`, and
+`revenue_year_to_date`.
+
+The orders cube holds 30 in revenue in December 2024, shown in the monthly table below,
+and nothing earlier. 1 January falls in the ISO week that began on 30 December, so WTD
+opens with that 30 already counted, while MTD, QTD, and YTD all start fresh:
 
 | created_at | revenue |   WTD |   MTD |   QTD |   YTD |
 |------------|--------:|------:|------:|------:|------:|
@@ -153,14 +160,21 @@ already counted, while MTD, QTD, and YTD all start fresh:
 | 2025-01-07 |    1600 |  2400 |  3100 |  3100 |  3100 |
 
 On 6 January, a Monday, WTD resets to that day's own revenue while the longer windows
-carry on. Grouping by month shows the same behavior one level up, where February resets
-MTD but not QTD or YTD:
+carry on.
 
-| created_at |   MTD |   QTD |   YTD |
-|------------|------:|------:|------:|
-| 2024-12    |    30 |    30 |    30 |
-| 2025-01    |  3100 |  3100 |  3100 |
-| 2025-02    |  5000 |  8100 |  8100 |
+Grouping by month shows the longer windows one level up. January starts a new quarter and
+a new year, so both QTD and YTD drop December's 30 and restart; February then accumulates
+on top of January in both:
+
+| created_at |   QTD |   YTD |
+|------------|------:|------:|
+| 2024-12    |    30 |    30 |
+| 2025-01    |  3100 |  3100 |
+| 2025-02    |  8100 |  8100 |
+
+MTD is omitted here on purpose: grouping a `to_date` window by its own granularity
+collapses it onto the base measure, so the MTD column would just repeat each month's
+revenue. Group by a finer granularity than the window to see it accumulate.
 
 ## Following a fiscal or retail calendar
 

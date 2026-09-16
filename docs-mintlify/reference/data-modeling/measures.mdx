@@ -472,6 +472,57 @@ BigQuery, Microsoft SQL Server, and Snowflake, the date range is still required.
 
 </Warning>
 
+#### `type` and `granularity`
+
+Set `type` to `to_date` to accumulate from the start of the period that contains each
+data point, instead of over a window of fixed size. A `to_date` window also requires
+`granularity`, which names that period: a default granularity such as `week`, `month`,
+`quarter`, or `year`, or a [custom granularity][ref-custom-granularities]. Omitting it
+fails validation.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: revenue_year_to_date
+        sql: amount
+        type: sum
+        rolling_window:
+          type: to_date
+          granularity: year
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  measures: {
+    revenue_year_to_date: {
+      sql: `amount`,
+      type: `sum`,
+      rolling_window: {
+        type: `to_date`,
+        granularity: `year`
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+A window of type `to_date` takes none of the `offset`, `trailing`, or `leading`
+parameters documented below; those apply to fixed-size windows only. To apply the same
+period-to-date logic across many measures without writing each one by hand, see
+[reusing period-to-date logic][ref-recipe-period-to-date].
+
+The `year_to_date`, `quarter_to_date`, and `month_to_date` types are deprecated
+equivalents of `to_date` with the matching `granularity`.
+
 #### `offset`
 
 The `offset` parameter is used to specify the starting point of the time window.
@@ -560,55 +611,6 @@ cube(`orders`, {
 ```
 
 </CodeGroup>
-
-#### `type` and `granularity`
-
-Set `type` to `to_date` to accumulate from the start of the period that contains each
-data point, instead of over a window of fixed size. The `granularity` parameter names
-that period: a default granularity such as `week`, `month`, `quarter`, or `year`, or a
-[custom granularity][ref-custom-granularities].
-
-<CodeGroup>
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: revenue_year_to_date
-        sql: amount
-        type: sum
-        rolling_window:
-          type: to_date
-          granularity: year
-```
-
-```javascript title="JavaScript"
-cube(`orders`, {
-  // ...
-
-  measures: {
-    revenue_year_to_date: {
-      sql: `amount`,
-      type: `sum`,
-      rolling_window: {
-        type: `to_date`,
-        granularity: `year`
-      }
-    }
-  }
-})
-```
-
-</CodeGroup>
-
-A window of type `to_date` takes none of `trailing`, `leading`, or `offset`. To apply
-the same period-to-date logic across many measures without writing each one by hand,
-see [reusing period-to-date logic][ref-recipe-period-to-date].
-
-The `year_to_date`, `quarter_to_date`, and `month_to_date` types are deprecated
-equivalents of `to_date` with the matching `granularity`.
 
 ### `multi_stage`
 
