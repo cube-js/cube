@@ -30,8 +30,8 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "integration": "jest dist/test",
-    "integration:mongobi": "jest dist/test"
+    "integration": "NODE_OPTIONS=--experimental-vm-modules jest dist/test",
+    "integration:mongobi": "NODE_OPTIONS=--experimental-vm-modules jest dist/test"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.39",

@@ -32,7 +32,7 @@
     "watch": "tsc -w",
     "unit": "jest --verbose dist/test/unit",
     "integration": "npm run integration:pinot",
-    "integration:pinot": "jest --verbose dist/test"
+    "integration:pinot": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.39",

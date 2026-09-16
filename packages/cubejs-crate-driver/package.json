@@ -32,7 +32,7 @@
     "watch": "tsc -w",
     "test": "yarn integration",
     "integration": "npm run integration:crate",
-    "integration:crate": "jest --verbose dist/test",
+    "integration:crate": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test",
     "unit": "jest --forceExit --verbose dist/test/CrateDriver.unit.test.js"
   },
   "dependencies": {

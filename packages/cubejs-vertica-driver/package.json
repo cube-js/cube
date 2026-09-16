@@ -14,7 +14,7 @@
   "main": "src/VerticaDriver.js",
   "scripts": {
     "integration": "npm run integration:vertica",
-    "integration:vertica": "jest --verbose ./test"
+    "integration:vertica": "NODE_OPTIONS=--experimental-vm-modules jest --verbose ./test"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.39",

@@ -16,7 +16,7 @@
   "scripts": {
     "test": "npm run unit && npm run integration",
     "unit": "jest ./**/*.test.js",
-    "integration": "jest ./**/*.integration.js",
+    "integration": "NODE_OPTIONS=--experimental-vm-modules jest ./**/*.integration.js",
     "integration:mysql-aurora-serverless": "npm run integration"
   },
   "dependencies": {

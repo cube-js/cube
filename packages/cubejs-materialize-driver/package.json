@@ -31,7 +31,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "integration": "npm run integration:materialize",
-    "integration:materialize": "jest --verbose dist/test"
+    "integration:materialize": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.39",

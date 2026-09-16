@@ -31,8 +31,8 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "unit": "jest dist/test/unit",
-    "integration": "jest dist/test/integration",
-    "integration:trino": "jest dist/test/integration"
+    "integration": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/integration",
+    "integration:trino": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/integration"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.39",
