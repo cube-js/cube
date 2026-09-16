@@ -208,36 +208,34 @@ const headers = {
   Authorization: `Embed-Token ${EMBED_TOKEN}`,
 };
 
+// Always check the status. An unchecked error body parses fine, so `root.id`
+// comes back undefined and the reply below posts as a second thread instead
+const send = async (path, body) => {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  return res.json();
+};
+
 // 1. Start a thread on the dashboard
-const res = await fetch(`${BASE}/dashboard/${PUBLIC_ID}/comments`, {
-  method: "POST",
-  headers,
-  body: JSON.stringify({ body: "Revenue looks off for the EU region." }),
+const root = await send(`/dashboard/${PUBLIC_ID}/comments`, {
+  body: "Revenue looks off for the EU region.",
 });
-// Check the status: an unchecked error body yields `root.id === undefined`,
-// and step 2 would then post its reply as a second thread instead of failing
-if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
-const root = await res.json();
 
 // 2. Reply to it — pass the root's id as parentId
-await fetch(`${BASE}/dashboard/${PUBLIC_ID}/comments`, {
-  method: "POST",
-  headers,
-  body: JSON.stringify({
-    body: "The EU rollup finished late — refreshed now.",
-    parentId: root.id,
-  }),
+await send(`/dashboard/${PUBLIC_ID}/comments`, {
+  body: "The EU rollup finished late — refreshed now.",
+  parentId: root.id,
 });
 
 // 3. Resolve the thread. Only the embed user who started it may do this
-const thread = await fetch(
-  `${BASE}/dashboard/${PUBLIC_ID}/comments/${root.id}/resolve`,
-  {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ resolved: true }),
-  }
-).then((r) => r.json());
+const thread = await send(
+  `/dashboard/${PUBLIC_ID}/comments/${root.id}/resolve`,
+  { resolved: true }
+);
 
 // thread.resolvedAt is set; pass resolved: false to re-open the thread
 ```
@@ -253,7 +251,7 @@ curl "https://your-account.cubecloud.dev/api/v1/embed/dashboard/PUBLIC_ID/commen
 
 | Status | When |
 | --- | --- |
-| `400` | Replying to a reply, resolving a reply's id, or a `body` that is empty or over 10,000 characters. |
+| `400` | Replying to a reply, resolving a reply's id, a `body` that is empty or over 10,000 characters, or a query parameter out of range — `search` over 255 characters, `first` below 1. |
 | `401` | The `Embed-Token` is invalid or expired, or the `sessionId` you tried to exchange was already redeemed — an iframe spends its own. Mint a fresh session and exchange that. |
 | `403` | The credential carries no embed tenant — an API key, a console session, or an `internalId` session; the dashboard resolves but the caller may not read it; or the comment belongs to another embed user. |
 | `404` | The dashboard, the comment, or a `parentId` does not exist on this dashboard. A dashboard is looked up before access is checked, so one that does not resolve is `404` and one the caller merely may not read is `403`. |
