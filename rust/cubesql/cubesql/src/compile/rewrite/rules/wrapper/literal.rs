@@ -11,8 +11,9 @@ use crate::compile::rewrite::{
     rules::utils::{DecomposedDayTime, DecomposedMonthDayNano},
     wrapper_replacer_context,
 };
-use datafusion::scalar::ScalarValue;
+use datafusion::{arrow::datatypes::DataType, scalar::ScalarValue};
 use egg::Subst;
+use std::ops::ControlFlow;
 
 impl WrapperRules {
     pub fn literal_rules(&self, rules: &mut Vec<CubeRewrite>) {
@@ -90,10 +91,15 @@ impl WrapperRules {
                 return false;
             };
 
-            let supports_float_literal = |type_template| {
-                Self::can_rewrite_template(&data_source, &meta, "expressions/float_literal")
-                    || (Self::can_rewrite_template(&data_source, &meta, type_template)
-                        && Self::can_rewrite_template(&data_source, &meta, "expressions/cast"))
+            let supports_float_literal = |data_type: &DataType| {
+                let sql_generator = match Self::template_sql_generator(&data_source, &meta) {
+                    ControlFlow::Continue(sql_generator) => sql_generator,
+                    ControlFlow::Break(verdict) => return verdict,
+                };
+                let templates = sql_generator.get_sql_templates();
+                templates.contains_template("expressions/float_literal")
+                    || (templates.contains_sql_type(data_type)
+                        && templates.contains_template("expressions/cast"))
             };
 
             for literal in var_iter!(egraph[subst[value_var]], LiteralExprValue) {
@@ -102,11 +108,11 @@ impl WrapperRules {
                     // identifier in a cast nor an exponent literal can represent them.
                     ScalarValue::Float32(value) => {
                         return value.is_none_or(|value| value.is_finite())
-                            && supports_float_literal("types/float");
+                            && supports_float_literal(&DataType::Float32);
                     }
                     ScalarValue::Float64(value) => {
                         return value.is_none_or(|value| value.is_finite())
-                            && supports_float_literal("types/double");
+                            && supports_float_literal(&DataType::Float64);
                     }
                     ScalarValue::TimestampNanosecond(_, _)
                     | ScalarValue::TimestampMillisecond(_, _)
