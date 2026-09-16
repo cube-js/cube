@@ -19,7 +19,7 @@ The Dashboard Comments API is available on [Premium and above plans](https://cub
 
 **The setting hides the panel; it does not close the API.** It governs whether the built-in comment panel renders on an embedded dashboard, and nothing more — **the endpoints below answer either way**. With the setting off, any embed session that can read the dashboard can still post and read comments through the API.
 
-That is what makes the endpoints usable for your own comment UI. It also means **there is no server-side switch that stops comments being written**: for an embed session scoped to an embed tenant, read access to the dashboard is all it takes to read and post — nothing further is checked before a comment is accepted. If comments must not be accepted at all, do not embed that dashboard — the only credential these endpoints refuse is an `internalId` session, which names an existing internal Cube user and so is no help for embedding to your own customers.
+That is what makes the endpoints usable for your own comment UI. It also means **there is no server-side switch that stops comments being written**: for an embed session scoped to an embed tenant, read access to the dashboard is all it takes to read and post — nothing further is checked before a comment is accepted. The credentials these endpoints refuse — an `internalId` session, an API key, a console session — are the ones that cannot carry an embed tenant, so none of them is a way to keep serving a customer-facing embed while withholding comments. If comments must not be accepted at all, stop minting sessions for that dashboard — and note that a token already exchanged keeps working until it expires, up to 24 hours later.
 
 </Warning>
 
