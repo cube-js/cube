@@ -13,13 +13,19 @@ The Dashboard Comments API is available on [Premium and above plans](https://cub
 
 ## Enable the comment panel
 
-**The account decides whether the comment UI appears.** Turn on **Allow comments on embedded dashboards** under **Embed → Settings** in the Cube console — see [Show and hide features](/embedding/iframe/feature-visibility#account-settings). The setting governs whether the built-in comment panel renders on an embedded dashboard; **the endpoints below answer either way**, so a client building its own comment UI does not depend on it. It is the host account's switch alone: an embed user cannot turn it on, and there is no per-session override.
+**The account decides whether the comment UI appears.** Turn on **Allow comments on embedded dashboards** under **Embed → Settings** in the Cube console — see [Show and hide features](/embedding/iframe/feature-visibility#account-settings). It is the host account's switch alone: an embed user cannot turn it on, and there is no per-session override.
+
+<Warning>
+
+**The setting hides the panel; it does not close the API.** It governs whether the built-in comment panel renders on an embedded dashboard, and nothing more — **the endpoints below answer either way**. With the setting off, any embed session that can read the dashboard can still post and read comments through the API. That is convenient if you are building your own comment UI, but it means the switch is not a way to guarantee an account accepts no comments at all: to do that, withhold the capability upstream — do not mint embed sessions for users who must not comment.
+
+</Warning>
 
 **The two commenting surfaces are independent.** Comments on embedded dashboards and comments inside the Cube app have separate storage and separate settings, and a thread written on one surface is not visible on the other.
 
 ## Authentication
 
-Every endpoint requires a **signed embed session scoped to an embed tenant**. Mint one with [Generate Session][ref-generate-session] using `externalId`. `embedTenantName` is optional: omit it and the session scopes to the Cube tenant's own name, which reaches these endpoints; pass it to scope the conversation to a specific embed tenant.
+Every endpoint requires a **signed embed session scoped to an embed tenant**. Mint one with [Generate Session][ref-generate-session] using `externalId`. `embedTenantName` is optional: omit it and the session scopes to the Cube tenant's own name, which reaches these endpoints; pass it to scope the conversation to a specific embed tenant. That name decides which conversation the session sees — see [A conversation lives inside a single embed tenant](#who-may-edit-delete-and-resolve).
 
 A session minted with `internalId` cannot comment. Such a session resolves its user from Cube's own user table and so carries no embed tenant by design, and these endpoints reject it with `403 Forbidden`. A [Cube API key][ref-api-keys] and a console session are rejected the same way.
 
@@ -63,7 +69,9 @@ This is narrower than commenting in the Cube app, where a user with edit rights 
 | Delete a comment | Author | Author |
 | Resolve or re-open a thread | Author, or a workbook editor | Author |
 
-Reading is wider than writing: everyone who can open the dashboard sees the whole conversation, including threads they did not start.
+Reading is wider than writing — but only inside one embed tenant. Every embed user of the caller's own embed tenant sees the whole conversation, including threads they did not start.
+
+**A conversation lives inside a single embed tenant.** Threads are stored per embed tenant and `GET /dashboard/{publicId}/comments` returns only the caller's own tenant's threads. Embed one published dashboard across several customers and each gets a separate, private conversation on it: a user in `acme` never sees a thread written in `globex`, and neither can reply to the other. Expect an empty list on a dashboard your own tenant has not commented on yet, however busy it looks to someone else.
 
 ## Threads and replies
 
@@ -107,12 +115,14 @@ Returned by `POST /dashboard/{publicId}/comments` and `PATCH /dashboard/{publicI
 | `createdAt` | string | When the comment was posted. |
 | `isOwn` | boolean | Whether the calling embed user wrote this comment. Stamped by the server — use it to decide which controls to render, rather than comparing `userId` yourself. |
 
-<Note>
+<Info>
+
 **`userId` is an embed user's identifier, not a Cube user's.** Embed users
 and Cube users are numbered independently, so the same value names a
 different person on each surface. Resolve it against
 [mentionable users](#mentionable-users), which reads embed users only.
-</Note>
+
+</Info>
 
 ### Thread
 
@@ -187,13 +197,15 @@ Returned by `GET /dashboard/{publicId}/comments/mentionable-users`. Use it to ba
 
 **The directory is scoped to the caller's own embed tenant, and to embed users only.** An embed user can mention their colleagues in the same embed tenant. They cannot mention a Cube user of the host account, and they never see another embed tenant's users. Pass `search` to filter by username or email; results are ordered by username. Paginate as for [threads](#thread-list), `hasNextPage` included — a `search` that matches nobody returns an empty page whose cursors are `null` or absent.
 
-<Note>
+<Info>
+
 **There is no mention syntax to write.** `body` is stored and returned verbatim,
 and nothing on the server reads it for mentions — no parsing, no linking, no
 notification. Picking a user from this directory is a client-side concern: choose
 whatever markup you like, render it yourself, and expect Cube to hand it back
 byte for byte.
-</Note>
+
+</Info>
 
 ## Example: start a thread, reply, resolve
 

@@ -178,9 +178,11 @@ features](/embedding/iframe/feature-visibility).
 
 ## Comments
 
-Viewers of an embedded dashboard can discuss it in comment threads. The comment
-panel appears once the account turns on **Allow comments on embedded dashboards**
-under **Embed → Settings**, which is off by default.
+Viewers of an embedded dashboard can discuss it in comment threads, privately
+within their own embed tenant. The comment panel appears once the account turns
+on **Allow comments on embedded dashboards** under **Embed → Settings**, which
+is off by default. That setting hides the panel rather than closing the API:
+the comment endpoints answer either way.
 [Dashboard Comments](/reference/embed-apis/dashboard-comments) documents the
 setting, the API behind it, and who may edit, delete, and resolve.
 
