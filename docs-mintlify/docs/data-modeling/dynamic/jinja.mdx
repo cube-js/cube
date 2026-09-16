@@ -142,7 +142,7 @@ property:
 
 ```yaml
 {%- macro cents_to_dollars(column_name, precision=2) -%}
-  ({{ column_name }} / 100)::NUMERIC(16, {{ precision }})
+  ({{ column_name | safe }} / 100)::NUMERIC(16, {{ precision | safe }})
 {%- endmacro -%}
 
 cubes:
@@ -187,7 +187,7 @@ First, define reusable macros in a `.jinja` file under the `macros/` directory:
 {% endmacro -%}
 
 {%- macro cents_to_dollars(column_name, precision=2) -%}
-  ({{ column_name }} / 100)::NUMERIC(16, {{ precision }})
+  ({{ column_name | safe }} / 100)::NUMERIC(16, {{ precision | safe }})
 {%- endmacro -%}
 ```
 
@@ -208,7 +208,7 @@ cubes:
     measures:
       - name: amount_usd
         type: sum
-        sql: "{{ common.cents_to_dollars('amount') }}"
+        sql: {{ common.cents_to_dollars('amount') }}
 ```
 
 The import path is relative to the `model/` directory.
