@@ -352,8 +352,9 @@ variable is set without ever seeing what it is set to.
 
 #### How model edits stay safe
 
-Letting an AI client edit your semantic model is safe because of five constraints — four
-enforced by the MCP server, one by clients that honor tool annotations:
+Letting an AI client edit your semantic model is safe because of five constraints — three
+enforced by the MCP server, one by clients that honor tool annotations, and one that is
+yours to apply:
 
 - **File writes never touch production.** Every write goes to a personal dev branch named
   `dev-<user>-<hash>`. `writeDataModelFile` and `deleteDataModelFile` reject any branch
@@ -370,9 +371,9 @@ enforced by the MCP server, one by clients that honor tool annotations:
   `getDeploymentEnv`, the six commit and branch tools, and both pre-aggregation tools — is
   offered only to users whose role allows editing the semantic model. A Viewer never sees
   any of them.
-- **Verification happens on the branch, before a merge, not after.** Pass the dev
-  `branchName` to `runQuery` to check that an edit returns the right data — `valid: true`
-  from `writeDataModelFile` only means the model compiles, not that it's correct.
+- **Verify on the branch, before a merge, not after.** Pass the dev `branchName` to
+  `runQuery` to check that an edit returns the right data — `valid: true` from
+  `writeDataModelFile` only means the model compiles, not that it's correct.
 
 <Warning>
 
