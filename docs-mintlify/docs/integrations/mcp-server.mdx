@@ -360,7 +360,7 @@ into the MCP server:
 - **`startDataModelEdit` is the only entry point.** It returns the dev `branchName`, and
   `writeDataModelFile` and `deleteDataModelFile` require it. There is no way to write
   without going through it first.
-- **Publishing to production needs an explicit ask.** `mergeToDefaultBranch` — the tool
+- **Merging a branch to production prompts for confirmation.** `mergeToDefaultBranch` — the tool
   that publishes an already-committed branch — is marked destructive, so a client always
   prompts for confirmation. See [Committing and publishing
   changes](#committing-and-publishing-changes).
