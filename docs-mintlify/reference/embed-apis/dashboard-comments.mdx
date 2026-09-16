@@ -55,7 +55,7 @@ The embed token is the signed session's own JWT. Exchange the `sessionId` from [
 
 **Authorship is the whole permission.** An embed user may edit, delete, and resolve only their own comments. Editing or deleting somebody else's comment returns `403`, and so does resolving a thread somebody else started.
 
-This is narrower than commenting in the Cube app, where a user with edit rights on the workbook may also resolve a thread another person started. An embed viewer holds no workbook rights at all, so that branch has no counterpart here.
+This is narrower than commenting in the Cube app, where a user with edit rights on the workbook may also resolve a thread another person started. A viewer of a published dashboard holds no rights on the workbook a thread would belong to, so that branch has no counterpart here.
 
 | Action | Cube app | Embedded dashboard |
 | --- | --- | --- |
@@ -209,11 +209,15 @@ const headers = {
 };
 
 // 1. Start a thread on the dashboard
-const root = await fetch(`${BASE}/dashboard/${PUBLIC_ID}/comments`, {
+const res = await fetch(`${BASE}/dashboard/${PUBLIC_ID}/comments`, {
   method: "POST",
   headers,
   body: JSON.stringify({ body: "Revenue looks off for the EU region." }),
-}).then((r) => r.json());
+});
+// Check the status: an unchecked error body yields `root.id === undefined`,
+// and step 2 would then post its reply as a second thread instead of failing
+if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+const root = await res.json();
 
 // 2. Reply to it — pass the root's id as parentId
 await fetch(`${BASE}/dashboard/${PUBLIC_ID}/comments`, {
@@ -251,8 +255,8 @@ curl "https://your-account.cubecloud.dev/api/v1/embed/dashboard/PUBLIC_ID/commen
 | --- | --- |
 | `400` | Replying to a reply, resolving a reply's id, or a `body` that is empty or over 10,000 characters. |
 | `401` | The `Embed-Token` is invalid or expired, or the `sessionId` you tried to exchange was already redeemed — an iframe spends its own. Mint a fresh session and exchange that. |
-| `403` | The credential carries no embed tenant — an API key, a console session, or an `internalId` session; the caller cannot read the dashboard; or the comment belongs to another embed user. |
-| `404` | The dashboard, the comment, or a `parentId` does not exist on this dashboard. |
+| `403` | The credential carries no embed tenant — an API key, a console session, or an `internalId` session; the dashboard resolves but the caller may not read it; or the comment belongs to another embed user. |
+| `404` | The dashboard, the comment, or a `parentId` does not exist on this dashboard. A dashboard is looked up before access is checked, so one that does not resolve is `404` and one the caller merely may not read is `403`. |
 
 [ref-generate-session]: /reference/embed-apis/generate-session
 [ref-api-keys]: /admin/account-billing/api-keys
