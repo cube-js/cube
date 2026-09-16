@@ -291,6 +291,36 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       }
     });
 
+    test('an orphaned result without a rejection stays quiet', async () => {
+      const queryKey: QueryKey = ['select * from 6', []];
+      const startedCount = delayCount;
+
+      // the delay handler resolves on its own timer and its cancel handler does not reject it, so
+      // this removes the queue item under a query which then succeeds - an orphaned result carrying
+      // no rejection, which has to stay as quiet as it was before the cancellation rode on it
+      const pending = queue
+        .executeInQueue('delay', queryKey, { delay: 300, result: '1' }, QueuePriority.Background)
+        .catch(e => e);
+
+      const deadline = Date.now() + 750;
+      while (delayCount === startedCount && Date.now() < deadline) {
+        await pausePromise(10);
+      }
+      expect(delayCount).toEqual(startedCount + 1);
+
+      await queue.cancelQuery(queue.redisHash(queryKey), null);
+      await pending;
+      await awaitProcessing();
+
+      const events = logger.mock.calls.map(([message]) => message);
+      expect(events).toContain('Orphaned execution result');
+      expect(events).not.toContain('Error while querying');
+
+      const [, orphanedPayload] = logger.mock.calls.find(([message]) => message === 'Orphaned execution result')!;
+      expect(orphanedPayload.warning).toBeUndefined();
+      expect(orphanedPayload.cancellationError).toBeUndefined();
+    });
+
     test('cancelled query is not reported as an error', async () => {
       cancelledQuery = null;
 

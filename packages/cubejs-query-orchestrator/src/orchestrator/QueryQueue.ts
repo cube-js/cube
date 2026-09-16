@@ -858,8 +858,7 @@ export class QueryQueue {
     try {
       let executionResult;
       let queryExecutionFinished = false;
-      // Kept until the queue tells us whether the query was cancelled, see setResultAndRemoveQuery
-      // below. The duration is snapshotted with it, because the reporting happens after the cancel
+      // The duration is snapshotted with the error, because the reporting happens after the cancel
       // and the ack, which a lazy measurement would count as query time.
       let executionError: { error: any, duration: number } | null = null;
       // Set by the query handler's setCancelHandler callback once execution begins.
