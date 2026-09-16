@@ -357,8 +357,8 @@ Letting an AI client edit your semantic model is safe because of five constraint
 into the MCP server:
 
 - **Edits never touch production.** Every write goes to a personal dev branch named
-  `dev-<user>-<hash>`. The write tools reject any branch that isn't a dev branch, so
-  the deploy branch is never writable over MCP.
+  `dev-<user>-<hash>`. `writeDataModelFile` and `deleteDataModelFile` reject any branch
+  that isn't a dev branch, so no file edit can land on the deploy branch directly.
 - **`startDataModelEdit` is the only entry point.** It returns the dev `branchName`, and
   `writeDataModelFile` and `deleteDataModelFile` require it. There is no way to write
   without going through it first.

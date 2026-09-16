@@ -432,25 +432,39 @@ Use session ID in [signed embedding][ref-signed-embedding].
 
 ## Revoke a session
 
+Call this from your application's logout handler to end an embed session from the
+server side, rather than relying on its token to expire on its own. Removing the
+embedded iframe on logout is still required — revoking a session doesn't tear it down.
+
 ```text
 POST https://{accountName}.cubecloud.dev/api/v1/embed/session/revoke
 ```
 
-Call this from your application's logout handler to end an embed session from the
-server side, rather than relying on its token to expire on its own. Removing the
-embedded iframe on logout is still required — revoking a session doesn't tear it down.
+### Request Body
 
 ```json
 { "sessionId": "abc123def456..." }
 ```
 
-Pass the `sessionId` that Generate Session returned. It works on a session in either
-state: an id that hasn't been exchanged for a token yet can no longer be redeemed, and
-the token an already-exchanged id produced is rejected from that point on. The call is
-idempotent — revoking an unknown, expired, or already-revoked id also returns `204`, so
-the response alone doesn't tell you whether a token was actually revocable. It requires
-the same admin `Api-Key` authentication as Generate Session, and returns `403` if
-embedding isn't enabled for the account.
+Pass the `sessionId` that Generate Session returned. It requires the same admin
+`Api-Key` authentication as Generate Session.
+
+### Response
+
+Returns `204 No Content` on success, with no response body. It works on a session in
+either state: an id that hasn't been exchanged for a token yet can no longer be
+redeemed, and the token an already-exchanged id produced is rejected from that point on.
+
+The call is idempotent — revoking an unknown, expired, or already-revoked id also
+returns `204`, so the response alone doesn't tell you whether a token was actually
+revocable. Returns `403` if embedding isn't enabled for the account.
+
+```bash title="Bash" cURL
+curl -X POST "https://your-account.cubecloud.dev/api/v1/embed/session/revoke" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Api-Key YOUR_API_KEY" \
+  -d '{"sessionId": "abc123def456..."}'
+```
 
 <Note>
 
