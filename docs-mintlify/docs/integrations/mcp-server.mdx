@@ -502,8 +502,10 @@ the full changed-file list even when the patch itself is trimmed.
 
 Once `writeDataModelFile` edits compile and `runQuery` confirms they return the right
 data, call `commitDataModelChanges` to land them on the branch the dev branch forked
-from — or `commitToNewBranch` to put them on a new branch instead, optionally with a
-pull request. Use `switchUserBranch` to point your own Cube UI at the result so you can
+from — the deploy branch itself, live, if that's where the dev branch came from, so see
+[How model edits stay safe](#how-model-edits-stay-safe) before committing that way — or
+`commitToNewBranch` to put them on a new branch instead, optionally with a pull request.
+Use `switchUserBranch` to point your own Cube UI at the result so you can
 see it. `mergeToDefaultBranch` is the publish step: it makes the branch live for
 everyone, so call it only when you want the change in production — it can't be undone
 from the response it returns. Call `getBranchState` to see whether the MCP session's
