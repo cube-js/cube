@@ -1,6 +1,6 @@
 ---
 title: Control Plane API
-description: REST surface for automating Cube Cloud deployments, environments, JWT issuance, audit log export, and dashboard PDF/PNG export.
+description: REST surface for automating Cube deployments, environments, JWT issuance, audit log export, and dashboard PDF/PNG export.
 ---
 
 Control Plane API enables programmatic management of [deployments][ref-deployments]
@@ -413,8 +413,11 @@ reports: one API key produces a correctly-scoped file per person, instead of
 one key per person, and only the identity that submitted a job can poll or
 download it. Submitting returns `403` when the account has data downloads
 restricted — including an on-behalf-of export, which deliberately does not
-bypass that setting the way a built-in scheduled notification does. See the
-[API reference][ref-api-reference] for the full request and response schema.
+bypass that setting the way a built-in scheduled notification does — and
+`429` when too many exports are already in flight for the identity being
+rendered as, so fan out per-recipient reports with a bounded number of jobs
+open at a time. See the [API reference][ref-api-reference] for the full
+request and response schema.
 
 [ref-dashboard-download]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
 [ref-api-reference]: /api-reference/dashboard-exports/export-a-dashboard-as-png-or-pdf
