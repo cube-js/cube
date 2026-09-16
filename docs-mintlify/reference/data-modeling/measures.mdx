@@ -529,8 +529,9 @@ parameters documented below; those apply to fixed-size windows, which are select
 period-to-date logic across many measures without writing each one by hand, see
 [reusing period-to-date logic][ref-recipe-period-to-date].
 
-The `year_to_date`, `quarter_to_date`, and `month_to_date` types are deprecated
-equivalents of `to_date` with the matching `granularity`.
+The `year_to_date`, `quarter_to_date`, and `month_to_date` types are deprecated. On the
+legacy planner they are equivalent to `to_date` with the matching `granularity`.
+Tesseract recognizes only `to_date`, so use `to_date` with an explicit `granularity`.
 
 #### `offset`
 

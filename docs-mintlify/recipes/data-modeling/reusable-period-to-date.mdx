@@ -211,9 +211,8 @@ other period. This too requires Tesseract — on the legacy planner a custom gra
 name in a `to_date` window compiles but fails at query time.
 
 A name of your own also has to be declared under `granularities` on the very time
-dimension the query groups by. Unlike a default name, it has nothing to fall back to:
-Tesseract fails the query with `Rolling window granularity '<name>' is not found in time
-dimension` rather than silently reporting Gregorian periods.
+dimension the query groups by. Unlike a default name, it has nothing to fall back to, so
+the query fails outright rather than silently reporting Gregorian periods.
 
 ```yaml
 {{ ptd.to_date_measures("revenue", "amount", periods=["fiscal_year"]) }}
