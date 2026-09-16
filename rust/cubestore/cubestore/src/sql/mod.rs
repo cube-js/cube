@@ -3756,8 +3756,8 @@ mod tests {
     ///
     /// A `SELECT DISTINCT` over a `UNION ALL` stops deduplicating when the query also
     /// carries a top-level `ORDER BY ... LIMIT` and the input crosses a record batch
-    /// (> 2048 rows): duplicate keys survive the DISTINCT, so any aggregate over it is
-    /// silently inflated. Here March returns 1401 rows for 1100 distinct keys.
+    /// (> 2048 rows): duplicate keys survive the DISTINCT, so a `count(*)` over the key
+    /// set exceeds the number of distinct keys -- which this query's algebra cannot produce.
     ///
     /// The issue was reported against a Tesseract `multi_stage` measure whose plan joins
     /// two per-key leaf aggregations back to such a key set, but neither the join nor the
@@ -3880,7 +3880,7 @@ SELECT "m", count(*) "keys" FROM keys GROUP BY 1{}"#,
                                     assert_eq!(counts(&result), expected, "suffix: {:?}", suffix);
                                 }
 
-                                // Together: currently returns [1100, 1401].
+                                // Both clauses together -- the case the controls above isolate.
                                 let result = service
                                     .exec_query(&query(" ORDER BY 1 ASC LIMIT 10000"))
                                     .await?
@@ -3907,15 +3907,14 @@ SELECT "m", count(*) "keys" FROM keys GROUP BY 1{}"#,
     /// DISTINCT key set built from their UNION ALL, a LEFT JOIN back to each leaf, and a
     /// top-level `ORDER BY ... LIMIT`.
     ///
-    /// Each month holds 1100 orders, so each must return 1100. Before the limit pushdown was
-    /// scoped to the aggregate that owns the limit, widening the range so the join input crossed a
-    /// record batch boundary (> 2048 keys) made the same query over the same table return 1401 for
-    /// March -- more than the number of keys feeding the sum, because the inner CTEs were reordered
-    /// under a merge that had been planned against their old order and the streaming DISTINCT above
-    /// it then emitted duplicate keys.
+    /// Each month holds 1100 orders, so each must return 1100 whatever date range is asked for.
+    /// The sum can only exceed the number of keys feeding it if the key set carries duplicates,
+    /// which happens when the CTEs are reordered under a merge planned against another ordering
+    /// and the streaming DISTINCT above it stops seeing equal keys adjacent.
     ///
-    /// It took BOTH the top-level ORDER BY and the LIMIT: the LIMIT is what made a descriptor exist
-    /// at all, the ORDER BY is what made it a non-trivial permutation of the group key.
+    /// The shape needs BOTH the top-level ORDER BY and the LIMIT: the LIMIT is what makes a
+    /// descriptor exist at all, the ORDER BY is what makes it a non-trivial permutation of the
+    /// group key. Neither may be dropped when trimming this query.
     #[test]
     fn multi_stage_gated_join_with_sort_and_limit() {
         // Planning this query recurses deeply enough to overflow libtest's default 2 MiB
@@ -4062,7 +4061,8 @@ LIMIT 10000"#,
                     .await?;
                 assert_eq!(tickets(&march), vec![ORDERS_PER_MONTH as i64]);
 
-                // Same table, same query, wider range: returned [1100, 1401] before the fix.
+                // Same table and query as the two cases above; the range width is the only
+                // difference, and it is what pushes the key set across a record batch.
                 let both_months = service
                     .exec_query(&tickets_by_month(
                         "2026-02-01T00:00:00.000",
