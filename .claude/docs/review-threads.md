@@ -12,14 +12,23 @@ it is worth keeping afterwards — what you need back is a verdict per thread, n
 the threads.
 
 So do the whole of this file in one `Task` subagent, launched once you have your
-findings and before you post any of them. Hand it the findings; it pages the
-threads, resolves your stale ones, and returns the verdicts. Give it:
+findings and before you post any of them. It pages the threads, resolves your
+stale ones, and returns the verdicts. Give it:
 
 - the repo and PR number, and your login — `claude` in CI
 - each finding you are about to post, as `path:line` plus a sentence of the
   concern (the root cause, enough that a duplicate is recognisable)
 - this file's rules, and a request for exactly two things back: the thread ids
   it resolved, and per finding POST or SKIP with the thread id behind a SKIP
+
+**Launch it on every review round, including rounds with zero findings.** The two
+jobs below are independent: resolving your own stale threads is unconditional and
+is about the threads a *previous* round left behind, while duplicate-avoidance is
+what the findings list is for. A round that posts nothing inline — every finding
+landed in the tracking comment, or the diff came back clean — is exactly the round
+after which a previous round's threads are most likely to be stale, so skipping
+the subagent there leaves them open forever. With no findings to hand over, pass
+an empty findings list and ask only for the resolved thread ids.
 
 The tracking comment is not one of these threads — it is a top-level comment, so
 it never appears in the list below, and fetching the top-level comments to find it

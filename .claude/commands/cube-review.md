@@ -80,5 +80,15 @@ reader expands when they want details.
 Leave a blank line after `<summary>` and before `</details>`, otherwise GitHub
 won't render the markdown inside (tables and lists especially).
 
-For review-thread hygiene — resolving your own stale threads and not
-re-posting an inline comment you already have — follow @.claude/docs/review-threads.md
+Review-thread hygiene is two separate jobs, and the rules for both are in
+@.claude/docs/review-threads.md
+
+1. **Resolve your own stale threads.** Unconditional, every round. It is about
+   threads a previous round left behind, so it does not depend on this round
+   having found anything: run it even when you post no inline comments at all.
+2. **Do not re-post an inline comment you already have.** Only applies when this
+   round has findings to post.
+
+Both happen in the one subagent described there. Report in the tracking
+comment what it did, including "no prior threads" when the list came back empty —
+a review that says nothing about threads reads as a review that skipped the step.
