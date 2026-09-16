@@ -119,6 +119,7 @@ Either grant **Full access** (a shortcut that enables every current and future d
 | Data Model  | View data model                     | Read data model files and dev branches.                                                                                                                                   |
 | Data Model  | Edit data model                     | Edit the data model on any branch, including the main/deploy branch. Allows committing and merging to main, force-syncing main, and starting dev mode against main.       |
 | Data Model  | Edit data model on dev branches     | Edit the data model only on non-default branches. Blocks any write that targets the main/deploy branch (including merging to main).                                       |
+| Data Model  | Access SQL Runner                   | Open the SQL Runner and execute queries in it.                                                                                                                            |
 | AI          | Access AI agents                    | Use the agent in Analytics Chat, workbooks, the IDE, and dashboards.                                                                                                      |
 | AI          | Create scheduled tasks              | Create [scheduled tasks][ref-scheduled-tasks] in the deployment, from the **Scheduled** page, by asking the agent, or with the Platform API. Editing, pausing, running, and deleting a task stay with its creator or an admin. Granted by default to the built-in Viewer, Explorer, and Developer roles. |
 | Monitoring  | Access query history                | View deployment query history, performance, and traces.                                                                                                                   |
@@ -134,6 +135,8 @@ When **Full access** is checked, the granular checkboxes appear checked and disa
 <Note>
 
 A custom role saved before **Create scheduled tasks** existed holds it on every deployment where the role grants **Access deployment** or **Access AI agents**, and on all deployments if it grants **Manage deployments (account-wide)**. The role editor shows it checked, and saving stores what the editor shows. To withhold it, uncheck it and save the role. Roles stack, so a user keeps it while any of their roles grants it.
+
+**Access deployment** (`DeploymentRead`) and **Download data** (`DownloadData`) are exempt from the [auto-bump](#auto-bump-to-developer) because Viewers need them just to open a deployment and download data from it. That section lists the full set of exempt actions.
 
 </Note>
 
@@ -321,6 +324,7 @@ This section lists every action a custom role can grant. The internal action nam
 | `SchemaRead`              | View data model                                             |
 | `SchemaUpdate`            | Edit data model                                             |
 | `SchemaUpdateDevBranches` | Edit data model on dev branches                             |
+| `SqlRunnerRead`           | Access SQL Runner                                           |
 | `DeploymentAgentRead`     | Access AI agents                                            |
 | `ScheduledTasksCreate`    | Create scheduled tasks                                      |
 | `APMRead`                 | Access query history                                        |
