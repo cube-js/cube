@@ -12631,7 +12631,7 @@ fast-xml-builder@^1.1.5:
     path-expression-matcher "^1.6.2"
     xml-naming "^0.3.0"
 
-fast-xml-parser@5.7.2, fast-xml-parser@^5.0.7, fast-xml-parser@^5.3.4, fast-xml-parser@^5.4.1:
+fast-xml-parser@^5.0.7, fast-xml-parser@^5.3.4, fast-xml-parser@^5.4.1:
   version "5.7.2"
   resolved "https://registry.yarnpkg.com/fast-xml-parser/-/fast-xml-parser-5.7.2.tgz#fecd0b054c6c132fc03dab994a413da781e0eb9f"
   integrity sha512-P7oW7tLbYnhOLQk/Gv7cZgzgMPP/XN03K02/Jy6Y/NHzyIAIpxuZIM/YqAkfiXFPxA2CTm7NtCijK9EDu09u2w==
