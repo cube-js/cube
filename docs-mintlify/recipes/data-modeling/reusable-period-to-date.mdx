@@ -216,7 +216,8 @@ and a granularity defined that way must be named after a default granularity, so
 
 A fixed-length period is different: a [custom granularity][ref-custom-granularities]
 defined with `interval` does carry a name of your own, and the macro takes it like any
-other period.
+other period. This too requires Tesseract — on the legacy planner a custom granularity
+name in a `to_date` window compiles but fails at query time.
 
 ```yaml
 {{ ptd.to_date_measures("revenue", "amount", periods=["fiscal_year"]) }}

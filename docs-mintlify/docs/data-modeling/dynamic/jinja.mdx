@@ -212,7 +212,10 @@ cubes:
           {{ common.cents_to_dollars('amount') }}
 ```
 
-The import path is relative to the `model/` directory.
+The import path is relative to the `model/` directory. `cents_to_dollars` expands to a
+single line, so the block scalar alone is enough. A macro that can emit more than one line
+also needs the [`indent`][jinja-docs-filters-indent] filter — see [emitting SQL from a
+macro](#emitting-sql-from-a-macro).
 
 ### Escaping unsafe strings
 
