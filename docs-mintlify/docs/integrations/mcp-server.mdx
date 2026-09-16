@@ -299,7 +299,7 @@ programmatically. Creating and editing workbooks requires the Explorer role or h
 | `readReport` | Reads one workbook report or standalone exploration by id — its title, SQL, chart spec, placement, and a shareable URL. | Read-only |
 | `updateReport` | Edits an existing workbook report or exploration in place, keeping its `reportId`. Send only the fields you want to change. | Destructive — prompts |
 | `deleteReport` | Deletes a workbook report or exploration. | Destructive — prompts |
-| `manageFolders` | Lists, creates, renames, moves, or deletes the [workspace folders][ref-folders] standalone explorations, workbooks, and dashboards are filed in. | Destructive — prompts |
+| `manageFolders` | Lists, creates, renames, moves, or deletes the [workspace folders][ref-folders] that standalone explorations, workbooks, and dashboards are filed in. | Destructive — prompts |
 | `updateDashboard` | Saves the dashboard layout to the workbook **draft**. Replaces the full widget set and does not go live. | Destructive — prompts |
 | `publishDashboard` | Publishes the current draft to make it live. Idempotent — republishing an unchanged draft is a no-op. | Destructive — prompts |
 
@@ -309,8 +309,9 @@ published dashboard keeps serving its previous version until you approve
 
 Call `manageFolders` with `action: "list"` first to get a folder's numeric id — that id,
 not its name, is what `folderId` takes on `createReport` and `updateReport` to place a
-standalone exploration inside it. Its delete is [narrower than deleting a folder from
-the Workspace page][ref-deleting-folders].
+standalone exploration inside it. The annotation covers the whole tool, so a client
+prompts for `list` as it would for `delete`. Its delete is [narrower than deleting a
+folder from the Workspace page][ref-deleting-folders].
 
 **To change an existing report, use `updateReport` — never recreate it.** A dashboard's
 chart widget points at a specific `reportId`, so replacing a report with a new one orphans
@@ -407,10 +408,7 @@ flow instead of asking you to click through it.
 
 Call `getBranchState` before editing, so work doesn't land on a branch you never look
 at, and again after committing, to see whether you still need `switchUserBranch` to see
-it. `commitDataModelChanges` refuses to commit a dev branch
-whose parent is the deploy branch unless the call also sets
-`confirmPublishToDefaultBranch` — publishing that way should only happen once you've
-said so. `mergeToDefaultBranch` is separate from committing: it publishes an already
+it. `mergeToDefaultBranch` is separate from committing: it publishes an already
 committed branch, and its description tells the agent to call it only when you've
 explicitly asked to publish or merge to production.
 
