@@ -27,7 +27,7 @@ That is what makes the endpoints usable for your own comment UI. It also means *
 
 ## Authentication
 
-Every endpoint requires a **signed embed session scoped to an embed tenant**. Mint one with [Generate Session][ref-generate-session] using `externalId`. `embedTenantName` is optional and these endpoints answer either way — omit it and the session falls back to your own account's tenant name. **Pass it anyway if you embed for more than one customer:** that name is what separates one customer's conversation from another's, and sessions that omit it all share a single one. See [A conversation lives inside a single embed tenant](#a-conversation-lives-inside-a-single-embed-tenant).
+Every endpoint requires a **signed embed session scoped to an embed tenant**. Mint one with [Generate Session][ref-generate-session] using `externalId`. `embedTenantName` is optional and these endpoints answer either way, but it is what separates one customer's conversation from another's — see [A conversation lives inside a single embed tenant](#a-conversation-lives-inside-a-single-embed-tenant).
 
 A session minted with `internalId` cannot comment. Such a session resolves its user from Cube's own user table and so carries no embed tenant by design, and these endpoints reject it with `403 Forbidden`. A [Cube API key][ref-api-keys] and a console session are rejected the same way.
 
