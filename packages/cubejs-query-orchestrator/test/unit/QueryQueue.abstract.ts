@@ -233,8 +233,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         expect(events).toContain('Error while querying');
         expect(events).toContain('Queue storage error');
       } finally {
-        // the cancel threw before the result was set, so the item is still active: left behind it
-        // is reaped as an orphan during a later test, whose events and cancelled query it joins
+        // the cancel threw before the result was set, so the item is still active - remove it here
+        // or a later test picks it up as an orphan and inherits its events and cancelled query
         failCancelMessage = false;
         await queue.cancelQuery(queue.redisHash(query), null);
       }
