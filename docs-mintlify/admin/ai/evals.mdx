@@ -104,8 +104,7 @@ background. The run list shows live progress and then the outcome:
 
 Open a run to see per-question results: the question list on the left, with a
 pass/fail icon for each, and the selected question's detail on the right. The
-header repeats the run's scope next to **Questions** — the file it ran, or
-**All questions**.
+run's scope is repeated in the header, next to **Questions**.
 
 - **Assessment** — `pass`, `fail`, `review`, or `error`.
 - **Score reason** — when a question doesn't pass, a tag categorizing why:
@@ -150,7 +149,7 @@ Verdicts:
 ## Limitations
 
 - Questions are authored as code only; the **Questions** tab is read-only.
-- Very large question sets can be slow to run — split them across
-  `agents/eval_questions/*.yml` files and scope the run to one file.
+- Very large question sets can be slow to run in full. To iterate faster, split
+  them across `agents/eval_questions/*.yml` files and scope the run to one file.
 - Grading is execution-based on the result set; it does not semantically judge
   prose answers.
