@@ -362,13 +362,8 @@ into the MCP server:
   `writeDataModelFile` and `deleteDataModelFile` require it. There is no way to write
   without going through it first.
 - **Publishing to production needs an explicit ask.** `mergeToDefaultBranch` — the tool
-  that publishes an already-committed branch — is marked destructive so a client always
-  prompts for confirmation. `commitDataModelChanges` is a second route to production: a
-  dev branch created from the deploy branch commits straight onto it, live,
-  when the call sets `confirmPublishToDefaultBranch`. That tool is **not** marked
-  destructive, so a client isn't guaranteed to prompt before calling it — the guard there
-  is the tool's own description, which tells the agent to set that flag only once you've
-  said so, never to retry a refusal on its own. See [Committing and publishing
+  that publishes an already-committed branch — is marked destructive, so a client always
+  prompts for confirmation. See [Committing and publishing
   changes](#committing-and-publishing-changes).
 - **Registration is permission-gated.** Every tool in Data model editing, Committing and
   publishing changes, and Pre-aggregations — the six model-editing tools, `getBranchDiff`,
@@ -378,6 +373,17 @@ into the MCP server:
 - **Verification happens on the branch, before a merge, not after.** Pass the dev
   `branchName` to `runQuery` to check that an edit returns the right data — `valid: true`
   from `writeDataModelFile` only means the model compiles, not that it's correct.
+
+<Warning>
+
+`commitDataModelChanges` is a second route to production: a dev branch created from the
+deploy branch commits straight onto it, live, when the call sets
+`confirmPublishToDefaultBranch`. That tool is **not** annotated destructive, so a client
+isn't guaranteed to prompt first — the only guard is the tool's own description, which
+tells the agent to set the flag only on your explicit say-so, never to retry a refusal on
+its own.
+
+</Warning>
 
 Review pending work with `getDataModelChanges` before you commit.
 
@@ -391,7 +397,7 @@ them without ever using the Cube UI.
 
 | Tool | Description | Access |
 | --- | --- | --- |
-| `getBranchState` | Reports the branch this session works on, the branch the user is looking at in the Cube console, the deploy branch, and whether the session's branch has uncommitted edits. | Read-only |
+| `getBranchState` | Reports the branch this session works on, the branch the user is looking at in the Cube UI, the deploy branch, and whether the session's branch has uncommitted edits. | Read-only |
 | `commitDataModelChanges` | Commits the dev branch's edits onto the branch it was created from. | Write |
 | `commitToNewBranch` | Commits the dev branch's edits to a new branch instead, optionally opening a pull request. | Write |
 | `mergeToDefaultBranch` | Merges a committed branch into the deploy branch, making it live for everyone. | Destructive — prompts |
@@ -502,11 +508,11 @@ the full changed-file list even when the patch itself is trimmed.
 Once `writeDataModelFile` edits compile and `runQuery` confirms they return the right
 data, call `commitDataModelChanges` to land them on the branch the dev branch forked
 from — or `commitToNewBranch` to put them on a new branch instead, optionally with a
-pull request. Offer `switchUserBranch` so you can see the result in the Cube console.
-Only call `mergeToDefaultBranch` once you've explicitly asked to publish; it makes the
+pull request. Use `switchUserBranch` to point the user's console at the result so they
+can see it. Publish only when the user has asked to: `mergeToDefaultBranch` makes the
 branch live for everyone and can't be undone from the response it returns. Call
-`getBranchState` at any point to check which branch you and the session are each on, and
-`discardDataModelChanges` to throw away an edit that isn't working out.
+`getBranchState` at any point to check which branch the user and the MCP session are
+each on, and `discardDataModelChanges` to throw away an edit that isn't working out.
 
 ### Verify a pre-aggregation
 

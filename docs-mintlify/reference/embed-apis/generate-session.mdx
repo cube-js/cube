@@ -455,10 +455,9 @@ embedding isn't enabled for the account.
 <Note>
 
 Revocation only affects the embed session token, not a Cube API token obtained from
-`POST /api/v1/deployments/{deploymentId}/token` — that's a separate credential. Cube
-Cloud rolls this out continuously with no version number to check against; the only
-tokens it doesn't cover are ones minted before your account received the update, and
-those still expire on their own within 24 hours.
+`POST /api/v1/deployments/{deploymentId}/token` — that's a separate credential. Embed
+tokens minted before your account received this feature aren't revocable and expire on
+their own within 24 hours.
 
 </Note>
 
