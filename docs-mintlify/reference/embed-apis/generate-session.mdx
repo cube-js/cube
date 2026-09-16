@@ -17,7 +17,7 @@ The Generate Session API requires your [Cube Cloud API key][ref-api-keys] for au
 
 If the API key is [scoped to specific deployments][ref-api-keys], the `deploymentId` in the request body must be within the key's scope; otherwise the request is rejected with `403 Forbidden`. Unscoped keys can mint sessions for any deployment.
 
-The deployment-scope restriction is specific to Generate Session. [Revoke a session](#revoke-a-session) requires an admin key, but its scope is not checked: the request body carries only a `sessionId`, so a key scoped to one deployment can revoke a session belonging to any deployment in the account.
+The deployment-scope restriction above is specific to Generate Session; see [Revoke a session](#revoke-a-session) for how that endpoint's authorization differs.
 
 ## Endpoint
 
@@ -444,6 +444,10 @@ POST https://{accountName}.cubecloud.dev/api/v1/embed/session/revoke
 Call this from your application's logout handler to end an embed session from the
 server side. Pass the `sessionId` that Generate Session returned, and still remove the
 embedded iframe on logout — revoking a session doesn't tear it down on its own.
+
+It requires an admin key, but unlike Generate Session, that key's scope is not
+checked: the request body carries only a `sessionId`, so a key scoped to one
+deployment can revoke a session belonging to any deployment in the account.
 
 See [Revoke an Embed Session][ref-revoke-session] for the full request, response, and
 authentication reference.
