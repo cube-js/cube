@@ -121,11 +121,9 @@ docked in the header in [Creator Mode](/embedding/iframe/creator-mode),
 floating over the dashboard in the published-dashboard embed — with **Download
 as PNG** and **Download as PDF** for the whole dashboard. `allowExport` is the
 single switch that grants all of these — there is no way to allow one format
-while blocking another. (`showDashboardExportMenu=false`, below, can still
-hide the dashboard-level menu while keeping per-widget export.) Only the
-exact literal string `true` opts in: `allowExport=1`,
-`allowExport=TRUE`, a bare `?allowExport`, and omitting the parameter (the
-default) all leave every download action hidden.
+while blocking another. Only the exact literal string `true` opts in:
+`allowExport=1`, `allowExport=TRUE`, a bare `?allowExport`, and omitting the
+parameter (the default) all leave every download action hidden.
 
 The CSV is generated client-side from the data already loaded into the
 widget, so no additional query is issued. Inside an embed, `allowExport` —
