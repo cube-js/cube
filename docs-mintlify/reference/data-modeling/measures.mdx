@@ -561,6 +561,55 @@ cube(`orders`, {
 
 </CodeGroup>
 
+#### `type` and `granularity`
+
+Set `type` to `to_date` to accumulate from the start of the period that contains each
+data point, instead of over a window of fixed size. The `granularity` parameter names
+that period: a default granularity such as `week`, `month`, `quarter`, or `year`, or a
+[custom granularity][ref-custom-granularities].
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: revenue_year_to_date
+        sql: amount
+        type: sum
+        rolling_window:
+          type: to_date
+          granularity: year
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  measures: {
+    revenue_year_to_date: {
+      sql: `amount`,
+      type: `sum`,
+      rolling_window: {
+        type: `to_date`,
+        granularity: `year`
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+A window of type `to_date` takes neither `trailing` nor `leading`. To apply the same
+period-to-date logic across many measures without writing each one by hand, see
+[reusing period-to-date logic][ref-recipe-period-to-date].
+
+The `year_to_date`, `quarter_to_date`, and `month_to_date` types are deprecated
+equivalents of `to_date` with the matching `granularity`.
+
 ### `multi_stage`
 
 The `multi_stage` parameter is used to define measures that are used with [multi-stage
@@ -1518,3 +1567,4 @@ cube(`orders`, {
 [link-iso-4217]: https://en.wikipedia.org/wiki/ISO_4217
 [ref-calculated-measures]: /docs/data-modeling/measures#calculated-measures
 [ref-schema-ref-preaggs-rollup]: /reference/data-modeling/pre-aggregations#rollup
+[ref-recipe-period-to-date]: /recipes/data-modeling/reusable-period-to-date

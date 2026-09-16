@@ -38,24 +38,12 @@ measures:
       granularity: year
 ```
 
-<Warning>
-
-Rolling windows of type `to_date` are powered by Tesseract, the [next-generation data
-modeling engine][link-tesseract]. In versions before v1.7.0, it was not enabled by
-default.
-
-</Warning>
-
 ### Defining the macro
 
 Put the macro in a `.jinja` file under `model/macros` so that every cube can import it:
 
 ```yaml title="model/macros/period_to_date.jinja"
-{#- Period-to-date measures for one base measure.
-
-    periods defaults to the four standard periods. Pass a shorter list to
-    generate fewer, or the name of a granularity defined on a calendar cube
-    to follow a fiscal or retail calendar. -#}
+{#- Period-to-date measures for one base measure. -#}
 {%- macro to_date_measures(name, sql, type='sum', periods=['week', 'month', 'quarter', 'year']) -%}
 {%- for period in periods %}
       - name: {{ name | safe }}_{{ period | safe }}_to_date
@@ -172,33 +160,44 @@ MTD but not QTD or YTD:
 
 ## Following a fiscal or retail calendar
 
-The `granularity` of a `to_date` window accepts custom granularities, so the same macro
-covers fiscal and retail periods. Define the granularities on a [calendar
-cube][ref-calendar-cubes] and pass their names:
+The macro needs no change to follow a fiscal or retail calendar. A [calendar
+cube][ref-calendar-cubes] overrides what `week`, `month`, `quarter`, and `year` mean, and
+the generated measures pick that up: `{{ ptd.to_date_measures("revenue", "amount") }}`
+already emits `granularity: week` and `granularity: month`, so a five-week retail month
+accumulates over all five of its weeks.
+
+Do not pass a name like `retail_month`. A variable-length period is defined with `sql`,
+and a granularity defined that way must be named after a default granularity, so
+`retail_month` does not compile. See [custom calendars][ref-custom-calendar] for the
+calendar cube itself, including its [pre-aggregation
+requirements][ref-custom-calendar-pre-aggregations].
+
+A fixed-length period is different: a [custom granularity][ref-custom-granularities]
+defined with `interval` does carry a name of your own, and the macro takes it like any
+other period.
 
 ```yaml
-{{ ptd.to_date_measures("revenue", "amount", "sum", ["retail_week", "retail_month"]) }}
+{{ ptd.to_date_measures("revenue", "amount", "sum", ["fiscal_year"]) }}
 ```
-
-Each window then opens on the retail period's own first day rather than a
-`DATE_TRUNC` boundary, so a five-week retail month accumulates over all five of its
-weeks. See [custom calendars][ref-custom-calendar] for the calendar cube itself.
 
 <Warning>
 
-A [pre-aggregation][ref-pre-aggregations] over an overridden granularity must declare that
-granularity. A rollup at a finer granularity is not a correct source: it holds
-`DATE_TRUNC` buckets that the overriding column cannot be recovered from, so the query
-either fails or returns Gregorian periods.
+**Group by the time dimension that carries the override.** The retail periods come from
+the calendar cube's overridden dimension. A query that groups by a dimension without the
+override falls back to `DATE_TRUNC` and returns Gregorian periods, with no error.
 
 </Warning>
 
+Rolling windows over calendar granularities require Tesseract, the [next-generation data
+modeling engine][link-tesseract]. In versions before v1.7.0, it was not enabled by
+default.
 
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
-[ref-rolling-window]: /reference/data-modeling/measures#rolling_window
+[ref-rolling-window]: /reference/data-modeling/measures#type-and-granularity
 [ref-jinja-macros]: /docs/data-modeling/dynamic/jinja#macros
 [ref-jinja-escaping]: /docs/data-modeling/dynamic/jinja#escaping-unsafe-strings
 [ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
+[ref-custom-granularities]: /recipes/data-modeling/custom-granularity
 [ref-custom-calendar]: /recipes/data-modeling/custom-calendar
-[ref-pre-aggregations]: /docs/pre-aggregations/matching-pre-aggregations
+[ref-custom-calendar-pre-aggregations]: /recipes/data-modeling/custom-calendar#pre-aggregations
 [ref-dynamic-rolling-windows]: /recipes/data-modeling/dynamic-rolling-windows
