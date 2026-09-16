@@ -516,7 +516,8 @@ model edits stay safe](#how-model-edits-stay-safe) before committing that way. U
 Either way, use `switchUserBranch` to point your own Cube UI at the result so you can
 see it. `mergeToDefaultBranch` is the publish step: it makes the branch live for
 everyone, so call it only when you want the change in production — no tool reverts it
-afterwards. Use `discardDataModelChanges` to throw away an edit that isn't working out.
+afterwards. Before any of that, `discardDataModelChanges` throws away an edit that
+isn't working out; it resets the dev branch only, so it is not an undo for a merge.
 
 ### Verify a pre-aggregation
 
