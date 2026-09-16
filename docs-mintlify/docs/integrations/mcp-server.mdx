@@ -266,7 +266,8 @@ work together.
 `chat`'s **Read-only** annotation covers only the MCP call itself, not what the agent
 does in response. It's the same agent Analytics Chat uses, with the same write-capable
 tools — creating reports, organizing workspace folders — when the caller's access allows
-it, and folder actions run with no confirmation step. A client that runs `chat`
+it, and the agent's own folder actions run with no confirmation step — unlike
+`manageFolders` below, which a client prompts for. A client that runs `chat`
 automatically because the annotation says read-only can still cause an unconfirmed write
 through the agent's own reply.
 
