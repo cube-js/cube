@@ -19,7 +19,7 @@ The Dashboard Comments API is available on [Premium and above plans](https://cub
 
 **The setting hides the panel; it does not close the API.** It governs whether the built-in comment panel renders on an embedded dashboard, and nothing more — **the endpoints below answer either way**. With the setting off, any embed session that can read the dashboard can still post and read comments through the API.
 
-That is what makes the endpoints usable for your own comment UI. It also means **there is no server-side switch that stops comments being written**: read access to the dashboard is the whole permission, so any session you mint for a viewer carries the ability to comment with it. If comments must not be accepted at all, do not embed that dashboard.
+That is what makes the endpoints usable for your own comment UI. It also means **there is no server-side switch that stops comments being written**: for an embed session scoped to an embed tenant, read access to the dashboard is all it takes to read and post — nothing further is checked before a comment is accepted. If comments must not be accepted at all, do not embed that dashboard.
 
 </Warning>
 
@@ -71,7 +71,7 @@ This is narrower than commenting in the Cube app, where a user with edit rights 
 | Delete a comment | Author | Author |
 | Resolve or re-open a thread | Author, or a workbook editor | Author |
 
-Reading is wider than writing — but only inside one embed tenant. Every embed user of the caller's own embed tenant sees the whole conversation, including threads they did not start.
+Reading is wider than writing — but only inside one embed tenant. Every embed user of the caller's own embed tenant who can read the dashboard sees the whole conversation, including threads they did not start.
 
 ## A conversation lives inside a single embed tenant
 
