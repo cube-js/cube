@@ -449,7 +449,9 @@ POST https://{accountName}.cubecloud.dev/api/v1/embed/session/revoke
 ```
 
 Pass the `sessionId` that Generate Session returned. It requires the same admin
-`Api-Key` authentication as Generate Session.
+`Api-Key` authentication as Generate Session, but not the deployment scope check: a
+session id carries no deployment once redeemed, so a key scoped to one deployment can
+still revoke a session belonging to any deployment in your account.
 
 ### Revoke Response {#revoke-response}
 

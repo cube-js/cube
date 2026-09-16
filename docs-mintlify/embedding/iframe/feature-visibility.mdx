@@ -135,9 +135,9 @@ they are ignored outside `/embed/*`.
 | --- | --- | --- |
 | `allowExport=true` | The grant for export: per chart widget **Download as CSV / PNG / PDF**, the whole-dashboard download menu, and **Download as CSV** in the Creator Mode report builder, where a workbook's queries are authored before publishing. | Dashboards, Creator Mode |
 | `showDashboardExportMenu=false` | Hides the whole-dashboard download menu (in the Creator Mode dashboard header; floating over a published-dashboard embed). A hide switch, not the grant — `allowExport=true` is still what hands out export at all. | Dashboards, Creator Mode |
-| `showDashboardHeader=false` | Hides the entire dashboard header bar. | Dashboards |
-| `showDashboardBackButton=false` | Hides the dashboard header's back button. | Dashboards |
-| `showDashboardTitle=false` | Hides the dashboard title. | Dashboards |
+| `showDashboardHeader=false` | Hides the entire dashboard header bar. | Dashboards, Creator Mode |
+| `showDashboardBackButton=false` | Hides the dashboard header's back button. | Dashboards, Creator Mode |
+| `showDashboardTitle=false` | Hides the dashboard title. | Dashboards, Creator Mode |
 | `showDashboardEditButton=false` | Hides the **Edit** action. Can only hide it — it never shows one to a viewer without edit permission. | Dashboards |
 | `showDashboardDuplicateButton=false` | Hides the **Duplicate** action. | Dashboards |
 | `showWorkbookBackButton=false` | Hides the back button in the Creator Mode **workbook** header. The rest of that header is the authoring flow (name, tabs, Publish, Share), so there is no master switch for it. The workbook actions menu keeps its **View all** item, which reaches the same place. | Creator Mode |
