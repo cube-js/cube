@@ -13,7 +13,8 @@ launched after you have your findings and before you post any of them. Give it:
 - the repo and PR number, and your login — `claude` in CI
 - each finding you have, as `path:line` plus a sentence of the concern (the root
   cause, enough that a duplicate is recognisable) — including findings you have
-  decided not to post inline, since a prior thread may already carry them
+  decided not to post inline, so that a thread still carrying one is not
+  resolved as stale
 - this file's rules, and a request for exactly three things back: how many of
   your own threads the listing returned (0 when it came back empty), the thread
   ids it resolved, and per finding POST or SKIP with the thread id behind a SKIP

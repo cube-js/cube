@@ -84,6 +84,7 @@ Every round, including one with nothing to post inline, resolve your own stale
 review threads and check new findings against existing ones, following
 @.claude/docs/review-threads.md
 
-State the outcome inside the tracking comment's `<details>` — resolved N,
-re-affirmed N, or "no prior threads". A review silent on threads reads as one
-that skipped the step.
+State the outcome inside the tracking comment's `<details>` — how many of your
+own threads the listing returned, and of those how many you resolved and how
+many you re-affirmed ("no prior threads" when the count is 0). A review silent
+on threads reads as one that skipped the step.
