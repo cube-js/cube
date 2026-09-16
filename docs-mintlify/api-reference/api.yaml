@@ -5290,7 +5290,7 @@ paths:
               },
               {
                 "resourceType": "Deployment",
-                "actions": ["DeploymentRead", "SchemaRead", "PlaygroundRead"],
+                "actions": ["DeploymentRead", "SchemaRead", "SqlRunnerRead"],
                 "resources": ["1734"]
               }
             ]
