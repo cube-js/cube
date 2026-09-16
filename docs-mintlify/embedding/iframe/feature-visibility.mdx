@@ -133,13 +133,13 @@ they are ignored outside `/embed/*`.
 
 | Parameter | Effect | Surface |
 | --- | --- | --- |
-| `allowExport=true` | Offers per-widget **Download as CSV / PNG / PDF** on chart widgets. The single switch for all three formats. | Dashboards |
-| `showDashboardExportMenu=false` | Hides the whole-dashboard download menu (in the Creator Mode dashboard header; floating over a published-dashboard embed). A hide switch, not the grant — `allowExport=true` is still what hands out export at all. | Dashboards |
-| `showDashboardHeader=false` | Hides the entire dashboard header bar. | Dashboards |
-| `showDashboardBackButton=false` | Hides the dashboard header's back button. | Dashboards |
-| `showDashboardTitle=false` | Hides the dashboard title. | Dashboards |
-| `showDashboardEditButton=false` | Hides the **Edit** action. Can only hide it — it never shows one to a viewer without edit permission. | Dashboards |
-| `showDashboardDuplicateButton=false` | Hides the **Duplicate** action. | Dashboards |
+| `allowExport=true` | The grant for export: per chart widget **Download as CSV / PNG / PDF**, the whole-dashboard download menu, and **Download as CSV** in the Creator Mode report builder, where a workbook's queries are authored before publishing. | Dashboards, Creator Mode |
+| `showDashboardExportMenu=false` | Hides the whole-dashboard download menu (in the Creator Mode dashboard header; floating over a published-dashboard embed). A hide switch, not the grant — `allowExport=true` is still what hands out export at all. | Dashboards, Creator Mode |
+| `showDashboardHeader=false` | Hides the entire dashboard header bar. | Dashboards, Creator Mode |
+| `showDashboardBackButton=false` | Hides the dashboard header's back button. | Dashboards, Creator Mode |
+| `showDashboardTitle=false` | Hides the dashboard title. | Dashboards, Creator Mode |
+| `showDashboardEditButton=false` | Hides the **Edit** action. Can only hide it — it never shows one to a viewer without edit permission. | Dashboards, Creator Mode |
+| `showDashboardDuplicateButton=false` | Hides the **Duplicate** action. | Dashboards, Creator Mode |
 | `showWorkbookBackButton=false` | Hides the back button in the Creator Mode **workbook** header. The rest of that header is the authoring flow (name, tabs, Publish, Share), so there is no master switch for it. The workbook actions menu keeps its **View all** item, which reaches the same place. | Creator Mode |
 | `locale=es-MX` | Sets the embed's UI language, overriding `settings.locale`. See [Localization](/embedding/iframe/localization). | All |
 | `timezone=America/New_York` | Sets the time zone agent queries run in, overriding `settings.timezone`. See [Time zones](/embedding/iframe/time-zones). | All |
@@ -149,7 +149,10 @@ in its own chrome otherwise ends up with two of everything — most visibly two
 back buttons that navigate to different places. Each control is its own switch
 because which of them duplicate yours is your decision; `showDashboardHeader=false`
 is the shortcut for all of them, and hiding the last remaining control collapses
-the bar for you.
+the bar for you. These switches govern the same header in Creator Mode's dashboard
+view too, which renders the identical back button, title, Edit, Duplicate, and
+download-menu controls — a different header from the workbook-editing one
+`showWorkbookBackButton` controls, which has no master switch of its own.
 
 ### How values are parsed {#parsing}
 
