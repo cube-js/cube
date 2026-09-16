@@ -149,7 +149,10 @@ in its own chrome otherwise ends up with two of everything — most visibly two
 back buttons that navigate to different places. Each control is its own switch
 because which of them duplicate yours is your decision; `showDashboardHeader=false`
 is the shortcut for all of them, and hiding the last remaining control collapses
-the bar for you.
+the bar for you. All five govern the same header in Creator Mode's dashboard view
+too, which renders the identical back button, title, Edit, and Duplicate controls —
+a different header from the workbook-editing one `showWorkbookBackButton` controls,
+which has no master switch of its own.
 
 ### How values are parsed {#parsing}
 
