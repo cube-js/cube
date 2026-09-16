@@ -356,7 +356,7 @@ variable is set without ever seeing what it is set to.
 Letting an AI client edit your semantic model is safe because of five constraints built
 into the MCP server:
 
-- **Edits never touch production.** Every write goes to a personal dev branch named
+- **File writes never touch production.** Every write goes to a personal dev branch named
   `dev-<user>-<hash>`. `writeDataModelFile` and `deleteDataModelFile` reject any branch
   that isn't a dev branch, so no file edit can land on the deploy branch directly.
 - **`startDataModelEdit` is the only entry point.** It returns the dev `branchName`, and
