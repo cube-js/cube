@@ -245,7 +245,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       expect(logger.mock.calls[3][0]).toEqual('Error while querying');
     });
 
-    test('a failing cancel does not swallow the query error', async () => {
+    test('a timeout is reported before a failing cancel can lose it', async () => {
       failCancelMessage = true;
 
       const query: QueryKey = ['select * from 4', []];
@@ -308,9 +308,10 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
       // the delay handler resolves on its own timer and its cancel handler does not reject it, so
       // this removes the queue item under a query which then succeeds - an orphaned result carrying
-      // no rejection, which has to stay as quiet as it was before the cancellation rode on it
+      // no rejection, which has to stay as quiet as it was before the cancellation rode on it. The
+      // delay has to outlast the cancel round trip, which is a network call on the Cube Store driver
       const pending = queue
-        .executeInQueue('delay', queryKey, { delay: 300, result: '1' }, QueuePriority.Background)
+        .executeInQueue('delay', queryKey, { delay: 1000, result: '1' }, QueuePriority.Background)
         .catch(e => e);
 
       const deadline = Date.now() + 750;

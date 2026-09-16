@@ -1026,10 +1026,8 @@ export class QueryQueue {
         executionError = { error: e, duration: ((new Date()).getTime() - startQueryTime) };
 
         if (e instanceof TimeoutError) {
-          // A timeout fires on the clock rather than because anything cancelled the query, so it
-          // needs nothing from the ack to know it is a failure. Reporting it here keeps it one
-          // whether or not the item had already been reaped, and leaves nothing pending over the
-          // cancel below.
+          // A timeout is a failure whatever the ack says - nothing cancelled the query, the clock
+          // ran out - so it is reported here rather than held for the ack below.
           logExecutionError(executionError);
           executionError = null;
 
