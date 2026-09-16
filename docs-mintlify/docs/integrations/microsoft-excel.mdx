@@ -164,9 +164,9 @@ filters are dropped from the totals query; dimension filters are kept. With
 measures on **Rows** and no row dimension, no totals row is written, since
 each "total" would just restate its own data row.
 
-Column and row totals are saved with the exploration and survive **Refresh**;
-with auto-run off, toggling either switch waits for **Run** like any other
-display change.
+Column totals are saved with the exploration and survive **Refresh**; with
+auto-run off, toggling the switch waits for **Run** like any other display
+change.
 
 {/* TODO: screenshot — a pivoted exploration with the Total row on the sheet */}
 
@@ -187,6 +187,9 @@ filters dropped and dimension filters kept, and totals taken over the query's
 full result rather than the rows on the sheet. With both switches on,
 the cell where they meet holds a grand total across the whole result, from a
 third query with neither zone kept.
+
+Row totals persist the same way: saved with the exploration, surviving
+**Refresh**, and waiting for **Run** when auto-run is off.
 
 {/* TODO: screenshot — a pivoted exploration with the Total column on the sheet */}
 
