@@ -363,16 +363,17 @@ into the MCP server:
 - **Publishing to production needs an explicit ask.** `mergeToDefaultBranch` — the tool
   that publishes an already-committed branch — is marked destructive so a client always
   prompts for confirmation. `commitDataModelChanges` is a second route to production: a
-  dev branch created from the deployment's default branch commits straight onto it, live,
+  dev branch created from the deploy branch commits straight onto it, live,
   when the call sets `confirmPublishToDefaultBranch`. That tool is **not** marked
   destructive, so a client isn't guaranteed to prompt before calling it — the guard there
   is the tool's own description, which tells the agent to set that flag only once you've
   said so, never to retry a refusal on its own. See [Committing and publishing
   changes](#committing-and-publishing-changes).
-- **Registration is permission-gated.** Every tool in the three sections above and below
-  — the six model-editing tools, `getBranchDiff`, `getDeploymentEnv`, the six commit and
-  branch tools, and both pre-aggregation tools — is offered only to users whose role
-  allows editing the semantic model. A Viewer never sees any of them.
+- **Registration is permission-gated.** Every tool in Data model editing, Committing and
+  publishing changes, and Pre-aggregations — the six model-editing tools, `getBranchDiff`,
+  `getDeploymentEnv`, the six commit and branch tools, and both pre-aggregation tools — is
+  offered only to users whose role allows editing the semantic model. A Viewer never sees
+  any of them.
 - **Verification happens on the branch, before a merge, not after.** Pass the dev
   `branchName` to `runQuery` to check that an edit returns the right data — `valid: true`
   from `writeDataModelFile` only means the model compiles, not that it's correct.
@@ -389,10 +390,10 @@ them without ever using the Cube UI.
 
 | Tool | Description | Access |
 | --- | --- | --- |
-| `getBranchState` | Reports the branch this session works on, the branch the user is looking at in the Cube console, the deployment's default branch, and whether the session's branch has uncommitted edits. | Read-only |
+| `getBranchState` | Reports the branch this session works on, the branch the user is looking at in the Cube console, the deploy branch, and whether the session's branch has uncommitted edits. | Read-only |
 | `commitDataModelChanges` | Commits the dev branch's edits onto the branch it was created from. | Write |
 | `commitToNewBranch` | Commits the dev branch's edits to a new branch instead, optionally opening a pull request. | Write |
-| `mergeToDefaultBranch` | Merges a committed branch into the deployment's default branch, making it live for everyone. | Destructive — prompts |
+| `mergeToDefaultBranch` | Merges a committed branch into the deploy branch, making it live for everyone. | Destructive — prompts |
 | `discardDataModelChanges` | Resets the dev branch to its parent (or to a given commit hash), throwing away pending edits. | Destructive — prompts |
 | `switchUserBranch` | Switches the user's own console over to a branch, the same action as the branch switcher in the UI, so they can see and test what was committed. | Write |
 
@@ -403,7 +404,7 @@ flow instead of asking you to click through it.
 Call `getBranchState` before editing, so work doesn't land on a branch the user never
 looks at, and again after committing, to see whether the user still needs
 `switchUserBranch` to see it. `commitDataModelChanges` refuses to commit a dev branch
-whose parent is the deployment's default branch unless the call also sets
+whose parent is the deploy branch unless the call also sets
 `confirmPublishToDefaultBranch` — publishing that way should only happen once you've
 said so. `mergeToDefaultBranch` is separate from committing: it publishes an already
 committed branch, and its description tells the agent to call it only when you've

@@ -449,13 +449,16 @@ state: an id that hasn't been exchanged for a token yet can no longer be redeeme
 the token an already-exchanged id produced is rejected from that point on. The call is
 idempotent — revoking an unknown, expired, or already-revoked id also returns `204`, so
 the response alone doesn't tell you whether a token was actually revocable. It requires
-the same admin `Api-Key` authentication as Generate Session.
+the same admin `Api-Key` authentication as Generate Session, and returns `403` if
+embedding isn't enabled for the account.
 
 <Note>
 
-Only sessions Cube minted after this endpoint shipped carry the claim revocation checks
-against — a token minted before that keeps working until it expires on its own, within
-24 hours.
+Revocation only affects the embed session token, not a Cube API token obtained from
+`POST /api/v1/deployments/{deploymentId}/token` — that's a separate credential. Cube
+Cloud rolls this out continuously with no version number to check against; the only
+tokens it doesn't cover are ones minted before your account received the update, and
+those still expire on their own within 24 hours.
 
 </Note>
 

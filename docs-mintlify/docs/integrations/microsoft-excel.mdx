@@ -174,11 +174,11 @@ change.
 
 The **Row totals** switch, next to **Column totals** on the **Display** tab,
 appends a bold **Total** column at the right of the written range, totaling
-each row across the pivot columns. It needs both a measure and a dimension on
-**Columns** to pivot across — it's disabled, with a tooltip explaining which
-is missing, until both are set. With measures on **Columns**, each measure
-gets its own total column; with measures on **Rows**, a single total column
-covers them all, since each row already holds one measure.
+each row across the pivot columns. It needs a measure in the query and a
+dimension on **Columns** to pivot across — it's disabled, with a tooltip
+explaining which is missing, until both are set. With measures on **Columns**,
+each measure gets its own total column; with measures on **Rows**, a single
+total column covers them all, since each row already holds one measure.
 
 Like column totals, each total comes from a separate query grouped by the
 opposite zone, so it's correct for non-additive measures. With both switches
@@ -280,8 +280,8 @@ create, rename, or delete a sheet, and organize your saved explorations into
 request. Deleting a folder this way doesn't delete what's inside it; its
 contents move to the workspace root.
 
-Drag a saved exploration or an unsaved draft from the workbook list onto the
-chat composer to attach it as context for your next question.
+Drag a saved exploration or an unsaved draft from the workbook's home onto
+the chat composer to attach it as context for your next question.
 
 Before any destructive or ambiguous action — writing over an occupied area,
 clearing a placement, renaming or deleting a sheet — the pane asks you to
