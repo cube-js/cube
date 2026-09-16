@@ -77,6 +77,8 @@ Resolving applies to threads only. Passing a reply's id returns `400`, because a
 
 ## Response shapes
 
+A field typed `| null` below may also be **absent** — only `id`, `dashboardId`, `body`, `createdAt`, and `isOwn` are guaranteed on a comment, `root` and `replies` on a thread, and `id` and `username` on a mentionable user. Test with `== null`, which catches both, rather than `=== null`: an open thread can omit `resolvedAt` entirely, and `thread.resolvedAt === null` then reads `false` and reports every open thread as resolved.
+
 ### Comment
 
 Returned by `POST /dashboard/{publicId}/comments` and `PATCH /dashboard/{publicId}/comments/{commentId}`, and nested inside every thread.
