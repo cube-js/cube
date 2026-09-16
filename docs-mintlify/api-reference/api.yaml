@@ -4558,6 +4558,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/Role'
           description: ''
+        '409':
+          description: A role with that name already exists.
       summary: Create a custom role
       tags:
         - Roles
@@ -4567,7 +4569,8 @@ paths:
           key, embed JWT, or any bearer token) must belong to a user with the admin role.
 
 
-          Creates a role and returns it with the `id` to assign it by.
+          Creates a role and returns it with the `id` to assign it by. Role names are unique, so
+          recreating one that already exists answers `409`.
 
 
           To scope the role to specific deployments, send a `Deployment` policy whose `resources`
@@ -4575,8 +4578,8 @@ paths:
           holder's license tier — `AIBIView`, `AIBIExplore` or `AIBIDevelop` — which is what the
           console calls the role's Base Role. Pick a tier that covers the deployment actions you
           grant: the console forces Developer (`AIBIDevelop`) for every deployment action except
-          `DeploymentRead` and `DownloadData`, so a lower tier here produces a role its role builder
-          would not have let you save:
+          `DeploymentRead`, `DeploymentAgentRead`, `DownloadData` and `ChatHistoryRead`, so a lower
+          tier here produces a role its role builder would not have let you save:
 
 
           ```json
@@ -4690,6 +4693,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/Role'
           description: ''
+        '409':
+          description: A role with that name already exists.
       summary: Update a custom role
       tags:
         - Roles
@@ -4701,7 +4706,8 @@ paths:
 
           Updates the fields present in the body and leaves the rest alone. Sending `policies`
           replaces the role's policies outright, so read the role first if you mean to add one
-          rather than start over. Built-in roles cannot be updated.
+          rather than start over. Renaming to a name another role already holds answers `409`.
+          Built-in roles cannot be updated.
   /api/v1/roles/{roleId}/users/{userId}:
     delete:
       operationId: removeRoleFromUser
@@ -11924,23 +11930,19 @@ components:
             - type: 'null'
           description: Omit to leave the description unchanged; `null` clears it.
         name:
-          oneOf:
-            - maxLength: 255
-              type: string
-              minLength: 1
-            - type: 'null'
           description: Omit to leave the name unchanged. `null` is rejected.
+          maxLength: 255
+          minLength: 1
+          type: string
         policies:
-          oneOf:
-            - items:
-                $ref: '#/components/schemas/Policy'
-              type: array
-              maxItems: 200
-            - type: 'null'
           description: >-
             Replaces the role's policies outright when present — there is no per-policy merge. Omit
             it to leave them unchanged, or send `[]` to remove them all. `null` is rejected, so a
             partly-filled client object cannot strip a role's grants by accident.
+          items:
+            $ref: '#/components/schemas/Policy'
+          maxItems: 200
+          type: array
       type: object
     RoleWithAccess:
       properties:
