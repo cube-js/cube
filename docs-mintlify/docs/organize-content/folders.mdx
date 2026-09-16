@@ -134,6 +134,11 @@ dashboards, and explorations — along with it; this cannot be undone.
 If anything inside the folder has its own permissions and you don't have Full
 access there too, deletion is blocked entirely and nothing is deleted.
 
+Asking [Analytics Chat](/docs/explore-analyze/analytics-chat) or an MCP client to delete
+a folder is narrower than deleting it here: it only removes the folder itself — contents
+move to the workspace root instead of being deleted — and it refuses a folder that still
+has sub-folders, rather than deleting the whole subtree.
+
 ## Folder permissions
 
 Folder access is controlled through three permission levels:

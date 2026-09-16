@@ -309,9 +309,10 @@ published dashboard keeps serving its previous version until you approve
 
 Call `manageFolders` with `action: "list"` first to get a folder's numeric id — that id,
 not its name, is what `folderId` takes on `createReport` and `updateReport` to place a
-standalone exploration inside it. Deleting a folder does not delete what's inside it;
-its contents move to the workspace root, and a folder that still holds sub-folders can't
-be deleted.
+standalone exploration inside it. This tool's delete is narrower than deleting a folder
+from the [Workspace page][ref-folders]: it only removes the folder itself — contents
+move to the workspace root instead of being deleted — and refuses when the folder still
+has sub-folders, rather than deleting the whole subtree.
 
 **To change an existing report, use `updateReport` — never recreate it.** A dashboard's
 chart widget points at a specific `reportId`, so replacing a report with a new one orphans
