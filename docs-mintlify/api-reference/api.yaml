@@ -4630,6 +4630,8 @@ paths:
           content:
             application/json: {}
           description: Successful response
+        '204':
+          description: Role deleted.
       summary: Delete a custom role
       tags:
         - Roles
@@ -4719,6 +4721,8 @@ paths:
           content:
             application/json: {}
           description: Successful response
+        '204':
+          description: Role removed, or was not held.
       summary: Remove a role from a user
       tags:
         - Roles
@@ -4748,6 +4752,8 @@ paths:
           content:
             application/json: {}
           description: Successful response
+        '204':
+          description: Role assigned, or already held.
       summary: Assign a role to a user
       tags:
         - Roles
