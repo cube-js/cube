@@ -455,9 +455,15 @@ curl -X POST "https://your-account.cubecloud.dev/api/v1/embed/session/revoke" \
 Returns `204 No Content` on success, with no body.
 
 It requires an admin principal — an API key, embed JWT, or bearer token belonging
-to an admin user — but unlike Generate Session, an API key's scope is not checked:
-the request body carries only a `sessionId`, so a key scoped to one deployment can
-revoke a session belonging to any deployment in the account.
+to an admin user.
+
+<Warning>
+
+Unlike Generate Session, an API key's scope is **not** checked: the request body
+carries only a `sessionId`, so a key scoped to one deployment can revoke a session
+belonging to any deployment in the account.
+
+</Warning>
 
 Only tokens issued after this endpoint shipped carry the claim revocation checks
 against — an older token keeps working until its own signed expiry, 24 hours from
