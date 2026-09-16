@@ -4558,6 +4558,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/Role'
           description: ''
+        '400':
+          description: >-
+            The name is one of the built-in role names, or a policy grants no action, names no
+            resource, or scopes a `Deployment` to something that is not a deployment id.
         '409':
           description: A role with that name already exists.
       summary: Create a custom role
@@ -4635,6 +4639,8 @@ paths:
           description: Successful response
         '204':
           description: Role deleted.
+        '404':
+          description: No custom role has that id.
       summary: Delete a custom role
       tags:
         - Roles
@@ -4661,6 +4667,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/Role'
           description: ''
+        '404':
+          description: No custom role has that id.
       summary: Get a custom role
       tags:
         - Roles
@@ -4693,6 +4701,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Role'
           description: ''
+        '400':
+          description: >-
+            `name` or `policies` was `null`, the new name is one of the built-in role names, or a
+            policy is not a valid one.
+        '404':
+          description: No custom role has that id.
         '409':
           description: A role with that name already exists.
       summary: Update a custom role
@@ -4729,6 +4743,8 @@ paths:
           description: Successful response
         '204':
           description: Role removed, or was not held.
+        '404':
+          description: The user is unknown.
       summary: Remove a role from a user
       tags:
         - Roles
@@ -4760,6 +4776,10 @@ paths:
           description: Successful response
         '204':
           description: Role assigned, or already held.
+        '404':
+          description: >-
+            The user or the role is unknown. Cube's Admin role is not resolvable here, so its id
+            answers `404` as well.
       summary: Assign a role to a user
       tags:
         - Roles
