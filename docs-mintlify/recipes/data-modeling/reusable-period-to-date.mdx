@@ -49,7 +49,7 @@ Put the macro in a `.jinja` file under `model/macros` so that every cube can imp
       - name: {{ name | safe }}_{{ period | safe }}_to_date
         description: {{ name | safe }}, accumulated from the start of the {{ period | safe }}
         {% if sql %}sql: >-
-          {{ sql | safe }}
+          {{ sql | safe | indent(10) }}
         {% endif %}type: {{ type | safe }}
         rolling_window:
           type: to_date
@@ -82,8 +82,11 @@ The `sql` argument is emitted as a [folded string][ref-jinja-folded] (`>-`) rath
 inline. A SQL expression is arbitrary text, and inline it has to avoid everything YAML
 reads as syntax: `{CUBE}.amount` starts a flow mapping, `amount # note` truncates at the
 comment, and wrapping the whole thing in double quotes only moves the problem to
-expressions that contain one, such as `{CUBE}."amount"`. The folded form takes all of
-them.
+expressions that contain one, such as `{CUBE}."amount"`.
+
+Jinja's [`indent`][link-jinja-indent] filter is what makes a multi-line expression work. A
+folded block ends at the first line indented less than its opening, so without it the
+second line of a `CASE` expression closes the block and is read as a mapping key.
 
 </Note>
 
@@ -162,9 +165,9 @@ its own period and resetting at the boundary. The columns below are
 `revenue_week_to_date`, `revenue_month_to_date`, `revenue_quarter_to_date`, and
 `revenue_year_to_date`.
 
-The orders cube holds 30 in revenue in December 2024, shown in the monthly table below,
-and nothing earlier. 1 January falls in the ISO week that began on 30 December, so WTD
-opens with that 30 already counted, while MTD, QTD, and YTD all start fresh:
+The orders cube holds 30 in revenue in December 2024 and nothing earlier. 1 January
+falls in the ISO week that began on 30 December, so WTD opens with that 30 already
+counted, while MTD, QTD, and YTD all start fresh:
 
 | created_at | revenue |   WTD |   MTD |   QTD |   YTD |
 |------------|--------:|------:|------:|------:|------:|
@@ -195,14 +198,24 @@ revenue. Group by a finer granularity than the window to see it accumulate.
 
 The macro needs no change to follow a fiscal or retail calendar. A [calendar
 cube][ref-calendar-cubes] overrides what `week`, `month`, `quarter`, and `year` mean, and
-the generated measures pick that up: `{{ ptd.to_date_measures("revenue", "amount") }}`
-already emits `granularity: week` and `granularity: month`, so a five-week retail month
-accumulates over all five of its weeks.
+the generated measures pick that up unchanged, because they already emit those names as
+their granularity. See [custom calendars][ref-custom-calendar] for the calendar cube
+itself, how a `to_date` window behaves over it, and its [pre-aggregation
+requirements][ref-custom-calendar-pre-aggregations].
 
-Pass only the periods the calendar cube actually overrides. A calendar cube that defines
-`week`, `month`, and `year` but not `quarter` still accepts `granularity: quarter` — it
-falls back to `DATE_TRUNC` and reports Gregorian quarters next to retail months, with no
-error. Restrict the list to match:
+<Warning>
+
+Rolling windows over calendar granularities require Tesseract, the [next-generation data
+modeling engine][link-tesseract]. In versions before v1.7.0, it was not enabled by
+default. Querying a `to_date` window over an overridden granularity also requires v1.7.32
+or later.
+
+</Warning>
+
+What the macro adds is the period list. Pass only the periods the calendar cube actually
+overrides. A calendar cube that defines `week`, `month`, and `year` but not `quarter`
+still accepts `granularity: quarter` — it falls back to `DATE_TRUNC` and reports Gregorian
+quarters next to retail months, with no error. Restrict the list to match:
 
 ```yaml
 {{ ptd.to_date_measures("revenue", "amount", periods=["week", "month", "year"]) }}
@@ -210,16 +223,14 @@ error. Restrict the list to match:
 
 Do not pass a name like `retail_month`. A variable-length period is defined with `sql`,
 and a granularity defined that way must be named after a default granularity, so
-`retail_month` does not compile. See [custom calendars][ref-custom-calendar] for the
-calendar cube itself, including its [pre-aggregation
-requirements][ref-custom-calendar-pre-aggregations].
+`retail_month` does not compile.
 
 A fixed-length period is different: a [custom granularity][ref-custom-granularities]
 defined with `interval` does carry a name of your own, and the macro takes it like any
 other period.
 
 ```yaml
-{{ ptd.to_date_measures("revenue", "amount", "sum", ["fiscal_year"]) }}
+{{ ptd.to_date_measures("revenue", "amount", periods=["fiscal_year"]) }}
 ```
 
 <Warning>
@@ -230,12 +241,8 @@ override falls back to `DATE_TRUNC` and returns Gregorian periods, with no error
 
 </Warning>
 
-Rolling windows over calendar granularities require Tesseract, the [next-generation data
-modeling engine][link-tesseract]. In versions before v1.7.0, it was not enabled by
-default. Querying a `to_date` window over an overridden granularity also requires
-v1.7.32 or later.
-
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
+[link-jinja-indent]: https://jinja.palletsprojects.com/en/stable/templates/#jinja-filters.indent
 [ref-rolling-window]: /reference/data-modeling/measures#type-and-granularity
 [ref-jinja-macros]: /docs/data-modeling/dynamic/jinja#macros
 [ref-jinja-escaping]: /docs/data-modeling/dynamic/jinja#escaping-unsafe-strings
