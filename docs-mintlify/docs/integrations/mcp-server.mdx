@@ -352,8 +352,8 @@ variable is set without ever seeing what it is set to.
 
 #### How model edits stay safe
 
-Letting an AI client edit your semantic model is safe because of five constraints built
-into the MCP server:
+Letting an AI client edit your semantic model is safe because of five constraints — four
+enforced by the MCP server, one by clients that honor tool annotations:
 
 - **File writes never touch production.** Every write goes to a personal dev branch named
   `dev-<user>-<hash>`. `writeDataModelFile` and `deleteDataModelFile` reject any branch

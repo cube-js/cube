@@ -440,7 +440,7 @@ embedded iframe on logout is still required — revoking a session doesn't tear 
 POST https://{accountName}.cubecloud.dev/api/v1/embed/session/revoke
 ```
 
-### Revoke request body {#revoke-request-body}
+### Revoke Request Body {#revoke-request-body}
 
 ```json
 { "sessionId": "abc123def456..." }
@@ -449,7 +449,7 @@ POST https://{accountName}.cubecloud.dev/api/v1/embed/session/revoke
 Pass the `sessionId` that Generate Session returned. It requires the same admin
 `Api-Key` authentication as Generate Session.
 
-### Revoke response {#revoke-response}
+### Revoke Response {#revoke-response}
 
 Returns `204 No Content` on success, with no response body. It works on a session in
 either state: an id that hasn't been exchanged for a token yet can no longer be
