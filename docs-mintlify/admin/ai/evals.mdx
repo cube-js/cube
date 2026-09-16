@@ -34,8 +34,7 @@ top-level `agents/eval_questions.yml` file — the simplest place to start — o
 split them across any number of `agents/eval_questions/*.yml` files as your set
 grows. The parser picks up both and merges every file's `eval_questions` list
 into one set, so you can move from one file to many at any time without changing
-anything else. Splitting the set up also gives you something to aim a run at:
-an eval can be scoped to a single file (see
+anything else. A run can also be scoped to a single file (see
 [Running an eval](#running-an-eval)).
 
 Each file has a top-level `eval_questions` list. A question needs a unique
@@ -82,8 +81,8 @@ On the **Evals** tab, click **Run eval** and choose:
   against. Defaults to the active branch.
 - **Questions** — **All questions** (the default) or a single question file,
   to run only that file's questions. The selector appears only when the
-  selected branch's questions come from more than one file, and each option
-  shows how many questions that file holds. Switching branches resets it to
+  selected branch's questions come from more than one file, and each file
+  option shows how many questions it holds. Switching branches resets it to
   **All questions**.
 - **Agent** — `auto` (the implicit auto-agent) or a configured agent name.
 
@@ -151,6 +150,7 @@ Verdicts:
 ## Limitations
 
 - Questions are authored as code only; the **Questions** tab is read-only.
-- Very large question sets can be slow to run.
+- Very large question sets can be slow to run — scope the run to a single
+  question file to cut it down.
 - Grading is execution-based on the result set; it does not semantically judge
   prose answers.
