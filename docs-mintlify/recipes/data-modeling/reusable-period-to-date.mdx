@@ -48,7 +48,8 @@ Put the macro in a `.jinja` file under `model/macros` so that every cube can imp
 {%- for period in periods %}
       - name: {{ name | safe }}_{{ period | safe }}_to_date
         description: {{ name | safe }}, accumulated from the start of the {{ period | safe }}
-        {% if sql %}sql: "{{ sql | safe }}"
+        {% if sql %}sql: >-
+          {{ sql | safe }}
         {% endif %}type: {{ type | safe }}
         rolling_window:
           type: to_date
@@ -70,7 +71,21 @@ prose and has the same problem. The macro applies `safe` throughout for consiste
 The macro also emits its own leading indentation. Indenting the `{{ ... }}` call in the
 cube file instead only indents the first generated line.
 
+Both mistakes surface as a YAML parse error far from the macro that caused them. Render
+the model first — see [previewing YAML][ref-jinja-preview].
+
 </Warning>
+
+<Note>
+
+The `sql` argument is emitted as a [folded string][ref-jinja-folded] (`>-`) rather than
+inline. A SQL expression is arbitrary text, and inline it has to avoid everything YAML
+reads as syntax: `{CUBE}.amount` starts a flow mapping, `amount # note` truncates at the
+comment, and wrapping the whole thing in double quotes only moves the problem to
+expressions that contain one, such as `{CUBE}."amount"`. The folded form takes all of
+them.
+
+</Note>
 
 ### Applying it to a cube
 
@@ -224,6 +239,8 @@ v1.7.32 or later.
 [ref-rolling-window]: /reference/data-modeling/measures#type-and-granularity
 [ref-jinja-macros]: /docs/data-modeling/dynamic/jinja#macros
 [ref-jinja-escaping]: /docs/data-modeling/dynamic/jinja#escaping-unsafe-strings
+[ref-jinja-preview]: /docs/data-modeling/dynamic/jinja#previewing-yaml
+[ref-jinja-folded]: /docs/data-modeling/dynamic/jinja#folded-and-literal-strings
 [ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
 [ref-custom-granularities]: /recipes/data-modeling/custom-granularity
 [ref-custom-calendar]: /recipes/data-modeling/custom-calendar
