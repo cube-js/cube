@@ -176,7 +176,7 @@ Consider the following project structure:
 
 First, define reusable macros in a `.jinja` file under the `macros/` directory:
 
-```yamltitle="model/macros/common_dimensions.jinja"
+```yaml title="model/macros/common_dimensions.jinja"
 {%- macro dimension(column_name, type='string', primary_key=False) -%}
       - name: {{ column_name }}
         sql: {{ column_name }}
@@ -193,7 +193,7 @@ First, define reusable macros in a `.jinja` file under the `macros/` directory:
 
 Then, import and use those macros in your data model files:
 
-```yamltitle="model/cubes/orders.yml"
+```yaml title="model/cubes/orders.yml"
 {%- import "macros/common_dimensions.jinja" as common -%}
 
 cubes:
@@ -390,12 +390,12 @@ In the `model/globals.py` file (or the `cube.py` configuration file), you can
 import modules from the current directory. In the following example, we import a function
 from the `utils` module and use it to populate a variable in the template context:
 
-```pythontitle="model/utils.py"
+```python title="model/utils.py"
 def answer_to_main_question() -> str:
   return "42"
 ```
 
-```pythontitle="model/globals.py"
+```python title="model/globals.py"
 from cube import TemplateContext
 from utils import answer_to_main_question
 
