@@ -241,13 +241,14 @@ way to reach your data, not a new access surface.
 
 ### Read and write tools
 
-Each tool is annotated as read-only or destructive. MCP clients that honor these
+Each tool is annotated as read-only, write, or destructive. MCP clients that honor these
 annotations — including Claude — run read-only tools automatically and **always ask for
 confirmation** before any of the nine destructive ones: `updateReport`, `deleteReport`,
 `manageFolders`, `updateDashboard`, `publishDashboard`, `writeDataModelFile`,
-`deleteDataModelFile`, `mergeToDefaultBranch`, and `discardDataModelChanges`. Nothing
-that changes a workbook report, an exploration, a dashboard, your data model, or a
-workspace folder happens without an explicit approval.
+`deleteDataModelFile`, `mergeToDefaultBranch`, and `discardDataModelChanges`. A tool
+annotated write, not destructive, may run without a prompt — including
+`commitDataModelChanges`, which can publish straight to production in one case; see [How
+model edits stay safe](#how-model-edits-stay-safe).
 
 ### Deployments and chat
 
