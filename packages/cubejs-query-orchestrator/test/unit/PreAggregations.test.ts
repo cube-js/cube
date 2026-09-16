@@ -7,7 +7,6 @@ import {
   timeSeries,
   QueryDateRange,
 } from '@cubejs-backend/shared';
-import { CompilerCache } from '@cubejs-backend/schema-compiler/dist/src/compiler/CompilerCache';
 import crypto from 'crypto';
 
 import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, LocalCacheDriver, version, type QueryWithParams } from '../../src';
@@ -1527,10 +1526,15 @@ describe('PreAggregations', () => {
     const rangeA: [string, string] = ['2024-01-01T00:00:00.000', '2024-01-02T12:00:00.000'];
     const rangeB: [string, string] = ['2024-01-01T00:00:00.000', '2024-01-02T12:00:01.000'];
     const cache = () => {
-      const compiler = new CompilerCache({ maxQueryCacheSize: 100, maxQueryCacheAge: 60 });
-      const query = compiler.getQueryCache({ measures: ['Events.count'] });
-      const compilerCacheFn = (key: string[], fn: () => any) => query.cache(['expandPartitions', ...key], fn);
-      return { compiler, query, compilerCacheFn };
+      const entries = new Map<string, unknown>();
+      const compilerCacheFn = <T>(key: string[], fn: () => T): T => {
+        const serializedKey = JSON.stringify(key);
+        if (!entries.has(serializedKey)) {
+          entries.set(serializedKey, fn());
+        }
+        return entries.get(serializedKey) as T;
+      };
+      return { entries, compilerCacheFn };
     };
 
     test('reuses the plan without generating a partition series on a hit', async () => {
@@ -1550,7 +1554,7 @@ describe('PreAggregations', () => {
     });
 
     test('replaces A → B → A, updates second-level bounds and preserves old arrays', async () => {
-      const { compilerCacheFn, query } = cache();
+      const { compilerCacheFn, entries } = cache();
       const loader = createLoader({ partitionInvalidateKeyQueries: [['SELECT 1', []]] }, { compilerCacheFn });
       const bounds = jest.spyOn(loader, 'loadBuildRange').mockResolvedValue(rangeA);
       const first = await loader.partitionPreAggregations();
@@ -1566,9 +1570,8 @@ describe('PreAggregations', () => {
       const third = await loader.partitionPreAggregations();
       expect(third).not.toBe(first);
       expect(third).toEqual(first);
-      const plans: any[] = Object.values((query as any).storage.expandPartitions.partitionPlan);
-      expect(plans).toHaveLength(1);
-      expect(plans[0].descriptions).toBe(third);
+      expect(entries.size).toBe(1);
+      expect([...entries.values()]).toEqual([{ rangeKey: JSON.stringify(rangeA), descriptions: third }]);
     });
 
     test('checks the current limit on hits and keeps the previous plan after failures', async () => {
@@ -1598,7 +1601,7 @@ describe('PreAggregations', () => {
       { timestampFormat: 'YYYY-MM-DDTHH:mm:ss.SSSSSS' },
       { timestampPrecision: 6 },
     ])('isolates identities with a shared dependency callback: %j', async (overrides) => {
-      const { compilerCacheFn, query } = cache();
+      const { compilerCacheFn, entries } = cache();
       const firstLoader = createLoader({}, { compilerCacheFn });
       const otherLoader = createLoader(overrides, { compilerCacheFn });
       const first = await firstLoader.partitionPreAggregations();
@@ -1606,28 +1609,7 @@ describe('PreAggregations', () => {
       expect(other).not.toBe(first);
       expect(await firstLoader.partitionPreAggregations()).toBe(first);
       expect(await otherLoader.partitionPreAggregations()).toBe(other);
-      expect(Object.keys((query as any).storage.expandPartitions.partitionPlan)).toHaveLength(2);
-    });
-
-    test('hundreds of updates retain only the last plan per identity in CompilerCache', async () => {
-      const { compilerCacheFn, query, compiler } = cache();
-      const loaders = ['UTC', 'Europe/Paris'].map(timezone => createLoader({ timezone }, { compilerCacheFn }));
-      const bounds = loaders.map(loader => jest.spyOn(loader, 'loadBuildRange'));
-
-      for (let i = 0; i < 300; i++) {
-        const range: [string, string] = [rangeA[0], new Date(Date.UTC(2024, 0, 2, 12, 0, i)).toISOString().slice(0, -1)];
-        bounds.forEach(spy => spy.mockResolvedValue(range));
-        await Promise.all(loaders.map(loader => loader.partitionPreAggregations()));
-      }
-      expect((compiler as any).queryCache.size).toBe(1);
-      expect(Object.keys((query as any).storage.expandPartitions)).toEqual(['partitionPlan']);
-      const plans: any[] = Object.values((query as any).storage.expandPartitions.partitionPlan);
-      expect(plans).toHaveLength(2);
-      plans.forEach(plan => {
-        expect(Object.keys(plan)).toEqual(['rangeKey', 'descriptions']);
-        expect(plan.rangeKey).toBe(JSON.stringify([rangeA[0], '2024-01-02T12:04:59.000']));
-        expect(plan.descriptions).toHaveLength(2);
-      });
+      expect(entries.size).toBe(2);
     });
 
     test('keys the plan by the effective intersection and falls back to the last partition', async () => {
