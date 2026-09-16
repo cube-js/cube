@@ -1,6 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": ["src", "test"],
+  "include": ["src", "test", "test/fixtures/mssql-boolean-contexts.json"],
   "compilerOptions": {
     "types": ["node", "jest"],
     // antlr4's `types` is a .d.cts re-exporting `.d.ts` files that are ESM under antlr4's own
