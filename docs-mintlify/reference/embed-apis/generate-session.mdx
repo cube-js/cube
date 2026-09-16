@@ -450,8 +450,9 @@ to an admin user — but unlike Generate Session, an API key's scope is not chec
 the request body carries only a `sessionId`, so a key scoped to one deployment can
 revoke a session belonging to any deployment in the account.
 
-See [Revoke an Embed Session][ref-revoke-session] for the full request, response, and
-authentication reference.
+See [Revoke an Embed Session][ref-revoke-session] for the full request and response
+reference, including the `204` idempotency behavior and the `403` when embedding isn't
+enabled for the account.
 
 [ref-api-keys]: /admin/account-billing/api-keys
 [ref-revoke-session]: /api-reference/embed/revoke-an-embed-session
