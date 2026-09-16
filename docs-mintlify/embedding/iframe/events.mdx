@@ -512,15 +512,6 @@ Session](/reference/embed-apis/generate-session) — an API key that must never
 reach the browser. Each id is single-use and expires 5 minutes after minting,
 so mint a fresh one on every call rather than caching one ahead of time.
 
-### Ending a session on logout
-
-Letting the token expire isn't the same as logging the viewer out — for that,
-[revoke the embed session](/api-reference/embed/revoke-an-embed-session) from
-your own logout handler. Every renewal mints a new session id, so track each
-one you've minted for that viewer and revoke all of them; an earlier one may
-still be a live, unexpired token. Revoking doesn't tear down a running
-iframe by itself — remove it as you normally would on logout.
-
 Without the SDK, drive the same renewal by hand from the raw events and action:
 
 ```js
@@ -546,6 +537,15 @@ window.addEventListener("message", (event) => {
   }
 });
 ```
+
+### Ending a session on logout
+
+Letting the token expire isn't the same as logging the viewer out — for that,
+[revoke the embed session](/api-reference/embed/revoke-an-embed-session) from
+your own logout handler. Every renewal mints a new session id, so track each
+one you've minted for that viewer and revoke all of them; an earlier one may
+still be a live, unexpired token. Revoking doesn't tear down a running
+iframe by itself — remove it as you normally would on logout.
 
 ## Surfaces
 
