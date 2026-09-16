@@ -363,9 +363,9 @@ variable is set without ever seeing what it is set to.
 
 #### How model edits stay safe
 
-Letting an AI client edit your semantic model is safe because of six constraints — four
-enforced by the MCP server, one by clients that honor tool annotations, and one that is
-yours to apply:
+Model editing over MCP is constrained by six mechanisms — four enforced by the MCP
+server, one by clients that honor tool annotations, and one that is yours to apply —
+with one gap noted below:
 
 - **File writes never touch production.** Every write goes to a personal dev branch named
   `dev-<user>-<hash>`. `writeDataModelFile` and `deleteDataModelFile` reject any branch
@@ -519,10 +519,9 @@ the full changed-file list even when the patch itself is trimmed.
 
 Once `writeDataModelFile` edits compile and `runQuery` confirms they return the right
 data, call `commitDataModelChanges` to land them on the branch the dev branch forked
-from. If that branch is the deploy branch, the commit only goes through when the call
-sets `confirmPublishToDefaultBranch` — and then it is live immediately, so see [How
-model edits stay safe](#how-model-edits-stay-safe) before committing that way. Use
-`commitToNewBranch` instead to put them on a new branch, optionally with a pull request.
+from — read [How model edits stay safe](#how-model-edits-stay-safe) first if that
+branch is the deploy branch. Use `commitToNewBranch` instead to put them on a new
+branch, optionally with a pull request.
 Either way, use `switchUserBranch` to point your own Cube UI at the result so you can
 see it. `mergeToDefaultBranch` is the publish step: it makes the branch live for
 everyone, so call it only when you want the change in production — no tool reverts it

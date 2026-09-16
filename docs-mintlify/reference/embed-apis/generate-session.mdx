@@ -341,7 +341,7 @@ DELETE /api/v1/embed-tenants/{embedTenantName}/user-attributes/{id}
 
 These endpoints use the same `Api-Key` authentication as Generate Session and require admin access. List endpoints return cursor-paginated results (`?first=`, `?after=`).
 
-## Response
+## Generate Session response
 
 The API returns a session object:
 
@@ -474,7 +474,8 @@ curl -X POST "https://your-account.cubecloud.dev/api/v1/embed/session/revoke" \
 
 Revocation only affects the embed session token, not a Cube API token obtained from
 `POST /api/v1/deployments/{deploymentId}/token` — that's a separate credential. Embed
-tokens minted before your account received this feature aren't revocable.
+tokens minted before your account received this feature aren't revocable, but expire on
+their own within 24 hours regardless.
 
 </Note>
 
