@@ -47,7 +47,9 @@ All paths are relative to `https://{accountName}.cubecloud.dev/api/v1/embed`, an
 | `Content-Type` | `application/json` | For `POST` and `PATCH` |
 | `Authorization` | `Embed-Token YOUR_EMBED_TOKEN` | Yes |
 
-The embed token is the signed session's own JWT. Exchange the `sessionId` from [Generate Session][ref-generate-session] for one with `POST /api/v1/embed/session/token`. A session id is single-use and expires 5 minutes after it is minted, so exchange it at once; the token it returns lasts 24 hours. An embedded dashboard performs the exchange itself, so the comment UI inside an iframe is already authenticated — supply the header yourself only when you call these endpoints from your own code.
+The embed token is the signed session's own JWT. Exchange the `sessionId` from [Generate Session][ref-generate-session] for one with `POST /api/v1/embed/session/token`, which needs no `Authorization` header of its own — the session id is the credential. A session id is single-use and expires 5 minutes after it is minted, so exchange it at once; the token it returns lasts 24 hours. An embedded dashboard performs the exchange itself, so the comment UI inside an iframe is already authenticated — supply the header yourself only when you call these endpoints from your own code.
+
+`Bearer YOUR_EMBED_TOKEN` is accepted as well, and resolves the same embed user. Prefer `Embed-Token`: it names the credential you are actually presenting, and the prefix is matched case-sensitively either way.
 
 ## Who may edit, delete, and resolve
 
@@ -67,9 +69,9 @@ Reading is wider than writing: everyone who can open the dashboard sees the whol
 
 A thread is one root comment plus its replies, oldest first. **Nesting is one level deep** — pass `parentId` to reply to a thread root, and replying to a reply returns `400`. A `parentId` that names nothing, a deleted thread, or a comment on another dashboard returns `404`.
 
-Threads are listed newest-first by last activity, so replying to a thread moves it back to the top. Open threads are returned by default. Pass `includeResolved=true` to widen the page to resolved threads as well, or `resolvedOnly=true` to return only those; `resolvedOnly` wins when both are set.
+Threads are listed **newest-first by when they started**, so a thread holds its place while it is being replied to — a busy thread does not climb back to the top. Open threads are returned by default. Pass `includeResolved=true` to widen the page to resolved threads as well, or `resolvedOnly=true` to return only those; `resolvedOnly` wins when both are set.
 
-Deleting is a soft delete, and the two cases differ. **Deleting a reply** drops it from its thread and moves the thread back to the time of the newest reply still standing, so a thread does not hold its position on the strength of a message that is gone. **Deleting a thread root takes the whole thread with it**, replies included — a deleted thread leaves nothing behind rather than a tombstone holding replies whose parent is gone.
+Deleting is a soft delete, and the two cases differ. **Deleting a reply** drops it from its thread; the rest of the thread stands and keeps its position. **Deleting a thread root takes the whole thread with it**, replies included — the thread stops appearing in `GET /dashboard/{publicId}/comments` altogether, rather than staying on as a tombstone holding orphaned replies.
 
 Resolving applies to threads only. Passing a reply's id returns `400`, because a reply carries no resolve state of its own.
 
@@ -184,6 +186,14 @@ Returned by `GET /dashboard/{publicId}/comments/mentionable-users`. Use it to ba
 | `firstName` | string \| null | May be `null`. |
 
 **The directory is scoped to the caller's own embed tenant, and to embed users only.** An embed user can mention their colleagues in the same embed tenant. They cannot mention a Cube Cloud user of the host account, and they never see another embed tenant's users. Pass `search` to filter by username or email; results are ordered by username. Pagination works as it does for threads: pass `first` and `after` with the previous page's `endCursor`.
+
+<Note>
+**There is no mention syntax to write.** `body` is stored and returned verbatim,
+and nothing on the server reads it for mentions — no parsing, no linking, no
+notification. Picking a user from this directory is a client-side concern: choose
+whatever markup you like, render it yourself, and expect Cube to hand it back
+byte for byte.
+</Note>
 
 ## Example: start a thread, reply, resolve
 
