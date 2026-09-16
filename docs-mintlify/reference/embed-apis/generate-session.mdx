@@ -433,7 +433,7 @@ Use session ID in [signed embedding][ref-signed-embedding].
 ## Revoke a session
 
 Call this from your application's logout handler to end an embed session from the
-server side, rather than relying on its token to expire on its own. Removing the
+server side, rather than waiting out the token's own 24-hour expiry. Removing the
 embedded iframe on logout is still required — revoking a session doesn't tear it down.
 
 ```text
@@ -470,8 +470,7 @@ curl -X POST "https://your-account.cubecloud.dev/api/v1/embed/session/revoke" \
 
 Revocation only affects the embed session token, not a Cube API token obtained from
 `POST /api/v1/deployments/{deploymentId}/token` — that's a separate credential. Embed
-tokens minted before your account received this feature aren't revocable and expire on
-their own within 24 hours.
+tokens minted before your account received this feature aren't revocable.
 
 </Note>
 

@@ -135,13 +135,10 @@ If anything inside the folder has its own permissions and you don't have Full
 access there too, deletion is blocked entirely and nothing is deleted.
 
 Asking [Analytics Chat](/docs/explore-analyze/analytics-chat), the Excel or Google
-Sheets chat pane, or an MCP client to delete a folder is narrower than deleting it here:
-it only removes the
-folder itself — contents move to the workspace root instead of being deleted — and it
-refuses a folder that still has subfolders, rather than deleting the whole subtree. In
-Analytics Chat and the Excel and Google Sheets chat panes, folder actions also run
-immediately, with no confirmation step; over MCP, `manageFolders` is annotated
-destructive, so clients that honor those annotations prompt first.
+Sheets chat pane, or an MCP client to delete a folder is narrower than deleting it
+here: it only removes the folder itself — contents move to the workspace root instead
+of being deleted — and it refuses a folder that still has subfolders, rather than
+deleting the whole subtree.
 
 ## Folder permissions
 
