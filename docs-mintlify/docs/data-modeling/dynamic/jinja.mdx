@@ -208,7 +208,8 @@ cubes:
     measures:
       - name: amount_usd
         type: sum
-        sql: {{ common.cents_to_dollars('amount') }}
+        sql: |-
+          {{ common.cents_to_dollars('amount') }}
 ```
 
 The import path is relative to the `model/` directory.
@@ -245,6 +246,19 @@ cubes:
     description: Daily {{ name | safe }}, by region
 ```
 
+Alternatively, you can wrap unsafe strings into instances of the following
+class in your Python code, effectively marking them as safe. This is
+particularly useful for library code, e.g., similar to the
+[`cube_dbt`][ref-cube-dbt] package.
+
+```python
+class SafeString(str):
+  is_safe: bool
+
+  def __init__(self, v: str):
+    self.is_safe = True
+```
+
 #### Emitting SQL from a macro
 
 When a macro takes a SQL expression as an argument, emit it as a
@@ -273,19 +287,6 @@ expression raw:
 
 Both mistakes surface as a YAML parse error far from the macro that caused
 them. Render the model first — see [previewing YAML](#previewing-yaml).
-
-Alternatively, you can wrap unsafe strings into instances of the following
-class in your Python code, effectively marking them as safe. This is
-particularly useful for library code, e.g., similar to the
-[`cube_dbt`][ref-cube-dbt] package.
-
-```python
-class SafeString(str):
-  is_safe: bool
-
-  def __init__(self, v: str):
-    self.is_safe = True
-```
 
 ## Python
 
