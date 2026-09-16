@@ -9,7 +9,6 @@ import {
   QueryStageStateResponse,
   AddToQueueOptions,
   QueuePriority,
-  QueueDriverConnectionInterface,
   RetrieveForProcessingSuccess
 } from '@cubejs-backend/base-driver';
 import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
@@ -859,14 +858,28 @@ export class QueryQueue {
     try {
       let executionResult;
       let queryExecutionFinished = false;
-      // Set once the queue item is known to be gone, so that the rejection the cancellation
-      // causes isn't reported as a query error.
-      let queryCancelled = false;
+      // Kept until the queue tells us whether the query was cancelled, see setResultAndRemoveQuery below.
+      let executionError: any = null;
       // Set by the query handler's setCancelHandler callback once execution begins.
       // Not available on the original query def from retrieveForProcessing.
       let localCancelHandler: unknown = null;
       const startQueryTime = (new Date()).getTime();
       const timeInQueue = (new Date()).getTime() - query.addedToQueueTime;
+      const logExecutionError = (e: any) => this.logger('Error while querying', {
+        queueId,
+        queueSize,
+        duration: ((new Date()).getTime() - startQueryTime),
+        queryKey: query.queryKey,
+        queuePrefix: this.redisQueuePrefix,
+        requestId: query.requestId,
+        timeInQueue,
+        metadata: query.query?.metadata,
+        preAggregationId: query.query?.preAggregation?.preAggregationId,
+        newVersionEntry: query.query?.newVersionEntry,
+        preAggregation: query.query?.preAggregation,
+        addedToQueueTime: query.addedToQueueTime,
+        error: (e.stack || e).toString()
+      });
       this.logger('Performing query', {
         queueId,
         queueSize,
@@ -910,7 +923,6 @@ export class QueryQueue {
             try {
               const currentDef = await queueConnection.getQueryDef(queryKeyHashed, queueId);
               if (!currentDef && !queryExecutionFinished) {
-                queryCancelled = true;
                 this.logger('Cancelling query due to external cancellation', {
                   queueId,
                   queryKey: query.queryKey,
@@ -1008,45 +1020,9 @@ export class QueryQueue {
           error: (e.message || e).toString() // TODO error handling
         };
 
-        // The queue removes an item when it cancels it - orphaned, stalled or explicit - and the
-        // driver then rejects the execution still in flight. Reporting that rejection as a query
-        // failure surfaces the cancellation in query history, which orphaned queries are kept out
-        // of. The lookup happens after the rejection, so a query which genuinely fails as its item
-        // is orphaned is reclassified too: harmless, nothing is waiting for either result. A
-        // timeout is excluded - it cancels a query which is still queued, so it stays an error.
-        const cancelled = !(e instanceof TimeoutError) &&
-          (queryCancelled || await this.isQueryRemovedFromQueue(queueConnection, query, queryKeyHashed, queueId));
-
-        const logEvent = {
-          queueId,
-          queueSize,
-          duration: ((new Date()).getTime() - startQueryTime),
-          queryKey: query.queryKey,
-          queuePrefix: this.redisQueuePrefix,
-          requestId: query.requestId,
-          timeInQueue,
-          metadata: query.query?.metadata,
-          preAggregationId: query.query?.preAggregation?.preAggregationId,
-          newVersionEntry: query.query?.newVersionEntry,
-          preAggregation: query.query?.preAggregation,
-          addedToQueueTime: query.addedToQueueTime,
-        };
-
-        if (cancelled) {
-          // `warning` rather than `error` on purpose: an `error` field is what marks a query as
-          // failed downstream, and a cancellation is not a failure. It still has to be one of the
-          // two, otherwise the default logger drops the event at the default `info` level.
-          this.logger('Cancelled query execution', {
-            ...logEvent,
-            warning: 'Query execution was rejected because the query had been cancelled',
-            cancellationError: (e.stack || e).toString()
-          });
-        } else {
-          this.logger('Error while querying', {
-            ...logEvent,
-            error: (e.stack || e).toString()
-          });
-        }
+        // Reported once the queue item is accounted for below: a rejection which a cancellation
+        // caused is not a query failure.
+        executionError = e;
 
         if (e instanceof TimeoutError) {
           const queryWithCancelHandle = await queueConnection.getQueryDef(queryKeyHashed, queueId);
@@ -1071,7 +1047,23 @@ export class QueryQueue {
         clearInterval(heartBeatTimer);
       }
 
-      if (!(await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, queueId))) {
+      // A cancellation - orphaned, stalled or explicit - removes the queue item, and the driver then
+      // rejects the execution still in flight. Setting the result is where the two are told apart: it
+      // only succeeds while the item is still there, so a failure means the query was cancelled and
+      // its rejection has to stay out of query history the way an orphaned query does.
+      let queueItemWasActive: unknown;
+      try {
+        queueItemWasActive = await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, queueId);
+      } catch (e: any) {
+        // A storage failure says nothing about a cancellation, so an execution error is still an error.
+        if (executionError) {
+          logExecutionError(executionError);
+        }
+
+        throw e;
+      }
+
+      if (!queueItemWasActive) {
         this.logger('Orphaned execution result', {
           queueId,
           warn: 'Result for query was not set because the queue item is no longer active',
@@ -1083,7 +1075,10 @@ export class QueryQueue {
           newVersionEntry: query.query?.newVersionEntry,
           preAggregation: query.query?.preAggregation,
           addedToQueueTime: query.addedToQueueTime,
+          ...(executionError ? { cancellationError: (executionError.stack || executionError).toString() } : {}),
         });
+      } else if (executionError) {
+        logExecutionError(executionError);
       }
 
       await this.reconcileQueue();
@@ -1097,32 +1092,6 @@ export class QueryQueue {
       });
     } finally {
       this.queueDriver.release(queueConnection);
-    }
-  }
-
-  /**
-   * Whether the queue item is gone, which means a cancellation - orphaned, stalled or explicit -
-   * has removed it while its execution was still in flight. A queue lookup failure is reported as
-   * `false` so that a genuine query error is never hidden by a queue storage issue.
-   */
-  protected async isQueryRemovedFromQueue(
-    queueConnection: QueueDriverConnectionInterface,
-    query: QueryDef,
-    queryKeyHashed: QueryKeyHash,
-    queueId: QueueId
-  ): Promise<boolean> {
-    try {
-      return !(await queueConnection.getQueryDef(queryKeyHashed, queueId));
-    } catch (e: any) {
-      this.logger('Error while checking query cancellation', {
-        queueId,
-        queryKey: query.queryKey,
-        queuePrefix: this.redisQueuePrefix,
-        requestId: query.requestId,
-        error: (e.stack || e).toString()
-      });
-
-      return false;
     }
   }
 

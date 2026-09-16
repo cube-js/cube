@@ -202,8 +202,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
       expect(logger.mock.calls.length).toEqual(5);
       // assert that query queue is able to get query def by query key
-      expect(logger.mock.calls[4][0]).toEqual('Cancelling query due to timeout');
-      expect(logger.mock.calls[3][0]).toEqual('Error while querying');
+      expect(logger.mock.calls[3][0]).toEqual('Cancelling query due to timeout');
+      // a timeout cancels a query whose queue item stays active, so it is still reported as an error
+      expect(logger.mock.calls[4][0]).toEqual('Error while querying');
     });
 
     test('cancelled query is not reported as an error', async () => {
@@ -234,8 +235,11 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       // it as one would surface it in query history
       const events = logger.mock.calls.map(([message]) => message);
       expect(events).toContain('Cancelling query manual');
-      expect(events).toContain('Cancelled query execution');
+      expect(events).toContain('Orphaned execution result');
       expect(events).not.toContain('Error while querying');
+
+      const [, orphanedPayload] = logger.mock.calls.find(([message]) => message === 'Orphaned execution result')!;
+      expect(orphanedPayload.cancellationError).toContain('Query was cancelled');
     });
 
     test('stage reporting', async () => {
