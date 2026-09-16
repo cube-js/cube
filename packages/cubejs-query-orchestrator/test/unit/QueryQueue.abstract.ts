@@ -45,6 +45,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     // Makes the cancel a queue storage failure, so that a throw on the way out of the timeout path
     // can be asserted on.
     let failCancelMessage = false;
+    // Same for the result ack, which is the other way a storage failure can carry a query error out
+    // of executeQuery unreported.
+    let failResultAck = false;
     // Rejects of the in-flight `cancelable` queries, so that a cancellation can reject the
     // running handler the way a driver rejects a query it has stopped. Keyed by the handle the
     // handler registers with setCancelHandler, so a cancellation rejects only its own query.
@@ -119,6 +122,31 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       logger,
     });
 
+    // Wrapping the connection rather than a handler is what makes `failResultAck` reach both queue
+    // drivers - `setResultAndRemoveQuery` is the driver's, not something the options surface exposes.
+    const createQueueConnection = queue.queueDriver.createConnection.bind(queue.queueDriver);
+    queue.queueDriver.createConnection = async () => {
+      const connection = await createQueueConnection();
+
+      if (!failResultAck) {
+        return connection;
+      }
+
+      return new Proxy(connection, {
+        get: (target, prop) => {
+          if (prop === 'setResultAndRemoveQuery') {
+            return async () => {
+              throw new Error('Queue storage failure while setting the result');
+            };
+          }
+
+          const value = Reflect.get(target, prop);
+
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    };
+
     async function awaitProcessing() {
       // process query can call reconcileQueue
       while (await queue.shutdown() || processMessagePromises.length || processCancelPromises.length) {
@@ -140,6 +168,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       streamCallOrder = [];
       cancelableRejects = new Map();
       failCancelMessage = false;
+      failResultAck = false;
     });
 
     afterAll(async () => {
@@ -236,6 +265,28 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         // the cancel threw before the result was set, so the item is still active - remove it here
         // or a later test picks it up as an orphan and inherits its events and cancelled query
         failCancelMessage = false;
+        await queue.cancelQuery(queue.redisHash(query), null);
+      }
+    });
+
+    test('a failing result ack does not swallow the query error', async () => {
+      failResultAck = true;
+
+      const query: QueryKey = ['select * from 5', []];
+
+      try {
+        // executionTimeout is 2s, so this fails and reaches the ack with an error to report
+        await queue.executeInQueue('delay', query, { delay: 5 * 1000, result: '1', isJob: true });
+        await awaitProcessing();
+
+        // the ack is what tells a cancellation apart from a failure, so when it throws the error is
+        // reported before the storage failure carries it out of executeQuery
+        const events = logger.mock.calls.map(([message]) => message);
+        expect(events).toContain('Error while querying');
+        expect(events).toContain('Queue storage error');
+      } finally {
+        failResultAck = false;
+        // the ack threw, so the item is still active - see the failing-cancel test above
         await queue.cancelQuery(queue.redisHash(query), null);
       }
     });
