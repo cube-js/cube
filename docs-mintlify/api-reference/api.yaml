@@ -5267,7 +5267,9 @@ paths:
 
 
           To scope the role to specific deployments, send a `Deployment` policy whose `resources`
-          are the deployment ids as strings:
+          are the deployment ids as strings. A role usually also needs a `Global` policy naming the
+          holder's license tier — `AIBIView`, `AIBIExplore` or `AIBIDevelop` — which is what the
+          console calls the role's Base Role:
 
 
           ```json
@@ -5275,6 +5277,11 @@ paths:
           {
             "name": "team-analytics",
             "policies": [
+              {
+                "resourceType": "Global",
+                "actions": ["AIBIExplore"],
+                "resources": ["All"]
+              },
               {
                 "resourceType": "Deployment",
                 "actions": ["DeploymentRead", "SchemaRead", "PlaygroundRead"],
@@ -5284,6 +5291,16 @@ paths:
           }
 
           ```
+
+
+          The tier is **not** required and is **not** derived from the deployment actions: a role
+          sent without one is accepted and simply confers no tier, so a user holding only that role
+          gets the deployment grants and still cannot use the product. That is deliberate — a user
+          holds the union of their roles, so a role that only adds a deployment scope beside another
+          role carrying the tier is valid — but it means nothing warns you. Omit the `Global` policy
+          only when some other role supplies the tier. Note the console does require one on every
+          role it writes, so a role created here without a tier shows an unset Base Role when opened
+          in the role builder.
 
 
           Use `["All"]` as `resources` to cover every deployment, and `"All"` as the single action
