@@ -7,6 +7,7 @@ import {
   timeSeries,
   QueryDateRange,
 } from '@cubejs-backend/shared';
+import { CompilerCache } from '@cubejs-backend/schema-compiler/dist/src/compiler/CompilerCache';
 import crypto from 'crypto';
 
 import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, LocalCacheDriver, version, type QueryWithParams } from '../../src';
@@ -1523,33 +1524,156 @@ describe('PreAggregations', () => {
   });
 
   describe('partitionPreAggregations', () => {
-    test('should generate partitioned pre-aggregations', async () => {
-      const compilerCacheFn = jest.fn((_subKey: any, fn: () => any) => fn());
-      const loader = createLoader(
-        {
-          partitionGranularity: 'day',
-          matchedTimeDimensionDateRange: ['2023-01-01T00:00:00.000', '2023-01-02T23:59:59.999'],
-        },
-        { compilerCacheFn }
-      );
+    const rangeA: [string, string] = ['2024-01-01T00:00:00.000', '2024-01-02T12:00:00.000'];
+    const rangeB: [string, string] = ['2024-01-01T00:00:00.000', '2024-01-02T12:00:01.000'];
+    const cache = () => {
+      const compiler = new CompilerCache({ maxQueryCacheSize: 100, maxQueryCacheAge: 60 });
+      const query = compiler.getQueryCache({ measures: ['Events.count'] });
+      const compilerCacheFn = (key: string[], fn: () => any) => query.cache(['expandPartitions', ...key], fn);
+      return { compiler, query, compilerCacheFn };
+    };
 
-      jest.spyOn(loader as any, 'partitionRanges').mockResolvedValue({
-        buildRange: ['2023-01-01T00:00:00.000', '2023-01-02T23:59:59.999'],
-        partitionRanges: [
-          ['2023-01-01T00:00:00.000', '2023-01-01T23:59:59.999'],
-          ['2023-01-02T00:00:00.000', '2023-01-02T23:59:59.999'],
-        ],
+    test('reuses the plan without generating a partition series on a hit', async () => {
+      const { compilerCacheFn } = cache();
+      const loader = createLoader({}, { compilerCacheFn });
+      const series = jest.spyOn(PreAggregationPartitionRangeLoader, 'timeSeries');
+
+      try {
+        const first = await loader.partitionPreAggregations();
+        expect(series).toHaveBeenCalledTimes(1);
+        expect(await loader.partitionPreAggregations()).toBe(first);
+        expect(series).toHaveBeenCalledTimes(1);
+        expect(first.map(p => p.tableName)).toEqual(['test_table20240101', 'test_table20240102', 'test_table20240103']);
+      } finally {
+        series.mockRestore();
+      }
+    });
+
+    test('replaces A → B → A, updates second-level bounds and preserves old arrays', async () => {
+      const { compilerCacheFn, query } = cache();
+      const loader = createLoader({ partitionInvalidateKeyQueries: [['SELECT 1', []]] }, { compilerCacheFn });
+      const bounds = jest.spyOn(loader, 'loadBuildRange').mockResolvedValue(rangeA);
+      const first = await loader.partitionPreAggregations();
+      const original = JSON.stringify(first);
+      bounds.mockResolvedValue(rangeB);
+      const second = await loader.partitionPreAggregations();
+      expect(second).not.toBe(first);
+      expect(second[1].loadSql[1][1]).toBe(rangeB[1]);
+      expect(second[1].buildRangeEnd).toBe(rangeB[1]);
+      expect(first[1].loadSql[1][1]).toBe(rangeA[1]);
+      expect(JSON.stringify(first)).toBe(original);
+      bounds.mockResolvedValue(rangeA);
+      const third = await loader.partitionPreAggregations();
+      expect(third).not.toBe(first);
+      expect(third).toEqual(first);
+      const plans: any[] = Object.values((query as any).storage.expandPartitions.partitionPlan);
+      expect(plans).toHaveLength(1);
+      expect(plans[0].descriptions).toBe(third);
+    });
+
+    test('checks the current limit on hits and keeps the previous plan after failures', async () => {
+      const { compilerCacheFn } = cache();
+      const loader = createLoader({}, { compilerCacheFn, maxPartitions: 2 });
+      const bounds = jest.spyOn(loader, 'loadBuildRange').mockResolvedValue(rangeA);
+      const first = await loader.partitionPreAggregations();
+      const stricter = createLoader({}, { compilerCacheFn, maxPartitions: 1 });
+      jest.spyOn(stricter, 'loadBuildRange').mockResolvedValue(rangeA);
+      await expect(stricter.partitionPreAggregations()).rejects.toThrow('requested to build 2 partitions which exceeds the maximum number of partitions per pre-aggregation of 1');
+      bounds.mockResolvedValue(['2024-01-01T00:00:00.000', '2024-01-03T00:00:00.000']);
+      await expect(loader.partitionPreAggregations()).rejects.toThrow('requested to build 3 partitions');
+      bounds.mockResolvedValue(rangeB);
+      const describe = jest.spyOn(loader as any, 'partitionPreAggregationDescription').mockImplementationOnce(() => { throw new Error('expansion failed'); });
+      await expect(loader.partitionPreAggregations()).rejects.toThrow('expansion failed');
+      describe.mockRestore();
+      bounds.mockResolvedValue(rangeA);
+      expect(await loader.partitionPreAggregations()).toBe(first);
+    });
+
+    test.each([
+      { preAggregationId: 'Other.byDay' },
+      { tableName: 'other_table' },
+      { dataSource: 'other' },
+      { timezone: 'America/New_York' },
+      { partitionGranularity: 'hour' },
+      { timestampFormat: 'YYYY-MM-DDTHH:mm:ss.SSSSSS' },
+      { timestampPrecision: 6 },
+    ])('isolates identities with a shared dependency callback: %j', async (overrides) => {
+      const { compilerCacheFn, query } = cache();
+      const firstLoader = createLoader({}, { compilerCacheFn });
+      const otherLoader = createLoader(overrides, { compilerCacheFn });
+      const first = await firstLoader.partitionPreAggregations();
+      const other = await otherLoader.partitionPreAggregations();
+      expect(other).not.toBe(first);
+      expect(await firstLoader.partitionPreAggregations()).toBe(first);
+      expect(await otherLoader.partitionPreAggregations()).toBe(other);
+      expect(Object.keys((query as any).storage.expandPartitions.partitionPlan)).toHaveLength(2);
+    });
+
+    test('hundreds of updates retain only the last plan per identity in CompilerCache', async () => {
+      const { compilerCacheFn, query, compiler } = cache();
+      const loaders = ['UTC', 'Europe/Paris'].map(timezone => createLoader({ timezone }, { compilerCacheFn }));
+      const bounds = loaders.map(loader => jest.spyOn(loader, 'loadBuildRange'));
+
+      for (let i = 0; i < 300; i++) {
+        const range: [string, string] = [rangeA[0], new Date(Date.UTC(2024, 0, 2, 12, 0, i)).toISOString().slice(0, -1)];
+        bounds.forEach(spy => spy.mockResolvedValue(range));
+        await Promise.all(loaders.map(loader => loader.partitionPreAggregations()));
+      }
+      expect((compiler as any).queryCache.size).toBe(1);
+      expect(Object.keys((query as any).storage.expandPartitions)).toEqual(['partitionPlan']);
+      const plans: any[] = Object.values((query as any).storage.expandPartitions.partitionPlan);
+      expect(plans).toHaveLength(2);
+      plans.forEach(plan => {
+        expect(Object.keys(plan)).toEqual(['rangeKey', 'descriptions']);
+        expect(plan.rangeKey).toBe(JSON.stringify([rangeA[0], '2024-01-02T12:04:59.000']));
+        expect(plan.descriptions).toHaveLength(2);
       });
+    });
 
-      const result = await loader.partitionPreAggregations();
+    test('keys the plan by the effective intersection and falls back to the last partition', async () => {
+      const { compilerCacheFn } = cache();
+      const matchedTimeDimensionDateRange = ['2024-01-02T00:00:00.000', '2024-01-02T23:59:59.999'];
+      const loader = createLoader({ matchedTimeDimensionDateRange }, { compilerCacheFn });
+      const bounds = jest.spyOn(loader, 'loadBuildRange').mockResolvedValue([
+        '2024-01-01T00:00:00.000', '2024-01-03T23:59:59.999',
+      ]);
+      const first = await loader.partitionPreAggregations();
+      expect(first.map(p => p.tableName)).toEqual(['test_table20240102']);
+      bounds.mockResolvedValue(['2024-01-01T01:00:00.000', '2024-01-03T23:59:59.999']);
+      expect(await loader.partitionPreAggregations()).toBe(first);
+      bounds.mockResolvedValue(['2024-01-04T00:00:00.000', '2024-01-05T12:00:00.000']);
+      const fallback = await loader.partitionPreAggregations();
+      expect(fallback.map(p => p.tableName)).toEqual(['test_table20240105']);
+      // externalRefresh retries using the full build range, ignoring the unmatched query bounds.
+      const full = await (loader as any).partitionRanges(true);
+      expect(full.partitionRanges).toHaveLength(2);
+      expect(full.buildRange).toEqual(['2024-01-04T00:00:00.000', '2024-01-05T12:00:00.000']);
+    });
 
-      expect(result.length).toBe(2);
-      expect(result[0].tableName).toMatch(/test_table20230101/);
-      expect(result[1].tableName).toMatch(/test_table20230102/);
-      expect(compilerCacheFn).toHaveBeenCalledWith(
-        ['partitions', JSON.stringify(['2023-01-01T00:00:00.000', '2023-01-02T23:59:59.999'])],
-        expect.any(Function)
-      );
+    test.each([{ partitionGranularity: undefined }, { expandedPartition: true }])('passes through unpartitioned or expanded descriptions: %j', async overrides => {
+      const compilerCacheFn = jest.fn((_key, fn) => fn());
+      const loader = createLoader(overrides, { compilerCacheFn });
+      const bounds = jest.spyOn(loader, 'loadBuildRange');
+      expect((await loader.partitionPreAggregations())[0]).toBe((loader as any).preAggregation);
+      expect(bounds).not.toHaveBeenCalled();
+      expect(compilerCacheFn).not.toHaveBeenCalled();
+    });
+
+    test('ordinary query range generation remains uncached', async () => {
+      const compilerCacheFn = jest.fn((_key, fn) => fn());
+      const loader = createLoader({}, { compilerCacheFn });
+      const first = await (loader as any).partitionRanges();
+      const second = await (loader as any).partitionRanges();
+      expect(second).toEqual(first);
+      expect(second.partitionRanges).not.toBe(first.partitionRanges);
+      expect(compilerCacheFn).not.toHaveBeenCalled();
+    });
+
+    test.each([undefined, (_key, fn) => fn()])('does not retain plans without persistent SQL caching (%p)', async compilerCacheFn => {
+      const loader = createLoader({}, { compilerCacheFn });
+      const first = await loader.partitionPreAggregations();
+      expect(await loader.partitionPreAggregations()).toEqual(first);
+      expect(await loader.partitionPreAggregations()).not.toBe(first);
     });
   });
 
