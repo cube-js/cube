@@ -858,17 +858,19 @@ export class QueryQueue {
     try {
       let executionResult;
       let queryExecutionFinished = false;
-      // Kept until the queue tells us whether the query was cancelled, see setResultAndRemoveQuery below.
-      let executionError: any = null;
+      // Kept until the queue tells us whether the query was cancelled, see setResultAndRemoveQuery
+      // below. The duration is snapshotted with it, because the reporting happens after the cancel
+      // and the ack, which a lazy measurement would count as query time.
+      let executionError: { error: any, duration: number } | null = null;
       // Set by the query handler's setCancelHandler callback once execution begins.
       // Not available on the original query def from retrieveForProcessing.
       let localCancelHandler: unknown = null;
       const startQueryTime = (new Date()).getTime();
       const timeInQueue = (new Date()).getTime() - query.addedToQueueTime;
-      const logExecutionError = (e: any) => this.logger('Error while querying', {
+      const logExecutionError = ({ error, duration }: { error: any, duration: number }) => this.logger('Error while querying', {
         queueId,
         queueSize,
-        duration: ((new Date()).getTime() - startQueryTime),
+        duration,
         queryKey: query.queryKey,
         queuePrefix: this.redisQueuePrefix,
         requestId: query.requestId,
@@ -878,7 +880,7 @@ export class QueryQueue {
         newVersionEntry: query.query?.newVersionEntry,
         preAggregation: query.query?.preAggregation,
         addedToQueueTime: query.addedToQueueTime,
-        error: (e.stack || e).toString()
+        error: (error.stack || error).toString()
       });
       this.logger('Performing query', {
         queueId,
@@ -1022,7 +1024,7 @@ export class QueryQueue {
 
         // Reported once the queue item is accounted for below: a rejection which a cancellation
         // caused is not a query failure.
-        executionError = e;
+        executionError = { error: e, duration: ((new Date()).getTime() - startQueryTime) };
 
         if (e instanceof TimeoutError) {
           const queryWithCancelHandle = await queueConnection.getQueryDef(queryKeyHashed, queueId);
@@ -1080,7 +1082,7 @@ export class QueryQueue {
           // quiet as it is today.
           ...(executionError ? {
             warning: 'Query execution was rejected because the query had been cancelled',
-            cancellationError: (executionError.stack || executionError).toString()
+            cancellationError: (executionError.error.stack || executionError.error).toString()
           } : {}),
         });
       } else if (executionError) {
