@@ -1027,21 +1027,29 @@ export class QueryQueue {
         executionError = { error: e, duration: ((new Date()).getTime() - startQueryTime) };
 
         if (e instanceof TimeoutError) {
-          const queryWithCancelHandle = await queueConnection.getQueryDef(queryKeyHashed, queueId);
-          if (queryWithCancelHandle) {
-            this.logger('Cancelling query due to timeout', {
-              queueId,
-              queryKey: queryWithCancelHandle.queryKey,
-              queuePrefix: this.redisQueuePrefix,
-              requestId: queryWithCancelHandle.requestId,
-              metadata: queryWithCancelHandle.query?.metadata,
-              preAggregationId: queryWithCancelHandle.query?.preAggregation?.preAggregationId,
-              newVersionEntry: queryWithCancelHandle.query?.newVersionEntry,
-              preAggregation: queryWithCancelHandle.query?.preAggregation,
-              addedToQueueTime: queryWithCancelHandle.addedToQueueTime,
-            });
+          try {
+            const queryWithCancelHandle = await queueConnection.getQueryDef(queryKeyHashed, queueId);
+            if (queryWithCancelHandle) {
+              this.logger('Cancelling query due to timeout', {
+                queueId,
+                queryKey: queryWithCancelHandle.queryKey,
+                queuePrefix: this.redisQueuePrefix,
+                requestId: queryWithCancelHandle.requestId,
+                metadata: queryWithCancelHandle.query?.metadata,
+                preAggregationId: queryWithCancelHandle.query?.preAggregation?.preAggregationId,
+                newVersionEntry: queryWithCancelHandle.query?.newVersionEntry,
+                preAggregation: queryWithCancelHandle.query?.preAggregation,
+                addedToQueueTime: queryWithCancelHandle.addedToQueueTime,
+              });
 
-            await this.sendCancelMessageFn(queryWithCancelHandle, queueId);
+              await this.sendCancelMessageFn(queryWithCancelHandle, queueId);
+            }
+          } catch (cancelError: any) {
+            // Reporting happens after this block, so a failure to cancel would otherwise carry the
+            // query error out of the method unreported.
+            logExecutionError(executionError);
+
+            throw cancelError;
           }
         }
       } finally {
@@ -1076,10 +1084,8 @@ export class QueryQueue {
           newVersionEntry: query.query?.newVersionEntry,
           preAggregation: query.query?.preAggregation,
           addedToQueueTime: query.addedToQueueTime,
-          // `warning` rather than this event's own `warn` field, which the default logger does not
-          // route: without it the rejection would vanish from logs entirely, where it used to be
-          // printed as an error. Set only when there is one, so a plain orphaned result stays as
-          // quiet as it is today.
+          // `warning`, not this event's own `warn` field, which devLogger/prodLogger do not route.
+          // Set only when there is a rejection, so a plain orphaned result stays silent.
           ...(executionError ? {
             warning: 'Query execution was rejected because the query had been cancelled',
             cancellationError: (executionError.error.stack || executionError.error).toString()

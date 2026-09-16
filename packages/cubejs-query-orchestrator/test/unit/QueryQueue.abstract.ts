@@ -42,6 +42,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     const processMessagePromises: Promise<any>[] = [];
     const processCancelPromises: Promise<any>[] = [];
     let cancelledQuery;
+    // Makes the cancel a queue storage failure, so that a throw on the way out of the timeout path
+    // can be asserted on.
+    let failCancelMessage = false;
     // Rejects of the in-flight `cancelable` queries, so that a cancellation can reject the
     // running handler the way a driver rejects a query it has stopped. Keyed by the handle the
     // handler registers with setCancelHandler, so a cancellation rejects only its own query.
@@ -91,6 +94,10 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         processMessagePromises.push(queue.executeQuery(queryKeyHash, queueId, retrieved));
       },
       sendCancelMessageFn: async (query) => {
+        if (failCancelMessage) {
+          throw new Error('Queue storage failure while cancelling');
+        }
+
         processCancelPromises.push(queue.processCancel.bind(queue)(query));
       },
       cancelHandlers: {
@@ -132,6 +139,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       streamHandlerDelay = 250;
       streamCallOrder = [];
       cancelableRejects = new Map();
+      failCancelMessage = false;
     });
 
     afterAll(async () => {
@@ -207,6 +215,22 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       expect(logger.mock.calls[3][0]).toEqual('Cancelling query due to timeout');
       // a timeout cancels a query whose queue item stays active, so it is still reported as an error
       expect(logger.mock.calls[4][0]).toEqual('Error while querying');
+    });
+
+    test('a failing cancel does not swallow the query error', async () => {
+      failCancelMessage = true;
+
+      const query: QueryKey = ['select * from 4', []];
+
+      // executionTimeout is 2s, 5s is enough
+      await queue.executeInQueue('delay', query, { delay: 5 * 1000, result: '1', isJob: true });
+      await awaitProcessing();
+
+      // the error is reported before the failing cancel carries it out of executeQuery, which the
+      // storage error below would otherwise be the only trace of
+      const events = logger.mock.calls.map(([message]) => message);
+      expect(events).toContain('Error while querying');
+      expect(events).toContain('Queue storage error');
     });
 
     test('cancelled query is not reported as an error', async () => {
