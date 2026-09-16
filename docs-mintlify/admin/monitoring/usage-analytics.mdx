@@ -66,12 +66,11 @@ private unless you share it.
 | **Dashboard Authoring** | Publishes and deletions — who ships dashboard changes and who removes them. |
 | **Dashboard Inventory** | A daily snapshot of the dashboard estate, for trends over time. |
 
-If you embed Cube for multiple customers, group Dashboard Usage, Authoring, and
-Inventory by `viewer_embed_tenant` (on Dashboard Usage) to see which of your embed
-customers' users did the looking, or by `embed_tenant_name` (on Dashboard
-Usage, Authoring, and Inventory) to see which embed tenant the content itself
-belongs to — the two can disagree, since a viewer from one customer can open
-a dashboard that lives in another partition. Dashboard Engagement and
+If you embed Cube for multiple customers, Dashboard Usage carries
+`viewer_embed_tenant` — which of your embed customers' users did the looking.
+Dashboard Usage, Authoring, and Inventory all carry `embed_tenant_name` — which
+embed tenant the content itself belongs to. The two can disagree, since a viewer
+from one customer can open a dashboard that lives in another partition. Dashboard
 Dashboard Interactions are collected client-side and are suppressed entirely
 for embedded Creator Mode, so they carry no embed-tenant breakdown and return
 nothing for embed-only traffic — that's suppression, not zero usage.
