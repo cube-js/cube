@@ -237,8 +237,9 @@ The MCP server exposes 30 tools, grouped below.
 
 Every tool runs as the authenticated user. Queries respect the same
 [permissions][ref-roles] as the rest of Cube, including row-level security — MCP is a new
-way to reach your data, not a new access surface — with one exception, noted under
-[`manageFolders`](#dashboard-authoring).
+way to reach your data, not a new access surface — with one exception:
+[`manageFolders`](#dashboard-authoring) deletes a folder without the
+content-permission check the Workspace page applies.
 
 ### Read and write tools
 

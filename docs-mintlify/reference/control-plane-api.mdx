@@ -378,7 +378,7 @@ same rendering the [Download as PNG or PDF][ref-dashboard-download] action
 uses — without driving a browser through the console. Identify the dashboard
 with either `dashboardId` (numeric) or `dashboardPublicId` (string) — exactly
 one, not both. Requires **manage** access to the dashboard's workbook, the
-same permission the console's own download actions require.
+same permission the console's whole-dashboard download requires.
 
 Rendering happens asynchronously, since a capture waits for every widget on
 the dashboard to finish querying: submit a job, poll it until `status` is
