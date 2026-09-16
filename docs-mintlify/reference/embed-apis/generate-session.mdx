@@ -451,8 +451,9 @@ the request body carries only a `sessionId`, so a key scoped to one deployment c
 revoke a session belonging to any deployment in the account.
 
 Only tokens issued after this endpoint shipped carry the claim revocation checks
-against — an older token keeps working until it expires on its own, within 24
-hours, and the `204` response is identical either way.
+against — an older token keeps working until its own signed expiry, 24 hours from
+mint (not the ~23-hour figure above, which is when the iframe itself stops
+trusting a token early). The `204` response is identical either way.
 
 See [Revoke an Embed Session][ref-revoke-session] for the full request and response
 reference, including the `204` idempotency behavior and the `403` when embedding isn't

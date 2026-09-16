@@ -237,7 +237,9 @@ The MCP server exposes 30 tools, grouped below.
 
 Every tool runs as the authenticated user. Queries respect the same
 [permissions][ref-roles] as the rest of Cube, including row-level security — MCP is a new
-way to reach your data, not a new access surface.
+way to reach your data, not a new access surface. Workspace-organization actions are a
+separate case: `manageFolders`'s delete, for one, [checks less than the equivalent
+Workspace-page action][ref-deleting-folders].
 
 ### Read and write tools
 
