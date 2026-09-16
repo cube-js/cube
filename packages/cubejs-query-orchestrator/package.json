@@ -37,6 +37,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "1.7.39",
+    "@cubejs-backend/schema-compiler": "1.7.39",
     "@types/jest": "^29",
     "@types/node": "^22",
     "@types/ramda": "^0.27.40",
