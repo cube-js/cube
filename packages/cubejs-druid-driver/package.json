@@ -18,8 +18,8 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "integration": "jest dist/test/*.js",
-    "integration:druid": "jest dist/test/*.js"
+    "integration": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/*.js",
+    "integration:druid": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/*.js"
   },
   "files": [
     "README.md",

@@ -18,7 +18,7 @@
     "test": "yarn integration",
     "unit": "jest --verbose dist/test/unit",
     "integration": "npm run integration:dremio",
-    "integration:dremio": "jest --verbose dist/test"
+    "integration:dremio": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.39",

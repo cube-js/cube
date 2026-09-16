@@ -17,7 +17,7 @@
     "watch": "tsc -w",
     "test": "yarn integration",
     "integration": "npm run integration:bigquery",
-    "integration:bigquery": "jest --verbose dist/test"
+    "integration:bigquery": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test"
   },
   "files": [
     "dist/src",
@@ -40,7 +40,7 @@
     "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/shared": "1.7.39",
     "@google-cloud/bigquery": "^7.7.0",
-    "@google-cloud/storage": "^7.13.0",
+    "@google-cloud/storage": "^8.1.0",
     "ramda": "^0.27.2"
   },
   "devDependencies": {

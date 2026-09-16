@@ -31,7 +31,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "integration": "npm run integration:questdb",
-    "integration:questdb": "jest --verbose dist/test"
+    "integration:questdb": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.39",

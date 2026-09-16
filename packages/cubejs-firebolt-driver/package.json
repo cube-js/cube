@@ -32,7 +32,7 @@
     "watch": "tsc -w",
     "test": "yarn integration",
     "integration": "npm run integration:firebolt",
-    "integration:firebolt": "jest --verbose dist/test --runInBand"
+    "integration:firebolt": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test --runInBand"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.39",
