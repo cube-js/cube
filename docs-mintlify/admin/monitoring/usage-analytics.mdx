@@ -39,7 +39,7 @@ Each dashboard answers a different question about your account's usage.
 
 | Dashboard | Description |
 | --- | --- |
-| **Overview** | High-level health and adoption at a glance: requests, error rate, cache hit rate, response time, AI activity, and top tenants. |
+| **Overview** | High-level health and adoption at a glance: requests, error rate, cache hit rate, response time, and AI activity. |
 | **Query Activity & Performance** | Query volume by API type, latency percentiles, execution-stage breakdown, slowest queries, errors, and activity heatmap. |
 | **Users & Adoption** | Active users over time, new vs. returning users, engagement frequency, seat utilization, and dormant accounts. |
 | **AI & Token Tracking** | AI messages and conversations by surface, AI adoption, token consumption with estimated cost, and latency. |
@@ -51,18 +51,29 @@ Usage Analytics runs the full Cube application in
 the pre-built dashboards, you get the complete authoring experience: explore
 the usage data, create workbooks, and assemble your own dashboards from it.
 
-Your dashboards query the same three curated views that power the pre-built
-ones. Anything you build stays private unless you share it.
+Your dashboards can query every curated view below — including the five
+dashboard views, which no pre-built dashboard uses. Anything you build stays
+private unless you share it.
 
 | View | What it contains |
 | --- | --- |
-| **API Requests** | Every query hitting your deployments' data APIs, with timing, caching, errors, and the user, tenant, and deployment behind each request. |
+| **API Requests** | Every query hitting your deployments' data APIs, with timing, caching, and errors. `tenant_id` here is your own Cube account, not an embed tenant — row-level security pins every query to it, so this view can't be used to compare your embed tenants against each other. For per-request detail on one deployment, see [Query History](/admin/monitoring/query-history) instead. |
 | **AI Usage** | AI messages grouped into conversations and sessions, with context, token consumption, estimated cost, and latency. |
 | **Users & Adoption** | Users and their engagement: sign-ups, active users, activity frequency, seat utilization, and dormant accounts. |
+| **Dashboard Usage** | Every dashboard in your account — opens, viewers, surface, and when it was last touched — including ones nobody has opened yet. |
+| **Dashboard Engagement** | One row per view session: dwell time and whether the viewer did anything at all. |
+| **Dashboard Interactions** | In-dashboard actions: filter changes, refreshes, exports, drill-ins, chat opens. |
+| **Dashboard Authoring** | Publishes and deletions — who ships dashboard changes and who removes them. |
+| **Dashboard Inventory** | A daily snapshot of the dashboard estate, for trends over time. |
 
-The API Requests view includes the security context behind each request, so
-embedded analytics customers can slice usage by tenant — for example, to find
-the heaviest tenants or compare per-tenant latency and cache efficiency.
+If you embed Cube for multiple customers, Dashboard Usage carries
+`viewer_embed_tenant` — which of your embed customers' users did the looking.
+Dashboard Usage, Authoring, and Inventory all carry `embed_tenant_name` — which
+embed tenant the content itself belongs to. The two can disagree, since a viewer
+from one customer can open a dashboard that lives in another partition. Dashboard
+Engagement and Dashboard Interactions are collected client-side and are suppressed entirely
+for embedded Creator Mode, so they carry no embed-tenant breakdown and return
+nothing for embed-only traffic — that's suppression, not zero usage.
 
 ## Query programmatically
 

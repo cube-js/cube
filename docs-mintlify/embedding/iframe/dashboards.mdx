@@ -120,13 +120,14 @@ as PNG**, and **Download as PDF** actions, and a dashboard-level ⋮ appears —
 docked in the header in [Creator Mode](/embedding/iframe/creator-mode),
 floating over the dashboard in the published-dashboard embed — with **Download
 as PNG** and **Download as PDF** for the whole dashboard. `allowExport` is the
-single switch for all of these — there is no way to allow one format while
-blocking another, or to allow chart-level export without dashboard-level
-export. Only the exact literal string `true` opts in: `allowExport=1`,
+single switch that grants all of these — there is no way to allow one format
+while blocking another. It also grants **Download as CSV** in the Creator
+Mode report builder; see [Show and hide features](/embedding/iframe/feature-visibility).
+Only the exact literal string `true` opts in: `allowExport=1`,
 `allowExport=TRUE`, a bare `?allowExport`, and omitting the parameter (the
 default) all leave every download action hidden.
 
-The CSV is generated client-side from the data already loaded into the
+A widget's CSV is generated client-side from the data already loaded into the
 widget, so no additional query is issued. Inside an embed, `allowExport` —
 not the viewer's own Cube role — is the authority on whether the download
 actions appear. The account-wide **Allow data downloads** switch outranks it —

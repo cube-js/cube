@@ -1,6 +1,6 @@
 ---
 title: Control Plane API
-description: REST surface for automating Cube Cloud deployments, environments, JWT issuance, and audit log export.
+description: REST surface for automating Cube deployments, environments, JWT issuance, audit log export, and dashboard PDF/PNG export.
 ---
 
 Control Plane API enables programmatic management of [deployments][ref-deployments]
@@ -370,6 +370,67 @@ curl \
   -o audit_log.csv \
   "https://YOUR_CUBE_CLOUD_HOST/api/v1/audit-logs/export?start=2024-01-01&end=2024-01-31&eventName=Logged+in&userEmail=user@example.com"
 ```
+
+### `/api/v1/deployments/{deployment_id}/dashboard-exports`
+
+Request a server-rendered snapshot of a whole published dashboard as PNG or
+PDF — the same rendering the [Download as PNG or PDF][ref-dashboard-download]
+action uses — without driving a browser through the console. A draft that has
+never been published can't be exported. Identify the dashboard with either
+`dashboardId` (numeric) or `dashboardPublicId` (string) — exactly one, not
+both. Requires **manage** access to the dashboard's workbook, the same
+permission the console's whole-dashboard download requires.
+
+Rendering happens asynchronously, since a capture waits for every widget on
+the dashboard to finish querying: submit a job, poll it until `status` is
+`completed` — or `failed`, whose `error` says why — then download the file.
+The job and its file are dropped at the `expiresAt` the submit returns —
+5 minutes out — so download before then or submit again. Only the identity
+that submitted a job can poll or download it.
+
+```bash
+# 1. Submit the export
+curl -X POST \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"dashboardPublicId": "abc123", "format": "pdf"}' \
+  "https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments/123/dashboard-exports"
+# -> { "jobId": "...", "expiresAt": "..." }
+
+# 2. Poll until it's done
+curl \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  "https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments/123/dashboard-exports/JOB_ID"
+
+# 3. Download the file
+curl \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -o dashboard.pdf \
+  "https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments/123/dashboard-exports/JOB_ID/download"
+```
+
+An account administrator can also render the dashboard as if a specific other
+user opened it — `renderAs` a console user or an embed user — so the file
+reflects that person's own row-level security. An embed subject that doesn't
+exist yet is provisioned by the call; the `groups`/`userAttributes`/
+`securityContext` passed with it apply to that render only, never to the
+user's stored context. This is meant for scheduled, per-recipient reports:
+one API key produces a correctly-scoped file per person, instead of one key
+per person.
+
+Submitting returns `400` for a request that supplies both ids or neither,
+`404` for a dashboard that doesn't belong to the deployment or a deactivated
+console subject, and `403` when the account has
+data downloads restricted (not bypassed for an on-behalf-of export, unlike a
+built-in scheduled notification) or when an embed subject's tenant doesn't
+have the dashboard's workbook shared with it. It returns `429` when too many
+exports are already in flight for the identity being rendered as, so fan out
+per-recipient reports with a bounded number of jobs open at a time. See the
+[API reference][ref-api-reference] for the full request and response
+schema.
+
+[ref-dashboard-download]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
+[ref-api-reference]: /api-reference/dashboard-exports/export-a-dashboard-as-png-or-pdf
 
 [ref-core-data-apis]: /reference/core-data-apis
 [ref-rest-api]: /reference/core-data-apis/rest-api

@@ -483,9 +483,9 @@ for it and retry.
 ## Keeping a signed session alive
 
 A signed embed's token is usable for about 23 hours (see [Session
-lifecycle](/embedding/iframe/auth/signed#how-it-works)) and can't refresh
-itself — left alone, a tab open that long drops to a "Session expired"
-message. Renew it in place instead.
+lifecycle](/embedding/iframe/auth/signed#how-it-works)), unless revoked
+sooner, and can't refresh itself — left alone, a tab open that long drops to
+a "Session expired" message. Renew it in place instead.
 
 If you're using `@cube-dev/embed-sdk`, call `autoRenewSession` on the
 connection instead of hand-rolling the listener below — it drives renewal
@@ -537,6 +537,15 @@ window.addEventListener("message", (event) => {
   }
 });
 ```
+
+### Ending a session on logout
+
+Letting the token expire isn't the same as logging the viewer out — for that,
+[revoke the embed session](/reference/embed-apis/generate-session#revoke-a-session) from
+your own logout handler. Every renewal mints a new session id, so track each
+one you've minted for that viewer and revoke all of them; an earlier one may
+still be a live, unexpired token. Revoking doesn't tear down a running
+iframe by itself — remove it as you normally would on logout.
 
 ## Surfaces
 

@@ -1,6 +1,6 @@
 ---
 title: Generate Session
-description: HTTP reference for minting short-lived embed sessions that authorize external viewers under signed embedding without sharing API keys.
+description: HTTP reference for minting short-lived embed sessions that authorize external viewers under signed embedding without sharing API keys, and how to revoke one.
 ---
 
 The Generate Session API provides secure, session-based authentication for [signed embedding][ref-signed-embedding]. This API creates temporary sessions that allow external users to access embedded dashboards and visualizations without exposing your API keys.
@@ -16,6 +16,8 @@ The Generate Session API is available on [Premium and Enterprise plans](https://
 The Generate Session API requires your [Cube Cloud API key][ref-api-keys] for authentication. The key must belong to an admin user: this endpoint mints a session for somebody else, choosing their identity and the groups and attributes their data access is resolved against, so a [personal key][ref-personal-api-keys] is rejected with `403 Forbidden`.
 
 If the API key is [scoped to specific deployments][ref-api-keys], the `deploymentId` in the request body must be within the key's scope; otherwise the request is rejected with `403 Forbidden`. Unscoped keys can mint sessions for any deployment.
+
+The deployment-scope restriction above is specific to Generate Session; see [Revoke a session](#revoke-a-session) for how that endpoint's authorization differs.
 
 ## Endpoint
 
@@ -60,6 +62,25 @@ When using `internalId`, the user must already exist in Cube Cloud. You cannot s
 Accounts are limited to 10,000 external users. To increase this limit, please contact support.
 
 </Warning>
+
+### Response {#response}
+
+The API returns a session object:
+
+```json
+{
+  "sessionId": "abc123def456..."
+}
+```
+
+| Field       | Type   | Description                                            |
+| ----------- | ------ | ------------------------------------------------------ |
+| `sessionId` | string | Unique session identifier to use for embedding content |
+
+Use the `sessionId` directly in your embed URL to authenticate and load content securely.
+It is single-use and must be exchanged within 5 minutes; the token it's exchanged for is
+then usable for about 23 hours — see [signed embedding][ref-signed-embedding] — unless
+you revoke it sooner; see [Revoke a session](#revoke-a-session).
 
 ## Session settings
 
@@ -341,22 +362,6 @@ DELETE /api/v1/embed-tenants/{embedTenantName}/user-attributes/{id}
 
 These endpoints use the same `Api-Key` authentication as Generate Session and require admin access. List endpoints return cursor-paginated results (`?first=`, `?after=`).
 
-### Response
-
-The API returns a session object:
-
-```json
-{
-  "sessionId": "abc123def456..."
-}
-```
-
-| Field       | Type   | Description                                            |
-| ----------- | ------ | ------------------------------------------------------ |
-| `sessionId` | string | Unique session identifier to use for embedding content |
-
-Use the `sessionId` directly in your embed URL to authenticate and load content securely.
-
 ## Code Example
 
 <CodeGroup>
@@ -430,7 +435,51 @@ curl -X POST "https://your-account.cubecloud.dev/api/v1/embed/generate-session" 
 
 Use session ID in [signed embedding][ref-signed-embedding].
 
+## Revoke a session
+
+```text
+POST https://{accountName}.cubecloud.dev/api/v1/embed/session/revoke
+```
+
+Call this from your application's logout handler to end an embed session from the
+server side. Pass the `sessionId` that Generate Session returned, and still remove the
+embedded iframe on logout — revoking a session doesn't tear it down on its own.
+
+```bash
+curl -X POST "https://your-account.cubecloud.dev/api/v1/embed/session/revoke" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Api-Key YOUR_API_KEY" \
+  -d '{ "sessionId": "abc123def456..." }'
+```
+
+Returns `204 No Content` on success, with no body.
+
+It requires an admin principal — an API key, embed JWT, or bearer token belonging
+to an admin user.
+
+<Warning>
+
+Unlike Generate Session, an API key's scope is **not** checked: the request body
+carries only a `sessionId`, so a key scoped to one deployment can revoke a session
+belonging to any deployment in the account.
+
+</Warning>
+
+Only tokens issued after this endpoint shipped carry the claim revocation checks
+against — an older token keeps working until its own signed expiry, 24 hours from
+mint (not the ~23-hour figure above, which is when the iframe itself stops
+trusting a token early). The `204` response is identical either way.
+
+Revocation covers the embed session only. A Cube API token the embed obtained from
+`POST /api/v1/deployments/{deploymentId}/token` is a separate credential and keeps
+working — revoke or expire it separately if your logout has to stop data-API access.
+
+See [Revoke an Embed Session][ref-revoke-session] for the full request and response
+reference, including the `204` idempotency behavior and the `403` when embedding isn't
+enabled for the account.
+
 [ref-api-keys]: /admin/account-billing/api-keys
+[ref-revoke-session]: /api-reference/embed/revoke-an-embed-session
 [ref-personal-api-keys]: /admin/account-billing/api-keys#personal-api-keys
 [ref-signed-embedding]: /embedding/iframe/auth/signed
 [ref-creator-mode]: /embedding/iframe/creator-mode
