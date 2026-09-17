@@ -7,7 +7,7 @@
 
 # Cube Angular Client
 
-Cube Angular is an Angular Module for Angular 12+.
+Cube Angular is an Angular Module for Angular 20+.
 
 [Learn more](https://github.com/cube-js/cube.js#getting-started)
 
