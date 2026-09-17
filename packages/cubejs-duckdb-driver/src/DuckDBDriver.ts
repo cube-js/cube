@@ -12,8 +12,7 @@ import { finished } from 'stream/promises';
 import { DuckDBConnection, DuckDBInstance } from '@duckdb/node-api';
 
 import { DuckDBQuery } from './DuckDBQuery';
-import { transformRow } from './HydrationStream';
-import { convertDuckDBParams, convertDuckDBValue } from './DuckDBValueConverters';
+import { convertDuckDBParams, convertDuckDBValue, transformRow } from './Transform';
 
 const { version } = require('../../package.json');
 
@@ -36,7 +35,7 @@ type ExecFn = (sql: string) => Promise<unknown>;
 
 const DuckDBToGenericType: Record<string, GenericDataBaseType> = {
   // DATE_TRUNC returns DATE, but Cube Store still doesn't support DATE type
-  // DuckDB's driver transform date/timestamp to Date object, but HydrationStream converts any Date object to ISO timestamp
+  // DuckDB's driver transform date/timestamp to Date object, but transformRow converts any Date object to ISO timestamp
   // That's why It's safe to use timestamp here
   date: 'timestamp',
 };

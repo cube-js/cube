@@ -15,9 +15,7 @@ import {
 // DuckDB renders DECIMAL with the full declared scale ("100.000"); the legacy driver
 // went through a double, so consumers never saw the padding.
 function formatDecimal(value: DuckDBDecimalValue): string {
-  const text = value.toString();
-
-  return text.includes('.') ? text.replace(/\.?0+$/, '') : text;
+  return value.scale === 0 ? String(value.value) : value.toString().replace(/\.?0+$/, '');
 }
 
 /**
@@ -66,4 +64,14 @@ export function convertDuckDBParams(values: unknown[] | null | undefined): DuckD
 
     return value as DuckDBValue;
   });
+}
+
+export function transformRow(row: any) {
+  for (const [field, value] of Object.entries(row)) {
+    if (typeof value === 'number' || typeof value === 'bigint') {
+      row[field] = value.toString();
+    } else if (Object.prototype.toString.call(value) === '[object Date]') {
+      row[field] = (value as any).toISOString();
+    }
+  }
 }
