@@ -263,6 +263,25 @@ describe('DuckDBDriver', () => {
     await expect(driver.testConnection()).resolves.toBeUndefined();
   });
 
+  test.each([
+    ['a scalar', '1::BIGINT', '1'],
+    ['an object', '[1::BIGINT, 2::BIGINT]', ['1', '2']],
+  ])('keeps a __proto__ column of %s in a result too wide for an object shape', async (_name, expr, expected) => {
+    const columns = [
+      `${expr} AS "__proto__"`,
+      ...Array.from({ length: 127 }, (_, i) => `${i}::INTEGER AS c${i}`),
+    ];
+
+    const [row] = await driver.query<Record<string, unknown>>(`SELECT ${columns.join(', ')}`);
+
+    const protoCell = (o: unknown) => Object.getOwnPropertyDescriptor(o, '__proto__')?.value;
+
+    expect(Object.keys(row)).toHaveLength(128);
+    expect(protoCell(row)).toEqual(expected);
+    // JSON.parse also defines __proto__ as an own property, so the cell survives a round trip
+    expect(protoCell(JSON.parse(JSON.stringify(row)))).toEqual(expected);
+  });
+
   test('a throwing close surfaces as a stream error', async () => {
     const close = jest.spyOn(DuckDBConnection.prototype, 'closeSync').mockImplementation(() => {
       throw new Error('closeSync failed');

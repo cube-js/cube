@@ -1,4 +1,4 @@
-import { formatIsoFromMillis } from '../../src/Transform';
+import { buildTransform, formatIsoFromMillis } from '../../src/Transform';
 
 describe('formatIsoFromMillis', () => {
   const cases = [
@@ -32,5 +32,11 @@ describe('formatIsoFromMillis', () => {
   test('throws like Date for values outside its range', () => {
     expect(() => formatIsoFromMillis(8.64e15 + 1)).toThrow(RangeError);
     expect(() => formatIsoFromMillis(NaN)).toThrow(RangeError);
+  });
+});
+
+describe('buildTransform', () => {
+  test('rejects a names/types length mismatch', () => {
+    expect(() => buildTransform(['a', 'b'], [])).toThrow('names 2 vs types 0');
   });
 });
