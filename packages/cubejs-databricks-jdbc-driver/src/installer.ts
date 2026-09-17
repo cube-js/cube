@@ -7,9 +7,8 @@ export const JDBC_DRIVER_JAR_NAME = `databricks-jdbc-${DRIVER_VERSION}.jar`;
 
 /**
  * Databricks' open-source JDBC driver, which replaced the legacy Simba driver.
- * More info could be found at https://docs.databricks.com/aws/en/integrations/jdbc/oss
- * Starting from the 3.x line the artifact is published without the `-oss` version suffix.
  * Requires a Java Runtime Environment (JRE) 11.0 or above.
+ * https://docs.databricks.com/aws/en/integrations/jdbc/oss
  */
 export async function downloadJDBCDriver(): Promise<string | null> {
   console.log(`Downloading ${JDBC_DRIVER_JAR_NAME}`);
