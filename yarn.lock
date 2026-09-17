@@ -230,6 +230,13 @@
     yargs "18.0.0"
     zod "4.1.13"
 
+"@angular/common@^20.3.31":
+  version "20.3.31"
+  resolved "https://registry.yarnpkg.com/@angular/common/-/common-20.3.31.tgz#87325b78374a361f1e20b8cd1ba6be8ebaa2aca3"
+  integrity sha512-h2SM62jldHWHN+SFERjOaxDYAdFyJTfx1dSFbg92OiRKRq2oRZkc6NrSk+rwpHCy5hkaqDxZl0UCqT/C6uLbXA==
+  dependencies:
+    tslib "^2.3.0"
+
 "@angular/compiler-cli@^20.3.31":
   version "20.3.31"
   resolved "https://registry.yarnpkg.com/@angular/compiler-cli/-/compiler-cli-20.3.31.tgz#07fa84907e7d942b55903c475b581edd40517c64"
@@ -255,6 +262,20 @@
   version "20.3.31"
   resolved "https://registry.yarnpkg.com/@angular/core/-/core-20.3.31.tgz#809e70e907d07aab931ece182a162138a1af0e63"
   integrity sha512-y67gb2VIAFNmgP3Zl1nuFn+c5BYEwIXsOR8mbFTDasKNM7ZfK4QJAtRYlhZk/NwuySJ+4oLeWiid84xLVOsBAw==
+  dependencies:
+    tslib "^2.3.0"
+
+"@angular/platform-browser-dynamic@^20.3.31":
+  version "20.3.31"
+  resolved "https://registry.yarnpkg.com/@angular/platform-browser-dynamic/-/platform-browser-dynamic-20.3.31.tgz#7b8dc2994c062de484003c8caf7296c9884db6da"
+  integrity sha512-2N+KP9ivejCadNspXlLKEeNS3qYqWmGQQouEa22kkBCd0JbI+JLSXBP23fxHSc31QbFFPv254LwHXFedKjFXrA==
+  dependencies:
+    tslib "^2.3.0"
+
+"@angular/platform-browser@^20.3.31":
+  version "20.3.31"
+  resolved "https://registry.yarnpkg.com/@angular/platform-browser/-/platform-browser-20.3.31.tgz#8bc8add548afe41f6308a26c35d9065bc2199168"
+  integrity sha512-DCWfLHwLG4c8r/W4SmS8pyRh0416PenIfBPwicnpvgsK2vIIZDRHU4pPlAftv66zfErHa7m12TPzxaAcUey2ag==
   dependencies:
     tslib "^2.3.0"
 
@@ -11485,6 +11506,11 @@ es6-symbol@^3.1.0, es6-symbol@^3.1.1, es6-symbol@~3.1.3:
     d "^1.0.2"
     ext "^1.7.0"
 
+esbuild-wasm@>=0.15.13:
+  version "0.28.2"
+  resolved "https://registry.yarnpkg.com/esbuild-wasm/-/esbuild-wasm-0.28.2.tgz#b1f69ae107aa8471b57756af4f8bc131407f4481"
+  integrity sha512-GccVwhv3mmOUVQHCQm2Ox/rby8n/EqUwvZxE6Pjfikrq/lWw9g9WX/u9EykWnpot3Ko6j426DgQdea2xWKIAQA==
+
 esbuild@0.28.1:
   version "0.28.1"
   resolved "https://registry.yarnpkg.com/esbuild/-/esbuild-0.28.1.tgz#ef45b4634c9c9d97a296aea4114a5f9840f95578"
@@ -11517,6 +11543,38 @@ esbuild@0.28.1:
     "@esbuild/win32-ia32" "0.28.1"
     "@esbuild/win32-x64" "0.28.1"
 
+esbuild@>=0.15.13, "esbuild@^0.27.0 || ^0.28.0":
+  version "0.28.2"
+  resolved "https://registry.yarnpkg.com/esbuild/-/esbuild-0.28.2.tgz#0f43bd1bad955b72d24e2261e3abe5957ccf0816"
+  integrity sha512-HKVLS8dvII+xoKW9kmqxbRKrnWEXfJJr/FZhhJmiqIB0e053QNYFqOBouTMO/k5sID4MvCiUCvv8b9M4h32wIA==
+  optionalDependencies:
+    "@esbuild/aix-ppc64" "0.28.2"
+    "@esbuild/android-arm" "0.28.2"
+    "@esbuild/android-arm64" "0.28.2"
+    "@esbuild/android-x64" "0.28.2"
+    "@esbuild/darwin-arm64" "0.28.2"
+    "@esbuild/darwin-x64" "0.28.2"
+    "@esbuild/freebsd-arm64" "0.28.2"
+    "@esbuild/freebsd-x64" "0.28.2"
+    "@esbuild/linux-arm" "0.28.2"
+    "@esbuild/linux-arm64" "0.28.2"
+    "@esbuild/linux-ia32" "0.28.2"
+    "@esbuild/linux-loong64" "0.28.2"
+    "@esbuild/linux-mips64el" "0.28.2"
+    "@esbuild/linux-ppc64" "0.28.2"
+    "@esbuild/linux-riscv64" "0.28.2"
+    "@esbuild/linux-s390x" "0.28.2"
+    "@esbuild/linux-x64" "0.28.2"
+    "@esbuild/netbsd-arm64" "0.28.2"
+    "@esbuild/netbsd-x64" "0.28.2"
+    "@esbuild/openbsd-arm64" "0.28.2"
+    "@esbuild/openbsd-x64" "0.28.2"
+    "@esbuild/openharmony-arm64" "0.28.2"
+    "@esbuild/sunos-x64" "0.28.2"
+    "@esbuild/win32-arm64" "0.28.2"
+    "@esbuild/win32-ia32" "0.28.2"
+    "@esbuild/win32-x64" "0.28.2"
+
 esbuild@^0.25.0:
   version "0.25.12"
   resolved "https://registry.yarnpkg.com/esbuild/-/esbuild-0.25.12.tgz#97a1d041f4ab00c2fce2f838d2b9969a2d2a97a5"
@@ -11548,38 +11606,6 @@ esbuild@^0.25.0:
     "@esbuild/win32-arm64" "0.25.12"
     "@esbuild/win32-ia32" "0.25.12"
     "@esbuild/win32-x64" "0.25.12"
-
-"esbuild@^0.27.0 || ^0.28.0":
-  version "0.28.2"
-  resolved "https://registry.yarnpkg.com/esbuild/-/esbuild-0.28.2.tgz#0f43bd1bad955b72d24e2261e3abe5957ccf0816"
-  integrity sha512-HKVLS8dvII+xoKW9kmqxbRKrnWEXfJJr/FZhhJmiqIB0e053QNYFqOBouTMO/k5sID4MvCiUCvv8b9M4h32wIA==
-  optionalDependencies:
-    "@esbuild/aix-ppc64" "0.28.2"
-    "@esbuild/android-arm" "0.28.2"
-    "@esbuild/android-arm64" "0.28.2"
-    "@esbuild/android-x64" "0.28.2"
-    "@esbuild/darwin-arm64" "0.28.2"
-    "@esbuild/darwin-x64" "0.28.2"
-    "@esbuild/freebsd-arm64" "0.28.2"
-    "@esbuild/freebsd-x64" "0.28.2"
-    "@esbuild/linux-arm" "0.28.2"
-    "@esbuild/linux-arm64" "0.28.2"
-    "@esbuild/linux-ia32" "0.28.2"
-    "@esbuild/linux-loong64" "0.28.2"
-    "@esbuild/linux-mips64el" "0.28.2"
-    "@esbuild/linux-ppc64" "0.28.2"
-    "@esbuild/linux-riscv64" "0.28.2"
-    "@esbuild/linux-s390x" "0.28.2"
-    "@esbuild/linux-x64" "0.28.2"
-    "@esbuild/netbsd-arm64" "0.28.2"
-    "@esbuild/netbsd-x64" "0.28.2"
-    "@esbuild/openbsd-arm64" "0.28.2"
-    "@esbuild/openbsd-x64" "0.28.2"
-    "@esbuild/openharmony-arm64" "0.28.2"
-    "@esbuild/sunos-x64" "0.28.2"
-    "@esbuild/win32-arm64" "0.28.2"
-    "@esbuild/win32-ia32" "0.28.2"
-    "@esbuild/win32-x64" "0.28.2"
 
 escalade@3.2.0, escalade@^3.1.1, escalade@^3.2.0:
   version "3.2.0"
@@ -13828,7 +13854,7 @@ jest-each@^29.7.0:
     jest-util "^29.7.0"
     pretty-format "^29.7.0"
 
-jest-environment-jsdom@^29:
+jest-environment-jsdom@^29, jest-environment-jsdom@^29.7.0:
   version "29.7.0"
   resolved "https://registry.yarnpkg.com/jest-environment-jsdom/-/jest-environment-jsdom-29.7.0.tgz#d206fa3551933c3fd519e5dfdb58a0f5139a837f"
   integrity sha512-k9iQbsf9OyOfdzWH8HDmrRT0gSIcX+FLNW7IQq94tFX0gynPwqDTW0Ho6iMVNjGz/nb+l/vW3dWM2bbLLpkbXA==
@@ -13937,6 +13963,20 @@ jest-pnp-resolver@^1.2.2:
   version "1.2.2"
   resolved "https://registry.yarnpkg.com/jest-pnp-resolver/-/jest-pnp-resolver-1.2.2.tgz#b704ac0ae028a89108a4d040b3f919dfddc8e33c"
   integrity sha512-olV41bKSMm8BdnuMsewT4jqlZ8+3TCARAXjZGT9jcoSnrfUnRCqnMoF9XEeoWjbzObpqF9dRhHQj0Xb9QdF6/w==
+
+jest-preset-angular@^14.6.2:
+  version "14.6.2"
+  resolved "https://registry.yarnpkg.com/jest-preset-angular/-/jest-preset-angular-14.6.2.tgz#1a00058550bfee4746506254a80eaf2690465f34"
+  integrity sha512-QWnjfXrnYJX65D+iZXBrdQ0ABHSo6DGvcmL3dGYOdF+V2ZhDlqJwKTmt7nyiOcORPdCL+20P8y+Q1mmnjZTHKQ==
+  dependencies:
+    bs-logger "^0.2.6"
+    esbuild-wasm ">=0.15.13"
+    jest-environment-jsdom "^29.7.0"
+    jest-util "^29.7.0"
+    pretty-format "^29.7.0"
+    ts-jest "^29.3.0"
+  optionalDependencies:
+    esbuild ">=0.15.13"
 
 jest-regex-util@^29.6.3:
   version "29.6.3"
@@ -19933,7 +19973,7 @@ ts-invariant@^0.10.3:
   dependencies:
     tslib "^2.1.0"
 
-ts-jest@^29.4.12:
+ts-jest@^29.3.0, ts-jest@^29.4.12:
   version "29.4.12"
   resolved "https://registry.yarnpkg.com/ts-jest/-/ts-jest-29.4.12.tgz#c34cd91f02d364e9286d2c016843315fd0efff76"
   integrity sha512-Ov6ClY53Fflh6BGAnY2DlTq1hYDrTycz2PVTXBWFW2CU+9zrEqAp9fWdGXl42EXO5RLSFAcAZ2JFKbP+zBTFfw==
@@ -21042,3 +21082,8 @@ zod@4.1.13, zod@^4.1.13:
   version "4.6.5"
   resolved "https://registry.yarnpkg.com/zod/-/zod-4.6.5.tgz#e3af3edbdc260239c52f73caad05dbbffe6e82cd"
   integrity sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==
+
+zone.js@~0.15.0:
+  version "0.15.1"
+  resolved "https://registry.yarnpkg.com/zone.js/-/zone.js-0.15.1.tgz#1e109adb75f80e9e004ee8e0d4a0a52e0a336481"
+  integrity sha512-XE96n56IQpJM7NAoXswY3XRLcWFW83xe0BiAOeMD7K5k5xecOeul3Qcpx6GqEeeHNkW5DWL5zOyTbEfB4eti8w==
