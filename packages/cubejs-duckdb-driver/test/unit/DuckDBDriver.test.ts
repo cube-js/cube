@@ -252,6 +252,17 @@ describe('DuckDBDriver', () => {
     }
   );
 
+  test('conversion error mid-stream destroys the stream and closes its connection', async () => {
+    const close = jest.spyOn(DuckDBConnection.prototype, 'closeSync');
+    const tableData = await driver.stream("SELECT DATE 'infinity' AS date", [], { highWaterMark: 1 });
+
+    await expect(streamToArray(tableData.rowStream as Readable)).rejects.toThrow(RangeError);
+    await tableData.release?.();
+
+    expect(close).toHaveBeenCalledTimes(1);
+    await expect(driver.testConnection()).resolves.toBeUndefined();
+  });
+
   test('failed query and stream do not break the driver', async () => {
     const close = jest.spyOn(DuckDBConnection.prototype, 'closeSync');
 
