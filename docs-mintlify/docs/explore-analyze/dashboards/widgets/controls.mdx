@@ -292,12 +292,12 @@ Every control offers at most one of two actions in the control itself, beside it
 
 | Action | When it shows | What it does |
 |---|---|---|
-| **Clear** (✕) | The control has a value. | Empties the control and stops applying it, so its charts fall back to their own defaults. Clearing a [parent control](#parent) clears the [children](#children) it drives as well — fully, rather than returning them to their defaults, since an option's mapping is what put those defaults there. |
-| **Reset to default** (↩) | The control has a value published in the last dashboard version, and its current value differs. | Puts the control back on that published value. |
+| **Clear** (✕) | The control has a value. | Empties the control and stops applying it, so its charts fall back to their own defaults. Clearing a [parent control](#parent) clears the [children](#children) it drives as well — fully, rather than returning them to their defaults. |
+| **Reset to default** (↩) | The control has been changed, it has a value published in the last dashboard version, and the two differ. | Puts the control back on that published value. |
 
 Only one shows there at a time: **Reset to default** takes the slot whenever it applies, so a control that has drifted from its published value offers the way back rather than the way to empty. The dropdown header is not limited that way — whichever of the two apply are there as text links, **Reset** to the left of **Clear** — and neither closes the dropdown.
 
-A [field switcher](#field-switcher) never offers **Clear**. It always has a member selected, and clearing it would leave its charts with no member to query, so **Reset to default** is the only action it carries and there is no ✕.
+A [field switcher](#field-switcher) never offers **Clear**. Its selection is obligatory — with no member picked, charts fall back to [the member it replaces](#field-switcher-default-option) — so there is no empty state for a viewer to choose, and **Reset to default** is the only action it carries.
 
 <Note>
 This is the control's *own* published value, which is not always what a [parent control](#parent) means by its **Reset to default** [child mapping](#children): that one returns the child to the value it opens on *for that viewer* — the user attribute default a [filter](#user-attribute-default), [time granularity switcher](#time-granularity-user-attribute-default) or [field switcher](#field-switcher-user-attribute-default) resolves, otherwise the child's own static default.
@@ -309,7 +309,7 @@ In the [dashboard builder][ref-workbooks] both write the draft. **Reset to defau
 
 Until a control has been published with a value — on a dashboard still being built, or one published while the control was empty — there is nothing to return to, and the ↩ doesn't appear at all.
 
-A clear also doesn't survive the [shareable link](#sharing-the-current-selection). Clearing drops the control's parameter rather than recording the empty state, so an emptied control looks the same in the URL as one nobody touched, and a bookmark or shared link reopens it on the default the clear was there to remove. Reset is unaffected: it lands on the published value, which [stays out of the link](#sharing-the-current-selection) anyway.
+A clear also doesn't survive the [shareable link](#sharing-the-current-selection). Clearing drops the control's parameter rather than recording the empty state, so an emptied control looks the same in the URL as one nobody touched, and a bookmark or shared link reopens it on the default the clear was there to remove. Reset drops the parameter too. That reproduces the same state for a viewer whose control opens on the published value, but not for one seeded by a [user attribute default](#user-attribute-default): there the reload reopens on the attribute value, not the published one the reset landed on.
 
 ## Sharing the current selection
 
