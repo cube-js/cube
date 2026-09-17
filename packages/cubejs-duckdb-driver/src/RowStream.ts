@@ -68,16 +68,18 @@ export class DuckDBRowStream extends Readable {
   }
 
   public override _destroy(error: Error | null, callback: (error?: Error | null) => void): void {
+    const close = () => {
+      try {
+        this.onClose();
+        callback(error);
+      } catch (e) {
+        // Letting this escape the handler would leave the stream without a 'close' event and
+        // raise an unhandled rejection; the destroy error, when there is one, came first.
+        callback(error || e as Error);
+      }
+    };
+
     // The connection must not close under an in-flight native fetch
-    Promise.resolve(this.pendingFetch).then(
-      () => {
-        this.onClose();
-        callback(error);
-      },
-      () => {
-        this.onClose();
-        callback(error);
-      },
-    );
+    Promise.resolve(this.pendingFetch).then(close, close);
   }
 }

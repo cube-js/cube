@@ -263,6 +263,23 @@ describe('DuckDBDriver', () => {
     await expect(driver.testConnection()).resolves.toBeUndefined();
   });
 
+  test('a throwing close surfaces as a stream error', async () => {
+    const close = jest.spyOn(DuckDBConnection.prototype, 'closeSync').mockImplementation(() => {
+      throw new Error('closeSync failed');
+    });
+    const tableData = await driver.stream('SELECT * FROM range(10000)', [], { highWaterMark: 1 });
+    const rowStream = tableData.rowStream as Readable;
+    const error = once(rowStream, 'error');
+
+    rowStream.destroy();
+
+    // without this the stream would never emit 'close', and release() below would hang
+    await expect(error).resolves.toEqual([new Error('closeSync failed')]);
+    await expect(tableData.release?.()).resolves.toBeUndefined();
+
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
   test('failed query and stream do not break the driver', async () => {
     const close = jest.spyOn(DuckDBConnection.prototype, 'closeSync');
 
