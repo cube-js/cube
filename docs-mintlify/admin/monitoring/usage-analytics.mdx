@@ -51,15 +51,15 @@ Usage Analytics runs the full Cube application in
 the pre-built dashboards, you get the complete authoring experience: explore
 the usage data, create workbooks, and assemble your own dashboards from it.
 
-Your dashboards can query every curated view below — including the dashboard
-and billing views, which no pre-built dashboard uses. Anything you build
-stays private unless you share it.
+Your dashboards can query every curated view below — including the dashboard,
+billing, and AI Calls & Cost views, which no pre-built dashboard uses.
+Anything you build stays private unless you share it.
 
 | View | What it contains |
 | --- | --- |
 | **API Requests** | Every query hitting your deployments' data APIs, with timing, caching, and errors. `tenant_id` here is your own Cube account, not an embed tenant — row-level security pins every query to it, so this view can't be used to compare your embed tenants against each other. For per-request detail on one deployment, see [Query History](/admin/monitoring/query-history) instead. |
 | **AI Usage** | AI messages grouped into conversations and sessions, with context, token consumption, estimated cost, and latency. |
-| **AI Calls & Cost** | Token consumption and cost of every individual LLM call — a finer grain than AI Usage's per-run rows — broken down by conversation, embedded end user, model, and billing line item. Runs on a model you bring yourself ([BYOM](/admin/ai/bring-your-own-model)) still appear in AI Usage, but consume no Cube tokens, so they have no cost to attribute here. Per-call detail is retained for about 120 days. |
+| **AI Calls & Cost** | Token consumption and cost of every individual LLM call — finer-grained than AI Usage, which rolls calls up per conversation — broken down by conversation, embedded end user, model, and billing line item. Calls served by a model you bring yourself ([BYOM](/admin/ai/bring-your-own-model)) appear in AI Usage but consume no Cube tokens, so they carry no cost here. |
 | **Users & Adoption** | Users and their engagement: sign-ups, active users, activity frequency, seat utilization, and dormant accounts. |
 | **Dashboard Usage** | Every dashboard in your account — opens, viewers, surface, and when it was last touched — including ones nobody has opened yet. |
 | **Dashboard Engagement** | One row per view session: dwell time and whether the viewer did anything at all. |
