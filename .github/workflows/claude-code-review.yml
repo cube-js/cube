@@ -184,11 +184,8 @@ jobs:
             --silent
 
       - name: Delete tracking comment (cancelled run)
-        # cancel-in-progress kills a superseded run mid-review, which would leave
-        # its "Claude Code is working…" comment on the PR forever. Steps guarded
-        # by cancelled() still run during the cancellation grace period. The
-        # action keeps the run link in that comment's body for its whole
-        # lifetime, so it doubles as the marker for the comment this run owns.
+        # The action keeps the run link in the tracking comment's body for its
+        # whole lifetime, so it doubles as the marker for the comment this run owns.
         if: cancelled() && env.PR_NUMBER != ''
         continue-on-error: true
         env:
