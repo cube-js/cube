@@ -326,7 +326,7 @@ packages:
 Here `dbt deps` fails inside the sandbox unless `DBT_PACKAGES_TOKEN` is available
 to it. Data source connection variables (`CUBEJS_DB_*`) reach the sandbox automatically;
 any other variable does **not**, unless you select it.
-[`DBT_SANDBOX_VERSION`](#set-the-dbt-core-version) also needs no selecting — Cube reads
+[`DBT_SANDBOX_VERSION`](#set-the-dbt-core-version) isn't selectable either — Cube reads
 it to decide which dbt Core to install.
 
 In the **dbt project** settings card, the **Environment variables** picker lets
@@ -383,9 +383,6 @@ deployment under **Settings → Configuration**:
 ```text
 DBT_SANDBOX_VERSION=1.9.2
 ```
-
-It reaches the sandbox automatically, so it isn't selected in the **Environment
-variables** picker above.
 
 - The value must be an **exact, stable version**: `1.9.2`, not `latest`, `1.9`, `^1.9`, or
   a prerelease such as `1.9.2rc1`. Any other value fails the pull immediately with a
