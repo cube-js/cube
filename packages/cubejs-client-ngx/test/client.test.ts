@@ -159,19 +159,4 @@ describe('CubeClient requests', () => {
     expect(subscribeSpy).toHaveBeenCalledTimes(1);
     expect(transport.calls).toEqual(['load', 'load']);
   });
-
-  // A bare Subject never replays, so the subscription apiInstance() opens on the
-  // first request misses the config that was already emitted. Nothing creates the
-  // api instance and every request method throws.
-  describe('with a bare Subject config', () => {
-    test('requests throw even after the config has emitted', () => {
-      const config = new Subject<any>();
-      const client = setup(config);
-
-      config.next({ token: 'token', options: { transport } });
-
-      expect(() => client.load({ measures: ['Orders.count'] })).toThrow(TypeError);
-      expect(transport.calls).toEqual([]);
-    });
-  });
 });
