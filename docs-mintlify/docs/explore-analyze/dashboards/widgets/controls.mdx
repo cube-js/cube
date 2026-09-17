@@ -296,12 +296,12 @@ Every control offers at most one of two actions in the control itself, beside it
 | **Reset to default** (↩) | The control has been changed, it has a value published in the last dashboard version, and the two differ. | Puts the control back on that published value. |
 
 <Note>
-This is the control's *own* published value, which is not always what a [parent control](#parent) means by its **Reset to default** [child mapping](#children): that one returns the child to the value it opens on *for that viewer* — the user attribute default a [filter](#user-attribute-default), [time granularity switcher](#time-granularity-user-attribute-default) or [field switcher](#field-switcher-user-attribute-default) resolves, otherwise the child's own static default.
+This is the control's *own* published value, which is not always what a [parent control](#parent) means by its **Reset to default** [child mapping](#children): despite the shared label, that one returns the child to the value it opens on *for that viewer*.
 </Note>
 
-**Reset to default** takes the slot whenever it applies, so a control that has drifted from its published value offers the way back rather than the way to empty. The dropdown header is not limited that way — whichever of the two apply are there as text links, **Reset** to the left of **Clear** — and neither closes the dropdown.
+**Reset to default** wins that single spot whenever it applies, so a control that has drifted from its published value offers the way back rather than the way to empty. The dropdown header is not limited that way — whichever of the two apply are there as text links, **Reset** to the left of **Clear** — and neither closes the dropdown.
 
-On a published dashboard, clearing or resetting changes only what that viewer sees, and writes nothing back to the dashboard — or [into the URL](#sharing-the-current-selection). A control whose [visibility](#visibility) is **Disabled** greys out whichever action it shows, so a viewer can see the state without changing it.
+On a published dashboard, clearing or resetting changes only what that viewer sees, and writes nothing back to the dashboard; in the URL it [drops the control's parameter](#sharing-the-current-selection) rather than recording the result. A control whose [visibility](#visibility) is **Disabled** greys out whichever action it shows, so a viewer can see the state without changing it.
 
 In the [dashboard builder][ref-workbooks] both write the draft. **Reset to default** returns the control to the published value, leaving no unsaved change behind. **Clear** removes the control's saved default, which viewers see once you publish; clearing a [parent control](#parent) saves its children's cleared defaults in the same write.
 
