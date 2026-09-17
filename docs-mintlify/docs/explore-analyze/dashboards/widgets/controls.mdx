@@ -72,6 +72,8 @@ Empty, `null`, or unresolvable attribute values are skipped — the filter falls
 
 The user attribute default only seeds the filter's *initial* value. Viewers can still change the filter unless its [visibility](#visibility) is set to **Disabled**, in which case the resolved attribute value is locked in for that viewer. Values passed via URL parameters also take precedence over user attribute defaults, so deep links continue to work.
 
+If a [parent control](#parent) drives this filter, the option the viewer is on decides it: one that [keeps the filter as-is](#children) lets the attribute seed it, and one set to **Clear** empties it and the attribute does *not* seed it back — the filter stays unfiltered until the viewer sets it or a value arrives [in the URL](#sharing-the-current-selection).
+
 ### Faceted filters
 
 When multiple filters target dimensions from the same semantic view, you can mark them as **faceted**. Faceted filters scope each other's value lists — selecting a value in one filter narrows the options shown in the others, so viewers only see combinations that exist in the data.
