@@ -29,6 +29,19 @@ pub static DATA_QUERIES_STALE_CACHE_SIZE: Gauge =
     metrics::gauge("cs.sql.query.data.cache.stale.size");
 pub static DATA_QUERIES_STALE_CACHE_WEIGHT: Gauge =
     metrics::gauge("cs.sql.query.data.cache.stale.weight");
+
+/// Queries handed a logical plan the cache already held. A query that waited on another
+/// query's planning for the same key counts here too: it got a plan without planning.
+pub static PLAN_CACHE_HIT: Counter = metrics::counter("cs.sql.query.plan.cache.hit");
+/// Queries that had to build the logical plan themselves.
+pub static PLAN_CACHE_MISS: Counter = metrics::counter("cs.sql.query.plan.cache.miss");
+/// Queries the cache cannot hold: they carry inline tables, or they mention a function that
+/// `optimize` would fold against the current time. Kept apart from misses, which are simply
+/// queries the cache has not seen yet.
+pub static PLAN_CACHE_BYPASS: Counter = metrics::counter("cs.sql.query.plan.cache.bypass");
+/// Approximate number of logical plans held.
+pub static PLAN_CACHE_SIZE: Gauge = metrics::gauge("cs.sql.query.plan.cache.size");
+
 pub static DATA_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.data.ms");
 pub static DATA_QUERY_LOGICAL_PLAN_TOTAL_CREATION_TIME_US: Histogram =
     metrics::histogram("cs.sql.query.data.planning.logical_plan.total_creation.us");

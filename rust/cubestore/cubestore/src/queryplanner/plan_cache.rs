@@ -1,8 +1,11 @@
+use crate::app_metrics;
 use crate::sql::InlineTables;
 use crate::CubeError;
 use datafusion::logical_expr::LogicalPlan;
 use moka::future::Cache;
 use std::future::Future;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 /// Identifies a logical plan by everything it is derived from: the statement with its
 /// parameters already substituted, and the version of the table list it was resolved
@@ -56,13 +59,24 @@ impl LogicalPlanCache {
     where
         F: Future<Output = Result<LogicalPlan, CubeError>>,
     {
-        self.cache
-            .try_get_with(key, plan)
+        let planned = Arc::new(AtomicBool::new(false));
+        let planned_here = planned.clone();
+        let result = self
+            .cache
+            .try_get_with(key, async move {
+                planned_here.store(true, Ordering::Relaxed);
+                plan.await
+            })
             .await
-            .map_err(|e| (*e).clone())
-    }
+            .map_err(|e| (*e).clone());
 
-    pub fn entry_count(&self) -> u64 {
-        self.cache.entry_count()
+        if planned.load(Ordering::Relaxed) {
+            app_metrics::PLAN_CACHE_MISS.increment();
+        } else {
+            app_metrics::PLAN_CACHE_HIT.increment();
+        }
+        app_metrics::PLAN_CACHE_SIZE.report(self.cache.entry_count() as i64);
+
+        result
     }
 }

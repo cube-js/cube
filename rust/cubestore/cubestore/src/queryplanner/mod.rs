@@ -171,6 +171,7 @@ impl QueryPlanner for QueryPlannerImpl {
                             .await?
                     }
                     None => {
+                        app_metrics::PLAN_CACHE_BYPASS.increment();
                         self.build_logical_plan(statement, inline_tables, tables)
                             .await?
                     }
