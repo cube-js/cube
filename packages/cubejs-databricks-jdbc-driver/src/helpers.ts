@@ -53,12 +53,6 @@ export function extractAndRemoveUidPwdFromJdbcUrl(jdbcUrl: string): [uid: string
   return [uid, pwd, formatJdbcUrl(removeJdbcUrlParams(parsed, ['UID', 'PWD', 'AuthMech']))];
 }
 
-/**
- * Cube pins EnableGeoSpatialSupport off, so a URL asking to enable it can not be honoured and is
- * rejected rather than silently ignored. Any other value already means off to the driver
- * (`"1".equals(value)`), but left in the URL it would collide with the pinned property and the
- * driver would throw `IllegalArgumentException: Multiple entries with same key`.
- */
 export function validateAndRemoveGeoSpatialSupportFromJdbcUrl(jdbcUrl: string): string {
   const parsed = parseJdbcUrl(jdbcUrl);
 
