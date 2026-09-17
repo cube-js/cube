@@ -4913,6 +4913,9 @@ async fn test_wrapper_cast_without_template_folds_to_cube_scan_filter() {
 
 #[tokio::test]
 async fn boolean_context_wrapper_plans() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
     use crate::compile::{
         test::{LogicalPlanTestUtils, TestContext},
         DatabaseProtocol,
@@ -4933,5 +4936,45 @@ async fn boolean_context_wrapper_plans() {
         let sql = plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains(fragment), "{}: {}", query, sql);
         assert!(!sql.contains("TRUE") && !sql.contains("FALSE"), "{}", sql);
+    }
+}
+
+#[tokio::test]
+async fn boolean_context_segment_members() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    let context = TestContext::with_custom_templates(
+        DatabaseProtocol::PostgreSQL,
+        crate::compile::test::mssql_boolean_templates(),
+    )
+    .await;
+    let fixture = crate::compile::test::mssql_boolean_fixture();
+    for case in fixture["segmentCases"].as_array().unwrap() {
+        let plan = context
+            .convert_sql_to_cube_query(case["query"].as_str().unwrap())
+            .await
+            .unwrap()
+            .as_logical_plan();
+        // The test transport embeds the schema-compiler request in its SQL response.
+        let sql = plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        let request: serde_json::Value =
+            serde_json::from_str(&sql[sql.find('{').unwrap()..=sql.rfind('}').unwrap()]).unwrap();
+        let members = if case["predicate"].as_bool().unwrap() {
+            "segments"
+        } else {
+            "measures"
+        };
+        let expressions = request["query"][members]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|member| {
+                let member: serde_json::Value =
+                    serde_json::from_str(member.as_str().unwrap()).unwrap();
+                member["expr"]["sql"].clone()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(expressions, vec![case["sql"].clone()]);
     }
 }

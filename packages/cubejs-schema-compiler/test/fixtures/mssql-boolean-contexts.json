@@ -296,6 +296,38 @@
       ]
     }
   ],
+  "segmentCases": [
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE is_male GROUP BY 1",
+      "sql": "(${KibanaSampleDataEcommerce.is_male})",
+      "predicate": true,
+      "expected": 5
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE NOT is_male GROUP BY 1",
+      "sql": "NOT ((${KibanaSampleDataEcommerce.is_male}))",
+      "predicate": true,
+      "expected": 1
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN is_male THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce GROUP BY 1",
+      "sql": "SUM(CASE WHEN (${KibanaSampleDataEcommerce.is_male}) THEN 1 ELSE 0 END)",
+      "predicate": false,
+      "expected": 5
+    },
+    {
+      "query": "SELECT customer_gender, COUNT(DISTINCT is_male) FROM KibanaSampleDataEcommerce GROUP BY 1",
+      "sql": "COUNT(DISTINCT CAST(CASE WHEN (${KibanaSampleDataEcommerce.is_male}) THEN 1 WHEN NOT ((${KibanaSampleDataEcommerce.is_male})) THEN 0 ELSE NULL END AS BIT))",
+      "predicate": false,
+      "expected": 2
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE is_male AND NOT has_subscription GROUP BY 1",
+      "sql": "((${KibanaSampleDataEcommerce.is_male}) AND NOT ((${KibanaSampleDataEcommerce.has_subscription} = CAST(1 AS BIT))))",
+      "predicate": true,
+      "expected": 1
+    }
+  ],
   "aggregates": [
     {
       "scalar": "CAST(CASE WHEN (COUNT(DISTINCT \"b\") = 2) THEN 1 WHEN NOT ((COUNT(DISTINCT \"b\") = 2)) THEN 0 ELSE NULL END AS BIT)",
