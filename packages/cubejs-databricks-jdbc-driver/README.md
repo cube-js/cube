@@ -7,7 +7,7 @@
 
 # Cube Databricks Database Driver
 
-This driver is based on top of Simba JDBC driver.
+This driver is based on top of the [Databricks JDBC driver (OSS)](https://github.com/databricks/databricks-jdbc).
 
 [Learn more](https://github.com/cube-js/cube.js#getting-started)
 

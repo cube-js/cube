@@ -263,6 +263,9 @@ export class DatabricksDriver extends JDBCDriver {
       properties: {
         ...authProps,
         UserAgentEntry: 'CubeDev_Cube',
+        // Driver 3.4.1 turned geospatial support on by default, which returns
+        // GEOMETRY/GEOGRAPHY columns as Java objects instead of EWKT strings.
+        EnableGeoSpatialSupport: 0,
       },
       catalog:
         conf?.catalog ||

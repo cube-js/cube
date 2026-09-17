@@ -47,7 +47,7 @@ describe('DatabricksDriver', () => {
 
   beforeAll(() => {
     process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY = 'true';
-    process.env.CUBEJS_DB_DATABRICKS_URL = 'jdbc:databricks://adb-123456789.10.azuredatabricks.net:443';
+    process.env.CUBEJS_DB_DATABRICKS_URL = 'jdbc:databricks://adb-123456789.10.azuredatabricks.net:443;httpPath=/sql/1.0/warehouses/abc123def456';
     process.env.CUBEJS_DB_EXPORT_BUCKET_TYPE = 'azure';
     process.env.CUBEJS_DB_EXPORT_BUCKET = 'wasbs://cube-export@mock.blob.core.windows.net';
     process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY = 'azure-key';
