@@ -153,18 +153,27 @@ impl QueryPlanner for QueryPlannerImpl {
         let logical_plan = match &self.plan_cache {
             Some(cache) => {
                 let rendered = statement.to_string();
-                if Self::may_fold_a_non_immutable_function(&self.non_immutable_functions, &rendered)
-                {
-                    self.build_logical_plan(statement, inline_tables, tables)
-                        .await?
+                let key = if Self::may_fold_a_non_immutable_function(
+                    &self.non_immutable_functions,
+                    &rendered,
+                ) {
+                    None
                 } else {
-                    let key = LogicalPlanCacheKey::new(rendered, inline_tables, tables_version);
-                    cache
-                        .get_or_plan(
-                            key,
-                            self.build_logical_plan(statement, inline_tables, tables),
-                        )
-                        .await?
+                    LogicalPlanCacheKey::new(rendered, inline_tables, tables_version)
+                };
+                match key {
+                    Some(key) => {
+                        cache
+                            .get_or_plan(
+                                key,
+                                self.build_logical_plan(statement, inline_tables, tables),
+                            )
+                            .await?
+                    }
+                    None => {
+                        self.build_logical_plan(statement, inline_tables, tables)
+                            .await?
+                    }
                 }
             }
             None => {
@@ -1205,6 +1214,29 @@ pub mod tests {
         // NOW is no longer a UDF.
         let plan = initial_plan("SELECT NOW()", get_test_execution_ctx());
         assert_eq!(SerializedPlan::is_data_select_query(&plan), false);
+    }
+
+    #[test]
+    fn inline_tables_have_no_cache_key() {
+        use crate::metastore::{Column, ColumnType};
+        use crate::queryplanner::plan_cache::LogicalPlanCacheKey;
+        use crate::sql::InlineTable;
+        use crate::store::DataFrame;
+
+        assert!(LogicalPlanCacheKey::new("SELECT 1".to_string(), &Vec::new(), 0).is_some());
+
+        let inline = vec![InlineTable::new(
+            1,
+            "t".to_string(),
+            Arc::new(DataFrame::new(
+                vec![Column::new("a".to_string(), ColumnType::Int, 0)],
+                Vec::new(),
+            )),
+        )];
+        assert!(
+            LogicalPlanCacheKey::new("SELECT 1".to_string(), &inline, 0).is_none(),
+            "a query with inline tables must not be cacheable: its data is not in the key"
+        );
     }
 
     #[test]

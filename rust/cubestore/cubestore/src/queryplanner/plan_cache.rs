@@ -5,23 +5,32 @@ use moka::future::Cache;
 use std::future::Future;
 
 /// Identifies a logical plan by everything it is derived from: the statement with its
-/// parameters already substituted, the inline tables it may reference, and the version of
-/// the table list it was resolved against. Physical state — indexes, partitions, chunks —
-/// is deliberately absent: it only enters the plan later, in `choose_index_ext`.
+/// parameters already substituted, and the version of the table list it was resolved
+/// against. Physical state — indexes, partitions, chunks — is deliberately absent: it only
+/// enters the plan later, in `choose_index_ext`. Queries carrying inline tables are not
+/// cached at all, so their data never has to appear here.
 #[derive(Clone, Hash, Eq, PartialEq, Debug)]
 pub struct LogicalPlanCacheKey {
     statement: String,
-    inline_tables: InlineTables,
     tables_version: u64,
 }
 
 impl LogicalPlanCacheKey {
-    pub fn new(statement: String, inline_tables: &InlineTables, tables_version: u64) -> Self {
-        Self {
-            statement,
-            inline_tables: inline_tables.clone(),
-            tables_version,
+    /// `None` for a query carrying inline tables. Their data is part of what the plan is
+    /// built from but is deliberately not part of the key, so there must be no way to build
+    /// one for such a query: two of them sharing a statement would collide.
+    pub fn new(
+        statement: String,
+        inline_tables: &InlineTables,
+        tables_version: u64,
+    ) -> Option<Self> {
+        if !inline_tables.is_empty() {
+            return None;
         }
+        Some(Self {
+            statement,
+            tables_version,
+        })
     }
 }
 
