@@ -15,7 +15,6 @@ export type JdbcUrlParam = {
 };
 
 export type ParsedJdbcUrl = {
-  /** `jdbc:<engine>://<host>[:<port>]`. */
   base: string,
   params: JdbcUrlParam[],
 };
