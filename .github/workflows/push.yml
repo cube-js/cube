@@ -197,10 +197,8 @@ jobs:
         run: yarn lint:npm
       - name: Oxlint
         run: yarn lint:js
-      # cubejs-client-ngx is not in the root tsconfig references, and its jest suite
-      # (run by the `unit` job) transpiles without type checking, so nothing else
-      # compiles the library the way ng-packagr does. ng build needs
-      # @cubejs-client/core's declarations, hence the build:client-core first.
+      # The jest suite is transpile-only, so ng build is the only type check for
+      # this package. It needs @cubejs-client/core's declarations built first.
       - name: Build client-ngx
         run: |
           yarn lerna run build:client-core

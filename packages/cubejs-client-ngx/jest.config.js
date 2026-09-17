@@ -6,10 +6,8 @@ module.exports = {
   preset: 'jest-preset-angular',
   collectCoverage: false,
   testEnvironment: 'jsdom',
-  // The base config adds <rootDir>/node_modules to the lookup, which makes every
-  // module -- including jest's own -- resolve here first. This package is in the
-  // root nohoist list, so that shadows e.g. the hoisted CJS ansi-styles with the
-  // ESM copy the Angular CLI brings in. Plain node resolution already finds both.
+  // Drops the base config's <rootDir>/node_modules, which resolves this
+  // nohoisted package's ESM copies (e.g. ansi-styles) over the hoisted CJS ones.
   moduleDirectories: ['node_modules'],
   testMatch: ['<rootDir>/test/**/*.test.ts'],
   setupFilesAfterEnv: ['<rootDir>/test/setup-jest.ts'],

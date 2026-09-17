@@ -126,14 +126,38 @@ describe('CubeClient requests', () => {
       expect(transport.calls).toEqual(['load']);
     });
 
-    test('the api instance is created once and reused', async () => {
-      const client = setup(makeConfig(transport));
+  });
 
-      await firstValueFrom(client.load({ measures: ['Orders.count'] }));
-      await firstValueFrom(client.load({ measures: ['Orders.count'] }));
+  test('a plain config is only read once, the api instance is reused', async () => {
+    let tokenReads = 0;
+    const client = setup({
+      get token() {
+        tokenReads++;
 
-      expect(transport.calls).toEqual(['load', 'load']);
+        return 'token';
+      },
+      options: { transport },
     });
+
+    await firstValueFrom(client.load({ measures: ['Orders.count'] }));
+    await firstValueFrom(client.load({ measures: ['Orders.count'] }));
+
+    expect(tokenReads).toBe(1);
+    expect(transport.calls).toEqual(['load', 'load']);
+  });
+
+  test('an observable config is only subscribed once, the api instance is reused', async () => {
+    const config = new BehaviorSubject({ token: 'token', options: { transport } });
+    const subscribeSpy = jest.spyOn(config, 'subscribe');
+    const client = setup(config);
+    // the constructor's ready$ subscription
+    subscribeSpy.mockClear();
+
+    await firstValueFrom(client.load({ measures: ['Orders.count'] }));
+    await firstValueFrom(client.load({ measures: ['Orders.count'] }));
+
+    expect(subscribeSpy).toHaveBeenCalledTimes(1);
+    expect(transport.calls).toEqual(['load', 'load']);
   });
 
   // A bare Subject never replays, so the subscription apiInstance() opens on the
