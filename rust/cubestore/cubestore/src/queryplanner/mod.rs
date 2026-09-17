@@ -84,7 +84,7 @@ use datafusion::error::DataFusionError;
 use datafusion::execution::{SessionState, SessionStateBuilder, TaskContext};
 use datafusion::logical_expr::{
     AggregateUDF, Expr, Extension, LogicalPlan, ScalarUDF, TableProviderFilterPushDown,
-    TableSource, WindowUDF,
+    TableSource, Volatility, WindowUDF,
 };
 use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
@@ -128,6 +128,9 @@ pub struct QueryPlannerImpl {
     cache: Arc<SqlResultCache>,
     metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     plan_cache: Option<LogicalPlanCache>,
+    /// Lowercased names of every scalar function that is not `Immutable`, used to keep
+    /// plans that fold one of them into a literal out of the cache.
+    non_immutable_functions: HashSet<String>,
 }
 
 crate::di_service!(QueryPlannerImpl, [QueryPlanner]);
@@ -149,14 +152,20 @@ impl QueryPlanner for QueryPlannerImpl {
 
         let logical_plan = match &self.plan_cache {
             Some(cache) => {
-                let key =
-                    LogicalPlanCacheKey::new(statement.to_string(), inline_tables, tables_version);
-                cache
-                    .get_or_plan(
-                        key,
-                        self.build_logical_plan(statement, inline_tables, tables),
-                    )
-                    .await?
+                let rendered = statement.to_string();
+                if Self::may_fold_a_non_immutable_function(&self.non_immutable_functions, &rendered)
+                {
+                    self.build_logical_plan(statement, inline_tables, tables)
+                        .await?
+                } else {
+                    let key = LogicalPlanCacheKey::new(rendered, inline_tables, tables_version);
+                    cache
+                        .get_or_plan(
+                            key,
+                            self.build_logical_plan(statement, inline_tables, tables),
+                        )
+                        .await?
+                }
             }
             None => {
                 self.build_logical_plan(statement, inline_tables, tables)
@@ -327,6 +336,11 @@ impl QueryPlannerImpl {
         metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     ) -> Arc<QueryPlannerImpl> {
         let max_entries = config.query_plan_cache_max_entries();
+        let non_immutable_functions = if max_entries > 0 {
+            Self::non_immutable_function_names(metadata_cache_factory.as_ref())
+        } else {
+            HashSet::new()
+        };
         Arc::new(QueryPlannerImpl {
             meta_store,
             cache_store,
@@ -334,7 +348,32 @@ impl QueryPlannerImpl {
             cache,
             metadata_cache_factory,
             plan_cache: (max_entries > 0).then(|| LogicalPlanCache::new(max_entries)),
+            non_immutable_functions,
         })
+    }
+
+    fn non_immutable_function_names(factory: &dyn MetadataCacheFactory) -> HashSet<String> {
+        let ctx = Self::make_execution_context(factory.make_session_config());
+        let state = ctx.state();
+        let mut names = HashSet::new();
+        for (name, udf) in state.scalar_functions() {
+            if udf.signature().volatility != Volatility::Immutable {
+                names.insert(name.to_lowercase());
+                for alias in udf.aliases() {
+                    names.insert(alias.to_lowercase());
+                }
+            }
+        }
+        names
+    }
+
+    /// `optimize` const-folds stable functions against the time this query started, so a plan
+    /// that mentions one would hand every later query the first one's timestamp. Matching on
+    /// the rendered statement over-approximates — a column called `today` is enough to opt a
+    /// query out — which is the safe direction.
+    fn may_fold_a_non_immutable_function(names: &HashSet<String>, statement: &str) -> bool {
+        let statement = statement.to_lowercase();
+        names.iter().any(|name| statement.contains(name))
     }
 }
 
@@ -1166,5 +1205,34 @@ pub mod tests {
         // NOW is no longer a UDF.
         let plan = initial_plan("SELECT NOW()", get_test_execution_ctx());
         assert_eq!(SerializedPlan::is_data_select_query(&plan), false);
+    }
+
+    #[test]
+    fn non_immutable_functions_keep_plans_out_of_the_cache() {
+        let names = QueryPlannerImpl::non_immutable_function_names(
+            &crate::queryplanner::metadata_cache::BasicMetadataCacheFactory::new(),
+        );
+        for expected in ["now", "current_date", "current_timestamp", "unix_timestamp"] {
+            assert!(
+                names.contains(expected),
+                "{} must be recognised as non-immutable, otherwise optimize() folds it into a \
+                 literal and the plan cache serves that literal forever; got {:?}",
+                expected,
+                names
+            );
+        }
+
+        assert!(QueryPlannerImpl::may_fold_a_non_immutable_function(
+            &names,
+            "SELECT now()"
+        ));
+        assert!(QueryPlannerImpl::may_fold_a_non_immutable_function(
+            &names,
+            "SELECT a FROM t WHERE ts > CURRENT_TIMESTAMP"
+        ));
+        assert!(!QueryPlannerImpl::may_fold_a_non_immutable_function(
+            &names,
+            "SELECT a FROM t WHERE ts > CAST('2026-01-01' AS TIMESTAMP)"
+        ));
     }
 }
