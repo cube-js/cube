@@ -630,6 +630,12 @@ pub trait ConfigObj: DIService {
 
     fn query_cache_stale_while_revalidate_secs(&self) -> Option<u64>;
 
+    /// Number of logical plans to keep cached. Zero disables the cache.
+    fn query_plan_cache_max_entries(&self) -> u64;
+
+    /// Number of active-partition lookups to keep cached. Zero disables the cache.
+    fn active_partitions_cache_max_entries(&self) -> u64;
+
     fn metadata_cache_max_capacity_bytes(&self) -> u64;
 
     fn metadata_cache_time_to_idle_secs(&self) -> u64;
@@ -791,6 +797,8 @@ pub struct ConfigObjImpl {
     pub query_queue_cache_max_capacity: u64,
     pub query_cache_time_to_idle_secs: Option<u64>,
     pub query_cache_stale_while_revalidate_secs: Option<u64>,
+    pub query_plan_cache_max_entries: u64,
+    pub active_partitions_cache_max_entries: u64,
     pub metadata_cache_max_capacity_bytes: u64,
     pub metadata_cache_time_to_idle_secs: u64,
     pub stream_replay_check_interval_secs: u64,
@@ -1175,6 +1183,12 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn query_cache_stale_while_revalidate_secs(&self) -> Option<u64> {
         self.query_cache_stale_while_revalidate_secs
+    }
+    fn query_plan_cache_max_entries(&self) -> u64 {
+        self.query_plan_cache_max_entries
+    }
+    fn active_partitions_cache_max_entries(&self) -> u64 {
+        self.active_partitions_cache_max_entries
     }
 
     fn metadata_cache_max_capacity_bytes(&self) -> u64 {
@@ -1976,6 +1990,14 @@ impl Config {
                     "CUBESTORE_QUEUE_CACHE_MAX_CAPACITY",
                     10000,
                 ),
+                query_plan_cache_max_entries: env_parse(
+                    "CUBESTORE_QUERY_PLAN_CACHE_MAX_ENTRIES",
+                    5000,
+                ),
+                active_partitions_cache_max_entries: env_parse(
+                    "CUBESTORE_ACTIVE_PARTITIONS_CACHE_MAX_ENTRIES",
+                    5000,
+                ),
                 query_cache_time_to_idle_secs: if query_cache_time_to_idle_secs == 0 {
                     None
                 } else {
@@ -2230,6 +2252,8 @@ impl Config {
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
                 query_cache_max_capacity_bytes: 512 << 20,
+                query_plan_cache_max_entries: 5000,
+                active_partitions_cache_max_entries: 5000,
                 query_queue_cache_max_capacity: 10000,
                 query_cache_time_to_idle_secs: Some(600),
                 query_cache_stale_while_revalidate_secs: None,

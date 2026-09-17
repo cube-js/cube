@@ -877,6 +877,9 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         include_non_ready: bool,
     ) -> Result<Arc<Vec<TablePath>>, CubeError>;
+    /// Ready tables together with a version that changes whenever the set of tables does,
+    /// so callers can tell whether something derived from the list is still valid.
+    async fn get_ready_tables_versioned(&self) -> Result<(Arc<Vec<TablePath>>, u64), CubeError>;
     async fn not_ready_tables(
         &self,
         created_seconds_ago: i64,
@@ -1376,27 +1379,53 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
     }
 }
 
+struct CachedTablesState {
+    tables: Option<Arc<Vec<TablePath>>>,
+    /// Bumped on every mutation below, so anything derived from this list can tell whether
+    /// the list it was derived from is still the current one.
+    version: u64,
+}
+
 pub struct CachedTables {
-    tables: Mutex<Option<Arc<Vec<TablePath>>>>,
+    state: Mutex<CachedTablesState>,
 }
 
 impl CachedTables {
     pub fn new() -> Self {
         Self {
-            tables: Mutex::new(None),
+            state: Mutex::new(CachedTablesState {
+                tables: None,
+                version: 0,
+            }),
         }
     }
 
     pub fn reset(&self) {
-        *self.tables.lock().unwrap() = None;
+        let mut guard = self.state.lock().unwrap();
+        guard.tables = None;
+        guard.version += 1;
     }
 
     pub fn get(&self) -> Option<Arc<Vec<TablePath>>> {
-        self.tables.lock().unwrap().clone()
+        self.state.lock().unwrap().tables.clone()
+    }
+
+    pub fn get_with_version(&self) -> Option<(Arc<Vec<TablePath>>, u64)> {
+        let guard = self.state.lock().unwrap();
+        guard.tables.clone().map(|tables| (tables, guard.version))
     }
 
     pub fn set(&self, tables: Arc<Vec<TablePath>>) {
-        *self.tables.lock().unwrap() = Some(tables);
+        let mut guard = self.state.lock().unwrap();
+        guard.tables = Some(tables);
+        guard.version += 1;
+    }
+
+    pub fn set_with_version(&self, tables: Arc<Vec<TablePath>>) -> u64 {
+        let mut guard = self.state.lock().unwrap();
+        guard.tables = Some(tables);
+        guard.version += 1;
+        guard.version
     }
 
     /// Surgically update a single entry in the cache by table ID.
@@ -1407,8 +1436,9 @@ impl CachedTables {
     where
         F: FnOnce(&mut TablePath),
     {
-        let mut guard = self.tables.lock().unwrap();
-        let Some(cached) = guard.as_mut() else {
+        let mut guard = self.state.lock().unwrap();
+        guard.version += 1;
+        let Some(cached) = guard.tables.as_mut() else {
             return;
         };
 
@@ -1420,7 +1450,7 @@ impl CachedTables {
                 table_id
             );
 
-            *guard = None;
+            guard.tables = None;
             return;
         };
 
@@ -1434,8 +1464,9 @@ impl CachedTables {
     }
 
     pub fn upsert_table_by_id(&self, table_id: u64, entry: TablePath) {
-        let mut guard = self.tables.lock().unwrap();
-        let Some(cached) = guard.as_mut() else {
+        let mut guard = self.state.lock().unwrap();
+        guard.version += 1;
+        let Some(cached) = guard.tables.as_mut() else {
             return;
         };
 
@@ -1457,14 +1488,15 @@ impl CachedTables {
     }
 
     pub fn remove_by_table_id_or_reset(&self, table_id: u64) {
-        let mut guard = self.tables.lock().unwrap();
-        let Some(cached) = guard.as_mut() else {
+        let mut guard = self.state.lock().unwrap();
+        guard.version += 1;
+        let Some(cached) = guard.tables.as_mut() else {
             return;
         };
 
         let tables = Arc::make_mut(cached);
         let Some(idx) = tables.iter().position(|tp| tp.table.get_id() == table_id) else {
-            *guard = None;
+            guard.tables = None;
             return;
         };
 
@@ -1481,6 +1513,9 @@ pub struct RocksMetaStore {
     in_memory_compaction_cache: Arc<RwLock<Option<(HashMap<String, Vec<u64>>, SystemTime)>>>,
     in_memory_compaction_compute_lock: Arc<tokio::sync::Mutex<()>>,
     upload_loop: Arc<WorkerLoop>,
+    active_partitions_cache: Option<
+        moka::future::Cache<(Vec<u64>, u64), Arc<Vec<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>>>>,
+    >,
 }
 
 impl RocksMetaStore {
@@ -1499,7 +1534,14 @@ impl RocksMetaStore {
     }
 
     fn new_from_store(store: Arc<RocksStore>) -> Arc<Self> {
+        let active_partitions_cache_max_entries =
+            store.config.active_partitions_cache_max_entries();
         Arc::new(Self {
+            active_partitions_cache: (active_partitions_cache_max_entries > 0).then(|| {
+                moka::future::Cache::builder()
+                    .max_capacity(active_partitions_cache_max_entries)
+                    .build()
+            }),
             store,
             cached_tables: Arc::new(CachedTables::new()),
             disk_space_cache: Arc::new(RwLock::new(None)),
@@ -1512,6 +1554,54 @@ impl RocksMetaStore {
 
     pub fn reset_cached_tables(&self) {
         self.cached_tables.reset();
+    }
+
+    async fn active_partitions_and_chunks_for_select(
+        &self,
+        index_id: Vec<u64>,
+    ) -> Result<Vec<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>>, CubeError> {
+        self.read_operation_out_of_queue(
+            "get_active_partitions_and_chunks_by_index_id_for_select",
+            move |db_ref| {
+                let rocks_chunk = ChunkRocksTable::new(db_ref.clone());
+                let rocks_partition = PartitionRocksTable::new(db_ref);
+
+                let mut results = Vec::with_capacity(index_id.len());
+                for index_id in index_id {
+                    let mut processed = HashSet::new();
+                    let mut partitions = Vec::new();
+                    let mut add_with_parents = |mut p: u64| -> Result<(), CubeError> {
+                        loop {
+                            if !processed.insert(p) {
+                                break;
+                            }
+                            let r = rocks_partition.get_row_or_not_found(p)?;
+                            let parent = r.row.parent_partition_id().clone();
+                            partitions.push((r, Vec::new()));
+                            match parent {
+                                None => break,
+                                Some(parent) => p = parent,
+                            }
+                        }
+                        Ok(())
+                    };
+                    // TODO iterate over range.
+                    for p in rocks_partition.get_row_ids_by_index(
+                        &PartitionIndexKey::ByIndexId(index_id),
+                        &PartitionRocksIndex::IndexId,
+                    )? {
+                        add_with_parents(p)?;
+                    }
+
+                    for (p, chunks) in &mut partitions {
+                        *chunks = Self::chunks_by_partition(p.id, &rocks_chunk, false)?;
+                    }
+                    results.push(partitions)
+                }
+                Ok(results)
+            },
+        )
+        .await
     }
 
     async fn disk_space_cached(&self) -> Result<Option<HashMap<String, u64>>, CubeError> {
@@ -2677,40 +2767,44 @@ impl MetaStore for RocksMetaStore {
             })
             .await
         } else {
-            let cache = self.cached_tables.clone();
+            Ok(self.get_ready_tables_versioned().await?.0)
+        }
+    }
 
-            if let Some(t) = cube_ext::spawn_blocking(move || cache.get()).await? {
+    async fn get_ready_tables_versioned(&self) -> Result<(Arc<Vec<TablePath>>, u64), CubeError> {
+        let cache = self.cached_tables.clone();
+
+        if let Some(t) = cube_ext::spawn_blocking(move || cache.get_with_version()).await? {
+            return Ok(t);
+        }
+
+        let cache = self.cached_tables.clone();
+        // Can't do read_operation_out_of_queue as we need to update cache on the same thread where it's dropped
+        self.read_operation("get_tables_with_path", move |db_ref| {
+            if let Some(t) = cache.get_with_version() {
                 return Ok(t);
             }
 
-            let cache = self.cached_tables.clone();
-            // Can't do read_operation_out_of_queue as we need to update cache on the same thread where it's dropped
-            self.read_operation("get_tables_with_path", move |db_ref| {
-                if let Some(t) = cache.get() {
-                    return Ok(t);
+            let table_rocks_table = TableRocksTable::new(db_ref.clone());
+            let mut tables = Vec::new();
+            for t in table_rocks_table.scan_all_rows()? {
+                let t = t?;
+                if t.get_row().is_ready() {
+                    tables.push(t);
                 }
+            }
+            let schemas = SchemaRocksTable::new(db_ref);
+            let tables = Arc::new(schemas.build_path_rows(
+                tables,
+                |t| t.get_row().get_schema_id(),
+                |table, schema| TablePath::new(schema, table),
+            )?);
 
-                let table_rocks_table = TableRocksTable::new(db_ref.clone());
-                let mut tables = Vec::new();
-                for t in table_rocks_table.scan_all_rows()? {
-                    let t = t?;
-                    if t.get_row().is_ready() {
-                        tables.push(t);
-                    }
-                }
-                let schemas = SchemaRocksTable::new(db_ref);
-                let tables = Arc::new(schemas.build_path_rows(
-                    tables,
-                    |t| t.get_row().get_schema_id(),
-                    |table, schema| TablePath::new(schema, table),
-                )?);
+            let version = cache.set_with_version(tables.clone());
 
-                cache.set(tables.clone());
-
-                Ok(tables)
-            })
-            .await
-        }
+            Ok((tables, version))
+        })
+        .await
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
@@ -3762,48 +3856,24 @@ impl MetaStore for RocksMetaStore {
         &self,
         index_id: Vec<u64>,
     ) -> Result<Vec<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>>, CubeError> {
-        self.read_operation_out_of_queue(
-            "get_active_partitions_and_chunks_by_index_id_for_select",
-            move |db_ref| {
-                let rocks_chunk = ChunkRocksTable::new(db_ref.clone());
-                let rocks_partition = PartitionRocksTable::new(db_ref);
+        let Some(cache) = &self.active_partitions_cache else {
+            return self.active_partitions_and_chunks_for_select(index_id).await;
+        };
 
-                let mut results = Vec::with_capacity(index_id.len());
-                for index_id in index_id {
-                    let mut processed = HashSet::new();
-                    let mut partitions = Vec::new();
-                    let mut add_with_parents = |mut p: u64| -> Result<(), CubeError> {
-                        loop {
-                            if !processed.insert(p) {
-                                break;
-                            }
-                            let r = rocks_partition.get_row_or_not_found(p)?;
-                            let parent = r.row.parent_partition_id().clone();
-                            partitions.push((r, Vec::new()));
-                            match parent {
-                                None => break,
-                                Some(parent) => p = parent,
-                            }
-                        }
-                        Ok(())
-                    };
-                    // TODO iterate over range.
-                    for p in rocks_partition.get_row_ids_by_index(
-                        &PartitionIndexKey::ByIndexId(index_id),
-                        &PartitionRocksIndex::IndexId,
-                    )? {
-                        add_with_parents(p)?;
-                    }
+        // The version makes any write that could have moved a partition or a chunk produce a
+        // different key, so an entry can only ever be served for the state it was read in.
+        let key = (index_id.clone(), self.store.physical_version());
+        let this = self.clone();
+        let cached = cache
+            .try_get_with(key, async move {
+                this.active_partitions_and_chunks_for_select(index_id)
+                    .await
+                    .map(Arc::new)
+            })
+            .await
+            .map_err(|e: Arc<CubeError>| (*e).clone())?;
 
-                    for (p, chunks) in &mut partitions {
-                        *chunks = Self::chunks_by_partition(p.id, &rocks_chunk, false)?;
-                    }
-                    results.push(partitions)
-                }
-                Ok(results)
-            },
-        )
-        .await
+        Ok((*cached).clone())
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
@@ -5687,6 +5757,86 @@ mod tests {
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn physical_version_tracks_physical_writes() -> Result<(), CubeError> {
+        let config = Config::test("physical_version_tracks_physical_writes");
+        let store_path = env::current_dir()?.join("physical_version-local");
+        let remote_store_path = env::current_dir()?.join("physical_version-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+
+        let meta_store = RocksMetaStore::new(
+            store_path.join("metastore").as_path(),
+            BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+            config.config_obj(),
+        )?;
+
+        meta_store.create_schema("foo".to_string(), false).await?;
+        let columns = vec![Column::new("col1".to_string(), ColumnType::Int, 0)];
+        let table = meta_store
+            .create_table(
+                "foo".to_string(),
+                "boo".to_string(),
+                columns,
+                None,
+                None,
+                vec![],
+                true,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                false,
+                None,
+            )
+            .await?;
+
+        let index = meta_store.get_default_index(table.get_id()).await?;
+        let partition = meta_store
+            .get_active_partitions_by_index_id(index.get_id())
+            .await?
+            .into_iter()
+            .next()
+            .expect("table must have an active partition");
+
+        let before = meta_store.store.physical_version();
+        meta_store
+            .mark_partition_warmed_up(partition.get_id())
+            .await?;
+        assert!(
+            meta_store.store.physical_version() > before,
+            "a partition write must move the physical version"
+        );
+
+        // Jobs churn constantly; if they moved the version nothing derived from the physical
+        // layout could ever stay cached.
+        let job = meta_store
+            .add_job(Job::new(
+                RowKey::Table(TableId::Partitions, partition.get_id()),
+                JobType::PartitionCompaction,
+                "test".to_string(),
+            ))
+            .await?
+            .expect("job was not created");
+        let before_heart_beat = meta_store.store.physical_version();
+        meta_store.update_heart_beat(job.get_id()).await?;
+        assert_eq!(
+            before_heart_beat,
+            meta_store.store.physical_version(),
+            "a job heartbeat must not move the physical version"
+        );
+
+        let _ = fs::remove_dir_all(store_path);
+        let _ = fs::remove_dir_all(remote_store_path);
         Ok(())
     }
 

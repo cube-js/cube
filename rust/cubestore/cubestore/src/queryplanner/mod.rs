@@ -28,6 +28,7 @@ mod inline_aggregate;
 mod is_not_distinct_from_join_test;
 pub mod merge_sort;
 pub mod metadata_cache;
+pub mod plan_cache;
 pub mod providers;
 mod rolling;
 #[cfg(test)]
@@ -60,6 +61,7 @@ use crate::queryplanner::topk::ClusterAggregateTopKLower;
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
 use crate::queryplanner::optimizations::is_not_distinct_from_join_keys::IsNotDistinctFromJoinKeysRule;
 use crate::queryplanner::optimizations::rolling_optimizer::RollingOptimizerRule;
+use crate::queryplanner::plan_cache::{LogicalPlanCache, LogicalPlanCacheKey};
 use crate::queryplanner::pretty_printers::{pp_plan_ext, PPOptions};
 use crate::queryplanner::udfs::{registerable_aggregate_udfs_iter, registerable_scalar_udfs_iter};
 use crate::sql::cache::SqlResultCache;
@@ -125,6 +127,7 @@ pub struct QueryPlannerImpl {
     config: Arc<dyn ConfigObj>,
     cache: Arc<SqlResultCache>,
     metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
+    plan_cache: Option<LogicalPlanCache>,
 }
 
 crate::di_service!(QueryPlannerImpl, [QueryPlanner]);
@@ -142,6 +145,78 @@ impl QueryPlanner for QueryPlannerImpl {
         inline_tables: &InlineTables,
         trace_obj: Option<String>,
     ) -> Result<QueryPlan, CubeError> {
+        let (tables, tables_version) = self.meta_store.get_ready_tables_versioned().await?;
+
+        let logical_plan = match &self.plan_cache {
+            Some(cache) => {
+                let key =
+                    LogicalPlanCacheKey::new(statement.to_string(), inline_tables, tables_version);
+                cache
+                    .get_or_plan(
+                        key,
+                        self.build_logical_plan(statement, inline_tables, tables),
+                    )
+                    .await?
+            }
+            None => {
+                self.build_logical_plan(statement, inline_tables, tables)
+                    .await?
+            }
+        };
+
+        let post_optimize_time = SystemTime::now();
+        let post_is_data_select_query_time: SystemTime;
+        let plan = if SerializedPlan::is_data_select_query(&logical_plan) {
+            let choose_index_ext_start = SystemTime::now();
+            post_is_data_select_query_time = choose_index_ext_start;
+            let choose_guard = OpGuard::start_wrapper(OpKind::Planning, "plan.choose_index");
+            let (logical_plan, meta) = choose_index_ext(
+                logical_plan,
+                &self.meta_store.as_ref(),
+                self.config.enable_topk(),
+                self.config.limit_pushdown(),
+            )
+            .await?;
+            let workers = compute_workers(
+                self.config.as_ref(),
+                &logical_plan,
+                &meta.multi_part_subtree,
+            )?;
+            drop(choose_guard);
+            app_metrics::DATA_QUERY_CHOOSE_INDEX_AND_WORKERS_TIME_US
+                .report(choose_index_ext_start.elapsed()?.as_micros() as i64);
+            QueryPlan::Select(
+                PreSerializedPlan::try_new(logical_plan, meta, trace_obj)?,
+                workers,
+            )
+        } else {
+            post_is_data_select_query_time = SystemTime::now();
+            QueryPlan::Meta(logical_plan)
+        };
+        app_metrics::DATA_QUERY_LOGICAL_PLAN_IS_DATA_SELECT_QUERY_US.report(
+            post_is_data_select_query_time
+                .duration_since(post_optimize_time)?
+                .as_micros() as i64,
+        );
+
+        Ok(plan)
+    }
+
+    async fn execute_meta_plan(&self, plan: LogicalPlan) -> Result<DataFrame, CubeError> {
+        self.execute_meta_plan_impl(plan).await
+    }
+}
+
+impl QueryPlannerImpl {
+    /// Everything the plan depends on that is not physical: the statement and the set of
+    /// tables. Stops short of `choose_index_ext`, which is what pulls in indexes,
+    /// partitions and chunks and therefore must run on every query.
+    pub(crate) async fn build_logical_plan(
+        &self,
+        statement: Statement,
+        inline_tables: &InlineTables,
+        tables: Arc<Vec<TablePath>>,
+    ) -> Result<LogicalPlan, CubeError> {
         let pre_execution_context_time = SystemTime::now();
         let ec_guard = OpGuard::start(OpKind::Planning, "plan.session_context");
         let ctx = self.execution_context()?;
@@ -156,7 +231,7 @@ impl QueryPlanner for QueryPlannerImpl {
 
         let state = Arc::new(ctx.state());
         let schema_provider = MetaStoreSchemaProvider::new(
-            self.meta_store.get_tables_with_path(false).await?,
+            tables,
             self.meta_store.clone(),
             self.cache_store.clone(),
             inline_tables,
@@ -223,44 +298,10 @@ impl QueryPlanner for QueryPlannerImpl {
             )
         );
 
-        let post_is_data_select_query_time: SystemTime;
-        let plan = if SerializedPlan::is_data_select_query(&logical_plan) {
-            let choose_index_ext_start = SystemTime::now();
-            post_is_data_select_query_time = choose_index_ext_start;
-            let choose_guard = OpGuard::start_wrapper(OpKind::Planning, "plan.choose_index");
-            let (logical_plan, meta) = choose_index_ext(
-                logical_plan,
-                &self.meta_store.as_ref(),
-                self.config.enable_topk(),
-                self.config.limit_pushdown(),
-            )
-            .await?;
-            let workers = compute_workers(
-                self.config.as_ref(),
-                &logical_plan,
-                &meta.multi_part_subtree,
-            )?;
-            drop(choose_guard);
-            app_metrics::DATA_QUERY_CHOOSE_INDEX_AND_WORKERS_TIME_US
-                .report(choose_index_ext_start.elapsed()?.as_micros() as i64);
-            QueryPlan::Select(
-                PreSerializedPlan::try_new(logical_plan, meta, trace_obj)?,
-                workers,
-            )
-        } else {
-            post_is_data_select_query_time = SystemTime::now();
-            QueryPlan::Meta(logical_plan)
-        };
-        app_metrics::DATA_QUERY_LOGICAL_PLAN_IS_DATA_SELECT_QUERY_US.report(
-            post_is_data_select_query_time
-                .duration_since(post_optimize_time)?
-                .as_micros() as i64,
-        );
-
-        Ok(plan)
+        Ok(logical_plan)
     }
 
-    async fn execute_meta_plan(&self, plan: LogicalPlan) -> Result<DataFrame, CubeError> {
+    async fn execute_meta_plan_impl(&self, plan: LogicalPlan) -> Result<DataFrame, CubeError> {
         let ctx = self.execution_context()?;
 
         let plan_ctx = ctx.clone();
@@ -285,12 +326,14 @@ impl QueryPlannerImpl {
         cache: Arc<SqlResultCache>,
         metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     ) -> Arc<QueryPlannerImpl> {
+        let max_entries = config.query_plan_cache_max_entries();
         Arc::new(QueryPlannerImpl {
             meta_store,
             cache_store,
             config,
             cache,
             metadata_cache_factory,
+            plan_cache: (max_entries > 0).then(|| LogicalPlanCache::new(max_entries)),
         })
     }
 }

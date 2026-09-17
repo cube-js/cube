@@ -154,6 +154,10 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn get_ready_tables_versioned(&self) -> Result<(Arc<Vec<TablePath>>, u64), CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     async fn not_ready_tables(
         &self,
         _created_seconds_ago: i64,
