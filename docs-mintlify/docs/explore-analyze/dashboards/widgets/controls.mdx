@@ -301,9 +301,9 @@ This is the control's *own* published value, which is not always what a [parent 
 
 **Reset to default** takes the one action slot in the control whenever it applies, so a control that has drifted from its published value offers the way back rather than the way to empty. The dropdown header is not limited that way — whichever of the two apply are there as text links, **Reset** to the left of **Clear** — and neither closes the dropdown.
 
-On a published dashboard, clearing or resetting changes only what that viewer sees, and writes nothing back to the dashboard; in the URL it [drops the control's parameter](#sharing-the-current-selection) rather than recording the result. A control whose [visibility](#visibility) is **Disabled** greys out whichever action it shows, so a viewer can see the state without changing it.
+On a published dashboard, clearing or resetting changes only what that viewer sees, and writes nothing back to the dashboard. [Neither action is recorded in the URL](#sharing-the-current-selection), so a reload reopens the control on whatever it opens on for that viewer. A control whose [visibility](#visibility) is **Disabled** greys out whichever action it shows, so a viewer can see the state without changing it.
 
-In the [dashboard builder][ref-workbooks] both write the draft. **Reset to default** returns the control to the published value, leaving no unsaved change behind. **Clear** removes the control's saved default, which viewers see once you publish; clearing a [parent control](#parent) saves its children's cleared defaults in the same write.
+In the [dashboard builder][ref-workbooks] both write the draft. **Reset to default** returns the control to the published value, so that control has no unsaved change left on it. **Clear** removes the control's saved default, which viewers see once you publish; clearing a [parent control](#parent) saves its children's cleared defaults in the same write.
 
 ## Sharing the current selection
 
