@@ -150,13 +150,48 @@ describe('CubeClient requests', () => {
     const config = new BehaviorSubject({ token: 'token', options: { transport } });
     const subscribeSpy = jest.spyOn(config, 'subscribe');
     const client = setup(config);
-    // the constructor's ready$ subscription
-    subscribeSpy.mockClear();
 
     await firstValueFrom(client.load({ measures: ['Orders.count'] }));
     await firstValueFrom(client.load({ measures: ['Orders.count'] }));
 
     expect(subscribeSpy).toHaveBeenCalledTimes(1);
     expect(transport.calls).toEqual(['load', 'load']);
+  });
+
+  describe('with a bare Subject config', () => {
+    test('requests work once the config has emitted', async () => {
+      const config = new Subject<any>();
+      const client = setup(config);
+
+      config.next({ token: 'token', options: { transport } });
+
+      const resultSet = await firstValueFrom(client.load({ measures: ['Orders.count'] }));
+
+      expect(resultSet).toBeInstanceOf(ResultSet);
+      expect(transport.calls).toEqual(['load']);
+    });
+
+    test('requests before the first emission report a missing config', () => {
+      const client = setup(new Subject<any>());
+
+      expect(() => client.load({ measures: ['Orders.count'] })).toThrow(
+        /The config observable has not emitted yet/
+      );
+    });
+
+    test('a later emission replaces the api instance', async () => {
+      const config = new Subject<any>();
+      const client = setup(config);
+      const nextTransport = new StubTransport();
+
+      config.next({ token: 'token', options: { transport } });
+      await firstValueFrom(client.load({ measures: ['Orders.count'] }));
+
+      config.next({ token: 'next-token', options: { transport: nextTransport } });
+      await firstValueFrom(client.load({ measures: ['Orders.count'] }));
+
+      expect(transport.calls).toEqual(['load']);
+      expect(nextTransport.calls).toEqual(['load']);
+    });
   });
 });
