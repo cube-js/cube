@@ -5,8 +5,7 @@ import { Transform, transformChunk } from './Transform';
 
 /**
  * Streams a DuckDB result as hydrated row objects, one fetched chunk (up to 2048 rows) per
- * `await` instead of one row per generator step. The consumer's `highWaterMark` bounds how far
- * ahead of it the chunks are read.
+ * `await`. The consumer's `highWaterMark` bounds how far ahead of it the chunks are read.
  */
 export class DuckDBRowStream extends Readable {
   private reading = false;
