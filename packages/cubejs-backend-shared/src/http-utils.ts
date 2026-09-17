@@ -236,10 +236,9 @@ async function applyDirectoryModes(extraction: ZipExtraction): Promise<void> {
     ([a], [b]) => b.split(path.sep).length - a.split(path.sep).length
   );
 
-  // `O_DIRECTORY | O_NOFOLLOW` because this runs after the whole archive: a link
-  // swapped in at `dest` since the containment check would otherwise take an
-  // archive-chosen mode outside the target.
-  // Both constants are POSIX-only; on Windows they fold to 0, so chmod by path there.
+  // Runs after the whole archive, so a link swapped in at `dest` since the containment
+  // check would otherwise take an archive-chosen mode outside the target.
+  // POSIX-only; on Windows both fold to 0, so chmod by path there.
   const canOpenDirectory = typeof fs.constants.O_DIRECTORY === 'number'
     && typeof fs.constants.O_NOFOLLOW === 'number';
   // eslint-disable-next-line no-bitwise
@@ -279,6 +278,8 @@ function rememberCreated(extraction: ZipExtraction, created: string | undefined)
 
 async function writeZipEntry(extraction: ZipExtraction, entry: yauzl.Entry): Promise<void> {
   const { zipfile, root: dir, signal, directoryModes } = extraction;
+
+  signal.throwIfAborted();
 
   // Defence in depth. yauzl runs this itself inside `readEntry` while `decodeStrings`
   // is on, so a `..` name errors out of `nextZipEntry` and never reaches here; this
@@ -348,16 +349,18 @@ async function writeZipEntry(extraction: ZipExtraction, entry: yauzl.Entry): Pro
   // regular and `O_NOFOLLOW` does not apply, so unlinking is the only check there is.
   // It also keeps `open` off a fifo, which would block for a reader.
   if (existing && !existing.isDirectory()) {
+    // Losing the fatal race abandons this function, it does not cancel it — without
+    // this the unlink lands after the call rejected, deleting a file it never replaced.
+    signal.throwIfAborted();
     await fs.promises.unlink(dest);
   }
 
   const mode = unixPermissions(entry);
   const readStream = await zipfile.openReadStreamPromise(entry);
 
-  // `O_EXCL` because the unlink above is a check-then-open race too, and a hardlink
-  // re-planted in that window is something `O_NOFOLLOW` cannot refuse. Opened by hand
-  // because `createWriteStream`'s `flags` is typed as a string. `O_NOFOLLOW` is
-  // POSIX-only; on Windows it folds to 0 and the `lstat` is the only guard.
+  // `O_EXCL` because the unlink above is a check-then-open race, and `O_NOFOLLOW`
+  // cannot refuse a hardlink re-planted in that window. Opened by hand because
+  // `createWriteStream`'s `flags` is typed as a string.
   // eslint-disable-next-line no-bitwise
   const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW;
 
@@ -432,10 +435,9 @@ async function extractZipArchive(archivePath: string, dir: string): Promise<void
     applied = true;
     await applyDirectoryModes(extraction);
   } catch (e) {
-    // A refused entry leaves the tree it had already written, and nothing here removes
-    // it — so the directories the archive asked to keep private should still end up
-    // private. Best effort: the entry's error is the one worth reporting, and by now
-    // there is nothing left to write under a restrictive mode.
+    // A refused entry keeps the tree it already wrote, and nothing here removes it, so
+    // a directory the archive marked private still has to end up private. Best effort:
+    // the entry's error is the one worth reporting.
     if (!applied) {
       await applyDirectoryModes(extraction).catch(() => undefined);
     }

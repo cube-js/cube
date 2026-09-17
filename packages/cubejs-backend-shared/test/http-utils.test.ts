@@ -658,6 +658,50 @@ describe('extractArchive', () => {
       expect((fs.statSync(path.join(target, 'private')).mode & 0o777).toString(8)).toBe('700');
     });
 
+    it('does not delete the destination once the extraction has given up', async () => {
+      // Losing the fatal race abandons `writeZipEntry`, it does not cancel it — so the
+      // unlink can land after the call rejected, leaving the caller's file deleted and
+      // nothing in its place. The abort is fired from inside the `mkdir` the entry does
+      // just before the unlink.
+      const archive = path.join(work, 'abortunlink.zip');
+      await writeZip(archive, [{ name: 'driver.jar', content: 'new' }]);
+
+      const target = targetDir();
+      fs.writeFileSync(path.join(target, 'driver.jar'), 'original');
+
+      const { openPromise } = jest.requireActual<typeof import('yauzl')>('yauzl');
+      let zipfile: yauzl.ZipFile | undefined;
+
+      (yauzl.openPromise as jest.MockedFunction<typeof yauzl.openPromise>).mockImplementationOnce(
+        async (file: string, options?: yauzl.Options) => {
+          zipfile = await openPromise(file, options);
+          return zipfile;
+        }
+      );
+
+      const mkdir = fs.promises.mkdir.bind(fs.promises);
+      jest.spyOn(fs.promises, 'mkdir').mockImplementation(async (...args: Parameters<typeof fs.promises.mkdir>) => {
+        const made = await mkdir(...args);
+        if (String(args[0]) === target) {
+          zipfile?.emit('error', new Error('reader exploded'));
+          await new Promise((resolve) => { setImmediate(resolve); });
+        }
+        return made;
+      });
+
+      try {
+        await expect(extractArchive(archive, target)).rejects.toThrow(/reader exploded|aborted/i);
+
+        // The abandoned entry runs on after the rejection, so asserting straight away
+        // would pass by arriving first rather than by the unlink being skipped.
+        await new Promise((resolve) => { setTimeout(resolve, 100); });
+
+        expect(fs.readFileSync(path.join(target, 'driver.jar'), 'utf8')).toBe('original');
+      } finally {
+        jest.restoreAllMocks();
+      }
+    });
+
     it('lets the last of two entries with the same name win', async () => {
       // Legal, and emitted by real packagers — an updated zip can keep the superseded
       // local header. Under `O_EXCL` the second entry only works because the first's
