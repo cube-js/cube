@@ -4,7 +4,18 @@ import path from 'path';
 import * as tar from 'tar';
 import { crc32 } from 'zlib';
 
+import { PassThrough, Readable, Writable } from 'stream';
+import * as yauzl from 'yauzl';
+
 import { extractArchive } from '../src/http-utils';
+
+// The module namespace object is frozen under the ESM interop, so `jest.spyOn` cannot
+// redefine `openPromise`. Replace the module with a passthrough whose one export is a
+// mock, which a single test swaps out to hand back a zipfile it can make misbehave.
+jest.mock('yauzl', () => {
+  const actual = jest.requireActual<typeof import('yauzl')>('yauzl');
+  return { ...actual, openPromise: jest.fn(actual.openPromise) };
+});
 
 /**
  * `extractArchive` replaced the unmaintained `decompress`, which carries two
@@ -27,6 +38,18 @@ describe('extractArchive', () => {
   afterEach(() => {
     fs.rmSync(work, { recursive: true, force: true });
   });
+
+  /** Teardown after an abort is asynchronous, so poll rather than assert on the next tick. */
+  const waitUntil = async (condition: () => boolean, what: string, timeoutMs = 2000) => {
+    const deadline = Date.now() + timeoutMs;
+    while (!condition()) {
+      if (Date.now() > deadline) {
+        throw new Error(`Timed out waiting for ${what}`);
+      }
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => { setTimeout(resolve, 10); });
+    }
+  };
 
   const targetDir = () => {
     const dir = path.join(work, 'target');
@@ -218,10 +241,11 @@ describe('extractArchive', () => {
       expect(fs.existsSync(path.join(outside, 'SYM_PWNED.txt'))).toBe(false);
     });
 
-    it('does not write through a zip symlink that points outside the target', async () => {
-      // The zip backend's containment is the half worth proving separately: a symlink
-      // entry has a clean relative *name*, so only a check on the resolved destination
-      // catches the entry written through it afterwards.
+    it('refuses a zip symlink entry outright, rather than the write through it', async () => {
+      // A symlink entry has a clean relative *name*, so a name check waves it through
+      // and the next entry is written through it. Catching only that second entry
+      // still leaves an attacker-controlled link pointing out of the target, so assert
+      // the link itself never appears.
       const archive = path.join(work, 'zipsym.zip');
       const outside = path.join(work, 'outside');
       fs.mkdirSync(outside);
@@ -231,8 +255,249 @@ describe('extractArchive', () => {
         { name: 'esc/PWNED.txt', content: 'pwned-through-symlink' },
       ]);
 
-      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/out of bound path/i);
+      const target = targetDir();
+      await expect(extractArchive(archive, target)).rejects.toThrow(/symlink/i);
+
       expect(fs.existsSync(path.join(outside, 'PWNED.txt'))).toBe(false);
+      expect(fs.existsSync(path.join(target, 'esc'))).toBe(false);
+    });
+
+    it('refuses a zip entry whose parent is a symlink that was already there', async () => {
+      // The symlink refusal above only covers links *this* extraction would create.
+      // `downloadAndExtractFile` takes a caller-supplied `cwd` that is not required to
+      // be empty, and the tar backend does write symlink entries — so tar first, zip
+      // second into the same directory puts an escaping link in the path of a zip entry
+      // with a blameless relative name. A lexical containment check cannot see it.
+      const archive = path.join(work, 'preexisting.zip');
+      // Nested one deeper than the link so the refusal also has to happen *before*
+      // `mkdir`: resolving only after creating the parent would leave `outside/sub`
+      // behind on the way to rejecting.
+      await writeZip(archive, [{ name: 'esc/sub/PWNED.txt', content: 'pwned-through-preexisting' }]);
+
+      const outside = path.join(work, 'outside');
+      fs.mkdirSync(outside);
+      const target = targetDir();
+      fs.symlinkSync(outside, path.join(target, 'esc'));
+
+      await expect(extractArchive(archive, target)).rejects.toThrow(/out of bound path/i);
+      expect(fs.existsSync(path.join(outside, 'sub'))).toBe(false);
+      expect(fs.existsSync(path.join(outside, 'sub', 'PWNED.txt'))).toBe(false);
+    });
+
+    it('treats a `./` root entry as a no-op instead of an escape, and keeps the target\'s mode', async () => {
+      // `validateFileName` accepts a bare `.`, and `'./'` strips to it — both normalise
+      // to the target itself. Some jar-adjacent packagers emit one, so reading it as an
+      // escape would turn a working driver download into a hard failure; and the mode
+      // it carries belongs to the caller, not to the archive.
+      const archive = path.join(work, 'dotdir.zip');
+      await writeZip(archive, [
+        { name: './', content: '', mode: 0o040777 },
+        { name: 'driver.txt', content: 'legit-content' },
+      ]);
+
+      const target = targetDir();
+      // eslint-disable-next-line no-bitwise
+      const before = (fs.statSync(target).mode & 0o777).toString(8);
+
+      await extractArchive(archive, target);
+
+      expect(fs.readFileSync(path.join(target, 'driver.txt'), 'utf8')).toBe('legit-content');
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(target).mode & 0o777).toString(8)).toBe(before);
+    });
+
+    it('refuses a trailing-slash entry over a pre-existing symlink', async () => {
+      // `path.join` keeps the trailing separator and POSIX resolves it as if `/.`
+      // followed, so `lstat('…/esc/')` stats the link's target and reports "not a
+      // link" — the one name shape that reaches the directory branch past that guard.
+      // Left unstripped, `mkdir` resolves through the link and the deferred pass
+      // chmods a directory outside the target.
+      const archive = path.join(work, 'slashdir.zip');
+      await writeZip(archive, [{ name: 'esc/', content: '', mode: 0o040777 }]);
+
+      const outside = path.join(work, 'outside');
+      fs.mkdirSync(outside, { mode: 0o755 });
+      const target = targetDir();
+      fs.symlinkSync(outside, path.join(target, 'esc'));
+
+      await expect(extractArchive(archive, target)).rejects.toThrow(/symlink/i);
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(outside).mode & 0o777).toString(8)).toBe('755');
+    });
+
+    it('refuses to write through a symlink already standing at the entry name', async () => {
+      // Resolving the parent leaves the last component unchecked, so this is the same
+      // escape one level shallower: the entry is named exactly like the link.
+      const archive = path.join(work, 'overlink.zip');
+      await writeZip(archive, [{ name: 'esc', content: 'overwritten' }]);
+
+      const outside = path.join(work, 'outside');
+      fs.mkdirSync(outside);
+      const secret = path.join(outside, 'secret');
+      fs.writeFileSync(secret, 'original');
+
+      const target = targetDir();
+      fs.symlinkSync(secret, path.join(target, 'esc'));
+
+      await expect(extractArchive(archive, target)).rejects.toThrow(/over a symlink/i);
+      expect(fs.readFileSync(secret, 'utf8')).toBe('original');
+    });
+
+    it('does not write through a pre-existing hardlink at the entry name', async () => {
+      // A hardlink is a second name for the inode, not a link the kernel follows, so
+      // `lstat` calls it a regular file, the parent resolves to the target, and
+      // `O_NOFOLLOW` has nothing to refuse. The tar backend extracts `Link` entries, so
+      // tar-then-zip into one `cwd` plants it.
+      const archive = path.join(work, 'hardlink.zip');
+      await writeZip(archive, [{ name: 'esc', content: 'overwritten', mode: 0o100777 }]);
+
+      const outside = path.join(work, 'outside');
+      fs.mkdirSync(outside);
+      const secret = path.join(outside, 'secret');
+      fs.writeFileSync(secret, 'original');
+      fs.chmodSync(secret, 0o600);
+
+      const target = targetDir();
+      fs.linkSync(secret, path.join(target, 'esc'));
+
+      await extractArchive(archive, target);
+
+      expect(fs.readFileSync(secret, 'utf8')).toBe('original');
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(secret).mode & 0o777).toString(8)).toBe('600');
+      // The other half: the entry still lands, so this passes because the alias was
+      // broken rather than because nothing was written.
+      expect(fs.readFileSync(path.join(target, 'esc'), 'utf8')).toBe('overwritten');
+    });
+
+    it('refuses a dangling symlink at the entry name, which would create its target', async () => {
+      // `realpath` cannot see this one at all — it throws ENOENT and resolves to an
+      // ancestor — yet `open(…, 'w')` through the link creates the file outside.
+      const archive = path.join(work, 'danglinglink.zip');
+      await writeZip(archive, [{ name: 'esc', content: 'created-outside' }]);
+
+      const outside = path.join(work, 'outside');
+      fs.mkdirSync(outside);
+      const notYetThere = path.join(outside, 'new');
+
+      const target = targetDir();
+      fs.symlinkSync(notYetThere, path.join(target, 'esc'));
+
+      await expect(extractArchive(archive, target)).rejects.toThrow(/over a symlink/i);
+      expect(fs.existsSync(notYetThere)).toBe(false);
+    });
+  });
+
+  describe('does not leak the archive descriptor when an entry fails', () => {
+    it('releases it when opening the destination throws', async () => {
+      // `openReadStreamPromise` refs the archive's reader, and yauzl only unrefs on the
+      // entry stream's end or destroy — so a rejection between those two calls leaves
+      // `zipfile.close()` unrefing against a count the abandoned stream still holds.
+      // A directory entry followed by a file of the same name makes the open throw
+      // EEXIST — `O_EXCL`, and the directory is not unlinked — which is that window
+      // without needing a race.
+      const archive = path.join(work, 'eisdir.zip');
+      await writeZip(archive, [
+        { name: 'clash/', content: '', mode: 0o040755 },
+        { name: 'clash', content: 'x' },
+      ]);
+
+      // Witnessed on the stream itself rather than by counting `/dev/fd`: that is
+      // POSIX-only and moves with anything else the worker happens to hold open, so a
+      // flake would point at the production code instead of at the measurement.
+      const { openPromise } = jest.requireActual<typeof import('yauzl')>('yauzl');
+      const entryStreams: Readable[] = [];
+
+      (yauzl.openPromise as jest.MockedFunction<typeof yauzl.openPromise>).mockImplementationOnce(
+        async (file: string, options?: yauzl.Options) => {
+          const zipfile = await openPromise(file, options);
+          const openReadStreamPromise = zipfile.openReadStreamPromise.bind(zipfile);
+
+          zipfile.openReadStreamPromise = async (...args: Parameters<typeof openReadStreamPromise>) => {
+            const stream = await openReadStreamPromise(...args);
+            entryStreams.push(stream);
+            return stream;
+          };
+
+          return zipfile;
+        }
+      );
+
+      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/EEXIST/);
+
+      expect(entryStreams).toHaveLength(1);
+      await waitUntil(
+        () => entryStreams[0].destroyed,
+        "the abandoned entry stream to be destroyed, which is what unrefs the archive's descriptor"
+      );
+    });
+  });
+
+  describe('survives a reader failure rather than crashing the process', () => {
+    it('rejects while the entry is still being written, not once the write settles', async () => {
+      // The read stream never ends and never errors, so `pipeline` never settles and the
+      // zipfile's `error` is the only signal there is — which is what makes this pin
+      // racing the write rather than checking after it.
+      //
+      // The error is scheduled from an `entry` listener registered before
+      // `nextZipEntry`'s, so it lands after that per-read listener has come off again.
+      const archive = path.join(work, 'two-entries.zip');
+      await writeZip(archive, [
+        { name: 'a.txt', content: 'first' },
+        { name: 'b.txt', content: 'second' },
+      ]);
+
+      const { openPromise } = jest.requireActual<typeof import('yauzl')>('yauzl');
+      const stalled = new PassThrough();
+
+      (yauzl.openPromise as jest.MockedFunction<typeof yauzl.openPromise>).mockImplementationOnce(
+        async (file: string, options?: yauzl.Options) => {
+          const zipfile = await openPromise(file, options);
+
+          zipfile.openReadStreamPromise = async () => stalled;
+
+          zipfile.once('entry', () => {
+            setImmediate(() => zipfile.emit('error', new Error('reader exploded')));
+          });
+
+          return zipfile;
+        }
+      );
+
+      // Losing the race only abandons the write promise — nothing in `Promise.race`
+      // closes what it was doing, so capture the destination stream and require that
+      // the abort actually tore it down.
+      // Captured through `fs.promises.open`, since the entry is opened by hand for
+      // `O_NOFOLLOW` and turned into a stream off the handle.
+      const open = fs.promises.open.bind(fs.promises);
+      const opened: Writable[] = [];
+      jest.spyOn(fs.promises, 'open').mockImplementation(async (...args: Parameters<typeof fs.promises.open>) => {
+        const handle = await open(...args);
+        const createWriteStream = handle.createWriteStream.bind(handle);
+
+        handle.createWriteStream = (...streamArgs: Parameters<typeof handle.createWriteStream>) => {
+          const stream = createWriteStream(...streamArgs);
+          opened.push(stream);
+          return stream;
+        };
+
+        return handle;
+      });
+
+      try {
+        await expect(extractArchive(archive, targetDir())).rejects.toThrow(/reader exploded/);
+
+        // The rejection outruns the write, which is the point of racing — so wait for
+        // the abandoned write to reach its destination stream before asking whether
+        // anything closed it.
+        await waitUntil(() => opened.length === 1, 'the destination stream to be created');
+        await waitUntil(() => opened[0].destroyed, 'the destination stream to be destroyed');
+        // The source too: `pipeline` is entered with the signal already aborted here,
+        // and destroying the entry stream is what unrefs the archive's descriptor.
+        await waitUntil(() => stalled.destroyed, 'the entry stream to be destroyed');
+      } finally {
+        jest.restoreAllMocks();
+      }
     });
   });
 
@@ -255,6 +520,240 @@ describe('extractArchive', () => {
       await extractArchive(archive, target);
 
       expect(fs.readFileSync(path.join(target, 'dir', 'file.txt'), 'utf8')).toBe('legit-content');
+    });
+
+    it('treats a zip entry marked a directory by mode alone as a directory', async () => {
+      // The trailing slash is the convention, not the rule. Read as a file, this entry
+      // lands as an empty regular file and the entry under it collides on `mkdir`.
+      const archive = path.join(work, 'moddir.zip');
+      await writeZip(archive, [
+        { name: 'plugins', content: '', mode: 0o040755 },
+        { name: 'plugins/driver.txt', content: 'legit-content' },
+      ]);
+
+      const target = targetDir();
+      await extractArchive(archive, target);
+
+      expect(fs.statSync(path.join(target, 'plugins')).isDirectory()).toBe(true);
+      expect(fs.readFileSync(path.join(target, 'plugins', 'driver.txt'), 'utf8')).toBe('legit-content');
+    });
+
+    it('keeps an entry\'s exec bit, and leaves a mode-less entry to node\'s default', async () => {
+      // Both sides of `mode || undefined` in one fixture. A launcher that
+      // extracts as 0644 fails at exec time, far from here; and a DOS-made zip records
+      // no unix mode at all, where passing the 0 through would make the file unreadable.
+      const archive = path.join(work, 'modes.zip');
+      await writeZip(archive, [
+        { name: 'bin/run.sh', content: '#!/bin/sh\n', mode: 0o100755 },
+        { name: 'dos.txt', content: 'x', mode: 0 },
+      ]);
+
+      const target = targetDir();
+      await extractArchive(archive, target);
+
+      // eslint-disable-next-line no-bitwise
+      expect(fs.statSync(path.join(target, 'bin', 'run.sh')).mode & 0o111).not.toBe(0);
+      expect(fs.readFileSync(path.join(target, 'dos.txt'), 'utf8')).toBe('x');
+    });
+
+    it('applies a directory mode recorded after its own children', async () => {
+      // Nothing in the zip format orders a directory entry before its contents, and
+      // `mkdir({ recursive: true })` will not chmod one a child entry already made.
+      const archive = path.join(work, 'dirlate.zip');
+      await writeZip(archive, [
+        { name: 'private/file.txt', content: 'x' },
+        { name: 'private', content: '', mode: 0o040700 },
+      ]);
+
+      const target = targetDir();
+      await extractArchive(archive, target);
+
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(path.join(target, 'private')).mode & 0o777).toString(8)).toBe('700');
+      expect(fs.readFileSync(path.join(target, 'private', 'file.txt'), 'utf8')).toBe('x');
+    });
+
+    it('writes into a directory the archive marks unwritable, then restricts it', async () => {
+      // A `0o500` directory applied at `mkdir` time makes every later write under it
+      // fail EACCES for a non-root user — so the mode has to land after the contents.
+      const archive = path.join(work, 'dirreadonly.zip');
+      await writeZip(archive, [
+        { name: 'locked', content: '', mode: 0o040500 },
+        { name: 'locked/file.txt', content: 'x' },
+      ]);
+
+      const target = targetDir();
+      await extractArchive(archive, target);
+
+      const locked = path.join(target, 'locked');
+      // eslint-disable-next-line no-bitwise
+      const mode = (fs.statSync(locked).mode & 0o777).toString(8);
+      const written = fs.readFileSync(path.join(locked, 'file.txt'), 'utf8');
+
+      // Before the assertions, not after: a failure would otherwise leave a 0o500
+      // directory for `afterEach`'s rm to trip over, and its EACCES would be what
+      // surfaces instead of the assertion that actually failed.
+      fs.chmodSync(locked, 0o700);
+
+      expect(mode).toBe('500');
+      // Root ignores the missing write bit, so the EACCES half of this only exists for
+      // a non-root writer — under root the pre-deferral code passes here too.
+      if (process.getuid?.() !== 0) {
+        expect(written).toBe('x');
+      }
+    });
+
+    it('filters a directory mode through the umask, as the file path already is', async () => {
+      // `chmod` sets bits verbatim where `open` filters them, so without masking an
+      // archive gets to choose a world-writable directory under the extraction target —
+      // somewhere Cube later loads code from.
+      const archive = path.join(work, 'worldwritable.zip');
+      await writeZip(archive, [
+        { name: 'plugins', content: '', mode: 0o040777 },
+        { name: 'plugins/driver.txt', content: 'x' },
+      ]);
+
+      const target = targetDir();
+      // Pre-created wide, which is the case a stat of the extracted directory cannot
+      // mask: `0o777 & ~umask` only describes a directory `mkdir` actually made, and
+      // `downloadAndExtractFile`'s `cwd` is not required to be empty.
+      fs.mkdirSync(path.join(target, 'plugins'), { mode: 0o777 });
+      fs.chmodSync(path.join(target, 'plugins'), 0o777);
+
+      // Pinned rather than measured: computing the expectation from the live umask
+      // makes the test agree with itself on a host with `umask 000` — a root container
+      // — where it would then assert nothing, or fail for a reason unrelated to the
+      // code. Restored in `finally`, or it leaks into every later test in the worker.
+      const previousUmask = process.umask(0o022);
+
+      try {
+        await extractArchive(archive, target);
+      } finally {
+        process.umask(previousUmask);
+      }
+
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(path.join(target, 'plugins')).mode & 0o777).toString(8)).toBe('755');
+      expect(fs.readdirSync(target).filter((e) => e.startsWith('.cube-umask-probe-'))).toEqual([]);
+    });
+
+    it('still applies recorded directory modes when a later entry is refused', async () => {
+      // A refused entry leaves behind what was already written, and nothing removes it
+      // — so a directory the archive marked private must not be left at the default.
+      const archive = path.join(work, 'failpartial.zip');
+      const outside = path.join(work, 'outside');
+      fs.mkdirSync(outside);
+
+      await writeZip(archive, [
+        { name: 'private', content: '', mode: 0o040700 },
+        { name: 'private/key', content: 'secret-material' },
+        { name: 'esc', content: outside, mode: 0o120777 },
+      ]);
+
+      const target = targetDir();
+      await expect(extractArchive(archive, target)).rejects.toThrow(/symlink/i);
+
+      expect(fs.readFileSync(path.join(target, 'private', 'key'), 'utf8')).toBe('secret-material');
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(path.join(target, 'private')).mode & 0o777).toString(8)).toBe('700');
+    });
+
+    it('lets the last of two entries with the same name win', async () => {
+      // Legal, and emitted by real packagers — an updated zip can keep the superseded
+      // local header. Under `O_EXCL` the second entry only works because the first's
+      // output is unlinked, so this pins the branch that makes it so; `unzip -o` agrees.
+      const archive = path.join(work, 'duplicate.zip');
+      await writeZip(archive, [
+        { name: 'driver.jar', content: 'first' },
+        { name: 'driver.jar', content: 'second' },
+      ]);
+
+      const target = targetDir();
+      await extractArchive(archive, target);
+
+      expect(fs.readFileSync(path.join(target, 'driver.jar'), 'utf8')).toBe('second');
+    });
+
+    it('narrows a pre-existing file to the mode the archive records', async () => {
+      // An existing `dest` is replaced rather than written into, so `open` creates the
+      // file and sets its mode; `wide.jar` is the half that also pins the kernel's
+      // umask filtering.
+      const archive = path.join(work, 'overwrite.zip');
+      await writeZip(archive, [
+        { name: 'driver.jar', content: 'new', mode: 0o100644 },
+        // A mode the umask has to cut down — 0o644 passes any mask unchanged, so on its
+        // own it cannot tell a masked write from an unmasked one.
+        { name: 'wide.jar', content: 'new', mode: 0o100777 },
+      ]);
+
+      const target = targetDir();
+      fs.writeFileSync(path.join(target, 'driver.jar'), 'old');
+      fs.chmodSync(path.join(target, 'driver.jar'), 0o666);
+      fs.writeFileSync(path.join(target, 'wide.jar'), 'old');
+      fs.chmodSync(path.join(target, 'wide.jar'), 0o666);
+
+      const previousUmask = process.umask(0o022);
+
+      try {
+        await extractArchive(archive, target);
+      } finally {
+        process.umask(previousUmask);
+      }
+
+      expect(fs.readFileSync(path.join(target, 'driver.jar'), 'utf8')).toBe('new');
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(path.join(target, 'driver.jar')).mode & 0o777).toString(8)).toBe('644');
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(path.join(target, 'wide.jar')).mode & 0o777).toString(8)).toBe('755');
+    });
+
+    it('masks without probing when the archive created a directory of its own', async () => {
+      // The umask is read off a directory `mkdir` reported creating, so the common
+      // archive needs no probe — and leaves nothing behind in the caller's directory.
+      const archive = path.join(work, 'createdmask.zip');
+      await writeZip(archive, [
+        { name: 'plugins', content: '', mode: 0o040777 },
+        { name: 'plugins/driver.txt', content: 'x' },
+      ]);
+
+      const target = targetDir();
+      // Asserted on the `mkdir` calls, not on what is left on disk: the probe removes
+      // itself, so a leftover check passes whether or not one was ever made.
+      const mkdir = fs.promises.mkdir.bind(fs.promises);
+      const madeDirectories: string[] = [];
+      jest.spyOn(fs.promises, 'mkdir').mockImplementation((...args: Parameters<typeof fs.promises.mkdir>) => {
+        madeDirectories.push(String(args[0]));
+        return mkdir(...args);
+      });
+
+      const previousUmask = process.umask(0o022);
+
+      try {
+        await extractArchive(archive, target);
+      } finally {
+        process.umask(previousUmask);
+        jest.restoreAllMocks();
+      }
+
+      // eslint-disable-next-line no-bitwise
+      expect((fs.statSync(path.join(target, 'plugins')).mode & 0o777).toString(8)).toBe('755');
+      expect(madeDirectories.filter((d) => d.includes('.cube-umask-probe-'))).toEqual([]);
+    });
+
+    it('keeps a directory entry\'s mode too, not just a file\'s', async () => {
+      // Directories go through `mkdir`, which takes its own mode — so this is a
+      // separate code path from the file bits above, and dropping it silently widens
+      // a private directory to group- and other-readable.
+      const archive = path.join(work, 'dirmode.zip');
+      await writeZip(archive, [{ name: 'private', content: '', mode: 0o040700 }]);
+
+      const target = targetDir();
+      await extractArchive(archive, target);
+
+      const stat = fs.statSync(path.join(target, 'private'));
+      expect(stat.isDirectory()).toBe(true);
+      // eslint-disable-next-line no-bitwise
+      expect((stat.mode & 0o777).toString(8)).toBe('700');
     });
 
     it('detects an uncompressed tar from the ustar magic at offset 257', async () => {

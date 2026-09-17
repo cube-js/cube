@@ -1,5 +1,5 @@
 import * as tar from 'tar';
-import extractZip from 'extract-zip';
+import * as yauzl from 'yauzl';
 import fetch, { Headers, Request, Response } from 'node-fetch';
 import bytes from 'bytes';
 import { throttle } from 'throttle-debounce';
@@ -10,6 +10,7 @@ import * as os from 'os';
 import crypto from 'crypto';
 import * as path from 'path';
 import { gunzipSync } from 'zlib';
+import { pipeline } from 'stream/promises';
 
 import { internalExceptions } from './errors';
 import { getHttpAgentForProxySettings } from './proxy';
@@ -106,6 +107,345 @@ const tarOptions = {
   },
 };
 
+// A zip records a unix mode in the high 16 bits of the external attributes; the
+// file-type nibble there is what marks an entry a symlink or a directory.
+const UNIX_MODE_MASK = 0o170000;
+const UNIX_MODE_SYMLINK = 0o120000;
+const UNIX_MODE_DIRECTORY = 0o040000;
+
+// eslint-disable-next-line no-bitwise
+const unixFileType = (entry: yauzl.Entry) => (entry.externalFileAttributes >>> 16) & UNIX_MODE_MASK;
+
+// 0 when the producer recorded no unix mode at all — a DOS-made zip — where node's
+// default is the right answer for both files and directories.
+// eslint-disable-next-line no-bitwise
+const unixPermissions = (entry: yauzl.Entry) => (entry.externalFileAttributes >>> 16) & 0o777;
+
+/** Pull one entry, or `null` at the end of the archive. */
+function nextZipEntry(zipfile: yauzl.ZipFile): Promise<yauzl.Entry | null> {
+  return new Promise((resolve, reject) => {
+    // `zipfile` outlives a single entry, so every listener has to come back off
+    // before settling — three entries in and the handlers would otherwise be
+    // stacked three deep, and the first `error` would settle every pending read.
+    const cleanups: Array<() => void> = [];
+    const settle = (finish: () => void) => {
+      cleanups.forEach((off) => off());
+      finish();
+    };
+
+    const onEntry = (entry: yauzl.Entry) => settle(() => resolve(entry));
+    const onEnd = () => settle(() => resolve(null));
+    const onError = (err: Error) => settle(() => reject(err));
+
+    cleanups.push(
+      () => zipfile.removeListener('entry', onEntry),
+      () => zipfile.removeListener('end', onEnd),
+      () => zipfile.removeListener('error', onError)
+    );
+
+    zipfile.once('entry', onEntry);
+    zipfile.once('end', onEnd);
+    zipfile.once('error', onError);
+    zipfile.readEntry();
+  });
+}
+
+/**
+ * `realpath` of the deepest ancestor of `target` that exists.
+ *
+ * Any symlink on the path is by definition in the part that already exists, so
+ * resolving that prefix accounts for all of them — and doing it before `mkdir` means a
+ * rejected entry creates nothing.
+ */
+async function realpathOfExistingAncestor(target: string): Promise<string> {
+  let current = target;
+
+  for (;;) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      return await fs.promises.realpath(current);
+    } catch (e) {
+      // Only "does not exist yet" means keep walking. Anything else — EACCES on an
+      // intermediate directory, say — would otherwise approve the entry against a
+      // shallower ancestor than the one being checked.
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw e;
+      }
+
+      const parent = path.dirname(current);
+      if (parent === current) {
+        throw e;
+      }
+      current = parent;
+    }
+  }
+}
+
+type ZipExtraction = {
+  zipfile: yauzl.ZipFile;
+  /** Resolved target directory; every entry must land inside it. */
+  root: string;
+  signal: AbortSignal;
+  /** Directory modes to apply once every entry is written — see `applyDirectoryModes`. */
+  directoryModes: Map<string, number>;
+  /**
+   * First directory this extraction created, so the umask has filtered its mode.
+   * `mkdir({ recursive: true })` returns the path it made, `undefined` when it made none.
+   */
+  createdDirectory?: string;
+};
+
+/**
+ * The permission bits the umask currently allows — not `process.umask()` (DEP0139),
+ * and not the stat of any extracted directory, which a pre-existing `0o777` `dest`
+ * would answer with the archive's own mode.
+ */
+async function umaskAllowedBits(root: string, createdDirectory?: string): Promise<number> {
+  if (createdDirectory) {
+    const { mode } = await fs.promises.stat(createdDirectory);
+    // eslint-disable-next-line no-bitwise
+    return mode & 0o777;
+  }
+
+  const probe = path.join(root, `.cube-umask-probe-${crypto.randomBytes(8).toString('hex')}`);
+
+  // Plain `mkdir`, not `mkdtemp` — that forces `0o700` and would answer its own question.
+  await fs.promises.mkdir(probe);
+
+  try {
+    const { mode } = await fs.promises.stat(probe);
+    // eslint-disable-next-line no-bitwise
+    return mode & 0o777;
+  } finally {
+    await fs.promises.rmdir(probe);
+  }
+}
+
+/**
+ * Apply recorded directory modes once every entry is written. Deepest first, because
+ * restricting an ancestor takes away the traversal bit its descendants need.
+ */
+async function applyDirectoryModes(extraction: ZipExtraction): Promise<void> {
+  const { directoryModes } = extraction;
+
+  if (directoryModes.size === 0) {
+    return;
+  }
+
+  const deepestFirst = [...directoryModes.entries()].sort(
+    ([a], [b]) => b.split(path.sep).length - a.split(path.sep).length
+  );
+
+  // `O_DIRECTORY | O_NOFOLLOW` because this runs after the whole archive: a link
+  // swapped in at `dest` since the containment check would otherwise take an
+  // archive-chosen mode outside the target.
+  // Both constants are POSIX-only; on Windows they fold to 0, so chmod by path there.
+  const canOpenDirectory = typeof fs.constants.O_DIRECTORY === 'number'
+    && typeof fs.constants.O_NOFOLLOW === 'number';
+  // eslint-disable-next-line no-bitwise
+  const flags = fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW;
+
+  // `chmod` sets bits verbatim where `open` filters them through the umask, so an
+  // unmasked directory mode would let an archive pick one the file path cannot.
+  const allowed = await umaskAllowedBits(extraction.root, extraction.createdDirectory);
+
+  for (const [dest, mode] of deepestFirst) {
+    // eslint-disable-next-line no-bitwise
+    const masked = mode & allowed;
+
+    if (canOpenDirectory) {
+      // eslint-disable-next-line no-await-in-loop
+      const handle = await fs.promises.open(dest, flags);
+
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await handle.chmod(masked);
+      } finally {
+        // eslint-disable-next-line no-await-in-loop
+        await handle.close();
+      }
+    } else {
+      // eslint-disable-next-line no-await-in-loop
+      await fs.promises.chmod(dest, masked);
+    }
+  }
+}
+
+function rememberCreated(extraction: ZipExtraction, created: string | undefined): void {
+  if (created && !extraction.createdDirectory) {
+    extraction.createdDirectory = created;
+  }
+}
+
+async function writeZipEntry(extraction: ZipExtraction, entry: yauzl.Entry): Promise<void> {
+  const { zipfile, root: dir, signal, directoryModes } = extraction;
+
+  // Defence in depth. yauzl runs this itself inside `readEntry` while `decodeStrings`
+  // is on, so a `..` name errors out of `nextZipEntry` and never reaches here; this
+  // keeps the check owned locally rather than by a default we do not set.
+  const invalid = yauzl.validateFileName(entry.fileName);
+  if (invalid) {
+    throw new Error(`Refusing to extract zip entry, ${invalid}`);
+  }
+
+  // Refused outright rather than containment-checked (GHSA-jmr9-qjv8-65gv): with no
+  // symlink ever created under `dir`, no later entry can resolve out of it either.
+  if (unixFileType(entry) === UNIX_MODE_SYMLINK) {
+    throw new Error(`Refusing to extract symlink entry from zip: ${entry.fileName}`);
+  }
+
+  // Stripped before it reaches the filesystem: POSIX resolves a trailing slash as if
+  // `/.` followed, so `lstat('esc/')` stats the link's target and calls it not a link.
+  const dest = path.join(dir, entry.fileName.replace(/\/+$/, ''));
+  // Lexical first: it costs nothing and refuses a hostile name before any filesystem
+  // call. It is not sufficient on its own — see `realpathOfExistingAncestor`.
+  if (dest !== dir && !dest.startsWith(dir + path.sep)) {
+    throw new Error(`Refusing to extract zip entry out of bound path: ${entry.fileName}`);
+  }
+
+  // `.` and `./` are names `validateFileName` accepts, and they normalise to the
+  // target itself. The parent of the root is outside the root by construction, so
+  // without this the check below reads them as an escape and aborts the archive.
+  if (dest === dir) {
+    return;
+  }
+
+  const parent = await realpathOfExistingAncestor(path.dirname(dest));
+  if (parent !== dir && !parent.startsWith(dir + path.sep)) {
+    throw new Error(`Refusing to extract zip entry out of bound path: ${entry.fileName}`);
+  }
+
+  // Resolving the parent cannot see the last component, and `realpath` cannot see a
+  // dangling link at all. Before the directory branch, which would `mkdir` through one.
+  const existing = await fs.promises.lstat(dest).catch((e) => {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw e;
+    }
+    return null;
+  });
+  if (existing?.isSymbolicLink()) {
+    throw new Error(`Refusing to extract zip entry over a symlink: ${entry.fileName}`);
+  }
+
+  // The trailing slash is the convention, but a producer may mark a directory by mode
+  // alone; read as a file, it lands as an empty regular file and the first entry under
+  // it collides on `mkdir` with EEXIST.
+  if (entry.fileName.endsWith('/') || unixFileType(entry) === UNIX_MODE_DIRECTORY) {
+    rememberCreated(extraction, await fs.promises.mkdir(dest, { recursive: true }));
+
+    // Recorded, not applied: a restrictive mode cannot be set while there are still
+    // entries to write underneath it.
+    const dirMode = unixPermissions(entry);
+    if (dirMode) {
+      directoryModes.set(dest, dirMode);
+    }
+    return;
+  }
+
+  rememberCreated(extraction, await fs.promises.mkdir(path.dirname(dest), { recursive: true }));
+
+  // A hardlink at `dest` is a second name for a file outside `dir`: `lstat` calls it
+  // regular and `O_NOFOLLOW` does not apply, so unlinking is the only check there is.
+  // It also keeps `open` off a fifo, which would block for a reader.
+  if (existing && !existing.isDirectory()) {
+    await fs.promises.unlink(dest);
+  }
+
+  const mode = unixPermissions(entry);
+  const readStream = await zipfile.openReadStreamPromise(entry);
+
+  // `O_EXCL` because the unlink above is a check-then-open race too, and a hardlink
+  // re-planted in that window is something `O_NOFOLLOW` cannot refuse. Opened by hand
+  // because `createWriteStream`'s `flags` is typed as a string. `O_NOFOLLOW` is
+  // POSIX-only; on Windows it folds to 0 and the `lstat` is the only guard.
+  // eslint-disable-next-line no-bitwise
+  const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW;
+
+  let handle: fs.promises.FileHandle;
+
+  try {
+    handle = await fs.promises.open(dest, flags, mode || undefined);
+  } catch (e) {
+    // Nothing else will consume `readStream`, and yauzl only unrefs the archive's
+    // descriptor when the entry stream ends or is destroyed — so without this an
+    // ELOOP here (the case `O_NOFOLLOW` exists to produce) leaks the archive's fd.
+    readStream.destroy();
+    throw e;
+  }
+
+  // The signal is what tears these two down when the zipfile errors out from under
+  // them — losing the race only abandons this promise, it does not close anything.
+  await pipeline(readStream, handle.createWriteStream(), { signal });
+}
+
+/**
+ * Extract a zip into `dir`, which must already exist.
+ */
+async function extractZipArchive(archivePath: string, dir: string): Promise<void> {
+  // Before the zipfile is opened, or a throw here leaks its descriptor. Resolved
+  // because it is compared against resolved parents below.
+  const root = await fs.promises.realpath(dir);
+
+  const zipfile = await yauzl.openPromise(archivePath, { lazyEntries: true });
+
+  // yauzl reports reader failures by emitting `error` on the zipfile, and an emit with
+  // no listener *throws* — `nextZipEntry`'s comes off between reads, so this one has to
+  // stay on for the zipfile's lifetime.
+  let raiseFatal!: (err: Error) => void;
+  const fatal = new Promise<never>((_resolve, reject) => {
+    raiseFatal = reject;
+  });
+  // An error arriving after the last read has no race left to observe it.
+  fatal.catch(() => undefined);
+
+  const aborter = new AbortController();
+  zipfile.on('error', (err: Error) => {
+    // Settle the race first: `abort()` dispatches synchronously, and losing to
+    // `pipeline`'s `AbortError` would swallow the reader's real error.
+    raiseFatal(err);
+    aborter.abort();
+  });
+
+  const extraction: ZipExtraction = {
+    zipfile,
+    root,
+    signal: aborter.signal,
+    directoryModes: new Map(),
+  };
+
+  let applied = false;
+
+  try {
+    for (;;) {
+      // Sequential on purpose: entries are read from one cursor.
+      // eslint-disable-next-line no-await-in-loop
+      const entry = await Promise.race([nextZipEntry(zipfile), fatal]);
+      if (!entry) {
+        break;
+      }
+      // Raced, not checked after: a failure can leave the read stream neither ending
+      // nor erroring, and `pipeline` would then never settle.
+      // eslint-disable-next-line no-await-in-loop
+      await Promise.race([writeZipEntry(extraction, entry), fatal]);
+    }
+
+    applied = true;
+    await applyDirectoryModes(extraction);
+  } catch (e) {
+    // A refused entry leaves the tree it had already written, and nothing here removes
+    // it — so the directories the archive asked to keep private should still end up
+    // private. Best effort: the entry's error is the one worth reporting, and by now
+    // there is nothing left to write under a restrictive mode.
+    if (!applied) {
+      await applyDirectoryModes(extraction).catch(() => undefined);
+    }
+
+    throw e;
+  } finally {
+    zipfile.close();
+  }
+}
+
 /**
  * Extract a downloaded archive into `cwd`, which is created if missing.
  *
@@ -119,11 +459,11 @@ const tarOptions = {
  * by.
  *
  * Neither backend writes outside `cwd`: `tar` strips a leading `/` on extraction and
- * drops entries containing `..`, and `extract-zip` rejects entries that resolve outside
- * the target.
+ * drops entries containing `..`, and the zip backend rejects absolute and `..` names
+ * outright and refuses symlink entries altogether.
  */
 export async function extractArchive(archivePath: string, cwd: string): Promise<void> {
-  // `extract-zip` creates its target but `tar.x` throws `CwdError` when it is
+  // The zip backend needs its target to exist and `tar.x` throws `CwdError` when it is
   // missing, so without this the contract would depend on the archive's format —
   // which callers cannot know in advance, that being the point of magic-byte dispatch.
   mkdirpSync(cwd);
@@ -151,7 +491,7 @@ export async function extractArchive(archivePath: string, cwd: string): Promise<
   // zip: the two-byte "PK" prefix, shared by a local file header and by the
   // end-of-central-directory record that an empty archive consists of.
   if (startsWith(0x50, 0x4b)) {
-    await extractZip(archivePath, { dir: path.resolve(cwd) });
+    await extractZipArchive(archivePath, path.resolve(cwd));
     return;
   }
 
