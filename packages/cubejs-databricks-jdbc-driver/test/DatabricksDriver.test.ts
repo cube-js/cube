@@ -31,7 +31,6 @@ jest.spyOn(BlobServiceClient.prototype, 'getUserDelegationKey').mockImplementati
   jest.fn().mockReturnValue('mockKey')
 );
 
-// `config` is protected; widen it rather than casting so the assertions stay type-checked.
 class TestDatabricksDriver extends DatabricksDriver {
   public get testConfig(): DatabricksDriverConfiguration {
     return this.config;
@@ -108,8 +107,6 @@ describe('DatabricksDriver', () => {
       expect(() => new TestDatabricksDriver()).toThrow(/EnableGeoSpatialSupport=1/);
     });
 
-    // The driver enables the feature only on a literal `1`, so any other value already means off.
-    // It still has to leave the URL: a key present both there and in the properties map is fatal.
     test.each([
       ['EnableGeoSpatialSupport=0'],
       ['EnableGeoSpatialSupport='],
