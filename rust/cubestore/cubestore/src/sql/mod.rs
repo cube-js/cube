@@ -796,6 +796,14 @@ impl SqlService for SqlServiceImpl {
             let mut parser = CubeStoreParser::new(query, context.parameters.take())?;
             parser.parse_statement()?
         };
+
+        app_metrics::INCOMING_QUERIES.add_with_tags(
+            1,
+            Some(&vec![metrics::format_tag(
+                "command",
+                Self::command_tag(&ast),
+            )]),
+        );
         // trace!("AST is: {:?}", ast);
         match ast {
             CubeStoreStatement::Statement(Statement::ShowVariable { variable }) => {
@@ -7381,6 +7389,38 @@ LIMIT 10000"#,
 }
 
 impl SqlServiceImpl {
+    /// Tag values mirror the ones the per-command counters report, so arrivals and
+    /// completions of the same command can be compared directly.
+    fn command_tag(ast: &CubeStoreStatement) -> &'static str {
+        match ast {
+            CubeStoreStatement::Statement(Statement::Query(_)) => "select",
+            CubeStoreStatement::Statement(Statement::Insert(_)) => "insert",
+            CubeStoreStatement::Statement(Statement::CreateIndex(_)) => "create_index",
+            CubeStoreStatement::Statement(Statement::CreatePartitionedIndex { .. }) => {
+                "create_partitioned_index"
+            }
+            CubeStoreStatement::Statement(Statement::Drop { object_type, .. }) => match object_type
+            {
+                ObjectType::Schema => "drop_schema",
+                ObjectType::Table => "drop_table",
+                ObjectType::PartitionedIndex => "drop_partitioned_index",
+                _ => "drop",
+            },
+            CubeStoreStatement::Statement(Statement::ShowVariable { .. }) => "show",
+            CubeStoreStatement::Statement(Statement::SetVariable { .. }) => "set",
+            CubeStoreStatement::Statement(Statement::Explain { .. }) => "explain",
+            CubeStoreStatement::CreateTable { .. } => "create_table",
+            CubeStoreStatement::CreateSchema { .. } => "create_schema",
+            CubeStoreStatement::CreateSource { .. } => "create_source",
+            CubeStoreStatement::Cache(_) => "cache",
+            CubeStoreStatement::Queue(_) => "queue",
+            CubeStoreStatement::System(_) => "system",
+            CubeStoreStatement::Dump(_) => "dump",
+            CubeStoreStatement::ExplainAnalyzeDetailed(_) => "explain_analyze_detailed",
+            _ => "other",
+        }
+    }
+
     fn handle_workbench_queries(q: &str) -> Option<DataFrame> {
         if q == "SHOW SESSION VARIABLES LIKE 'lower_case_table_names'" {
             return Some(DataFrame::new(

@@ -10,7 +10,13 @@ pub static STARTUPS: Counter = metrics::counter("cs.startup");
 /// Errors in IPC.
 pub static WORKER_POOL_ERROR: Counter = metrics::counter("cs.worker_pool.errors");
 
-/// Incoming SQL queries that do data reads.
+/// Every SQL query once parsed, counted before planning and execution. Tagged with the same
+/// `command` values as the counters below, so arrivals can be compared against completions.
+pub static INCOMING_QUERIES: Counter = metrics::counter("cs.sql.query.incoming");
+
+/// SQL queries that do data reads, counted once they are parsed, planned and dispatched.
+/// Queries still queued, timed out or lost to a restart never reach this counter — compare
+/// against [INCOMING_QUERIES] to see them.
 pub static DATA_QUERIES: Counter = metrics::counter("cs.sql.query.data");
 pub static DATA_QUERIES_CACHE_HIT: Counter = metrics::counter("cs.sql.query.data.cache.hit");
 pub static DATA_QUERIES_CACHE_STALE_HIT: Counter =
