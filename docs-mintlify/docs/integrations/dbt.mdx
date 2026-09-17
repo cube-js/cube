@@ -324,9 +324,10 @@ packages:
 ```
 
 Here `dbt deps` fails inside the sandbox unless `DBT_PACKAGES_TOKEN` is available
-to it. Data
-source connection variables (`CUBEJS_DB_*`) reach the sandbox automatically; any
-other variable does **not**, unless you select it.
+to it. Data source connection variables (`CUBEJS_DB_*`) reach the sandbox automatically;
+any other variable does **not**, unless you select it.
+[`DBT_SANDBOX_VERSION`](#set-the-dbt-core-version) isn't selectable either — Cube reads
+it to decide which dbt Core to install.
 
 In the **dbt project** settings card, the **Environment variables** picker lets
 you choose which of the deployment's environment variables to pass into the
@@ -362,12 +363,36 @@ the rest of the pull.
 
 <Note>
 
-`CUBEJS_DB_*` connection variables, and a few names reserved by the sync itself
-(schema, dbt profile, and Git internals), can't be selected. If a selected
-variable is later removed from the deployment env, it's skipped on the next sync
-and the settings card flags it.
+`CUBEJS_DB_*` connection variables, `DBT_SANDBOX_VERSION`, and a few names reserved by
+the sync itself (schema, dbt profile, and Git internals), can't be selected. If a
+selected variable is later removed from the deployment env, it's skipped on the next
+sync and the settings card flags it.
 
 </Note>
+
+## Set the dbt Core version
+
+This section applies only to Git-based pulls. A manifest pull runs no dbt process in
+Cube — the artifact is produced by whatever dbt version your pipeline runs.
+
+The sandbox runs a pinned dbt Core version — currently **1.12.3** — together with the
+adapter for your deployment's warehouse. To run a pull on a different version — to match
+the version your dbt project is built against — set `DBT_SANDBOX_VERSION` on the
+deployment under **Settings → Configuration**:
+
+```text
+DBT_SANDBOX_VERSION=1.9.2
+```
+
+- The value must be an **exact, stable version**: `1.9.2`, not `latest`, `1.9`, `^1.9`, or
+  a prerelease such as `1.9.2rc1`. Any other value fails the pull immediately with a
+  message naming the variable.
+- Cube doesn't enforce a minimum version or check the one you pin against your warehouse
+  adapter. A version the adapter can't work with fails while the sandbox installs
+  dependencies.
+- Pinning a version other than the default installs dbt into a fresh environment on every
+  pull instead of reusing Cube's prebuilt one, so those pulls spend a few extra minutes
+  installing dependencies.
 
 ## Run a pull manually
 
