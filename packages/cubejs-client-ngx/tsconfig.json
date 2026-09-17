@@ -2,7 +2,7 @@
   "compilerOptions": {
     "baseUrl": "./",
     "outDir": "../../out-tsc/lib",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -12,10 +12,11 @@
     "allowSyntheticDefaultImports": true,
     "strict": false,
     "types": [],
-    "target": "es2017",
-    "module": "es2020",
+    "target": "es2022",
+    "module": "esnext",
+    "useDefineForClassFields": false,
     "lib": [
-      "es2020",
+      "es2022",
       "dom"
     ],
     "paths": {
@@ -25,12 +26,9 @@
   },
   "angularCompilerOptions": {
     "annotateForClosureCompiler": true,
-    "skipTemplateCodegen": true,
-    "strictMetadataEmit": true,
     "fullTemplateTypeCheck": true,
     "strictInjectionParameters": true,
-    "enableResourceInlining": true,
-    "preserveSymlinks": true,
+    "preserveSymlinks": true
   },
   "exclude": ["src/test.ts", "**/*.spec.ts"],
   "include": ["index.ts", "src/*"]

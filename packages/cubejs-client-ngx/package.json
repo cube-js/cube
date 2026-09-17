@@ -30,16 +30,17 @@
     "tslib": "^2.3.0"
   },
   "devDependencies": {
-    "@angular-devkit/build-angular": "^18.2.16",
-    "@angular/cli": "^18.2.16",
-    "@angular/compiler": "^18.2.13",
-    "@angular/compiler-cli": "^18.2.13",
-    "@angular/core": "^18.2.13",
-    "ng-packagr": "^18.2.1",
-    "rxjs": "~7.5.0",
-    "typescript": "~5.4.5"
+    "@angular/build": "^20.3.37",
+    "@angular/cli": "^20.3.37",
+    "@angular/compiler": "^20.3.31",
+    "@angular/compiler-cli": "^20.3.31",
+    "@angular/core": "^20.3.31",
+    "ng-packagr": "^20.3.2",
+    "rxjs": "~7.8.0",
+    "typescript": "~5.8.3"
   },
   "peerDependencies": {
+    "@angular/core": ">=20.0.0",
     "@cubejs-client/core": ">=0.28.1",
     "rxjs": ">=6.6.0"
   }
