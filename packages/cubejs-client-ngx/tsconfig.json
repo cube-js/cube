@@ -25,7 +25,6 @@
     }
   },
   "angularCompilerOptions": {
-    "annotateForClosureCompiler": true,
     "fullTemplateTypeCheck": true,
     "strictInjectionParameters": true,
     "preserveSymlinks": true
