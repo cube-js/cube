@@ -316,6 +316,10 @@ describe('OptsHandler class', () => {
   });
 
   test('must configure/reconfigure contextToDbType', async () => {
+    // Outside of dev mode CUBEJS_DB_TYPE or a driverFactory is required upfront,
+    // and this case is about resolving the type after the instance was created
+    process.env.CUBEJS_DEV_MODE = 'true';
+
     const core = new CubejsServerCoreExposed({
       ...conf,
       driverFactory: undefined,

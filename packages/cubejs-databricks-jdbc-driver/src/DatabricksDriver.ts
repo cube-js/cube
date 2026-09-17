@@ -468,9 +468,7 @@ export class DatabricksDriver extends JDBCDriver {
     if (schema) {
       return schema;
     } else {
-      const devMode =
-        process.env.NODE_ENV !== 'production' || getEnv('devMode');
-      return devMode
+      return getEnv('devMode')
         ? 'dev_pre_aggregations'
         : 'prod_pre_aggregations';
     }

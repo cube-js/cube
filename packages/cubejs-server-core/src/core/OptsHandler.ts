@@ -480,13 +480,11 @@ export class OptsHandler {
 
   /**
    * Determines whether current instance should be bootstraped in the
-   * dev mode or not.
+   * dev mode or not. Dev mode is opt-in through CUBEJS_DEV_MODE only, it is off
+   * by default and NODE_ENV has no say in it.
    */
   private isDevMode(): boolean {
-    return (
-      process.env.NODE_ENV !== 'production' ||
-      getEnv('devMode')
-    );
+    return getEnv('devMode');
   }
 
   /**

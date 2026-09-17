@@ -318,3 +318,46 @@ describe('getEnv(compilerCacheSize)', () => {
     );
   });
 });
+
+describe('getEnv(devMode)', () => {
+  const nodeEnv = process.env.NODE_ENV;
+
+  beforeEach(() => {
+    delete process.env.CUBEJS_DEV_MODE;
+    delete process.env.NODE_ENV;
+  });
+
+  afterAll(() => {
+    delete process.env.CUBEJS_DEV_MODE;
+    process.env.NODE_ENV = nodeEnv;
+  });
+
+  test('is off when neither CUBEJS_DEV_MODE nor NODE_ENV is set', () => {
+    expect(getEnv('devMode')).toBe(false);
+  });
+
+  test('ignores NODE_ENV, which is deprecated for this decision', () => {
+    process.env.NODE_ENV = 'development';
+    expect(getEnv('devMode')).toBe(false);
+
+    process.env.NODE_ENV = 'test';
+    expect(getEnv('devMode')).toBe(false);
+
+    process.env.NODE_ENV = 'production';
+    expect(getEnv('devMode')).toBe(false);
+  });
+
+  test('follows CUBEJS_DEV_MODE whatever NODE_ENV says', () => {
+    process.env.CUBEJS_DEV_MODE = 'true';
+    expect(getEnv('devMode')).toBe(true);
+
+    process.env.NODE_ENV = 'production';
+    expect(getEnv('devMode')).toBe(true);
+
+    process.env.CUBEJS_DEV_MODE = 'false';
+    expect(getEnv('devMode')).toBe(false);
+
+    process.env.NODE_ENV = 'development';
+    expect(getEnv('devMode')).toBe(false);
+  });
+});

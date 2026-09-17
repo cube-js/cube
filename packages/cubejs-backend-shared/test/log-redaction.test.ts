@@ -236,8 +236,17 @@ describe('CUBEJS_LOG_REDACTION', () => {
     process.env.NODE_ENV = nodeEnv;
   });
 
-  it('is on by default in production', () => {
+  it('is on by default outside of development mode', () => {
     process.env.NODE_ENV = 'production';
+    expect(getEnv('logRedaction')).toBe(true);
+
+    process.env.NODE_ENV = 'development';
+    expect(getEnv('logRedaction')).toBe(true);
+
+    delete process.env.NODE_ENV;
+    expect(getEnv('logRedaction')).toBe(true);
+
+    process.env.CUBEJS_DEV_MODE = 'false';
     expect(getEnv('logRedaction')).toBe(true);
   });
 
@@ -246,7 +255,6 @@ describe('CUBEJS_LOG_REDACTION', () => {
     process.env.CUBEJS_DEV_MODE = 'true';
     expect(getEnv('logRedaction')).toBe(false);
 
-    delete process.env.CUBEJS_DEV_MODE;
     process.env.NODE_ENV = 'development';
     expect(getEnv('logRedaction')).toBe(false);
 

@@ -285,7 +285,7 @@ class ApiGateway {
 
     this.queryRewrite = options.queryRewrite || (async (query) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
-    this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
+    this.enforceSecurityChecks = options.enforceSecurityChecks || !getEnv('devMode');
     this.extendContext = options.extendContext;
 
     this.checkAuthFn = this.createCheckAuthFn(options);
@@ -391,7 +391,7 @@ class ApiGateway {
             res,
             apiGateway: this
           },
-          graphiql: getEnv('nodeEnv') !== 'production'
+          graphiql: getEnv('devMode')
             ? { headerEditorEnabled: true }
             : false,
           extensions: () => (res as any).extensions || {},
