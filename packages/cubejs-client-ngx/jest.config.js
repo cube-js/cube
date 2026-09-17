@@ -14,7 +14,7 @@ module.exports = {
   testMatch: ['<rootDir>/test/**/*.test.ts'],
   setupFilesAfterEnv: ['<rootDir>/test/setup-jest.ts'],
   transform: {
-    '^.+\\.(ts|js|mjs)$': ['jest-preset-angular', {
+    '^.+\\.(ts|js|mjs|html|svg)$': ['jest-preset-angular', {
       tsconfig: '<rootDir>/tsconfig.spec.json',
     }],
   },
