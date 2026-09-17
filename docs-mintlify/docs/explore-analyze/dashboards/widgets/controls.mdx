@@ -200,20 +200,18 @@ For example, an **Analysis** parent with the options `Retail`, `Wholesale` and `
 In the [dashboard builder][ref-workbooks], open the **Add Controls** menu in the toolbar and choose **Parent**, then click **Configure Parent** to set it up. The editor gives each option its own tab, and lists every filter, time granularity switcher and [field switcher](#field-switcher) on the dashboard inside it — so one tab is one complete arrangement, and you can read off what an option does to the whole row at a glance.
 
 <Info>
-Add the child controls to the dashboard *before* the parent control. A tab lists only the controls that already exist, so a parent added to an empty dashboard has nothing to drive yet. Another parent control is never listed — a parent cannot be a child of one.
+A tab lists the controls that are on the dashboard, so a parent added to an empty one has nothing to drive yet; a control added later simply appears in every tab on **Keep as-is**. Another parent control is never listed — a parent cannot be a child of one.
 </Info>
 
 ### Options
 
-Each option is a tab across the top of the editor. Add one with **+** at the end of the tab strip, rename a tab in place by editing its title, and delete one with the ✕ that appears on the tab. A parent control created without options opens on a single tab named **Default** — a real option, saved with the control and offered in the viewer's dropdown like any other, so rename it if that label isn't what viewers should see. A parent control can hold up to 50 options.
+Each option is a tab across the top of the editor. Add one with **+** at the end of the tab strip, rename a tab in place by editing its title, and delete one with the ✕ that appears on it when you hover — except the first tab, which anchors the dropdown and cannot be deleted. A parent control created without options opens on a single tab named **Default** — a real option, saved with the control and offered in the viewer's dropdown like any other, so rename it if that label isn't what viewers should see. A parent control can hold up to 50 options.
 
 Renaming an option later doesn't disturb the values you've mapped to it, so you can reword a label without redoing the mapping — but if the control has a [user attribute default](#parent-user-attribute-default), that match is by label, so rename the attribute's values with it.
 
 ### Children
 
-Open an option's tab and you see every filter, time granularity switcher and field switcher on the dashboard, each with a dropdown saying what that option does to it. You set one option's whole arrangement in one place, rather than configuring one child at a time.
-
-Every option/child pair is in one of four states:
+Each control on the tab carries a dropdown saying what that option does to it. Every option/child pair is in one of four states:
 
 | State | What happens when the viewer picks that option |
 |---|---|
@@ -242,13 +240,17 @@ Once a dashboard has at least one parent control, every filter, time granularity
 
 **Set to**, **Clear** and **Reset to default** all count as driving — each is something the option does to the control. Only **Keep as-is** doesn't, which is why a control every option keeps as-is reads **Not driven**, and why a control left untouched on a two-option parent reads **Partly driven**: the first tab's **Reset to default** drives it, the second tab's **Keep as-is** does not.
 
-Click the indicator to open that control's own settings, where **Driven by parent** names the parent driving it.
+Saving the parent's settings writes the first tab's untouched cells as the **Reset to default** they show, so a parent that still has only its first tab drives *every* control on the dashboard the moment you save it — each one reads **Fully driven**, before you have mapped anything by hand. Add the options you mean to offer, and each later tab leaves the controls it doesn't set as-is.
+
+Click the indicator to open that control's own settings, at its **Driven by parent** section.
 
 ### Driven by parent
 
-Every filter, time granularity switcher and [field switcher](#field-switcher) carries a **Driven by parent** section in its own settings, so you can see what drives a control without opening the parent.
+Once a dashboard has a parent control, every filter, time granularity switcher and [field switcher](#field-switcher) carries a **Driven by parent** section in its own settings, naming what drives it without your having to open the parent.
 
-The dropdown offers the parent that currently drives it and **None**. Picking **None** detaches the control: the parent stops driving it, and it keeps whatever value it is showing. Pointing a control at a *different* parent is done in that parent's settings, which is where the per-option values live — as the section itself says: *Mapping is set in the parent control's settings.*
+The dropdown offers the parent that currently drives the control, and **None**. Picking **None** detaches it: the parent stops driving it, and it keeps whatever value it is showing.
+
+Mapping is the one thing you cannot do here — the values belong to the parent's options, so a control nothing drives yet shows only **None**. To map it, or to hand it to a different parent, open that parent's settings and set the control's row on each option's tab.
 
 ### Default option
 
