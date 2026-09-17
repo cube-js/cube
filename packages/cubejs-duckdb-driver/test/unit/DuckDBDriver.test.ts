@@ -26,7 +26,8 @@ const TYPES_SQL = `SELECT
   TIMETZ '03:04:05+02' AS time_zoned,
   INTERVAL '1 month 2 days 3 hours' AS interval,
   [1::BIGINT, 2::BIGINT] AS list,
-  {a: 5::BIGINT, b: [TIME '01:02:03']} AS struct,
+  {a: 5::BIGINT, b: [TIME '01:02:03'], c: TIMESTAMP '2020-01-02 03:04:05.123',
+   d: DATE '2020-01-02', e: 'ab'::BLOB} AS struct,
   MAP {'k': 1::BIGINT} AS map,
   UUID '550e8400-e29b-41d4-a716-446655440000' AS uuid`;
 
@@ -61,7 +62,13 @@ const TYPES_EXPECTED = [{
   time_zoned: '03:04:05+02',
   interval: { months: 1, days: 2, micros: 10800000000 },
   list: ['1', '2'],
-  struct: { a: '5', b: ['01:02:03'] },
+  struct: {
+    a: '5',
+    b: ['01:02:03'],
+    c: '2020-01-02T03:04:05.123Z',
+    d: '2020-01-02T00:00:00.000Z',
+    e: Buffer.from('ab'),
+  },
   map: [{ key: 'k', value: '1' }],
   uuid: '550e8400-e29b-41d4-a716-446655440000',
 }];
@@ -251,6 +258,53 @@ describe('DuckDBDriver', () => {
       await expect(driver.testConnection()).resolves.toBeUndefined();
     }
   );
+
+  test('conversion error mid-stream destroys the stream and closes its connection', async () => {
+    const close = jest.spyOn(DuckDBConnection.prototype, 'closeSync');
+    const tableData = await driver.stream("SELECT DATE 'infinity' AS date", [], { highWaterMark: 1 });
+
+    await expect(streamToArray(tableData.rowStream as Readable)).rejects.toThrow(RangeError);
+    await tableData.release?.();
+
+    expect(close).toHaveBeenCalledTimes(1);
+    await expect(driver.testConnection()).resolves.toBeUndefined();
+  });
+
+  test.each([
+    ['a scalar', '1::BIGINT', '1'],
+    ['an object', '[1::BIGINT, 2::BIGINT]', ['1', '2']],
+  ])('keeps a __proto__ column of %s in a result too wide for an object shape', async (_name, expr, expected) => {
+    const columns = [
+      `${expr} AS "__proto__"`,
+      ...Array.from({ length: 127 }, (_, i) => `${i}::INTEGER AS c${i}`),
+    ];
+
+    const [row] = await driver.query<Record<string, unknown>>(`SELECT ${columns.join(', ')}`);
+
+    const protoCell = (o: unknown) => Object.getOwnPropertyDescriptor(o, '__proto__')?.value;
+
+    expect(Object.keys(row)).toHaveLength(128);
+    expect(protoCell(row)).toEqual(expected);
+    // JSON.parse also defines __proto__ as an own property, so the cell survives a round trip
+    expect(protoCell(JSON.parse(JSON.stringify(row)))).toEqual(expected);
+  });
+
+  test('a throwing close surfaces as a stream error', async () => {
+    const close = jest.spyOn(DuckDBConnection.prototype, 'closeSync').mockImplementation(() => {
+      throw new Error('closeSync failed');
+    });
+    const tableData = await driver.stream('SELECT * FROM range(10000)', [], { highWaterMark: 1 });
+    const rowStream = tableData.rowStream as Readable;
+    const error = once(rowStream, 'error');
+
+    rowStream.destroy();
+
+    // without this the stream would never emit 'close', and release() below would hang
+    await expect(error).resolves.toEqual([new Error('closeSync failed')]);
+    await expect(tableData.release?.()).resolves.toBeUndefined();
+
+    expect(close).toHaveBeenCalledTimes(1);
+  });
 
   test('failed query and stream do not break the driver', async () => {
     const close = jest.spyOn(DuckDBConnection.prototype, 'closeSync');

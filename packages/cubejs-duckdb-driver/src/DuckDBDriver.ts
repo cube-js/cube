@@ -7,12 +7,12 @@ import {
   GenericDataBaseType,
 } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
-import * as stream from 'stream';
 import { finished } from 'stream/promises';
 import { DuckDBConnection, DuckDBInstance } from '@duckdb/node-api';
 
 import { DuckDBQuery } from './DuckDBQuery';
-import { convertDuckDBParams, convertDuckDBValue, transformRow } from './Transform';
+import { DuckDBRowStream } from './RowStream';
+import { buildTransform, convertDuckDBParams, transformChunk } from './Transform';
 
 const { version } = require('../../package.json');
 
@@ -34,9 +34,8 @@ type InitPromise = {
 type ExecFn = (sql: string) => Promise<unknown>;
 
 const DuckDBToGenericType: Record<string, GenericDataBaseType> = {
-  // DATE_TRUNC returns DATE, but Cube Store still doesn't support DATE type
-  // DuckDB's driver transform date/timestamp to Date object, but transformRow converts any Date object to ISO timestamp
-  // That's why It's safe to use timestamp here
+  // DATE_TRUNC returns DATE, but Cube Store still doesn't support DATE type;
+  // Transform renders DATE values as ISO timestamps anyway, so declaring them timestamp is safe
   date: 'timestamp',
 };
 
@@ -95,7 +94,6 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
   protected async init(): Promise<InitPromise> {
     const token = this.config.motherDuckToken || getEnv('duckdbMotherDuckToken', this.config);
     const dbPath = this.config.databasePath || getEnv('duckdbDatabasePath', this.config);
-    // Determine the database URL based on the provided db_path or token
     let dbUrl: string;
     if (dbPath) {
       dbUrl = dbPath;
@@ -197,7 +195,6 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
       }
     }
 
-    // Install & load extensions if configured in env variable.
     const officialExtensions = getEnv('duckdbExtensions', this.config);
     await this.installExtensions(officialExtensions, execAsync);
     await this.loadExtensions(officialExtensions, execAsync);
@@ -260,14 +257,17 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
   public async query<R = unknown>(query: string, values: unknown[] = [], _options?: QueryOptions): Promise<R[]> {
     const { defaultConnection } = await this.getInitiatedState();
 
-    const reader = await defaultConnection.runAndReadAll(query, convertDuckDBParams(values));
-    const rows = reader.convertRowObjects(convertDuckDBValue);
+    const result = await defaultConnection.run(query, convertDuckDBParams(values));
+    const transform = buildTransform(result.columnNames(), result.columnTypes());
+    const rows: R[] = [];
 
-    return rows.map((item) => {
-      transformRow(item);
+    for (const chunk of await result.fetchAllChunks()) {
+      for (const row of transformChunk(chunk, transform)) {
+        rows.push(row as R);
+      }
+    }
 
-      return item as R;
-    });
+    return rows;
   }
 
   public async stream(
@@ -291,25 +291,11 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
 
     try {
       const result = await connection.stream(query, convertDuckDBParams(values));
+      const transform = buildTransform(result.columnNames(), result.columnTypes());
 
-      // Chunks are fetched lazily, so the connection must outlive the iteration; closing it
-      // in `finally` covers completion, destroy() and early `break` alike.
-      const rows = async function* rows(): AsyncGenerator<Record<string, unknown>> {
-        try {
-          for await (const chunk of result.yieldConvertedRowObjects(convertDuckDBValue)) {
-            for (const row of chunk) {
-              transformRow(row);
-              yield row;
-            }
-          }
-        } finally {
-          close();
-        }
-      };
-
-      const rowStream = stream.Readable.from(rows(), { highWaterMark });
-      // destroy() before the first read never enters the generator
-      rowStream.once('close', close);
+      // Chunks are fetched lazily, so the connection lives until the stream is destroyed,
+      // which covers completion, release(), destroy() and an early `break` alike.
+      const rowStream = new DuckDBRowStream(result, transform, close, highWaterMark);
 
       return {
         rowStream,
