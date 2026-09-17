@@ -101,6 +101,7 @@ describe('DatabricksDriver', () => {
       ['EnableGeoSpatialSupport=1'],
       ['enablegeospatialsupport=1'],
       ['EnableGeoSpatialSupport=1;ConnCatalog=main'],
+      ['ConnCatalog=main;EnableGeoSpatialSupport=1'],
     ])('rejects "%s" instead of silently ignoring it', (param) => {
       process.env.CUBEJS_DB_DATABRICKS_URL = `${baseUrl};${param}`;
 
@@ -119,6 +120,34 @@ describe('DatabricksDriver', () => {
       const { url, properties } = new TestDatabricksDriver().testConfig;
 
       expect(url).not.toMatch(/geospatial/i);
+      expect(properties.EnableGeoSpatialSupport).toBe('0');
+    });
+
+    // A space *before* the '=' makes it a different (unknown) parameter to the driver, which can
+    // neither enable the feature nor collide with the pin.
+    test.each([
+      ['EnableGeoSpatialSupport = 1'],
+      ['EnableGeoSpatialSupport =1'],
+    ])('leaves the inert "%s" alone and keeps the pin', (param) => {
+      process.env.CUBEJS_DB_DATABRICKS_URL = `${baseUrl};${param}`;
+
+      const { url, properties } = new TestDatabricksDriver().testConfig;
+
+      expect(url).toBe(`${baseUrl};${param}`);
+      expect(properties.EnableGeoSpatialSupport).toBe('0');
+    });
+
+    // A space *after* the '=' leaves the name intact, so the entry would collide with the pinned
+    // property while its ' 1' value still reads as off.
+    test.each([
+      ['EnableGeoSpatialSupport= 1'],
+      ['EnableGeoSpatialSupport=1 '],
+    ])('drops the colliding "%s" and keeps the pin', (param) => {
+      process.env.CUBEJS_DB_DATABRICKS_URL = `${baseUrl};${param}`;
+
+      const { url, properties } = new TestDatabricksDriver().testConfig;
+
+      expect(url).toBe(baseUrl);
       expect(properties.EnableGeoSpatialSupport).toBe('0');
     });
 
