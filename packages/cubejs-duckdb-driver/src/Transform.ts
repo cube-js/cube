@@ -18,11 +18,6 @@ function formatDecimal(value: DuckDBDecimalValue): string {
   return value.scale === 0 ? String(value.value) : value.toString().replace(/\.?0+$/, '');
 }
 
-/**
- * Converts DuckDB values to the shapes the legacy `duckdb` package produced, at any nesting depth.
- * The default JS converter leaves bigint inside INTERVAL/TIME_TZ/LIST/STRUCT, which JSON cannot
- * serialize, renders TIME as raw microseconds and loses precision on wide DECIMALs.
- */
 export const convertDuckDBValue: DuckDBValueConverter<JS> = (value, type, converter) => {
   if (value === null) {
     return null;
