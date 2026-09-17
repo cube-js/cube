@@ -176,9 +176,6 @@ export function transformChunk(chunk: DuckDBDataChunk, transform: Transform): Re
   const rows: Record<string, unknown>[] = new Array(rowCount);
 
   for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
-    // A prototype-less row keeps a `__proto__` column a plain cell; `{}` would hand the
-    // assignment below to Object.prototype's setter, which drops it and can swap the row's
-    // prototype. The shape clone is immune by construction.
     rows[rowIndex] = objectShape === null ? Object.create(null) : { ...objectShape };
   }
 
