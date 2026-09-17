@@ -8218,6 +8218,11 @@
   resolved "https://registry.yarnpkg.com/@types/jwk-to-pem/-/jwk-to-pem-2.0.1.tgz#ba6949f447e02cb7bebf101551e3a4dea5f4fde4"
   integrity sha512-QXmRPhR/LPzvXBHTPfG2BBfMTkNLUD7NyRcPft8m5xFCeANa1BZyLgT0Gw+OxdWx6i1WCpT27EqyggP4UUHMrA==
 
+"@types/luxon@^3.4.2":
+  version "3.7.5"
+  resolved "https://registry.yarnpkg.com/@types/luxon/-/luxon-3.7.5.tgz#d223e1adfdadb140eca9c51647aba59b98508128"
+  integrity sha512-jJ41Q4z6ZVO260MNDdHfW7+7a5iMiX8Mr6ZJHcmgrvhZha6dz5704o/lF2kKl6URjH6ivEL97w9xS/MgpJEphg==
+
 "@types/mime@^1":
   version "1.3.2"
   resolved "https://registry.yarnpkg.com/@types/mime/-/mime-1.3.2.tgz#93e25bf9ee75fe0fd80b594bc4feb0e862111b5a"
@@ -15624,10 +15629,10 @@ lru.min@^1.1.0, lru.min@^1.1.4:
   resolved "https://registry.yarnpkg.com/lru.min/-/lru.min-1.1.4.tgz#6ea1737a8c1ba2300cc87ad46910a4bdffa0117b"
   integrity sha512-DqC6n3QQ77zdFpCMASA1a3Jlb64Hv2N2DciFGkO/4L9+q/IpIAuRlKOvCXabtRW6cQf8usbmM6BE/TOPysCdIA==
 
-luxon@^3.2.1:
-  version "3.4.4"
-  resolved "https://registry.yarnpkg.com/luxon/-/luxon-3.4.4.tgz#cf20dc27dc532ba41a169c43fdcc0063601577af"
-  integrity sha512-zobTr7akeGHnv7eBOXcRgMeCP6+uyYsczwmeRCauvpvaAltgNyTbLH/+VaEAPUeWBT+1GuNmz4wC/6jtQzbbVA==
+luxon@^3.2.1, luxon@^3.4.4:
+  version "3.7.2"
+  resolved "https://registry.yarnpkg.com/luxon/-/luxon-3.7.2.tgz#d697e48f478553cca187a0f8436aff468e3ba0ba"
+  integrity sha512-vtEhXh/gNjI9Yg1u4jX/0YVPMvxzHuGgCm6tC5kZyb08yjGWGnqAjGJvcXbqQR2P3MyMEFnRbpcdFS6PBcLqew==
 
 lz-string@^1.4.4:
   version "1.4.4"

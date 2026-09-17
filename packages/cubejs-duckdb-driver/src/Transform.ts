@@ -1,4 +1,5 @@
 import { buildObjectShape } from '@cubejs-backend/shared';
+import { DateTime } from 'luxon';
 import {
   blobValue,
   DuckDBBlobValue,
@@ -34,45 +35,16 @@ export type Transform = {
 
 const MILLIS_PER_DAY = 86400000;
 
-const MIN_FAST_ISO_MILLIS = -62167219200000; // 0000-01-01T00:00:00.000Z
-const MAX_FAST_ISO_MILLIS = 253402300799999; // 9999-12-31T23:59:59.999Z
-
-const PAD2: string[] = Array.from({ length: 100 }, (_, i) => `${i}`.padStart(2, '0'));
-const PAD3: string[] = Array.from({ length: 1000 }, (_, i) => `${i}`.padStart(3, '0'));
-
 /**
- * `new Date(millis).toISOString()` without the Date allocation and the parse/format round trip.
- * Only for the four-digit-year range; outside it (and for NaN) Date decides, including its
- * RangeError for out-of-range values.
+ * Renders epoch millis as an ISO timestamp, matching `new Date(millis).toISOString()`
+ * byte for byte across the whole range Date accepts, expanded years included.
  */
 export function formatIsoFromMillis(millis: number): string {
-  if (!(millis >= MIN_FAST_ISO_MILLIS && millis <= MAX_FAST_ISO_MILLIS)) {
-    return new Date(millis).toISOString();
-  }
+  const iso = DateTime.fromMillis(millis, { zone: 'utc' }).toISO();
 
-  const days = Math.floor(millis / MILLIS_PER_DAY);
-  let rest = millis - days * MILLIS_PER_DAY;
-  const ms = rest % 1000;
-  rest = (rest - ms) / 1000;
-  const second = rest % 60;
-  rest = (rest - second) / 60;
-  const minute = rest % 60;
-  const hour = (rest - minute) / 60;
-
-  // civil_from_days, http://howardhinnant.github.io/date_algorithms.html
-  const z = days + 719468;
-  const era = Math.floor(z / 146097);
-  const doe = z - era * 146097;
-  const yoe = Math.floor((doe - Math.floor(doe / 1460) + Math.floor(doe / 36524) - Math.floor(doe / 146096)) / 365);
-  const doy = doe - (365 * yoe + Math.floor(yoe / 4) - Math.floor(yoe / 100));
-  const mp = Math.floor((5 * doy + 2) / 153);
-  const day = doy - Math.floor((153 * mp + 2) / 5) + 1;
-  const month = mp < 10 ? mp + 3 : mp - 9;
-  const year = yoe + era * 400 + (month <= 2 ? 1 : 0);
-
-  const yyyy = year < 1000 ? `${year}`.padStart(4, '0') : `${year}`;
-
-  return `${yyyy}-${PAD2[month]}-${PAD2[day]}T${PAD2[hour]}:${PAD2[minute]}:${PAD2[second]}.${PAD3[ms]}Z`;
+  // luxon returns null for NaN and for values outside Date's range, where callers expect
+  // the RangeError that Date throws.
+  return iso === null ? new Date(millis).toISOString() : iso;
 }
 
 // DuckDB renders DECIMAL with the full declared scale ("100.000"); the legacy driver
