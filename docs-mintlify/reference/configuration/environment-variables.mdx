@@ -1219,11 +1219,22 @@ option](/reference/configuration/config#context_to_api_scopes).
 
 ## `CUBEJS_DEV_MODE`
 
-If `true`, enables [development mode](/docs/data-modeling/dev-mode).
+If `true`, enables [development mode](/docs/data-modeling/dev-mode). It is the only
+thing that enables it: development mode is off unless this variable is set to `true`,
+and `NODE_ENV` is ignored.
 
-| Possible Values | Default in Development | Default in Production |
-| --------------- | ---------------------- | --------------------- |
-| `true`, `false` | `true`                 | `false`               |
+| Possible Values | Default   |
+| --------------- | --------- |
+| `true`, `false` | `false`   |
+
+<Note>
+
+`NODE_ENV` used to enable development mode whenever it was anything but `production`,
+which put an instance with no `NODE_ENV` at all into development mode. That is
+deprecated and no longer happens; Cube prints a warning if it sees a non-production
+`NODE_ENV` with `CUBEJS_DEV_MODE` unset. Set `CUBEJS_DEV_MODE=true` instead.
+
+</Note>
 
 <DevModeWarning />
 
@@ -1410,7 +1421,7 @@ original spacing are not kept. Every string argument is redacted, a granularity 
 as it was received. A statement Cube could not redact at all, such as a malformed request
 body or a SQL API error raised before the statement was read, is logged as `redacted`.
 
-It is off by default in development mode, that is when `NODE_ENV` is not `production` or
+It is off by default in [development mode](/docs/data-modeling/dev-mode), that is when
 [`CUBEJS_DEV_MODE`](#cubejs_dev_mode) is `true`, so runnable SQL statements can be read
 from the console.
 

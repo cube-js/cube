@@ -193,7 +193,7 @@ export class CubejsServerCore {
     this.coreServerVersion = version;
 
     const logger = opts.logger || createLogger(
-      process.env.NODE_ENV === 'production',
+      !getEnv('devMode'),
       getEnv('logLevel'),
     );
     // Wraps the log sink only: the agent and telemetry wrappers installed below

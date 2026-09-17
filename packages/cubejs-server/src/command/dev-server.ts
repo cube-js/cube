@@ -16,6 +16,9 @@ export class DevServer extends Command {
   public async run() {
     const options = this.parse(DevServer);
 
+    // Dev mode is driven by CUBEJS_DEV_MODE only, NODE_ENV is kept in sync for
+    // user configuration code and third-party libraries that still read it
+    process.env.CUBEJS_DEV_MODE = 'true';
     process.env.NODE_ENV = 'development';
 
     const container = new ServerContainer({

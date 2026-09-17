@@ -248,6 +248,8 @@ export class ServerContainer {
       multiline: 'line-breaks'
     });
 
+    // Dev mode is decided by CUBEJS_DEV_MODE alone. NODE_ENV is only kept in sync
+    // for user configuration code and third-party libraries that still read it
     const devMode = getEnv('devMode');
     if (devMode) {
       process.env.NODE_ENV = 'development';

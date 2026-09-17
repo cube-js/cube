@@ -71,6 +71,7 @@ features:
 | Removed    | [`context_to_roles`](#context-to-roles)                                                                                           | v1.6.4     | v1.7.0    |
 | Deprecated | [Node.js 22](#nodejs-22)                                                                                                          | v1.7.0     |           |
 | Deprecated | [Hive driver](#hive-driver)                                                                                                       | v1.7.25    |           |
+| Removed    | [`NODE_ENV` as a development mode switch](#node_env-as-a-development-mode-switch)                                                  | v1.7.41    | v1.7.41   |
 
 ### Node.js 8
 
@@ -465,3 +466,20 @@ removed in a future release. It is community-supported and is not maintained by 
 the database vendor. There is no drop-in replacement; `@cubejs-backend/jdbc-driver`
 ships Hive/SparkSQL connection settings that can be used through a custom
 [`driverFactory`](https://docs.cube.dev/reference/configuration/config#driver_factory).
+
+### `NODE_ENV` as a development mode switch
+
+**Deprecated in Release: v1.7.41**
+
+**Removed in Release: v1.7.41**
+
+Development mode used to be on whenever `NODE_ENV` was anything but `production`,
+which put an instance with no `NODE_ENV` set at all into development mode — an
+authentication bypass — without anyone asking for it. `NODE_ENV` is no longer taken
+into account: development mode is off by default and is enabled only by
+[`CUBEJS_DEV_MODE=true`](https://docs.cube.dev/reference/configuration/environment-variables#cubejs_dev_mode).
+
+Cube prints a warning when it sees a non-production `NODE_ENV` with `CUBEJS_DEV_MODE`
+unset. If you relied on `NODE_ENV` to get development mode, set `CUBEJS_DEV_MODE=true`
+instead. The `cubejs dev-server` command is unaffected: it sets `CUBEJS_DEV_MODE=true`
+for you.

@@ -179,6 +179,9 @@ describe('index.test', () => {
   });
 
   test('externalDriverFactory should return driver, failure', async () => {
+    // No driverFactory and no CUBEJS_DB_TYPE, which only dev mode allows
+    process.env.CUBEJS_DEV_MODE = 'true';
+
     const options: CreateOptions = { externalDriverFactory: () => <any>null, };
 
     const [_driverFactory, orchestratorOptions] = await getCreateOrchestratorOptionsFromServer(options);
@@ -626,6 +629,8 @@ describe('index.test', () => {
   });
 
   test('Should not throw when the required options are missing in dev mode and no config file exists', () => {
+    process.env.CUBEJS_DEV_MODE = 'true';
+
     expect(() => {
       jest.spyOn(CubejsServerCoreOpen.prototype, 'isReadyForQueryProcessing').mockImplementation(() => false);
       // eslint-disable-next-line

@@ -50,7 +50,7 @@ export class SQLServer {
     setupLogger(
       ({ event }) => apiGateway.log(event),
       process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn',
-      process.env.NODE_ENV === 'production'
+      !getEnv('devMode')
     );
 
     // Actually, proxy is enabled in gateway

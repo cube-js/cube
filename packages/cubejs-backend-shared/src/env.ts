@@ -208,9 +208,34 @@ function asBoolOrTime(input: string, envName: string): number | boolean {
   );
 }
 
-const devMode = () => get('CUBEJS_DEV_MODE')
-  .default('false')
-  .asBoolStrict();
+/**
+ * Development mode is opt-in and driven solely by CUBEJS_DEV_MODE. It is off by
+ * default, including when neither CUBEJS_DEV_MODE nor NODE_ENV is set.
+ *
+ * NODE_ENV is deprecated for this decision and no longer enables development
+ * mode: it used to be on whenever NODE_ENV was anything but `production`, which
+ * silently turned an unconfigured instance into an authentication bypass.
+ */
+const devMode = () => {
+  const enabled = get('CUBEJS_DEV_MODE')
+    .default('false')
+    .asBoolStrict();
+
+  if (
+    process.env.CUBEJS_DEV_MODE === undefined &&
+    process.env.NODE_ENV !== undefined &&
+    process.env.NODE_ENV !== 'production'
+  ) {
+    displayCLIWarningOnce(
+      'NODE_ENV_DEV_MODE',
+      `NODE_ENV is deprecated as a way to enable development mode and is ignored: NODE_ENV=${
+        process.env.NODE_ENV
+      } no longer puts Cube in development mode. Please use CUBEJS_DEV_MODE=true instead.`
+    );
+  }
+
+  return enabled;
+};
 
 const variables: Record<string, (...args: any) => any> = {
   devMode,
@@ -218,7 +243,7 @@ const variables: Record<string, (...args: any) => any> = {
   logRedaction: () => {
     // Off in development mode as OptsHandler.isDevMode decides it: there the console is
     // the log sink and runnable SQL is wanted
-    const isDevMode = process.env.NODE_ENV !== 'production' || devMode();
+    const isDevMode = devMode();
 
     return get('CUBEJS_LOG_REDACTION')
       .default(isDevMode ? 'false' : 'true')
@@ -2038,11 +2063,7 @@ const variables: Record<string, (...args: any) => any> = {
       return port;
     }
 
-    const isDevMode = get('CUBEJS_DEV_MODE')
-      .default('false')
-      .asBoolStrict();
-
-    if (isDevMode) {
+    if (devMode()) {
       if (isNativeSupported()) {
         return 15432;
       } else {
