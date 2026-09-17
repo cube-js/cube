@@ -120,8 +120,6 @@ const timestampNanosConverter: ColumnConverter = (value) => formatIsoFromMillis(
   Number((value as DuckDBTimestampNanosecondsValue).nanos / 1000000n)
 );
 
-// The legacy driver returned JS built-ins and a second pass stringified top-level numbers
-// and formatted Dates as ISO; each converter here does both steps in one call.
 const CONVERTERS_BY_TYPE_ID: Partial<Record<DuckDBTypeId, ColumnConverter | null>> = {
   [DuckDBTypeId.BOOLEAN]: null,
   [DuckDBTypeId.VARCHAR]: null,
