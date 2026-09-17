@@ -1,12 +1,7 @@
 /**
- * The `;`-delimited JDBC URL flavour used by Databricks, Spark, SQL Server and friends:
- * `jdbc:<engine>://<host>[:<port>];Key=Value;Key=Value`.
- *
- * Those drivers lowercase parameter names and split each entry on its *first* `=` without trimming,
- * so these helpers do the same — a padded name really is a different parameter to them.
- *
- * WHATWG `URL` is no help: `jdbc:` is a non-special scheme, so the whole URL lands in `pathname`,
- * and the `;` after the port makes the inner `<engine>://…` invalid outright.
+ * The `;`-delimited JDBC URL flavour (`jdbc:<engine>://<host>[:<port>];Key=Value;…`) used by
+ * Databricks, Spark, SQL Server and friends. Those drivers lowercase parameter names and split each
+ * entry on its first `=` without trimming, so these helpers do the same. WHATWG `URL` can not parse it.
  */
 
 const URL_DELIMITER = ';';
