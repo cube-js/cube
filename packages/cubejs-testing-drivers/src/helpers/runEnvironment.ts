@@ -156,7 +156,7 @@ export async function runEnvironment(
   // TODO extract as a config
   if (type === 'mssql') {
     compose.withWaitStrategy('data', Wait.forSuccessfulCommand(
-      '/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" -b -o /dev/null'
+      'PATH=/opt/mssql-tools18/bin:/opt/mssql-tools/bin:$PATH sqlcmd -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" -b -o /dev/null'
     ));
   }
   // TODO: Add health checks for all drivers
