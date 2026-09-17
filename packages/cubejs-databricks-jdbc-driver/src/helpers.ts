@@ -54,6 +54,18 @@ export function extractAndRemoveUidPwdFromJdbcUrl(jdbcUrl: string): [uid: string
   return [uid, pwd, cleanedUrl];
 }
 
+/**
+ * Lift a parameter out of the JDBC URL so it can be forwarded through the properties map instead.
+ * The OSS driver merges URL params and properties into a single map and throws
+ * `IllegalArgumentException: Multiple entries with same key` when a (case-insensitive) key appears
+ * in both, so anything we set as a property has to be removed from the URL first.
+ */
+export function extractAndRemoveUrlParam(jdbcUrl: string, param: string): [value: string | undefined, cleanedUrl: string] {
+  const value = jdbcUrl.match(new RegExp(`${param}=([^;]*)`, 'i'))?.[1];
+
+  return [value, jdbcUrl.replace(new RegExp(`;?${param}=[^;]*`, 'i'), '')];
+}
+
 export function parseDatabricksJdbcUrl(jdbcUrl: string): ParsedConnectionProperties {
   const jdbcPrefix = 'jdbc:databricks://';
   const urlWithoutPrefix = jdbcUrl.slice(jdbcPrefix.length);

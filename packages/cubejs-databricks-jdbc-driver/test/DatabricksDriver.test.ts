@@ -1,4 +1,4 @@
-import { DatabricksDriver } from '../src/DatabricksDriver';
+import { DatabricksDriver, DatabricksDriverConfiguration } from '../src/DatabricksDriver';
 import { UnloadOptions } from '@cubejs-backend/base-driver';
 import { ContainerClient, BlobServiceClient } from '@azure/storage-blob';
 
@@ -30,6 +30,13 @@ jest.spyOn(ContainerClient.prototype, 'listBlobsFlat').mockImplementation(
 jest.spyOn(BlobServiceClient.prototype, 'getUserDelegationKey').mockImplementation(
   jest.fn().mockReturnValue('mockKey')
 );
+
+// `config` is protected; widen it rather than casting so the assertions stay type-checked.
+class TestDatabricksDriver extends DatabricksDriver {
+  public get testConfig(): DatabricksDriverConfiguration {
+    return this.config;
+  }
+}
 
 describe('DatabricksDriver', () => {
   const mockTableName = 'product';
@@ -78,6 +85,47 @@ describe('DatabricksDriver', () => {
     const result = await databricksDriver.unload(mockTableName, mockOptions);
     expect(mockUnloadWithSql).toHaveBeenCalledWith(mockTableName, mockSql, mockParams);
     expect(result.csvFile).toBeTruthy();
+  });
+
+  describe('connection properties', () => {
+    const baseUrl = 'jdbc:databricks://adb-123456789.10.azuredatabricks.net:443;httpPath=/sql/1.0/warehouses/abc123def456';
+
+    afterEach(() => {
+      process.env.CUBEJS_DB_DATABRICKS_URL = baseUrl;
+    });
+
+    test('pins geospatial support off by default', () => {
+      expect(new TestDatabricksDriver().testConfig.properties.EnableGeoSpatialSupport).toBe('0');
+    });
+
+    // The OSS driver merges URL params and properties into one map and throws on a duplicate key,
+    // so a URL-supplied value has to be lifted out of the URL rather than set in both places.
+    test('lifts a URL-supplied geospatial setting out of the URL and lets it win', () => {
+      process.env.CUBEJS_DB_DATABRICKS_URL = `${baseUrl};EnableGeoSpatialSupport=1`;
+
+      const { url, properties } = new TestDatabricksDriver().testConfig;
+
+      expect(properties.EnableGeoSpatialSupport).toBe('1');
+      expect(url).not.toMatch(/EnableGeoSpatialSupport/i);
+    });
+
+    test('matches the URL parameter case-insensitively, as the driver does', () => {
+      process.env.CUBEJS_DB_DATABRICKS_URL = `${baseUrl};enablegeospatialsupport=1`;
+
+      const { url, properties } = new TestDatabricksDriver().testConfig;
+
+      expect(properties.EnableGeoSpatialSupport).toBe('1');
+      expect(url).not.toMatch(/geospatial/i);
+    });
+
+    test('lets caller-supplied properties override the defaults', () => {
+      const driver = new TestDatabricksDriver({
+        properties: { EnableGeoSpatialSupport: '1', UserAgentEntry: 'Custom' },
+      });
+
+      expect(driver.testConfig.properties.EnableGeoSpatialSupport).toBe('1');
+      expect(driver.testConfig.properties.UserAgentEntry).toBe('Custom');
+    });
   });
 
   describe('s3 export bucket', () => {
