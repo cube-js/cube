@@ -1242,6 +1242,24 @@ respected.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                 | `true`                |
 
+<Warning>
+
+Keep this option enabled. With `false`, orphaned table collection only removes
+*older versions* of each pre-aggregation table; it always keeps the most recent
+version of every table present in the pre-aggregation schema. Tables that the
+current data model no longer builds are therefore never dropped, e.g., partitions
+that have rotated out of the [build
+range](/reference/data-modeling/pre-aggregations#build_range_start-and-build_range_end),
+or partitions left behind after a rollup is renamed or removed or its partition
+granularity is changed.
+
+These partitions accumulate in Cube Store indefinitely and inflate its metastore.
+A large metastore slows down metastore operations, which degrades the performance
+of every query served from a pre-aggregation and can eventually bring down the
+Cube Store cluster.
+
+</Warning>
+
 ## `CUBEJS_FIREBOLT_ACCOUNT`
 
 The [Firebolt account name][firebolt-docs-account-name].
