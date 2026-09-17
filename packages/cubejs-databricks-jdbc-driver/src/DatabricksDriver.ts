@@ -21,8 +21,8 @@ import { EscapeDialect, JDBCDriver, JDBCDriverConfiguration, } from '@cubejs-bac
 import { DatabricksQuery } from './DatabricksQuery';
 import {
   extractAndRemoveUidPwdFromJdbcUrl,
-  extractAndRemoveUrlParam,
   parseDatabricksJdbcUrl,
+  removeGeoSpatialSupportFromJdbcUrl,
   resolveJDBCDriver
 } from './helpers';
 
@@ -221,10 +221,7 @@ export class DatabricksDriver extends JDBCDriver {
     }
 
     const [uid, pwd, urlWithoutCredentials] = extractAndRemoveUidPwdFromJdbcUrl(url);
-    // 3.4.1 turned geospatial support on by default, which returns GEOMETRY/GEOGRAPHY columns as
-    // Java objects instead of EWKT strings. The URL is the only place users could previously set
-    // this, so an explicit value there keeps winning over the default pinned below.
-    const [urlGeoSpatialSupport, cleanedUrl] = extractAndRemoveUrlParam(urlWithoutCredentials, 'EnableGeoSpatialSupport');
+    const cleanedUrl = removeGeoSpatialSupportFromJdbcUrl(urlWithoutCredentials);
     const passwd = conf?.token ||
           getEnv('databricksToken', { dataSource, preAggregations }) ||
           pwd;
@@ -268,8 +265,9 @@ export class DatabricksDriver extends JDBCDriver {
       properties: {
         ...authProps,
         UserAgentEntry: 'CubeDev_Cube',
-        EnableGeoSpatialSupport: urlGeoSpatialSupport ?? '0',
-        ...conf?.properties,
+        // 3.4.1 turned geospatial support on by default, which returns GEOMETRY/GEOGRAPHY columns
+        // as Java objects instead of EWKT strings.
+        EnableGeoSpatialSupport: '0',
       },
       catalog:
         conf?.catalog ||

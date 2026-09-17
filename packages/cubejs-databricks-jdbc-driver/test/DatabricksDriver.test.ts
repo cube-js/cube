@@ -94,37 +94,30 @@ describe('DatabricksDriver', () => {
       process.env.CUBEJS_DB_DATABRICKS_URL = baseUrl;
     });
 
-    test('pins geospatial support off by default', () => {
+    test('pins geospatial support off', () => {
       expect(new TestDatabricksDriver().testConfig.properties.EnableGeoSpatialSupport).toBe('0');
     });
 
-    // The OSS driver merges URL params and properties into one map and throws on a duplicate key,
-    // so a URL-supplied value has to be lifted out of the URL rather than set in both places.
-    test('lifts a URL-supplied geospatial setting out of the URL and lets it win', () => {
-      process.env.CUBEJS_DB_DATABRICKS_URL = `${baseUrl};EnableGeoSpatialSupport=1`;
+    // The driver merges URL params and properties into one map and throws on a duplicate key, so
+    // a URL-supplied value has to be removed rather than left to collide with the pin.
+    test.each([
+      ['EnableGeoSpatialSupport=1'],
+      ['enablegeospatialsupport=1'],
+      ['EnableGeoSpatialSupport='],
+      ['EnableGeoSpatialSupport=1;EnableGeoSpatialSupport=0'],
+    ])('drops "%s" from the URL and keeps the pin', (param) => {
+      process.env.CUBEJS_DB_DATABRICKS_URL = `${baseUrl};${param}`;
 
       const { url, properties } = new TestDatabricksDriver().testConfig;
 
-      expect(properties.EnableGeoSpatialSupport).toBe('1');
-      expect(url).not.toMatch(/EnableGeoSpatialSupport/i);
-    });
-
-    test('matches the URL parameter case-insensitively, as the driver does', () => {
-      process.env.CUBEJS_DB_DATABRICKS_URL = `${baseUrl};enablegeospatialsupport=1`;
-
-      const { url, properties } = new TestDatabricksDriver().testConfig;
-
-      expect(properties.EnableGeoSpatialSupport).toBe('1');
       expect(url).not.toMatch(/geospatial/i);
+      expect(properties.EnableGeoSpatialSupport).toBe('0');
     });
 
-    test('lets caller-supplied properties override the defaults', () => {
-      const driver = new TestDatabricksDriver({
-        properties: { EnableGeoSpatialSupport: '1', UserAgentEntry: 'Custom' },
-      });
+    test('leaves the rest of the URL intact', () => {
+      process.env.CUBEJS_DB_DATABRICKS_URL = `${baseUrl};EnableGeoSpatialSupport=1;ConnCatalog=main`;
 
-      expect(driver.testConfig.properties.EnableGeoSpatialSupport).toBe('1');
-      expect(driver.testConfig.properties.UserAgentEntry).toBe('Custom');
+      expect(new TestDatabricksDriver().testConfig.url).toBe(`${baseUrl};ConnCatalog=main`);
     });
   });
 
