@@ -26,7 +26,8 @@ const TYPES_SQL = `SELECT
   TIMETZ '03:04:05+02' AS time_zoned,
   INTERVAL '1 month 2 days 3 hours' AS interval,
   [1::BIGINT, 2::BIGINT] AS list,
-  {a: 5::BIGINT, b: [TIME '01:02:03']} AS struct,
+  {a: 5::BIGINT, b: [TIME '01:02:03'], c: TIMESTAMP '2020-01-02 03:04:05.123',
+   d: DATE '2020-01-02', e: 'ab'::BLOB} AS struct,
   MAP {'k': 1::BIGINT} AS map,
   UUID '550e8400-e29b-41d4-a716-446655440000' AS uuid`;
 
@@ -61,7 +62,13 @@ const TYPES_EXPECTED = [{
   time_zoned: '03:04:05+02',
   interval: { months: 1, days: 2, micros: 10800000000 },
   list: ['1', '2'],
-  struct: { a: '5', b: ['01:02:03'] },
+  struct: {
+    a: '5',
+    b: ['01:02:03'],
+    c: '2020-01-02T03:04:05.123Z',
+    d: '2020-01-02T00:00:00.000Z',
+    e: Buffer.from('ab'),
+  },
   map: [{ key: 'k', value: '1' }],
   uuid: '550e8400-e29b-41d4-a716-446655440000',
 }];

@@ -7,14 +7,11 @@ import {
   DuckDBDateValue,
   DuckDBDecimalValue,
   DuckDBIntervalValue,
-  DuckDBTimeNSValue,
   DuckDBTimestampMillisecondsValue,
   DuckDBTimestampNanosecondsValue,
   DuckDBTimestampSecondsValue,
   DuckDBTimestampTZValue,
   DuckDBTimestampValue,
-  DuckDBTimeTZValue,
-  DuckDBTimeValue,
   DuckDBType,
   DuckDBTypeId,
   DuckDBValue,
@@ -64,37 +61,6 @@ function formatDecimal(value: DuckDBDecimalValue): string {
 function toBuffer(bytes: Uint8Array): Buffer {
   return Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }
-
-/**
- * Recursive converter for nested types (LIST, STRUCT, MAP, ...), where the legacy driver
- * kept JS built-ins. The default JS converter leaves bigint that JSON cannot serialize,
- * renders TIME as raw microseconds and loses precision on wide DECIMALs.
- */
-export const convertNestedValue: DuckDBValueConverter<JS> = (value, type, converter) => {
-  if (value === null) {
-    return null;
-  }
-
-  if (typeof value === 'bigint') {
-    return value.toString();
-  }
-
-  if (value instanceof DuckDBDecimalValue) {
-    return formatDecimal(value);
-  }
-
-  if (value instanceof DuckDBTimeValue || value instanceof DuckDBTimeNSValue || value instanceof DuckDBTimeTZValue) {
-    return value.toString();
-  }
-
-  if (value instanceof DuckDBIntervalValue) {
-    return { months: value.months, days: value.days, micros: Number(value.micros) };
-  }
-
-  const converted = JSDuckDBValueConverter(value, type, converter);
-
-  return converted instanceof Uint8Array ? toBuffer(converted) : converted;
-};
 
 const stringConverter: ColumnConverter = (value) => String(value);
 
@@ -159,6 +125,24 @@ const CONVERTERS_BY_TYPE_ID: Partial<Record<DuckDBTypeId, ColumnConverter | null
   [DuckDBTypeId.TIMESTAMP_S]: timestampSecondsConverter,
   [DuckDBTypeId.TIMESTAMP_MS]: timestampMillisConverter,
   [DuckDBTypeId.TIMESTAMP_NS]: timestampNanosConverter,
+};
+
+/**
+ * Recursive converter for nested types (LIST, STRUCT, MAP, ...), where the legacy driver
+ * kept JS built-ins. Nested cells go through the very same converters as top-level columns,
+ * so a TIMESTAMP inside a STRUCT is the same ISO string as a TIMESTAMP column.
+ */
+export const convertNestedValue: DuckDBValueConverter<JS> = (value, type, converter) => {
+  if (value === null) {
+    return null;
+  }
+
+  const columnConverter = CONVERTERS_BY_TYPE_ID[type.typeId];
+  if (columnConverter !== undefined) {
+    return (columnConverter === null ? value : columnConverter(value)) as JS;
+  }
+
+  return JSDuckDBValueConverter(value, type, converter);
 };
 
 export function getColumnConverter(type: DuckDBType): ColumnConverter | null {
