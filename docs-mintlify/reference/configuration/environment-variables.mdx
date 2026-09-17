@@ -1242,6 +1242,24 @@ respected.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                 | `true`                |
 
+<Warning>
+
+Keep this option enabled. With `false`, only *older versions* of each table are
+dropped, so partitions the current data model no longer builds — rotated out of
+the [build
+range](/reference/data-modeling/pre-aggregations#build_range_start-and-build_range_end),
+or left behind after a rollup is renamed or removed, or after its partition
+granularity is changed — are never dropped. They accumulate in Cube Store and
+inflate its metastore, which slows metastore operations, degrades every query
+served from a pre-aggregation, and can eventually bring down the cluster.
+
+If partitions that are still in use are being dropped, raise
+[`CUBEJS_TOUCH_PRE_AGG_TIMEOUT`](/reference/configuration/environment-variables#cubejs_touch_pre_agg_timeout)
+and/or add Refresh Worker capacity so every partition is touched within the
+timeout, rather than disabling this option.
+
+</Warning>
+
 ## `CUBEJS_FIREBOLT_ACCOUNT`
 
 The [Firebolt account name][firebolt-docs-account-name].
