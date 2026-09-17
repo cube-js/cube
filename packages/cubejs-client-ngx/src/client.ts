@@ -29,8 +29,8 @@ export class CubeClient {
       // A single subscription keeps the last emitted config, so a cold source
       // such as a bare Subject is not re-subscribed (and its already emitted
       // value lost) on the first request.
-      this.config.subscribe((config) => {
-        this.latestConfig = config;
+      this.config.subscribe((nextConfig) => {
+        this.latestConfig = nextConfig;
         this.cubeApi = undefined;
         this.ready$.next(true);
       });

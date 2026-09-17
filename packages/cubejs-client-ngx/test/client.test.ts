@@ -125,7 +125,6 @@ describe('CubeClient requests', () => {
       expect(await emitted).toBeInstanceOf(ResultSet);
       expect(transport.calls).toEqual(['load']);
     });
-
   });
 
   test('a plain config is only read once, the api instance is reused', async () => {
