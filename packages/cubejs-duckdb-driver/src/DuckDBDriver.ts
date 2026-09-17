@@ -94,7 +94,6 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
   protected async init(): Promise<InitPromise> {
     const token = this.config.motherDuckToken || getEnv('duckdbMotherDuckToken', this.config);
     const dbPath = this.config.databasePath || getEnv('duckdbDatabasePath', this.config);
-    // Determine the database URL based on the provided db_path or token
     let dbUrl: string;
     if (dbPath) {
       dbUrl = dbPath;
@@ -196,7 +195,6 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
       }
     }
 
-    // Install & load extensions if configured in env variable.
     const officialExtensions = getEnv('duckdbExtensions', this.config);
     await this.installExtensions(officialExtensions, execAsync);
     await this.loadExtensions(officialExtensions, execAsync);

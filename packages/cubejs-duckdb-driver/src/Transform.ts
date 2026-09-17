@@ -23,7 +23,7 @@ import {
   timestampValue,
 } from '@duckdb/node-api';
 
-/** Converts one non-null column value into what Cube expects to see in a row. */
+/** Never receives null; the caller short-circuits those. */
 export type ColumnConverter = (value: DuckDBValue) => unknown;
 
 export type Transform = {
@@ -205,8 +205,8 @@ export function buildTransform(names: string[], types: DuckDBType[]): Transform 
 }
 
 /**
- * Hydrates every row of a chunk. Column-major: each vector is decoded once and the converter
- * for it is picked once, instead of dispatching on the type for every cell.
+ * Column-major: each vector is decoded once and its converter is picked once, instead of
+ * dispatching on the type for every cell.
  */
 export function transformChunk(chunk: DuckDBDataChunk, transform: Transform): Record<string, unknown>[] {
   const { names, converters, objectShape } = transform;
