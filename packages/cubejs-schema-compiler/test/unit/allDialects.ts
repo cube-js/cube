@@ -10,8 +10,8 @@ const MIN_DIALECTS = 10;
 
 /**
  * Every dialect in the schema-compiler adapter directory, discovered rather than listed
- * by hand. Driver-package overrides, including cubejs-questdb-driver's QuestQuery and
- * cubejs-pinot-driver's PinotQuery, are outside this scan.
+ * by hand. Driver packages carry Query subclasses outside this scan; the ones that matter
+ * to a template invariant are those redefining it — today QuestQuery and PinotQuery.
  *
  * Paired with its name, which is what a caller needs to report which dialect failed.
  */
