@@ -1,4 +1,6 @@
 import booleanFixture from '../../fixtures/mssql-boolean-contexts.json';
+import { MssqlQuery } from '../../../src/adapter/MssqlQuery';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './MSSqlDbRunner';
 
 // Rust asserts these SQL strings against its actual expression renderer, and the
@@ -11,6 +13,31 @@ describe('MSSQL SQL API boolean contexts', () => {
   const bit = (value: boolean | null) => `CAST(${value === null ? 'NULL' : Number(value)} AS BIT)`;
   const fixture = `(VALUES ${rows.map(row => `(${row.id}, ${bit(row.b)}, ${bit(row.c)})`).join(', ')}) AS fixture(id, b, c)`;
   const query = (sql: string) => dbRunner.testQuery([sql, []]);
+
+  it('expands segment predicates in rendered member expressions', async () => {
+    const compilers = prepareJsCompiler(`
+      cube('KibanaSampleDataEcommerce', {
+        sql: 'SELECT * FROM fixture',
+        measures: { count: { type: 'count' } },
+        dimensions: { has_subscription: { sql: 'CAST(b AS BIT)', type: 'boolean' } },
+        segments: { is_male: { sql: 'b = CAST(1 AS BIT) OR c = CAST(1 AS BIT)' } }
+      })
+    `);
+    await compilers.compiler.compile();
+    const modelQuery = new MssqlQuery(compilers, { measures: ['KibanaSampleDataEcommerce.count'] });
+    const segmentSql = modelQuery.newSegment('KibanaSampleDataEcommerce.is_male').segmentSql();
+    const dimensionSql = modelQuery.newDimension('KibanaSampleDataEcommerce.has_subscription').dimensionSql();
+
+    for (const test of booleanFixture.segmentCases) {
+      // Rust verifies each fixture expression against the real wrapper plan.
+      const sql = test.sql.split(`\${KibanaSampleDataEcommerce.is_male}`).join(segmentSql)
+        .split(`\${KibanaSampleDataEcommerce.has_subscription}`).join(dimensionSql);
+      const result = await query(test.predicate
+        ? `SELECT COUNT(*) AS n FROM ${fixture} WHERE ${sql}`
+        : `SELECT ${sql} AS n FROM ${fixture}`);
+      expect(Number(result[0].n)).toBe(test.expected);
+    }
+  });
 
   it.each(booleanFixture.cases)('preserves scalar, filter and grouping results for $expression', async test => {
     const actual = await query(`SELECT ${test.scalar} AS flag FROM ${fixture} ORDER BY id`);

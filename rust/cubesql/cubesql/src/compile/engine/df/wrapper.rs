@@ -99,6 +99,7 @@ pub struct JoinSubquery {
 
 pub struct PushToCubeContext<'l> {
     ungrouped_scan_node: &'l CubeScanNode,
+    meta: &'l MetaContext,
     // Known join subquery qualifiers, to generate proper column expressions
     known_join_subqueries: HashSet<String>,
 }
@@ -2470,7 +2471,28 @@ impl WrappedSelectNode {
         while let Expr::Alias(inner, _) = expr {
             expr = *inner;
         }
-        let is_predicate = Self::is_sql_predicate(&expr);
+        let mut is_segment = false;
+        if let (Expr::Column(column), Some(context)) = (&expr, push_to_cube_context) {
+            // Raw segment references expand to predicates in the schema compiler.
+            // Materialized/join columns and boolean dimensions remain scalar values.
+            if !subqueries.contains_key(&column.flat_name())
+                && !column
+                    .relation
+                    .as_ref()
+                    .is_some_and(|relation| context.known_join_subqueries.contains(relation))
+            {
+                if let MemberField::Member(member) =
+                    Self::find_member_in_ungrouped_scan(context.ungrouped_scan_node, column)?
+                {
+                    is_segment = context.meta.cubes.iter().any(|cube| {
+                        cube.segments
+                            .iter()
+                            .any(|segment| segment.name == member.member)
+                    });
+                }
+            }
+        }
+        let is_predicate = Self::is_sql_predicate(&expr) || is_segment;
         if is_predicate
             && !predicate
             && sql_generator
@@ -2489,6 +2511,17 @@ impl WrappedSelectNode {
             push_to_cube_context,
             subqueries,
         )?;
+        // Segment SQL is opaque and may contain OR/AND. Keep its precedence when
+        // embedding it in a larger MSSQL predicate or a scalarizing CASE.
+        let sql = if is_segment
+            && sql_generator
+                .get_sql_templates()
+                .contains_template("expressions/scalar_to_predicate")
+        {
+            format!("({sql})")
+        } else {
+            sql
+        };
         let sql = if is_predicate != predicate {
             sql_generator
                 .get_sql_templates()
@@ -3024,6 +3057,7 @@ impl WrappedSelectNode {
         } else if let Some(PushToCubeContext {
             ungrouped_scan_node,
             known_join_subqueries,
+            ..
         }) = push_to_cube_context
         {
             if let Some(relation) = c.relation.as_ref() {
@@ -3779,6 +3813,7 @@ impl WrappedSelectNode {
                 Some(PushToCubeContext {
                     ungrouped_scan_node,
                     known_join_subqueries,
+                    ..
                 }),
             ) = (&fun, &args[0], &args[1], push_to_cube_context)
             {
@@ -4105,6 +4140,7 @@ impl WrappedSelectNode {
             PushToCubeContext {
                 ungrouped_scan_node,
                 known_join_subqueries,
+                meta,
             }
         };
 
@@ -4293,7 +4329,7 @@ impl WrappedSelectNode {
 
         let PushToCubeContext {
             ungrouped_scan_node,
-            known_join_subqueries: _,
+            ..
         } = push_to_cube_context;
         let mut prepared_join_subqueries = vec![];
         for JoinSubquery {
@@ -4927,6 +4963,7 @@ impl<'ctx, 'mem> CollectMembersVisitor<'ctx, 'mem> {
             let PushToCubeContext {
                 ungrouped_scan_node,
                 known_join_subqueries,
+                ..
             } = self.push_to_cube_context;
 
             if let Some(relation) = c.relation.as_ref() {
