@@ -59,7 +59,10 @@ describe('extractArchive', () => {
    * silently rewrites `../ZIP_PWNED.txt` to `ZIP_PWNED.txt`, which would make the Zip
    * Slip test below extract a benign archive and pass for the wrong reason.
    */
-  const writeZip = async (file: string, entries: { name: string; content: string; mode?: number }[]) => {
+  const writeZip = async (
+    file: string,
+    entries: { name: string; content: string; mode?: number; host?: number }[]
+  ) => {
     const local: Buffer[] = [];
     const central: Buffer[] = [];
     let offset = 0;
@@ -81,10 +84,10 @@ describe('extractArchive', () => {
 
       const cdh = Buffer.alloc(46);
       cdh.writeUInt32LE(0x02014b50, 0); // central directory signature
-      // version made by: the high byte is the host system, and only 3 (unix) makes the
-      // external attributes below a unix mode rather than DOS attribute bits.
+      // version made by: the high byte is the host system, and only 3 (unix) formally
+      // makes the external attributes below a unix mode rather than DOS attribute bits.
       // eslint-disable-next-line no-bitwise
-      cdh.writeUInt16LE((3 << 8) | 20, 4);
+      cdh.writeUInt16LE(((entry.host ?? 3) << 8) | 20, 4);
       cdh.writeUInt16LE(10, 6); // version needed
       cdh.writeUInt16LE(0, 10); // method: stored
       cdh.writeUInt32LE(sum, 16);
@@ -245,6 +248,22 @@ describe('extractArchive', () => {
 
       await writeZip(archive, [
         { name: 'esc', content: outside, mode: 0o120777 },
+        { name: 'esc/PWNED.txt', content: 'pwned-through-symlink' },
+      ]);
+
+      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/symlink entries.*not allowed/i);
+      expect(fs.existsSync(path.join(outside, 'PWNED.txt'))).toBe(false);
+    });
+
+    it('rejects a zip symlink entry from a producer reporting MS-DOS', async () => {
+      // Several writers report host 0 whatever they run on, and the error message
+      // promises a rule with no exception for them.
+      const archive = path.join(work, 'dossym.zip');
+      const outside = path.join(work, 'outside');
+      fs.mkdirSync(outside);
+
+      await writeZip(archive, [
+        { name: 'esc', content: outside, mode: 0o120777, host: 0 },
         { name: 'esc/PWNED.txt', content: 'pwned-through-symlink' },
       ]);
 

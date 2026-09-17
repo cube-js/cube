@@ -97,11 +97,17 @@ const tarOptions = {
   },
 };
 
+/** A zip records the unix mode in the high half of the external attributes. */
+function zipEntryMode(entry: StreamZip.ZipEntry): number {
+  // eslint-disable-next-line no-bitwise
+  return entry.attr >>> 16;
+}
+
 /**
- * A zip records the unix mode in the high half of the external attributes, but only
- * when the high byte of "version made by" is 3 (unix). With the DOS default of 0
- * those same bits are DOS attribute flags, and reading them as a mode would invent
- * file types out of read-only/archive/hidden bits.
+ * The same mode, but only from a producer that reports unix (high byte 3 of "version
+ * made by") as its host system. Anything else, the DOS default of 0 included, is free
+ * to leave those bits unset or meaningless, so a mode read from them cannot be
+ * applied to a file.
  */
 function zipEntryUnixMode(entry: StreamZip.ZipEntry): number | undefined {
   // eslint-disable-next-line no-bitwise
@@ -109,8 +115,7 @@ function zipEntryUnixMode(entry: StreamZip.ZipEntry): number | undefined {
     return undefined;
   }
 
-  // eslint-disable-next-line no-bitwise
-  return (entry.attr >>> 16) || undefined;
+  return zipEntryMode(entry) || undefined;
 }
 
 const S_IFMT = 0o170000;
@@ -127,9 +132,13 @@ async function extractZipArchive(archivePath: string, dir: string): Promise<void
     const entries = Object.values(await zip.entries())
       .map((entry) => ({ entry, mode: zipEntryUnixMode(entry) }));
 
-    for (const { entry, mode } of entries) {
+    // Ungated by the host byte, unlike the exec bit below, so that the rejection holds
+    // for every archive the message claims it does: a producer reporting MS-DOS can
+    // still record `S_IFLNK` there, and its own attribute bits live in the low byte,
+    // too small to alias a file type in the high half.
+    for (const { entry } of entries) {
       // eslint-disable-next-line no-bitwise
-      if (mode !== undefined && (mode & S_IFMT) === S_IFLNK) {
+      if ((zipEntryMode(entry) & S_IFMT) === S_IFLNK) {
         throw new Error(
           `Refusing to extract "${entry.name}": symlink entries in zip archives are not allowed.`
         );
