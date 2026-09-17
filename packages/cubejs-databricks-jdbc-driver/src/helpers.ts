@@ -55,11 +55,20 @@ export function extractAndRemoveUidPwdFromJdbcUrl(jdbcUrl: string): [uid: string
 }
 
 /**
- * The driver merges URL params and the properties map into one map and throws
- * `IllegalArgumentException: Multiple entries with same key` when a key appears in both, matching
- * case-insensitively. Cube always pins EnableGeoSpatialSupport, so drop every occurrence from the URL.
+ * Cube pins EnableGeoSpatialSupport off, so a URL asking to enable it can not be honoured and is
+ * rejected rather than silently ignored. The driver enables the feature only on a literal `1`
+ * (`"1".equals(value)`), so every other value already means off and is simply dropped — leaving it
+ * in place would collide with the pinned property, which the driver rejects with
+ * `IllegalArgumentException: Multiple entries with same key`.
  */
-export function removeGeoSpatialSupportFromJdbcUrl(jdbcUrl: string): string {
+export function validateAndRemoveGeoSpatialSupportFromJdbcUrl(jdbcUrl: string): string {
+  if (/;EnableGeoSpatialSupport=1(;|$)/i.test(jdbcUrl)) {
+    throw new Error(
+      'Unsupported configuration: EnableGeoSpatialSupport=1. Cube reads GEOMETRY/GEOGRAPHY columns ' +
+      'as EWKT strings, please remove this parameter from the Databricks connection URL.'
+    );
+  }
+
   return jdbcUrl.replace(/;EnableGeoSpatialSupport=[^;]*/gi, '');
 }
 

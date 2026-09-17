@@ -22,8 +22,8 @@ import { DatabricksQuery } from './DatabricksQuery';
 import {
   extractAndRemoveUidPwdFromJdbcUrl,
   parseDatabricksJdbcUrl,
-  removeGeoSpatialSupportFromJdbcUrl,
-  resolveJDBCDriver
+  resolveJDBCDriver,
+  validateAndRemoveGeoSpatialSupportFromJdbcUrl
 } from './helpers';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
@@ -221,7 +221,7 @@ export class DatabricksDriver extends JDBCDriver {
     }
 
     const [uid, pwd, urlWithoutCredentials] = extractAndRemoveUidPwdFromJdbcUrl(url);
-    const cleanedUrl = removeGeoSpatialSupportFromJdbcUrl(urlWithoutCredentials);
+    const cleanedUrl = validateAndRemoveGeoSpatialSupportFromJdbcUrl(urlWithoutCredentials);
     const passwd = conf?.token ||
           getEnv('databricksToken', { dataSource, preAggregations }) ||
           pwd;

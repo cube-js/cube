@@ -98,13 +98,24 @@ describe('DatabricksDriver', () => {
       expect(new TestDatabricksDriver().testConfig.properties.EnableGeoSpatialSupport).toBe('0');
     });
 
-    // The driver merges URL params and properties into one map and throws on a duplicate key, so
-    // a URL-supplied value has to be removed rather than left to collide with the pin.
     test.each([
       ['EnableGeoSpatialSupport=1'],
       ['enablegeospatialsupport=1'],
+      ['EnableGeoSpatialSupport=1;ConnCatalog=main'],
+    ])('rejects "%s" instead of silently ignoring it', (param) => {
+      process.env.CUBEJS_DB_DATABRICKS_URL = `${baseUrl};${param}`;
+
+      expect(() => new TestDatabricksDriver()).toThrow(/EnableGeoSpatialSupport=1/);
+    });
+
+    // The driver enables the feature only on a literal `1`, so any other value already means off.
+    // It still has to leave the URL: a key present both there and in the properties map is fatal.
+    test.each([
+      ['EnableGeoSpatialSupport=0'],
       ['EnableGeoSpatialSupport='],
-      ['EnableGeoSpatialSupport=1;EnableGeoSpatialSupport=0'],
+      ['EnableGeoSpatialSupport=10'],
+      ['EnableGeoSpatialSupport=true'],
+      ['EnableGeoSpatialSupport=0;EnableGeoSpatialSupport=0'],
     ])('drops "%s" from the URL and keeps the pin', (param) => {
       process.env.CUBEJS_DB_DATABRICKS_URL = `${baseUrl};${param}`;
 
@@ -115,7 +126,7 @@ describe('DatabricksDriver', () => {
     });
 
     test('leaves the rest of the URL intact', () => {
-      process.env.CUBEJS_DB_DATABRICKS_URL = `${baseUrl};EnableGeoSpatialSupport=1;ConnCatalog=main`;
+      process.env.CUBEJS_DB_DATABRICKS_URL = `${baseUrl};EnableGeoSpatialSupport=0;ConnCatalog=main`;
 
       expect(new TestDatabricksDriver().testConfig.url).toBe(`${baseUrl};ConnCatalog=main`);
     });
