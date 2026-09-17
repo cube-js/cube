@@ -50,7 +50,14 @@ export function formatIsoFromMillis(millis: number): string {
 // DuckDB renders DECIMAL with the full declared scale ("100.000"); the legacy driver
 // went through a double, so consumers never saw the padding.
 function formatDecimal(value: DuckDBDecimalValue): string {
-  return value.scale === 0 ? String(value.value) : value.toString().replace(/\.?0+$/, '');
+  if (value.scale === 0) {
+    return String(value.value);
+  }
+
+  const text = value.toString();
+
+  // `/\.?0+$/` matches with no point at all, which would eat the integer part of "100"
+  return text.includes('.') ? text.replace(/\.?0+$/, '') : text;
 }
 
 function toBuffer(bytes: Uint8Array): Buffer {
