@@ -1250,8 +1250,8 @@ version of every table present in the pre-aggregation schema. Tables that the
 current data model no longer builds are therefore never dropped, e.g., partitions
 that have rotated out of the [build
 range](/reference/data-modeling/pre-aggregations#build_range_start-and-build_range_end),
-or partitions left behind after a rollup is renamed or removed or its partition
-granularity is changed.
+or partitions left behind after a rollup is renamed or removed, or after its
+partition granularity is changed.
 
 These partitions accumulate in Cube Store indefinitely and inflate its metastore.
 A large metastore slows down metastore operations, which degrades the performance
@@ -1262,8 +1262,7 @@ If partitions that are still in use are being dropped, address the missing touch
 rather than disabling this option: raise
 [`CUBEJS_TOUCH_PRE_AGG_TIMEOUT`](/reference/configuration/environment-variables#cubejs_touch_pre_agg_timeout)
 and/or add Refresh Worker capacity so every partition is refreshed or freshness-checked
-within the timeout. For externally refreshed pre-aggregations, make sure each one is
-refreshed at least once within that timeout.
+within the timeout.
 
 </Warning>
 
