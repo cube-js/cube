@@ -200,7 +200,7 @@ For example, an **Analysis** parent with the options `Retail`, `Wholesale` and `
 In the [dashboard builder][ref-workbooks], open the **Add Controls** menu in the toolbar and choose **Parent**, then click **Configure Parent** to set it up. The editor gives each option its own tab, and lists every filter, time granularity switcher and [field switcher](#field-switcher) on the dashboard inside it — so one tab is one complete arrangement, and you can read off what an option does to the whole row at a glance.
 
 <Info>
-A tab lists the controls that are on the dashboard, so a parent added to an empty one has nothing to drive yet; a control added later simply appears in the tabs, on **Keep as-is** in each one after the first and on **Reset to default** in that one, like every other control there. Another parent control is never listed — a parent cannot be a child of one.
+A tab lists the controls that are on the dashboard, so a parent added to an empty one has nothing to drive yet. A control added later appears in the tabs by itself, but is not driven until you save the parent's settings again. Another parent control is never listed — a parent cannot be a child of one.
 </Info>
 
 ### Options
@@ -211,7 +211,7 @@ Renaming an option later doesn't disturb the values you've mapped to it, so you 
 
 ### Children
 
-Each control on the tab carries a dropdown saying what that option does to it. Every option/child pair is in one of four states:
+Each control on an option's tab carries a dropdown saying what that option does to it. Every option/child pair is in one of four states:
 
 | State | What happens when the viewer picks that option |
 |---|---|
@@ -238,19 +238,17 @@ Once a dashboard has at least one parent control, every filter, time granularity
 | **Partly driven** | Only some of the owning parent's options drive this control; the rest keep it as-is. |
 | **Not driven** | No parent control drives this one. |
 
-**Set to**, **Clear** and **Reset to default** all count as driving — each is something the option does to the control. Only **Keep as-is** doesn't, which is why a control every option keeps as-is reads **Not driven**, and why a control left untouched on a two-option parent reads **Partly driven**: the first tab's **Reset to default** drives it, the second tab's **Keep as-is** does not.
+**Set to**, **Clear** and **Reset to default** all count as driving — each is something the option does to the control; only **Keep as-is** doesn't.
 
-Saving the parent's settings writes the first tab's untouched cells as the **Reset to default** they show, so a parent that still has only its first tab drives *every* control on the dashboard the moment you save it — each one reads **Fully driven**, before you have mapped anything by hand. Add the options you mean to offer, and each later tab leaves the controls it doesn't set as-is.
+A mapping is written when you save the parent's settings, [defaults included](#children) — so a parent still on its first tab drives *every* control on the dashboard the moment you save it, each reading **Fully driven** before you have mapped anything by hand.
 
-Click the indicator to open that control's own settings, at its **Driven by parent** section.
+Click the indicator to open that control's own settings, at its **Driven by parent** section — which names the parent for a driven control, and offers only **None** for one nothing drives yet.
 
 ### Driven by parent
 
-Once a dashboard has a parent control, every filter, time granularity switcher and [field switcher](#field-switcher) carries a **Driven by parent** section in its own settings, naming what drives it without your having to open the parent.
+Once a dashboard has a parent control, every filter, time granularity switcher and [field switcher](#field-switcher) carries a **Driven by parent** section in its own settings, so you can see what drives a control without opening the parent. Picking **None** there detaches it: the parent stops driving it, and it keeps whatever value it is showing.
 
-The dropdown offers the parent that currently drives the control, and **None**. Picking **None** detaches it: the parent stops driving it, and it keeps whatever value it is showing.
-
-Mapping is the one thing you cannot do here — the values belong to the parent's options, so a control nothing drives yet shows only **None**. To map it, or to hand it to a different parent, open that parent's settings and set the control's row on each option's tab.
+Mapping is the one thing you cannot do from here — the values belong to the parent's options. To map a control, or hand it to a different parent, open that parent's settings and set the control's row on each option's tab.
 
 ### Default option
 
