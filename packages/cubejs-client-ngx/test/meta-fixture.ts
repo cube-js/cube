@@ -1,6 +1,6 @@
 import { Meta } from '@cubejs-client/core';
 
-const metaResponse: any = {
+export const metaResponse: any = {
   cubes: [
     {
       name: 'Orders',
