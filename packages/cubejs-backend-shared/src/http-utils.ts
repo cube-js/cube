@@ -118,7 +118,10 @@ const S_IFLNK = 0o120000;
 const S_IXUGO = 0o111;
 
 async function extractZipArchive(archivePath: string, dir: string): Promise<void> {
-  const zip = new StreamZipAsync({ file: archivePath });
+  // `skipEntryNameValidation` is the default, and passed explicitly because it is what
+  // rejects `..`, a leading `/`, a drive letter or a backslash while the central
+  // directory is read — before a byte is written. Flip it and Zip Slip is back.
+  const zip = new StreamZipAsync({ file: archivePath, skipEntryNameValidation: false });
 
   try {
     const entries = Object.values(await zip.entries())
