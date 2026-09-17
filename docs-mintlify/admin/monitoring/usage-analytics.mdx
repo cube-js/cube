@@ -51,20 +51,24 @@ Usage Analytics runs the full Cube application in
 the pre-built dashboards, you get the complete authoring experience: explore
 the usage data, create workbooks, and assemble your own dashboards from it.
 
-Your dashboards can query every curated view below — including the five
-dashboard views, which no pre-built dashboard uses. Anything you build stays
-private unless you share it.
+Your dashboards can query every curated view below — including the dashboard,
+billing, and AI Calls & Cost views, which no pre-built dashboard uses.
+Anything you build stays private unless you share it.
 
 | View | What it contains |
 | --- | --- |
 | **API Requests** | Every query hitting your deployments' data APIs, with timing, caching, and errors. `tenant_id` here is your own Cube account, not an embed tenant — row-level security pins every query to it, so this view can't be used to compare your embed tenants against each other. For per-request detail on one deployment, see [Query History](/admin/monitoring/query-history) instead. |
 | **AI Usage** | AI messages grouped into conversations and sessions, with context, token consumption, estimated cost, and latency. |
+| **AI Calls & Cost** | Token consumption and cost of every individual LLM call — finer-grained than AI Usage's per-message rows — broken down by conversation, embedded end user, model, and billing line item. Excludes calls served by a model you bring yourself ([BYOM](/admin/ai/bring-your-own-model)), since Cube doesn't bill for those. |
 | **Users & Adoption** | Users and their engagement: sign-ups, active users, activity frequency, seat utilization, and dormant accounts. |
 | **Dashboard Usage** | Every dashboard in your account — opens, viewers, surface, and when it was last touched — including ones nobody has opened yet. |
 | **Dashboard Engagement** | One row per view session: dwell time and whether the viewer did anything at all. |
 | **Dashboard Interactions** | In-dashboard actions: filter changes, refreshes, exports, drill-ins, chat opens. |
 | **Dashboard Authoring** | Publishes and deletions — who ships dashboard changes and who removes them. |
 | **Dashboard Inventory** | A daily snapshot of the dashboard estate, for trends over time. |
+| **Metered Usage** | Everything metered on your account per day, deployment, and usage dimension, before pricing is applied — the full consumption picture, including dimensions your plan doesn't bill for. |
+| **Billing Spend** | What your usage cost per day and deployment, and which bucket absorbed it: plan allowance, credit package, or billed overage. |
+| **Invoices** | Your issued invoices, with amount, status, and due and payment dates. |
 
 If you embed Cube for multiple customers, Dashboard Usage carries
 `viewer_embed_tenant` — which of your embed customers' users did the looking.
