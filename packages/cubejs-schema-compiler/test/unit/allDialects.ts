@@ -10,8 +10,8 @@ const MIN_DIALECTS = 10;
 
 /**
  * Every dialect in the schema-compiler adapter directory, discovered rather than listed
- * by hand. Driver packages carry Query subclasses outside this scan; the ones that matter
- * to a template invariant are those redefining it — today QuestQuery and PinotQuery.
+ * by hand. Driver packages carry Query subclasses outside this scan; for a given template
+ * invariant the ones that matter are those redefining or deleting that template.
  *
  * Paired with its name, which is what a caller needs to report which dialect failed.
  */
