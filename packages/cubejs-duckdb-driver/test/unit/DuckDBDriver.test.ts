@@ -5,7 +5,7 @@ import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { Readable } from 'stream';
-import { DuckDBDriver } from '../src';
+import { DuckDBDriver } from '../../src';
 
 // Every type the legacy `duckdb` package rendered differently from @duckdb/node-api's defaults.
 const TYPES_SQL = `SELECT
