@@ -102,6 +102,7 @@ describe('DatabricksDriver', () => {
       ['enablegeospatialsupport=1'],
       ['EnableGeoSpatialSupport=1;ConnCatalog=main'],
       ['ConnCatalog=main;EnableGeoSpatialSupport=1'],
+      ['EnableGeoSpatialSupport=0;EnableGeoSpatialSupport=1'],
     ])('rejects "%s" instead of silently ignoring it', (param) => {
       process.env.CUBEJS_DB_DATABRICKS_URL = `${baseUrl};${param}`;
 

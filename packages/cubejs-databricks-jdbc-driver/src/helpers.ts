@@ -1,12 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import {
-  findJdbcUrlParam,
-  formatJdbcUrl,
-  parseJdbcUrl,
-  removeJdbcUrlParams,
-} from '@cubejs-backend/jdbc-driver';
+import { parseJdbcUrl } from '@cubejs-backend/jdbc-driver';
 
 import { downloadJDBCDriver, JDBC_DRIVER_JAR_NAME } from './installer';
 import type { ParsedConnectionProperties } from './DatabricksDriver';
@@ -47,30 +42,30 @@ export async function resolveJDBCDriver(): Promise<string> {
 export function extractAndRemoveUidPwdFromJdbcUrl(jdbcUrl: string): [uid: string, pwd: string, cleanedUrl: string] {
   const parsed = parseJdbcUrl(jdbcUrl);
 
-  const uid = findJdbcUrlParam(parsed, 'UID')?.value || 'token';
-  const pwd = findJdbcUrlParam(parsed, 'PWD')?.value || '';
+  const uid = parsed.get('UID')?.value || 'token';
+  const pwd = parsed.get('PWD')?.value || '';
 
-  return [uid, pwd, formatJdbcUrl(removeJdbcUrlParams(parsed, ['UID', 'PWD', 'AuthMech']))];
+  return [uid, pwd, parsed.without(['UID', 'PWD', 'AuthMech']).toString()];
 }
 
 export function validateAndRemoveGeoSpatialSupportFromJdbcUrl(jdbcUrl: string): string {
   const parsed = parseJdbcUrl(jdbcUrl);
 
-  if (findJdbcUrlParam(parsed, 'EnableGeoSpatialSupport')?.value === '1') {
+  if (parsed.getAll('EnableGeoSpatialSupport').some(({ value }) => value === '1')) {
     throw new Error(
       'Unsupported configuration: EnableGeoSpatialSupport=1. Cube reads GEOMETRY/GEOGRAPHY columns ' +
       'as EWKT strings, please remove this parameter from the Databricks connection URL.'
     );
   }
 
-  return formatJdbcUrl(removeJdbcUrlParams(parsed, ['EnableGeoSpatialSupport']));
+  return parsed.without(['EnableGeoSpatialSupport']).toString();
 }
 
 export function parseDatabricksJdbcUrl(jdbcUrl: string): ParsedConnectionProperties {
   const parsed = parseJdbcUrl(jdbcUrl);
   const [host] = parsed.base.slice('jdbc:databricks://'.length).split(':');
 
-  const httpPath = findJdbcUrlParam(parsed, 'httpPath')?.value;
+  const httpPath = parsed.get('httpPath')?.value;
   if (!httpPath) {
     throw new Error('Missing httpPath in JDBC URL');
   }

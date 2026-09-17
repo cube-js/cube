@@ -14,39 +14,45 @@ export type JdbcUrlParam = {
   raw: string,
 };
 
-export type ParsedJdbcUrl = {
-  base: string,
-  params: JdbcUrlParam[],
-};
+export class ParsedJdbcUrl {
+  public constructor(
+    public readonly base: string,
+    public readonly params: JdbcUrlParam[],
+  ) {}
+
+  public get(name: string): JdbcUrlParam | undefined {
+    return this.getAll(name)[0];
+  }
+
+  /**
+   * A JDBC URL may repeat a parameter, and which entry the driver honours is driver-specific, so a
+   * caller that cares about a value has to look at all of them.
+   */
+  public getAll(name: string): JdbcUrlParam[] {
+    const wanted = name.toLowerCase();
+
+    return this.params.filter(({ key }) => key.toLowerCase() === wanted);
+  }
+
+  public without(names: string[]): ParsedJdbcUrl {
+    const removed = names.map(name => name.toLowerCase());
+
+    return new ParsedJdbcUrl(this.base, this.params.filter(({ key }) => !removed.includes(key.toLowerCase())));
+  }
+
+  public toString(): string {
+    return [this.base, ...this.params.map(({ raw }) => raw)].join(URL_DELIMITER);
+  }
+}
 
 export function parseJdbcUrl(jdbcUrl: string): ParsedJdbcUrl {
   const [base, ...parts] = jdbcUrl.split(URL_DELIMITER);
 
-  return {
-    base,
-    params: parts.map((raw) => {
-      const delimiterIndex = raw.indexOf(PAIR_DELIMITER);
+  return new ParsedJdbcUrl(base, parts.map((raw) => {
+    const delimiterIndex = raw.indexOf(PAIR_DELIMITER);
 
-      return delimiterIndex >= 0
-        ? { key: raw.slice(0, delimiterIndex), value: raw.slice(delimiterIndex + 1), raw }
-        : { key: raw, value: '', raw };
-    }),
-  };
-}
-
-export function formatJdbcUrl({ base, params }: ParsedJdbcUrl): string {
-  return [base, ...params.map(({ raw }) => raw)].join(URL_DELIMITER);
-}
-
-export function findJdbcUrlParam({ params }: ParsedJdbcUrl, name: string): JdbcUrlParam | undefined {
-  return params.find(({ key }) => key.toLowerCase() === name.toLowerCase());
-}
-
-export function removeJdbcUrlParams(parsed: ParsedJdbcUrl, names: string[]): ParsedJdbcUrl {
-  const removed = names.map(name => name.toLowerCase());
-
-  return {
-    ...parsed,
-    params: parsed.params.filter(({ key }) => !removed.includes(key.toLowerCase())),
-  };
+    return delimiterIndex >= 0
+      ? { key: raw.slice(0, delimiterIndex), value: raw.slice(delimiterIndex + 1), raw }
+      : { key: raw, value: '', raw };
+  }));
 }
