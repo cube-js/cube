@@ -8,9 +8,6 @@ export class MssqlDbRunner extends DbRunnerAbstract {
     const version = process.env.TEST_MSSQL_VERSION || options.version || '2019-latest';
     const password = process.env.TEST_DB_PASSWORD || 'Test1test';
 
-    // Startup log lines ("Service Broker manager has started", "SQL Server is now ready for
-    // client connections") are printed while the `sa` login is still being provisioned, so
-    // connecting on them fails with "Login failed for user 'sa'". Probe the login itself.
     const container = new GenericContainer(`mcr.microsoft.com/mssql/server:${version}`)
       .withEnvironment({
         ACCEPT_EULA: 'Y',
