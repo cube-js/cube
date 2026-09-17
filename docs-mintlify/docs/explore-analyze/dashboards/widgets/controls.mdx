@@ -292,18 +292,16 @@ Every control offers at most one of two actions in the control itself, beside it
 
 | Action | When it shows | What it does |
 |---|---|---|
-| **Clear** (✕) | The control has a value. | Empties the control and stops applying it, so its charts fall back to their own defaults. Clearing a [parent control](#parent) clears the [children](#children) it drives as well — fully, rather than returning them to their defaults. |
+| **Clear** (✕) | The control has a value, and is not a [field switcher](#field-switcher) — that one carries no ✕. | Empties the control and stops applying it, so its charts fall back to their own defaults. Clearing a [parent control](#parent) clears the [children](#children) it drives as well — fully, rather than returning them to their defaults. |
 | **Reset to default** (↩) | The control has been changed, it has a value published in the last dashboard version, and the two differ. | Puts the control back on that published value. |
 
 <Note>
 This is the control's *own* published value, which is not always what a [parent control](#parent) means by its **Reset to default** [child mapping](#children): that one returns the child to the value it opens on *for that viewer* — the user attribute default a [filter](#user-attribute-default), [time granularity switcher](#time-granularity-user-attribute-default) or [field switcher](#field-switcher-user-attribute-default) resolves, otherwise the child's own static default.
 </Note>
 
-Only one shows there at a time: **Reset to default** takes the slot whenever it applies, so a control that has drifted from its published value offers the way back rather than the way to empty. The dropdown header is not limited that way — whichever of the two apply are there as text links, **Reset** to the left of **Clear** — and neither closes the dropdown.
+Only one shows in the control at a time: **Reset to default** takes the slot whenever it applies, so a control that has drifted from its published value offers the way back rather than the way to empty. The dropdown header is not limited that way — whichever of the two apply are there as text links, **Reset** to the left of **Clear** — and neither closes the dropdown.
 
-A [field switcher](#field-switcher) never offers **Clear** — there is no ✕, so **Reset to default** is the only action it can carry.
-
-On a published dashboard, clearing or resetting changes only what that viewer sees, and writes nothing back to the dashboard. [Neither action travels in the URL](#sharing-the-current-selection), so a reload reopens the control on whatever it opens on for that viewer: a clear is always undone, while a reset survives unless the control is seeded by a [user attribute default](#user-attribute-default).
+On a published dashboard, clearing or resetting changes only what that viewer sees, and writes nothing back to the dashboard. [Neither action travels in the URL](#sharing-the-current-selection), so a reload reopens the control on whatever it opens on for that viewer.
 
 In the [dashboard builder][ref-workbooks] both write the draft. **Reset to default** returns the control to the published value, leaving no unsaved change behind. **Clear** removes the control's saved default, which viewers see once you publish; clearing a [parent control](#parent) saves its children's cleared defaults in the same write.
 
