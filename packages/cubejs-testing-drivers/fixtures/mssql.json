@@ -25,14 +25,7 @@
       "MSSQL_SA_PASSWORD": "123-Strong-Password-321",
       "ACCEPT_EULA": "Y"
     },
-    "ports" : ["1433"],
-    "healthcheck": {
-      "test": "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\" -b -o /dev/null",
-      "start_period": "2s",
-      "interval": "2s",
-      "retries": 45,
-      "timeout": "5s"
-    }
+    "ports" : ["1433"]
   },
   "cast": {
     "SELECT_PREFIX": "",
