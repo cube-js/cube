@@ -191,6 +191,29 @@ describe('extractArchive', () => {
       expect(fs.existsSync(path.join(work, 'ZIP_PWNED.txt'))).toBe(false);
     });
 
+    it('rejects a zip entry with an absolute path', async () => {
+      // The opposite contract to the tar case above, which re-roots such an entry
+      // inside the target instead of refusing it.
+      const archive = path.join(work, 'abs.zip');
+      const escapeTo = path.join(work, 'ZIP_ABS_PWNED.txt');
+      await writeZip(archive, [{ name: escapeTo, content: 'pwned' }]);
+
+      await expect(extractArchive(archive, targetDir())).rejects.toThrow(/malicious entry/i);
+      expect(fs.existsSync(escapeTo)).toBe(false);
+    });
+
+    it('rejects a zip entry with a windows drive-letter path', async () => {
+      // The remaining two shapes the name check covers, in one entry: a `\w+:` prefix
+      // and a backslash separator, which on a posix host would otherwise become a file
+      // literally called `C:\WIN_PWNED.txt` and on Windows would escape the target.
+      const archive = path.join(work, 'win.zip');
+      await writeZip(archive, [{ name: 'C:\\WIN_PWNED.txt', content: 'pwned' }]);
+
+      const target = targetDir();
+      await expect(extractArchive(archive, target)).rejects.toThrow(/malicious entry/i);
+      expect(fs.readdirSync(target)).toEqual([]);
+    });
+
     it('does not follow a tar symlink that points outside the target', async () => {
       const archive = path.join(work, 'sym.tar.gz');
       const outside = path.join(work, 'outside');
