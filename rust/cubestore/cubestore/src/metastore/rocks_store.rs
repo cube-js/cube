@@ -895,36 +895,6 @@ pub struct RocksStore {
     snapshots_upload_stopped: Arc<AsyncMutex<bool>>,
     pub(crate) rw_loop_default_cf: RocksStoreRWLoop,
     details: Arc<dyn RocksStoreDetails>,
-    physical_version: Arc<std::sync::atomic::AtomicU64>,
-}
-
-/// Tables whose writes cannot change what a select reads, so they must not invalidate
-/// anything derived from the physical layout. Everything else bumps the version: an
-/// unrecognised write has to over-invalidate rather than be missed.
-fn event_keeps_physical_version(event: &MetaStoreEvent) -> bool {
-    let table_id = match event {
-        MetaStoreEvent::Insert(table_id, _)
-        | MetaStoreEvent::Update(table_id, _)
-        | MetaStoreEvent::Delete(table_id, _) => *table_id,
-        MetaStoreEvent::UpdateJob(_, _) | MetaStoreEvent::DeleteJob(_) => TableId::Jobs,
-        MetaStoreEvent::UpdateCacheItem(_, _) | MetaStoreEvent::DeleteCacheItem(_) => {
-            TableId::CacheItems
-        }
-        MetaStoreEvent::UpdateQueueItem(_, _) | MetaStoreEvent::DeleteQueueItem(_) => {
-            TableId::QueueItems
-        }
-        _ => return false,
-    };
-
-    matches!(
-        table_id,
-        TableId::Jobs
-            | TableId::CacheItems
-            | TableId::QueueItems
-            | TableId::QueueResults
-            | TableId::QueueItemPayload
-            | TableId::TraceObjects
-    )
 }
 
 pub fn check_if_exists(name: &String, existing_keys_len: usize) -> Result<(), CubeError> {
@@ -971,7 +941,6 @@ impl RocksStore {
             last_checkpoint_time: Arc::new(RwLock::new(SystemTime::now())),
             snapshot_uploaded: Arc::new(RwLock::new(false)),
             write_notify: Arc::new(Notify::new()),
-            physical_version: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             write_completed_notify: Arc::new(Notify::new()),
             last_upload_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
             last_check_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
@@ -1057,12 +1026,6 @@ impl RocksStore {
     }
 
     #[inline(always)]
-    /// Changes whenever a write touches anything a select's physical layout depends on.
-    pub fn physical_version(&self) -> u64 {
-        self.physical_version
-            .load(std::sync::atomic::Ordering::SeqCst)
-    }
-
     pub async fn write_operation<F, R>(&self, op_name: &'static str, f: F) -> Result<R, CubeError>
     where
         F: for<'a> FnOnce(DbTableRef<'a>, &mut BatchPipe<'a>) -> Result<R, CubeError>
@@ -1194,15 +1157,6 @@ impl RocksStore {
         let (spawn_res, events) = res?;
 
         self.write_notify.notify_waiters();
-
-        // A write with no events at all (a raw batch, `truncate`) says nothing about what
-        // it touched, so it has to count as a change.
-        let physical_state_intact =
-            !events.is_empty() && events.iter().all(event_keeps_physical_version);
-        if !physical_state_intact {
-            self.physical_version
-                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        }
 
         if events.len() > 0 {
             for listener in self.listeners.read().await.clone().iter_mut() {

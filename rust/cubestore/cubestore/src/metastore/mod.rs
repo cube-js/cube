@@ -1513,9 +1513,6 @@ pub struct RocksMetaStore {
     in_memory_compaction_cache: Arc<RwLock<Option<(HashMap<String, Vec<u64>>, SystemTime)>>>,
     in_memory_compaction_compute_lock: Arc<tokio::sync::Mutex<()>>,
     upload_loop: Arc<WorkerLoop>,
-    active_partitions_cache: Option<
-        moka::future::Cache<(Vec<u64>, u64), Arc<Vec<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>>>>,
-    >,
 }
 
 impl RocksMetaStore {
@@ -1534,14 +1531,7 @@ impl RocksMetaStore {
     }
 
     fn new_from_store(store: Arc<RocksStore>) -> Arc<Self> {
-        let active_partitions_cache_max_entries =
-            store.config.active_partitions_cache_max_entries();
         Arc::new(Self {
-            active_partitions_cache: (active_partitions_cache_max_entries > 0).then(|| {
-                moka::future::Cache::builder()
-                    .max_capacity(active_partitions_cache_max_entries)
-                    .build()
-            }),
             store,
             cached_tables: Arc::new(CachedTables::new()),
             disk_space_cache: Arc::new(RwLock::new(None)),
@@ -3856,24 +3846,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         index_id: Vec<u64>,
     ) -> Result<Vec<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>>, CubeError> {
-        let Some(cache) = &self.active_partitions_cache else {
-            return self.active_partitions_and_chunks_for_select(index_id).await;
-        };
-
-        // The version makes any write that could have moved a partition or a chunk produce a
-        // different key, so an entry can only ever be served for the state it was read in.
-        let key = (index_id.clone(), self.store.physical_version());
-        let this = self.clone();
-        let cached = cache
-            .try_get_with(key, async move {
-                this.active_partitions_and_chunks_for_select(index_id)
-                    .await
-                    .map(Arc::new)
-            })
-            .await
-            .map_err(|e: Arc<CubeError>| (*e).clone())?;
-
-        Ok((*cached).clone())
+        self.active_partitions_and_chunks_for_select(index_id).await
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
@@ -5757,86 +5730,6 @@ mod tests {
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn physical_version_tracks_physical_writes() -> Result<(), CubeError> {
-        let config = Config::test("physical_version_tracks_physical_writes");
-        let store_path = env::current_dir()?.join("physical_version-local");
-        let remote_store_path = env::current_dir()?.join("physical_version-remote");
-        let _ = fs::remove_dir_all(store_path.clone());
-        let _ = fs::remove_dir_all(remote_store_path.clone());
-        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
-
-        let meta_store = RocksMetaStore::new(
-            store_path.join("metastore").as_path(),
-            BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
-            config.config_obj(),
-        )?;
-
-        meta_store.create_schema("foo".to_string(), false).await?;
-        let columns = vec![Column::new("col1".to_string(), ColumnType::Int, 0)];
-        let table = meta_store
-            .create_table(
-                "foo".to_string(),
-                "boo".to_string(),
-                columns,
-                None,
-                None,
-                vec![],
-                true,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                false,
-                None,
-            )
-            .await?;
-
-        let index = meta_store.get_default_index(table.get_id()).await?;
-        let partition = meta_store
-            .get_active_partitions_by_index_id(index.get_id())
-            .await?
-            .into_iter()
-            .next()
-            .expect("table must have an active partition");
-
-        let before = meta_store.store.physical_version();
-        meta_store
-            .mark_partition_warmed_up(partition.get_id())
-            .await?;
-        assert!(
-            meta_store.store.physical_version() > before,
-            "a partition write must move the physical version"
-        );
-
-        // Jobs churn constantly; if they moved the version nothing derived from the physical
-        // layout could ever stay cached.
-        let job = meta_store
-            .add_job(Job::new(
-                RowKey::Table(TableId::Partitions, partition.get_id()),
-                JobType::PartitionCompaction,
-                "test".to_string(),
-            ))
-            .await?
-            .expect("job was not created");
-        let before_heart_beat = meta_store.store.physical_version();
-        meta_store.update_heart_beat(job.get_id()).await?;
-        assert_eq!(
-            before_heart_beat,
-            meta_store.store.physical_version(),
-            "a job heartbeat must not move the physical version"
-        );
-
-        let _ = fs::remove_dir_all(store_path);
-        let _ = fs::remove_dir_all(remote_store_path);
         Ok(())
     }
 
