@@ -156,12 +156,11 @@ export async function runEnvironment(
   // TODO extract as a config
   // SQL Server logs "now ready for client connections" while the `sa` login is still
   // being provisioned, so that line is not a readiness signal - connecting on it fails
-  // with "Login failed for user 'sa'". Wait on the container HEALTHCHECK (defined in the
-  // mssql fixture, running a sqlcmd SELECT as `sa`) instead, with a raised global startup
-  // timeout since the compose environment overwrites each strategy's own timeout.
+  // with "Login failed for user 'sa'". Probe the login itself instead.
   if (type === 'mssql') {
-    compose.withStartupTimeout(120 * 1000);
-    compose.withWaitStrategy('data', Wait.forHealthCheck());
+    compose.withWaitStrategy('data', Wait.forSuccessfulCommand(
+      '/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" -b -o /dev/null'
+    ));
   }
   // TODO: Add health checks for all drivers
   if (type === 'clickhouse') {
