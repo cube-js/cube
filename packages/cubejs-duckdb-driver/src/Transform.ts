@@ -41,14 +41,15 @@ const MILLIS_PER_DAY = 86400000;
  */
 export function formatIsoFromMillis(millis: number): string {
   const iso = DateTime.fromMillis(millis, { zone: 'utc' }).toISO();
+  if (iso) {
+    return iso;
+  }
 
-  // luxon returns null for NaN and for values outside Date's range, where callers expect
-  // the RangeError that Date throws.
-  return iso === null ? new Date(millis).toISOString() : iso;
+  // luxon returns null exactly where Date throws: NaN and anything outside
+  // -271821-04-20 .. +275760-09-13 (|millis| > 8.64e15).
+  throw new RangeError(`Invalid time value: ${millis}`);
 }
 
-// DuckDB renders DECIMAL with the full declared scale ("100.000"); the legacy driver
-// went through a double, so consumers never saw the padding.
 function formatDecimal(value: DuckDBDecimalValue): string {
   if (value.scale === 0) {
     return String(value.value);
