@@ -299,7 +299,7 @@ Every control offers at most one of two actions in the control itself, beside it
 This is the control's *own* published value, which is not always what a [parent control](#parent) means by its **Reset to default** [child mapping](#children): despite the shared label, that one returns the child to the value it opens on *for that viewer*.
 </Note>
 
-**Reset to default** wins that single spot whenever it applies, so a control that has drifted from its published value offers the way back rather than the way to empty. The dropdown header is not limited that way — whichever of the two apply are there as text links, **Reset** to the left of **Clear** — and neither closes the dropdown.
+**Reset to default** takes the one action slot in the control whenever it applies, so a control that has drifted from its published value offers the way back rather than the way to empty. The dropdown header is not limited that way — whichever of the two apply are there as text links, **Reset** to the left of **Clear** — and neither closes the dropdown.
 
 On a published dashboard, clearing or resetting changes only what that viewer sees, and writes nothing back to the dashboard; in the URL it [drops the control's parameter](#sharing-the-current-selection) rather than recording the result. A control whose [visibility](#visibility) is **Disabled** greys out whichever action it shows, so a viewer can see the state without changing it.
 
