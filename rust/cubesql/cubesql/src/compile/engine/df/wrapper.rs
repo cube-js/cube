@@ -4854,6 +4854,7 @@ mod tests {
         ]);
         for (literal, expected) in [
             (ScalarValue::Float32(Some(100.0)), "CAST(100 AS FLOAT(24))"),
+            (ScalarValue::Float32(Some(0.1)), "CAST(0.1 AS FLOAT(24))"),
             (ScalarValue::Float64(Some(100.0)), "CAST(100 AS FLOAT(53))"),
             (
                 ScalarValue::Float64(Some(100.1)),
