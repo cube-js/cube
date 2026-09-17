@@ -1,29 +1,29 @@
 import path from 'path';
-import { downloadAndExtractFile, getEnv } from '@cubejs-backend/shared';
+import { downloadAndExtractFile } from '@cubejs-backend/shared';
 
-export const OSS_DRIVER_VERSION = '1.0.11';
+export const DRIVER_VERSION = '3.4.2';
+
+export const JDBC_DRIVER_JAR_NAME = `databricks-jdbc-${DRIVER_VERSION}.jar`;
 
 /**
- * In the beginning of 2025 Databricks released their open-source version of JDBC driver and encourage
- * all users to migrate to it as company plans to focus on improving and evolving it over legacy simba driver.
- * More info about OSS Driver could be found at https://docs.databricks.com/aws/en/integrations/jdbc/oss
- * As of March 2025 To use the Databricks JDBC Driver (OSS), the following requirements must be met:
- * Java Runtime Environment (JRE) 11.0 or above. CI testing is supported on JRE 11, 17, and 21.
+ * Databricks' open-source JDBC driver, which replaced the legacy Simba driver.
+ * Requires a Java Runtime Environment (JRE) 11.0 or above.
+ * https://docs.databricks.com/aws/en/integrations/jdbc/oss
  */
 export async function downloadJDBCDriver(): Promise<string | null> {
-  console.log(`Downloading databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`);
+  console.log(`Downloading ${JDBC_DRIVER_JAR_NAME}`);
 
   await downloadAndExtractFile(
-    `https://repo1.maven.org/maven2/com/databricks/databricks-jdbc/${OSS_DRIVER_VERSION}-oss/databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`,
+    `https://repo1.maven.org/maven2/com/databricks/databricks-jdbc/${DRIVER_VERSION}/${JDBC_DRIVER_JAR_NAME}`,
     {
       showProgress: true,
       cwd: path.resolve(path.join(__dirname, '..', 'download')),
       skipExtract: true,
-      dstFileName: `databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`,
+      dstFileName: JDBC_DRIVER_JAR_NAME,
     }
   );
 
-  console.log(`Release notes: https://mvnrepository.com/artifact/com.databricks/databricks-jdbc/${OSS_DRIVER_VERSION}-oss`);
+  console.log(`Release notes: https://mvnrepository.com/artifact/com.databricks/databricks-jdbc/${DRIVER_VERSION}`);
 
-  return path.resolve(path.join(__dirname, '..', 'download', `databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`));
+  return path.resolve(path.join(__dirname, '..', 'download', JDBC_DRIVER_JAR_NAME));
 }

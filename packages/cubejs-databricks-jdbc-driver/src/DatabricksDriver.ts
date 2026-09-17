@@ -22,7 +22,8 @@ import { DatabricksQuery } from './DatabricksQuery';
 import {
   extractAndRemoveUidPwdFromJdbcUrl,
   parseDatabricksJdbcUrl,
-  resolveJDBCDriver
+  resolveJDBCDriver,
+  validateAndRemoveGeoSpatialSupportFromJdbcUrl
 } from './helpers';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
@@ -219,7 +220,8 @@ export class DatabricksDriver extends JDBCDriver {
       url = url.replace('jdbc:spark://', 'jdbc:databricks://');
     }
 
-    const [uid, pwd, cleanedUrl] = extractAndRemoveUidPwdFromJdbcUrl(url);
+    const [uid, pwd, urlWithoutCredentials] = extractAndRemoveUidPwdFromJdbcUrl(url);
+    const cleanedUrl = validateAndRemoveGeoSpatialSupportFromJdbcUrl(urlWithoutCredentials);
     const passwd = conf?.token ||
           getEnv('databricksToken', { dataSource, preAggregations }) ||
           pwd;
@@ -263,6 +265,9 @@ export class DatabricksDriver extends JDBCDriver {
       properties: {
         ...authProps,
         UserAgentEntry: 'CubeDev_Cube',
+        // 3.4.1 turned geospatial support on by default, which returns GEOMETRY/GEOGRAPHY columns
+        // as Java objects instead of EWKT strings.
+        EnableGeoSpatialSupport: '0',
       },
       catalog:
         conf?.catalog ||

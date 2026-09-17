@@ -19,6 +19,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit-tests",
+    "unit": "npm run unit-tests",
     "unit-tests": "NODE_OPTIONS=--experimental-vm-modules jest dist/test --forceExit",
     "postinstall": "node bin/post-install"
   },
