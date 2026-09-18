@@ -84,8 +84,8 @@ impl PlanningThrottle {
     fn waited_too_long(&self) -> CubeError {
         app_metrics::QUERY_PLANNING_THROTTLE_REJECTED.increment();
         CubeError::user(format!(
-            "Waited longer than {} s (CUBESTORE_QUERY_TIMEOUT) for a query planning slot. Raise \
-             CUBESTORE_MAX_CONCURRENT_QUERY_PLANS to plan more queries at once.",
+            "Waited longer than {} s for a query planning slot. Please consider using \
+             multi-cluster deployment.",
             self.max_wait.as_secs()
         ))
     }
@@ -99,8 +99,7 @@ impl PlanningThrottle {
             app_metrics::QUERY_PLANNING_THROTTLE_REJECTED.increment();
             return Err(CubeError::user(format!(
                 "Too many queries are waiting to be planned: {} queued, the limit is {}. \
-                 Raise CUBESTORE_MAX_QUEUED_QUERY_PLANS or CUBESTORE_MAX_CONCURRENT_QUERY_PLANS \
-                 to accept more.",
+                 Please consider using multi-cluster deployment.",
                 queued, self.max_queued
             )));
         }
