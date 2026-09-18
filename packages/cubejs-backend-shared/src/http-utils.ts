@@ -175,8 +175,7 @@ async function extractZipArchive(archivePath: string, dir: string): Promise<void
  * Two gaps are deliberate, and both throw a named error rather than failing
  * obscurely: bzip2, and pre-POSIX v7 tars, which carry no magic to detect them by.
  *
- * Neither backend writes outside `cwd`: `tar` strips a leading `/` and drops entries
- * containing `..`, and the zip backend rejects such names outright.
+ * Neither backend writes outside `cwd`.
  */
 export async function extractArchive(archivePath: string, cwd: string): Promise<void> {
   // Neither backend creates its target — `tar.x` throws `CwdError`, the zip backend
