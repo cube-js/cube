@@ -24,6 +24,14 @@ pub static DATA_QUERIES_STALE_CACHE_SIZE: Gauge =
 pub static DATA_QUERIES_STALE_CACHE_WEIGHT: Gauge =
     metrics::gauge("cs.sql.query.data.cache.stale.weight");
 pub static DATA_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.data.ms");
+pub static QUERY_PLANNING_THROTTLE_IN_FLIGHT: Gauge =
+    metrics::gauge("cs.sql.query.data.planning.throttle.in_flight");
+pub static QUERY_PLANNING_THROTTLE_QUEUED: Gauge =
+    metrics::gauge("cs.sql.query.data.planning.throttle.queued");
+pub static QUERY_PLANNING_THROTTLE_WAIT_US: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.throttle.wait.us");
+pub static QUERY_PLANNING_THROTTLE_REJECTED: Counter =
+    metrics::counter("cs.sql.query.data.planning.throttle.rejected");
 pub static DATA_QUERY_LOGICAL_PLAN_TOTAL_CREATION_TIME_US: Histogram =
     metrics::histogram("cs.sql.query.data.planning.logical_plan.total_creation.us");
 pub static DATA_QUERY_LOGICAL_PLAN_EXECUTION_CONTEXT_TIME_US: Histogram =

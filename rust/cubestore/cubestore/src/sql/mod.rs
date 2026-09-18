@@ -2569,6 +2569,50 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn planning_throttle_serializes_queries() -> Result<(), CubeError> {
+        Config::test("planning_throttle_serializes_queries")
+            .update_config(|mut c| {
+                c.max_concurrent_query_plans = 1;
+                c.max_queued_query_plans = 0;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+                service
+                    .exec_query("CREATE TABLE foo.values (id int)")
+                    .await
+                    .unwrap();
+                service
+                    .exec_query("INSERT INTO foo.values (id) VALUES (1), (2), (3)")
+                    .await
+                    .unwrap();
+
+                let queries = (0..20).map(|_| {
+                    let service = service.clone();
+                    async move {
+                        service
+                            .exec_query("SELECT sum(id) FROM foo.values")
+                            .await?
+                            .collect()
+                            .await
+                    }
+                });
+                for result in join_all(queries).await {
+                    assert_eq!(
+                        result.unwrap().get_rows()[0],
+                        Row::new(vec![TableValue::Int(6)])
+                    );
+                }
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn decimal() -> Result<(), CubeError> {
         Config::test("decimal").update_config(|mut c| {
             c.partition_split_threshold = 2;

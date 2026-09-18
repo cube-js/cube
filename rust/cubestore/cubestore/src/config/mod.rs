@@ -426,6 +426,14 @@ pub trait ConfigObj: DIService {
     /// leaving the row-count split as the only trigger.
     fn wal_split_size_threshold_bytes(&self) -> Option<u64>;
 
+    /// Maximum number of logical plans built at the same time: `auto` by default, which is
+    /// `2 x cores`. `0` disables the limit.
+    fn max_concurrent_query_plans(&self) -> usize;
+
+    /// Maximum number of queries waiting for a planning slot. Over that, a query is rejected
+    /// instead of queued. `0` disables the limit.
+    fn max_queued_query_plans(&self) -> usize;
+
     fn select_worker_pool_size(&self) -> usize;
 
     fn select_worker_idle_timeout(&self) -> u64;
@@ -714,6 +722,8 @@ pub struct ConfigObjImpl {
     pub data_dir: PathBuf,
     pub dump_dir: Option<PathBuf>,
     pub store_provider: FileStoreProvider,
+    pub max_concurrent_query_plans: usize,
+    pub max_queued_query_plans: usize,
     pub select_worker_pool_size: usize,
     pub select_worker_idle_timeout: u64,
     pub job_runners_count: usize,
@@ -893,6 +903,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn wal_split_size_threshold_bytes(&self) -> Option<u64> {
         self.wal_split_size_threshold_bytes
+    }
+
+    fn max_concurrent_query_plans(&self) -> usize {
+        self.max_concurrent_query_plans
+    }
+
+    fn max_queued_query_plans(&self) -> usize {
+        self.max_queued_query_plans
     }
 
     fn select_worker_pool_size(&self) -> usize {
@@ -1379,6 +1397,40 @@ fn env_topk_strategy(name: &str) -> TopKAggregateStrategy {
     }
 }
 
+/// Planning is CPU bound, but it also waits on the metastore, so the cores stay fed only with
+/// somewhat more plans in flight than there are cores. Undershooting costs throughput several
+/// times over, overshooting costs memory, hence the deliberate oversubscription. Respects the
+/// cgroup CPU quota of the container.
+fn auto_max_concurrent_query_plans() -> usize {
+    let cores = std::thread::available_parallelism()
+        .map(|c| c.get())
+        .unwrap_or(4);
+    std::cmp::max(4, 2 * cores)
+}
+
+/// `auto` (the default) sizes the limit by the cores available to the process, an explicit number
+/// overrides it and `0` turns the throttling off.
+fn max_concurrent_query_plans_from_env() -> usize {
+    const NAME: &str = "CUBESTORE_MAX_CONCURRENT_QUERY_PLANS";
+    let value = match env::var(NAME) {
+        Ok(value) => value,
+        Err(_) => return auto_max_concurrent_query_plans(),
+    };
+    let value = value.trim();
+    if value.eq_ignore_ascii_case("auto") {
+        return auto_max_concurrent_query_plans();
+    }
+    value.parse().unwrap_or_else(|e: std::num::ParseIntError| {
+        log::warn!(
+            "Ignoring environment variable '{}' with '{}' value: {}; using auto",
+            NAME,
+            value,
+            e
+        );
+        auto_max_concurrent_query_plans()
+    })
+}
+
 fn env_bool(name: &str, default: bool) -> bool {
     env::var(name)
         .ok()
@@ -1767,6 +1819,8 @@ impl Config {
                         FileStoreProvider::Filesystem { remote_dir: None }
                     }
                 },
+                max_concurrent_query_plans: max_concurrent_query_plans_from_env(),
+                max_queued_query_plans: env_parse_lenient("CUBESTORE_MAX_QUEUED_QUERY_PLANS", 5000),
                 select_worker_pool_size: env_parse("CUBESTORE_SELECT_WORKERS", 4),
                 select_worker_idle_timeout: env_parse_duration(
                     "CUBESTORE_SELECT_WORKERS_IDLE_TIMEOUT",
@@ -2157,6 +2211,8 @@ impl Config {
                 store_provider: FileStoreProvider::Filesystem {
                     remote_dir: Some(Self::test_remote_dir_path(directory, name)),
                 },
+                max_concurrent_query_plans: 8,
+                max_queued_query_plans: 5000,
                 select_worker_pool_size: 0,
                 select_worker_idle_timeout: 600,
                 job_runners_count: 4,
