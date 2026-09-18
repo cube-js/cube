@@ -1321,6 +1321,8 @@ impl SqlService for SqlServiceImpl {
                 .await?
                 .into()),
             CubeStoreStatement::Statement(Statement::Query(q)) => {
+                app_metrics::DATA_QUERIES_INCOMING.increment();
+
                 let logical_plan_time_start = SystemTime::now();
                 let logical_plan = self
                     .query_planner

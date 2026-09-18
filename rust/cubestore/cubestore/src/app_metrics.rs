@@ -10,7 +10,12 @@ pub static STARTUPS: Counter = metrics::counter("cs.startup");
 /// Errors in IPC.
 pub static WORKER_POOL_ERROR: Counter = metrics::counter("cs.worker_pool.errors");
 
-/// Incoming SQL queries that do data reads.
+/// Data reads counted on arrival: parsed and about to be planned. [DATA_QUERIES] is incremented
+/// only once a query is planned and dispatched, so queries still queued in planning, timed out or
+/// lost to a restart never reach it; comparing the two shows that backlog.
+pub static DATA_QUERIES_INCOMING: Counter = metrics::counter("cs.sql.query.data.incoming");
+
+/// SQL queries that do data reads, counted once they are planned and dispatched.
 pub static DATA_QUERIES: Counter = metrics::counter("cs.sql.query.data");
 pub static DATA_QUERIES_CACHE_HIT: Counter = metrics::counter("cs.sql.query.data.cache.hit");
 pub static DATA_QUERIES_CACHE_STALE_HIT: Counter =
