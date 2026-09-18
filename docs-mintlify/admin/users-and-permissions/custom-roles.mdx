@@ -213,7 +213,7 @@ See [Manage users][ref-manage-users] for more.
 
 ## Validation
 
-These are the **role builder's** rules, enforced client-side before it submits; the API validates differently — see [Managing roles through the API](#managing-roles-through-the-api) below, where a policy with no actions is rejected rather than dropped.
+These are the **role builder's** rules, enforced client-side before it submits; the API validates differently — see [Managing roles through the API](#managing-roles-through-the-api) below:
 
 - **Name** is required and must be unique. Reserved names (`Admin`, `Guest`, `Developer`, `None`, `All`) are rejected. The API reserves a different set — every built-in role name, which includes `AIBIDeveloper`, `AIBIUser`, `AIBIViewer`, `D3User` and `EmbedUser`, but not `None` or `All`; see [`POST /api/v1/roles`][ref-api-create-role].
 - **Base Role** is required — Save is disabled until one is picked, and an inline error appears if you try to submit without one.
