@@ -53,7 +53,7 @@ Every custom role has exactly one **Base Role**. It determines:
 | Explorer   | Viewer + create/edit workbooks, run queries.                 |
 | Developer  | Explorer + edit data model, manage deployments.              |
 
-Most of that is what the tier licenses — the same thing a custom role's Base Role carries. What the built-in roles add through their own deployment policies varies by role: Viewer and Explorer get `DeploymentRead`, `DeploymentAgentRead` and `DownloadData` over every deployment, which is why a built-in Viewer can open a deployment and a custom role with Base Role **Viewer** and no deployment policy cannot; Developer's policy carries nearly every deployment action, the data-model ones included, so a custom Developer-equivalent has to grant `SchemaUpdate` itself. Developer's account-wide deployment management is different again — a [Global permission](#global-permissions).
+Those descriptions are the built-in roles' own policies at work, not the tier's: Viewer and Explorer carry `DeploymentRead`, `DeploymentAgentRead` and `DownloadData` over every deployment, Developer's policy carries nearly every deployment action including the data-model ones, and Developer's account-wide deployment management is a [Global permission](#global-permissions). A custom role's Base Role carries none of it — with Base Role **Viewer** and no deployment policy, the holder is licensed for viewer-level work and reaches no deployment.
 
 The tier is hierarchical, so a higher one satisfies a requirement for a lower:
 
@@ -113,7 +113,7 @@ Either grant **Full access** (a shortcut that enables every current and future d
 
 | Group       | Permission                          | What it grants                                                                                                                                                            |
 | ----------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| General     | Access deployment                   | Foundation permission required to access the deployment at all. A Viewer needs this just to open it.                                                                      |
+| General     | Access deployment                   | Foundation permission required to access the deployment at all. A custom role with Base Role **Viewer** needs this to open the deployment; the built-in Viewer already has it from its own deployment policy.                                                                      |
 | General     | Edit deployment                     | Modify general deployment settings (name, Build & Deploy, Configuration flags, etc.). Does **not** include environment variables, data sources, or other configuration secrets — see **Manage secrets**. |
 | General     | Delete deployment                   | Remove the deployment.                                                                                                                                                    |
 | Configuration & Secrets | Manage secrets          | View and edit environment variables, manage data sources (add/edit database connections, including the test-connection step), the Model Configuration card on **Settings → Configuration**, Power BI (XMLA) settings, and restarting dev mode to apply saved environment variable changes. |
