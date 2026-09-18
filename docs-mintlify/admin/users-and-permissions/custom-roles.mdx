@@ -17,7 +17,7 @@ Cube comes with [default roles][ref-default-roles] (Admin, Developer, Explorer, 
 
 Each custom role is built around three concepts:
 
-1. **Base Role** (required in the role builder) — Viewer, Explorer, or Developer. Determines the user's license tier — the kind of work the holder is licensed for; access to any deployment comes from the role's deployment policies.
+1. **Base Role** (required in the role builder) — Viewer, Explorer, or Developer. Determines the user's license tier — the kind of work the holder is licensed for; the permissions themselves come from the role's Global and deployment policies.
 2. **Global permissions** — org-wide capabilities such as billing, customization, integrations, and account-wide deployment management.
 3. **Deployment permissions** — one or more policies, each targeting "All deployments" or specific deployments.
 
@@ -53,7 +53,7 @@ Every custom role has exactly one **Base Role**. It determines:
 | Explorer   | Viewer + create/edit workbooks, run queries.                 |
 | Developer  | Explorer + edit data model, manage deployments.              |
 
-Those are the built-in roles' own deployment policies at work. A custom role with Base Role **Viewer** and no deployment policy licenses the holder for viewer-level work but reaches no deployment.
+Those are the built-in roles' own policies at work — mostly deployment-scoped, though Developer's account-wide deployment management is a [Global permission](#global-permissions). A custom role with Base Role **Viewer** and no deployment policy licenses the holder for viewer-level work but reaches no deployment.
 
 The tier is hierarchical, so a higher one satisfies a requirement for a lower:
 
@@ -285,7 +285,7 @@ This section lists every action the role builder exposes. The internal action na
 
 ### Base Role actions (Global)
 
-As a custom role's Base Role, the action sets the license tier — see [Base Role](#base-role) for which of these capabilities that carries.
+As a custom role's Base Role, the action sets the license tier and nothing deployment-scoped — see [Base Role](#base-role) for what the tier licenses.
 
 | Internal name   | Label     | Access the built-in role of that name has                  |
 | --------------- | --------- | ---------------------------------------------------------- |
