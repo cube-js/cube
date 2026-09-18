@@ -4928,8 +4928,8 @@ async fn boolean_context_wrapper_plans() {
     for (query, fragment) in [
         ("SELECT COUNT(DISTINCT customer_gender) = 2 AS flag FROM KibanaSampleDataEcommerce", "CAST(CASE WHEN"),
         ("SELECT has_subscription IS NULL AS missing, MEASURE(count) FROM KibanaSampleDataEcommerce GROUP BY 1", "CAST(CASE WHEN"),
-        ("SELECT customer_gender, SUM(CASE WHEN has_subscription THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce GROUP BY 1", "= CAST(1 AS BIT)"),
-        ("SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE NOT has_subscription GROUP BY 1", "= CAST(1 AS BIT)"),
+        ("SELECT customer_gender, SUM(CASE WHEN has_subscription = TRUE THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce GROUP BY 1", "= CAST(1 AS BIT)"),
+        ("SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE NOT (has_subscription = TRUE) GROUP BY 1", "= CAST(1 AS BIT)"),
         ("SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription = CAST(0 AS BOOLEAN) GROUP BY 1", "CAST(0 AS BIT)"),
     ] {
         let plan = context.convert_sql_to_cube_query(query).await.unwrap().as_logical_plan();
@@ -4950,7 +4950,12 @@ async fn boolean_context_segment_members() {
     )
     .await;
     let fixture = crate::compile::test::mssql_boolean_fixture();
-    for case in fixture["segmentCases"].as_array().unwrap() {
+    for case in fixture["segmentCases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .chain(fixture["dimensionCases"].as_array().unwrap())
+    {
         let plan = context
             .convert_sql_to_cube_query(case["query"].as_str().unwrap())
             .await

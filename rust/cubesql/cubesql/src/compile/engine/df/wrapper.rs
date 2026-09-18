@@ -2472,13 +2472,15 @@ impl WrappedSelectNode {
             expr = *inner;
         }
         let mut is_segment = false;
+        let mut leave_raw_dimension = false;
         let has_boolean_context = sql_generator
             .get_sql_templates()
             .contains_template("expressions/scalar_to_predicate");
         if has_boolean_context {
             if let (Expr::Column(column), Some(context)) = (&expr, push_to_cube_context) {
-                // Raw segment references expand to predicates in the schema compiler.
-                // Materialized/join columns and boolean dimensions remain scalar values.
+                // A segment is a predicate, but boolean dimension SQL can be either
+                // a predicate or a BIT scalar. Preserve raw dimensions in predicate
+                // context; explicit comparisons/casts still get normal conversion.
                 if !subqueries.contains_key(&column.flat_name())
                     && !column
                         .relation
@@ -2489,10 +2491,13 @@ impl WrappedSelectNode {
                         Self::find_member_in_ungrouped_scan(context.ungrouped_scan_node, column)?
                     {
                         if let Some((cube_name, member_name)) = member.member.split_once('.') {
-                            is_segment = context
-                                .meta
-                                .find_cube_with_name(cube_name)
-                                .is_some_and(|cube| cube.lookup_segment(member_name).is_some());
+                            if let Some(cube) = context.meta.find_cube_with_name(cube_name) {
+                                is_segment = cube.lookup_segment(member_name).is_some();
+                                leave_raw_dimension = predicate
+                                    && cube
+                                        .lookup_dimension(member_name)
+                                        .is_some_and(|dimension| dimension.r#type == "boolean");
+                            }
                         }
                     }
                 }
@@ -2517,10 +2522,14 @@ impl WrappedSelectNode {
             push_to_cube_context,
             subqueries,
         )?;
-        // Segment SQL is opaque and may contain OR/AND. Keep its precedence when
-        // embedding it in a larger MSSQL predicate or a scalarizing CASE.
-        let sql = if is_segment { format!("({sql})") } else { sql };
-        let sql = if is_predicate != predicate {
+        // Opaque predicate SQL may contain OR/AND. Preserve its precedence when
+        // embedding it in another predicate or a scalarizing CASE.
+        let sql = if is_segment || leave_raw_dimension {
+            format!("({sql})")
+        } else {
+            sql
+        };
+        let sql = if !leave_raw_dimension && is_predicate != predicate {
             sql_generator
                 .get_sql_templates()
                 .boolean_context_expr(sql, predicate)
@@ -5094,6 +5103,70 @@ mod tests {
             used_cubes,
             None,
         )
+    }
+
+    #[test]
+    fn boolean_context_raw_dimension_boundaries() {
+        use crate::compile::test::{mssql_boolean_templates, sql_generator};
+        use datafusion::logical_plan::col;
+
+        let mut meta = meta_context_with_cubes(&[("Orders", "Orders.completed", "warehouse")]);
+        meta.cubes[0].dimensions[0].r#type = "boolean".to_string();
+        let scan = cube_scan_node(
+            vec![MemberField::regular("Orders.completed".to_string())],
+            vec!["Orders".to_string()],
+        );
+        let context = PushToCubeContext {
+            ungrouped_scan_node: &scan,
+            meta: &meta,
+            known_join_subqueries: HashSet::from(["joined".to_string()]),
+        };
+        let render = |expr, predicate, context, subqueries: &HashMap<String, String>, mssql| {
+            WrappedSelectNode::generate_sql_for_expr_context(
+                SqlQuery::new(String::new(), vec![]),
+                sql_generator(if mssql {
+                    mssql_boolean_templates()
+                } else {
+                    vec![]
+                }),
+                expr,
+                context,
+                subqueries,
+                predicate,
+            )
+            .unwrap()
+            .0
+        };
+        let empty = HashMap::new();
+        assert_eq!(
+            render(col("c0").alias("flag"), true, Some(&context), &empty, true),
+            "(${Orders.completed})"
+        );
+        assert_eq!(
+            render(col("c0"), false, Some(&context), &empty, true),
+            "${Orders.completed}"
+        );
+        assert_eq!(
+            render(col("c0"), true, Some(&context), &empty, false),
+            "${Orders.completed}"
+        );
+        assert_eq!(
+            render(col("c0"), true, None, &empty, true),
+            "(\"c0\" = CAST(1 AS BIT))"
+        );
+        let joined = Expr::Column(Column {
+            relation: Some("joined".to_string()),
+            name: "c0".to_string(),
+        });
+        assert_eq!(
+            render(joined, true, Some(&context), &empty, true),
+            "(\"joined\".\"c0\" = CAST(1 AS BIT))"
+        );
+        let subqueries = HashMap::from([("c0".to_string(), "SELECT CAST(1 AS BIT)".to_string())]);
+        assert_eq!(
+            render(col("c0"), true, Some(&context), &subqueries, true),
+            "((SELECT CAST(1 AS BIT)) = CAST(1 AS BIT))"
+        );
     }
 
     /// A plain wrapped `CubeScan` whose columns are all literals has no member to

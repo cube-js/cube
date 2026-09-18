@@ -55,6 +55,51 @@ describe('MSSQL SQL API boolean contexts', () => {
     }
   });
 
+  describe('raw boolean dimensions', () => {
+    const modelSql = {
+      bit: 'CAST(b AS BIT)',
+      comparison: 'CAST(b AS INT) > 0',
+      compound: 'b = CAST(1 AS BIT) OR c = CAST(1 AS BIT)'
+    };
+    const dimensions: Record<string, string> = {};
+    let segmentSql: string;
+
+    beforeAll(async () => {
+      for (const [model, sql] of Object.entries(modelSql)) {
+        const compilers = prepareJsCompiler(`
+          cube('KibanaSampleDataEcommerce', {
+            sql: 'SELECT * FROM fixture',
+            measures: { count: { type: 'count' } },
+            dimensions: { has_subscription: { sql: '${sql}', type: 'boolean' } },
+            segments: { is_male: { sql: 'c = CAST(0 AS BIT)' } }
+          })
+        `);
+        await compilers.compiler.compile();
+        const modelQuery = new MssqlQuery(compilers, { measures: ['KibanaSampleDataEcommerce.count'] });
+        dimensions[model] = modelQuery.newDimension('KibanaSampleDataEcommerce.has_subscription').dimensionSql();
+        segmentSql = modelQuery.newSegment('KibanaSampleDataEcommerce.is_male').segmentSql();
+      }
+    });
+
+    it.each(booleanFixture.dimensionCases)('$model: $query', async test => {
+      // Rust asserts these exact member expressions after planning. The provider
+      // executes their model expansion across true, false, and NULL inputs.
+      const sql = test.sql.split(`\${KibanaSampleDataEcommerce.has_subscription}`).join(dimensions[test.model])
+        .split(`\${KibanaSampleDataEcommerce.is_male}`).join(segmentSql);
+      const result = query(test.predicate
+        ? `SELECT COUNT(*) AS n FROM ${fixture} WHERE ${sql}`
+        : `SELECT ${sql} AS n FROM ${fixture}`);
+
+      // Excluding raw references deliberately cannot make a BIT into a bare
+      // condition, or an opaque predicate into a scalar value.
+      if (test.expected === null) {
+        await expect(result).rejects.toThrow(/non-boolean|syntax/i);
+      } else {
+        expect(Number((await result)[0].n)).toBe(test.expected);
+      }
+    });
+  });
+
   it.each(booleanFixture.aggregates)('preserves aggregate projection $scalar on nonempty and empty inputs', async test => {
     for (const empty of [false, true]) {
       const result = await query(`SELECT ${test.scalar} AS flag FROM ${fixture}${empty ? ' WHERE id < 0' : ''}`);
