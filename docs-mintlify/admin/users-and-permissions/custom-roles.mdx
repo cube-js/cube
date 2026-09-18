@@ -17,7 +17,7 @@ Cube comes with [default roles][ref-default-roles] (Admin, Developer, Explorer, 
 
 Each custom role is built around three concepts:
 
-1. **Base Role** (required in the role builder) — Viewer, Explorer, or Developer. Determines the user's license tier and the account-wide capabilities that tier carries; deployment access comes from the role's deployment policies.
+1. **Base Role** (required in the role builder) — Viewer, Explorer, or Developer. Determines the user's license tier — the kind of work the holder is licensed for; access to any deployment comes from the role's deployment policies.
 2. **Global permissions** — org-wide capabilities such as billing, customization, integrations, and account-wide deployment management.
 3. **Deployment permissions** — one or more policies, each targeting "All deployments" or specific deployments.
 
@@ -45,7 +45,7 @@ The role builder uses a two-column layout. The left column (sticky as you scroll
 Every custom role has exactly one **Base Role**. It determines:
 
 - The user's **license tier** — Cube infers the tier from the highest Base Role across all of the user's roles.
-- The **inherited** capabilities that tier carries. These are account-wide capabilities only — the Base Role grants no deployment-scoped access on its own, even where a built-in role of the same name does; that comes from the role's own deployment policies.
+- What that tier **licenses** — the kind of work its holder may do. The Base Role grants no deployment-scoped access on its own, even where a built-in role of the same name does; that comes from the role's own deployment policies.
 
 | Base Role  | Access the built-in role of that name has                    |
 | ---------- | ------------------------------------------------------------ |
@@ -53,7 +53,7 @@ Every custom role has exactly one **Base Role**. It determines:
 | Explorer   | Viewer + create/edit workbooks, run queries.                 |
 | Developer  | Explorer + edit data model, manage deployments.              |
 
-Those descriptions split in two where a custom role is concerned. The account-wide capabilities in them — viewing dashboards and chats, creating and editing workbooks, running queries — are gated on the tier alone, so a custom role's Base Role carries them. The deployment-scoped ones — editing the data model, managing a deployment — the built-in role grants through its own deployment policy, and a custom role needs a deployment policy of its own.
+Those descriptions are the built-in roles', and a custom role's Base Role carries only half of each. The tier licenses the kind of work — viewing dashboards and chats, creating and editing workbooks, running queries, editing the data model — but reaching the deployment where any of it happens comes from the role's own deployment policies, which the built-in roles carry and a Base Role does not. So a custom role with Base Role **Viewer** and no deployment policy grants nothing at all.
 
 The tier is hierarchical, so a higher one satisfies a requirement for a lower:
 
