@@ -279,7 +279,7 @@ Assignment is the exception — `PUT /api/v1/roles/{roleId}/users/{userId}` reso
 
 ## Reference: action catalog
 
-This section lists every action a custom role can grant. The internal action names match the names shown in the [audit log][ref-audit-log].
+This section lists every action the role builder exposes. The internal action names match the names shown in the [audit log][ref-audit-log]. `POST /api/v1/roles` accepts a wider set than the builder renders — see the `actions` enum on [`POST /api/v1/roles`][ref-api-create-role] for the full list.
 
 [ref-audit-log]: /admin/monitoring/audit-log
 
