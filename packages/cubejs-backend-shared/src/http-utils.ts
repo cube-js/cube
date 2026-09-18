@@ -104,10 +104,9 @@ function zipEntryMode(entry: StreamZip.ZipEntry): number {
 }
 
 /**
- * The same mode, but only from a producer that reports unix (high byte 3 of "version
- * made by") as its host system. Anything else, the DOS default of 0 included, is free
- * to leave those bits unset or meaningless, so a mode read from them cannot be
- * applied to a file.
+ * The same mode, but only when the "version made by" host byte is 3; with the DOS
+ * default of 0 those bits are DOS attribute flags, and applying them as a mode would
+ * invent permissions.
  */
 function zipEntryUnixMode(entry: StreamZip.ZipEntry): number | undefined {
   // eslint-disable-next-line no-bitwise
@@ -132,10 +131,9 @@ async function extractZipArchive(archivePath: string, dir: string): Promise<void
     const entries = Object.values(await zip.entries())
       .map((entry) => ({ entry, mode: zipEntryUnixMode(entry) }));
 
-    // Ungated by the host byte, unlike the exec bit below, so that the rejection holds
-    // for every archive the message claims it does: a producer reporting MS-DOS can
-    // still record `S_IFLNK` there, and its own attribute bits live in the low byte,
-    // too small to alias a file type in the high half.
+    // Ungated by the host byte, unlike the exec bit below: a producer reporting MS-DOS
+    // can still record `S_IFLNK`, and DOS attribute bits live in the low byte, too small
+    // to alias a file type in the high half.
     for (const { entry } of entries) {
       // eslint-disable-next-line no-bitwise
       if ((zipEntryMode(entry) & S_IFMT) === S_IFLNK) {
@@ -147,10 +145,9 @@ async function extractZipArchive(archivePath: string, dir: string): Promise<void
 
     await zip.extract(null, dir);
 
-    // `node-stream-zip` opens every file with the default 0o666, where `extract-zip`
-    // applied the recorded mode — so a zipped binary would arrive unrunnable. Only the
-    // exec bit is restored: honouring the whole mode would let an archive widen its own
-    // permissions, and nothing here depends on the rest of it.
+    // `node-stream-zip` applies no entry modes, so a zipped binary arrives unrunnable.
+    // Only the exec bit is restored, because honouring the whole mode would let an
+    // archive widen its own permissions.
     for (const { entry, mode } of entries) {
       // eslint-disable-next-line no-bitwise
       if (entry.isFile && mode !== undefined && (mode & S_IXUGO)) {
