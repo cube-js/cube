@@ -148,6 +148,28 @@ type PreAggJob = {
  */
 export type PreAggregationType = 'rollup' | 'originalSql';
 
+/**
+ * State of a build for a particular versioned partition table. The table becomes
+ * visible to `getTablesQuery` as soon as it is created, long before the rows are
+ * imported into it, so a finished build is recorded by the absence of a record
+ * rather than by a status of its own.
+ */
+export type PreAggregationBuildStatus = {
+  status: 'building' | 'failure',
+  error?: string,
+  startedAt?: number,
+};
+
+const PRE_AGG_BUILD_STATUS_PERSIST_TIME = 86400;
+
+/**
+ * How much longer than the queue execution timeout a build is still believed
+ * to be running. The slack covers the queue writing the timeout failure down,
+ * and the clock difference between the instance that started the build and the
+ * one reading its status.
+ */
+const ABANDONED_BUILD_TIMEOUT_FACTOR = 2;
+
 export type LoadPreAggregationResult = {
   targetTableName: string;
   refreshKeyValues: any[];
@@ -357,6 +379,43 @@ export class PreAggregations {
     return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_REFRESH_END_REACHED', '');
   }
 
+  protected preAggBuildStatusRedisKey(tableName: string): string {
+    // TODO add dataSource?
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_BUILD_STATUS', tableName);
+  }
+
+  public async setPreAggregationBuildStatus(tableName: string, status: PreAggregationBuildStatus): Promise<void> {
+    await this.queryCache.getCacheDriver().set(
+      this.preAggBuildStatusRedisKey(tableName),
+      status,
+      PRE_AGG_BUILD_STATUS_PERSIST_TIME
+    );
+  }
+
+  public async getPreAggregationBuildStatus(tableName: string): Promise<PreAggregationBuildStatus | null> {
+    return await this.queryCache.getCacheDriver().get(this.preAggBuildStatusRedisKey(tableName)) || null;
+  }
+
+  public async removePreAggregationBuildStatus(tableName: string): Promise<void> {
+    await this.queryCache.getCacheDriver().remove(this.preAggBuildStatusRedisKey(tableName));
+  }
+
+  /**
+   * The queue times a build out on its own and records the failure, so a build
+   * that is still marked as running long past that timeout is one whose process
+   * is gone and will never report an outcome.
+   */
+  private async isBuildAbandoned(dataSource: string, buildStatus: PreAggregationBuildStatus): Promise<boolean> {
+    if (!buildStatus.startedAt) {
+      return false;
+    }
+
+    const { executionTimeout } = await this.options.queueOptions?.(dataSource) || {};
+    const limit = (executionTimeout || getEnv('dbQueryTimeout')) * 1000 * ABANDONED_BUILD_TIMEOUT_FACTOR;
+
+    return new Date().getTime() - buildStatus.startedAt > limit;
+  }
+
   public async addTableUsed(tableName: string): Promise<void> {
     if (this.usedCache.has(tableName)) {
       return;
@@ -492,23 +551,36 @@ export class PreAggregations {
     const result = await conn.getResult(key);
     queue.getQueueDriver().release(conn);
 
-    // calculating status
+    // fetching the state of the build. The queue result is readable only once,
+    // so this record is the durable source of truth here.
+    const buildStatus = await this.getPreAggregationBuildStatus(table);
+
+    // A build record outranks the table: the table is there from the moment the
+    // build starts and is left behind when it fails or is killed.
     let status: string;
-    if (tables.length === 1) {
+    if (buildStatus?.status === 'failure') {
+      status = `failure: ${buildStatus.error}`;
+    } else if (buildStatus?.status === 'building') {
+      status = await this.isBuildAbandoned(dataSource, buildStatus)
+        ? 'failure: the build has not completed'
+        : 'processing';
+    } else if (tables.length === 1) {
       status = 'done';
+    } else if (result?.error) {
+      status = `failure: ${result.error}`;
     } else {
-      status = result?.error
-        ? `failure: ${result.error}`
-        : 'missing_partition';
+      status = 'missing_partition';
     }
 
     // updating jobs cache if needed
-    if (result) {
-      const preAggJob: PreAggJob = await this
-        .queryCache
-        .getCacheDriver()
-        .get(`PRE_AGG_JOB_${token}`);
+    const preAggJob: PreAggJob = await this
+      .queryCache
+      .getCacheDriver()
+      .get(`PRE_AGG_JOB_${token}`);
 
+    // clients poll in a loop, so rewriting an unchanged status would both add a
+    // write per token per poll and keep pushing the record's expiry forward
+    if (preAggJob && preAggJob.status !== status) {
       await this
         .queryCache
         .getCacheDriver()
