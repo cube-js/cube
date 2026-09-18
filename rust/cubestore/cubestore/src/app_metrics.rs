@@ -10,7 +10,12 @@ pub static STARTUPS: Counter = metrics::counter("cs.startup");
 /// Errors in IPC.
 pub static WORKER_POOL_ERROR: Counter = metrics::counter("cs.worker_pool.errors");
 
-/// Incoming SQL queries that do data reads.
+/// Selects counted on arrival, before planning. Compare against [DATA_QUERIES] tagged
+/// `command:select` — untagged it also counts DDL/DML, and system-table selects land in
+/// [META_QUERIES]; the gap is the planning backlog.
+pub static DATA_QUERIES_INCOMING: Counter = metrics::counter("cs.sql.query.data.incoming");
+
+/// Queries counted once planned and dispatched, tagged with the command they ran.
 pub static DATA_QUERIES: Counter = metrics::counter("cs.sql.query.data");
 pub static DATA_QUERIES_CACHE_HIT: Counter = metrics::counter("cs.sql.query.data.cache.hit");
 pub static DATA_QUERIES_CACHE_STALE_HIT: Counter =
@@ -24,6 +29,16 @@ pub static DATA_QUERIES_STALE_CACHE_SIZE: Gauge =
 pub static DATA_QUERIES_STALE_CACHE_WEIGHT: Gauge =
     metrics::gauge("cs.sql.query.data.cache.stale.weight");
 pub static DATA_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.data.ms");
+pub static QUERY_PLANNING_THROTTLE_IN_FLIGHT: Gauge =
+    metrics::gauge("cs.sql.query.data.planning.throttle.in_flight");
+pub static QUERY_PLANNING_THROTTLE_QUEUED: Gauge =
+    metrics::gauge("cs.sql.query.data.planning.throttle.queued");
+/// Only queries that actually waited for a slot are reported, so this describes the waiting
+/// minority, not the typical query.
+pub static QUERY_PLANNING_THROTTLE_WAIT_US: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.throttle.wait.us");
+pub static QUERY_PLANNING_THROTTLE_REJECTED: Counter =
+    metrics::counter("cs.sql.query.data.planning.throttle.rejected");
 pub static DATA_QUERY_LOGICAL_PLAN_TOTAL_CREATION_TIME_US: Histogram =
     metrics::histogram("cs.sql.query.data.planning.logical_plan.total_creation.us");
 pub static DATA_QUERY_LOGICAL_PLAN_EXECUTION_CONTEXT_TIME_US: Histogram =

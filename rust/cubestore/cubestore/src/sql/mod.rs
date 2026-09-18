@@ -1321,6 +1321,8 @@ impl SqlService for SqlServiceImpl {
                 .await?
                 .into()),
             CubeStoreStatement::Statement(Statement::Query(q)) => {
+                app_metrics::DATA_QUERIES_INCOMING.increment();
+
                 let logical_plan_time_start = SystemTime::now();
                 let logical_plan = self
                     .query_planner
@@ -2566,6 +2568,99 @@ mod tests {
         })
             .await;
         Ok(())
+    }
+
+    /// A single-threaded runtime: if acquiring a planning permit blocked the thread instead of
+    /// parking the task, the first query would never release it.
+    #[tokio::test]
+    async fn planning_throttle_does_not_deadlock() -> Result<(), CubeError> {
+        Config::test("planning_throttle_does_not_deadlock")
+            .update_config(|mut c| {
+                c.max_concurrent_query_plans = 1;
+                c.max_queued_query_plans = 0;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                create_values_table(&service).await;
+
+                let queries = (0..20).map(|_| {
+                    let service = service.clone();
+                    async move {
+                        service
+                            .exec_query("SELECT sum(id) FROM foo.values")
+                            .await?
+                            .collect()
+                            .await
+                    }
+                });
+                for result in join_all(queries).await {
+                    assert_eq!(
+                        result.unwrap().get_rows()[0],
+                        Row::new(vec![TableValue::Int(6)])
+                    );
+                }
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn planning_throttle_rejects_over_queue_depth() -> Result<(), CubeError> {
+        Config::test("planning_throttle_rejects_over_queue_depth")
+            .update_config(|mut c| {
+                c.max_concurrent_query_plans = 1;
+                c.max_queued_query_plans = 1;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                create_values_table(&service).await;
+
+                let queries = (0..20).map(|_| {
+                    let service = service.clone();
+                    async move {
+                        service
+                            .exec_query("SELECT sum(id) FROM foo.values")
+                            .await?
+                            .collect()
+                            .await
+                    }
+                });
+                let results = join_all(queries).await;
+                let rejected = results
+                    .iter()
+                    .filter(|r| match r {
+                        Err(e) => e.message.contains("waiting to be planned"),
+                        Ok(_) => false,
+                    })
+                    .count();
+                assert!(rejected > 0, "the queue depth of 1 rejected nothing");
+                for result in results.into_iter().filter(|r| r.is_ok()) {
+                    assert_eq!(
+                        result.unwrap().get_rows()[0],
+                        Row::new(vec![TableValue::Int(6)])
+                    );
+                }
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
+    async fn create_values_table(service: &Arc<dyn SqlService>) {
+        service.exec_query("CREATE SCHEMA foo").await.unwrap();
+        service
+            .exec_query("CREATE TABLE foo.values (id int)")
+            .await
+            .unwrap();
+        service
+            .exec_query("INSERT INTO foo.values (id) VALUES (1), (2), (3)")
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
