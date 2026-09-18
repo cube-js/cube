@@ -158,6 +158,11 @@ const schemaOptions = Joi.object().keys({
   serverless: Joi.boolean(),
   allowNodeRequire: Joi.boolean(),
   fastReload: Joi.boolean(),
+  // LLM Gateway hook. Core does not read it, but this schema rejects unknown
+  // keys, so without an entry every deployment declaring it fails to start.
+  // An object is allowed because the hook may be a model instance, not a
+  // factory. See docs-mintlify/admin/ai/bring-your-own-model.mdx.
+  chatCompletion: Joi.alternatives().try(Joi.func(), Joi.object()),
 });
 
 export function validateOptions<T>(options: T): T {

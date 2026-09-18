@@ -241,6 +241,13 @@ export interface CreateOptions {
   allowNodeRequire?: boolean;
   semanticLayerSync?: (context: RequestContext) => Promise<BiToolSyncConfig[]> | BiToolSyncConfig[];
   fastReload?: boolean;
+  /**
+   * LLM Gateway hook — a chat model instance, a factory returning one, or a
+   * function returning a stream of chunks. Core accepts it and never reads it;
+   * declared so a `cube.ts` config that sets it type-checks. See
+   * docs-mintlify/admin/ai/bring-your-own-model.mdx.
+   */
+  chatCompletion?: unknown;
 }
 
 export interface DriverDecoratedOptions extends CreateOptions {
