@@ -47,16 +47,18 @@ Every custom role has exactly one **Base Role**. It determines:
 - The user's **license tier** — Cube infers the tier from the highest Base Role across all of the user's roles.
 - The **inherited** capabilities that tier carries. These are account-wide capabilities only — the Base Role grants no deployment-scoped access on its own, even where a built-in role of the same name does; that comes from the role's own deployment policies.
 
-| Base Role  | What the built-in role of that name can do                   |
+| Base Role  | Access the built-in role of that name has                    |
 | ---------- | ------------------------------------------------------------ |
 | Viewer     | Read-only access to dashboards and chats.                    |
 | Explorer   | Viewer + create/edit workbooks, run queries.                 |
 | Developer  | Explorer + edit data model, manage deployments.              |
 
-Inheritance is hierarchical:
+Those descriptions split in two where a custom role is concerned. The account-wide capabilities in them — viewing dashboards and chats, creating and editing workbooks, running queries — are gated on the tier alone, so a custom role's Base Role carries them. The deployment-scoped ones — editing the data model, managing a deployment — the built-in role grants through its own deployment policy, and a custom role needs a deployment policy of its own.
 
-- **Explorer** automatically grants Viewer access.
-- **Developer** automatically grants Explorer and Viewer access.
+The tier is hierarchical, so a higher one satisfies a requirement for a lower:
+
+- **Explorer** meets any Viewer requirement.
+- **Developer** meets any Explorer or Viewer requirement.
 
 {/* TODO: Upload screenshot of Base Role section with all three options visible */}
 
