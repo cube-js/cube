@@ -134,7 +134,10 @@ API — for example, an internal LLM gateway.
   may include placeholders that are resolved per request from the caller's
   identity: `{{userId}}`, `{{userExternalId}}`, `{{email}}`, `{{username}}`,
   `{{tenantId}}`, `{{tenantName}}`, `{{tenantUrl}}`, `{{deploymentId}}`, and
-  `{{agentId}}`
+  `{{agentId}}`. If a placeholder has no value for a given request (for
+  example, `{{userExternalId}}` for a user who did not arrive through
+  signed embedding), it is left in the header value as literal text rather
+  than being replaced with an empty string
 
 ### Custom Anthropic-compatible
 
