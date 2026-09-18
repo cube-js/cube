@@ -182,3 +182,21 @@ jobs:
             "repos/$REPO/issues/comments/$COMMENT_ID/reactions" \
             -f "content=$reaction" \
             --silent
+
+      - name: Delete tracking comment (cancelled run)
+        # The action keeps the run link in the tracking comment's body for its
+        # whole lifetime, so it doubles as the marker for the comment this run owns.
+        if: cancelled() && env.PR_NUMBER != ''
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # shellcheck disable=SC2016 # $ENV is jq's environment, not the shell's
+          gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+            --jq '.[] | select(.body | contains($ENV.RUN_URL)) | .id' \
+          | while read -r comment_id; do
+              echo "Deleting tracking comment $comment_id"
+              gh api --method DELETE "repos/$REPO/issues/comments/$comment_id" --silent
+            done
