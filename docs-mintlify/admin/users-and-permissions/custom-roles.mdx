@@ -53,7 +53,7 @@ Every custom role has exactly one **Base Role**. It determines:
 | Explorer   | Viewer + create/edit workbooks, run queries.                 |
 | Developer  | Explorer + edit data model, manage deployments.              |
 
-Those are the built-in roles' own policies at work — mostly deployment-scoped, though Developer's account-wide deployment management is a [Global permission](#global-permissions). A custom role with Base Role **Viewer** and no deployment policy licenses the holder for viewer-level work but reaches no deployment.
+Most of that is what the tier licenses — the same thing a custom role's Base Role carries. What the built-in roles add through their own deployment policies is narrower: `DeploymentRead`, `DeploymentAgentRead` and `DownloadData` over every deployment, which is why a built-in Viewer can open a deployment and a custom role with Base Role **Viewer** and no deployment policy cannot. Developer's account-wide deployment management is different again — a [Global permission](#global-permissions).
 
 The tier is hierarchical, so a higher one satisfies a requirement for a lower:
 
