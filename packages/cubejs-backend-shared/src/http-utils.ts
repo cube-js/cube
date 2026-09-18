@@ -131,9 +131,9 @@ async function extractZipArchive(archivePath: string, dir: string): Promise<void
     const entries = Object.values(await zip.entries())
       .map((entry) => ({ entry, mode: zipEntryUnixMode(entry) }));
 
-    // Ungated by the host byte, unlike the exec bit below: a producer reporting MS-DOS
-    // can still record `S_IFLNK`, and DOS attribute bits live in the low byte, too small
-    // to alias a file type in the high half.
+    // Policy, not containment: `node-stream-zip` never creates symlinks, so the entry
+    // would land as a file holding the target path — a silently broken install, worth
+    // failing loudly over. Ungated by the host byte, which a producer may report as DOS.
     for (const { entry } of entries) {
       // eslint-disable-next-line no-bitwise
       if ((zipEntryMode(entry) & S_IFMT) === S_IFLNK) {
