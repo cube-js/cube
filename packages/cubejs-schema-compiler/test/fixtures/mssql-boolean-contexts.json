@@ -322,10 +322,124 @@
       "expected": 2
     },
     {
-      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE is_male AND NOT has_subscription GROUP BY 1",
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE is_male AND NOT (has_subscription = TRUE) GROUP BY 1",
       "sql": "((${KibanaSampleDataEcommerce.is_male}) AND NOT ((${KibanaSampleDataEcommerce.has_subscription} = CAST(1 AS BIT))))",
       "predicate": true,
       "expected": 1
+    }
+  ],
+  "dimensionCases": [
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription GROUP BY 1",
+      "sql": "(${KibanaSampleDataEcommerce.has_subscription})",
+      "predicate": true,
+      "model": "comparison",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE NOT has_subscription GROUP BY 1",
+      "sql": "NOT ((${KibanaSampleDataEcommerce.has_subscription}))",
+      "predicate": true,
+      "model": "comparison",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN has_subscription THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce GROUP BY 1",
+      "sql": "SUM(CASE WHEN (${KibanaSampleDataEcommerce.has_subscription}) THEN 1 ELSE 0 END)",
+      "predicate": false,
+      "model": "comparison",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN has_subscription THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce GROUP BY 1",
+      "sql": "SUM(CASE WHEN (${KibanaSampleDataEcommerce.has_subscription}) THEN 1 ELSE 0 END)",
+      "predicate": false,
+      "model": "compound",
+      "expected": 5
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription AND is_male GROUP BY 1",
+      "sql": "((${KibanaSampleDataEcommerce.has_subscription}) AND (${KibanaSampleDataEcommerce.is_male}))",
+      "predicate": true,
+      "model": "compound",
+      "expected": 1
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription = TRUE GROUP BY 1",
+      "sql": "(${KibanaSampleDataEcommerce.has_subscription} = CAST(1 AS BIT))",
+      "predicate": true,
+      "model": "bit",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription = FALSE GROUP BY 1",
+      "sql": "(${KibanaSampleDataEcommerce.has_subscription} = CAST(0 AS BIT))",
+      "predicate": true,
+      "model": "bit",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE NOT (has_subscription = TRUE) GROUP BY 1",
+      "sql": "NOT ((${KibanaSampleDataEcommerce.has_subscription} = CAST(1 AS BIT)))",
+      "predicate": true,
+      "model": "bit",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN has_subscription = TRUE THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce GROUP BY 1",
+      "sql": "SUM(CASE WHEN (${KibanaSampleDataEcommerce.has_subscription} = CAST(1 AS BIT)) THEN 1 ELSE 0 END)",
+      "predicate": false,
+      "model": "bit",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE CAST(has_subscription AS BOOLEAN) GROUP BY 1",
+      "sql": "(CAST(${KibanaSampleDataEcommerce.has_subscription} AS BIT) = CAST(1 AS BIT))",
+      "predicate": true,
+      "model": "bit",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE COALESCE(has_subscription, FALSE) GROUP BY 1",
+      "sql": "(COALESCE(${KibanaSampleDataEcommerce.has_subscription}, CAST(0 AS BIT)) = CAST(1 AS BIT))",
+      "predicate": true,
+      "model": "bit",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription IS NULL GROUP BY 1",
+      "sql": "(${KibanaSampleDataEcommerce.has_subscription} IS NULL)",
+      "predicate": true,
+      "model": "bit",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, COUNT(DISTINCT has_subscription) FROM KibanaSampleDataEcommerce GROUP BY 1",
+      "sql": "COUNT(DISTINCT ${KibanaSampleDataEcommerce.has_subscription})",
+      "predicate": false,
+      "model": "bit",
+      "expected": 2
+    },
+    {
+      "query": "SELECT customer_gender, COUNT(NOT has_subscription) FROM KibanaSampleDataEcommerce GROUP BY 1",
+      "sql": "COUNT(CAST(CASE WHEN NOT ((${KibanaSampleDataEcommerce.has_subscription})) THEN 1 WHEN NOT (NOT ((${KibanaSampleDataEcommerce.has_subscription}))) THEN 0 ELSE NULL END AS BIT))",
+      "predicate": false,
+      "model": "comparison",
+      "expected": 6
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription GROUP BY 1",
+      "sql": "(${KibanaSampleDataEcommerce.has_subscription})",
+      "predicate": true,
+      "model": "bit",
+      "expected": null
+    },
+    {
+      "query": "SELECT customer_gender, COUNT(DISTINCT has_subscription) FROM KibanaSampleDataEcommerce GROUP BY 1",
+      "sql": "COUNT(DISTINCT ${KibanaSampleDataEcommerce.has_subscription})",
+      "predicate": false,
+      "model": "comparison",
+      "expected": null
     }
   ],
   "aggregates": [
