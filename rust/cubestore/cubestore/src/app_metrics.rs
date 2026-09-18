@@ -10,11 +10,9 @@ pub static STARTUPS: Counter = metrics::counter("cs.startup");
 /// Errors in IPC.
 pub static WORKER_POOL_ERROR: Counter = metrics::counter("cs.worker_pool.errors");
 
-/// Selects counted on arrival: parsed and about to be planned. The comparable completion counter
-/// is [DATA_QUERIES] with `command:select` only — untagged it also counts DDL and DML, and a
-/// select over a system table completes into [META_QUERIES] instead. The difference against that
-/// one tag is the planning backlog: queries still waiting for a planning slot, timed out or lost
-/// to a restart arrive but never complete.
+/// Selects counted on arrival, before planning. Compare against [DATA_QUERIES] tagged
+/// `command:select` — untagged it also counts DDL/DML, and system-table selects land in
+/// [META_QUERIES]; the gap is the planning backlog.
 pub static DATA_QUERIES_INCOMING: Counter = metrics::counter("cs.sql.query.data.incoming");
 
 /// Queries counted once planned and dispatched, tagged with the command they ran.
@@ -35,6 +33,8 @@ pub static QUERY_PLANNING_THROTTLE_IN_FLIGHT: Gauge =
     metrics::gauge("cs.sql.query.data.planning.throttle.in_flight");
 pub static QUERY_PLANNING_THROTTLE_QUEUED: Gauge =
     metrics::gauge("cs.sql.query.data.planning.throttle.queued");
+/// Only queries that actually waited for a slot are reported, so this describes the waiting
+/// minority, not the typical query.
 pub static QUERY_PLANNING_THROTTLE_WAIT_US: Histogram =
     metrics::histogram("cs.sql.query.data.planning.throttle.wait.us");
 pub static QUERY_PLANNING_THROTTLE_REJECTED: Counter =

@@ -35,7 +35,11 @@ impl PlanningThrottle {
             permits: if max_concurrent == 0 {
                 None
             } else {
-                Some(Arc::new(Semaphore::new(max_concurrent)))
+                // Semaphore::new panics above MAX_PERMITS, and the env value is unvalidated.
+                Some(Arc::new(Semaphore::new(std::cmp::min(
+                    max_concurrent,
+                    Semaphore::MAX_PERMITS,
+                ))))
             },
             max_queued,
             max_wait,
@@ -80,7 +84,7 @@ impl PlanningThrottle {
     fn waited_too_long(&self) -> CubeError {
         app_metrics::QUERY_PLANNING_THROTTLE_REJECTED.increment();
         CubeError::user(format!(
-            "Waited longer than {} s for a query planning slot. Raise \
+            "Waited longer than {} s (CUBESTORE_QUERY_TIMEOUT) for a query planning slot. Raise \
              CUBESTORE_MAX_CONCURRENT_QUERY_PLANS to plan more queries at once.",
             self.max_wait.as_secs()
         ))
