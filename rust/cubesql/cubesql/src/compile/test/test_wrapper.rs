@@ -100,6 +100,36 @@ async fn test_float_literal_pushdown_fallback() {
 }
 
 #[tokio::test]
+async fn test_float_literal_member_pushdown_fallback() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    for (sql_type, type_template) in [("REAL", "types/float"), ("DOUBLE", "types/double")] {
+        for missing in [false, true] {
+            let plan = convert_select_to_query_plan_customized(
+                format!(
+                    "SELECT SUM(v) FROM (SELECT CAST(100 AS {sql_type}) AS v \
+                     FROM KibanaSampleDataEcommerce LIMIT 0) q"
+                ),
+                DatabaseProtocol::PostgreSQL,
+                if missing {
+                    vec![(type_template.to_string(), String::new())]
+                } else {
+                    vec![]
+                },
+            )
+            .await;
+            // LIMIT 0 preserves a literal scan member, bypassing expression gates.
+            // A missing type must still leave an executable local plan.
+            if !missing {
+                plan.as_logical_plan().find_cube_scan_wrapped_sql();
+            }
+            plan.as_physical_plan().await.unwrap();
+        }
+    }
+}
+
+#[tokio::test]
 async fn test_wrapper_group_by_rollup() {
     if !Rewriter::sql_push_down_enabled() {
         return;
