@@ -45,7 +45,7 @@ The role builder uses a two-column layout. The left column (sticky as you scroll
 Every custom role has exactly one **Base Role**. It determines:
 
 - The user's **license tier** — Cube infers the tier from the highest Base Role across all of the user's roles.
-- The **inherited** capabilities the role grants out of the box.
+- The **inherited** capabilities that tier carries. These are account-wide capabilities only — the Base Role grants no deployment-scoped access on its own, even where a built-in role of the same name does; that comes from the role's own deployment policies.
 
 | Base Role  | Description                                                  |
 | ---------- | ------------------------------------------------------------ |
