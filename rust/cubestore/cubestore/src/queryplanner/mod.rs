@@ -28,6 +28,7 @@ mod inline_aggregate;
 mod is_not_distinct_from_join_test;
 pub mod merge_sort;
 pub mod metadata_cache;
+pub mod plan_cache;
 pub mod providers;
 mod rolling;
 #[cfg(test)]
@@ -60,6 +61,7 @@ use crate::queryplanner::topk::ClusterAggregateTopKLower;
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
 use crate::queryplanner::optimizations::is_not_distinct_from_join_keys::IsNotDistinctFromJoinKeysRule;
 use crate::queryplanner::optimizations::rolling_optimizer::RollingOptimizerRule;
+use crate::queryplanner::plan_cache::{LogicalPlanCache, LogicalPlanCacheKey};
 use crate::queryplanner::pretty_printers::{pp_plan_ext, PPOptions};
 use crate::queryplanner::udfs::{registerable_aggregate_udfs_iter, registerable_scalar_udfs_iter};
 use crate::sql::cache::SqlResultCache;
@@ -82,7 +84,7 @@ use datafusion::error::DataFusionError;
 use datafusion::execution::{SessionState, SessionStateBuilder, TaskContext};
 use datafusion::logical_expr::{
     AggregateUDF, Expr, Extension, LogicalPlan, ScalarUDF, TableProviderFilterPushDown,
-    TableSource, WindowUDF,
+    TableSource, Volatility, WindowUDF,
 };
 use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
@@ -98,10 +100,13 @@ use log::{debug, trace};
 use mockall::automock;
 use serde_derive::{Deserialize, Serialize};
 use smallvec::alloc::fmt::Formatter;
+use sqlparser::ast::visit_expressions;
+use sqlparser::ast::Expr as SqlExpr;
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
+use std::ops::ControlFlow;
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -125,6 +130,10 @@ pub struct QueryPlannerImpl {
     config: Arc<dyn ConfigObj>,
     cache: Arc<SqlResultCache>,
     metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
+    plan_cache: Option<LogicalPlanCache>,
+    /// Lowercased names of every scalar function that is not `Immutable`, used to keep
+    /// plans that fold one of them into a literal out of the cache.
+    non_immutable_functions: HashSet<String>,
 }
 
 crate::di_service!(QueryPlannerImpl, [QueryPlanner]);
@@ -142,6 +151,94 @@ impl QueryPlanner for QueryPlannerImpl {
         inline_tables: &InlineTables,
         trace_obj: Option<String>,
     ) -> Result<QueryPlan, CubeError> {
+        let (tables, tables_version) = self.meta_store.get_ready_tables_versioned().await?;
+
+        let logical_plan = match &self.plan_cache {
+            Some(cache) => {
+                cache.forget_plans_for_older_tables(tables_version);
+                let key = if Self::may_fold_a_non_immutable_function(
+                    &self.non_immutable_functions,
+                    &statement,
+                ) {
+                    None
+                } else {
+                    LogicalPlanCacheKey::new(statement.to_string(), inline_tables, tables_version)
+                };
+                match key {
+                    Some(key) => {
+                        cache
+                            .get_or_plan(
+                                key,
+                                self.build_logical_plan(statement, inline_tables, tables),
+                            )
+                            .await?
+                    }
+                    None => {
+                        app_metrics::PLAN_CACHE_BYPASS.increment();
+                        self.build_logical_plan(statement, inline_tables, tables)
+                            .await?
+                    }
+                }
+            }
+            None => {
+                self.build_logical_plan(statement, inline_tables, tables)
+                    .await?
+            }
+        };
+
+        let pre_is_data_select_query_time = SystemTime::now();
+        let post_is_data_select_query_time: SystemTime;
+        let plan = if SerializedPlan::is_data_select_query(&logical_plan) {
+            let choose_index_ext_start = SystemTime::now();
+            post_is_data_select_query_time = choose_index_ext_start;
+            let choose_guard = OpGuard::start_wrapper(OpKind::Planning, "plan.choose_index");
+            let (logical_plan, meta) = choose_index_ext(
+                logical_plan,
+                &self.meta_store.as_ref(),
+                self.config.enable_topk(),
+                self.config.limit_pushdown(),
+            )
+            .await?;
+            let workers = compute_workers(
+                self.config.as_ref(),
+                &logical_plan,
+                &meta.multi_part_subtree,
+            )?;
+            drop(choose_guard);
+            app_metrics::DATA_QUERY_CHOOSE_INDEX_AND_WORKERS_TIME_US
+                .report(choose_index_ext_start.elapsed()?.as_micros() as i64);
+            QueryPlan::Select(
+                PreSerializedPlan::try_new(logical_plan, meta, trace_obj)?,
+                workers,
+            )
+        } else {
+            post_is_data_select_query_time = SystemTime::now();
+            QueryPlan::Meta(logical_plan)
+        };
+        app_metrics::DATA_QUERY_LOGICAL_PLAN_IS_DATA_SELECT_QUERY_US.report(
+            post_is_data_select_query_time
+                .duration_since(pre_is_data_select_query_time)?
+                .as_micros() as i64,
+        );
+
+        Ok(plan)
+    }
+
+    async fn execute_meta_plan(&self, plan: LogicalPlan) -> Result<DataFrame, CubeError> {
+        self.execute_meta_plan_impl(plan).await
+    }
+}
+
+impl QueryPlannerImpl {
+    /// Everything the plan depends on that is not physical: the statement and the set of
+    /// tables. Stops short of `choose_index_ext`, which is what pulls in indexes,
+    /// partitions and chunks and therefore must run on every query.
+    pub(crate) async fn build_logical_plan(
+        &self,
+        statement: Statement,
+        inline_tables: &InlineTables,
+        tables: Arc<Vec<TablePath>>,
+    ) -> Result<LogicalPlan, CubeError> {
         let pre_execution_context_time = SystemTime::now();
         let ec_guard = OpGuard::start(OpKind::Planning, "plan.session_context");
         let ctx = self.execution_context()?;
@@ -156,7 +253,7 @@ impl QueryPlanner for QueryPlannerImpl {
 
         let state = Arc::new(ctx.state());
         let schema_provider = MetaStoreSchemaProvider::new(
-            self.meta_store.get_tables_with_path(false).await?,
+            tables,
             self.meta_store.clone(),
             self.cache_store.clone(),
             inline_tables,
@@ -223,44 +320,10 @@ impl QueryPlanner for QueryPlannerImpl {
             )
         );
 
-        let post_is_data_select_query_time: SystemTime;
-        let plan = if SerializedPlan::is_data_select_query(&logical_plan) {
-            let choose_index_ext_start = SystemTime::now();
-            post_is_data_select_query_time = choose_index_ext_start;
-            let choose_guard = OpGuard::start_wrapper(OpKind::Planning, "plan.choose_index");
-            let (logical_plan, meta) = choose_index_ext(
-                logical_plan,
-                &self.meta_store.as_ref(),
-                self.config.enable_topk(),
-                self.config.limit_pushdown(),
-            )
-            .await?;
-            let workers = compute_workers(
-                self.config.as_ref(),
-                &logical_plan,
-                &meta.multi_part_subtree,
-            )?;
-            drop(choose_guard);
-            app_metrics::DATA_QUERY_CHOOSE_INDEX_AND_WORKERS_TIME_US
-                .report(choose_index_ext_start.elapsed()?.as_micros() as i64);
-            QueryPlan::Select(
-                PreSerializedPlan::try_new(logical_plan, meta, trace_obj)?,
-                workers,
-            )
-        } else {
-            post_is_data_select_query_time = SystemTime::now();
-            QueryPlan::Meta(logical_plan)
-        };
-        app_metrics::DATA_QUERY_LOGICAL_PLAN_IS_DATA_SELECT_QUERY_US.report(
-            post_is_data_select_query_time
-                .duration_since(post_optimize_time)?
-                .as_micros() as i64,
-        );
-
-        Ok(plan)
+        Ok(logical_plan)
     }
 
-    async fn execute_meta_plan(&self, plan: LogicalPlan) -> Result<DataFrame, CubeError> {
+    async fn execute_meta_plan_impl(&self, plan: LogicalPlan) -> Result<DataFrame, CubeError> {
         let ctx = self.execution_context()?;
 
         let plan_ctx = ctx.clone();
@@ -285,13 +348,56 @@ impl QueryPlannerImpl {
         cache: Arc<SqlResultCache>,
         metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     ) -> Arc<QueryPlannerImpl> {
+        let max_entries = config.query_plan_cache_max_entries();
+        let non_immutable_functions = if max_entries > 0 {
+            Self::non_immutable_function_names(metadata_cache_factory.as_ref())
+        } else {
+            HashSet::new()
+        };
         Arc::new(QueryPlannerImpl {
             meta_store,
             cache_store,
             config,
             cache,
             metadata_cache_factory,
+            plan_cache: (max_entries > 0).then(|| LogicalPlanCache::new(max_entries)),
+            non_immutable_functions,
         })
+    }
+
+    fn non_immutable_function_names(factory: &dyn MetadataCacheFactory) -> HashSet<String> {
+        let ctx = Self::make_execution_context(factory.make_session_config());
+        let state = ctx.state();
+        let mut names = HashSet::new();
+        for (name, udf) in state.scalar_functions() {
+            if udf.signature().volatility != Volatility::Immutable {
+                names.insert(name.to_lowercase());
+                for alias in udf.aliases() {
+                    names.insert(alias.to_lowercase());
+                }
+            }
+        }
+        names
+    }
+
+    /// `optimize` const-folds stable functions against the time this query started, so a plan
+    /// that mentions one would hand every later query the first one's timestamp.
+    fn may_fold_a_non_immutable_function(names: &HashSet<String>, statement: &Statement) -> bool {
+        let Statement::Statement(inner) = statement else {
+            // Anything that is not a plain SQL statement is rare and not worth reasoning
+            // about here; treat it as uncacheable.
+            return true;
+        };
+
+        visit_expressions(inner.as_ref(), |expr| {
+            if let SqlExpr::Function(function) = expr {
+                if names.contains(&function.name.to_string().to_lowercase()) {
+                    return ControlFlow::Break(());
+                }
+            }
+            ControlFlow::Continue(())
+        })
+        .is_break()
     }
 }
 
@@ -1123,5 +1229,79 @@ pub mod tests {
         // NOW is no longer a UDF.
         let plan = initial_plan("SELECT NOW()", get_test_execution_ctx());
         assert_eq!(SerializedPlan::is_data_select_query(&plan), false);
+    }
+
+    #[test]
+    fn inline_tables_have_no_cache_key() {
+        use crate::metastore::{Column, ColumnType};
+        use crate::queryplanner::plan_cache::LogicalPlanCacheKey;
+        use crate::sql::InlineTable;
+        use crate::store::DataFrame;
+
+        assert!(LogicalPlanCacheKey::new("SELECT 1".to_string(), &Vec::new(), 0).is_some());
+
+        let inline = vec![InlineTable::new(
+            1,
+            "t".to_string(),
+            Arc::new(DataFrame::new(
+                vec![Column::new("a".to_string(), ColumnType::Int, 0)],
+                Vec::new(),
+            )),
+        )];
+        assert!(
+            LogicalPlanCacheKey::new("SELECT 1".to_string(), &inline, 0).is_none(),
+            "a query with inline tables must not be cacheable: its data is not in the key"
+        );
+    }
+
+    #[test]
+    fn non_immutable_functions_keep_plans_out_of_the_cache() {
+        use datafusion::sql::parser::DFParser;
+
+        let names = QueryPlannerImpl::non_immutable_function_names(
+            &crate::queryplanner::metadata_cache::BasicMetadataCacheFactory::new(),
+        );
+        for expected in ["now", "current_date", "current_timestamp", "unix_timestamp"] {
+            assert!(
+                names.contains(expected),
+                "{} must be recognised as non-immutable, otherwise optimize() folds it into a \
+                 literal and the plan cache serves that literal forever; got {:?}",
+                expected,
+                names
+            );
+        }
+
+        let uncacheable = |sql: &str| {
+            let statement = DFParser::parse_sql(sql).unwrap().pop_front().unwrap();
+            QueryPlannerImpl::may_fold_a_non_immutable_function(&names, &statement)
+        };
+
+        for sql in [
+            "SELECT now()",
+            "SELECT CURRENT_TIMESTAMP",
+            "SELECT current_date",
+            "SELECT unix_timestamp()",
+            "SELECT a FROM t WHERE ts > now()",
+            "SELECT a FROM t WHERE b IN (SELECT c FROM u WHERE d > now())",
+        ] {
+            assert!(
+                uncacheable(sql),
+                "{} folds a timestamp into the plan and must not be cached",
+                sql
+            );
+        }
+
+        // Cube appends a random suffix to every pre-aggregation table, so identifiers
+        // containing a function name by accident are the common case, not a curiosity.
+        for sql in [
+            "SELECT a FROM t WHERE ts > CAST('2026-01-01' AS TIMESTAMP)",
+            "SELECT giyxonow FROM s.reference_count20260824_2wlnh5vd_1vnoww4k_1l9k4df",
+        ] {
+            assert!(
+                !uncacheable(sql),
+                "{} mentions no function call and must stay cacheable",
+                sql
+            );
+        }
     }
 }

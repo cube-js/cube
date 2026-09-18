@@ -794,8 +794,23 @@ impl SqlService for SqlServiceImpl {
 
         let ast = {
             let mut parser = CubeStoreParser::new(query, context.parameters.take())?;
-            parser.parse_statement()?
+            // A query that fails to parse still arrived. Counting it keeps a storm of them
+            // — a misbehaving client, an unsupported dialect — from reading as no traffic.
+            parser.parse_statement().inspect_err(|_| {
+                app_metrics::INCOMING_QUERIES.add_with_tags(
+                    1,
+                    Some(&vec![metrics::format_tag("command", "parse_error")]),
+                );
+            })?
         };
+
+        app_metrics::INCOMING_QUERIES.add_with_tags(
+            1,
+            Some(&vec![metrics::format_tag(
+                "command",
+                Self::command_tag(&ast),
+            )]),
+        );
         // trace!("AST is: {:?}", ast);
         match ast {
             CubeStoreStatement::Statement(Statement::ShowVariable { variable }) => {
@@ -1337,7 +1352,12 @@ impl SqlService for SqlServiceImpl {
                 // TODO distribute and combine
                 let res: Arc<DataFrame> = match logical_plan {
                     QueryPlan::Meta(logical_plan) => {
-                        app_metrics::META_QUERIES.increment();
+                        // Tagged to match the arrival tag: whether a query is meta is only
+                        // known after planning, so at arrival it counted as a select.
+                        app_metrics::META_QUERIES.add_with_tags(
+                            1,
+                            Some(&vec![metrics::format_tag("command", "select")]),
+                        );
                         Arc::new(self.query_planner.execute_meta_plan(logical_plan).await?)
                     }
                     QueryPlan::Select(serialized, workers) => {
@@ -7381,6 +7401,38 @@ LIMIT 10000"#,
 }
 
 impl SqlServiceImpl {
+    /// Tag values mirror the ones the per-command counters report, so arrivals and
+    /// completions of the same command can be compared directly.
+    fn command_tag(ast: &CubeStoreStatement) -> &'static str {
+        match ast {
+            CubeStoreStatement::Statement(Statement::Query(_)) => "select",
+            CubeStoreStatement::Statement(Statement::Insert(_)) => "insert",
+            CubeStoreStatement::Statement(Statement::CreateIndex(_)) => "create_index",
+            CubeStoreStatement::Statement(Statement::CreatePartitionedIndex { .. }) => {
+                "create_partitioned_index"
+            }
+            CubeStoreStatement::Statement(Statement::Drop { object_type, .. }) => match object_type
+            {
+                ObjectType::Schema => "drop_schema",
+                ObjectType::Table => "drop_table",
+                ObjectType::PartitionedIndex => "drop_partitioned_index",
+                _ => "drop",
+            },
+            CubeStoreStatement::Statement(Statement::ShowVariable { .. }) => "show",
+            CubeStoreStatement::Statement(Statement::SetVariable { .. }) => "set",
+            CubeStoreStatement::Statement(Statement::Explain { .. }) => "explain",
+            CubeStoreStatement::CreateTable { .. } => "create_table",
+            CubeStoreStatement::CreateSchema { .. } => "create_schema",
+            CubeStoreStatement::CreateSource { .. } => "create_source",
+            CubeStoreStatement::Cache(_) => "cache",
+            CubeStoreStatement::Queue(_) => "queue",
+            CubeStoreStatement::System(_) => "system",
+            CubeStoreStatement::Dump(_) => "dump",
+            CubeStoreStatement::ExplainAnalyzeDetailed(_) => "explain_analyze_detailed",
+            _ => "other",
+        }
+    }
+
     fn handle_workbench_queries(q: &str) -> Option<DataFrame> {
         if q == "SHOW SESSION VARIABLES LIKE 'lower_case_table_names'" {
             return Some(DataFrame::new(
