@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.41](https://github.com/cube-js/cube/compare/v1.7.40...v1.7.41) (2026-09-18)
+
+### Features
+
+- **client-ngx:** Upgrade to Angular 20 LTS, require @angular/core >=20 ([#11916](https://github.com/cube-js/cube/issues/11916)) ([e6e08c7](https://github.com/cube-js/cube/commit/e6e08c7ffb50ba414795f272bc652555c0dc34d2))
+- **cubestore:** Limit how many logical plans are built at once ([#11924](https://github.com/cube-js/cube/issues/11924)) ([7338c00](https://github.com/cube-js/cube/commit/7338c00aa27af7b46b122f08a4df8d5488150a62))
+- **databricks-jdbc-driver:** Upgrade OSS JDBC driver to 3.4.2 ([#11909](https://github.com/cube-js/cube/issues/11909)) ([c8244ba](https://github.com/cube-js/cube/commit/c8244ba5c8afdef9d308afc2dcaf5768f27b2728))
+- **duckdb-driver:** Migrate to @duckdb/node-api (DuckDB 1.5.5) ([#11910](https://github.com/cube-js/cube/issues/11910)) ([bff57d1](https://github.com/cube-js/cube/commit/bff57d1b0c870bc2df7cb9e9fc7c3463c0376939))
+- Replace extract-zip (unmaintained, 2 CVEs) with node-stream-zip ([#11892](https://github.com/cube-js/cube/issues/11892)) ([2bfc860](https://github.com/cube-js/cube/commit/2bfc860491d403cd3e4d831c35c2f8af05cfdf77))
+- Upgrade deps (clear 52 Dependabot alerts) ([#11853](https://github.com/cube-js/cube/issues/11853)) ([c3ba115](https://github.com/cube-js/cube/commit/c3ba11507d94389941e1f78a39286277a1e112c7))
+
+### Performance Improvements
+
+- **duckdb-driver:** Transform rows through a per-column transform map (~2x) ([#11913](https://github.com/cube-js/cube/issues/11913)) ([d952114](https://github.com/cube-js/cube/commit/d95211409155d83ba7da6f940bed0d49cd5544ee)), closes [#11910](https://github.com/cube-js/cube/issues/11910)
+
 ## [1.7.40](https://github.com/cube-js/cube/compare/v1.7.39...v1.7.40) (2026-09-16)
 
 ### Bug Fixes

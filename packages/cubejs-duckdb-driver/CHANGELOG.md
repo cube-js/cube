@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.41](https://github.com/cube-js/cube/compare/v1.7.40...v1.7.41) (2026-09-18)
+
+### Features
+
+- **duckdb-driver:** Migrate to @duckdb/node-api (DuckDB 1.5.5) ([#11910](https://github.com/cube-js/cube/issues/11910)) ([bff57d1](https://github.com/cube-js/cube/commit/bff57d1b0c870bc2df7cb9e9fc7c3463c0376939))
+
+### Performance Improvements
+
+- **duckdb-driver:** Transform rows through a per-column transform map (~2x) ([#11913](https://github.com/cube-js/cube/issues/11913)) ([d952114](https://github.com/cube-js/cube/commit/d95211409155d83ba7da6f940bed0d49cd5544ee)), closes [#11910](https://github.com/cube-js/cube/issues/11910)
+
 ## [1.7.40](https://github.com/cube-js/cube/compare/v1.7.39...v1.7.40) (2026-09-16)
 
 ### Features
