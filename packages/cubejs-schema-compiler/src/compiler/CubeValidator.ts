@@ -1115,13 +1115,11 @@ const MemberLevelPolicySchema = Joi.object().keys({
   includesMembers: Joi.array().items(Joi.string().required()),
   excludesMembers: Joi.array().items(Joi.string().required()),
 })
-  // `includes` defaults to '*', so an empty memberLevel grants every member —
-  // the opposite of how `memberLevel: {}` reads. It is also a silent no-op for
-  // any memberMasking in the same policy, since members granted by memberLevel
-  // are never masked. Require the intent to be spelled out.
+  // `includes` defaults to '*' in CubeEvaluator.prepareAccessPolicy, so an empty
+  // memberLevel grants every member — the opposite of how it reads.
   .or('includes', 'excludes')
   .messages({
-    'object.missing': 'memberLevel must define either includes or excludes. An empty memberLevel grants access to all members, use includes: \'*\' if that is intended'
+    'object.missing': 'memberLevel must define either includes or excludes. An empty memberLevel grants access to all members: spell that out with includes: \'*\', or use excludes to grant all but some. A member granted by memberLevel is never masked, so members you intend to mask with memberMasking belong in excludes'
   });
 
 const MemberMaskingPolicySchema = Joi.object().keys({

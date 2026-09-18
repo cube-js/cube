@@ -1854,6 +1854,15 @@ describe('Cube Validation', () => {
       expect(result.error?.message).toContain('memberLevel must define either includes or excludes');
     });
 
+    // `includes: '*'` grants every member just as `{}` does, so the message must
+    // not offer it as a blanket fix without saying that a granted member is
+    // never masked — otherwise it recommends the no-op it is meant to prevent.
+    it('should point at excludes for members intended to be masked', () => {
+      const result = cubeValidator.validate(newCube({}), new ConsoleErrorReporter());
+      expect(result.error?.message).toContain('never masked');
+      expect(result.error?.message).toContain('belong in excludes');
+    });
+
     it('should still allow a policy that omits memberLevel entirely', () => {
       const cube = {
         name: 'TestCube',
