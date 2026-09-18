@@ -1855,12 +1855,14 @@ describe('Cube Validation', () => {
     });
 
     // `includes: '*'` grants every member just as `{}` does, so the message must
-    // not offer it as a blanket fix without saying that a granted member is
-    // never masked — otherwise it recommends the no-op it is meant to prevent.
-    it('should point at excludes for members intended to be masked', () => {
+    // not offer it as a blanket fix without saying what a grant costs — otherwise
+    // it recommends the no-op it is meant to prevent. The wording has to stay
+    // true for a policy with rowLevel filters too, where a granted member is
+    // still masked outside the granted rows.
+    it('should point at excludes for members that must always be masked', () => {
       const result = cubeValidator.validate(newCube({}), new ConsoleErrorReporter());
-      expect(result.error?.message).toContain('never masked');
-      expect(result.error?.message).toContain('belong in excludes');
+      expect(result.error?.message).toContain('unmasked on every row the policy grants');
+      expect(result.error?.message).toContain('must always be masked belongs in excludes');
     });
 
     it('should still allow a policy that omits memberLevel entirely', () => {

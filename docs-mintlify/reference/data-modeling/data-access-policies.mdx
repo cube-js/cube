@@ -288,9 +288,10 @@ _all members_ shorthand for both of these paramaters: `includes: "*"`, `excludes
 When `member_level` is defined, it must set at least one of `includes` or
 `excludes`. An empty `member_level` is equivalent to `includes: "*"` and grants
 access to all members, so it has to be spelled out explicitly. Note that a
-member granted by `member_level` is never masked, so a member you intend to
-mask with [`member_masking`](#member_masking) must be left out of
-`member_level` — use `excludes` for it.
+member granted by `member_level` is unmasked on every row the policy grants, so
+a member that must always be masked with [`member_masking`](#member_masking)
+has to be left out of `member_level` — use `excludes` for it. (A policy with
+`row_level` filters masks a granted member outside those rows.)
 
 </Warning>
 

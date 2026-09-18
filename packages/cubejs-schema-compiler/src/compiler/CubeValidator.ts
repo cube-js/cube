@@ -1119,7 +1119,7 @@ const MemberLevelPolicySchema = Joi.object().keys({
   // memberLevel grants every member — the opposite of how it reads.
   .or('includes', 'excludes')
   .messages({
-    'object.missing': 'memberLevel must define either includes or excludes. An empty memberLevel grants access to all members: spell that out with includes: \'*\', or use excludes to grant all but some. A member granted by memberLevel is never masked, so members you intend to mask with memberMasking belong in excludes'
+    'object.missing': 'memberLevel must define either includes or excludes. An empty memberLevel grants access to all members: spell that out with includes: \'*\', or use excludes to grant all but some. A member granted by memberLevel is unmasked on every row the policy grants, so a member that must always be masked belongs in excludes'
   });
 
 const MemberMaskingPolicySchema = Joi.object().keys({
