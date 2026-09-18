@@ -4,8 +4,6 @@ pub mod panic;
 mod partition_filter;
 mod planning;
 mod planning_throttle;
-#[cfg(test)]
-mod planning_throttle_bench;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::logical_expr::planner::ExprPlanner;
 use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
