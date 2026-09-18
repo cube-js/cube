@@ -427,7 +427,7 @@ pub trait ConfigObj: DIService {
     fn wal_split_size_threshold_bytes(&self) -> Option<u64>;
 
     /// Maximum number of logical plans built at the same time: `auto` by default, which is
-    /// `2 x cores`. `0` disables the limit.
+    /// `max(4, 2 x cores)`. `0` disables the limit.
     fn max_concurrent_query_plans(&self) -> usize;
 
     /// Maximum number of queries waiting for a planning slot. Over that, a query is rejected
@@ -1397,10 +1397,8 @@ fn env_topk_strategy(name: &str) -> TopKAggregateStrategy {
     }
 }
 
-/// Planning is CPU bound, but it also waits on the metastore, so the cores stay fed only with
-/// somewhat more plans in flight than there are cores. Undershooting costs throughput several
-/// times over, overshooting costs memory, hence the deliberate oversubscription. Respects the
-/// cgroup CPU quota of the container.
+/// The oversubscription is deliberate: planning also waits on the metastore, and undershooting
+/// costs throughput several times over while overshooting only costs memory.
 fn auto_max_concurrent_query_plans() -> usize {
     let cores = std::thread::available_parallelism()
         .map(|c| c.get())
@@ -1481,13 +1479,14 @@ where
 
 /// Lenient numeric env read for opt-in performance toggles: an unparseable value logs a warning and
 /// falls back to the default instead of panicking, so a typo can't take a node down on startup.
+/// Surrounding whitespace is ignored, which a value coming from YAML easily carries.
 pub fn env_parse_lenient<T>(name: &str, default: T) -> T
 where
     T: FromStr,
     T::Err: Display,
 {
     match env::var(name) {
-        Ok(v) => match v.parse::<T>() {
+        Ok(v) => match v.trim().parse::<T>() {
             Ok(n) => n,
             Err(e) => {
                 log::warn!(

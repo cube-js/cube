@@ -1,21 +1,19 @@
-//! Admission control for logical planning.
-//!
-//! Planning is CPU bound and runs before the result cache, so a burst of queries
-//! enters it unbounded: every query pays the full planning cost at once, the cores
-//! are oversubscribed and every in-flight plan holds its intermediate state in
-//! memory. The throttle caps how many plans are built simultaneously and how many
-//! queries may wait for their turn.
+//! Admission control for logical planning: planning runs before the result cache and nothing
+//! else bounds how many queries enter it at once.
 
 use crate::app_metrics;
 use crate::CubeError;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, Instant};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, TryAcquireError};
 
 pub struct PlanningThrottle {
     permits: Option<Arc<Semaphore>>,
     max_queued: usize,
+    max_wait: Duration,
+    /// Reported as gauges, so both are approximate: the read and the report are separate steps
+    /// and concurrent releases can report out of order.
     in_flight: AtomicUsize,
     queued: AtomicUsize,
 }
@@ -28,7 +26,11 @@ pub struct PlanningPermit {
 
 impl PlanningThrottle {
     /// `max_concurrent` or `max_queued` of `0` disables the respective limit.
-    pub fn new(max_concurrent: usize, max_queued: usize) -> Arc<PlanningThrottle> {
+    pub fn new(
+        max_concurrent: usize,
+        max_queued: usize,
+        max_wait: Duration,
+    ) -> Arc<PlanningThrottle> {
         Arc::new(PlanningThrottle {
             permits: if max_concurrent == 0 {
                 None
@@ -36,6 +38,7 @@ impl PlanningThrottle {
                 Some(Arc::new(Semaphore::new(max_concurrent)))
             },
             max_queued,
+            max_wait,
             in_flight: AtomicUsize::new(0),
             queued: AtomicUsize::new(0),
         })
@@ -56,12 +59,13 @@ impl PlanningThrottle {
             }
             Err(TryAcquireError::NoPermits) => {
                 let _waiting = self.start_waiting()?;
-                let wait_start = SystemTime::now();
-                let permit = permits.acquire_owned().await?;
-                if let Ok(elapsed) = wait_start.elapsed() {
-                    app_metrics::QUERY_PLANNING_THROTTLE_WAIT_US.report(elapsed.as_micros() as i64);
-                }
-                permit
+                let wait_start = Instant::now();
+                let permit = tokio::time::timeout(self.max_wait, permits.acquire_owned())
+                    .await
+                    .map_err(|_| self.waited_too_long())?;
+                app_metrics::QUERY_PLANNING_THROTTLE_WAIT_US
+                    .report(wait_start.elapsed().as_micros() as i64);
+                permit?
             }
         };
 
@@ -71,6 +75,15 @@ impl PlanningThrottle {
             throttle: self.clone(),
             _permit: permit,
         }))
+    }
+
+    fn waited_too_long(&self) -> CubeError {
+        app_metrics::QUERY_PLANNING_THROTTLE_REJECTED.increment();
+        CubeError::user(format!(
+            "Waited longer than {} s for a query planning slot. Raise \
+             CUBESTORE_MAX_CONCURRENT_QUERY_PLANS to plan more queries at once.",
+            self.max_wait.as_secs()
+        ))
     }
 
     fn start_waiting(self: &Arc<Self>) -> Result<WaitingGuard, CubeError> {
@@ -115,11 +128,10 @@ mod tests {
     use super::*;
     use futures::future::join_all;
     use std::sync::atomic::AtomicBool;
-    use std::time::Duration;
 
     #[tokio::test]
     async fn disabled_throttle_hands_out_no_permits() {
-        let throttle = PlanningThrottle::new(0, 1);
+        let throttle = PlanningThrottle::new(0, 1, Duration::from_secs(30));
         let permits = join_all((0..100).map(|_| throttle.acquire()))
             .await
             .into_iter()
@@ -131,7 +143,7 @@ mod tests {
 
     #[tokio::test]
     async fn concurrency_is_capped_and_permits_are_returned() {
-        let throttle = PlanningThrottle::new(2, 0);
+        let throttle = PlanningThrottle::new(2, 0, Duration::from_secs(30));
         let first = throttle.acquire().await.unwrap();
         let second = throttle.acquire().await.unwrap();
         assert_eq!(throttle.in_flight.load(Ordering::SeqCst), 2);
@@ -158,8 +170,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn waiting_longer_than_the_budget_is_rejected() {
+        let throttle = PlanningThrottle::new(1, 0, Duration::from_millis(50));
+        let _held = throttle.acquire().await.unwrap();
+
+        let rejected = throttle.acquire().await;
+        assert!(rejected
+            .err()
+            .unwrap()
+            .message
+            .contains("Waited longer than"));
+        assert_eq!(throttle.queued.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
     async fn queue_depth_over_the_limit_is_rejected() {
-        let throttle = PlanningThrottle::new(1, 1);
+        let throttle = PlanningThrottle::new(1, 1, Duration::from_secs(30));
         let _held = throttle.acquire().await.unwrap();
 
         let throttle_to_move = throttle.clone();

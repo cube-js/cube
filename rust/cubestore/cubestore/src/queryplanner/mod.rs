@@ -105,7 +105,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 #[automock]
 #[async_trait]
@@ -293,6 +293,7 @@ impl QueryPlannerImpl {
         let throttle = PlanningThrottle::new(
             config.max_concurrent_query_plans(),
             config.max_queued_query_plans(),
+            Duration::from_secs(config.query_timeout()),
         );
         Arc::new(QueryPlannerImpl {
             meta_store,

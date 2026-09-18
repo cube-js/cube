@@ -10,12 +10,14 @@ pub static STARTUPS: Counter = metrics::counter("cs.startup");
 /// Errors in IPC.
 pub static WORKER_POOL_ERROR: Counter = metrics::counter("cs.worker_pool.errors");
 
-/// Data reads counted on arrival: parsed and about to be planned. [DATA_QUERIES] is incremented
-/// only once a query is planned and dispatched, so queries still queued in planning, timed out or
-/// lost to a restart never reach it; comparing the two shows that backlog.
+/// Selects counted on arrival: parsed and about to be planned. The comparable completion counter
+/// is [DATA_QUERIES] with `command:select` only — untagged it also counts DDL and DML, and a
+/// select over a system table completes into [META_QUERIES] instead. The difference against that
+/// one tag is the planning backlog: queries still waiting for a planning slot, timed out or lost
+/// to a restart arrive but never complete.
 pub static DATA_QUERIES_INCOMING: Counter = metrics::counter("cs.sql.query.data.incoming");
 
-/// SQL queries that do data reads, counted once they are planned and dispatched.
+/// Queries counted once planned and dispatched, tagged with the command they ran.
 pub static DATA_QUERIES: Counter = metrics::counter("cs.sql.query.data");
 pub static DATA_QUERIES_CACHE_HIT: Counter = metrics::counter("cs.sql.query.data.cache.hit");
 pub static DATA_QUERIES_CACHE_STALE_HIT: Counter =
