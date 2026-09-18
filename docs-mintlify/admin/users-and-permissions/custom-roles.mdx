@@ -47,7 +47,7 @@ Every custom role has exactly one **Base Role**. It determines:
 - The user's **license tier** — Cube infers the tier from the highest Base Role across all of the user's roles.
 - What that tier **licenses** — the kind of work its holder may do. The Base Role grants no deployment-scoped access on its own, even where a built-in role of the same name does; that comes from the role's own deployment policies.
 
-| Base Role  | Access the built-in role of that name has                    |
+| Base Role  | Description                                                  |
 | ---------- | ------------------------------------------------------------ |
 | Viewer     | Read-only access to dashboards and chats.                    |
 | Explorer   | Viewer + create/edit workbooks, run queries.                 |
@@ -58,7 +58,7 @@ Each description mixes the tier with access that comes from elsewhere, and a cus
 - **The tier licenses the kind of work** — viewing dashboards and chats, creating and editing workbooks, running queries, editing the data model. That is what the Base Role carries; whether the holder may do it on a given deployment is a separate question.
 - **Reaching the deployment the work happens in comes from the role's own deployment policies**, which is what the built-in roles add: `DeploymentRead`, `DeploymentAgentRead` and `DownloadData` over every deployment for Viewer and Explorer, nearly every deployment action for Developer, the data-model ones included. Developer's account-wide deployment management is a third thing again — a [Global permission](#global-permissions).
 
-So a custom role with Base Role **Viewer** and no deployment policy is licensed for viewer-level work and reaches no deployment; a Developer-equivalent has to grant `SchemaUpdate` itself.
+So a custom role with Base Role **Viewer** and no deployment policy is licensed for viewer-level work and reaches no deployment; a Developer-equivalent has to grant the deployment actions itself, which is what **Full access** (`All`) is for.
 
 The tier is hierarchical, so a higher one satisfies a requirement for a lower:
 
@@ -138,7 +138,7 @@ When **Full access** is checked, the granular checkboxes appear checked and disa
 
 <Tip>
 
-**Access deployment** (`DeploymentRead`) and **Download data** (`DownloadData`) are exempt from the [auto-bump](#auto-bump-to-developer) because Viewers need them just to open a deployment and download data from it. That section lists the full set of exempt actions.
+**Access deployment** (`DeploymentRead`) and **Download data** (`DownloadData`) are exempt from the [auto-bump](#auto-bump-to-developer) because a Viewer-tier role has to be able to hold them — opening a deployment and downloading from it are viewer-level work. That section lists the full set of exempt actions.
 
 </Tip>
 
