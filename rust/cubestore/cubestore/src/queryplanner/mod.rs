@@ -155,6 +155,7 @@ impl QueryPlanner for QueryPlannerImpl {
 
         let logical_plan = match &self.plan_cache {
             Some(cache) => {
+                cache.forget_plans_for_older_tables(tables_version);
                 let key = if Self::may_fold_a_non_immutable_function(
                     &self.non_immutable_functions,
                     &statement,
@@ -185,7 +186,7 @@ impl QueryPlanner for QueryPlannerImpl {
             }
         };
 
-        let post_optimize_time = SystemTime::now();
+        let pre_is_data_select_query_time = SystemTime::now();
         let post_is_data_select_query_time: SystemTime;
         let plan = if SerializedPlan::is_data_select_query(&logical_plan) {
             let choose_index_ext_start = SystemTime::now();
@@ -216,7 +217,7 @@ impl QueryPlanner for QueryPlannerImpl {
         };
         app_metrics::DATA_QUERY_LOGICAL_PLAN_IS_DATA_SELECT_QUERY_US.report(
             post_is_data_select_query_time
-                .duration_since(post_optimize_time)?
+                .duration_since(pre_is_data_select_query_time)?
                 .as_micros() as i64,
         );
 
@@ -380,10 +381,7 @@ impl QueryPlannerImpl {
     }
 
     /// `optimize` const-folds stable functions against the time this query started, so a plan
-    /// that mentions one would hand every later query the first one's timestamp. Looks for
-    /// function calls in the parsed statement rather than for names in its text: a column or
-    /// table whose name happens to contain `now` must not lose its query the cache, and the
-    /// pre-aggregation names this runs against carry random suffixes that do exactly that.
+    /// that mentions one would hand every later query the first one's timestamp.
     fn may_fold_a_non_immutable_function(names: &HashSet<String>, statement: &Statement) -> bool {
         let Statement::Statement(inner) = statement else {
             // Anything that is not a plain SQL statement is rare and not worth reasoning

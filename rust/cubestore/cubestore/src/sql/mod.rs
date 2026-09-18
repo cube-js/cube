@@ -794,7 +794,14 @@ impl SqlService for SqlServiceImpl {
 
         let ast = {
             let mut parser = CubeStoreParser::new(query, context.parameters.take())?;
-            parser.parse_statement()?
+            // A query that fails to parse still arrived. Counting it keeps a storm of them
+            // — a misbehaving client, an unsupported dialect — from reading as no traffic.
+            parser.parse_statement().inspect_err(|_| {
+                app_metrics::INCOMING_QUERIES.add_with_tags(
+                    1,
+                    Some(&vec![metrics::format_tag("command", "parse_error")]),
+                );
+            })?
         };
 
         app_metrics::INCOMING_QUERIES.add_with_tags(
@@ -1345,7 +1352,12 @@ impl SqlService for SqlServiceImpl {
                 // TODO distribute and combine
                 let res: Arc<DataFrame> = match logical_plan {
                     QueryPlan::Meta(logical_plan) => {
-                        app_metrics::META_QUERIES.increment();
+                        // Tagged to match the arrival tag: whether a query is meta is only
+                        // known after planning, so at arrival it counted as a select.
+                        app_metrics::META_QUERIES.add_with_tags(
+                            1,
+                            Some(&vec![metrics::format_tag("command", "select")]),
+                        );
                         Arc::new(self.query_planner.execute_meta_plan(logical_plan).await?)
                     }
                     QueryPlan::Select(serialized, workers) => {

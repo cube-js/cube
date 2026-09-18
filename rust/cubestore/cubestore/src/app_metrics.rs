@@ -10,8 +10,10 @@ pub static STARTUPS: Counter = metrics::counter("cs.startup");
 /// Errors in IPC.
 pub static WORKER_POOL_ERROR: Counter = metrics::counter("cs.worker_pool.errors");
 
-/// Every SQL query once parsed, counted before planning and execution. Tagged with the same
-/// `command` values as the counters below, so arrivals can be compared against completions.
+/// Every SQL query as it arrives, counted before planning and execution, tagged by command.
+/// Comparing against the completion counters below works per command for the data and meta
+/// families; cache and queue arrive under one tag each but complete tagged by subcommand, so
+/// those have to be summed first. Workbench shortcuts return before this and are not counted.
 pub static INCOMING_QUERIES: Counter = metrics::counter("cs.sql.query.incoming");
 
 /// SQL queries that do data reads, counted once they are parsed, planned and dispatched.
@@ -39,19 +41,28 @@ pub static PLAN_CACHE_MISS: Counter = metrics::counter("cs.sql.query.plan.cache.
 /// `optimize` would fold against the current time. Kept apart from misses, which are simply
 /// queries the cache has not seen yet.
 pub static PLAN_CACHE_BYPASS: Counter = metrics::counter("cs.sql.query.plan.cache.bypass");
+/// Times the whole cache was dropped because the set of tables changed. A high rate against
+/// [PLAN_CACHE_MISS] means the cache is churning, not warming up.
+pub static PLAN_CACHE_INVALIDATED: Counter =
+    metrics::counter("cs.sql.query.plan.cache.invalidated");
 /// Approximate number of logical plans held.
 pub static PLAN_CACHE_SIZE: Gauge = metrics::gauge("cs.sql.query.plan.cache.size");
 
 pub static DATA_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.data.ms");
 pub static DATA_QUERY_LOGICAL_PLAN_TOTAL_CREATION_TIME_US: Histogram =
     metrics::histogram("cs.sql.query.data.planning.logical_plan.total_creation.us");
+/// Sampled only when the plan cache misses, so this is the cost of building a plan, not the
+/// average cost of planning a query. Weigh it against [PLAN_CACHE_HIT] / [PLAN_CACHE_MISS].
 pub static DATA_QUERY_LOGICAL_PLAN_EXECUTION_CONTEXT_TIME_US: Histogram =
     metrics::histogram("cs.sql.query.data.planning.logical_plan.execution_context.us");
+/// Sampled only on a plan cache miss, as with the histogram above.
 pub static DATA_QUERY_LOGICAL_PLAN_QUERY_PLANNER_SETUP_TIME_US: Histogram =
     metrics::histogram("cs.sql.query.data.planning.logical_plan.query_planner_setup.us");
+/// Sampled only on a plan cache miss, as with the histogram above.
 pub static DATA_QUERY_LOGICAL_PLAN_STATEMENT_TO_PLAN_TIME_US: Histogram =
     metrics::histogram("cs.sql.query.data.planning.logical_plan.statement_to_plan.us");
 
+/// Sampled only on a plan cache miss, as with the histogram above.
 pub static DATA_QUERY_LOGICAL_PLAN_OPTIMIZE_TIME_US: Histogram =
     metrics::histogram("cs.sql.query.data.planning.logical_plan.optimize.us");
 pub static DATA_QUERY_LOGICAL_PLAN_IS_DATA_SELECT_QUERY_US: Histogram =
@@ -86,7 +97,9 @@ pub static SQL_DATA_FRAME_SERIALIZATION_TIME_US: Histogram =
 pub static HTTP_MESSAGE_DATA_FRAME_SERIALIZATION_TIME_US: Histogram =
     metrics::histogram("cs.http.data_frame_serialization.us");
 
-/// Incoming SQL queries that only read metadata or do trivial computations.
+/// SQL queries that only read metadata or do trivial computations. A select is only known to
+/// be one of these after planning, so it arrives tagged `select` on [INCOMING_QUERIES] and
+/// completes here: the select family balances as incoming = data + meta.
 pub static META_QUERIES: Counter = metrics::counter("cs.sql.query.meta");
 pub static META_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.meta.ms");
 /// Incoming cache queries.

@@ -4,14 +4,11 @@ use crate::CubeError;
 use datafusion::logical_expr::LogicalPlan;
 use moka::future::Cache;
 use std::future::Future;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-/// Identifies a logical plan by everything it is derived from: the statement with its
-/// parameters already substituted, and the version of the table list it was resolved
-/// against. Physical state — indexes, partitions, chunks — is deliberately absent: it only
-/// enters the plan later, in `choose_index_ext`. Queries carrying inline tables are not
-/// cached at all, so their data never has to appear here.
+/// Physical state — indexes, partitions, chunks — is deliberately absent: it only enters the
+/// plan later, in `choose_index_ext`.
 #[derive(Clone, Hash, Eq, PartialEq, Debug)]
 pub struct LogicalPlanCacheKey {
     statement: String,
@@ -19,9 +16,8 @@ pub struct LogicalPlanCacheKey {
 }
 
 impl LogicalPlanCacheKey {
-    /// `None` for a query carrying inline tables. Their data is part of what the plan is
-    /// built from but is deliberately not part of the key, so there must be no way to build
-    /// one for such a query: two of them sharing a statement would collide.
+    /// `None` for a query carrying inline tables: their data is not in the key, so two of
+    /// them sharing a statement would collide.
     pub fn new(
         statement: String,
         inline_tables: &InlineTables,
@@ -39,12 +35,24 @@ impl LogicalPlanCacheKey {
 
 pub struct LogicalPlanCache {
     cache: Cache<LogicalPlanCacheKey, LogicalPlan>,
+    tables_version: AtomicU64,
 }
 
 impl LogicalPlanCache {
     pub fn new(max_entries: u64) -> Self {
         Self {
             cache: Cache::builder().max_capacity(max_entries).build(),
+            tables_version: AtomicU64::new(0),
+        }
+    }
+
+    /// Entries keyed on an earlier table list can never be read again. Dropping them keeps
+    /// them from filling the entry budget and evicting the live ones to make room.
+    pub fn forget_plans_for_older_tables(&self, tables_version: u64) {
+        let previous = self.tables_version.swap(tables_version, Ordering::Relaxed);
+        if previous != tables_version {
+            self.cache.invalidate_all();
+            app_metrics::PLAN_CACHE_INVALIDATED.increment();
         }
     }
 
@@ -59,24 +67,19 @@ impl LogicalPlanCache {
     where
         F: Future<Output = Result<LogicalPlan, CubeError>>,
     {
-        let planned = Arc::new(AtomicBool::new(false));
-        let planned_here = planned.clone();
-        let result = self
-            .cache
-            .try_get_with(key, async move {
-                planned_here.store(true, Ordering::Relaxed);
-                plan.await
-            })
-            .await
-            .map_err(|e| (*e).clone());
+        let entry = self.cache.entry(key).or_try_insert_with(plan).await;
 
-        if planned.load(Ordering::Relaxed) {
-            app_metrics::PLAN_CACHE_MISS.increment();
-        } else {
-            app_metrics::PLAN_CACHE_HIT.increment();
+        // A failure is not a cache outcome: it reaches every waiter, and counting those
+        // waiters as hits would report plans that were never produced.
+        match &entry {
+            Ok(entry) if entry.is_fresh() => app_metrics::PLAN_CACHE_MISS.increment(),
+            Ok(_) => app_metrics::PLAN_CACHE_HIT.increment(),
+            Err(_) => {}
         }
         app_metrics::PLAN_CACHE_SIZE.report(self.cache.entry_count() as i64);
 
-        result
+        entry
+            .map(|entry| entry.into_value())
+            .map_err(|e: Arc<CubeError>| (*e).clone())
     }
 }
