@@ -1,8 +1,8 @@
+import fs from 'fs';
 import path from 'path';
 import { downloadAndExtractFile } from '@cubejs-backend/shared';
 
 export const DRIVER_VERSION = '3.4.2';
-
 export const JDBC_DRIVER_JAR_NAME = `databricks-jdbc-${DRIVER_VERSION}.jar`;
 
 /**
@@ -26,4 +26,33 @@ export async function downloadJDBCDriver(): Promise<string | null> {
   console.log(`Release notes: https://mvnrepository.com/artifact/com.databricks/databricks-jdbc/${DRIVER_VERSION}`);
 
   return path.resolve(path.join(__dirname, '..', 'download', JDBC_DRIVER_JAR_NAME));
+}
+
+async function fileExistsOr(
+  fsPath: string,
+  fn: () => Promise<string>,
+): Promise<string> {
+  if (fs.existsSync(fsPath)) {
+    return fsPath;
+  }
+  return fn();
+}
+
+export async function resolveJDBCDriver(): Promise<string> {
+  return fileExistsOr(
+    path.join(process.cwd(), JDBC_DRIVER_JAR_NAME),
+    async () => fileExistsOr(
+      path.join(__dirname, '..', 'download', JDBC_DRIVER_JAR_NAME),
+      async () => {
+        const pathOrNull = await downloadJDBCDriver();
+        if (pathOrNull) {
+          return pathOrNull;
+        }
+        throw new Error(
+          `Please download and place ${JDBC_DRIVER_JAR_NAME} inside your ` +
+          'project directory'
+        );
+      }
+    )
+  );
 }

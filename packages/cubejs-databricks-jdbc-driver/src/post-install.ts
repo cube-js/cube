@@ -1,7 +1,7 @@
 import 'source-map-support/register';
 
 import { displayCLIError } from '@cubejs-backend/shared';
-import { resolveJDBCDriver } from './helpers';
+import { resolveJDBCDriver } from './installer';
 
 (async () => {
   try {

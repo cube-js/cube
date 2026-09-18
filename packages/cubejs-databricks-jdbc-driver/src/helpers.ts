@@ -1,39 +1,6 @@
-import fs from 'fs';
-import path from 'path';
-
 import { parseJdbcUrl } from '@cubejs-backend/jdbc-driver';
 
-import { downloadJDBCDriver, JDBC_DRIVER_JAR_NAME } from './installer';
 import type { ParsedConnectionProperties } from './DatabricksDriver';
-
-async function fileExistsOr(
-  fsPath: string,
-  fn: () => Promise<string>,
-): Promise<string> {
-  if (fs.existsSync(fsPath)) {
-    return fsPath;
-  }
-  return fn();
-}
-
-export async function resolveJDBCDriver(): Promise<string> {
-  return fileExistsOr(
-    path.join(process.cwd(), JDBC_DRIVER_JAR_NAME),
-    async () => fileExistsOr(
-      path.join(__dirname, '..', 'download', JDBC_DRIVER_JAR_NAME),
-      async () => {
-        const pathOrNull = await downloadJDBCDriver();
-        if (pathOrNull) {
-          return pathOrNull;
-        }
-        throw new Error(
-          `Please download and place ${JDBC_DRIVER_JAR_NAME} inside your ` +
-          'project directory'
-        );
-      }
-    )
-  );
-}
 
 /**
  * The OSS driver throws if a parameter is passed both in the URL and as a separate property, so the

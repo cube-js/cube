@@ -22,9 +22,9 @@ import { DatabricksQuery } from './DatabricksQuery';
 import {
   extractAndRemoveUidPwdFromJdbcUrl,
   parseDatabricksJdbcUrl,
-  resolveJDBCDriver,
   validateAndRemoveGeoSpatialSupportFromJdbcUrl
 } from './helpers';
+import { resolveJDBCDriver } from './installer';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
 
