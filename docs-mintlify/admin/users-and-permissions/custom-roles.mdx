@@ -47,7 +47,7 @@ Every custom role has exactly one **Base Role**. It determines:
 - The user's **license tier** — Cube infers the tier from the highest Base Role across all of the user's roles.
 - The **inherited** capabilities that tier carries. These are account-wide capabilities only — the Base Role grants no deployment-scoped access on its own, even where a built-in role of the same name does; that comes from the role's own deployment policies.
 
-| Base Role  | Description                                                  |
+| Base Role  | What the built-in role of that name can do                   |
 | ---------- | ------------------------------------------------------------ |
 | Viewer     | Read-only access to dashboards and chats.                    |
 | Explorer   | Viewer + create/edit workbooks, run queries.                 |
@@ -283,7 +283,9 @@ This section lists every action the role builder exposes. The internal action na
 
 ### Base Role actions (Global)
 
-| Internal name   | Label     | Description                                                |
+The descriptions are what the built-in role of that name can do. As a custom role's Base Role, the action sets the license tier and nothing deployment-scoped — see [Base Role](#base-role).
+
+| Internal name   | Label     | The built-in role of that name                             |
 | --------------- | --------- | ---------------------------------------------------------- |
 | `AIBIView`      | Viewer    | Read-only access to dashboards and chats.                  |
 | `AIBIExplore`   | Explorer  | Viewer + create/edit workbooks, run queries.               |
