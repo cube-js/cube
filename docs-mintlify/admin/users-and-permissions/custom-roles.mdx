@@ -127,7 +127,7 @@ Either grant **Full access** (a shortcut that enables every current and future d
 | AI          | Access AI agents                    | Use the agent in Analytics Chat, workbooks, the IDE, and dashboards.                                                                                                      |
 | AI          | Create scheduled tasks              | Create [scheduled tasks][ref-scheduled-tasks] in the deployment, from the **Scheduled** page, by asking the agent, or with the Platform API. Editing, pausing, running, and deleting a task stay with its creator or an admin. Granted by default to the built-in Viewer, Explorer, and Developer roles. |
 | Monitoring  | Access query history                | View deployment query history, performance, and traces.                                                                                                                   |
-| Monitoring  | Access chat history                 | View other users' chat conversations for the deployment, including Analytics Chat and the Excel/Google Sheets add-in panes (**Admin → Chats History**).                  |
+| Monitoring  | Access chat history                 | View other users' chat conversations for the deployment, including Analytics Chat and the Excel/Google Sheets add-in panes (**Admin → Chats History**). It is [exempt from the auto-bump](#auto-bump-to-developer), so a Viewer-tier role can hold it — grant it only to roles that should see other people's conversations. |
 | Data Export | Download data                       | Download query results as CSV from workbooks, Analytics Chat, and published dashboards. The built-in Viewer, Explorer and Developer roles grant it themselves, through their own deployment policies; a custom role does not inherit that from its Base Role, so check it here if the role needs it. See [Data download controls][ref-data-download-controls]. |
 | Pre-aggregations | View pre-aggregations          | Open the [Pre-Aggregations][ref-pre-aggregations-page] page to view partitions, build history, and build errors, without starting or cancelling builds.                    |
 | Pre-aggregations | Build pre-aggregations         | Open the Pre-Aggregations page, start builds (**Build All**, **Build Selected**), and cancel queued or running builds. **Edit deployment** and **Manage deployments (account-wide)** also allow this. |
@@ -186,7 +186,7 @@ For an analyst who works in one deployment.
     Add a deployment policy, switch **Scope** to **Specific deployments**, and pick the relevant deployment(s) from the picker.
   </Step>
   <Step title="Pick actions">
-    Check **Access deployment** so the user can open the deployment, and **Download data** if they should be able to export query results. Check **Access AI agents** and **Create scheduled tasks** under AI if they should chat with the agent and schedule tasks. **Access query history** isn't available to an Explorer: checking it [bumps the Base Role to Developer](#auto-bump-to-developer).
+    Check **Access deployment** so the user can open the deployment, and **Download data** if they should be able to export query results. Check **Access AI agents** and **Create scheduled tasks** under AI if they should chat with the agent and schedule tasks — all four are [exempt from the auto-bump](#auto-bump-to-developer), so the role stays an Explorer. **Access query history** is not: checking it forces the Base Role to Developer.
   </Step>
   <Step title="Save">
     Click **Create**.
