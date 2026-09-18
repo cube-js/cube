@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile-upstream:master-experimental
-FROM node:24.18.0-trixie-slim AS builder
+FROM node:24.21.0-trixie-slim AS builder
 
 WORKDIR /cube
 COPY . .
@@ -24,7 +24,7 @@ RUN yarn install --prod \
     && rm -rf /cube/node_modules/@duckdb/node-bindings-*-musl \
     && yarn cache clean
 
-FROM node:24.18.0-trixie-slim
+FROM node:24.21.0-trixie-slim
 
 ARG IMAGE_VERSION=unknown
 

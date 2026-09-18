@@ -1,7 +1,7 @@
 ARG DEV_BUILD_IMAGE=cubejs/cube:build
 
 FROM $DEV_BUILD_IMAGE AS build
-FROM node:24.18.0-trixie-slim
+FROM node:24.21.0-trixie-slim
 
 ARG IMAGE_VERSION=dev
 
