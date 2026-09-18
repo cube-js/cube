@@ -224,7 +224,7 @@ The role builder enforces a few rules client-side:
 
 ## Managing roles through the API
 
-Custom roles can also be created, updated and assigned over the [REST API][ref-api-roles], so a team that provisions deployments from CI can grant access in the same pipeline instead of finishing in the console. The API takes the wire format — a flat list of policies — rather than the builder's cards: the **Base Role** is a `Global` policy naming the tier, and each deployment policy card is one `Deployment` policy.
+Custom roles can also be created, updated and assigned over the [REST API][ref-api-roles], so a team that provisions deployments from CI can grant access in the same pipeline instead of finishing in the console. Every call below needs a token that [authenticates][ref-api-auth] as a user with the admin role. The API takes the wire format — a flat list of policies — rather than the builder's cards: the **Base Role** is a `Global` policy naming the tier, and each deployment policy card is one `Deployment` policy.
 
 <Steps>
   <Step title="Create the deployment">
@@ -266,11 +266,12 @@ Custom roles can also be created, updated and assigned over the [REST API][ref-a
 
 </Warning>
 
-`GET`, `PUT` and `DELETE /api/v1/roles/{roleId}` read, update and remove a role; `PUT` updates only the fields present in the body, and sending `policies` replaces them outright rather than merging — so read the role first if you mean to add a policy, omit `policies` to leave them untouched, and send `[]` to clear them. Renaming to a name another role already holds answers `409`, so omit `name` too unless you mean to change it. All of these require administrator privileges, and they cover your custom roles only: the built-in roles are not listed or editable through these endpoints.
+`GET`, `PUT` and `DELETE /api/v1/roles/{roleId}` read, update and remove a role; `PUT` updates only the fields present in the body, and sending `policies` replaces them outright rather than merging — so read the role first if you mean to add a policy, omit `policies` to leave them untouched, and send `[]` to clear them. Renaming to a name another role already holds answers `409`, so omit `name` too unless you mean to change it. `DELETE` also drops every assignment of the role, from users and from groups, so everyone holding it loses what it granted. They cover your custom roles only: the built-in roles are not listed or editable through these endpoints.
 
 Assignment is the exception — `PUT /api/v1/roles/{roleId}/users/{userId}` resolves built-in roles as well as custom ones, though their ids are neither published nor returned by `GET /api/v1/roles`, so in practice it is the roles you created that you assign. Cube's **Admin** role is not among the ones it resolves: its id returns `404`, so assignment cannot hand out the built-in Admin role. That is a property of assignment alone — `POST /api/v1/roles` accepts a `Global` policy carrying account-wide actions such as `DeploymentsManage` or `AuditLogManage`, so a custom role can grant much of what Admin does. Only an administrator can call any of this.
 
 [ref-api-roles]: /api-reference/roles/list-custom-roles
+[ref-api-auth]: /api-reference/authentication
 [ref-api-create-role]: /api-reference/roles/create-a-custom-role
 [ref-api-create-deployment]: /api-reference/deployment-creation/create-a-deployment-with-an-empty-starter-project-and-trigger-its-first-build
 
