@@ -159,7 +159,9 @@ async function extractZipArchive(archivePath: string, dir: string): Promise<void
       }
     }
   } finally {
-    await zip.close();
+    // Swallowed: a rejection here would replace whatever the `try` threw, and the
+    // symlink refusal is the one error whose text a caller needs.
+    await zip.close().catch(() => undefined);
   }
 }
 
