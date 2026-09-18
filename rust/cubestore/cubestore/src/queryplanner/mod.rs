@@ -100,10 +100,13 @@ use log::{debug, trace};
 use mockall::automock;
 use serde_derive::{Deserialize, Serialize};
 use smallvec::alloc::fmt::Formatter;
+use sqlparser::ast::visit_expressions;
+use sqlparser::ast::Expr as SqlExpr;
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
+use std::ops::ControlFlow;
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -152,14 +155,13 @@ impl QueryPlanner for QueryPlannerImpl {
 
         let logical_plan = match &self.plan_cache {
             Some(cache) => {
-                let rendered = statement.to_string();
                 let key = if Self::may_fold_a_non_immutable_function(
                     &self.non_immutable_functions,
-                    &rendered,
+                    &statement,
                 ) {
                     None
                 } else {
-                    LogicalPlanCacheKey::new(rendered, inline_tables, tables_version)
+                    LogicalPlanCacheKey::new(statement.to_string(), inline_tables, tables_version)
                 };
                 match key {
                     Some(key) => {
@@ -378,12 +380,26 @@ impl QueryPlannerImpl {
     }
 
     /// `optimize` const-folds stable functions against the time this query started, so a plan
-    /// that mentions one would hand every later query the first one's timestamp. Matching on
-    /// the rendered statement over-approximates — a column called `today` is enough to opt a
-    /// query out — which is the safe direction.
-    fn may_fold_a_non_immutable_function(names: &HashSet<String>, statement: &str) -> bool {
-        let statement = statement.to_lowercase();
-        names.iter().any(|name| statement.contains(name))
+    /// that mentions one would hand every later query the first one's timestamp. Looks for
+    /// function calls in the parsed statement rather than for names in its text: a column or
+    /// table whose name happens to contain `now` must not lose its query the cache, and the
+    /// pre-aggregation names this runs against carry random suffixes that do exactly that.
+    fn may_fold_a_non_immutable_function(names: &HashSet<String>, statement: &Statement) -> bool {
+        let Statement::Statement(inner) = statement else {
+            // Anything that is not a plain SQL statement is rare and not worth reasoning
+            // about here; treat it as uncacheable.
+            return true;
+        };
+
+        visit_expressions(inner.as_ref(), |expr| {
+            if let SqlExpr::Function(function) = expr {
+                if names.contains(&function.name.to_string().to_lowercase()) {
+                    return ControlFlow::Break(());
+                }
+            }
+            ControlFlow::Continue(())
+        })
+        .is_break()
     }
 }
 
@@ -1242,6 +1258,8 @@ pub mod tests {
 
     #[test]
     fn non_immutable_functions_keep_plans_out_of_the_cache() {
+        use datafusion::sql::parser::DFParser;
+
         let names = QueryPlannerImpl::non_immutable_function_names(
             &crate::queryplanner::metadata_cache::BasicMetadataCacheFactory::new(),
         );
@@ -1255,17 +1273,37 @@ pub mod tests {
             );
         }
 
-        assert!(QueryPlannerImpl::may_fold_a_non_immutable_function(
-            &names,
-            "SELECT now()"
-        ));
-        assert!(QueryPlannerImpl::may_fold_a_non_immutable_function(
-            &names,
-            "SELECT a FROM t WHERE ts > CURRENT_TIMESTAMP"
-        ));
-        assert!(!QueryPlannerImpl::may_fold_a_non_immutable_function(
-            &names,
-            "SELECT a FROM t WHERE ts > CAST('2026-01-01' AS TIMESTAMP)"
-        ));
+        let uncacheable = |sql: &str| {
+            let statement = DFParser::parse_sql(sql).unwrap().pop_front().unwrap();
+            QueryPlannerImpl::may_fold_a_non_immutable_function(&names, &statement)
+        };
+
+        for sql in [
+            "SELECT now()",
+            "SELECT CURRENT_TIMESTAMP",
+            "SELECT current_date",
+            "SELECT unix_timestamp()",
+            "SELECT a FROM t WHERE ts > now()",
+            "SELECT a FROM t WHERE b IN (SELECT c FROM u WHERE d > now())",
+        ] {
+            assert!(
+                uncacheable(sql),
+                "{} folds a timestamp into the plan and must not be cached",
+                sql
+            );
+        }
+
+        // Cube appends a random suffix to every pre-aggregation table, so identifiers
+        // containing a function name by accident are the common case, not a curiosity.
+        for sql in [
+            "SELECT a FROM t WHERE ts > CAST('2026-01-01' AS TIMESTAMP)",
+            "SELECT giyxonow FROM s.reference_count20260824_2wlnh5vd_1vnoww4k_1l9k4df",
+        ] {
+            assert!(
+                !uncacheable(sql),
+                "{} mentions no function call and must stay cacheable",
+                sql
+            );
+        }
     }
 }
