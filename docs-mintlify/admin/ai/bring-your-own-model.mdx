@@ -130,14 +130,13 @@ API — for example, an internal LLM gateway.
   `https` and may not target a loopback or link-local host
 - **API key** is optional — leave it blank if your endpoint authenticates
   requests some other way, such as a custom header
-- You can add custom HTTP headers sent with every request. A header value
-  may include placeholders that are resolved per request from the caller's
-  identity: `{{userId}}`, `{{userExternalId}}`, `{{email}}`, `{{username}}`,
+- You can add custom HTTP headers sent with every request. Header values may
+  include placeholders resolved per request from the caller's identity:
+  `{{userId}}`, `{{userExternalId}}`, `{{email}}`, `{{username}}`,
   `{{tenantId}}`, `{{tenantName}}`, `{{tenantUrl}}`, `{{deploymentId}}`, and
-  `{{agentId}}`. If a placeholder has no value for a given request (for
-  example, `{{userExternalId}}` for a user who did not arrive through
-  signed embedding), it is left in the header value as literal text rather
-  than being replaced with an empty string
+  `{{agentId}}`. A placeholder with no value for a request — `{{userExternalId}}`
+  for a user who did not arrive through signed embedding, for example — is sent
+  through as literal text
 
 ### Custom Anthropic-compatible
 
