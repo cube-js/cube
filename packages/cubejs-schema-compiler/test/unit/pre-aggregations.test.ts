@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { FROM_PARTITION_RANGE, MAX_SOURCE_ROW_LIMIT } from '@cubejs-backend/shared';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createECommerceSchema, createSchemaYaml } from './utils';
 import { PostgresQuery, queryClass, QueryFactory } from '../../src';
@@ -222,6 +223,106 @@ describe('pre-aggregations', () => {
     expect(preAggregationsDescription.length).toEqual(2);
     expect(preAggregationsDescription[0].preAggregationId).toEqual('Orders.simple1');
     expect(preAggregationsDescription[1].preAggregationId).toEqual('Orders.simple2');
+  });
+
+  // @link https://github.com/cube-js/cube/issues/11682
+  describe('rollupLambda unionWithSourceData source query', () => {
+    const compileEvents = () => prepareJsCompiler(
+      `
+        cube('Events', {
+          sql: \`SELECT * FROM public.events\`,
+
+          preAggregations: {
+            eventsLambda: {
+              type: \`rollupLambda\`,
+              unionWithSourceData: true,
+              rollups: [CUBE.eventsRollup],
+            },
+            eventsRollup: {
+              measures: [CUBE.count],
+              timeDimension: CUBE.ts,
+              granularity: \`day\`,
+              partitionGranularity: \`month\`,
+              buildRangeStart: {
+                sql: \`SELECT DATE '2024-01-01'\`,
+              },
+              buildRangeEnd: {
+                sql: \`SELECT CURRENT_DATE\`,
+              },
+            },
+          },
+
+          measures: {
+            count: {
+              type: \`count\`,
+            },
+          },
+
+          dimensions: {
+            id: {
+              sql: \`id\`,
+              type: \`number\`,
+              primaryKey: true,
+            },
+            ts: {
+              sql: \`ts\`,
+              type: \`time\`,
+            },
+          },
+        });
+      `
+    );
+
+    const lambdaQueryFor = async (timeDimensions: any[]) => {
+      const { compiler, cubeEvaluator, joinGraph } = compileEvents();
+      await compiler.compile();
+
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['Events.count'],
+        timeDimensions,
+        timezone: 'UTC',
+      });
+
+      const lambdaQueries: any = query.buildLambdaQuery();
+      const [lambdaQuery] = Object.values<any>(lambdaQueries);
+      expect(lambdaQuery).toBeDefined();
+
+      return lambdaQuery;
+    };
+
+    it('is bounded by the requested date range', async () => {
+      const { sqlAndParams: [lambdaSql, lambdaParams] } = await lambdaQueryFor([{
+        dimension: 'Events.ts',
+        dateRange: ['2024-02-01', '2024-02-29'],
+      }]);
+
+      expect(lambdaParams).toContain(FROM_PARTITION_RANGE);
+      expect(lambdaParams).toContain('2024-02-29T23:59:59.999Z');
+      expect(lambdaParams).toContain('2024-02-01T00:00:00.000Z');
+      expect(lambdaSql).toMatch(/<=/);
+    });
+
+    it('stays unbounded above without a requested date range', async () => {
+      const { sqlAndParams: [lambdaSql, lambdaParams] } = await lambdaQueryFor([{
+        dimension: 'Events.ts',
+        granularity: 'day',
+      }]);
+
+      // With lambda-view we observe all 'fresh' data, with no partition/buildRange limit.
+      expect(lambdaParams).toEqual([FROM_PARTITION_RANGE]);
+      expect(lambdaSql).not.toMatch(/<=/);
+    });
+
+    it('renders the row limit as a number rather than a placeholder', async () => {
+      const { sqlAndParams: [lambdaSql, lambdaParams], maxSourceRowLimit } = await lambdaQueryFor([{
+        dimension: 'Events.ts',
+        dateRange: ['2024-02-01', '2024-02-29'],
+      }]);
+
+      expect(maxSourceRowLimit).toEqual(200000);
+      expect(lambdaSql).toMatch(/LIMIT 200000/);
+      expect(lambdaParams).not.toContain(MAX_SOURCE_ROW_LIMIT);
+    });
   });
 
   // @link https://github.com/cube-js/cube/issues/6623
