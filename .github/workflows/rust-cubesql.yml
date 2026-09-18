@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
+      - 'packages/cubejs-schema-compiler/src/adapter/MssqlQuery.ts'
+      - 'packages/cubejs-schema-compiler/test/fixtures/mssql-boolean-contexts.json'
       - 'rust/cube/**'
       - 'rust/cubesql/**'
     branches:
@@ -13,6 +15,8 @@ on:
     paths:
       - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
+      - 'packages/cubejs-schema-compiler/src/adapter/MssqlQuery.ts'
+      - 'packages/cubejs-schema-compiler/test/fixtures/mssql-boolean-contexts.json'
       - 'rust/cube/**'
       - 'rust/cubesql/**'
 
