@@ -53,9 +53,9 @@ Every custom role has exactly one **Base Role**. It determines:
 | Explorer   | Viewer + create/edit workbooks, run queries.                 |
 | Developer  | Explorer + edit data model, manage deployments.              |
 
-Each description mixes two things, and a custom role's Base Role supplies only the first:
+Each description mixes the tier with access that comes from elsewhere, and a custom role's Base Role supplies only the tier:
 
-- **The tier licenses the kind of work** — viewing dashboards and chats, creating and editing workbooks, running queries, editing the data model. That is what the Base Role carries, and there is no deployment action for any of it.
+- **The tier licenses the kind of work** — viewing dashboards and chats, creating and editing workbooks, running queries, editing the data model. That is what the Base Role carries; whether the holder may do it on a given deployment is a separate question.
 - **Reaching the deployment the work happens in comes from the role's own deployment policies**, which is what the built-in roles add: `DeploymentRead`, `DeploymentAgentRead` and `DownloadData` over every deployment for Viewer and Explorer, nearly every deployment action for Developer, the data-model ones included. Developer's account-wide deployment management is a third thing again — a [Global permission](#global-permissions).
 
 So a custom role with Base Role **Viewer** and no deployment policy is licensed for viewer-level work and reaches no deployment; a Developer-equivalent has to grant `SchemaUpdate` itself.
@@ -292,11 +292,11 @@ This section lists every action the role builder exposes. The internal action na
 
 As a custom role's Base Role, the action sets the license tier and nothing else — neither the deployment-scoped access nor the Global permissions the built-in role of that name holds. See [Base Role](#base-role) for what the tier licenses.
 
-| Internal name   | Label     | Access the built-in role of that name has                  |
-| --------------- | --------- | ---------------------------------------------------------- |
-| `AIBIView`      | Viewer    | Read-only access to dashboards and chats.                  |
-| `AIBIExplore`   | Explorer  | Viewer + create/edit workbooks, run queries.               |
-| `AIBIDevelop`   | Developer | Explorer + edit data model, manage deployments.            |
+| Internal name   | Label     |
+| --------------- | --------- |
+| `AIBIView`      | Viewer    |
+| `AIBIExplore`   | Explorer  |
+| `AIBIDevelop`   | Developer |
 
 ### Global actions
 
