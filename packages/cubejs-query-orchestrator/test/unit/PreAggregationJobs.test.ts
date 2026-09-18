@@ -203,7 +203,7 @@ describe('pre-aggregation build jobs', () => {
       },
       preAggregationsOptions: {
         maxPartitions: 100,
-        queueOptions: () => ({ executionTimeout: 2, concurrency: 2, processUid: 'p1' }),
+        queueOptions: () => ({ executionTimeout: 10, concurrency: 2, processUid: 'p1' }),
         usedTablePersistTime: 1,
       },
     };
@@ -409,10 +409,10 @@ describe('pre-aggregation build jobs', () => {
 
     await waitFor(() => externalMockDriver.indexes.length > 0);
 
-    // executionTimeout is 2s for this orchestrator, so this build can't still be running
+    // Past the abandoned window of this orchestrator, so the build can't still be running
     await orchestrator.getPreAggregations().setPreAggregationBuildStatus(targetTableName, {
       status: 'building',
-      startedAt: new Date().getTime() - 60000,
+      startedAt: new Date().getTime() - 120000,
     });
 
     const [, status] = await orchestrator.isPartitionExist(
