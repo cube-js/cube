@@ -207,7 +207,7 @@ A parent added to an empty dashboard has nothing to drive yet. A control added l
 
 ### Options
 
-Each option is a tab across the top of the editor. Add one with **+** at the end of the tab strip, rename a tab in place by editing its title, and delete one with the ✕ that appears on it when you hover. The first tab cannot be deleted. A parent control can hold up to 50 options.
+Each option is a tab across the top of the editor. Add one with **+** at the end of the tab strip, double-click a tab's title to rename it — or press <kbd>F2</kbd> with the tab focused — and delete one with the ✕ that appears on it when you hover. The first tab cannot be deleted. A parent control can hold up to 50 options.
 
 A parent control created without options opens on a single tab named **Default**. That is a real option — saved with the control and offered in the viewer's dropdown like any other — so rename it if that label isn't what viewers should see.
 
@@ -248,7 +248,7 @@ Saving the parent's settings fills in the **first** option's tab: every row ther
 
 This reaches controls another parent already drove. [Only one parent drives a control](#one-parent-per-child), so saving a second parent takes them over.
 
-One exception follows from the same rule: the save only fills in controls with no mapping, and a control you set to **Keep as-is** on the *second* parent's first option has one. The save leaves it alone, and **Keep as-is** is not a claim, so the first parent keeps driving it.
+The [**Keep as-is** exception](#one-parent-per-child) is how you keep a control with its original parent: set it to **Keep as-is** on the second parent's first option, and that parent's save leaves it alone.
 
 So on a dashboard with more than one parent control, map the one you are editing deliberately rather than saving it to dismiss the dialog — the [owner note](#one-parent-per-child) tells you which controls a save would claim, but only if you read the rows.
 
@@ -258,7 +258,7 @@ Click the indicator to open that control's own settings, at its **Driven by pare
 
 Once a dashboard has a parent control, every filter, time granularity switcher and [field switcher](#field-switcher) carries a **Driven by parent** section in its own settings. It names the parent driving the control, or offers only **None** when nothing drives it yet, so you can see what drives a control without opening the parent. Picking **None** detaches a driven control: the parent stops driving it, and it keeps whatever value it is showing.
 
-That detachment is not durable on its own: it holds only until the parent's settings are next saved, which drives the control again. To survive that parent's own saves, set the control to **Keep as-is** on the parent's **first** option — that is a mapping of its own, and [the save](#mapping-status-on-child-controls) fills in only controls that have none. The later options need nothing: untouched there already means **Keep as-is**, and the save doesn't write them. It is no defence against a *different* parent, which has no mapping for the control either way and [claims it on save](#mapping-status-on-child-controls) like any other.
+That detachment is not durable on its own: it holds only until the parent's settings are next saved, which drives the control again. To survive that parent's own saves, set the control to **Keep as-is** on the parent's **first** option — that is a mapping of its own, and [the save](#mapping-status-on-child-controls) fills in only controls that have none. The later options need nothing: untouched there already means **Keep as-is**, and the save doesn't write them. That binds only the parent you set it in — a *different* parent claims the control on its own save unless you set it to **Keep as-is** on that parent's first option too.
 
 Mapping is the one thing you cannot do from here — the values belong to the parent's options. To map a control, or hand it to a different parent, open that parent's settings and set the control's row on each option's tab.
 
