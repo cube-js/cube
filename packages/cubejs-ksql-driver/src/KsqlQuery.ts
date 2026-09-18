@@ -57,6 +57,8 @@ export class KsqlQuery extends BaseQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    // ksqlDB has no Float32 type; leave these expressions to local evaluation.
+    delete templates.types.float;
     // ksqlDB quotes identifiers with backticks, not double quotes.
     templates.quotes = {
       identifiers: '`',
