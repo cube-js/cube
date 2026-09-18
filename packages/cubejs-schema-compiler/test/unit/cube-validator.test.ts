@@ -1840,7 +1840,7 @@ describe('Cube Validation', () => {
     it('should reject an empty memberLevel', () => {
       const result = cubeValidator.validate(newCube({}), new ConsoleErrorReporter());
       expect(result.error).toBeTruthy();
-      expect(result.error?.message).toContain('memberLevel must define either includes or excludes');
+      expect(result.error?.message).toContain('must define either includes or excludes');
     });
 
     // The combination that silently defeats masking: memberLevel defaults to
@@ -1851,18 +1851,36 @@ describe('Cube Validation', () => {
         new ConsoleErrorReporter()
       );
       expect(result.error).toBeTruthy();
-      expect(result.error?.message).toContain('memberLevel must define either includes or excludes');
+      expect(result.error?.message).toContain('must define either includes or excludes');
     });
 
-    // `includes: '*'` grants every member just as `{}` does, so the message must
-    // not offer it as a blanket fix without saying what a grant costs — otherwise
-    // it recommends the no-op it is meant to prevent. The wording has to stay
-    // true for a policy with rowLevel filters too, where a granted member is
-    // still masked outside the granted rows.
+    // The wording has to stay true for a policy with rowLevel filters, where a
+    // granted member is still masked outside the granted rows.
     it('should point at excludes for members that must always be masked', () => {
       const result = cubeValidator.validate(newCube({}), new ConsoleErrorReporter());
       expect(result.error?.message).toContain('unmasked on every row the policy grants');
       expect(result.error?.message).toContain('must always be masked belongs in excludes');
+    });
+
+    // The message keeps Joi's label: errors are deduped by message text, so
+    // without it two broken policies in one cube collapse into a single line
+    // naming neither.
+    it('should name each offending policy when several are empty', () => {
+      const cube = {
+        name: 'TestCube',
+        fileName: 'test.js',
+        sql: () => 'SELECT * FROM test',
+        accessPolicy: [
+          { group: 'admin', memberLevel: {} },
+          { group: 'analyst', memberLevel: {} },
+        ]
+      };
+
+      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(result.error).toBeTruthy();
+      expect(result.error?.message).toContain('accessPolicy[0].memberLevel');
+      expect(result.error?.message).toContain('accessPolicy[1].memberLevel');
+      expect(result.error?.message.match(/must define either includes or excludes/g)).toHaveLength(2);
     });
 
     it('should still allow a policy that omits memberLevel entirely', () => {
