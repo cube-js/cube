@@ -149,15 +149,10 @@ type PreAggJob = {
 export type PreAggregationType = 'rollup' | 'originalSql';
 
 /**
- * State of a build for a particular versioned partition table, tracked
- * separately from the table itself: the versioned table becomes visible to
- * `getTablesQuery` as soon as it is created, which is long before the rows are
- * imported into it. A finished build has no record — the complete table speaks
- * for itself — so only builds in flight and failures are kept.
- *
- * `startedAt` is stamped by whichever instance runs the build and read by
- * whichever instance serves the status request, so it is compared against a
- * different machine's clock.
+ * State of a build for a particular versioned partition table. The table becomes
+ * visible to `getTablesQuery` as soon as it is created, long before the rows are
+ * imported into it, so a finished build is recorded by the absence of a record
+ * rather than by a status of its own.
  */
 export type PreAggregationBuildStatus = {
   status: 'building' | 'failure',
@@ -560,12 +555,8 @@ export class PreAggregations {
     // so this record is the durable source of truth here.
     const buildStatus = await this.getPreAggregationBuildStatus(table);
 
-    // calculating status. A build that is known to be running or to have failed
-    // wins over the existence of the versioned table: the table is created
-    // before the rows are imported into it and it is left behind when the
-    // import fails or is killed. A finished build leaves no record, and neither
-    // does a partition that was already up to date and never rebuilt, so in
-    // both of those the table is what the answer rests on.
+    // A build record outranks the table: the table is there from the moment the
+    // build starts and is left behind when it fails or is killed.
     let status: string;
     if (buildStatus?.status === 'failure') {
       status = `failure: ${buildStatus.error}`;
