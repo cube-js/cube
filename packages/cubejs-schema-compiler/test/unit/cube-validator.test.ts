@@ -1843,8 +1843,9 @@ describe('Cube Validation', () => {
       expect(result.error?.message).toContain('must define either includes or excludes');
     });
 
-    // The combination that silently defeats masking: memberLevel defaults to
-    // '*', so `ssn` is granted in full and the memberMasking rule never fires.
+    // The motivating shape. The rule reads only memberLevel, so memberMasking is
+    // inert here: this pins that the combination stays rejected, not the masking
+    // no-op itself, which lives in applyRowLevelSecurity (server-core).
     it('should reject an empty memberLevel paired with memberMasking', () => {
       const result = cubeValidator.validate(
         newCube({}, { memberMasking: { includes: ['ssn'] } }),
