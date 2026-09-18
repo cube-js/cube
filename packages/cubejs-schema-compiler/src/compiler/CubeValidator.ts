@@ -1114,7 +1114,15 @@ const MemberLevelPolicySchema = Joi.object().keys({
   ]),
   includesMembers: Joi.array().items(Joi.string().required()),
   excludesMembers: Joi.array().items(Joi.string().required()),
-});
+})
+  // `includes` defaults to '*', so an empty memberLevel grants every member —
+  // the opposite of how `memberLevel: {}` reads. It is also a silent no-op for
+  // any memberMasking in the same policy, since members granted by memberLevel
+  // are never masked. Require the intent to be spelled out.
+  .or('includes', 'excludes')
+  .messages({
+    'object.missing': 'memberLevel must define either includes or excludes. An empty memberLevel grants access to all members, use includes: \'*\' if that is intended'
+  });
 
 const MemberMaskingPolicySchema = Joi.object().keys({
   includes: Joi.alternatives([
