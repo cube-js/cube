@@ -17,7 +17,7 @@ use crate::{
     sql::{AuthContextRef, SessionState},
     transport::{
         AliasedColumn, DataSource, LoadRequestMeta, MetaContext, SpanId, SqlGenerator,
-        SqlTemplates, TransportLoadRequestQuery, TransportService,
+        SqlTemplates, TransportLoadRequestQuery, TransportService, V1CubeMetaExt,
     },
     CubeError,
 };
@@ -2472,23 +2472,29 @@ impl WrappedSelectNode {
             expr = *inner;
         }
         let mut is_segment = false;
-        if let (Expr::Column(column), Some(context)) = (&expr, push_to_cube_context) {
-            // Raw segment references expand to predicates in the schema compiler.
-            // Materialized/join columns and boolean dimensions remain scalar values.
-            if !subqueries.contains_key(&column.flat_name())
-                && !column
-                    .relation
-                    .as_ref()
-                    .is_some_and(|relation| context.known_join_subqueries.contains(relation))
-            {
-                if let MemberField::Member(member) =
-                    Self::find_member_in_ungrouped_scan(context.ungrouped_scan_node, column)?
+        let has_boolean_context = sql_generator
+            .get_sql_templates()
+            .contains_template("expressions/scalar_to_predicate");
+        if has_boolean_context {
+            if let (Expr::Column(column), Some(context)) = (&expr, push_to_cube_context) {
+                // Raw segment references expand to predicates in the schema compiler.
+                // Materialized/join columns and boolean dimensions remain scalar values.
+                if !subqueries.contains_key(&column.flat_name())
+                    && !column
+                        .relation
+                        .as_ref()
+                        .is_some_and(|relation| context.known_join_subqueries.contains(relation))
                 {
-                    is_segment = context.meta.cubes.iter().any(|cube| {
-                        cube.segments
-                            .iter()
-                            .any(|segment| segment.name == member.member)
-                    });
+                    if let MemberField::Member(member) =
+                        Self::find_member_in_ungrouped_scan(context.ungrouped_scan_node, column)?
+                    {
+                        if let Some((cube_name, member_name)) = member.member.split_once('.') {
+                            is_segment = context
+                                .meta
+                                .find_cube_with_name(cube_name)
+                                .is_some_and(|cube| cube.lookup_segment(member_name).is_some());
+                        }
+                    }
                 }
             }
         }
@@ -2513,15 +2519,7 @@ impl WrappedSelectNode {
         )?;
         // Segment SQL is opaque and may contain OR/AND. Keep its precedence when
         // embedding it in a larger MSSQL predicate or a scalarizing CASE.
-        let sql = if is_segment
-            && sql_generator
-                .get_sql_templates()
-                .contains_template("expressions/scalar_to_predicate")
-        {
-            format!("({sql})")
-        } else {
-            sql
-        };
+        let sql = if is_segment { format!("({sql})") } else { sql };
         let sql = if is_predicate != predicate {
             sql_generator
                 .get_sql_templates()
