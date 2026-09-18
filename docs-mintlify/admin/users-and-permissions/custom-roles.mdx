@@ -213,9 +213,7 @@ See [Manage users][ref-manage-users] for more.
 
 ## Validation
 
-These are the **role builder's** rules, applied in the console before it submits. The API validates differently — see [Managing roles through the API](#managing-roles-through-the-api) below, where a policy with no actions is rejected rather than dropped.
-
-The role builder enforces a few rules client-side:
+These are the **role builder's** rules, enforced client-side before it submits; the API validates differently — see [Managing roles through the API](#managing-roles-through-the-api) below, where a policy with no actions is rejected rather than dropped.
 
 - **Name** is required and must be unique. Reserved names (`Admin`, `Guest`, `Developer`, `None`, `All`) are rejected. The API reserves a different set — every built-in role name, which includes `AIBIDeveloper`, `AIBIUser`, `AIBIViewer`, `D3User` and `EmbedUser`, but not `None` or `All`; see [`POST /api/v1/roles`][ref-api-create-role].
 - **Base Role** is required — Save is disabled until one is picked, and an inline error appears if you try to submit without one.
@@ -268,7 +266,7 @@ Custom roles can also be created, updated and assigned over the [REST API][ref-a
 
 </Warning>
 
-`GET`, `PUT` and `DELETE /api/v1/roles/{roleId}` read, update and remove a role; `PUT` updates only the fields present in the body, and sending `policies` replaces them outright rather than merging — so read the role first if you mean to add a policy, omit `policies` to leave them untouched, and send `[]` to clear them. Renaming to a name another role already holds answers `409`, so omit `name` too unless you mean to change it. `DELETE` also drops every assignment of the role, from users and from groups, so everyone holding it loses what it granted. These three endpoints cover your custom roles only: the built-in roles are not listed or editable through them.
+`GET`, `PUT` and `DELETE /api/v1/roles/{roleId}` read, update and remove a role; `PUT` updates only the fields present in the body, and sending `policies` replaces them outright rather than merging — so read the role first if you mean to add a policy, omit `policies` to leave them untouched, and send `[]` to clear them. Renaming to a name another role already holds answers `409`, so omit `name` too unless you mean to change it. `DELETE` also drops every assignment of the role, from users and from groups, so everyone holding it loses what it granted. These three endpoints cover your custom roles only: a built-in role's id is neither readable nor editable through them.
 
 Assignment is the exception — `PUT /api/v1/roles/{roleId}/users/{userId}` resolves built-in roles as well as custom ones, though their ids are neither published nor returned by `GET /api/v1/roles`, so in practice it is the roles you created that you assign. Cube's **Admin** role is not among the ones it resolves: its id returns `404`, so assignment cannot hand out the built-in Admin role. That is a property of assignment alone — `POST /api/v1/roles` accepts a `Global` policy carrying account-wide actions such as `DeploymentsManage` or `AuditLogManage`, so a custom role can grant much of what Admin does. Only an administrator can call any of this.
 
