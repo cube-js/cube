@@ -59,16 +59,18 @@ To embed a dashboard for external/customer-facing applications, generate a sessi
 
 See [Signed embedding](/embedding/iframe/auth/signed) for the full session generation flow, API key setup, and a complete working example.
 
-## Pre-set dashboard filters and granularities via URL {#pre-set-dashboard-filters-via-url}
+## Pre-set dashboard filters, granularities, and tabs via URL {#pre-set-dashboard-filters-via-url}
 
-You can pre-set the values of a dashboard's [controls](/docs/explore-analyze/dashboards/widgets/controls) by adding
+You can pre-set the values of a dashboard's [controls](/docs/explore-analyze/dashboards/widgets/controls) — and the
+tab each [tabs container](/docs/explore-analyze/dashboards/widgets/layout#tabs) opens on — by adding
 URL parameters:
 
-| Control | Parameter | Example |
+| Widget | Parameter | Example |
 |---|---|---|
 | Filter | `f_<semantic_view>.<dimension>=<JSON>` | `f_orders_transactions.users_country={"value":"USA"}` |
 | Time granularity switcher | `tg_<semantic_view>.<dimension>=<granularity>` | `tg_orders_transactions.created_at=week` |
 | Field switcher | `ms_<semantic_view>.<replaced_member>=<selected_member>` | `ms_orders_transactions.status=users_city` |
+| Tabs container | `tab_<widgetId>=<tabId>` | `tab_tabs_container_widget_1737045120000=tab_1737045187000` |
 
 The semantic view and member must match the internal names (not display titles)
 configured on the widget — as must the member on the right-hand side of `ms_`,
@@ -78,6 +80,11 @@ Granularities are lowercase and must be one of the switcher's [allowed
 granularities](/docs/explore-analyze/dashboards/widgets/controls#allowed-granularities) —
 `day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour`
 for time dimensions that expose them.
+
+A `tab_` parameter takes internal ids rather than tab titles, so read them off a
+link the dashboard writes itself: open it, switch to the tab you want, and copy
+the URL. One naming a widget the dashboard doesn't have, or a tab that container
+doesn't have, is ignored and the container opens on its own default tab.
 
 Example:
 
