@@ -1,0 +1,298 @@
+use std::future::Future;
+use std::sync::Arc;
+
+use neon::prelude::*;
+use serde_json;
+
+use crate::auth::{parse_security_context_arg, NativeSQLAuthContext};
+use crate::config::NodeCubeServices;
+use crate::cubesql_utils::with_session;
+use crate::tokio_runtime_node;
+use cubesql::compile::ast_conv::{self, SqlFiltersUpdate};
+use cubesql::sql::Session;
+use cubesql::transport::{MetaContext, TransportLoadRequestQueryFilterItem};
+use cubesql::CubeError;
+use cubesql::CubeErrorCauseType;
+
+use crate::rest4sql::json_value_to_js;
+
+#[derive(Debug)]
+enum SqlFiltersResponse {
+    Ok {
+        sql: Option<String>,
+        filters: Vec<TransportLoadRequestQueryFilterItem>,
+    },
+    Error {
+        error: String,
+    },
+}
+
+impl SqlFiltersResponse {
+    pub fn to_js<'ctx>(&self, cx: &mut impl Context<'ctx>) -> JsResult<'ctx, JsObject> {
+        let obj = cx.empty_object();
+
+        match &self {
+            SqlFiltersResponse::Ok { sql, filters } => {
+                let status = cx.string("ok");
+                obj.set(cx, "status", status)?;
+
+                if let Some(sql) = sql {
+                    let sql = cx.string(sql);
+                    obj.set(cx, "sql", sql)?;
+                }
+
+                let filters_json = serde_json::to_value(filters)
+                    .or_else(|e| cx.throw_error(format!("Failed to serialize filters: {}", e)))?;
+                let filters_js = json_value_to_js(cx, &filters_json)?;
+                obj.set(cx, "filters", filters_js)?;
+            }
+            SqlFiltersResponse::Error { error } => {
+                let status = cx.string("error");
+                obj.set(cx, "status", status)?;
+
+                let error = cx.string(error);
+                obj.set(cx, "error", error)?;
+            }
+        }
+
+        Ok(obj)
+    }
+}
+
+/// Malformed filters are a caller mistake, so they are reported in-band as an
+/// error response like any other bad input, rather than thrown as a JS error
+/// (which the API gateway can't tell apart from an internal failure).
+fn parse_filters_arg(
+    cx: &mut FunctionContext,
+    index: usize,
+    what: &str,
+) -> NeonResult<Result<Vec<TransportLoadRequestQueryFilterItem>, String>> {
+    let filters_json = cx.argument::<JsString>(index)?.value(cx);
+    Ok(serde_json::from_str(&filters_json).map_err(|e| format!("Failed to parse {}: {}", what, e)))
+}
+
+/// Returns a promise already resolved with an error response.
+fn resolved_sql_filters_error<'a>(
+    cx: &mut FunctionContext<'a>,
+    error: String,
+) -> JsResult<'a, JsValue> {
+    let response = SqlFiltersResponse::Error { error }.to_js(cx)?;
+    let (deferred, promise) = cx.promise();
+    deferred.resolve(cx, response);
+
+    Ok(promise.upcast::<JsValue>())
+}
+
+fn spawn_sql_filters_task<'a, Fut>(cx: &mut FunctionContext<'a>, task: Fut) -> JsResult<'a, JsValue>
+where
+    Fut: Future<Output = Result<SqlFiltersResponse, CubeError>> + Send + 'static,
+{
+    let runtime = tokio_runtime_node(cx)?;
+    let channel = cx.channel();
+    let (deferred, promise) = cx.promise();
+
+    // Note: if the spawned task panics or is aborted before settling,
+    // Neon's Drop implementation for Deferred automatically rejects the promise on the JS side.
+    runtime.spawn(async move {
+        let result = task.await;
+
+        if let Err(err) = deferred.try_settle_with(&channel, move |mut cx| {
+            // `neon::result::ResultExt` is implemented only for Result<Handle, Handle>, even though Ok variant is not touched
+            let response = result.or_else(|err| cx.throw_error(err.to_string()))?;
+            let response = response.to_js(&mut cx)?;
+            Ok(response)
+        }) {
+            // There is not much we can do at this point
+            // TODO lift this error to task => JoinHandle => JS watchdog
+            log::error!(
+                "Unable to settle JS promise from tokio task, try_settle_with failed, err: {err}"
+            );
+        }
+    });
+
+    Ok(promise.upcast::<JsValue>())
+}
+
+async fn handle_get_sql_filters(
+    services: Arc<NodeCubeServices>,
+    native_auth_ctx: Arc<NativeSQLAuthContext>,
+    sql_query: String,
+) -> Result<SqlFiltersResponse, CubeError> {
+    with_session(&services, native_auth_ctx.clone(), |session| async move {
+        let transport = session.server.transport.clone();
+        let meta_context = transport.meta(native_auth_ctx).await?;
+
+        match ast_conv::get_sql_filters(&sql_query, meta_context, session).await {
+            Ok(filters) => Ok(SqlFiltersResponse::Ok { sql: None, filters }),
+            Err(err) => in_band_or_thrown(err),
+        }
+    })
+    .await
+}
+
+/// A failure of the caller's making - a query that does not plan, a filter
+/// that is not there - is answered in-band as `{ status: "error" }`, which
+/// the gateway maps to a 400. An internal one is thrown, so that it reaches
+/// the gateway's error handler and is answered as the server fault it is.
+fn in_band_or_thrown(err: CubeError) -> Result<SqlFiltersResponse, CubeError> {
+    match err.cause {
+        CubeErrorCauseType::Internal(_) => Err(err),
+        _ => Ok(SqlFiltersResponse::Error { error: err.message }),
+    }
+}
+
+/// Runs one rewrite against a session and answers as [`in_band_or_thrown`]
+/// does.
+async fn handle_update<F, Fut>(
+    services: Arc<NodeCubeServices>,
+    native_auth_ctx: Arc<NativeSQLAuthContext>,
+    update: F,
+) -> Result<SqlFiltersResponse, CubeError>
+where
+    F: FnOnce(Arc<MetaContext>, Arc<Session>) -> Fut + Send + 'static,
+    Fut: Future<Output = Result<SqlFiltersUpdate, CubeError>> + Send,
+{
+    with_session(&services, native_auth_ctx.clone(), |session| async move {
+        let meta_context = session
+            .server
+            .transport
+            .clone()
+            .meta(native_auth_ctx)
+            .await?;
+
+        match update(meta_context, session).await {
+            Ok(result) => Ok(SqlFiltersResponse::Ok {
+                sql: Some(result.sql),
+                filters: result.filters,
+            }),
+            Err(err) => in_band_or_thrown(err),
+        }
+    })
+    .await
+}
+
+async fn handle_add_sql_filters(
+    services: Arc<NodeCubeServices>,
+    native_auth_ctx: Arc<NativeSQLAuthContext>,
+    sql_query: String,
+    filters: Vec<TransportLoadRequestQueryFilterItem>,
+) -> Result<SqlFiltersResponse, CubeError> {
+    handle_update(services, native_auth_ctx, move |meta, session| async move {
+        ast_conv::add_sql_filters(&sql_query, &filters, meta, session).await
+    })
+    .await
+}
+
+async fn handle_set_sql_filters(
+    services: Arc<NodeCubeServices>,
+    native_auth_ctx: Arc<NativeSQLAuthContext>,
+    sql_query: String,
+    filters: Vec<TransportLoadRequestQueryFilterItem>,
+) -> Result<SqlFiltersResponse, CubeError> {
+    handle_update(services, native_auth_ctx, move |meta, session| async move {
+        ast_conv::set_sql_filters(&sql_query, &filters, meta, session).await
+    })
+    .await
+}
+
+async fn handle_delete_sql_filters(
+    services: Arc<NodeCubeServices>,
+    native_auth_ctx: Arc<NativeSQLAuthContext>,
+    sql_query: String,
+    filters: Vec<TransportLoadRequestQueryFilterItem>,
+) -> Result<SqlFiltersResponse, CubeError> {
+    handle_update(services, native_auth_ctx, move |meta, session| async move {
+        ast_conv::delete_sql_filters(&sql_query, &filters, meta, session).await
+    })
+    .await
+}
+
+async fn handle_replace_sql_filters(
+    services: Arc<NodeCubeServices>,
+    native_auth_ctx: Arc<NativeSQLAuthContext>,
+    sql_query: String,
+    old_filters: Vec<TransportLoadRequestQueryFilterItem>,
+    new_filters: Vec<TransportLoadRequestQueryFilterItem>,
+) -> Result<SqlFiltersResponse, CubeError> {
+    handle_update(services, native_auth_ctx, move |meta, session| async move {
+        ast_conv::replace_sql_filters(&sql_query, &old_filters, &new_filters, meta, session).await
+    })
+    .await
+}
+
+pub fn get_sql_filters(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let interface = cx.argument::<JsBox<crate::node_export::SQLInterface>>(0)?;
+    let sql_query = cx.argument::<JsString>(1)?.value(&mut cx);
+    let native_auth_ctx = parse_security_context_arg(&mut cx, 2)?;
+    let services = interface.services.clone();
+
+    spawn_sql_filters_task(
+        &mut cx,
+        handle_get_sql_filters(services, native_auth_ctx, sql_query),
+    )
+}
+
+/// The entry point shared by the operations taking one filter list: the
+/// interface, the query, the filters and the security context, in that order.
+fn filters_entry_point<H, Fut>(mut cx: FunctionContext, handle: H) -> JsResult<JsValue>
+where
+    H: FnOnce(
+        Arc<NodeCubeServices>,
+        Arc<NativeSQLAuthContext>,
+        String,
+        Vec<TransportLoadRequestQueryFilterItem>,
+    ) -> Fut,
+    Fut: Future<Output = Result<SqlFiltersResponse, CubeError>> + Send + 'static,
+{
+    let interface = cx.argument::<JsBox<crate::node_export::SQLInterface>>(0)?;
+    let sql_query = cx.argument::<JsString>(1)?.value(&mut cx);
+    let filters = match parse_filters_arg(&mut cx, 2, "filters")? {
+        Ok(filters) => filters,
+        Err(error) => return resolved_sql_filters_error(&mut cx, error),
+    };
+    let native_auth_ctx = parse_security_context_arg(&mut cx, 3)?;
+    let services = interface.services.clone();
+
+    spawn_sql_filters_task(
+        &mut cx,
+        handle(services, native_auth_ctx, sql_query, filters),
+    )
+}
+
+pub fn add_sql_filters(cx: FunctionContext) -> JsResult<JsValue> {
+    filters_entry_point(cx, handle_add_sql_filters)
+}
+
+pub fn set_sql_filters(cx: FunctionContext) -> JsResult<JsValue> {
+    filters_entry_point(cx, handle_set_sql_filters)
+}
+
+pub fn delete_sql_filters(cx: FunctionContext) -> JsResult<JsValue> {
+    filters_entry_point(cx, handle_delete_sql_filters)
+}
+
+pub fn replace_sql_filters(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let interface = cx.argument::<JsBox<crate::node_export::SQLInterface>>(0)?;
+    let sql_query = cx.argument::<JsString>(1)?.value(&mut cx);
+    let old_filters = match parse_filters_arg(&mut cx, 2, "old filters")? {
+        Ok(filters) => filters,
+        Err(error) => return resolved_sql_filters_error(&mut cx, error),
+    };
+    let new_filters = match parse_filters_arg(&mut cx, 3, "new filters")? {
+        Ok(filters) => filters,
+        Err(error) => return resolved_sql_filters_error(&mut cx, error),
+    };
+    let native_auth_ctx = parse_security_context_arg(&mut cx, 4)?;
+    let services = interface.services.clone();
+
+    spawn_sql_filters_task(
+        &mut cx,
+        handle_replace_sql_filters(
+            services,
+            native_auth_ctx,
+            sql_query,
+            old_filters,
+            new_filters,
+        ),
+    )
+}
