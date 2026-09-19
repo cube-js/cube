@@ -59,7 +59,9 @@ While you are editing, the tab strip is where you work with the tabs themselves:
 
 Click the empty part of the strip to select the container, then drag its resize grip to change its size; drag that same empty part to move it on the board. Its gear menu carries **Resize** and **Delete**.
 
-A new tabs container is added 6 cells wide and 9 tall. A board with fewer than 6 columns narrows the width to its own column count; inside a grid both the width and the height come down to the grid's own column and row counts. Neither narrowing goes below the 4×6 minimum, and the grid then needs a free block of the narrowed size — 6×9 in a grid at least that large — so it refuses the drop rather than inserting a smaller container. It can't be resized below 4×6 either, inside a grid as much as on the canvas; and if a tab holds a grid, it also can't shrink past what that grid's own contents need.
+A new tabs container is added 6 cells wide and 9 tall. A board narrows the width alone, to its own column count when that is under 6, so the height is always 9; a grid narrows both, to its own column and row counts. Neither narrowing goes below the 4×6 minimum.
+
+So a grid narrower than 4 columns or shorter than 6 rows can never take a tabs container at all, and a larger one takes it only where it has a free block of the narrowed size — 6×9 in a grid at least that big. It can't be resized below 4×6 either, inside a grid as much as on the canvas; and if a tab holds a grid, it also can't shrink past what that grid's own contents need.
 
 A tabs container can sit on the canvas, inside a grid, or inside a tab ([nesting rules](#nesting-containers)), but **not inside a stack**: that drop is refused and Cube tells you tabs can't be placed inside a stack. A container nested inside a tab is sized by the tab body rather than by hand: a nested grid keeps **Edit title** and **Delete** but drops **Resize**, and a nested stack or tabs container carries a delete button in its top-right corner instead of a menu.
 
@@ -75,7 +77,7 @@ Switching a tab writes it into the page URL as `?tab_<widgetId>=<tabId>`, so a l
 
 Containers nest inside one another up to **four levels deep**, counted from a container sitting directly on the canvas. The limit is on the chain as a whole, whatever the mix of kinds — a grid inside a grid inside a grid is as deep as a grid holding a tabs container holding a stack. A grid on the canvas, holding a tabs container, whose tab holds a grid, holding another grid, is at the limit: that innermost grid still takes charts and other widgets, but dropping another container into it is refused.
 
-One pairing is never allowed at any depth: a **grid** or a **tabs container** inside a stack. A stack has no cells of its own to give them. Everything else nests freely: a stack goes inside another stack, a grid, or a tab; a grid or a tabs container goes inside a grid or a tab.
+One pairing is never allowed at any depth: a **grid** or a **tabs container** inside a stack — a stack has no cells of its own to give them. The reverse is fine, which is why a stack is the one container that goes anywhere.
 
 ## Deleting a container
 
@@ -85,7 +87,7 @@ Cube asks you to confirm before deleting a container that still holds widgets, a
 
 </Warning>
 
-This holds for every container — stack, grid, and tabs — and for every way of deleting one: the container's own menu or delete button, and **Delete** / **Backspace** on a board selection. Deleting a single **tab** works the same way: its widget goes with it, and a tab that holds one asks first.
+This holds for every container — stack, grid, and tabs — and for every way of deleting one: the container's own menu or delete button, and **Delete** / **Backspace** on a board selection. Deleting a single **tab** works the same way: everything in it goes with it, at every depth, and a tab that isn't empty asks first.
 
 ## Adding a layout widget
 

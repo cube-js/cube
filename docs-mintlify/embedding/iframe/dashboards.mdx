@@ -98,17 +98,17 @@ The filter's JSON value is shown unencoded for readability. Percent-encode it
 before the URL goes anywhere real — pasted as-is into the `src="…"` of the iframe
 snippet above, its raw `"` closes the attribute and truncates the URL.
 
-`f_`, `tg_`, and `ms_` are applied only if a matching control for that member
-already exists on the dashboard; a granularity outside the switcher's allowed
-list is ignored, as is a member the field switcher doesn't offer — its
+`f_`, `tg_`, and `ms_` are read on both regular and published (embedded)
+dashboards, and are applied only if a matching control for that member already
+exists on the dashboard; a granularity outside the switcher's allowed list is
+ignored, as is a member the field switcher doesn't offer — its
 [**Alternatives**](/docs/explore-analyze/dashboards/widgets/controls#field-switcher),
 plus the member it replaces.
 
-The reverse direction works on published dashboards: when a viewer changes a
-control — or switches a tab — there, the new value is written back into the
-dashboard's own URL, so the state a link carries and the state a viewer reaches
-by clicking are the same format. Reading `f_`, `tg_`, and `ms_` works anywhere;
-writing them back is published-only. See [Controls → Sharing the current
+The reverse direction is published-only: when a viewer changes a control
+there — or switches a tab — the new value is written back into the dashboard's
+own URL, so the state a link carries and the state a viewer reaches by clicking
+are the same format. See [Controls → Sharing the current
 selection](/docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection).
 
 ## Allow chart and dashboard export {#allow-csv-export}
