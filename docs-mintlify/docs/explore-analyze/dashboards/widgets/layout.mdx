@@ -26,7 +26,7 @@ Place a stack on the canvas and resize it to any width and height; its children 
 
 Add a widget to a stack by dragging it in — from the canvas, the **Add Widgets** menu, or another stack — and remove one by dragging it back out; the remaining children redistribute to fill the space. Stacks can be nested inside one another.
 
-Because a stack owns its children's layout, you work with the **container as a unit**: select, move, resize, or delete the stack itself and it carries its children with it. Individual widgets inside a stack are not separately selectable on the board — a marquee drawn over a stack selects the container, not its children. To rearrange children, drag one to a new position **within** the stack; to take one out, drag it onto the canvas or into another container.
+Because a stack owns its children's layout, you work with the **container as a unit**: select, move, resize, or delete the stack itself ([what that removes](#deleting-a-container)) and it carries its children with it. Individual widgets inside a stack are not separately selectable on the board — a marquee drawn over a stack selects the container, not its children. To rearrange children, drag one to a new position **within** the stack; to take one out, drag it onto the canvas or into another container.
 
 ## Grid
 
@@ -34,7 +34,7 @@ A **grid** is a container whose children each hold a fixed cell position and siz
 
 A new grid is added as a square matching the column count of the board or grid it's placed in — for example, 12×12 on a 12-column dashboard. Add a widget to it by dragging one in from the canvas, the **Add Widgets** menu, or another container; the widget keeps its size and lands on the cell you drop it on, as long as that cell is free.
 
-Click the grid's header to select it, then drag its resize grip to change its size, or open its gear menu for **Edit title**, **Resize**, and **Delete**. Resizing only crops or restores empty rows and columns: a grid can't shrink below 2×2 or cut into an occupied cell. To name a grid, click into its header once it's selected and type a title.
+Click the grid's header to select it, then drag its resize grip to change its size, or open its gear menu for **Edit title**, **Resize**, and **Delete** ([what that removes](#deleting-a-container)). Resizing only crops or restores empty rows and columns: a grid can't shrink below 2×2 or cut into an occupied cell. To name a grid, click into its header once it's selected and type a title.
 
 A grid can be nested inside the root board, inside another grid, or inside a tab, but not inside a stack.
 
@@ -42,11 +42,11 @@ A grid can be nested inside the root board, inside another grid, or inside a tab
 
 A **tabs container** shows one widget at a time behind a row of tabs across the top of its card. Use it where a dashboard would otherwise run long: put each view of the data on its own tab and let viewers switch between them, instead of stacking every chart down the page.
 
-Each tab holds **one** widget, which fills the tab body — resize the container and the widget resizes with it, and there are no separate resize handles inside a tab. Drag a widget in from the canvas, the **Add Widgets** menu, or another container; an empty tab shows a **Drag a widget here** placeholder. A tab that already holds a widget refuses a second drop and the dragged widget returns to where it came from. To empty a tab, remove the widget through its own menu, or drag it back out onto the canvas — it keeps the size it had in the tab.
+Each tab holds **one** widget, which fills the tab body — resize the container and the widget resizes with it, and there are no separate resize handles inside a tab. Drag a widget in from the canvas, the **Add Widgets** menu, or another container; an empty tab shows a **Drag a widget here** placeholder. A tab that already holds a widget refuses a second drop and the dragged widget returns to where it came from. To empty a tab, remove the widget through its own menu or delete button, or drag it back out onto the canvas — it keeps the size it had in the tab.
 
 While you are editing, the tab strip is where you work with the tabs themselves:
 
-- **Switch** — click a tab, or focus one and press ArrowLeft / ArrowRight.
+- **Switch** — click a tab, or focus one and press <kbd>←</kbd> / <kbd>→</kbd>.
 - **Add** — press **+**, just after the last tab. The new tab opens empty and becomes the active one.
 - **Rename** — the tab's **⋮** menu → **Rename**, then type the new title in place.
 - **Reorder** — drag a tab along the strip.
@@ -54,7 +54,7 @@ While you are editing, the tab strip is where you work with the tabs themselves:
 
 Click the empty part of the strip to select the container, then drag its resize grip to change its size; drag that same empty part to move it on the board. Its gear menu carries **Resize** and **Delete**.
 
-A new tabs container is added at 6×9 cells and can't be resized below 4×6 — the strip spends the whole first row on tab titles, so a shorter container would leave a tab bar over a sliver of content. If a tab holds a grid, the container also can't shrink past what that grid's own contents need, so nothing inside is ever cropped.
+A new tabs container is added at 6×9 cells and can't be resized below 4×6. If a tab holds a grid, the container also can't shrink past what that grid's own contents need.
 
 A tabs container can sit on the canvas, inside a grid, or inside another tab — containers nest up to four levels deep — but **not inside a stack**: that drop is refused and Cube tells you tabs can't be placed inside a stack. A container nested inside a tab is sized by the tab body rather than by hand: a nested grid keeps **Edit title** and **Delete** but drops **Resize**, and a nested stack or tabs container carries a delete button in its top-right corner instead of a menu.
 
@@ -64,7 +64,7 @@ Only the active tab runs queries. A tab you haven't opened yet isn't rendered at
 
 On a published dashboard — including [embedded views](/embedding/iframe/dashboards) — the strip still switches tabs by click or arrow keys, but the editing affordances are gone: no **+**, no per-tab menu, no rename or reorder. The container opens on the tab it was created with — the one that was already there before you added any others. Switching tabs in the builder previews a tab without changing what viewers land on, and reordering the strip doesn't change it either; if you delete that tab, the first remaining one takes over.
 
-Switching a tab writes it into the page URL as `?tab_<widget id>=<tab id>`, so a link you copy reopens on the tab you were reading; only the containers you actually switched are written into that link. Exporting the dashboard as PNG or PDF captures the tab each container is currently showing.
+Switching a tab writes it into the page URL as `?tab_<widgetId>=<tabId>`, so a link you copy reopens on the tab you were reading; only the containers you actually switched are written into that link. Exporting the dashboard as PNG or PDF captures the tab each container is currently showing.
 
 ## Deleting a container
 
