@@ -1,3 +1,4 @@
+use crate::config::env_parse_lenient;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
 use crate::queryplanner::panic::PanicWorkerNode;
@@ -23,6 +24,8 @@ use datafusion::common::TableReference;
 use datafusion::datasource::physical_plan::ParquetFileReaderFactory;
 use datafusion::datasource::DefaultTableSource;
 use datafusion::error::DataFusionError;
+use datafusion::logical_expr::expr::{Exists, InSubquery};
+use datafusion::logical_expr::Expr;
 use datafusion::logical_expr::{
     Aggregate, Distinct, DistinctOn, EmptyRelation, Extension, Filter, Join, Limit, LogicalPlan,
     Projection, RecursiveQuery, Repartition, Sort, Subquery, SubqueryAlias, TableScan, Union,
@@ -33,7 +36,119 @@ use datafusion_proto::bytes::logical_plan_from_bytes_with_extension_codec;
 use datafusion_proto::logical_plan::LogicalExtensionCodec;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
+
+/// Nesting a serialized query plan may reach along its longest path, counting plan nodes,
+/// expression nodes and the plans of subqueries carried in expressions alike -- the protobuf
+/// encoding nests two message levels for each of them.
+///
+/// Every level of decoding is a recursive call, so the budget is really a stack budget, and the
+/// smallest stack that decodes is the select worker's (`CUBESTORE_SELECT_WORKER_STACK_SIZE`,
+/// 4 MiB), which a release build takes past 600 levels. This default stays well inside that,
+/// and unlike a stack overflow it can be reported.
+///
+/// Cube Store inlines a CTE body at each of its references, so a query built from N chained
+/// stages arrives here as roughly 2N nodes.
+const DEFAULT_MAX_QUERY_PLAN_DEPTH: usize = 150;
+
+fn max_query_plan_depth() -> usize {
+    static MAX_DEPTH: OnceLock<usize> = OnceLock::new();
+    *MAX_DEPTH.get_or_init(|| {
+        let depth = env_parse_lenient(
+            "CUBESTORE_MAX_QUERY_PLAN_DEPTH",
+            DEFAULT_MAX_QUERY_PLAN_DEPTH,
+        );
+        if depth == 0 {
+            DEFAULT_MAX_QUERY_PLAN_DEPTH
+        } else {
+            depth
+        }
+    })
+}
+
+/// Deepest expression tree carried by `node`, and the deepest plan reached through a subquery
+/// one of those expressions carries, both measured from `node`'s expressions.
+fn expression_depths(node: &LogicalPlan) -> (usize, usize) {
+    let mut deepest_expression = 0;
+    let mut deepest_subquery = 0;
+
+    let _ = node.apply_expressions(|root| {
+        let mut pending = vec![(root, 1usize)];
+        while let Some((expr, depth)) = pending.pop() {
+            deepest_expression = deepest_expression.max(depth);
+            // A subquery is a whole plan hanging off the expression that carries it. This is
+            // the one recursive step here, taken once per level of subquery nesting.
+            match expr {
+                Expr::ScalarSubquery(subquery)
+                | Expr::Exists(Exists { subquery, .. })
+                | Expr::InSubquery(InSubquery { subquery, .. }) => {
+                    deepest_subquery = deepest_subquery
+                        .max(depth + logical_plan_depth(subquery.subquery.as_ref()));
+                }
+                _ => {}
+            }
+            let _ = expr.apply_children(|child| {
+                pending.push((child, depth + 1));
+                Ok(TreeNodeRecursion::Continue)
+            });
+        }
+        Ok(TreeNodeRecursion::Continue)
+    });
+
+    (deepest_expression, deepest_subquery)
+}
+
+/// Longest root-to-leaf path in `plan`, counting a plan node, an expression node and a
+/// subquery's root alike, because the encoding nests all three the same way.
+///
+/// Walks an explicit stack and memoizes per node address: the plans this guards against are
+/// exactly the ones a recursive walk could not survive, and inputs are shared `Arc`s, so a
+/// node reachable by many paths must not be re-expanded per path.
+fn logical_plan_depth(plan: &LogicalPlan) -> usize {
+    let mut depth_below: HashMap<*const LogicalPlan, usize> = HashMap::new();
+    let mut pending: Vec<(&LogicalPlan, bool)> = vec![(plan, false)];
+
+    while let Some((node, inputs_visited)) = pending.pop() {
+        let key = node as *const LogicalPlan;
+        if !inputs_visited {
+            if depth_below.contains_key(&key) {
+                continue;
+            }
+            pending.push((node, true));
+            pending.extend(node.inputs().into_iter().map(|input| (input, false)));
+            continue;
+        }
+
+        let below = node
+            .inputs()
+            .into_iter()
+            .filter_map(|input| depth_below.get(&(input as *const LogicalPlan)))
+            .copied()
+            .max()
+            .unwrap_or(0);
+        let (in_expression, in_subquery) = expression_depths(node);
+        depth_below.insert(key, 1 + below.max(in_expression).max(in_subquery));
+    }
+
+    depth_below
+        .get(&(plan as *const LogicalPlan))
+        .copied()
+        .unwrap_or(1)
+}
+
+fn check_query_plan_depth(plan: &LogicalPlan) -> Result<(), CubeError> {
+    let limit = max_query_plan_depth();
+    let depth = logical_plan_depth(plan);
+    if depth > limit {
+        return Err(CubeError::user(format!(
+            "Query plan is nested too deeply to execute: {} levels against a limit of {}. \
+             Reduce the nesting the query asks for -- chained stages, nested subqueries and \
+             expressions all count -- or raise CUBESTORE_MAX_QUERY_PLAN_DEPTH.",
+            depth, limit
+        )));
+    }
+    Ok(())
+}
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
 pub struct RowRange {
@@ -857,6 +972,7 @@ pub enum SerializedTableSource {
 
 impl PreSerializedPlan {
     pub fn to_serialized_plan(&self) -> Result<SerializedPlan, CubeError> {
+        check_query_plan_depth(&self.logical_plan)?;
         let serialized_logical_plan =
             datafusion_proto::bytes::logical_plan_to_bytes_with_extension_codec(
                 &self.logical_plan,
@@ -1384,4 +1500,166 @@ pub enum SerializedTableProvider {
     CubeTable(CubeTable),
     CubeTableLogical(CubeTableLogical),
     InlineTableProvider(InlineTableProvider),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use datafusion::logical_expr::{col, lit, LogicalPlanBuilder};
+
+    /// The documented default of `CUBESTORE_MAX_QUERY_PLAN_DEPTH`, spelled out so that changing
+    /// the default has to come with a decision about these cases.
+    const DEFAULT_LIMIT: usize = 150;
+
+    /// The shape Cube Store gets from a chain of multi-stage stages: a CTE body inlined at each
+    /// reference, so one stage becomes a projection under a subquery alias.
+    fn chained_stage_plan(stages: usize) -> LogicalPlan {
+        let mut builder = LogicalPlanBuilder::values(vec![vec![lit(1i64)]]).unwrap();
+        for stage in 0..stages {
+            builder = builder
+                .project(vec![col("column1")])
+                .unwrap()
+                .alias(format!("stage_{}", stage))
+                .unwrap();
+        }
+        builder.build().unwrap()
+    }
+
+    fn pre_serialized(plan: LogicalPlan) -> PreSerializedPlan {
+        PreSerializedPlan::try_new(
+            plan,
+            PlanningMeta {
+                indices: Vec::new(),
+                multi_part_subtree: HashMap::new(),
+                pushable_chunk_filters: Vec::new(),
+            },
+            None,
+        )
+        .unwrap()
+    }
+
+    /// Serializing and deserializing both recurse per plan node and cost far more stack in a
+    /// debug build than in the release build that ships, hence the explicit size.
+    fn on_a_deep_enough_stack<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
+        std::thread::Builder::new()
+            .stack_size(32 * 1024 * 1024)
+            .spawn(f)
+            .unwrap()
+            .join()
+            .expect("serialization must not exhaust the stack")
+    }
+
+    fn roundtrip(plan: &LogicalPlan) -> Result<LogicalPlan, CubeError> {
+        let serialized = pre_serialized(plan.clone()).to_serialized_plan()?;
+        Ok(serialized.logical_plan(
+            HashMap::new(),
+            HashMap::new(),
+            crate::queryplanner::metadata_cache::NoopParquetMetadataCache::new(),
+        )?)
+    }
+
+    /// A plan of exactly the budget is served all the way through the roundtrip. The boundary is
+    /// the budget itself, not one short of it, and this is the deepest plan the budget admits,
+    /// so it is the one whose decoding has to fit the smallest stack that decodes.
+    ///
+    /// It also nests the encoding far past prost's own 100-level decode budget, which is what
+    /// used to refuse it.
+    #[test]
+    fn plan_at_the_depth_limit_survives_the_serialization_roundtrip() {
+        let plan = chained_stage_plan(74); // the values leaf plus 2 nodes a stage
+        assert_eq!(logical_plan_depth(&plan), DEFAULT_LIMIT);
+        let decoded = on_a_deep_enough_stack(move || roundtrip(&plan)).unwrap();
+        assert_eq!(
+            format!("{}", decoded.display_indent()).lines().count(),
+            149,
+            "the decoded plan must be the one that was encoded"
+        );
+    }
+
+    /// Past the budget the query has to be refused with depth named, rather than crash the node
+    /// somewhere inside the protobuf recursion.
+    #[test]
+    fn plan_over_the_depth_limit_names_depth() {
+        let plan = chained_stage_plan(75);
+        let depth = logical_plan_depth(&plan);
+        assert!(depth > DEFAULT_LIMIT);
+        let err = on_a_deep_enough_stack(move || pre_serialized(plan).to_serialized_plan())
+            .map(|_| ())
+            .expect_err("a plan past the depth limit must not be serialized");
+
+        let message = err.to_string();
+        assert!(
+            message.contains(&format!(
+                "{} levels against a limit of {}",
+                depth, DEFAULT_LIMIT
+            )),
+            "message must name the depth reached and the budget, got: {}",
+            message
+        );
+        assert!(
+            message.contains("CUBESTORE_MAX_QUERY_PLAN_DEPTH"),
+            "message must name the knob that raises the budget, got: {}",
+            message
+        );
+        assert_eq!(
+            err.cause,
+            crate::CubeErrorCauseType::User,
+            "a query the user has to flatten is not an internal error"
+        );
+    }
+
+    /// A nested expression nests the encoding the same way a chain of plan nodes does, on a
+    /// plan of two nodes that counting nodes alone reads as trivially shallow. Nothing bounds
+    /// the decoding of it any more, so the budget has to.
+    #[test]
+    fn depth_counts_nested_expressions() {
+        let mut deep = col("column1");
+        for _ in 0..DEFAULT_LIMIT {
+            deep = deep + lit(1i64);
+        }
+        let plan = LogicalPlanBuilder::values(vec![vec![lit(1i64)]])
+            .unwrap()
+            .project(vec![deep.alias("deep")])
+            .unwrap()
+            .build()
+            .unwrap();
+        assert_eq!(plan.inputs().len(), 1);
+
+        let err = on_a_deep_enough_stack(move || pre_serialized(plan).to_serialized_plan())
+            .map(|_| ())
+            .expect_err("an expression past the depth limit must not be serialized");
+        assert!(
+            err.to_string().contains("nested too deeply to execute"),
+            "message must name depth as the cause, got: {}",
+            err
+        );
+    }
+
+    /// Subqueries carried in expressions are separate plans that nest the encoding just as
+    /// deep, so counting plan inputs alone would let them through.
+    #[test]
+    fn depth_counts_subqueries_in_expressions() {
+        let plan = LogicalPlanBuilder::values(vec![vec![lit(1i64)]])
+            .unwrap()
+            .filter(Expr::Exists(Exists::new(
+                Subquery {
+                    subquery: Arc::new(chained_stage_plan(DEFAULT_LIMIT)),
+                    outer_ref_columns: vec![],
+                },
+                false,
+            )))
+            .unwrap()
+            .build()
+            .unwrap();
+        assert_eq!(plan.inputs().len(), 1);
+
+        let err = on_a_deep_enough_stack(move || pre_serialized(plan).to_serialized_plan())
+            .map(|_| ())
+            .expect_err("a subquery past the depth limit must not be serialized");
+        assert!(
+            err.to_string().contains("nested too deeply to execute"),
+            "message must name depth as the cause, got: {}",
+            err
+        );
+    }
 }

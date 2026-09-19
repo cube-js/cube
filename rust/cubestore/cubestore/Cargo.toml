@@ -110,7 +110,7 @@ deepsize = "0.2.0"
 anyhow = "1.0"
 arc-swap = "1.7.1"
 object_store = "0.11.1"
-prost = "0.13.1"
+prost = { version = "0.13.1", features = ["no-recursion-limit"] }
 comfy-table = "7.2.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]

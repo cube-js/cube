@@ -1,4 +1,5 @@
 use crate::cachestore::{QueueItemStatus, QueueKey, QUEUE_ITEM_EXTERNAL_ID_MAX_LEN};
+use crate::config::env_parse_lenient;
 use crate::sql::{QueryParameter, QueryParameters};
 use sqlparser::ast::{
     ColumnDef, CreateIndex, CreateTable, HiveDistributionStyle, Ident, ObjectName, Query,
@@ -8,6 +9,7 @@ use sqlparser::dialect::keywords::Keyword;
 use sqlparser::dialect::Dialect;
 use sqlparser::parser::{Parser, ParserError};
 use sqlparser::tokenizer::{Span, Token, Tokenizer};
+use std::sync::OnceLock;
 
 #[derive(Debug)]
 pub struct MySqlDialectWithBackTicks {}
@@ -271,6 +273,32 @@ macro_rules! parse_sql_options {
     }};
 }
 
+/// Nesting the parser accepts inside a single statement: one level per nested expression,
+/// subquery and parenthesised group. `sqlparser`'s own default is 50, low enough that a
+/// generated query with a few dozen nested expressions is rejected outright.
+///
+/// Every level is a recursive descent on the calling thread's stack and the parser has no
+/// stack-growth protection, so the real ceiling is the stack a statement is parsed on.
+/// Statements are parsed on the `cubestore-main` runtime, whose threads get 8 MiB
+/// (`CUBESTORE_MAIN_STACK_SIZE`). The costliest shape is nested subqueries, at roughly 33 KiB a
+/// level in a release build, which that stack takes past 200; this default stays inside it.
+const DEFAULT_SQL_PARSER_RECURSION_LIMIT: usize = 128;
+
+pub(crate) fn sql_parser_recursion_limit() -> usize {
+    static LIMIT: OnceLock<usize> = OnceLock::new();
+    *LIMIT.get_or_init(|| {
+        let limit = env_parse_lenient(
+            "CUBESTORE_SQL_PARSER_RECURSION_LIMIT",
+            DEFAULT_SQL_PARSER_RECURSION_LIMIT,
+        );
+        if limit == 0 {
+            DEFAULT_SQL_PARSER_RECURSION_LIMIT
+        } else {
+            limit
+        }
+    })
+}
+
 impl<'a> CubeStoreParser<'a> {
     pub fn new(sql: &str, parameters: Option<QueryParameters>) -> Result<Self, ParserError> {
         let dialect = &MySqlDialectWithBackTicks {};
@@ -278,7 +306,9 @@ impl<'a> CubeStoreParser<'a> {
         let tokens = tokenizer.tokenize()?;
 
         Ok(CubeStoreParser {
-            parser: Parser::new(dialect).with_tokens(tokens),
+            parser: Parser::new(dialect)
+                .with_recursion_limit(sql_parser_recursion_limit())
+                .with_tokens(tokens),
             parameters: parameters
                 .map(|parameters| parameters.into_iter().map(|p| Some(p)).collect()),
             placeholder_index: 0,
@@ -1507,5 +1537,55 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    /// Nesting a generated query easily reaches, and well past `sqlparser`'s own default of 50.
+    fn nested_expression_query(levels: usize) -> String {
+        let mut expr = String::from("sum(amount)");
+        for _ in 0..levels {
+            expr = format!("({} + 1)", expr);
+        }
+        format!("SELECT category, {} FROM s.t GROUP BY 1", expr)
+    }
+
+    /// Recursive descent means the budget is only usable on a stack that fits it, so parse on
+    /// the size `cubestore-main` gives its threads rather than whatever the harness provides.
+    fn parse_on_a_main_sized_stack(query: String) -> Result<(), CubeError> {
+        std::thread::Builder::new()
+            .stack_size(8 * 1024 * 1024)
+            .spawn(move || parse_stmt(&query).map(|_| ()))
+            .unwrap()
+            .join()
+            .expect("parsing must not exhaust the stack")
+    }
+
+    /// A nesting depth `sqlparser`'s own default of 50 rejects outright.
+    #[test]
+    fn parse_deeply_nested_expression() {
+        parse_on_a_main_sized_stack(nested_expression_query(100)).unwrap();
+    }
+
+    /// Past the budget the message has to say so: depth is the one thing the caller can act on.
+    #[test]
+    fn parse_over_recursion_limit_names_nesting() {
+        let err = parse_on_a_main_sized_stack(nested_expression_query(200))
+            .expect_err("200 levels is past any budget this node accepts");
+
+        let message = err.to_string();
+        assert!(
+            message.contains("nested too deeply"),
+            "message must name nesting as the cause, got: {}",
+            message
+        );
+        assert!(
+            message.contains("CUBESTORE_SQL_PARSER_RECURSION_LIMIT"),
+            "message must name the knob that raises the budget, got: {}",
+            message
+        );
+        assert_eq!(
+            err.cause,
+            crate::CubeErrorCauseType::User,
+            "a query the user has to flatten is not an internal error"
+        );
     }
 }
