@@ -96,7 +96,7 @@ A date source scopes the value list to the window the charts are showing, and ne
 
 - A value that names a whole period — a **Today**, **Yesterday**, **This week**, **This month**, **This quarter** or **This year** preset on the **Relative** tab, or an `in the month`, `in the quarter` or `in the year` condition — scopes the list to that period.
 - A fixed date, or a relative value that names a single moment such as **3 months ago**, scopes it to that moment, which is what the charts match.
-- `after`, `after or on`, `before` and `before or on` scope the list to everything on one side of the date, on the same whole-day bound the charts use, so the list stays open-ended exactly where they are.
+- `after`, `after or on`, `before` and `before or on` scope the list to everything on one side of the date. Every bound the value editor picks is a whole day, and on a whole day the scope uses the same bound the charts do, so the list stays open-ended exactly where they are.
 - A `between` range, including the **Past week** to **Past 2 years** presets, scopes the list to the range's own whole-day bounds. A range the charts return no rows for therefore leaves the value list empty too, instead of offering values the charts exclude.
 
 A negated date condition scopes the list the other way, to everything *outside* the period it names — `not in the month`, `not in the quarter` and `not in the year`, and `is not` on one of the whole-period values above.
