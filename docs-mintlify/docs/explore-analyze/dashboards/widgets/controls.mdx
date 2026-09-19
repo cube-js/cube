@@ -22,9 +22,12 @@ The available operators depend on the type of the underlying dimension:
 
 | Dimension type | Operators |
 |---|---|
-| **String** | `is`, `is not`, `contains`, `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`, `is null`, `is not null` |
+| **String** | `is`, `is not`, `contains`, `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`, `is null`, `is not null`, `is empty`, `is not empty` |
 | **Number** | `is`, `is not`, `greater than`, `greater than or equal`, `less than`, `less than or equal`, `is null`, `is not null` |
-| **Time** | `is`, `is not`, `before date`, `before or on date`, `after date`, `after or on date`, `between`, `relative date`, `is null`, `is not null` |
+| **Boolean** | `is` — no operator menu; the value picker's `is true` and `is false` set it |
+| **Time** | `is`, `is not`, `in the month`, `not in the month`, `in the quarter`, `not in the quarter`, `in the year`, `not in the year`, `after`, `after or on`, `before`, `before or on`, `between`, `is null`, `is not null` |
+
+A time filter's *value* is fixed or relative, picked on the value editor's **Fixed** and **Relative** tabs: a calendar date, a whole-period preset — **Today**, **Yesterday**, **This week**, **This month**, **This quarter**, **This year** — or a single-moment relative value, offered as the **1 week ago**, **1 month ago**, **3 months ago** and **1 year ago** presets and typed with any other count in the custom *N periods ago* / *from now* editor. A `between` filter picks a calendar date for each bound on its **Fixed** tab, and one whole window — **Past week** to **Past 2 years** — on its **Relative** tab.
 
 ### Single vs. multiple selection
 
@@ -79,6 +82,30 @@ If a [parent control](#parent) drives this filter, the option the viewer is on d
 When multiple filters target dimensions from the same semantic view, you can mark them as **faceted**. Faceted filters scope each other's value lists — selecting a value in one filter narrows the options shown in the others, so viewers only see combinations that exist in the data.
 
 For example, on a sales dashboard with a **Country** filter and a **City** filter, marking both as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only.
+
+A faceted filter can take as a source any sibling on the same semantic view set to one of these conditions:
+
+- A **String** or **Number** dimension set to `is` or `is not`. A **Boolean** dimension counts here too: its `is true` / `is false` set `is`.
+- A time dimension set to any of its date conditions except `is null` and `is not null` — though `is not` and the `in the …` and `not in the …` conditions each have a value shape they cannot narrow on.
+
+Every other condition cannot be picked as a source and scopes nothing — `contains`, `starts with` and `ends with` and their negations, the comparisons on a **Number** dimension (`greater than`, `less than` and their *or equal* forms), and `is null`, `is not null`, `is empty` and `is not empty`.
+
+To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar and press the gear beside the switch. A sibling whose condition cannot narrow is greyed out in that list, with a tooltip saying it is not available for this semantic view or filter type.
+
+A date source never scopes the value list to less than the window the charts are showing, so the list never drops a value the charts still have rows for. Which window a source scopes to depends on the condition:
+
+- `is` scopes the list to what its value names: the whole period for a whole-period preset, and the moment itself — what the charts match — for a fixed date or a single-moment relative value. Several values scope the list to all of their windows.
+- `in the month`, `in the quarter` and `in the year` scope the list to the whole period their value falls in.
+- `after`, `after or on`, `before` and `before or on` scope the list to everything on one side of the single whole day their value resolves to — for a whole-period preset, the day that period starts on, which is the day the charts compare against too.
+- `between` scopes the list to the range's own whole-day bounds, whether those bounds are fixed or relative. A range the charts return no rows for therefore leaves the value list empty too, instead of offering values the charts exclude.
+- The negated conditions — `not in the month`, `not in the quarter`, `not in the year`, and `is not` on a whole-period value — scope the list the other way, to everything *outside* that period.
+
+<Warning>
+A source can end up with nothing to scope by, leaving the value list as wide as it was while the charts narrow:
+
+- `is not` on a fixed date, on a single-moment relative value such as **3 months ago**, or on several values at once — a point in time has no period to exclude.
+- `in the month`, `in the quarter`, `in the year` and their negations on several values — each reads one period from one value.
+</Warning>
 
 ## Time granularity switcher
 
