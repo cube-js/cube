@@ -89,13 +89,13 @@ Turn it on with the **Enable facet** switch, in the **Facet** section of the fil
 
 #### What a source filter contributes
 
-A faceted filter reads every condition its sources can be set to — all of the [operators above](#operators-by-dimension-type).
+A faceted filter reads every condition its sources can be set to — all of the [operators above](#operators-by-dimension-type), with one exception: the last of the three cases below.
 
 A source contributes nothing in three cases:
 
 - **A filter still waiting on its value.** A condition that takes a value narrows nothing until it has one, just as it leaves the charts unfiltered — and so does one a viewer has cleared. The four that take no value — `is null`, `is not null`, `is empty`, `is not empty` — narrow as soon as they are set.
 - **A filter on another semantic view.** Narrowing a value list means querying this filter's own view, so only filters on that view qualify. The rest are greyed out in the [source picker](#choosing-which-filters-narrow-this-one).
-- **`is not` on a time dimension, set to a single moment.** A period value — **Today**, **Yesterday**, **This week**, **This month**, **This quarter**, **This year** — narrows as expected, because the charts exclude the whole period too. A fixed date, or a relative value naming one moment rather than a period such as **3 months ago**, does not: the charts exclude only the rows at that instant, and a list that dropped the whole day would hide values those charts still show.
+- **`is not` on a time dimension, set to a single moment.** A period value — **Today**, **Yesterday**, **This week**, **This month**, **This quarter**, **This year** — narrows as expected, because the charts exclude the whole period too. A fixed date, or a relative value such as **3 months ago** that names one moment rather than a period, does not: the charts exclude only the rows at that instant, and a list that dropped the whole day would hide values those charts still show.
 
 A source on a time dimension narrows by whole days, rounded outward, so a condition carrying a time of day scopes the list to every day it touches. A suggestion list is never narrowed past what the charts show: it can offer a value the charts have no rows for, but it never hides one they do.
 
@@ -103,7 +103,9 @@ A source on a time dimension narrows by whole days, rounded outward, so a condit
 
 By default a faceted filter is narrowed by every other filter on its semantic view. To follow only some of them, open the gear beside **Facet** and pick those filters in the picker it reveals — it reads **All** for as long as nothing is picked. A filter never narrows its own list, so it isn't offered as a source for itself.
 
-Closing the gear empties the picks, and that includes a list saved earlier: the gear opens on a saved list, so closing it there drops it and the next **Save** puts the filter back on **All** for every viewer. Leave the gear open while you are reviewing a saved list — leaving the settings with **Cancel** keeps it as it was.
+<Warning>
+Closing the gear empties the picks, and that includes a list saved earlier: the gear opens on a saved list, so closing it there drops it and the next **Save** puts the filter back on **All** for every viewer. Leaving the settings with **Cancel** restores the saved list, so that is the way out if you have already closed the gear — otherwise leave it open while you are reviewing a saved list.
+</Warning>
 
 A source you picked that later stops qualifying — its dimension re-pointed at another semantic view, say — is flagged in that picker.
 
