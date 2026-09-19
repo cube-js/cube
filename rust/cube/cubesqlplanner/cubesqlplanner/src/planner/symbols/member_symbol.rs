@@ -1,7 +1,7 @@
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 
-use crate::planner::{Case, CubeRef, SqlCall};
+use crate::planner::{Case, CubeRef, SqlCall, ViewJoinMap};
 
 use super::common::CompiledMemberPath;
 use super::deps::{self, DepVisitor, DepVisitorMut, SymbolDeps};
@@ -123,7 +123,7 @@ impl MemberSymbol {
     }
 
     /// Join-path metadata proxied from the owning cube definition.
-    pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
+    pub fn join_map(&self) -> &Option<ViewJoinMap> {
         self.compiled_path().join_map()
     }
 

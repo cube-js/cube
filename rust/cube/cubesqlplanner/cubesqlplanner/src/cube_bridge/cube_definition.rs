@@ -22,6 +22,10 @@ pub struct CubeDefinitionStatic {
     pub is_calendar: Option<bool>,
     #[serde(rename = "joinMap")]
     pub join_map: Option<Vec<Vec<String>>>,
+    /// Cubes the view includes at the root of its join tree, i.e. declared with
+    /// a single-segment `join_path`.
+    #[serde(rename = "rootCubes")]
+    pub root_cubes: Option<Vec<String>>,
 }
 
 impl CubeDefinitionStatic {

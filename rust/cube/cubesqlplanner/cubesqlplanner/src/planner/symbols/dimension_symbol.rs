@@ -14,7 +14,7 @@ use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::GranularityHelper;
 use crate::planner::SqlInterval;
 use crate::planner::TimeDimensionSymbol;
-use crate::planner::{Compiler, SqlCall};
+use crate::planner::{Compiler, SqlCall, ViewJoinMap};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -239,7 +239,7 @@ impl DimensionSymbol {
         self.compiled_path.cube_name().clone()
     }
 
-    pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
+    pub fn join_map(&self) -> &Option<ViewJoinMap> {
         self.compiled_path.join_map()
     }
 

@@ -9,6 +9,7 @@ use crate::planner::{Compiler, SqlCall};
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 /// Symbol for a cube referenced as an identifier (`{CUBE}` /
@@ -72,6 +73,42 @@ impl CubeNameSymbolFactory {
     }
 }
 
+/// How a view reaches the cubes it includes: the join paths it declares for the
+/// cubes it walks to, and the cubes it includes at the root of its join tree.
+#[derive(Debug, Default)]
+pub struct ViewJoinMap {
+    paths: Vec<Vec<String>>,
+    root_cubes: HashSet<String>,
+}
+
+impl ViewJoinMap {
+    pub fn new(paths: Vec<Vec<String>>, root_cubes: Vec<String>) -> Self {
+        Self {
+            paths,
+            root_cubes: root_cubes.into_iter().collect(),
+        }
+    }
+
+    /// The prefix of a declared join path that ends at `cube_name`, to be used
+    /// in place of a bare hint into that cube. `None` when no declared path
+    /// leads there, or when the view reaches the cube at its root as well.
+    pub fn path_to(&self, cube_name: &String) -> Option<&[String]> {
+        for path in self.paths.iter() {
+            if let Some(index) = path.iter().position(|part| part == cube_name) {
+                // A cube the view also includes at the root of its join tree is
+                // reachable on its own, so a bare hint into it must not be moved
+                // onto a longer path - that path serves the members included
+                // under it.
+                if index > 0 && self.root_cubes.contains(cube_name) {
+                    return None;
+                }
+                return Some(&path[0..=index]);
+            }
+        }
+        None
+    }
+}
+
 /// Symbol for a cube referenced as a table expression
 /// (`{CUBE.sql()}`); renders by evaluating the cube's `sql:`
 /// function or its raw `sql_table:` value.
@@ -82,7 +119,7 @@ pub struct CubeTableSymbol {
     member_sql: Option<Rc<SqlCall>>,
     alias: String,
     is_table_sql: bool,
-    join_map: Option<Vec<Vec<String>>>,
+    join_map: Option<ViewJoinMap>,
 }
 
 impl CubeTableSymbol {
@@ -92,7 +129,7 @@ impl CubeTableSymbol {
         member_sql: Option<Rc<SqlCall>>,
         alias: String,
         is_table_sql: bool,
-        join_map: Option<Vec<Vec<String>>>,
+        join_map: Option<ViewJoinMap>,
     ) -> Rc<Self> {
         let path = CubeNameSymbol::normalize_path(path, &cube_name);
         Rc::new(Self {
@@ -152,7 +189,7 @@ impl CubeTableSymbol {
         self.alias.clone()
     }
 
-    pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
+    pub fn join_map(&self) -> &Option<ViewJoinMap> {
         &self.join_map
     }
 }
@@ -203,13 +240,20 @@ impl CubeTableSymbolFactory {
         } else {
             PlanSqlTemplates::alias_name(&cube_name)
         };
+        let static_data = definition.static_data();
+        let join_map = static_data.join_map.as_ref().map(|paths| {
+            ViewJoinMap::new(
+                paths.clone(),
+                static_data.root_cubes.clone().unwrap_or_default(),
+            )
+        });
         Ok(CubeTableSymbol::new(
             cube_name,
             path,
             sql,
             alias,
             is_table_sql,
-            definition.static_data().join_map.clone(),
+            join_map,
         ))
     }
 }

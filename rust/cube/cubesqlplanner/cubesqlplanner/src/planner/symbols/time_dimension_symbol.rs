@@ -4,7 +4,7 @@ use super::MemberSymbol;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::state::State;
 use crate::planner::time_dimension::Granularity;
-use crate::planner::{GranularityHelper, QueryDateTime, QueryDateTimeHelper};
+use crate::planner::{GranularityHelper, QueryDateTime, QueryDateTimeHelper, ViewJoinMap};
 use chrono::Duration;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
@@ -249,7 +249,7 @@ impl TimeDimensionSymbol {
         self.compiled_path.path()
     }
 
-    pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
+    pub fn join_map(&self) -> &Option<ViewJoinMap> {
         self.compiled_path.join_map()
     }
 
