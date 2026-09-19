@@ -51,7 +51,7 @@ memory_mode: user
 |---------------------|------------------|--------------------------|-------------------------------------------------------------------------------------------------------------------------|
 | `llm`               | string or object | `auto`                   | LLM provider — `auto`, a [predefined model](#llm) name, or a [BYOM](/admin/ai/bring-your-own-model) reference.          |
 | `embedding_llm`     | string or object | `text-embedding-3-large` | Embedding model — a predefined name or a BYOM reference.                                                                |
-| `runtime`           | string           | `plain`                  | [Runtime mode](#runtime) — `plain` or `reasoning`.                                                                      |
+| `runtime`           | string           | `plain`                  | [Runtime mode](#runtime) — `plain`, `reasoning`, or `chassis`.                                                          |
 | `accessible_views`  | array            | _all views_              | List of view names exposed to the agent as context guidance for which views to query. This is not a security control — if omitted or empty, all views are exposed. Use [access policies](/reference/data-modeling/data-access-policies) to enforce actual access restrictions. |
 | `memory_mode`       | string           | `space`                  | [Memory isolation mode](#memory) — `space`, `user`, or `disabled`.                                                      |
 
@@ -93,6 +93,10 @@ To pin a specific model, set the `llm` property to one of the predefined models:
 - `o3`
 - `o4_mini`
 
+**Fireworks:**
+- `kimi_k3`
+- `glm_5_3`
+
 To use your own model, see [Bring your own model](/admin/ai/bring-your-own-model).
 
 ### Embedding models
@@ -112,9 +116,10 @@ The `runtime` property controls how the agent processes requests:
 |--------------|--------------------------------------------------------------------------------------------|
 | `plain`      | Default. Optimized for speed and cost. Recommended for most use cases.                     |
 | `reasoning`  | Enables extended thinking for complex analysis.                                            |
+| `chassis`    | Answers data questions with a lean semantic-model toolset, folding tool calls and placing query results inline in the answer.                     |
 
 <Warning>
-  `reasoning` is **experimental**. It may be unstable and is not yet feature-complete. Stick with `plain` unless you have a specific need for extended reasoning.
+  `reasoning` and `chassis` are **experimental**. They may be unstable and are not yet feature-complete. Stick with `plain` unless you have a specific need for extended reasoning or the Chassis toolset.
 </Warning>
 
 ## Memory
