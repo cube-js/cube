@@ -22,9 +22,9 @@ The available operators depend on the type of the underlying dimension:
 
 | Dimension type | Operators |
 |---|---|
-| **String** | `is`, `is not`, `contains`, `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`, `is null`, `is not null` |
+| **String** | `is`, `is not`, `contains`, `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`, `is null`, `is not null`, `is empty`, `is not empty` |
 | **Number** | `is`, `is not`, `greater than`, `greater than or equal`, `less than`, `less than or equal`, `is null`, `is not null` |
-| **Time** | `is`, `is not`, `before date`, `before or on date`, `after date`, `after or on date`, `between`, `relative date`, `is null`, `is not null` |
+| **Time** | `is`, `is not`, `in the month`, `not in the month`, `in the quarter`, `not in the quarter`, `in the year`, `not in the year`, `after`, `after or on`, `before`, `before or on`, `between`, `is null`, `is not null` |
 
 ### Single vs. multiple selection
 
@@ -80,13 +80,14 @@ When multiple filters target dimensions from the same semantic view, you can mar
 
 For example, on a sales dashboard with a **Country** filter and a **City** filter, marking both as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only.
 
-A faceted filter is narrowed by the sibling filters set to `is` or `is not`, and by a filter on a time dimension set to any of its date conditions but `is null` and `is not null`. The rest — a substring condition, a numeric comparison, `is null` — are greyed out in the source picker, which says so in a tooltip. One combination is offered and still narrows nothing: `is not` on a time dimension set to a single moment rather than a whole period, since excluding the whole day around one instant would hide values whose rows the charts still show.
+A faceted filter is narrowed by the sibling filters set to `is` or `is not`, and by a filter on a time dimension set to any of its date conditions but `is null` and `is not null`. Every other condition — the substring conditions, the numeric comparisons (`greater than`, `less than` and their *or equal* forms), and `is null`, `is not null`, `is empty` and `is not empty` — narrows nothing and cannot be picked as a source. You meet that in the filter's edit sidebar: turn the **Facet** switch on, press the gear beside it to open the list of source filters, and a sibling whose condition cannot narrow is greyed out there, with a tooltip saying it is not available for this semantic view or filter type. One combination is offered and still narrows nothing: `is not` on a time dimension whose value is not a whole period — a single moment, or several of them — since a point in time has no period to exclude.
 
 A date source scopes the value list to the rows the charts are showing, never to a wider window:
 
-- A value that names a whole period — a **Today**, **Yesterday**, **This week**, **This month**, **This quarter** or **This year** preset on the **Relative** tab, or a condition that picks a whole month, quarter or year — scopes the list to that period.
+- A value that names a whole period — a **Today**, **Yesterday**, **This week**, **This month**, **This quarter** or **This year** preset on the **Relative** tab, or an `in the month`, `in the quarter` or `in the year` condition — scopes the list to that period.
 - A fixed date, or a relative value that names a single moment such as **3 months ago**, scopes it to that moment, which is what the charts match.
-- A range, including the **Past week** to **Past 2 years** presets, scopes the list to the range's own bounds. A range the charts return no rows for therefore leaves the value list empty too, instead of offering values the charts exclude.
+- `after`, `after or on`, `before` and `before or on` scope the list to everything on one side of the date, on the same bound the charts use — the list stays open-ended exactly where they are.
+- A `between` range, including the **Past week** to **Past 2 years** presets, scopes the list to the range's own bounds. A range the charts return no rows for therefore leaves the value list empty too, instead of offering values the charts exclude.
 
 ## Time granularity switcher
 
