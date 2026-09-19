@@ -98,10 +98,10 @@ The filter's JSON value is shown unencoded for readability. Percent-encode it
 before the URL goes anywhere real — pasted as-is into the `src="…"` of the iframe
 snippet above, its raw `"` closes the attribute and truncates the URL.
 
-`f_`, `tg_`, and `ms_` are read on both regular and published (embedded)
-dashboards, and are applied only if a matching control for that member already
-exists on the dashboard; a granularity outside the switcher's allowed list is
-ignored, as is a member the field switcher doesn't offer — its
+`f_`, `tg_`, and `ms_` are read in the dashboard builder and on a published
+dashboard, embedded or not, and are applied only if a matching control for that
+member already exists on the dashboard; a granularity outside the switcher's
+allowed list is ignored, as is a member the field switcher doesn't offer — its
 [**Alternatives**](/docs/explore-analyze/dashboards/widgets/controls#field-switcher),
 plus the member it replaces.
 

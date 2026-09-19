@@ -129,7 +129,7 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
             - Divider
             - Stack
             - Grid
-            - Tabs
+            - Tabs container
     - **Dashboard**
       - Scheduled refresh
     - **Semantic Model**
