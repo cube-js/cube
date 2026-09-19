@@ -409,6 +409,12 @@ CSPS settings). Behind the scenes, Cube issues a real OIDC token, performs
 the GCP STS exchange, optionally impersonates the service account, and
 returns a precise error if anything is misconfigured.
 
+For CSPS on GCS, a failure past the token exchange — for example, the
+impersonated service account lacking write access to the bucket — reports
+the underlying GCS error (HTTP status, gRPC code, and the service's message
+naming the missing permission or principal) instead of a generic internal
+error.
+
 If the test fails:
 
 | Symptom                                                                                  | Likely cause                                                                                                                                            |
