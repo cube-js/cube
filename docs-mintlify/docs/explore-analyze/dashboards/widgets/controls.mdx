@@ -100,7 +100,7 @@ A faceted filter reads every condition its sources can be set to — all of the 
 A source contributes nothing in these cases:
 
 - **A filter still waiting on its value.** A condition that takes a value narrows nothing until it has one, just as it leaves the charts unfiltered — and so does one a viewer has cleared. The four that take no value — `is null`, `is not null`, `is empty`, `is not empty` — narrow as soon as they are set.
-- **A filter on another semantic view.** Narrowing a value list means querying this filter's own view, so only filters on that view qualify. The rest are greyed out in the [source picker](#choosing-which-filters-narrow-this-one). Within the view every condition the operator picker offers on a dimension can narrow, so a filter greys out only when the dimension it names has left the data model.
+- **A filter on another semantic view.** Narrowing a value list means querying this filter's own view, so only filters on that view qualify. The rest are greyed out in the [source picker](#choosing-which-filters-narrow-this-one).
 - **`is not` on a time dimension, set to a single moment.** A fixed date, or a relative value such as **3 months ago**, names one moment rather than a period, and leaves the list alone rather than dropping the whole day it falls in. One of the [period presets above](#operators-by-dimension-type) narrows as expected.
 
 A source on a time dimension narrows by whole days, so a condition carrying a time of day scopes the list to every day it touches.
