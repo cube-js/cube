@@ -1,7 +1,7 @@
 import { Readable } from 'stream';
 import crypto from 'crypto';
 
-import type { QueryKey, QueueDriverInterface } from '@cubejs-backend/base-driver';
+import type { QueryKey, QueryKeyHash, QueueDriverInterface } from '@cubejs-backend/base-driver';
 import { QueuePriority } from '@cubejs-backend/base-driver';
 import { pausePromise } from '@cubejs-backend/shared';
 import { CubeStoreDriver, CubestoreQueueDriverConnection } from '@cubejs-backend/cubestore-driver';
@@ -42,6 +42,15 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     const processMessagePromises: Promise<any>[] = [];
     const processCancelPromises: Promise<any>[] = [];
     let cancelledQuery;
+    // Make the cancel, and the result ack, a queue storage failure for one query. Scoped by hash
+    // because reconcile cancels orphans too, so a process-wide flag would let an unrelated item
+    // reject a test's own executeInQueue before its assertions run.
+    let failCancelMessageFor: QueryKeyHash | null = null;
+    let failResultAckFor: QueryKeyHash | null = null;
+    // Rejects of the in-flight `cancelable` queries, so that a cancellation can reject the
+    // running handler the way a driver rejects a query it has stopped. Keyed by the handle the
+    // handler registers with setCancelHandler, so a cancellation rejects only its own query.
+    let cancelableRejects = new Map<string, (error: Error) => void>();
     let streamCallOrder: string[] = [];
 
     const tenantPrefix = crypto.randomBytes(6).toString('hex');
@@ -54,6 +63,17 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           delayCount += 1;
           await setCancelHandler(result);
           return delayFn(result, query.delay);
+        },
+        cancelable: async (query, setCancelHandler) => {
+          await setCancelHandler(query.result);
+
+          return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => resolve(query.result), query.delay);
+            cancelableRejects.set(query.result, (error) => {
+              clearTimeout(timer);
+              reject(error);
+            });
+          });
         },
       },
       streamHandler: async (query, stream) => {
@@ -76,12 +96,21 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         processMessagePromises.push(queue.executeQuery(queryKeyHash, queueId, retrieved));
       },
       sendCancelMessageFn: async (query) => {
+        if (failCancelMessageFor && queue.redisHash(query.queryKey) === failCancelMessageFor) {
+          throw new Error('Queue storage failure while cancelling');
+        }
+
         processCancelPromises.push(queue.processCancel.bind(queue)(query));
       },
       cancelHandlers: {
         delay: async (query) => {
           console.log(`cancel call: ${JSON.stringify(query)}`);
           cancelledQuery = query.queryKey;
+        },
+        cancelable: async (query) => {
+          cancelledQuery = query.queryKey;
+          cancelableRejects.get(query.cancelHandler)?.(new Error('Query was cancelled'));
+          cancelableRejects.delete(query.cancelHandler);
         }
       },
       continueWaitTimeout: 1,
@@ -91,6 +120,36 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       ...options,
       logger,
     });
+
+    // Wrapping the connection rather than a handler is what makes the ack failure reach both queue
+    // drivers - `setResultAndRemoveQuery` is the driver's, not something the options surface exposes.
+    const createQueueConnection = queue.queueDriver.createConnection.bind(queue.queueDriver);
+    queue.queueDriver.createConnection = async () => {
+      const connection = await createQueueConnection();
+
+      if (!failResultAckFor) {
+        return connection;
+      }
+
+      return new Proxy(connection, {
+        get: (target, prop) => {
+          if (prop === 'setResultAndRemoveQuery') {
+            // the hash is the ack's own first argument, so only the query under test fails
+            return async (hash: QueryKeyHash, executionResult: unknown, queueId: number) => {
+              if (hash === failResultAckFor) {
+                throw new Error('Queue storage failure while setting the result');
+              }
+
+              return target.setResultAndRemoveQuery(hash, executionResult, queueId);
+            };
+          }
+
+          const value = Reflect.get(target, prop);
+
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    };
 
     async function awaitProcessing() {
       // process query can call reconcileQueue
@@ -111,6 +170,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       streamCount = 0;
       streamHandlerDelay = 250;
       streamCallOrder = [];
+      cancelableRejects = new Map();
+      failCancelMessageFor = null;
+      failResultAckFor = null;
     });
 
     afterAll(async () => {
@@ -185,6 +247,155 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       // assert that query queue is able to get query def by query key
       expect(logger.mock.calls[4][0]).toEqual('Cancelling query due to timeout');
       expect(logger.mock.calls[3][0]).toEqual('Error while querying');
+    });
+
+    test('a timeout is reported before a failing cancel can lose it', async () => {
+      const query: QueryKey = ['select * from 4', []];
+
+      failCancelMessageFor = queue.redisHash(query);
+
+      try {
+        // executionTimeout is 2s, 5s is enough
+        await queue.executeInQueue('delay', query, { delay: 5 * 1000, result: '1', isJob: true });
+        await awaitProcessing();
+
+        // the timeout is reported where it is raised, so a cancel which then fails carries it out of
+        // executeQuery with the error already logged rather than as only a storage error
+        const events = logger.mock.calls.map(([message]) => message);
+        expect(events).toContain('Error while querying');
+        expect(events).toContain('Queue storage error');
+      } finally {
+        // the cancel threw before the result was set, so the item is still active - remove it here
+        // or a later test picks it up as an orphan and inherits its events and cancelled query
+        failCancelMessageFor = null;
+        await queue.cancelQuery(queue.redisHash(query), null);
+      }
+    });
+
+    test('a failing result ack does not swallow the query error', async () => {
+      const queryKey: QueryKey = ['select * from 5', []];
+
+      // read when executeQuery opens its connection, so it is set before the query starts rather
+      // than once the handler is running
+      failResultAckFor = queue.redisHash(queryKey);
+
+      try {
+        const pending = queue
+          .executeInQueue('cancelable', queryKey, { delay: 60 * 1000, result: '5' }, QueuePriority.Background)
+          .catch(e => e);
+
+        const deadline = Date.now() + 750;
+        while (cancelableRejects.size === 0 && Date.now() < deadline) {
+          await pausePromise(10);
+        }
+        expect(cancelableRejects.size).toEqual(1);
+
+        // a failure of the query's own rather than a timeout, which is reported where it is raised:
+        // only this leaves an error still pending when the ack throws
+        cancelableRejects.get('5')!(new Error('Query failed'));
+        await pending;
+        await awaitProcessing();
+
+        const events = logger.mock.calls.map(([message]) => message);
+        expect(events).toContain('Error while querying');
+        expect(events).toContain('Queue storage error');
+      } finally {
+        failResultAckFor = null;
+        // the ack threw, so the item is still active - see the failing-cancel test above
+        await queue.cancelQuery(queue.redisHash(queryKey), null);
+      }
+    });
+
+    test('a query failure on an active queue item is still an error', async () => {
+      const queryKey: QueryKey = ['select * from 7', []];
+
+      const pending = queue
+        .executeInQueue('cancelable', queryKey, { delay: 60 * 1000, result: '7' }, QueuePriority.Background)
+        .catch(e => e);
+
+      const deadline = Date.now() + 750;
+      while (cancelableRejects.size === 0 && Date.now() < deadline) {
+        await pausePromise(10);
+      }
+      expect(cancelableRejects.size).toEqual(1);
+
+      // nothing cancelled the query, so the item is still there and the ack succeeds - the ordinary
+      // path every driver error takes, which must not be routed onto the cancellation one
+      cancelableRejects.get('7')!(new Error('Query failed'));
+      await pending;
+      await awaitProcessing();
+
+      const events = logger.mock.calls.map(([message]) => message);
+      expect(events).toContain('Error while querying');
+      expect(events).not.toContain('Orphaned execution result');
+    });
+
+    test('an orphaned result without a rejection stays quiet', async () => {
+      const queryKey: QueryKey = ['select * from 6', []];
+      const startedCount = delayCount;
+
+      // the delay handler resolves on its own timer and its cancel handler does not reject it, so
+      // the item is removed under a query which then succeeds. 1000ms because the delay has to
+      // outlast the cancel round trip, which is a network call on the Cube Store driver
+      const pending = queue
+        .executeInQueue('delay', queryKey, { delay: 1000, result: '1' }, QueuePriority.Background)
+        .catch(e => e);
+
+      const deadline = Date.now() + 750;
+      while (delayCount === startedCount && Date.now() < deadline) {
+        await pausePromise(10);
+      }
+      expect(delayCount).toEqual(startedCount + 1);
+
+      await queue.cancelQuery(queue.redisHash(queryKey), null);
+      await pending;
+      await awaitProcessing();
+
+      const events = logger.mock.calls.map(([message]) => message);
+      expect(events).toContain('Orphaned execution result');
+      expect(events).not.toContain('Error while querying');
+
+      const [, orphanedPayload] = logger.mock.calls.find(([message]) => message === 'Orphaned execution result')!;
+      expect(orphanedPayload.warning).toBeUndefined();
+      expect(orphanedPayload.cancellationError).toBeUndefined();
+    });
+
+    test('cancelled query is not reported as an error', async () => {
+      cancelledQuery = null;
+
+      const queryKey: QueryKey = ['select * from cancelled', []];
+      // The client gives up on ContinueWaitError long before the handler would resolve
+      const pending = queue
+        .executeInQueue('cancelable', queryKey, { delay: 60 * 1000, result: '1' }, QueuePriority.Background)
+        .catch(e => e);
+
+      // executionTimeout is 2s, so the cancellation has to reach a handler which is already
+      // running, otherwise the query fails with a timeout instead
+      const deadline = Date.now() + 750;
+      while (cancelableRejects.size === 0 && Date.now() < deadline) {
+        await pausePromise(10);
+      }
+      expect(cancelableRejects.size).toEqual(1);
+
+      await queue.cancelQuery(queue.redisHash(queryKey), null);
+      expect(cancelledQuery).toEqual(queryKey);
+      expect(await pending).toBeInstanceOf(ContinueWaitError);
+      await awaitProcessing();
+
+      // The rejection the cancellation causes is a cancellation, not a query failure: reporting
+      // it as one would surface it in query history
+      const events = logger.mock.calls.map(([message]) => message);
+      expect(events).toContain('Cancelling query manual');
+      expect(events).toContain('Orphaned execution result');
+      expect(events).not.toContain('Error while querying');
+
+      const [, orphanedPayload] = logger.mock.calls.find(([message]) => message === 'Orphaned execution result')!;
+      expect(orphanedPayload.cancellationError).toContain('Query was cancelled');
+      // `error` is what marks a query as failed downstream, so the rejection must not land there
+      expect(orphanedPayload.error).toBeUndefined();
+      // the default logger routes on `warning`, not on this event's own `warn` field, so without it
+      // the rejection is never written at the default level
+      expect(orphanedPayload.warning).toBeDefined();
     });
 
     test('stage reporting', async () => {

@@ -858,11 +858,29 @@ export class QueryQueue {
     try {
       let executionResult;
       let queryExecutionFinished = false;
+      // The duration is snapshotted with the error, because the reporting happens after the cancel
+      // and the ack, which a lazy measurement would count as query time.
+      let executionError: { error: any, duration: number } | null = null;
       // Set by the query handler's setCancelHandler callback once execution begins.
       // Not available on the original query def from retrieveForProcessing.
       let localCancelHandler: unknown = null;
       const startQueryTime = (new Date()).getTime();
       const timeInQueue = (new Date()).getTime() - query.addedToQueueTime;
+      const logExecutionError = ({ error, duration }: { error: any, duration: number }) => this.logger('Error while querying', {
+        queueId,
+        queueSize,
+        duration,
+        queryKey: query.queryKey,
+        queuePrefix: this.redisQueuePrefix,
+        requestId: query.requestId,
+        timeInQueue,
+        metadata: query.query?.metadata,
+        preAggregationId: query.query?.preAggregation?.preAggregationId,
+        newVersionEntry: query.query?.newVersionEntry,
+        preAggregation: query.query?.preAggregation,
+        addedToQueueTime: query.addedToQueueTime,
+        error: (error.stack || error).toString()
+      });
       this.logger('Performing query', {
         queueId,
         queueSize,
@@ -1002,22 +1020,17 @@ export class QueryQueue {
         executionResult = {
           error: (e.message || e).toString() // TODO error handling
         };
-        this.logger('Error while querying', {
-          queueId,
-          queueSize,
-          duration: ((new Date()).getTime() - startQueryTime),
-          queryKey: query.queryKey,
-          queuePrefix: this.redisQueuePrefix,
-          requestId: query.requestId,
-          timeInQueue,
-          metadata: query.query?.metadata,
-          preAggregationId: query.query?.preAggregation?.preAggregationId,
-          newVersionEntry: query.query?.newVersionEntry,
-          preAggregation: query.query?.preAggregation,
-          addedToQueueTime: query.addedToQueueTime,
-          error: (e.stack || e).toString()
-        });
+
+        // Reported once the queue item is accounted for below: a rejection which a cancellation
+        // caused is not a query failure.
+        executionError = { error: e, duration: ((new Date()).getTime() - startQueryTime) };
+
         if (e instanceof TimeoutError) {
+          // A timeout is a failure whatever the ack says - nothing cancelled the query, the clock
+          // ran out - so it is reported here rather than held for the ack below.
+          logExecutionError(executionError);
+          executionError = null;
+
           const queryWithCancelHandle = await queueConnection.getQueryDef(queryKeyHashed, queueId);
           if (queryWithCancelHandle) {
             this.logger('Cancelling query due to timeout', {
@@ -1040,7 +1053,22 @@ export class QueryQueue {
         clearInterval(heartBeatTimer);
       }
 
-      if (!(await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, queueId))) {
+      // Setting the result only succeeds while the queue item is still there, so a failure means a
+      // cancellation - orphaned, stalled or explicit - removed it and rejected the in-flight query.
+      let queueItemWasActive: boolean;
+
+      try {
+        queueItemWasActive = await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, queueId);
+      } catch (e: any) {
+        // A storage failure says nothing about a cancellation, so an execution error is still an error.
+        if (executionError) {
+          logExecutionError(executionError);
+        }
+
+        throw e;
+      }
+
+      if (!queueItemWasActive) {
         this.logger('Orphaned execution result', {
           queueId,
           warn: 'Result for query was not set because the queue item is no longer active',
@@ -1052,7 +1080,15 @@ export class QueryQueue {
           newVersionEntry: query.query?.newVersionEntry,
           preAggregation: query.query?.preAggregation,
           addedToQueueTime: query.addedToQueueTime,
+          // `warning`, not this event's own `warn` field, which devLogger/prodLogger do not route.
+          // Set only when there is a rejection, so a plain orphaned result stays silent.
+          ...(executionError ? {
+            warning: 'Query execution was rejected after its queue item was already gone',
+            cancellationError: (executionError.error.stack || executionError.error).toString()
+          } : {}),
         });
+      } else if (executionError) {
+        logExecutionError(executionError);
       }
 
       await this.reconcileQueue();
