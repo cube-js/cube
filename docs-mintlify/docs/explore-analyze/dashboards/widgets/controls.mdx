@@ -27,7 +27,7 @@ The available operators depend on the type of the underlying dimension:
 | **Time** | `is`, `is not`, `after`, `after or on`, `before`, `before or on`, `between`, `in the month`, `not in the month`, `in the quarter`, `not in the quarter`, `in the year`, `not in the year`, `is null`, `is not null` |
 | **Boolean** | `is` |
 
-A time filter's value is either a fixed date or a relative one, chosen in the filter's own value picker. The **Relative** tab lists presets — **Today**, **Yesterday**, **This month**, **3 months ago** and the like — and **Custom** builds any other relative value from a number, a unit and **ago** / **from now**. The operator is the same either way.
+Where a time operator takes a single value, that value is either a fixed date or a relative one, chosen in the filter's own value picker. The **Relative** tab lists presets — **Today**, **Yesterday**, **This month**, **3 months ago** and the like — and **Custom** builds any other relative value from a number, a unit and **ago** / **from now**. The operator is the same either way. `between` takes a fixed or relative *range* and offers its own presets, **Past week** through **Past 2 years**; `is null` and `is not null` take no value at all.
 
 A boolean filter takes a `true` / `false` value and shows no operator picker, since `is` is the only condition to choose from.
 
@@ -101,13 +101,11 @@ A source on a time dimension narrows by whole days, rounded outward, so a condit
 
 #### Choosing which filters narrow this one
 
-By default a faceted filter is narrowed by every other filter on its semantic view. To follow only some of them, open the gear beside **Facet** and pick those filters in the picker it reveals — it reads **All** for as long as nothing is picked. A filter never narrows its own list, so it isn't offered as a source for itself.
+By default a faceted filter is narrowed by every other filter on its semantic view. To follow only some of them, open the gear beside **Facet** and pick those filters in the picker it reveals — it reads **All** for as long as nothing is picked. A filter never narrows its own list, so it isn't offered as a source for itself. A source you picked that later stops qualifying — its dimension re-pointed at another semantic view, say — is flagged in that picker.
 
 <Warning>
 Closing the gear empties the picks, and that includes a list saved earlier: the gear opens on a saved list, so closing it there drops it and the next **Save** puts the filter back on **All** for every viewer. Leave the gear open while you are reviewing a saved list. If you have already closed it, leave the settings with **Cancel** — that restores the saved list.
 </Warning>
-
-A source you picked that later stops qualifying — its dimension re-pointed at another semantic view, say — is flagged in that picker.
 
 ## Time granularity switcher
 
