@@ -92,7 +92,7 @@ Every other condition cannot be picked as a source and scopes nothing — `conta
 
 To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar and press the gear beside the switch. A sibling whose condition cannot narrow is greyed out in that list, with a tooltip saying it is not available for this semantic view or filter type.
 
-A date source scopes the value list to the window the charts are showing, and never to a narrower one, so the list never drops a value the charts still have rows for. A positive date condition scopes it to the window it names:
+A date source scopes the value list to the window the charts are showing, and never to a narrower one, so the list never drops a value the charts still have rows for. A positive date condition scopes it to the window it names — and, where `is` carries several values, to all of their windows at once:
 
 - A value that names a whole period — a **Today**, **Yesterday**, **This week**, **This month**, **This quarter** or **This year** preset on the **Relative** tab, or an `in the month`, `in the quarter` or `in the year` condition — scopes the list to that period.
 - A fixed date, or a relative value that names a single moment such as **3 months ago**, scopes it to that moment, which is what the charts match.
