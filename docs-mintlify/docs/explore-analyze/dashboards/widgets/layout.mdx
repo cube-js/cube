@@ -1,9 +1,9 @@
 ---
-title: Spacer, Divider, Stack & Grid
-description: Non-data layout elements — a spacer for whitespace, a divider line, and stack and grid containers that group widgets — to help you structure a dashboard.
+title: Spacer, Divider, Stack, Grid & Tabs
+description: Non-data layout elements — a spacer for whitespace, a divider line, and stack, grid, and tabs containers that group widgets — to help you structure a dashboard.
 ---
 
-Spacers, dividers, stacks, and grids are non-data **layout** widgets. They carry no data of their own; you place them on the canvas alongside charts, text, and controls to add whitespace, visual structure, and grouping to a dashboard.
+Spacers, dividers, stacks, grids, and tabs containers are non-data **layout** widgets. They carry no data of their own; you place them on the canvas alongside charts, text, and controls to add whitespace, visual structure, and grouping to a dashboard.
 
 ## Spacer
 
@@ -24,9 +24,9 @@ Place a stack on the canvas and resize it to any width and height; its children 
 - In a **horizontal stack**, each child takes the full height and an equal share of the width.
 - In a **vertical stack**, each child takes the full width and an equal share of the height.
 
-Add a widget to a stack by dragging it in — from the canvas, the **Add Widgets** menu, or another stack — and remove one by dragging it back out; the remaining children redistribute to fill the space. Stacks can be nested inside one another.
+Add a widget to a stack by dragging it in — from the canvas, the **Add Widgets** menu, or another stack — and remove one by dragging it back out; the remaining children redistribute to fill the space. Stacks can be nested inside one another, inside a grid, or inside a tab ([nesting rules](#nesting-containers)).
 
-Because a stack owns its children's layout, you work with the **container as a unit**: select, move, resize, or delete the stack itself and it carries its children with it. Individual widgets inside a stack are not separately selectable on the board — a marquee drawn over a stack selects the container, not its children. To rearrange children, drag one to a new position **within** the stack; to take one out, drag it onto the canvas or into another container.
+Because a stack owns its children's layout, you work with the **container as a unit**: select, move, resize, or delete the stack itself ([what that removes](#deleting-a-container)) and it carries its children with it. Individual widgets inside a stack are not separately selectable on the board — a marquee drawn over a stack selects the container, not its children. To rearrange children, drag one to a new position **within** the stack; to take one out, drag it onto the canvas or into another container.
 
 ## Grid
 
@@ -34,13 +34,64 @@ A **grid** is a container whose children each hold a fixed cell position and siz
 
 A new grid is added as a square matching the column count of the board or grid it's placed in — for example, 12×12 on a 12-column dashboard. Add a widget to it by dragging one in from the canvas, the **Add Widgets** menu, or another container; the widget keeps its size and lands on the cell you drop it on, as long as that cell is free.
 
-Click the grid's header to select it, then drag its resize grip to change its size, or open its **⋯** menu for **Edit title**, **Resize**, and **Delete**. Resizing only crops or restores empty rows and columns: a grid can't shrink below 2×2 or cut into an occupied cell. To name a grid, click into its header once it's selected and type a title.
+Click the grid's header to select it, then drag its resize grip to change its size, or open its gear menu for **Edit title**, **Resize**, and **Delete** ([what that removes](#deleting-a-container)). Resizing only crops or restores empty rows and columns: a grid can't shrink below 2×2 or cut into an occupied cell. To name a grid, click into its header once it's selected and type a title.
 
-A grid can be nested inside the root board or inside another grid, but not inside a stack.
+A grid can be nested inside the root board, inside another grid, or inside a tab, but not inside a stack ([nesting rules](#nesting-containers)).
+
+## Tabs
+
+A **tabs container** shows one widget at a time behind a row of tabs across the top of its card. Use it where a dashboard would otherwise run long: put each view of the data on its own tab and let viewers switch between them, instead of stacking every chart down the page.
+
+Each tab holds **one** widget, which fills the tab body: resize the container and the widget resizes with it, and there are no separate resize handles inside a tab.
+
+- **Add a widget** — drag a widget in from the canvas, the **Add Widgets** menu, or another container.
+- **Empty tab** — shows a **Drag a widget here** placeholder.
+- **Second drop** — refused; the dragged widget returns to where it came from.
+- **Take one out** — remove it through its own menu or delete button, or drag it onto the canvas, where it lands at the size of the tab body it was filling.
+
+While you are editing, the tab strip is where you work with the tabs themselves:
+
+- **Switch** — click a tab, or focus one and press <kbd>←</kbd> / <kbd>→</kbd>.
+- **Add a tab** — press **+**, just after the last tab. The new tab opens empty and becomes the active one.
+- **Rename** — double-click a tab, press <kbd>F2</kbd> with it focused, or use its **⋮** menu → **Rename**; type the new title in place.
+- **Reorder** — drag a tab along the strip.
+- **Delete** — the tab's **⋮** menu → **Delete tab**. A container always keeps at least one tab, so the item is disabled on the last one.
+
+Click the empty part of the strip to select the container, then drag its resize grip to change its size; drag that same empty part to move it on the board. Its gear menu carries **Resize** and **Delete** ([what that removes](#deleting-a-container)).
+
+A new tabs container is added 6 cells wide and 9 tall. A board narrows the width alone, to its own column count when that is under 6, so the height is always 9; a grid narrows both, to its own column and row counts. Neither narrowing goes below the 4×6 minimum.
+
+So a grid narrower than 4 columns or shorter than 6 rows can never take a tabs container at all, and a larger one takes it only where it has a free block of the narrowed size — 6×9 in a grid at least that big. It can't be resized below 4×6 either, inside a grid as much as on the canvas; and if a tab holds a grid, it also can't shrink past what that grid's own contents need.
+
+A tabs container can sit on the canvas, inside a grid, or inside a tab, but not inside a stack ([nesting rules](#nesting-containers)). A container nested inside a tab is sized by the tab body rather than by hand: a nested grid keeps **Edit title** and **Delete** but drops **Resize**, and a nested stack or tabs container carries a delete button in its top-right corner instead of a menu.
+
+A tab you haven't opened yet isn't rendered at all, so its charts never query. Once you open it, it stays loaded: switching back to it costs no new queries, and it keeps up with a control or a refresh alongside the tabs already open.
+
+### Tabs on a published dashboard
+
+On a published dashboard — including [embedded views](/embedding/iframe/dashboards) — the strip still switches tabs by click or arrow keys, but the editing affordances are gone: no **+**, no per-tab menu, no rename or reorder. By default the container opens on the tab it was created with — the one that was already there before you added any others — unless the URL names a tab. Switching tabs in the builder previews a tab without changing what viewers land on, and reordering the strip doesn't change it either; if you delete that tab, the first remaining one takes over.
+
+Switching a tab writes it into the page URL as `?tab_<widget_id>=<tab_id>`, so a link you copy reopens on the tab you were reading; only the containers you actually switched are written into that link. You can also [set that parameter by hand](/embedding/iframe/dashboards#pre-set-dashboard-filters-via-url) to open a published or embedded dashboard on a particular tab. Exporting the dashboard as PNG or PDF captures the tab each container is currently showing.
+
+## Nesting containers
+
+Containers nest inside one another up to **four levels deep**, counted from a container sitting directly on the canvas. The limit is on the chain as a whole, whatever the mix of kinds — a grid inside a grid inside a grid is as deep as a grid holding a tabs container holding a stack. A grid on the canvas, holding a tabs container, whose tab holds a grid, holding another grid, is at the limit: that innermost grid still takes charts and other widgets, but dropping another container into it is refused.
+
+One pairing is never allowed at any depth: a **grid** or a **tabs container** inside a stack — a stack has no cells of its own to give them. The reverse is fine, which is why a stack is the one container that goes anywhere.
+
+## Deleting a container
+
+<Warning>
+
+Cube asks you to confirm before deleting a container that still holds widgets, and **Cancel** leaves everything in place. Confirming deletes every widget inside it, at every nesting depth — the children are not moved back onto the canvas. An empty container is deleted straight away, with no prompt.
+
+</Warning>
+
+This holds for every container — stack, grid, and tabs — and for every way of deleting one: the container's own menu or delete button, and **Delete** / **Backspace** on a board selection. Deleting a single **tab** works the same way: everything in it goes with it, at every depth, and a tab that isn't empty asks first.
 
 ## Adding a layout widget
 
-In the [dashboard builder][ref-workbooks], open the **Add Widgets** menu in the toolbar and choose **Spacer**, **Divider**, **Horizontal Stack**, **Vertical Stack**, or **Grid**. The widget is added to the canvas, where you can drag it into place and resize it (a divider resizes horizontally only).
+In the [dashboard builder][ref-workbooks], open the **Add Widgets** menu in the toolbar and choose **Spacer**, **Divider**, **Horizontal Stack**, **Vertical Stack**, **Grid**, or **Tabs**. The widget is added to the canvas, where you can drag it into place and resize it (a divider resizes horizontally only).
 
 ## Styling
 
@@ -49,6 +100,6 @@ The **spacer** and **divider** follow the dashboard's [widget styling settings](
 - The **divider** draws its line using the widget **border** width, style, and color.
 - A **spacer** picks up the same border and background settings while you are editing, so its bounds are easy to see.
 
-A **stack** draws no card of its own — it only groups and sizes its children, each of which keeps its own styling. A **grid** draws a header band with its title, visible to viewers on the published dashboard too.
+A **stack** draws no card of its own — it only groups and sizes its children, each of which keeps its own styling. A **grid** draws a header band with its title, and a **tabs container** draws one holding its tab strip; both are visible to viewers on the published dashboard too.
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
