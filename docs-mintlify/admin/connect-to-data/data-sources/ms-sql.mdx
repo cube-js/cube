@@ -24,6 +24,24 @@ CUBEJS_DB_USER=mssql_user
 CUBEJS_DB_PASS=**********
 ```
 
+<Warning>
+
+In SQL API pushdown, use explicit comparisons for boolean dimensions backed by
+`BIT` columns:
+
+```sql
+WHERE completed = TRUE
+WHERE completed = FALSE
+SUM(CASE WHEN completed = TRUE THEN 1 ELSE 0 END)
+```
+
+Bare `WHERE completed`, `NOT completed`, and `CASE WHEN completed THEN ...` are
+unsupported for these dimensions. Both comparisons preserve unknown for `NULL`.
+Existing conditions on predicate-backed dimensions, such as `amount > 50`, remain
+supported.
+
+</Warning>
+
 ## Environment Variables
 
 | Environment Variable | Description                                                                         | Possible Values                                            | Required |

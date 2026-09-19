@@ -1,0 +1,459 @@
+{
+  "templates": {
+    "expressions/true": "CAST(1 AS BIT)",
+    "expressions/false": "CAST(0 AS BIT)",
+    "types/boolean": "BIT",
+    "expressions/scalar_to_predicate": "({{ expr }} = CAST(1 AS BIT))",
+    "expressions/predicate_to_scalar": "CAST(CASE WHEN {{ expr }} THEN 1 WHEN NOT ({{ expr }}) THEN 0 ELSE NULL END AS BIT)"
+  },
+  "cases": [
+    {
+      "expression": "b",
+      "scalar": "\"fixture\".\"b\"",
+      "predicate": "(\"fixture\".\"b\" = CAST(1 AS BIT))",
+      "expected": [
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "expression": "TRUE",
+      "scalar": "CAST(1 AS BIT)",
+      "predicate": "(CAST(1 AS BIT) = CAST(1 AS BIT))",
+      "expected": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "expression": "FALSE",
+      "scalar": "CAST(0 AS BIT)",
+      "predicate": "(CAST(0 AS BIT) = CAST(1 AS BIT))",
+      "expected": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "expression": "CAST(NULL AS BOOLEAN)",
+      "scalar": "CAST(NULL AS BIT)",
+      "predicate": "(CAST(NULL AS BIT) = CAST(1 AS BIT))",
+      "expected": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "expression": "b = TRUE",
+      "scalar": "\"fixture\".\"b\"",
+      "predicate": "(\"fixture\".\"b\" = CAST(1 AS BIT))",
+      "expected": [
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "expression": "b = FALSE",
+      "scalar": "CAST(CASE WHEN NOT ((\"fixture\".\"b\" = CAST(1 AS BIT))) THEN 1 WHEN NOT (NOT ((\"fixture\".\"b\" = CAST(1 AS BIT)))) THEN 0 ELSE NULL END AS BIT)",
+      "predicate": "NOT ((\"fixture\".\"b\" = CAST(1 AS BIT)))",
+      "expected": [
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "expression": "NOT b",
+      "scalar": "CAST(CASE WHEN NOT ((\"fixture\".\"b\" = CAST(1 AS BIT))) THEN 1 WHEN NOT (NOT ((\"fixture\".\"b\" = CAST(1 AS BIT)))) THEN 0 ELSE NULL END AS BIT)",
+      "predicate": "NOT ((\"fixture\".\"b\" = CAST(1 AS BIT)))",
+      "expected": [
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "expression": "b AND c",
+      "scalar": "CAST(CASE WHEN ((\"fixture\".\"b\" = CAST(1 AS BIT)) AND (\"fixture\".\"c\" = CAST(1 AS BIT))) THEN 1 WHEN NOT (((\"fixture\".\"b\" = CAST(1 AS BIT)) AND (\"fixture\".\"c\" = CAST(1 AS BIT)))) THEN 0 ELSE NULL END AS BIT)",
+      "predicate": "((\"fixture\".\"b\" = CAST(1 AS BIT)) AND (\"fixture\".\"c\" = CAST(1 AS BIT)))",
+      "expected": [
+        true,
+        false,
+        null,
+        false,
+        false,
+        false,
+        null,
+        false,
+        null
+      ]
+    },
+    {
+      "expression": "b OR c",
+      "scalar": "CAST(CASE WHEN ((\"fixture\".\"b\" = CAST(1 AS BIT)) OR (\"fixture\".\"c\" = CAST(1 AS BIT))) THEN 1 WHEN NOT (((\"fixture\".\"b\" = CAST(1 AS BIT)) OR (\"fixture\".\"c\" = CAST(1 AS BIT)))) THEN 0 ELSE NULL END AS BIT)",
+      "predicate": "((\"fixture\".\"b\" = CAST(1 AS BIT)) OR (\"fixture\".\"c\" = CAST(1 AS BIT)))",
+      "expected": [
+        true,
+        true,
+        true,
+        true,
+        false,
+        null,
+        true,
+        null,
+        null
+      ]
+    },
+    {
+      "expression": "NOT (b AND c)",
+      "scalar": "CAST(CASE WHEN NOT (((\"fixture\".\"b\" = CAST(1 AS BIT)) AND (\"fixture\".\"c\" = CAST(1 AS BIT)))) THEN 1 WHEN NOT (NOT (((\"fixture\".\"b\" = CAST(1 AS BIT)) AND (\"fixture\".\"c\" = CAST(1 AS BIT))))) THEN 0 ELSE NULL END AS BIT)",
+      "predicate": "NOT (((\"fixture\".\"b\" = CAST(1 AS BIT)) AND (\"fixture\".\"c\" = CAST(1 AS BIT))))",
+      "expected": [
+        false,
+        true,
+        null,
+        true,
+        true,
+        true,
+        null,
+        true,
+        null
+      ]
+    },
+    {
+      "expression": "(b = c) = b",
+      "scalar": "CAST(CASE WHEN (CAST(CASE WHEN (\"fixture\".\"b\" = \"fixture\".\"c\") THEN 1 WHEN NOT ((\"fixture\".\"b\" = \"fixture\".\"c\")) THEN 0 ELSE NULL END AS BIT) = \"fixture\".\"b\") THEN 1 WHEN NOT ((CAST(CASE WHEN (\"fixture\".\"b\" = \"fixture\".\"c\") THEN 1 WHEN NOT ((\"fixture\".\"b\" = \"fixture\".\"c\")) THEN 0 ELSE NULL END AS BIT) = \"fixture\".\"b\")) THEN 0 ELSE NULL END AS BIT)",
+      "predicate": "(CAST(CASE WHEN (\"fixture\".\"b\" = \"fixture\".\"c\") THEN 1 WHEN NOT ((\"fixture\".\"b\" = \"fixture\".\"c\")) THEN 0 ELSE NULL END AS BIT) = \"fixture\".\"b\")",
+      "expected": [
+        true,
+        false,
+        null,
+        true,
+        false,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "expression": "b IS NULL",
+      "scalar": "CAST(CASE WHEN (\"fixture\".\"b\" IS NULL) THEN 1 WHEN NOT ((\"fixture\".\"b\" IS NULL)) THEN 0 ELSE NULL END AS BIT)",
+      "predicate": "(\"fixture\".\"b\" IS NULL)",
+      "expected": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "expression": "b IS NOT NULL",
+      "scalar": "CAST(CASE WHEN (\"fixture\".\"b\" IS NOT NULL) THEN 1 WHEN NOT ((\"fixture\".\"b\" IS NOT NULL)) THEN 0 ELSE NULL END AS BIT)",
+      "predicate": "(\"fixture\".\"b\" IS NOT NULL)",
+      "expected": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "expression": "CASE WHEN b THEN c ELSE b END",
+      "scalar": "CAST(CASE WHEN ((((\"fixture\".\"b\" = CAST(1 AS BIT)) AND NOT ((CAST(0 AS BIT) = CAST(1 AS BIT)))) AND (\"fixture\".\"c\" = CAST(1 AS BIT))) OR (NOT ((\"fixture\".\"b\" = CAST(1 AS BIT))) AND (\"fixture\".\"b\" = CAST(1 AS BIT)))) THEN 1 WHEN NOT (((((\"fixture\".\"b\" = CAST(1 AS BIT)) AND NOT ((CAST(0 AS BIT) = CAST(1 AS BIT)))) AND (\"fixture\".\"c\" = CAST(1 AS BIT))) OR (NOT ((\"fixture\".\"b\" = CAST(1 AS BIT))) AND (\"fixture\".\"b\" = CAST(1 AS BIT))))) THEN 0 ELSE NULL END AS BIT)",
+      "predicate": "((((\"fixture\".\"b\" = CAST(1 AS BIT)) AND NOT ((CAST(0 AS BIT) = CAST(1 AS BIT)))) AND (\"fixture\".\"c\" = CAST(1 AS BIT))) OR (NOT ((\"fixture\".\"b\" = CAST(1 AS BIT))) AND (\"fixture\".\"b\" = CAST(1 AS BIT))))",
+      "expected": [
+        true,
+        false,
+        null,
+        false,
+        false,
+        false,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "expression": "CASE b WHEN TRUE THEN c ELSE b END",
+      "scalar": "CASE \"fixture\".\"b\" WHEN CAST(1 AS BIT) THEN \"fixture\".\"c\" ELSE \"fixture\".\"b\" END",
+      "predicate": "(CASE \"fixture\".\"b\" WHEN CAST(1 AS BIT) THEN \"fixture\".\"c\" ELSE \"fixture\".\"b\" END = CAST(1 AS BIT))",
+      "expected": [
+        true,
+        false,
+        null,
+        false,
+        false,
+        false,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "expression": "COALESCE(b = c, b)",
+      "scalar": "COALESCE(CAST(CASE WHEN (\"fixture\".\"b\" = \"fixture\".\"c\") THEN 1 WHEN NOT ((\"fixture\".\"b\" = \"fixture\".\"c\")) THEN 0 ELSE NULL END AS BIT), \"fixture\".\"b\")",
+      "predicate": "(COALESCE(CAST(CASE WHEN (\"fixture\".\"b\" = \"fixture\".\"c\") THEN 1 WHEN NOT ((\"fixture\".\"b\" = \"fixture\".\"c\")) THEN 0 ELSE NULL END AS BIT), \"fixture\".\"b\") = CAST(1 AS BIT))",
+      "expected": [
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "expression": "b IN (TRUE, FALSE)",
+      "scalar": "CAST(CASE WHEN \"fixture\".\"b\" IN (CAST(1 AS BIT), CAST(0 AS BIT)) THEN 1 WHEN NOT (\"fixture\".\"b\" IN (CAST(1 AS BIT), CAST(0 AS BIT))) THEN 0 ELSE NULL END AS BIT)",
+      "predicate": "\"fixture\".\"b\" IN (CAST(1 AS BIT), CAST(0 AS BIT))",
+      "expected": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "expression": "b BETWEEN FALSE AND TRUE",
+      "scalar": "CAST(CASE WHEN \"fixture\".\"b\" BETWEEN CAST(0 AS BIT) AND CAST(1 AS BIT) THEN 1 WHEN NOT (\"fixture\".\"b\" BETWEEN CAST(0 AS BIT) AND CAST(1 AS BIT)) THEN 0 ELSE NULL END AS BIT)",
+      "predicate": "\"fixture\".\"b\" BETWEEN CAST(0 AS BIT) AND CAST(1 AS BIT)",
+      "expected": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        null,
+        null,
+        null
+      ]
+    }
+  ],
+  "segmentCases": [
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE is_male GROUP BY 1",
+      "sql": "(${KibanaSampleDataEcommerce.is_male})",
+      "predicate": true,
+      "expected": 5
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE NOT is_male GROUP BY 1",
+      "sql": "NOT ((${KibanaSampleDataEcommerce.is_male}))",
+      "predicate": true,
+      "expected": 1
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN is_male THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce GROUP BY 1",
+      "sql": "SUM(CASE WHEN (${KibanaSampleDataEcommerce.is_male}) THEN 1 ELSE 0 END)",
+      "predicate": false,
+      "expected": 5
+    },
+    {
+      "query": "SELECT customer_gender, COUNT(DISTINCT is_male) FROM KibanaSampleDataEcommerce GROUP BY 1",
+      "sql": "COUNT(DISTINCT CAST(CASE WHEN (${KibanaSampleDataEcommerce.is_male}) THEN 1 WHEN NOT ((${KibanaSampleDataEcommerce.is_male})) THEN 0 ELSE NULL END AS BIT))",
+      "predicate": false,
+      "expected": 2
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE is_male AND NOT (has_subscription = TRUE) GROUP BY 1",
+      "sql": "((${KibanaSampleDataEcommerce.is_male}) AND NOT ((${KibanaSampleDataEcommerce.has_subscription} = CAST(1 AS BIT))))",
+      "predicate": true,
+      "expected": 1
+    }
+  ],
+  "dimensionCases": [
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription GROUP BY 1",
+      "sql": "(${KibanaSampleDataEcommerce.has_subscription})",
+      "predicate": true,
+      "model": "comparison",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE NOT has_subscription GROUP BY 1",
+      "sql": "NOT ((${KibanaSampleDataEcommerce.has_subscription}))",
+      "predicate": true,
+      "model": "comparison",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN has_subscription THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce GROUP BY 1",
+      "sql": "SUM(CASE WHEN (${KibanaSampleDataEcommerce.has_subscription}) THEN 1 ELSE 0 END)",
+      "predicate": false,
+      "model": "comparison",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN has_subscription THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce GROUP BY 1",
+      "sql": "SUM(CASE WHEN (${KibanaSampleDataEcommerce.has_subscription}) THEN 1 ELSE 0 END)",
+      "predicate": false,
+      "model": "compound",
+      "expected": 5
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription AND is_male GROUP BY 1",
+      "sql": "((${KibanaSampleDataEcommerce.has_subscription}) AND (${KibanaSampleDataEcommerce.is_male}))",
+      "predicate": true,
+      "model": "compound",
+      "expected": 1
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription = TRUE GROUP BY 1",
+      "sql": "(${KibanaSampleDataEcommerce.has_subscription} = CAST(1 AS BIT))",
+      "predicate": true,
+      "model": "bit",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription = FALSE GROUP BY 1",
+      "sql": "(${KibanaSampleDataEcommerce.has_subscription} = CAST(0 AS BIT))",
+      "predicate": true,
+      "model": "bit",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE NOT (has_subscription = TRUE) GROUP BY 1",
+      "sql": "NOT ((${KibanaSampleDataEcommerce.has_subscription} = CAST(1 AS BIT)))",
+      "predicate": true,
+      "model": "bit",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN has_subscription = TRUE THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce GROUP BY 1",
+      "sql": "SUM(CASE WHEN (${KibanaSampleDataEcommerce.has_subscription} = CAST(1 AS BIT)) THEN 1 ELSE 0 END)",
+      "predicate": false,
+      "model": "bit",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE CAST(has_subscription AS BOOLEAN) GROUP BY 1",
+      "sql": "(CAST(${KibanaSampleDataEcommerce.has_subscription} AS BIT) = CAST(1 AS BIT))",
+      "predicate": true,
+      "model": "bit",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE COALESCE(has_subscription, FALSE) GROUP BY 1",
+      "sql": "(COALESCE(${KibanaSampleDataEcommerce.has_subscription}, CAST(0 AS BIT)) = CAST(1 AS BIT))",
+      "predicate": true,
+      "model": "bit",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription IS NULL GROUP BY 1",
+      "sql": "(${KibanaSampleDataEcommerce.has_subscription} IS NULL)",
+      "predicate": true,
+      "model": "bit",
+      "expected": 3
+    },
+    {
+      "query": "SELECT customer_gender, COUNT(DISTINCT has_subscription) FROM KibanaSampleDataEcommerce GROUP BY 1",
+      "sql": "COUNT(DISTINCT ${KibanaSampleDataEcommerce.has_subscription})",
+      "predicate": false,
+      "model": "bit",
+      "expected": 2
+    },
+    {
+      "query": "SELECT customer_gender, COUNT(NOT has_subscription) FROM KibanaSampleDataEcommerce GROUP BY 1",
+      "sql": "COUNT(CAST(CASE WHEN NOT ((${KibanaSampleDataEcommerce.has_subscription})) THEN 1 WHEN NOT (NOT ((${KibanaSampleDataEcommerce.has_subscription}))) THEN 0 ELSE NULL END AS BIT))",
+      "predicate": false,
+      "model": "comparison",
+      "expected": 6
+    },
+    {
+      "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription GROUP BY 1",
+      "sql": "(${KibanaSampleDataEcommerce.has_subscription})",
+      "predicate": true,
+      "model": "bit",
+      "expected": null,
+      "expectedError": { "number": 4145, "token": "')'" }
+    },
+    {
+      "query": "SELECT customer_gender, COUNT(DISTINCT has_subscription) FROM KibanaSampleDataEcommerce GROUP BY 1",
+      "sql": "COUNT(DISTINCT ${KibanaSampleDataEcommerce.has_subscription})",
+      "predicate": false,
+      "model": "comparison",
+      "expected": null,
+      "expectedError": { "number": 102, "token": "'>'" }
+    }
+  ],
+  "aggregates": [
+    {
+      "scalar": "CAST(CASE WHEN (COUNT(DISTINCT \"b\") = 2) THEN 1 WHEN NOT ((COUNT(DISTINCT \"b\") = 2)) THEN 0 ELSE NULL END AS BIT)",
+      "expected": true,
+      "expected_empty": false
+    },
+    {
+      "scalar": "CAST(CASE WHEN (SUM(CAST(\"b\" AS BIGINT)) > 0) THEN 1 WHEN NOT ((SUM(CAST(\"b\" AS BIGINT)) > 0)) THEN 0 ELSE NULL END AS BIT)",
+      "expected": true,
+      "expected_empty": null
+    }
+  ]
+}

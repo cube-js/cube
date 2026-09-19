@@ -1494,3 +1494,25 @@ where
         .join()
         .unwrap();
 }
+
+// The adapter unit test checks these templates against MssqlQuery.sqlTemplates().
+// Rust checks the rendered SQL in the same fixture; the MSSQL integration test
+// executes it. This keeps the database test connected to the actual renderer.
+#[cfg(test)]
+pub fn mssql_boolean_fixture() -> serde_json::Value {
+    serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../packages/cubejs-schema-compiler/test/fixtures/mssql-boolean-contexts.json"
+    )))
+    .unwrap()
+}
+
+#[cfg(test)]
+pub fn mssql_boolean_templates() -> Vec<(String, String)> {
+    mssql_boolean_fixture()["templates"]
+        .as_object()
+        .unwrap()
+        .iter()
+        .map(|(key, value)| (key.clone(), value.as_str().unwrap().to_string()))
+        .collect()
+}
