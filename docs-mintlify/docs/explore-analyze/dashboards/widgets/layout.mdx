@@ -44,7 +44,7 @@ A **tabs container** shows one widget at a time behind a row of tabs across the 
 
 Each tab holds **one** widget, which fills the tab body: resize the container and the widget resizes with it, and there are no separate resize handles inside a tab.
 
-- **Add** — drag a widget in from the canvas, the **Add Widgets** menu, or another container.
+- **Add a widget** — drag a widget in from the canvas, the **Add Widgets** menu, or another container.
 - **Empty tab** — shows a **Drag a widget here** placeholder.
 - **Second drop** — refused; the dragged widget returns to where it came from.
 - **Take one out** — remove it through its own menu or delete button, or drag it onto the canvas, where it lands at the size of the tab body it was filling.
@@ -52,28 +52,28 @@ Each tab holds **one** widget, which fills the tab body: resize the container an
 While you are editing, the tab strip is where you work with the tabs themselves:
 
 - **Switch** — click a tab, or focus one and press <kbd>←</kbd> / <kbd>→</kbd>.
-- **Add** — press **+**, just after the last tab. The new tab opens empty and becomes the active one.
+- **Add a tab** — press **+**, just after the last tab. The new tab opens empty and becomes the active one.
 - **Rename** — double-click a tab, press <kbd>F2</kbd> with it focused, or use its **⋮** menu → **Rename**; type the new title in place.
 - **Reorder** — drag a tab along the strip.
 - **Delete** — the tab's **⋮** menu → **Delete tab**. A container always keeps at least one tab, so the item is disabled on the last one.
 
 Click the empty part of the strip to select the container, then drag its resize grip to change its size; drag that same empty part to move it on the board. Its gear menu carries **Resize** and **Delete**.
 
-A new tabs container is added at 6×9 cells — narrowing to the column count of the board it's placed in when that board has fewer than 6 columns, though never below 4 — and can't be resized below 4×6. If a tab holds a grid, the container also can't shrink past what that grid's own contents need.
+A new tabs container is added at 6×9 cells — narrowing to the dashboard's own column count when that is fewer than 6, though never below 4 — and can't be resized below 4×6. If a tab holds a grid, the container also can't shrink past what that grid's own contents need.
 
-A tabs container can sit on the canvas, inside a grid, or inside another tab ([nesting rules](#nesting-containers)), but **not inside a stack**: that drop is refused and Cube tells you tabs can't be placed inside a stack. A container nested inside a tab is sized by the tab body rather than by hand: a nested grid keeps **Edit title** and **Delete** but drops **Resize**, and a nested stack or tabs container carries a delete button in its top-right corner instead of a menu.
+A tabs container can sit on the canvas, inside a grid, or inside a tab ([nesting rules](#nesting-containers)), but **not inside a stack**: that drop is refused and Cube tells you tabs can't be placed inside a stack. A container nested inside a tab is sized by the tab body rather than by hand: a nested grid keeps **Edit title** and **Delete** but drops **Resize**, and a nested stack or tabs container carries a delete button in its top-right corner instead of a menu.
 
 Only the active tab runs queries. A tab you haven't opened yet isn't rendered at all, so its charts never query; once you open it, it stays loaded, and switching back to it costs no new queries.
 
 ### Tabs on a published dashboard
 
-On a published dashboard — including [embedded views](/embedding/iframe/dashboards) — the strip still switches tabs by click or arrow keys, but the editing affordances are gone: no **+**, no per-tab menu, no rename or reorder. The container opens on the tab it was created with — the one that was already there before you added any others. Switching tabs in the builder previews a tab without changing what viewers land on, and reordering the strip doesn't change it either; if you delete that tab, the first remaining one takes over.
+On a published dashboard — including [embedded views](/embedding/iframe/dashboards) — the strip still switches tabs by click or arrow keys, but the editing affordances are gone: no **+**, no per-tab menu, no rename or reorder. By default the container opens on the tab it was created with — the one that was already there before you added any others — unless the URL names a tab. Switching tabs in the builder previews a tab without changing what viewers land on, and reordering the strip doesn't change it either; if you delete that tab, the first remaining one takes over.
 
 Switching a tab writes it into the page URL as `?tab_<widgetId>=<tabId>`, so a link you copy reopens on the tab you were reading; only the containers you actually switched are written into that link. You can also [set that parameter by hand](/embedding/iframe/dashboards#pre-set-dashboard-filters-via-url) to open a dashboard — embedded or not — on a particular tab. Exporting the dashboard as PNG or PDF captures the tab each container is currently showing.
 
 ## Nesting containers
 
-Containers nest inside one another up to **four levels deep**, counted from a container sitting directly on the canvas. The limit is on the chain as a whole, whatever the mix of kinds — a grid inside a grid inside a grid is as deep as a grid holding a tabs container holding a stack. A grid on the canvas, holding a tabs container, whose tab holds a grid, holding a stack, is at the limit: that stack still takes charts and other widgets, but dropping another container into it is refused.
+Containers nest inside one another up to **four levels deep**, counted from a container sitting directly on the canvas. The limit is on the chain as a whole, whatever the mix of kinds — a grid inside a grid inside a grid is as deep as a grid holding a tabs container holding a stack. A grid on the canvas, holding a tabs container, whose tab holds a grid, holding another grid, is at the limit: that innermost grid still takes charts and other widgets, but dropping another container into it is refused.
 
 One pairing is never allowed at any depth: a **grid** or a **tabs container** inside a stack. A stack has no cells of its own to give them. Everything else nests freely: a stack goes inside another stack, a grid, or a tab; a grid or a tabs container goes inside a grid or a tab.
 
