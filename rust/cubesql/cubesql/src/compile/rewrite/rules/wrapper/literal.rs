@@ -83,6 +83,8 @@ impl WrapperRules {
         data_source: &DataSource,
         meta: &MetaContext,
     ) -> bool {
+        // NaN and infinity need dialect-specific syntax; neither a bare
+        // identifier in a cast nor an exponent literal can represent them.
         let data_type = match literal {
             ScalarValue::Float32(value) if value.is_none_or(|value| value.is_finite()) => {
                 DataType::Float32
@@ -129,8 +131,6 @@ impl WrapperRules {
 
             for literal in var_iter!(egraph[subst[value_var]], LiteralExprValue) {
                 match literal {
-                    // NaN and infinity need dialect-specific syntax; neither a bare
-                    // identifier in a cast nor an exponent literal can represent them.
                     ScalarValue::Float32(_) | ScalarValue::Float64(_) => {
                         return Self::can_push_down_float_literal(literal, &data_source, &meta);
                     }
@@ -229,7 +229,7 @@ mod tests {
     use super::*;
     use crate::compile::{
         rewrite::{analysis::LogicalPlanAnalysis, WrapperReplacerContextInputDataSource},
-        test::{get_test_session, get_test_tenant_ctx_customized},
+        test::{get_test_session, get_test_tenant_ctx_with_multi_data_source_view_and_templates},
         CubeContext, DatabaseProtocol,
     };
     use crate::config::ConfigObjImpl;
@@ -257,7 +257,9 @@ mod tests {
                         "{{ value }}".to_string(),
                     ));
                 }
-                let meta = get_test_tenant_ctx_customized(templates);
+                let meta = get_test_tenant_ctx_with_multi_data_source_view_and_templates(vec![(
+                    "other", templates,
+                )]);
                 let session = get_test_session(DatabaseProtocol::PostgreSQL, meta.clone()).await;
                 let context = Arc::new(CubeContext::new(
                     Arc::new(SessionContext::new().state.read().clone()),
@@ -305,24 +307,26 @@ mod tests {
                             literal.clone(),
                         ))),
                     );
-                    let expected = finite
-                        && (has_override
-                            || (missing != Some(type_template)
-                                && missing != Some("expressions/cast")));
-                    for source in [Some("default".to_string()), None] {
+                    for source in [Some("default"), Some("other"), None] {
+                        let expected = finite
+                            && (source == Some("default")
+                                || has_override
+                                || (missing != Some(type_template)
+                                    && missing != Some("expressions/cast")));
                         subst.insert(
                             var!("?source"),
                             graph.add(LogicalPlanLanguage::WrapperReplacerContextInputDataSource(
-                                WrapperReplacerContextInputDataSource(source),
+                                WrapperReplacerContextInputDataSource(source.map(str::to_string)),
                             )),
                         );
                         assert_eq!(
                             rules.transform_literal("?source", "?value")(&mut graph, &mut subst),
                             expected,
-                            "{:?}, missing {:?}, override={}",
+                            "{:?}, missing {:?}, override={}, source={:?}",
                             literal,
                             missing,
-                            has_override
+                            has_override,
+                            source
                         );
                     }
                 }
