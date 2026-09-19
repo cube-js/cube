@@ -43,8 +43,7 @@ How many values a filter takes follows from the dimension type and the operator,
 
 - **String**, `is` and `is not` — multiple values. The **Selection Mode** switch (**Enable multiple values**) in the filter's edit sidebar is the only control over this, and it appears only while the operator is `is`. Turning it off makes the filter single-select, and that setting stays with the filter if you switch the operator to `is not` afterwards. The substring operators (`contains` and its relatives) take one text value.
 - **Number**, `is` and `is not` — multiple values, typed into the value picker. The comparison operators take one number each.
-- **Time** — one value per operator: a date for `is`, `is not`, `after`, `after or on`, `before` and `before or on`, a range for `between`, a whole period for the `in the …` operators.
-- **Boolean** — the single `true` / `false` described above.
+- **Time** and **Boolean** — one value, of the shape each operator takes [above](#operators-by-dimension-type).
 
 ### Default values
 
@@ -81,7 +80,7 @@ How the attribute value is matched to the filter:
 
 | Attribute type | How it's applied |
 |---|---|
-| **String**, **Number** | Used as a single value. Works with single-value operators like `is` / `is not`, and is also accepted by multi-select filters as a one-item selection. |
+| **String**, **Number** | Used as a single value — the whole value of a single-select filter, or a one-item selection on a multi-select one. |
 | **String array**, **Number array** | Used as a list of values, one per array entry. Empty values are dropped. |
 
 Empty, `null`, or unresolvable attribute values are skipped — the filter falls back to whatever static default it has, or no default if none is set.
