@@ -22,9 +22,12 @@ The available operators depend on the type of the underlying dimension:
 
 | Dimension type | Operators |
 |---|---|
-| **String** | `is`, `is not`, `contains`, `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`, `is null`, `is not null` |
+| **String** | `is`, `is not`, `contains`, `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`, `is null`, `is not null`, `is empty`, `is not empty` |
 | **Number** | `is`, `is not`, `greater than`, `greater than or equal`, `less than`, `less than or equal`, `is null`, `is not null` |
-| **Time** | `is`, `is not`, `before date`, `before or on date`, `after date`, `after or on date`, `between`, `relative date`, `is null`, `is not null` |
+| **Time** | `is`, `is not`, `after`, `after or on`, `before`, `before or on`, `between`, `in the month`, `not in the month`, `in the quarter`, `not in the quarter`, `in the year`, `not in the year`, `is null`, `is not null` |
+| **Boolean** | `is`, against a `true` / `false` value. With a single condition to choose from, a boolean filter shows no operator picker. |
+
+A time filter's value is either a fixed date or a relative one — **Today**, **Yesterday**, **This month**, `3 months ago` and the like — chosen in the filter's own value picker. The operator is the same either way.
 
 ### Single vs. multiple selection
 
@@ -79,6 +82,25 @@ If a [parent control](#parent) drives this filter, the option the viewer is on d
 When multiple filters target dimensions from the same semantic view, you can mark them as **faceted**. Faceted filters scope each other's value lists — selecting a value in one filter narrows the options shown in the others, so viewers only see combinations that exist in the data.
 
 For example, on a sales dashboard with a **Country** filter and a **City** filter, marking both as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only.
+
+Turn it on with **Enable facet** in the filter's settings. Faceting changes only the values this filter *suggests*; which rows the charts show is decided by the filters themselves, exactly as it is without it.
+
+#### What a source filter contributes
+
+Every condition a filter can be set to narrows a faceted filter — all of the [operators above](#operators-by-dimension-type): the substring conditions, the numeric comparisons, `between`, the date and period conditions, and `is null` / `is not null` / `is empty` / `is not empty` alongside `is` and `is not`.
+
+Two cases contribute nothing:
+
+- **A filter with no value yet.** A source is read on the same rule the charts read it by, so a filter nobody has filled in — or one a viewer has cleared — leaves the suggestions alone, just as it leaves the charts unfiltered.
+- **A filter on another semantic view.** Narrowing a value list means querying this filter's own view, so only filters on that view qualify. The rest are greyed out in the source picker below.
+
+A source on a time dimension narrows by whole days, so a condition carrying a time of day scopes the list to the days it covers. A suggestion list is never narrowed past what the charts show: it can offer a value the charts have no rows for, but it never hides one they do.
+
+#### Choosing which filters narrow this one
+
+By default a faceted filter is narrowed by every other filter on its semantic view. To follow only some of them, open the gear beside **Facet** and pick those filters in the picker it reveals — it reads **All** for as long as nothing is picked. Closing the gear again drops the picks and puts the filter back on **All**. A filter never narrows its own list, so it isn't offered as a source for itself.
+
+A source you picked that later stops qualifying — its dimension re-pointed at another semantic view, say — is flagged in that picker, rather than quietly dropping out of the arrangement.
 
 ## Time granularity switcher
 
