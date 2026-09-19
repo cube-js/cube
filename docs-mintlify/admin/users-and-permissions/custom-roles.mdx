@@ -17,7 +17,7 @@ Cube comes with [default roles][ref-default-roles] (Admin, Developer, Explorer, 
 
 Each custom role is built around three concepts:
 
-1. **Base Role** (required in the role builder) — Viewer, Explorer, or Developer. Determines the user's license tier — the kind of work the holder is licensed for; the permissions themselves come from the role's Global and deployment policies.
+1. **Base Role** (required in the role builder) — Viewer, Explorer, or Developer. Determines the user's license tier — the kind of work the holder is licensed for.
 2. **Global permissions** — org-wide capabilities such as billing, customization, integrations, and account-wide deployment management.
 3. **Deployment permissions** — one or more policies, each targeting "All deployments" or specific deployments.
 
@@ -53,9 +53,7 @@ Every custom role has exactly one **Base Role**. It determines:
 | Explorer   | Viewer's work, plus creating and editing workbooks and running queries. |
 | Developer  | Explorer's work, plus editing the data model.                |
 
-Whether the holder may do any of it on a given deployment is a separate question, answered by the role's own deployment policies — which is what the built-in roles of the same names add: `DeploymentRead`, `DeploymentAgentRead` and `DownloadData` over every deployment for Viewer and Explorer, nearly every deployment action for Developer, the data-model ones included. Developer's account-wide deployment management is a third thing again — a [Global permission](#global-permissions).
-
-So a custom role with Base Role **Viewer** and no deployment policy is licensed for viewer-level work and reaches no deployment; a Developer-equivalent has to grant the deployment actions itself, which is what **Full access** (`All`) is for.
+The built-in roles of the same names carry deployment policies of their own: `DeploymentRead`, `DeploymentAgentRead` and `DownloadData` over every deployment for Viewer and Explorer, nearly every deployment action for Developer including the data-model ones, plus — for Developer — account-wide deployment management as a [Global permission](#global-permissions). A custom role starts with none of it. Base Role **Viewer** and no deployment policy is licensed for viewer-level work and reaches no deployment; a Developer-equivalent has to grant the deployment actions itself, which is what **Full access** (`All`) is for.
 
 The tier is hierarchical, so a higher one satisfies a requirement for a lower:
 
@@ -115,7 +113,7 @@ Either grant **Full access** (a shortcut that enables every current and future d
 
 | Group       | Permission                          | What it grants                                                                                                                                                            |
 | ----------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| General     | Access deployment                   | Foundation permission required to access the deployment at all. A custom role with Base Role **Viewer** needs this to open the deployment; the built-in Viewer already has it from its own deployment policy.                                                                      |
+| General     | Access deployment                   | Foundation permission required to access the deployment at all.                                                                      |
 | General     | Edit deployment                     | Modify general deployment settings (name, Build & Deploy, Configuration flags, etc.). Does **not** include environment variables, data sources, or other configuration secrets — see **Manage secrets**. |
 | General     | Delete deployment                   | Remove the deployment.                                                                                                                                                    |
 | Configuration & Secrets | Manage secrets          | View and edit environment variables, manage data sources (add/edit database connections, including the test-connection step), the Model Configuration card on **Settings → Configuration**, Power BI (XMLA) settings, and restarting dev mode to apply saved environment variable changes. |
@@ -127,7 +125,7 @@ Either grant **Full access** (a shortcut that enables every current and future d
 | Pre-aggregations | Build pre-aggregations         | Trigger pre-aggregation builds (**Build All** and bulk build actions). Withholding it prevents accidental large builds that put Cube Store under pressure.                |
 | Monitoring  | Access query history                | View deployment query history, performance, and traces.                                                                                                                   |
 | Monitoring  | Access chat history                 | View other users' chat conversations for the deployment, including Analytics Chat and the Excel/Google Sheets add-in panes (**Admin → Chats History**). It does not [force the Base Role to Developer](#auto-bump-to-developer), so a Viewer-tier role can hold it — grant it only to roles that should see other people's conversations. |
-| Data Export | Download data                       | Download query results as CSV from workbooks, Analytics Chat, and published dashboards. The built-in Viewer, Explorer and Developer roles grant it themselves, through their own deployment policies; a custom role does not inherit that from its Base Role, so check it here if the role needs it. See [Data download controls][ref-data-download-controls]. |
+| Data Export | Download data                       | Download query results as CSV from workbooks, Analytics Chat, and published dashboards. See [Data download controls][ref-data-download-controls]. |
 
 When **Full access** is checked, the granular checkboxes appear checked and disabled — granting Full access today also covers any deployment-scoped permissions added in the future.
 
@@ -152,7 +150,7 @@ A common pattern: someone who consumes dashboards and chats but never edits anyt
     Select **Viewer**.
   </Step>
   <Step title="Add a deployment policy">
-    Click **Add deployment policy**, leave **Scope** on **All deployments**, and check **Access deployment** and **Access AI agents**. The Base Role carries neither; **Access AI agents** is what Analytics Chat needs, and neither [forces the Base Role to Developer](#auto-bump-to-developer), so the role stays a Viewer.
+    Click **Add deployment policy**, leave **Scope** on **All deployments**, and check **Access deployment**, **Access AI agents** for Analytics Chat, and **Download data** if they should be able to export dashboards and results. The Base Role carries none of them, and none [forces the Base Role to Developer](#auto-bump-to-developer), so the role stays a Viewer.
   </Step>
   <Step title="Save">
     Click **Create**.
@@ -281,7 +279,7 @@ This section lists every action the role builder exposes. The internal action na
 
 ### Base Role actions (Global)
 
-As a custom role's Base Role, the action sets the license tier and nothing else — neither the deployment-scoped access nor the Global permissions the built-in role of that name holds. See [Base Role](#base-role) for what the tier licenses.
+As a custom role's Base Role, the action sets the license tier — see [Base Role](#base-role) for what each tier licenses.
 
 | Internal name   | Label     |
 | --------------- | --------- |
