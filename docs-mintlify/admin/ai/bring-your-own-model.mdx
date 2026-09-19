@@ -25,6 +25,8 @@ how you manage AI costs.
 | **GCP Vertex AI** | Yes | No |
 | **Databricks** | Yes | No |
 | **Snowflake Cortex** | Yes | No |
+| **Custom OpenAI-compatible** | Yes | No |
+| **Custom Anthropic-compatible** | Yes | No |
 
 ## Configuration
 
@@ -118,6 +120,30 @@ Supports two authentication methods:
 
 - JWT authentication
 - Key-pair authentication (requires an encrypted PKCS#8 PEM private key)
+
+### Custom OpenAI-compatible
+
+Points an agent at any endpoint that implements the OpenAI chat completions
+API — for example, an internal LLM gateway.
+
+- **Model** and **base URL** are free text; the base URL must use `http` or
+  `https` and may not target a loopback or link-local host
+- **API key** is optional — leave it blank if your endpoint authenticates
+  requests some other way, such as a custom header
+- You can add custom HTTP headers sent with every request. Header values may
+  include placeholders resolved per request from the caller's identity:
+  `{{userId}}`, `{{userExternalId}}`, `{{email}}`, `{{username}}`,
+  `{{tenantId}}`, `{{tenantName}}`, `{{tenantUrl}}`, `{{deploymentId}}`, and
+  `{{agentId}}`. A placeholder with no value for a request — `{{userExternalId}}`
+  for a user who did not arrive through signed embedding, for example — is sent
+  through as literal text
+
+### Custom Anthropic-compatible
+
+Points an agent at any endpoint that implements the Anthropic messages API.
+Configuration is the same as [Custom OpenAI-compatible](#custom-openai-compatible):
+a free-text model and base URL, an optional API key, and optional custom
+headers with the same placeholders.
 
 ## Troubleshooting
 
