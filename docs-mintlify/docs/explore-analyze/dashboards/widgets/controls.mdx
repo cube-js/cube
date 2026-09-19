@@ -94,7 +94,8 @@ To pick which siblings a filter listens to, turn the **Facet** switch on in its 
 
 A date source scopes the value list to the window the charts are showing, and never to a narrower one, so the list never drops a value the charts still have rows for. Which window depends on the condition:
 
-- `is`, `in the month`, `in the quarter` and `in the year` scope the list to what their value names: the whole period for an `in the …` condition or a whole-period preset, and the moment itself — what the charts match — for a fixed date or a single-moment preset. Under `is`, several values scope the list to all of their windows.
+- `is` scopes the list to what its value names: the whole period for a whole-period preset, and the moment itself — what the charts match — for a fixed date or a single-moment preset. Several values scope the list to all of their windows.
+- `in the month`, `in the quarter` and `in the year` scope the list to the whole period their value falls in.
 - `after`, `after or on`, `before` and `before or on` scope the list to everything on one side of the single date their value resolves to — for a whole-period preset, the day that period starts on, which is the date the charts compare against too.
 - `between` scopes the list to the range's own whole-day bounds, whether those bounds are fixed or relative. A range the charts return no rows for therefore leaves the value list empty too, instead of offering values the charts exclude.
 - The negated conditions — `not in the month`, `not in the quarter`, `not in the year`, and `is not` on a whole-period value — scope the list the other way, to everything *outside* that period.
