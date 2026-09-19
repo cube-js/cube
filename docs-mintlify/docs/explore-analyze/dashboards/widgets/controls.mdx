@@ -27,7 +27,7 @@ The available operators depend on the type of the underlying dimension:
 | **Boolean** | `is` — no operator menu; the value picker's `is true` and `is false` set it |
 | **Time** | `is`, `is not`, `in the month`, `not in the month`, `in the quarter`, `not in the quarter`, `in the year`, `not in the year`, `after`, `after or on`, `before`, `before or on`, `between`, `is null`, `is not null` |
 
-A time filter's *value* is fixed or relative, picked on the value editor's **Fixed** and **Relative** tabs: a calendar date, a whole-period preset — **Today**, **Yesterday**, **This week**, **This month**, **This quarter**, **This year** — a single moment such as **1 week ago**, **1 month ago**, **3 months ago** or **1 year ago**, or a custom *N periods ago* / *from now*. A `between` filter picks both bounds the same way, and its **Relative** tab offers whole windows from **Past week** to **Past 2 years**.
+A time filter's *value* is fixed or relative, picked on the value editor's **Fixed** and **Relative** tabs: a calendar date, a whole-period preset — **Today**, **Yesterday**, **This week**, **This month**, **This quarter**, **This year** — a single-moment preset such as **1 week ago**, **1 month ago**, **3 months ago** or **1 year ago**, or a custom *N periods ago* / *from now*. A `between` filter picks both bounds the same way, and its **Relative** tab offers whole windows from **Past week** to **Past 2 years**.
 
 ### Single vs. multiple selection
 
@@ -92,7 +92,7 @@ Every other condition cannot be picked as a source and scopes nothing — `conta
 
 To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar and press the gear beside the switch. A sibling whose condition cannot narrow is greyed out in that list, with a tooltip saying it is not available for this semantic view or filter type.
 
-A date source scopes the value list to the window the charts are showing, and never to a narrower one, so the list never drops a value the charts still have rows for. Which window depends on the condition:
+A date source never scopes the value list to less than the window the charts are showing, so the list never drops a value the charts still have rows for. Which window a source scopes to depends on the condition:
 
 - `is` scopes the list to what its value names: the whole period for a whole-period preset, and the moment itself — what the charts match — for a fixed date or a single-moment preset. Several values scope the list to all of their windows.
 - `in the month`, `in the quarter` and `in the year` scope the list to the whole period their value falls in.
@@ -103,7 +103,7 @@ A date source scopes the value list to the window the charts are showing, and ne
 <Warning>
 Two conditions can end up with nothing to scope by, leaving the value list as wide as it was while the charts narrow:
 
-- `is not` on a fixed date, on a single moment such as **3 months ago**, or on several values at once — a point in time has no period to exclude.
+- `is not` on a fixed date, on a single-moment preset such as **3 months ago**, or on several values at once — a point in time has no period to exclude.
 - `in the month`, `in the quarter` and `in the year` on several values — each reads one period from one value.
 </Warning>
 
