@@ -25,7 +25,7 @@ The available operators depend on the type of the underlying dimension:
 | **String** | `is`, `is not`, `contains`, `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`, `is null`, `is not null`, `is empty`, `is not empty` |
 | **Number** | `is`, `is not`, `greater than`, `greater than or equal`, `less than`, `less than or equal`, `is null`, `is not null` |
 | **Time** | `is`, `is not`, `after`, `after or on`, `before`, `before or on`, `between`, `in the month`, `not in the month`, `in the quarter`, `not in the quarter`, `in the year`, `not in the year`, `is null`, `is not null` |
-| **Boolean** | `is` |
+| **Boolean** | `is true`, `is false` |
 
 `is null` and `is not null` test for a missing value, on a string, number or time dimension alike. On a string dimension `is empty` and `is not empty` sit beside them but test for a zero-length string instead, so which rows come back depends on whether the column stores an empty as `NULL` or as `''`. Neither pair takes a value.
 
@@ -35,7 +35,7 @@ A time filter's value depends on the operator:
 - `between` — a fixed or relative *range*, with six presets of its own: **Past week**, **Past month**, **Past 3 months**, **Past 6 months**, **Past year** and **Past 2 years**.
 - `in the month` / `in the quarter` / `in the year` and their `not in the …` negations — one whole period rather than a date or a range, picked in a month, quarter or year picker and shown as **July 2025**, **Q3 2025** or **2025**. No fixed-or-relative choice and no presets.
 
-A boolean filter is fixed on `is` — there's no operator picker — and takes a `true` / `false` value.
+A boolean filter has no operator picker at all: one dropdown carries the condition and the value together, reading `is true` or `is false`.
 
 ### Single vs. multiple selection
 
