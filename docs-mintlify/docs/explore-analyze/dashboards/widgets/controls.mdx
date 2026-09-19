@@ -86,7 +86,7 @@ For example, on a sales dashboard with a **Country** filter and a **City** filte
 A faceted filter can take as a source any sibling on the same semantic view set to one of these conditions:
 
 - A **String** or **Number** dimension set to `is` or `is not`. A **Boolean** dimension counts here too: its `is true` / `is false` set `is`.
-- A time dimension set to any of its date conditions except `is null` and `is not null` — though `is not` does not narrow on every value it accepts.
+- A time dimension set to any of its date conditions except `is null` and `is not null` — though `is not` and the `in the …` conditions each have a value shape they cannot narrow on.
 
 Every other condition cannot be picked as a source and scopes nothing — `contains`, `starts with` and `ends with` and their negations, the comparisons on a **Number** dimension (`greater than`, `less than` and their *or equal* forms), and `is null`, `is not null`, `is empty` and `is not empty`.
 
@@ -94,13 +94,13 @@ To pick which siblings a filter listens to, turn the **Facet** switch on in its 
 
 A date source scopes the value list to the window the charts are showing, and never to a narrower one, so the list never drops a value the charts still have rows for. Which window depends on the condition:
 
-- `is`, `in the month`, `in the quarter` and `in the year` scope the list to what their value names: the whole period for an [`in the …` condition or a whole-period preset](#operators-by-dimension-type), and the moment itself — what the charts match — for a fixed date or a single-moment preset. Several values scope the list to all of their windows.
+- `is`, `in the month`, `in the quarter` and `in the year` scope the list to what their value names: the whole period for an `in the …` condition or a whole-period preset, and the moment itself — what the charts match — for a fixed date or a single-moment preset. Under `is`, several values scope the list to all of their windows.
 - `after`, `after or on`, `before` and `before or on` scope the list to everything on one side of the single date their value resolves to — for a whole-period preset, the day that period starts on, which is the date the charts compare against too.
-- `between` scopes the list to the range's own whole-day bounds, whether those bounds are fixed or [relative](#operators-by-dimension-type). A range the charts return no rows for therefore leaves the value list empty too, instead of offering values the charts exclude.
+- `between` scopes the list to the range's own whole-day bounds, whether those bounds are fixed or relative. A range the charts return no rows for therefore leaves the value list empty too, instead of offering values the charts exclude.
 - The negated conditions — `not in the month`, `not in the quarter`, `not in the year`, and `is not` on a whole-period value — scope the list the other way, to everything *outside* that period.
 
 <Warning>
-`is not` on a fixed date, on a single moment such as **3 months ago**, or on several values at once has no period to exclude, so the value list stays as wide as it was while the charts narrow.
+Two shapes scope nothing at all, leaving the value list as wide as it was while the charts narrow: `is not` on a fixed date, on a single moment such as **3 months ago**, or on several values at once has no period to exclude, and `in the month`, `in the quarter` and `in the year` read one period from one value, so several values leave them with none.
 </Warning>
 
 ## Time granularity switcher
