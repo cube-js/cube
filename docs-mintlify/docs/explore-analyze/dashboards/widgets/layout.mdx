@@ -24,7 +24,7 @@ Place a stack on the canvas and resize it to any width and height; its children 
 - In a **horizontal stack**, each child takes the full height and an equal share of the width.
 - In a **vertical stack**, each child takes the full width and an equal share of the height.
 
-Add a widget to a stack by dragging it in — from the canvas, the **Add Widgets** menu, or another stack — and remove one by dragging it back out; the remaining children redistribute to fill the space. Stacks can be nested inside one another.
+Add a widget to a stack by dragging it in — from the canvas, the **Add Widgets** menu, or another stack — and remove one by dragging it back out; the remaining children redistribute to fill the space. Stacks can be nested inside one another, inside a grid, or inside a tab.
 
 Because a stack owns its children's layout, you work with the **container as a unit**: select, move, resize, or delete the stack itself ([what that removes](#deleting-a-container)) and it carries its children with it. Individual widgets inside a stack are not separately selectable on the board — a marquee drawn over a stack selects the container, not its children. To rearrange children, drag one to a new position **within** the stack; to take one out, drag it onto the canvas or into another container.
 
@@ -42,7 +42,7 @@ A grid can be nested inside the root board, inside another grid, or inside a tab
 
 A **tabs container** shows one widget at a time behind a row of tabs across the top of its card. Use it where a dashboard would otherwise run long: put each view of the data on its own tab and let viewers switch between them, instead of stacking every chart down the page.
 
-Each tab holds **one** widget, which fills the tab body — resize the container and the widget resizes with it, and there are no separate resize handles inside a tab. Drag a widget in from the canvas, the **Add Widgets** menu, or another container; an empty tab shows a **Drag a widget here** placeholder. A tab that already holds a widget refuses a second drop and the dragged widget returns to where it came from. To empty a tab, remove the widget through its own menu or delete button, or drag it back out onto the canvas — it keeps the size it had in the tab.
+Each tab holds **one** widget, which fills the tab body — resize the container and the widget resizes with it, and there are no separate resize handles inside a tab. Drag a widget in from the canvas, the **Add Widgets** menu, or another container; an empty tab shows a **Drag a widget here** placeholder. A tab that already holds a widget refuses a second drop and the dragged widget returns to where it came from. To empty a tab, remove the widget through its own menu or delete button, or drag it back out onto the canvas, where it lands at the size of the tab body it was filling rather than at the size a newly added widget of its type would get.
 
 While you are editing, the tab strip is where you work with the tabs themselves:
 
