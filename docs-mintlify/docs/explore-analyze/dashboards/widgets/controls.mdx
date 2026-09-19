@@ -22,13 +22,26 @@ The available operators depend on the type of the underlying dimension:
 
 | Dimension type | Operators |
 |---|---|
-| **String** | `is`, `is not`, `contains`, `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`, `is null`, `is not null` |
+| **String** | `is`, `is not`, `contains`, `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`, `is null`, `is not null`, `is empty`, `is not empty` |
 | **Number** | `is`, `is not`, `greater than`, `greater than or equal`, `less than`, `less than or equal`, `is null`, `is not null` |
-| **Time** | `is`, `is not`, `before date`, `before or on date`, `after date`, `after or on date`, `between`, `relative date`, `is null`, `is not null` |
+| **Time** | `is`, `is not`, `after`, `after or on`, `before`, `before or on`, `between`, `in the month`, `not in the month`, `in the quarter`, `not in the quarter`, `in the year`, `not in the year`, `is null`, `is not null` |
+| **Boolean** | `is true` / `is false`, in one value dropdown rather than an operator picker |
+
+`is null` and `is not null` test for a missing value, on a string, number or time dimension alike. On a string dimension `is empty` and `is not empty` sit beside them but test for a zero-length string instead, so which rows come back depends on whether the column stores an empty as `NULL` or as `''`. Neither pair takes a value.
+
+A time filter's value depends on the operator:
+
+- `is`, `is not`, `after`, `after or on`, `before`, `before or on` — a single date, fixed or relative, chosen in the filter's value picker. The **Relative** tab offers period presets — **Today**, **Yesterday**, **This week**, **This month**, **This quarter**, **This year** — each standing for the whole day, week, month, quarter or year it names, plus single-moment presets **1 week ago**, **1 month ago**, **3 months ago** and **1 year ago**. **Custom** builds any other single moment from a number, a unit and **ago** / **from now**.
+- `between` — a fixed or relative *range*, with six presets of its own: **Past week**, **Past month**, **Past 3 months**, **Past 6 months**, **Past year** and **Past 2 years**.
+- `in the month` / `in the quarter` / `in the year` and their `not in the …` negations — one whole period rather than a date or a range, picked in a month, quarter or year picker and shown as **July 2025**, **Q3 2025** or **2025**. No fixed-or-relative choice and no presets.
 
 ### Single vs. multiple selection
 
-Filters can allow either a single value or multiple values. Configure this when adding or editing the filter — multi-select is the default for string dimensions, while time and number dimensions default to a single value.
+How many values a filter takes follows from the dimension type and the operator, and only one combination of the two is configurable:
+
+- **String**, `is` and `is not` — multiple values by default. Only `is` is configurable: the **Selection Mode** switch (**Enable multiple values**) in the filter's edit sidebar appears only while that operator is selected, turning it off makes the filter single-select, and that setting stays with the filter if you switch the operator to `is not` afterwards. The substring operators (`contains` and its relatives) take one text value.
+- **Number**, `is` and `is not` — multiple values, typed into the value picker. The comparison operators take one number each.
+- **Time** and **Boolean** — at most one value, of the shape each operator takes [above](#operators-by-dimension-type).
 
 ### Default values
 
@@ -65,7 +78,7 @@ How the attribute value is matched to the filter:
 
 | Attribute type | How it's applied |
 |---|---|
-| **String**, **Number** | Used as a single value. Works with single-value operators like `is` / `is not`, and is also accepted by multi-select filters as a one-item selection. |
+| **String**, **Number** | Used as a single value — the whole value of a single-select filter, or a one-item selection on a multi-select one. |
 | **String array**, **Number array** | Used as a list of values, one per array entry. Empty values are dropped. |
 
 Empty, `null`, or unresolvable attribute values are skipped — the filter falls back to whatever static default it has, or no default if none is set.
@@ -76,9 +89,31 @@ If a [parent control](#parent) drives this filter, the option the viewer is on d
 
 ### Faceted filters
 
-When multiple filters target dimensions from the same semantic view, you can mark them as **faceted**. Faceted filters scope each other's value lists — selecting a value in one filter narrows the options shown in the others, so viewers only see combinations that exist in the data.
+A filter whose dimension shares a semantic view with other filters can be marked **faceted**, which scopes the values it suggests to the ones those other filters leave available — so viewers only see combinations that exist in the data.
 
-For example, on a sales dashboard with a **Country** filter and a **City** filter, marking both as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only.
+For example, on a sales dashboard with a **Country** filter and a **City** filter, marking the City filter as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only. The mark is per filter and narrows in one direction: Country is a *source* for City without carrying the mark itself, and marking Country faceted as well is what makes the two scope each other.
+
+Turn it on with the **Enable facet** switch, in the **Facet** section of the filter's settings. Faceting changes only the values this filter *suggests*; which rows the charts show is decided by the filters themselves, exactly as it is without it.
+
+#### What a source filter contributes
+
+A faceted filter reads every condition its sources can be set to — all of the [operators above](#operators-by-dimension-type) — with one exception, `is not` on a time dimension set to a single moment, covered in the list below.
+
+A source contributes nothing in these cases:
+
+- **A filter still waiting on its value.** A condition that takes a value narrows nothing until it has one, just as it leaves the charts unfiltered — and so does one a viewer has cleared. The four that take no value — `is null`, `is not null`, `is empty`, `is not empty` — narrow as soon as they are set.
+- **A filter on another semantic view.** Narrowing a value list means querying this filter's own view, so only filters on that view qualify. The rest are greyed out in the [source picker](#choosing-which-filters-narrow-this-one).
+- **`is not` on a time dimension, set to a single moment.** A fixed date, or a relative value such as **3 months ago**, names one moment rather than a period, and leaves the list alone rather than dropping the whole day it falls in. One of the [period presets above](#operators-by-dimension-type) narrows as expected.
+
+A source on a time dimension narrows by whole days, so a condition carrying a time of day scopes the list to every day it touches.
+
+#### Choosing which filters narrow this one
+
+By default a faceted filter is narrowed by every other filter on its semantic view. To follow only some of them, open the gear beside **Facet** and pick those filters in the picker it reveals — it reads **All** for as long as nothing is picked. A filter never narrows its own list, so it isn't offered as a source for itself. A source you picked that later stops qualifying — its dimension re-pointed at another semantic view, say — is flagged in that picker.
+
+<Warning>
+Closing the gear empties the picks, and that includes a list saved earlier: the gear opens on a saved list, so closing it there drops it and the next **Save** puts the filter back on **All** for every viewer. Leave the gear open while you are reviewing a saved list. If you have already closed it, leave the settings with **Cancel** — that restores the saved list.
+</Warning>
 
 ## Time granularity switcher
 
