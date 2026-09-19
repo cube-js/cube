@@ -24,14 +24,10 @@ CUBEJS_DB_USER=mssql_user
 CUBEJS_DB_PASS=**********
 ```
 
-## SQL API boolean expressions
+<Warning>
 
-SQL Server distinguishes scalar `BIT` values from predicates such as `amount > 50`.
-A dimension declared as `type: boolean` can contain either SQL shape. When the
-SQL API pushes an expression into a Cube member expression, it leaves a raw
-boolean dimension reference unchanged rather than guessing its SQL shape.
-
-For a dimension backed by a `BIT` column, use explicit comparisons:
+In SQL API pushdown, use explicit comparisons for boolean dimensions backed by
+`BIT` columns:
 
 ```sql
 WHERE completed = TRUE
@@ -39,20 +35,12 @@ WHERE completed = FALSE
 SUM(CASE WHEN completed = TRUE THEN 1 ELSE 0 END)
 ```
 
-Use `completed = FALSE` instead of `NOT completed`. Both comparisons preserve
-unknown for a `NULL` input. Bare `WHERE completed`, `NOT completed`, and
-`CASE WHEN completed THEN ...` are not supported for raw `BIT` dimensions on this
-pushdown path.
+Bare `WHERE completed`, `NOT completed`, and `CASE WHEN completed THEN ...` are
+unsupported for these dimensions. Both comparisons preserve unknown for `NULL`.
+Existing conditions on predicate-backed dimensions, such as `amount > 50`, remain
+supported.
 
-For a boolean dimension whose model SQL is a predicate, such as `amount > 50`,
-existing conditions like `WHERE big`, `NOT big`, and `CASE WHEN big THEN ...`
-retain their predicate SQL. This does not enable using that raw dimension as a
-scalar, for example `SELECT big` or `big = TRUE`.
-
-Comparisons written directly in the SQL API query, such as `SELECT amount > 50`
-or `SELECT COUNT(*) > 0`, can be converted to nullable `BIT` values because the
-renderer can see the comparison. Segment references are also recognized as
-predicates. No model opt-in setting is required.
+</Warning>
 
 ## Environment Variables
 

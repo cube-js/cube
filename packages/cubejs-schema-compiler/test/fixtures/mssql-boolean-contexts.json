@@ -432,14 +432,16 @@
       "sql": "(${KibanaSampleDataEcommerce.has_subscription})",
       "predicate": true,
       "model": "bit",
-      "expected": null
+      "expected": null,
+      "expectedError": { "number": 4145, "token": "')'" }
     },
     {
       "query": "SELECT customer_gender, COUNT(DISTINCT has_subscription) FROM KibanaSampleDataEcommerce GROUP BY 1",
       "sql": "COUNT(DISTINCT ${KibanaSampleDataEcommerce.has_subscription})",
       "predicate": false,
       "model": "comparison",
-      "expected": null
+      "expected": null,
+      "expectedError": { "number": 102, "token": "'>'" }
     }
   ],
   "aggregates": [

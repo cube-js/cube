@@ -2510,9 +2510,10 @@ impl WrappedSelectNode {
                 .get_sql_templates()
                 .contains_template("expressions/predicate_to_scalar")
         {
-            // A three-way CASE can evaluate its predicate twice. Do not silently
-            // change the result of a volatile function or duplicate an opaque
-            // subquery whose cost and volatility cannot be inspected here.
+            // A three-way CASE can evaluate its predicate twice. Reject volatile
+            // functions and subqueries visible in the expression tree. Model SQL
+            // behind member references is opaque here and must be deterministic;
+            // this guard cannot detect volatility or subqueries inside it.
             expr.accept(RejectRepeatedBoolean { subqueries })?;
         }
         let (sql, query) = Self::generate_sql_for_expr_raw(
