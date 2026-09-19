@@ -336,32 +336,6 @@ class ApiGateway {
      * graphql scope                                                 *
      *************************************************************** */
 
-    app.post(`${this.basePath}/v1/graphql-to-json`, userMiddlewares, async (req: any, res) => {
-      const { query, variables } = req.body;
-      const compilerApi = await this.getCompilerApi(req.context);
-
-      const metaConfig = await compilerApi.metaConfig(req.context, {
-        requestId: req.context.requestId,
-      });
-
-      let schema = compilerApi.getGraphQLSchema();
-      if (!schema) {
-        schema = makeSchema(metaConfig);
-        compilerApi.setGraphQLSchema(schema);
-      }
-
-      try {
-        const jsonQuery = getJsonQueryFromGraphQLQuery(query, metaConfig, variables);
-        res.json({ jsonQuery });
-      } catch (e: any) {
-        const stack = getEnv('devMode') ? e.stack : undefined;
-        this.logger('GraphQL to JSON error', {
-          error: (stack || e).toString(),
-        });
-        res.json({ jsonQuery: null });
-      }
-    });
-
     app.use(
       `${this.basePath}/graphql`,
       userMiddlewares,
@@ -540,6 +514,33 @@ class ApiGateway {
         }
       })
     );
+
+    // Named for GraphQL but guarded by `meta`: it only reads the data model
+    // metadata to translate a query string, and executes nothing.
+    app.post(`${this.basePath}/v1/graphql-to-json`, jsonParser, userMiddlewares, userAsyncHandler(async (req: any, res) => {
+      await this.assertApiScope(
+        'meta',
+        req?.context?.securityContext
+      );
+
+      const { query, variables } = req.body;
+      const compilerApi = await this.getCompilerApi(req.context);
+
+      const metaConfig = await compilerApi.metaConfig(req.context, {
+        requestId: req.context.requestId,
+      });
+
+      try {
+        const jsonQuery = getJsonQueryFromGraphQLQuery(query, metaConfig, variables);
+        res.json({ jsonQuery });
+      } catch (e: any) {
+        const stack = getEnv('devMode') ? e.stack : undefined;
+        this.logger('GraphQL to JSON error', {
+          error: (stack || e).toString(),
+        });
+        res.json({ jsonQuery: null });
+      }
+    }));
 
     app.post(
       `${this.basePath}/v1/cubesql`,
