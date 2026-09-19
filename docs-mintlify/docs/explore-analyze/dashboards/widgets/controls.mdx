@@ -25,7 +25,7 @@ The available operators depend on the type of the underlying dimension:
 | **String** | `is`, `is not`, `contains`, `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`, `is null`, `is not null`, `is empty`, `is not empty` |
 | **Number** | `is`, `is not`, `greater than`, `greater than or equal`, `less than`, `less than or equal`, `is null`, `is not null` |
 | **Time** | `is`, `is not`, `after`, `after or on`, `before`, `before or on`, `between`, `in the month`, `not in the month`, `in the quarter`, `not in the quarter`, `in the year`, `not in the year`, `is null`, `is not null` |
-| **Boolean** | `is true`, `is false` |
+| **Boolean** | One condition, shown as an `is true` / `is false` value dropdown rather than an operator picker |
 
 `is null` and `is not null` test for a missing value, on a string, number or time dimension alike. On a string dimension `is empty` and `is not empty` sit beside them but test for a zero-length string instead, so which rows come back depends on whether the column stores an empty as `NULL` or as `''`. Neither pair takes a value.
 
@@ -41,7 +41,7 @@ A boolean filter has no operator picker at all: one dropdown carries the conditi
 
 How many values a filter takes follows from the dimension type and the operator, and only one combination of the two is configurable:
 
-- **String**, `is` and `is not` — multiple values. The **Selection Mode** switch (**Enable multiple values**) in the filter's edit sidebar is the only control over this, and it appears only while the operator is `is`. Turning it off makes the filter single-select, and that setting stays with the filter if you switch the operator to `is not` afterwards. The substring operators (`contains` and its relatives) take one text value.
+- **String**, `is` and `is not` — multiple values by default, and configurable: the **Selection Mode** switch (**Enable multiple values**) in the filter's edit sidebar appears only while the operator is `is`; turning it off makes the filter single-select, and that setting stays with the filter if you switch the operator to `is not` afterwards. The substring operators (`contains` and its relatives) take one text value.
 - **Number**, `is` and `is not` — multiple values, typed into the value picker. The comparison operators take one number each.
 - **Time** and **Boolean** — one value, of the shape each operator takes [above](#operators-by-dimension-type).
 
