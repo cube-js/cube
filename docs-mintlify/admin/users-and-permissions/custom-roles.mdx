@@ -72,7 +72,7 @@ The Base Role is required. Save is disabled until one is selected.
 
 #### Auto-bump to Developer
 
-Four deployment-scoped actions sit at every tier, because a Viewer-tier role has to be able to hold them: **Access deployment** (`DeploymentRead`), **Access AI agents** (`DeploymentAgentRead`), **Download data** (`DownloadData`) and **Access chat history** (`ChatHistoryRead`). Opening a deployment, using Analytics Chat and downloading results are viewer-level work. Chat history is exempt too, though it shows other users' conversations, so grant it deliberately. Check any other action — for example **Edit deployment** or **Edit data model** — and the Base Role is automatically forced to **Developer**, with the Viewer and Explorer options disabled behind a tooltip:
+Four deployment-scoped actions sit at every tier: **Access deployment** (`DeploymentRead`), **Access AI agents** (`DeploymentAgentRead`), **Download data** (`DownloadData`) and **Access chat history** (`ChatHistoryRead`). Opening a deployment, using Analytics Chat and downloading results are viewer-level work. Chat history is exempt too, though it shows other users' conversations, so grant it deliberately. Check any other action — for example **Edit deployment** or **Edit data model** — and the Base Role is automatically forced to **Developer**, with the Viewer and Explorer options disabled behind a tooltip:
 
 > Selected actions require Developer role
 
