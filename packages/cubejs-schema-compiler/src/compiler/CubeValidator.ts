@@ -1114,7 +1114,13 @@ const MemberLevelPolicySchema = Joi.object().keys({
   ]),
   includesMembers: Joi.array().items(Joi.string().required()),
   excludesMembers: Joi.array().items(Joi.string().required()),
-});
+})
+  // `includes` defaults to '*' in CubeEvaluator.prepareAccessPolicy, so an empty
+  // memberLevel grants every member — the opposite of how it reads.
+  .or('includes', 'excludes')
+  .messages({
+    'object.missing': '{{#label}} must define either includes or excludes. An empty memberLevel grants access to all members: spell that out with includes: \'*\', or use excludes to grant all but some. A member granted by memberLevel is unmasked on every row the policy grants, so a member that must always be masked belongs in excludes'
+  });
 
 const MemberMaskingPolicySchema = Joi.object().keys({
   includes: Joi.alternatives([
